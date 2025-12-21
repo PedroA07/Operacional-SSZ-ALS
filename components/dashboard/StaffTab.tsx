@@ -1,16 +1,17 @@
+
 import React, { useState, useRef, useMemo } from 'react';
-import { Staff, User } from '../../types';
-import { db } from '../../utils/storage';
+import { Staff } from '../../types';
 
 interface StaffTabProps {
   staffList: Staff[];
-  onSaveStaff: (staff: Partial<Staff>, id?: string) => void;
-  onDeleteStaff: (id: string) => void;
+  onSaveStaff: (staff: Staff, id?: string) => Promise<void>;
+  onDeleteStaff: (id: string) => Promise<void>;
 }
 
 const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteStaff }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [form, setForm] = useState<Partial<Staff>>({ name: '', position: '', username: '', role: 'staff' });
   const photoRef = useRef<HTMLInputElement>(null);
 
@@ -22,24 +23,16 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
   const generateUsername = (name: string) => {
     const parts = name.trim().toLowerCase().split(' ');
     if (parts.length < 1) return '';
-    
     const first = parts[0];
     const last = parts.length > 1 ? parts[parts.length - 1] : '';
-    let base = last ? `${first}.${last}` : first;
-    
-    // Tratamento de duplicidade
-    let final = base;
-    let count = 0;
-    while (staffList.some(s => s.username === final && s.id !== editingId)) {
-      final = base + '_';
-      // Se houver mais de uma duplicata, poderíamos adicionar mais _, mas _ resolve o pedido
-    }
-    
-    return final;
+    return last ? `${first}.${last}` : first;
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
     const staffId = editingId || `stf-${Date.now()}`;
     const staffData = { 
       ...form, 
@@ -48,8 +41,27 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
       registrationDate: form.registrationDate || new Date().toISOString() 
     } as Staff;
     
-    onSaveStaff(staffData, editingId);
-    setIsModalOpen(false);
+    try {
+      await onSaveStaff(staffData, editingId);
+      setIsModalOpen(false);
+    } catch (err) {
+      alert("Erro ao salvar.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Deseja realmente excluir este colaborador e seu acesso?")) {
+      setIsProcessing(true);
+      try {
+        await onDeleteStaff(id);
+      } catch (err) {
+        alert("Erro ao excluir.");
+      } finally {
+        setIsProcessing(false);
+      }
+    }
   };
 
   return (
@@ -59,7 +71,12 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Equipe ALS</h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Colaboradores e Administradores</p>
         </div>
-        <button onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '' }); setEditingId(undefined); setIsModalOpen(true); }} className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all">Novo Colaborador</button>
+        <button 
+          onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '' }); setEditingId(undefined); setIsModalOpen(true); }} 
+          className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all"
+        >
+          Novo Colaborador
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -81,7 +98,13 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">User: <span className="text-slate-800">{s.username}</span></div>
                <div className="flex gap-2">
                  <button onClick={() => { setForm(s); setEditingId(s.id); setIsModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-600 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                 <button onClick={() => onDeleteStaff(s.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                 <button 
+                   disabled={isProcessing}
+                   onClick={() => handleDelete(s.id)} 
+                   className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                 >
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+                 </button>
                </div>
             </div>
           </div>
@@ -146,14 +169,20 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
                        </div>
                     </div>
                     <div className="space-y-1">
-                       <label className="text-[9px] font-black text-blue-500 uppercase ml-1">Usuário de Acesso (Gerado automaticamente)</label>
+                       <label className="text-[9px] font-black text-blue-500 uppercase ml-1">Usuário de Acesso</label>
                        <input readOnly className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 font-black text-blue-600 outline-none" value={form.username} />
                     </div>
                  </div>
 
                  <div className="pt-4 text-center">
                     <p className="text-[8px] font-bold text-slate-400 uppercase italic">A senha padrão no primeiro acesso será 12345678.</p>
-                    <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all mt-4">Salvar e Sincronizar</button>
+                    <button 
+                      type="submit" 
+                      disabled={isProcessing}
+                      className={`w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all mt-4 ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'}`}
+                    >
+                      {isProcessing ? 'PROCESSANDO...' : 'Salvar e Sincronizar'}
+                    </button>
                  </div>
               </form>
            </div>
