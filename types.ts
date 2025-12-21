@@ -2,6 +2,7 @@
 export interface User {
   id: string;
   username: string;
+  password?: string;
   displayName: string;
   role: 'admin' | 'staff' | 'driver';
   driverId?: string;

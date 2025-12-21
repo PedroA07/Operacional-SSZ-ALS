@@ -15,7 +15,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
   const [form, setForm] = useState<Partial<Staff>>({ name: '', position: '', username: '', role: 'staff' });
   const photoRef = useRef<HTMLInputElement>(null);
 
-  // Memoriza os cargos existentes para sugerir no datalist
+  // Armazena cargos únicos existentes para sugerir no datalist
   const existingPositions = useMemo(() => {
     const pos = staffList.map(s => s.position).filter(p => !!p);
     return Array.from(new Set(pos)).sort();
@@ -23,7 +23,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
 
   const handleCreateUser = (name: string) => {
     const parts = name.trim().toLowerCase().split(' ');
-    if (parts.length < 2) return '';
+    if (parts.length < 2) return parts[0] || '';
     // Formato: nome.ultimoSobrenome
     return `${parts[0]}.${parts[parts.length - 1]}`;
   };
@@ -31,7 +31,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const staffId = editingId || `stf-${Date.now()}`;
-    const staffData = { ...form, id: staffId } as Staff;
+    const staffData = { ...form, id: staffId, registrationDate: form.registrationDate || new Date().toISOString() } as Staff;
     
     // Salva o cadastro do colaborador
     onSaveStaff(staffData, editingId);
@@ -47,11 +47,18 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
         lastLogin: new Date().toISOString(),
         isFirstLogin: true,
         position: form.position,
-        avatar: form.photo
+        avatar: form.photo,
+        password: '12345678' // Senha padrão inicial
       });
     }
     
     setIsModalOpen(false);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    if (confirm(`Deseja realmente apagar o colaborador ${name} e remover seu acesso ao sistema?`)) {
+      onDeleteStaff(id);
+    }
   };
 
   return (
@@ -85,7 +92,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
                  <button onClick={() => { setForm(s); setEditingId(s.id); setIsModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-600 transition-colors" title="Editar">
                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg>
                  </button>
-                 <button onClick={() => onDeleteStaff(s.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors" title="Apagar">
+                 <button onClick={() => handleDelete(s.id, s.name)} className="p-2 text-slate-300 hover:text-red-500 transition-colors" title="Apagar">
                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
                  </button>
                </div>
@@ -100,7 +107,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                  <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Editar Perfil' : 'Cadastrar Colaborador'}</h3>
@@ -109,7 +116,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
               <form onSubmit={handleSave} className="p-10 space-y-6">
                  <div className="flex justify-center mb-6">
                     <div onClick={() => photoRef.current?.click()} className="w-24 h-24 rounded-[2rem] bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-500 transition-all">
-                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-slate-400 uppercase text-center">FOTO 3x4</span>}
+                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-slate-400 uppercase text-center p-2">FOTO 3x4</span>}
                     </div>
                     <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={e => {
                        const f = e.target.files?.[0];
@@ -159,7 +166,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
                        </div>
                     </div>
                     <div className="space-y-1">
-                       <label className="text-[9px] font-black text-blue-500 uppercase ml-1">Usuário de Acesso (Gerado)</label>
+                       <label className="text-[9px] font-black text-blue-500 uppercase ml-1">Usuário de Acesso (Gerado automaticamente)</label>
                        <input readOnly className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 font-black text-blue-600 outline-none" value={form.username} />
                     </div>
                  </div>

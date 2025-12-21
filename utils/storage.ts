@@ -72,7 +72,7 @@ export const db = {
     if (supabase) await supabase.from('staff').delete().eq('id', id);
     const current = await db.getStaff();
     localStorage.setItem(KEYS.STAFF, JSON.stringify(current.filter(s => s.id !== id)));
-    // Remove o usuário associado
+    // Também apaga o usuário de acesso vinculado
     await db.deleteUser(`u-${id}`);
   },
 
@@ -98,7 +98,7 @@ export const db = {
     await db.deleteUser(`u-${id}`);
   },
 
-  // OUTROS
+  // RESTO DOS MÉTODOS (Customers, Ports, PreStacking, etc...)
   getCustomers: async (): Promise<Customer[]> => {
     if (supabase) {
       const { data } = await supabase.from('customers').select('*');

@@ -25,9 +25,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     setError('');
     setIsLoading(true);
 
+    // Pequeno delay para UX
     await new Promise(r => setTimeout(r, 600));
 
-    // 1. Admin Estático
+    // 1. Admin Master Estático (Prioridade)
     if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
       onLoginSuccess({
         id: 'admin-01',
@@ -40,27 +41,35 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // 2. Banco de Usuários
-    // Se o usuário digitado for composto apenas por números e tiver entre 11 e 14 dígitos, 
-    // tratamos como CPF/CNPJ (motorista). Caso contrário, é usuário da equipe (staff).
-    const isOnlyDigits = /^\d+$/.test(username.replace(/\D/g, ''));
-    const cleanUsername = (isOnlyDigits && username.length >= 11) 
-      ? username.replace(/\D/g, '') 
-      : username.trim();
-
+    // 2. Busca no banco
     const users = await db.getUsers();
-    const foundUser = users.find(u => u.username === cleanUsername);
+    
+    // Tentativa 1: Busca exata (Funciona para staff "nome.sobrenome")
+    let foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase().trim());
+
+    // Tentativa 2: Busca por CPF limpo (Se o usuário digitou com pontos/traços e for motorista)
+    if (!foundUser) {
+      const cleanInput = username.replace(/\D/g, '');
+      if (cleanInput.length >= 11) {
+        foundUser = users.find(u => u.username === cleanInput);
+      }
+    }
 
     if (foundUser) {
-       // Verificação de Senha
        let isValid = false;
-       if (foundUser.role === 'driver') {
-          // Motoristas: senha inicial costuma ser os 4 últimos dígitos do CPF ou nome (conforme lógica do DriversTab)
-          // Em um sistema real, haveria um hash de senha.
-          isValid = password.length >= 4; 
+       
+       // Se o usuário já trocou a senha (não é mais primeiro acesso), verificamos a senha salva
+       if (!foundUser.isFirstLogin && foundUser.password) {
+          isValid = password === foundUser.password;
        } else {
-          // Staff: senha padrão inicial '12345678' ou o cargo (position) se for bypass
-          isValid = password === '12345678' || password === foundUser.position;
+          // Lógica de Primeiro Acesso ou Bypass
+          if (foundUser.role === 'driver') {
+             // Motoristas aceitam qualquer senha de 4 dígitos no primeiro acesso
+             isValid = password.length >= 4; 
+          } else {
+             // Staff aceita '12345678' ou o próprio cargo no primeiro acesso
+             isValid = password === '12345678' || (foundUser.position && password === foundUser.position);
+          }
        }
 
        if (isValid) {
@@ -82,13 +91,28 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword !== confirmPassword) { setError('Senhas não conferem.'); return; }
-    if (newPassword.length < 8) { setError('Senha deve ter no mínimo 8 caracteres.'); return; }
+    setError('');
+    
+    if (newPassword !== confirmPassword) { setError('As senhas não conferem.'); return; }
+    if (newPassword.length < 8) { setError('A senha deve ter no mínimo 8 caracteres.'); return; }
 
     if (pendingUser) {
-       const updated = { ...pendingUser, isFirstLogin: false, lastLogin: new Date().toISOString() };
-       await db.saveUser(updated);
-       onLoginSuccess(updated);
+       setIsLoading(true);
+       const updated: User = { 
+         ...pendingUser, 
+         password: newPassword,
+         isFirstLogin: false, 
+         lastLogin: new Date().toISOString() 
+       };
+       
+       try {
+         await db.saveUser(updated);
+         onLoginSuccess(updated);
+       } catch (err) {
+         setError('Erro ao salvar nova senha. Tente novamente.');
+       } finally {
+         setIsLoading(false);
+       }
     }
   };
 
@@ -100,36 +124,44 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
             <span className="text-4xl font-black italic">ALS</span>
           </div>
           <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-             {isChangingPassword ? 'Atualizar Senha' : 'Portal Integrado'}
+             {isChangingPassword ? 'Nova Senha' : 'Portal Integrado'}
           </h2>
           <p className="mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em]">
-             {isChangingPassword ? 'Primeiro acesso detectado' : 'Acesso Operacional'}
+             {isChangingPassword ? 'Defina seu acesso pessoal' : 'Acesso Operacional'}
           </p>
         </div>
 
         {isChangingPassword ? (
            <form className="mt-8 space-y-6" onSubmit={handlePasswordUpdate}>
               <div className="space-y-4">
-                 <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-700 font-bold rounded-2xl" placeholder="NOVA SENHA" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-                 <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-700 font-bold rounded-2xl" placeholder="CONFIRMAR SENHA" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                 <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Nova Senha</label>
+                    <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" placeholder="MÍNIMO 8 DÍGITOS" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Confirmar Senha</label>
+                    <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" placeholder="REPETIR SENHA" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                 </div>
               </div>
               {error && <div className="p-4 text-[10px] font-bold uppercase text-red-500 bg-red-50 rounded-xl">{error}</div>}
-              <button type="submit" className="w-full py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl">Atualizar e Entrar</button>
+              <button type="submit" disabled={isLoading} className="w-full py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl hover:bg-emerald-600 transition-all">
+                {isLoading ? 'Salvando...' : 'Atualizar e Acessar'}
+              </button>
            </form>
         ) : (
            <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
               <div className="space-y-4">
                  <div className="group">
                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-2">Acesso (Usuário ou CPF)</label>
-                    <input type="text" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-700 font-bold rounded-2xl focus:border-blue-400 outline-none transition-all" value={username} onChange={(e) => setUsername(e.target.value)} />
+                    <input type="text" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-400 outline-none transition-all" value={username} onChange={(e) => setUsername(e.target.value)} />
                  </div>
                  <div className="group">
                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-2">Senha</label>
-                    <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-700 font-bold rounded-2xl focus:border-blue-400 outline-none transition-all" value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-400 outline-none transition-all" value={password} onChange={(e) => setPassword(e.target.value)} />
                  </div>
               </div>
               {error && <div className="p-4 text-[10px] font-bold uppercase text-red-500 bg-red-50 rounded-xl">{error}</div>}
-              <button type="submit" disabled={isLoading} className="w-full py-5 bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-blue-600 transition-all">
+              <button type="submit" disabled={isLoading} className="w-full py-5 bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-blue-600 transition-all shadow-xl">
                  {isLoading ? 'Verificando...' : 'Acessar Sistema'}
               </button>
            </form>
