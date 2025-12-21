@@ -86,7 +86,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 type="text"
                 required
                 className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-700 font-bold rounded-2xl focus:outline-none focus:bg-white focus:border-blue-400 transition-all shadow-inner"
-                placeholder="operacional_ssz"
+                placeholder="USUÁRIO"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
@@ -97,7 +97,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 type="password"
                 required
                 className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-700 font-bold rounded-2xl focus:outline-none focus:bg-white focus:border-blue-400 transition-all shadow-inner"
-                placeholder="••••••••"
+                placeholder="SENHA"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
