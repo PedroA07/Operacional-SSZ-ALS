@@ -39,7 +39,8 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer }
       const matchedCategories = DEFAULT_OPERATIONS
         .filter(op => 
           nameUpper.includes(op.category.toUpperCase()) || 
-          op.clients.some(c => nameUpper.includes(c.toUpperCase()))
+          // FIX: Accessing .name property before calling .toUpperCase() on client object
+          op.clients.some(c => nameUpper.includes(c.name.toUpperCase()))
         )
         .map(op => op.category);
 

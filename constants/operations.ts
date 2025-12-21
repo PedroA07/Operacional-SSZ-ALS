@@ -1,24 +1,33 @@
 
-export interface OperationDefinition {
-  category: string;
-  clients: string[];
-}
+import { OperationDefinition } from '../types';
 
 export const DEFAULT_OPERATIONS: OperationDefinition[] = [
   {
+    id: 'op-alianca',
     category: 'Aliança',
-    clients: ['Volkswagen']
+    clients: [
+      { name: 'Volkswagen', hasDedicatedPage: true }
+    ]
   },
   {
+    id: 'op-mercosul',
     category: 'Mercosul',
-    clients: ['Owens']
+    clients: [
+      { name: 'Owens', hasDedicatedPage: false }
+    ]
   },
   {
+    id: 'op-industria',
     category: 'Industria',
-    clients: ['Diageo']
+    clients: [
+      { name: 'Diageo', hasDedicatedPage: true }
+    ]
   },
   {
+    id: 'op-carga-solta',
     category: 'Carga Solta',
-    clients: ['Geral']
+    clients: [
+      { name: 'Geral', hasDedicatedPage: false }
+    ]
   }
 ];

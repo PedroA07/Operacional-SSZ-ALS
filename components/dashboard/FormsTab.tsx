@@ -13,19 +13,20 @@ interface FormsTabProps {
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
+  initialFormId?: string | null;
 }
 
 type FormType = 'ORDEM_COLETA' | 'PRE_STACKING' | 'LIBERACAO_VAZIO' | 'DEVOLUCAO_VAZIO' | 'RETIRADA_CHEIO';
 
-const formConfigs: Record<FormType, { title: string; color: string }> = {
-  ORDEM_COLETA: { title: 'Ordem de Coleta', color: 'bg-blue-600' },
-  PRE_STACKING: { title: 'Pré-Stacking (Minuta Cheio)', color: 'bg-emerald-600' },
-  LIBERACAO_VAZIO: { title: 'Liberação de Vazio', color: 'bg-slate-700' },
-  DEVOLUCAO_VAZIO: { title: 'Devolução de Vazio', color: 'bg-amber-600' },
-  RETIRADA_CHEIO: { title: 'Retirada de Cheio', color: 'bg-indigo-600' },
+const formConfigs: Record<FormType, { title: string; color: string; description: string }> = {
+  ORDEM_COLETA: { title: 'Ordem de Coleta', color: 'bg-blue-600', description: 'Emissão de OC com códigos de barras dinâmicos' },
+  PRE_STACKING: { title: 'Pré-Stacking (Minuta Cheio)', color: 'bg-emerald-600', description: 'Minuta para entrega de container cheio no terminal' },
+  LIBERACAO_VAZIO: { title: 'Liberação de Vazio', color: 'bg-slate-700', description: 'Documento de autorização de retirada em depósitos' },
+  DEVOLUCAO_VAZIO: { title: 'Devolução de Vazio', color: 'bg-amber-600', description: 'Comprovante de entrega de unidade vazia' },
+  RETIRADA_CHEIO: { title: 'Retirada de Cheio', color: 'bg-indigo-600', description: 'Ordem para movimentação de container importado' },
 };
 
-const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports }) => {
+const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialFormId }) => {
   const [selectedFormType, setSelectedFormType] = useState<FormType | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -66,23 +67,22 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports }) => {
     obs: ''
   });
 
-  const generateBarcodes = (container: string, tara: string, seal: string, suffix: string = '') => {
-    // Apenas para Ordem de Coleta
-    if (selectedFormType !== 'ORDEM_COLETA') return;
+  useEffect(() => {
+    if (initialFormId) {
+      handleOpenForm(initialFormId as FormType);
+    }
+  }, [initialFormId]);
 
+  const generateBarcodes = (container: string, tara: string, seal: string, suffix: string = '') => {
+    if (selectedFormType !== 'ORDEM_COLETA') return;
     const generate = (id: string, value: string) => {
       const el = document.getElementById(id + suffix);
       if (el && value) {
         try {
           JsBarcode(`#${id + suffix}`, value, {
-            format: "CODE128",
-            width: 2,
-            height: 25,
-            displayValue: false,
-            margin: 0,
-            background: "transparent"
+            format: "CODE128", width: 2, height: 25, displayValue: false, margin: 0, background: "transparent"
           });
-        } catch (e) { console.warn("Barcode error:", e); }
+        } catch (e) { console.warn(e); }
       }
     };
     generate('barcode-container', container);
@@ -92,34 +92,22 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports }) => {
 
   useEffect(() => {
     if (isFormModalOpen && selectedFormType === 'ORDEM_COLETA') {
-      const timer = setTimeout(() => {
-        generateBarcodes(formData.container, formData.tara, formData.seal);
-      }, 500);
+      const timer = setTimeout(() => generateBarcodes(formData.container, formData.tara, formData.seal), 500);
       return () => clearTimeout(timer);
     }
   }, [formData.container, formData.tara, formData.seal, isFormModalOpen, selectedFormType]);
 
   const handleInputChange = (field: string, value: string) => {
     const upValue = value.toUpperCase();
-    
     if (field === 'container') {
       const carrier = findCarrierByPrefix(upValue);
-      setFormData(prev => {
-        const newData = { ...prev, container: upValue };
-        if (carrier && upValue.length >= 4) {
-          newData.agencia = carrier.name;
-        }
-        return newData;
-      });
+      setFormData(prev => ({ ...prev, container: upValue, agencia: carrier ? carrier.name : prev.agencia }));
       return;
     }
-
     if (field === 'seal') {
-      const masked = maskSeal(upValue, formData.agencia);
-      setFormData(prev => ({ ...prev, seal: masked }));
+      setFormData(prev => ({ ...prev, seal: maskSeal(upValue, formData.agencia) }));
       return;
     }
-
     setFormData(prev => ({ ...prev, [field]: upValue }));
   };
 
@@ -130,124 +118,57 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports }) => {
   const downloadPDF = async () => {
     if (!captureRef.current) return;
     setIsExporting(true);
-    
     try {
       const element = captureRef.current;
       element.style.display = 'block';
-      
-      if (selectedFormType === 'ORDEM_COLETA') {
-        generateBarcodes(formData.container, formData.tara, formData.seal);
-      }
-      
+      if (selectedFormType === 'ORDEM_COLETA') generateBarcodes(formData.container, formData.tara, formData.seal);
       await new Promise(r => setTimeout(r, 1000));
-
-      const canvas = await html2canvas(element, { 
-        scale: 2.5,
-        useCORS: true, 
-        logging: false,
-        backgroundColor: "#ffffff",
-        windowWidth: 794,
-        width: 794,
-        height: 1123
-      });
-      
+      const canvas = await html2canvas(element, { scale: 2.5, useCORS: true, logging: false, backgroundColor: "#ffffff", windowWidth: 794, width: 794, height: 1123 });
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      const pdf = new jsPDF({ 
-        orientation: 'portrait', 
-        unit: 'mm', 
-        format: 'a4'
-      });
-      
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      
-      const driverName = selectedDriver?.name || 'DOC';
-      const os = formData.os || 'SEM_OS';
-      const prefix = selectedFormType === 'ORDEM_COLETA' ? 'OC' : 'MINUTA';
-      pdf.save(`${prefix} - ${driverName} - ${os}.pdf`);
-      
+      pdf.save(`${selectedFormType === 'ORDEM_COLETA' ? 'OC' : 'MINUTA'} - ${selectedDriver?.name || 'DOC'} - ${formData.os || 'SEM_OS'}.pdf`);
       element.style.display = 'none';
-    } catch (e) {
-      console.error("PDF Export error:", e);
-      alert("Erro ao processar PDF.");
-    } finally {
-      setIsExporting(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
-  const handleOpenForm = (type: FormType) => {
-    setSelectedFormType(type);
-    setIsFormModalOpen(true);
-  };
-
-  const handleSelectDriver = (driver: Driver) => {
-    setFormData(prev => ({ ...prev, driverId: driver.id }));
-    setDriverSearch(`${driver.name} (${driver.plateHorse})`);
-    setShowDriverResults(false);
-  };
-
-  const handleSelectRemetente = (customer: Customer) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      remetenteId: customer.id,
-      expedidor: customer.name
-    }));
-    setRemetenteSearch(customer.name);
-    setShowRemetenteResults(false);
-  };
-
-  const handleSelectDestinatario = (port: Port) => {
-    setFormData(prev => ({ ...prev, destinatarioId: port.id }));
-    setDestinatarioSearch(port.name);
-    setShowDestinatarioResults(false);
-  };
-
-  const filteredDrivers = drivers.filter(d => d.name.toLowerCase().includes(driverSearch.toLowerCase()) || d.plateHorse.toLowerCase().includes(driverSearch.toLowerCase()));
-  const filteredRemetentes = customers.filter(c => c.name.toLowerCase().includes(remetenteSearch.toLowerCase()) || c.cnpj.includes(remetenteSearch));
-  const filteredDestinatarios = ports.filter(p => p.name.toLowerCase().includes(destinatarioSearch.toLowerCase()) || p.cnpj.includes(destinatarioSearch));
+  const handleOpenForm = (type: FormType) => { setSelectedFormType(type); setIsFormModalOpen(true); };
+  const handleSelectDriver = (driver: Driver) => { setFormData(prev => ({ ...prev, driverId: driver.id })); setDriverSearch(`${driver.name} (${driver.plateHorse})`); setShowDriverResults(false); };
+  const handleSelectRemetente = (customer: Customer) => { setFormData(prev => ({ ...prev, remetenteId: customer.id, expedidor: customer.name })); setRemetenteSearch(customer.name); setShowRemetenteResults(false); };
+  const handleSelectDestinatario = (port: Port) => { setFormData(prev => ({ ...prev, destinatarioId: port.id })); setDestinatarioSearch(port.name); setShowDestinatarioResults(false); };
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all";
   const selectClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none";
 
-  const renderTemplate = () => {
-    if (selectedFormType === 'ORDEM_COLETA') {
-      return (
-        <OrdemColetaTemplate 
-          formData={formData} 
-          selectedDriver={selectedDriver} 
-          selectedRemetente={selectedRemetente} 
-          selectedDestinatario={selectedDestinatario} 
-        />
-      );
-    }
-    if (selectedFormType === 'PRE_STACKING') {
-      return (
-        <PreStackingTemplate 
-          formData={formData} 
-          selectedDriver={selectedDriver} 
-          selectedRemetente={selectedRemetente} 
-          selectedDestinatario={selectedDestinatario} 
-        />
-      );
-    }
-    return <div className="p-20 text-center font-bold text-slate-400">Em desenvolvimento...</div>;
-  };
-
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
-          {renderTemplate()}
+          {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+          {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center">
-        <h2 className="text-xl font-black text-slate-700 uppercase tracking-tight mb-2">Central de Documentos ALS</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+        <h2 className="text-xl font-black text-slate-700 uppercase tracking-tight mb-8 text-center">Seleção de Documentos</h2>
+        
+        <div className="space-y-3">
           {(Object.keys(formConfigs) as FormType[]).map(type => (
-            <button key={type} onClick={() => handleOpenForm(type)} className="flex flex-col text-left p-6 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-white hover:border-blue-400 hover:shadow-xl transition-all group">
-              <div className={`w-12 h-12 ${formConfigs[type].color} rounded-xl mb-4 flex items-center justify-center text-white shadow-lg font-black italic`}>ALS</div>
-              <h3 className="font-bold text-slate-700 uppercase text-xs tracking-tight mb-1">{formConfigs[type].title}</h3>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Emitir Documento</p>
+            <button 
+              key={type} 
+              onClick={() => handleOpenForm(type)} 
+              className="w-full flex items-center gap-6 p-6 bg-slate-50 border border-slate-100 rounded-3xl hover:bg-white hover:border-blue-400 hover:shadow-xl transition-all group text-left"
+            >
+              <div className={`w-14 h-14 ${formConfigs[type].color} rounded-2xl flex items-center justify-center text-white shadow-lg font-black italic flex-shrink-0`}>
+                ALS
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-slate-700 uppercase text-sm">{formConfigs[type].title}</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{formConfigs[type].description}</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+              </div>
             </button>
           ))}
         </div>
@@ -262,7 +183,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports }) => {
             </div>
 
             <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-              <div className="w-full lg:w-[450px] p-6 overflow-y-auto space-y-4 border-r border-slate-100 bg-slate-50/50">
+              <div className="w-full lg:w-[450px] p-6 overflow-y-auto space-y-4 border-r border-slate-100 bg-slate-50/50 custom-scrollbar">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Emissão</label><input type="date" className={inputClasses} value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
                   <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nº OS</label><input type="text" className={inputClasses} value={formData.os} onChange={e => handleInputChange('os', e.target.value)} /></div>
@@ -271,9 +192,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports }) => {
                 <div className="space-y-1 relative" ref={remetenteSelectRef}>
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Remetente (Cliente)</label>
                   <input type="text" placeholder="BUSCAR CLIENTE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); }} />
-                  {showRemetenteResults && filteredRemetentes.length > 0 && (
+                  {showRemetenteResults && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-                      {filteredRemetentes.map(c => <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => handleSelectRemetente(c)}>{c.name}</button>)}
+                      {customers.filter(c => c.name.toUpperCase().includes(remetenteSearch)).map(c => <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => handleSelectRemetente(c)}>{c.name}</button>)}
                     </div>
                   )}
                 </div>
@@ -281,9 +202,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports }) => {
                 <div className="space-y-1 relative" ref={destinatarioSelectRef}>
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Destinatário (Entrega)</label>
                   <input type="text" placeholder="BUSCAR LOCAL..." className={inputClasses} value={destinatarioSearch} onFocus={() => setShowDestinatarioResults(true)} onChange={e => { setDestinatarioSearch(e.target.value.toUpperCase()); setShowDestinatarioResults(true); }} />
-                  {showDestinatarioResults && filteredDestinatarios.length > 0 && (
+                  {showDestinatarioResults && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-                      {filteredDestinatarios.map(p => <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => handleSelectDestinatario(p)}>{p.name}</button>)}
+                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch)).map(p => <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => handleSelectDestinatario(p)}>{p.name}</button>)}
                     </div>
                   )}
                 </div>
@@ -294,14 +215,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports }) => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Lacre</label>
-                    <input type="text" placeholder="LACRE..." className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} />
-                  </div>
-                  {selectedFormType === 'PRE_STACKING' ? (
-                    <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase tracking-widest ml-1">Nota Fiscal</label><input type="text" placeholder="NF..." className={inputClasses} value={formData.nf} onChange={e => handleInputChange('nf', e.target.value)} /></div>
-                  ) : (
-                    <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase tracking-widest ml-1">Genset</label><input type="text" placeholder="GENSET ID..." className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
-                  )}
+                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Lacre</label><input type="text" className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
+                  <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase tracking-widest ml-1">{selectedFormType === 'PRE_STACKING' ? 'Nota Fiscal' : 'Genset'}</label><input type="text" className={inputClasses} value={selectedFormType === 'PRE_STACKING' ? formData.nf : formData.genset} onChange={e => handleInputChange(selectedFormType === 'PRE_STACKING' ? 'nf' : 'genset', e.target.value)} /></div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -309,47 +224,25 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports }) => {
                   <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase tracking-widest ml-1">Booking</label><input type="text" className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo</label>
-                    <select className={selectClasses} value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value})}>
-                      <option value="40HC">40HC</option><option value="40HR">40HR</option><option value="20GP">20GP</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase tracking-widest ml-1">Armador</label><input type="text" placeholder="ARMADOR..." className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase tracking-widest ml-1">Aut. Coleta</label><input type="text" placeholder="AUTORIZAÇÃO..." className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} /></div>
-                  <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase tracking-widest ml-1">Embarcador</label><input type="text" placeholder="EMBARCADOR..." className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
-                </div>
-
                 <div className="space-y-1 relative" ref={driverSelectRef}>
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Motorista</label>
                   <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setShowDriverResults(true); }} />
-                  {showDriverResults && filteredDrivers.length > 0 && (
+                  {showDriverResults && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-                      {filteredDrivers.map(d => <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => handleSelectDriver(d)}>{d.name}</button>)}
+                      {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => handleSelectDriver(d)}>{d.name}</button>)}
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Agendamento</label><input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => setFormData({...formData, horarioAgendado: e.target.value})} /></div>
-
-                <button 
-                  disabled={isExporting} 
-                  onClick={downloadPDF} 
-                  className={`w-full py-5 rounded-2xl text-white font-black uppercase text-[12px] tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all ${isExporting ? 'bg-slate-400 cursor-not-allowed' : formConfigs[selectedFormType].color + ' hover:scale-[1.02]'}`}
-                >
+                <button disabled={isExporting} onClick={downloadPDF} className={`w-full py-5 rounded-2xl text-white font-black uppercase text-[12px] tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all ${isExporting ? 'bg-slate-400' : formConfigs[selectedFormType].color + ' hover:scale-[1.02]'}`}>
                   {isExporting ? 'PROCESSANDO...' : 'BAIXAR PDF'}
                 </button>
               </div>
 
               <div className="flex-1 bg-slate-300 flex justify-center overflow-auto items-start p-4 lg:p-10">
-                <div className="origin-top transform scale-[0.4] sm:scale-[0.5] md:scale-[0.7] lg:scale-[0.85] xl:scale-[1.0] shadow-2xl transition-transform">
-                  <div className="bg-white">
-                    {renderTemplate()}
-                  </div>
+                <div className="origin-top transform scale-[0.4] sm:scale-[0.5] md:scale-[0.7] lg:scale-[0.85] shadow-2xl transition-transform bg-white">
+                  {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+                  {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                 </div>
               </div>
             </div>
