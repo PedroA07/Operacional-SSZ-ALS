@@ -43,7 +43,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setIsSyncing(true);
     setIsCloud(db.isCloudActive());
     try {
-      // Pull simultâneo de todas as tabelas
       const [d, c, p, ps, s] = await Promise.all([
         db.getDrivers(), 
         db.getCustomers(), 
@@ -56,7 +55,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       setPorts(p || []); 
       setPreStacking(ps || []); 
       setStaffList(s || []);
-      setOnlineUsersCount(1);
     } catch (e) { 
       console.error("Falha ao carregar dados do banco:", e); 
     } finally {
@@ -256,7 +254,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                  loadAllData(); 
                }} 
                onDeleteDriver={async id => { 
-                 if(confirm("Deseja realmente excluir este motorista?")) { await db.deleteDriver(id); loadAllData(); } 
+                 if(confirm("Deseja realmente excluir este motorista?")) { 
+                    await db.deleteDriver(id); 
+                    loadAllData(); 
+                 } 
                }} 
                availableOps={availableOps} 
              />
@@ -264,25 +265,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.CLIENTES && (
              <CustomersTab 
                customers={customers} 
-               onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} 
+               onSaveCustomer={async (c, id) => { 
+                 await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); 
+                 loadAllData(); 
+               }} 
              />
            )}
            {activeTab === DashboardTab.PORTOS && (
              <PortsTab 
                ports={ports} 
-               onSavePort={async (p, id) => { await db.savePort({...p, id: id || `port-${Date.now()}`} as Port); loadAllData(); }} 
+               onSavePort={async (p, id) => { 
+                 await db.savePort({...p, id: id || `port-${Date.now()}`} as Port); 
+                 loadAllData(); 
+               }} 
              />
            )}
            {activeTab === DashboardTab.PRE_STACKING && (
              <PreStackingTab 
                preStacking={preStacking} 
-               onSavePreStacking={async (ps, id) => { await db.savePreStacking({...ps, id: id || `ps-${Date.now()}`} as PreStacking); loadAllData(); }} 
+               onSavePreStacking={async (ps, id) => { 
+                 await db.savePreStacking({...ps, id: id || `ps-${Date.now()}`} as PreStacking); 
+                 loadAllData(); 
+               }} 
              />
            )}
            {activeTab === DashboardTab.COLABORADORES && (
               <StaffTab 
                 staffList={staffList} 
-                onSaveStaff={async (s, id) => { await db.saveStaff({...s, id: id || `stf-${Date.now()}`} as Staff); loadAllData(); }} 
+                onSaveStaff={async (s, id) => { 
+                  await db.saveStaff({...s, id: id || `stf-${Date.now()}`} as Staff); 
+                  await loadAllData(); 
+                }} 
                 onDeleteStaff={async id => { 
                   if(confirm("Deseja realmente excluir este colaborador e seu acesso?")) { 
                     await db.deleteStaff(id); 
