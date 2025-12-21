@@ -43,8 +43,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       
       // Limpeza para verificar se o input é CPF (só números)
       const cleanInput = input.replace(/\D/g, '');
-      const isCpfFormat = cleanInput.length === 11 && /^\d+$/.test(cleanInput);
-
+      
       let foundUser = users.find(u => {
         const dbUser = u.username.toLowerCase();
         const searchInput = input.toLowerCase();
@@ -164,7 +163,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                       type="text" 
                       required 
                       className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-400 outline-none" 
-                      placeholder="NOME.SOBRENOME OU CPF"
+                      placeholder="USUÁRIO"
                       value={username} 
                       onChange={(e) => setUsername(e.target.value)} 
                     />
