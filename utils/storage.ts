@@ -33,7 +33,8 @@ export const db = {
 
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
-      const { data } = await supabase.from('users').select('*');
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) console.error("Erro ao buscar usuários no DB:", error.message);
       if (data) return data;
     }
     const local = localStorage.getItem(KEYS.USERS);
@@ -41,7 +42,10 @@ export const db = {
   },
 
   saveUser: async (user: User) => {
-    if (supabase) await supabase.from('users').upsert(user);
+    if (supabase) {
+      const { error } = await supabase.from('users').upsert(user);
+      if (error) console.error("Erro ao salvar usuário no DB:", error.message);
+    }
     const current = await db.getUsers();
     const idx = current.findIndex(u => u.id === user.id);
     if (idx >= 0) current[idx] = user; else current.push(user);
@@ -49,14 +53,19 @@ export const db = {
   },
 
   deleteUser: async (id: string) => {
-    if (supabase) await supabase.from('users').delete().eq('id', id);
+    if (supabase) {
+      const { error } = await supabase.from('users').delete().eq('id', id);
+      if (error) console.error("Erro ao deletar usuário no DB:", error.message);
+    }
     const current = await db.getUsers();
-    localStorage.setItem(KEYS.USERS, JSON.stringify(current.filter(u => u.id !== id)));
+    const filtered = current.filter(u => u.id !== id);
+    localStorage.setItem(KEYS.USERS, JSON.stringify(filtered));
   },
 
   getStaff: async (): Promise<Staff[]> => {
     if (supabase) {
-      const { data } = await supabase.from('staff').select('*');
+      const { data, error } = await supabase.from('staff').select('*');
+      if (error) console.error("Erro ao buscar staff no DB:", error.message);
       if (data) return data;
     }
     const local = localStorage.getItem(KEYS.STAFF);
@@ -64,7 +73,10 @@ export const db = {
   },
 
   saveStaff: async (staff: Staff) => {
-    if (supabase) await supabase.from('staff').upsert(staff);
+    if (supabase) {
+      const { error } = await supabase.from('staff').upsert(staff);
+      if (error) console.error("Erro ao salvar staff no DB:", error.message);
+    }
     const current = await db.getStaff();
     const idx = current.findIndex(s => s.id === staff.id);
     if (idx >= 0) current[idx] = staff; else current.push(staff);
@@ -89,15 +101,28 @@ export const db = {
   },
 
   deleteStaff: async (id: string) => {
-    if (supabase) await supabase.from('staff').delete().eq('id', id);
-    const current = await db.getStaff();
-    localStorage.setItem(KEYS.STAFF, JSON.stringify(current.filter(s => s.id !== id)));
-    await db.deleteUser(`u-${id}`);
+    // 1. Deletar do Supabase
+    if (supabase) {
+      const { error: staffErr } = await supabase.from('staff').delete().eq('id', id);
+      if (staffErr) console.error("Erro ao deletar staff:", staffErr.message);
+      
+      const { error: userErr } = await supabase.from('users').delete().eq('staffId', id);
+      if (userErr) console.error("Erro ao deletar usuário vinculado:", userErr.message);
+    }
+
+    // 2. Deletar do LocalStorage (Staff)
+    const currentStaff = await db.getStaff();
+    localStorage.setItem(KEYS.STAFF, JSON.stringify(currentStaff.filter(s => s.id !== id)));
+    
+    // 3. Deletar do LocalStorage (User)
+    const currentUsers = await db.getUsers();
+    localStorage.setItem(KEYS.USERS, JSON.stringify(currentUsers.filter(u => u.staffId !== id)));
   },
 
   getDrivers: async (): Promise<Driver[]> => {
     if (supabase) {
-      const { data } = await supabase.from('drivers').select('*');
+      const { data, error } = await supabase.from('drivers').select('*');
+      if (error) console.error("Erro ao buscar motoristas no DB:", error.message);
       if (data) return data;
     }
     const local = localStorage.getItem(KEYS.DRIVERS);
@@ -105,20 +130,26 @@ export const db = {
   },
 
   saveDriver: async (driver: Driver) => {
-    if (supabase) await supabase.from('drivers').upsert(driver);
+    if (supabase) {
+      const { error } = await supabase.from('drivers').upsert(driver);
+      if (error) console.error("Erro ao salvar motorista no DB:", error.message);
+    }
     const current = await db.getDrivers();
     const idx = current.findIndex(d => d.id === driver.id);
     if (idx >= 0) current[idx] = driver; else current.push(driver);
     localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current));
-
-    // A criação do usuário de motorista é disparada pelo componente DriversTab
   },
 
   deleteDriver: async (id: string) => {
-    if (supabase) await supabase.from('drivers').delete().eq('id', id);
-    const current = await db.getDrivers();
-    localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current.filter(d => d.id !== id)));
-    await db.deleteUser(`u-${id}`);
+    if (supabase) {
+      await supabase.from('drivers').delete().eq('id', id);
+      await supabase.from('users').delete().eq('driverId', id);
+    }
+    const currentDrivers = await db.getDrivers();
+    localStorage.setItem(KEYS.DRIVERS, JSON.stringify(currentDrivers.filter(d => d.id !== id)));
+    
+    const currentUsers = await db.getUsers();
+    localStorage.setItem(KEYS.USERS, JSON.stringify(currentUsers.filter(u => u.driverId !== id)));
   },
 
   getCustomers: async (): Promise<Customer[]> => {
@@ -172,7 +203,6 @@ export const db = {
     localStorage.setItem(KEYS.PRESTACKING, JSON.stringify(current));
   },
 
-  // FIX: Adicionando função de exportação de backup ausente exigida pelo SystemTab.tsx
   exportBackup: async () => {
     const data = {
       drivers: await db.getDrivers(),
@@ -191,7 +221,6 @@ export const db = {
     URL.revokeObjectURL(url);
   },
 
-  // FIX: Adicionando função de importação de backup ausente exigida pelo SystemTab.tsx
   importBackup: async (file: File): Promise<boolean> => {
     try {
       const text = await file.text();
@@ -204,7 +233,6 @@ export const db = {
       if (data.staff) localStorage.setItem(KEYS.STAFF, JSON.stringify(data.staff));
       if (data.users) localStorage.setItem(KEYS.USERS, JSON.stringify(data.users));
 
-      // A importação de backup sobrescreve os dados locais para restauração rápida.
       return true;
     } catch (e) {
       console.error("Erro na importação de backup:", e);

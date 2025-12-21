@@ -43,13 +43,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setIsSyncing(true);
     setIsCloud(db.isCloudActive());
     try {
+      // Pull simultâneo de todas as tabelas
       const [d, c, p, ps, s] = await Promise.all([
-        db.getDrivers(), db.getCustomers(), db.getPorts(), db.getPreStacking(), db.getStaff()
+        db.getDrivers(), 
+        db.getCustomers(), 
+        db.getPorts(), 
+        db.getPreStacking(), 
+        db.getStaff()
       ]);
-      setDrivers(d); setCustomers(c); setPorts(p); setPreStacking(ps); setStaffList(s);
+      setDrivers(d || []); 
+      setCustomers(c || []); 
+      setPorts(p || []); 
+      setPreStacking(ps || []); 
+      setStaffList(s || []);
       setOnlineUsersCount(1);
-    } catch (e) { console.error("Falha ao carregar dados:", e); }
-    setIsSyncing(false);
+    } catch (e) { 
+      console.error("Falha ao carregar dados do banco:", e); 
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const loadWeather = async () => {
@@ -271,7 +283,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <StaffTab 
                 staffList={staffList} 
                 onSaveStaff={async (s, id) => { await db.saveStaff({...s, id: id || `stf-${Date.now()}`} as Staff); loadAllData(); }} 
-                onDeleteStaff={async id => { if(confirm("Deseja realmente excluir este colaborador e seu acesso?")) { await db.deleteStaff(id); loadAllData(); } }}
+                onDeleteStaff={async id => { 
+                  if(confirm("Deseja realmente excluir este colaborador e seu acesso?")) { 
+                    await db.deleteStaff(id); 
+                    await loadAllData(); 
+                  } 
+                }}
               />
            )}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
