@@ -5,6 +5,7 @@ import { Driver, Customer, Port, PreStacking, Staff, User } from '../types';
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
 
+// Inicializa o cliente apenas se houver credenciais
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_KEY) 
   : null;
@@ -26,8 +27,8 @@ export const db = {
     localStorage.setItem(key, JSON.stringify(data));
   },
 
+  // SESSÃO: Usa sessionStorage para que ao fechar a guia a sessão expire
   setSession: (user: User | null) => {
-    // sessionStorage encerra os dados quando a aba é fechada
     if (user) sessionStorage.setItem(KEYS.SESSION, JSON.stringify(user));
     else sessionStorage.removeItem(KEYS.SESSION);
   },
@@ -36,49 +37,59 @@ export const db = {
     return s ? JSON.parse(s) : null;
   },
 
+  // USUÁRIOS
   getUsers: async (): Promise<User[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     if (supabase) {
-      const { data, error } = await supabase.from('users').select('*');
-      if (!error && data && data.length > 0) {
-        db._saveLocal(KEYS.USERS, data);
-        return data;
-      }
+      try {
+        const { data, error } = await supabase.from('users').select('*');
+        if (!error && data && data.length > 0) {
+          db._saveLocal(KEYS.USERS, data);
+          return data;
+        }
+      } catch (e) { console.warn("Supabase getUsers failed, using local."); }
     }
     return localData;
   },
 
   saveUser: async (user: User) => {
+    // 1. Garante salvamento local primeiro
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const idx = current.findIndex((u: any) => u.id === user.id);
     if (idx >= 0) current[idx] = user; else current.push(user);
     db._saveLocal(KEYS.USERS, current);
 
+    // 2. Tenta sincronizar com a nuvem em segundo plano
     if (supabase) {
-      const { error } = await supabase.from('users').upsert(user);
-      if (error) console.error("Erro Supabase User:", error);
+      try {
+        await supabase.from('users').upsert(user);
+      } catch (e) { console.error("Erro ao sincronizar User com Supabase."); }
     }
   },
 
+  // STAFF (EQUIPE)
   getStaff: async (): Promise<Staff[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     if (supabase) {
-      const { data, error } = await supabase.from('staff').select('*');
-      if (!error && data && data.length > 0) {
-        db._saveLocal(KEYS.STAFF, data);
-        return data;
-      }
-      if (error) console.error("Erro ao buscar Staff:", error);
+      try {
+        const { data, error } = await supabase.from('staff').select('*');
+        if (!error && data && data.length > 0) {
+          db._saveLocal(KEYS.STAFF, data);
+          return data;
+        }
+      } catch (e) { console.warn("Supabase getStaff failed."); }
     }
     return localData;
   },
 
-  saveStaff: async (staff: Staff) => {
+  saveStaff: async (staff: Staff, passwordOverride?: string) => {
+    // 1. Salvar Staff Localmente
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
     if (sIdx >= 0) currentStaff[sIdx] = staff; else currentStaff.push(staff);
     db._saveLocal(KEYS.STAFF, currentStaff);
 
+    // 2. Garantir Usuário de Acesso Localmente
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const existingUser = users.find((u: any) => u.staffId === staff.id);
     
@@ -90,15 +101,18 @@ export const db = {
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
-      password: existingUser?.password || '12345678',
+      // Senha padrão 12345678 se for novo
+      password: passwordOverride || existingUser?.password || '12345678',
       position: staff.position
     };
     
     await db.saveUser(userData);
 
+    // 3. Nuvem
     if (supabase) {
-      const { error } = await supabase.from('staff').upsert(staff);
-      if (error) console.error("Erro Supabase Staff:", error);
+      try {
+        await supabase.from('staff').upsert(staff);
+      } catch (e) { console.error("Erro ao sincronizar Staff com Supabase."); }
     }
   },
 
@@ -110,20 +124,25 @@ export const db = {
     db._saveLocal(KEYS.USERS, currentUsers.filter((u: any) => u.staffId !== id));
 
     if (supabase) {
-      await supabase.from('staff').delete().eq('id', id);
-      await supabase.from('users').delete().eq('staffId', id);
+      try {
+        await supabase.from('staff').delete().eq('id', id);
+        await supabase.from('users').delete().eq('staffId', id);
+      } catch (e) { console.error("Erro ao deletar Staff do Supabase."); }
     }
     return true;
   },
 
+  // MOTORISTAS
   getDrivers: async (): Promise<Driver[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     if (supabase) {
-      const { data } = await supabase.from('drivers').select('*');
-      if (data && data.length > 0) {
-        db._saveLocal(KEYS.DRIVERS, data);
-        return data;
-      }
+      try {
+        const { data } = await supabase.from('drivers').select('*');
+        if (data && data.length > 0) {
+          db._saveLocal(KEYS.DRIVERS, data);
+          return data;
+        }
+      } catch (e) { console.warn("Supabase getDrivers failed."); }
     }
     return localData;
   },
@@ -133,23 +152,33 @@ export const db = {
     const idx = current.findIndex((d: any) => d.id === driver.id);
     if (idx >= 0) current[idx] = driver; else current.push(driver);
     db._saveLocal(KEYS.DRIVERS, current);
-    if (supabase) await supabase.from('drivers').upsert(driver);
+    
+    if (supabase) {
+      try {
+        await supabase.from('drivers').upsert(driver);
+      } catch (e) { console.error("Erro ao sincronizar Driver com Supabase."); }
+    }
   },
 
   deleteDriver: async (id: string) => {
     const currentDrivers = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     db._saveLocal(KEYS.DRIVERS, currentDrivers.filter((d: any) => d.id !== id));
     if (supabase) {
-      await supabase.from('drivers').delete().eq('id', id);
-      await supabase.from('users').delete().eq('driverId', id);
+      try {
+        await supabase.from('drivers').delete().eq('id', id);
+        await supabase.from('users').delete().eq('driverId', id);
+      } catch (e) { console.error("Erro ao deletar Driver do Supabase."); }
     }
   },
 
+  // CLIENTES
   getCustomers: async (): Promise<Customer[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]');
     if (supabase) {
-      const { data } = await supabase.from('customers').select('*');
-      if (data && data.length > 0) { db._saveLocal(KEYS.CUSTOMERS, data); return data; }
+      try {
+        const { data } = await supabase.from('customers').select('*');
+        if (data && data.length > 0) { db._saveLocal(KEYS.CUSTOMERS, data); return data; }
+      } catch (e) { console.warn("Supabase getCustomers failed."); }
     }
     return localData;
   },
@@ -159,14 +188,21 @@ export const db = {
     const idx = current.findIndex((c: any) => c.id === customer.id);
     if (idx >= 0) current[idx] = customer; else current.push(customer);
     db._saveLocal(KEYS.CUSTOMERS, current);
-    if (supabase) await supabase.from('customers').upsert(customer);
+    if (supabase) {
+      try {
+        await supabase.from('customers').upsert(customer);
+      } catch (e) { console.error("Erro ao sincronizar Customer com Supabase."); }
+    }
   },
 
+  // PORTOS
   getPorts: async (): Promise<Port[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
     if (supabase) {
-      const { data } = await supabase.from('ports').select('*');
-      if (data && data.length > 0) { db._saveLocal(KEYS.PORTS, data); return data; }
+      try {
+        const { data } = await supabase.from('ports').select('*');
+        if (data && data.length > 0) { db._saveLocal(KEYS.PORTS, data); return data; }
+      } catch (e) { console.warn("Supabase getPorts failed."); }
     }
     return localData;
   },
@@ -176,14 +212,21 @@ export const db = {
     const idx = current.findIndex((p: any) => p.id === port.id);
     if (idx >= 0) current[idx] = port; else current.push(port);
     db._saveLocal(KEYS.PORTS, current);
-    if (supabase) await supabase.from('ports').upsert(port);
+    if (supabase) {
+      try {
+        await supabase.from('ports').upsert(port);
+      } catch (e) { console.error("Erro ao sincronizar Port com Supabase."); }
+    }
   },
 
+  // PRÉ-STACKING
   getPreStacking: async (): Promise<PreStacking[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.PRESTACKING) || '[]');
     if (supabase) {
-      const { data } = await supabase.from('pre_stacking').select('*');
-      if (data && data.length > 0) { db._saveLocal(KEYS.PRESTACKING, data); return data; }
+      try {
+        const { data } = await supabase.from('pre_stacking').select('*');
+        if (data && data.length > 0) { db._saveLocal(KEYS.PRESTACKING, data); return data; }
+      } catch (e) { console.warn("Supabase getPreStacking failed."); }
     }
     return localData;
   },
@@ -193,7 +236,11 @@ export const db = {
     const idx = current.findIndex((p: any) => p.id === item.id);
     if (idx >= 0) current[idx] = item; else current.push(item);
     db._saveLocal(KEYS.PRESTACKING, current);
-    if (supabase) await supabase.from('pre_stacking').upsert(item);
+    if (supabase) {
+      try {
+        await supabase.from('pre_stacking').upsert(item);
+      } catch (e) { console.error("Erro ao sincronizar PreStacking com Supabase."); }
+    }
   },
 
   exportBackup: async () => {

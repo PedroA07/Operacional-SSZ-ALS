@@ -6,7 +6,7 @@ import { db } from '../../utils/storage';
 interface StaffTabProps {
   staffList: Staff[];
   currentUserRole: string;
-  onSaveStaff: (staff: Staff, id?: string) => Promise<void>;
+  onSaveStaff: (staff: Staff, password?: string) => Promise<void>;
   onDeleteStaff: (id: string) => Promise<void>;
 }
 
@@ -27,7 +27,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
       setUsers(u);
     };
     loadUsers();
-  }, [staffList]);
+  }, [staffList, isModalOpen]);
 
   const existingPositions = useMemo(() => {
     const pos = staffList.map(s => s.position).filter(p => !!p);
@@ -48,35 +48,20 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
     
     setIsProcessing(true);
     const staffId = editingId || `stf-${Date.now()}`;
-    const staffData = { 
-      ...form, 
-      id: staffId, 
+    
+    const staffData: Staff = { 
+      id: staffId,
+      name: form.name || '',
+      position: form.position || '',
       username: form.username || generateUsername(form.name || ''),
+      role: (form.role as 'admin' | 'staff') || 'staff',
+      photo: form.photo,
       registrationDate: form.registrationDate || new Date().toISOString() 
-    } as Staff;
+    };
     
     try {
-      await onSaveStaff(staffData, editingId);
-      
-      const passToSave = form.password || '12345678';
-      const currentUser = users.find(u => u.staffId === staffId);
-      
-      if (currentUser) {
-        await db.saveUser({ ...currentUser, password: passToSave, position: staffData.position, role: staffData.role as any });
-      } else {
-        await db.saveUser({
-          id: `u-${staffId}`,
-          username: staffData.username,
-          displayName: staffData.name,
-          role: staffData.role as any,
-          staffId: staffId,
-          lastLogin: new Date().toISOString(),
-          isFirstLogin: true,
-          password: passToSave,
-          position: staffData.position
-        });
-      }
-      
+      // O Dashboard agora chama db.saveStaff que cuida de Staff e User
+      await onSaveStaff(staffData, form.password);
       setIsModalOpen(false);
     } catch (err) {
       alert("Erro ao salvar informações do colaborador.");
@@ -161,7 +146,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
 
               {currentUserRole === 'admin' && (
                 <div className="mt-6 flex gap-2">
-                   <button onClick={() => handleEdit(s)} className="flex-1 py-2.5 bg-slate-50 text-slate-500 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">Editar</button>
+                   <button onClick={() => handleEdit(s)} className="flex-1 py-2.5 bg-slate-50 text-slate-500 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all active:scale-95">Editar</button>
                    <button 
                      disabled={isProcessing}
                      onClick={() => onDeleteStaff(s.id)} 

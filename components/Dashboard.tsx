@@ -367,21 +367,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <StaffTab 
                 staffList={staffList} 
                 currentUserRole={user.role}
-                onSaveStaff={async (s, id) => { 
-                  const newStaff = {...s, id: id || `stf-${Date.now()}`} as Staff;
-                  setStaffList(prev => {
-                    const idx = prev.findIndex(item => item.id === newStaff.id);
-                    if (idx >= 0) {
-                      const copy = [...prev]; copy[idx] = newStaff; return copy;
-                    }
-                    return [...prev, newStaff];
-                  });
-                  await db.saveStaff(newStaff); 
+                onSaveStaff={async (s, pass) => { 
+                  // Função de salvamento centralizada
+                  await db.saveStaff(s, pass); 
                   await loadAllData(); 
                 }} 
                 onDeleteStaff={async id => { 
                   if(confirm("Deseja realmente excluir este colaborador?")) { 
-                    setStaffList(prev => prev.filter(s => s.id !== id));
                     await db.deleteStaff(id); 
                     await loadAllData(); 
                   } 
