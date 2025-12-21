@@ -2,29 +2,20 @@
 export interface User {
   id: string;
   username: string;
+  displayName: string;
   role: 'admin' | 'staff' | 'driver';
-  driverId?: string; // Vincula o usuário ao cadastro de motorista se for o caso
+  driverId?: string;
+  staffId?: string;
   lastLogin: string;
+  isFirstLogin?: boolean;
+  avatar?: string;
+  position?: string;
 }
 
 export enum AppScreen {
   LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD',
   DRIVER_PORTAL = 'DRIVER_PORTAL'
-}
-
-export interface Operation {
-  category: string;
-  client: string;
-}
-
-export interface OperationDefinition {
-  id: string;
-  category: string;
-  clients: {
-    name: string;
-    hasDedicatedPage: boolean;
-  }[];
 }
 
 export interface Port {
@@ -64,6 +55,11 @@ export interface Customer {
   operations: string[];
 }
 
+export interface DriverOperation {
+  category: string;
+  client: string;
+}
+
 export interface Driver {
   id: string;
   photo?: string;
@@ -83,38 +79,26 @@ export interface Driver {
   beneficiaryName: string;
   beneficiaryPhone: string;
   beneficiaryEmail: string;
+  beneficiaryCnpj?: string;
+  paymentPreference?: 'TED' | 'PIX';
   whatsappGroupName: string;
   whatsappGroupLink: string;
   registrationDate: string;
-  operations: Operation[];
+  operations: DriverOperation[];
   tripsCount: number;
+  hasAccess?: boolean;
+  generatedPassword?: string;
 }
 
-export type TripType = 'IMPORT_ENTREGA' | 'EXPORT_COLETA';
-export type TripStatus = 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'ATRASADA';
-
-export interface Trip {
+export interface Staff {
   id: string;
-  type: TripType;
-  os: string;
-  container?: string;
-  scheduledDateTime: string;
-  customerName: string;
-  driverId: string; // Link direto com Driver
-  driverName: string;
-  plateHorse: string;
-  plateTrailer: string;
-  status: TripStatus;
-  milestones: {
-    liberacaoRetirada?: { location: string, dt: string };
-    retiradaVazio?: { dt: string };
-    chegadaCliente?: { dt: string };
-    retiradaCheio?: { dt: string };
-    baixaNF?: { dt: string };
-    saidaCliente?: { dt: string };
-    agendamento?: { location: string, dt: string };
-    entregaFinal?: { dt: string };
-  };
+  photo?: string;
+  name: string;
+  position: string;
+  username: string;
+  role: 'admin' | 'staff';
+  registrationDate: string;
+  lastLogin?: string;
 }
 
 export enum DashboardTab {
@@ -124,9 +108,27 @@ export enum DashboardTab {
   CLIENTES = 'CLIENTES',
   PORTOS = 'PORTOS',
   PRE_STACKING = 'PRE_STACKING',
-  FORMULARIOS = 'FORMULARIOS'
+  FORMULARIOS = 'FORMULARIOS',
+  COLABORADORES = 'COLABORADORES'
 }
 
+export interface WeatherData {
+  temp: number;
+  condition: string;
+  icon: string;
+  forecastNextDay: {
+    temp: number;
+    condition: string;
+  };
+}
+
+export interface OperationDefinition {
+  id: string;
+  category: string;
+  clients: { name: string; hasDedicatedPage: boolean }[];
+}
+
+// Added types for Volkswagen operation monitoring
 export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
 
 export interface VWStatusUpdate {
@@ -139,8 +141,7 @@ export interface VWSchedule {
   dateTime: string;
   os: string;
   container: string;
-  cva: string;
-  driverId?: string;
+  cva?: string;
   driverName: string;
   cpf: string;
   plateHorse: string;
@@ -149,4 +150,36 @@ export interface VWSchedule {
   destination: string;
   status: VWStatus;
   statusHistory: VWStatusUpdate[];
+}
+
+// Added missing interfaces for Trip monitoring features
+export interface Milestone {
+  dt: string;
+  location?: string;
+}
+
+export interface TripMilestones {
+  retiradaVazio?: Milestone;
+  chegadaCliente?: Milestone;
+  retiradaCheio?: Milestone;
+  agendamento?: Milestone;
+  entregaFinal?: Milestone;
+  liberacaoRetirada?: Milestone;
+  baixaNF?: Milestone;
+  saidaCliente?: Milestone;
+}
+
+export interface Trip {
+  id: string;
+  os: string;
+  status: string;
+  type: 'IMPORT_ENTREGA' | 'EXPORT_COLETA';
+  customerName: string;
+  scheduledDateTime: string;
+  driverName: string;
+  driverId: string;
+  plateHorse: string;
+  plateTrailer: string;
+  container: string;
+  milestones: TripMilestones;
 }

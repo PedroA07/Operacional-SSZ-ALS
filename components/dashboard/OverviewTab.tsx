@@ -88,30 +88,44 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips }) => {
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Concluídas na Semana</p>
-          <p className="text-3xl font-black text-emerald-500">14</p>
+          <p className="text-3xl font-black text-emerald-500">{trips.filter(t => t.status === 'CONCLUIDA').length}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Programadas Próx. Semana</p>
-          <p className="text-3xl font-black text-slate-800">22</p>
+          <p className="text-3xl font-black text-slate-800">0</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <section className="space-y-6">
           <h3 className="text-sm font-black text-slate-800 uppercase italic border-l-4 border-indigo-500 pl-3">Importação & Entrega</h3>
-          <div className="grid gap-6">{importTrips.map(renderTripCard)}</div>
+          <div className="grid gap-6">
+            {importTrips.map(renderTripCard)}
+            {importTrips.length === 0 && (
+              <div className="bg-white/50 p-10 rounded-2xl border border-dashed border-slate-200 text-center text-[10px] font-black text-slate-300 uppercase italic">
+                Nenhuma viagem de importação ativa.
+              </div>
+            )}
+          </div>
         </section>
 
         <section className="space-y-6">
           <h3 className="text-sm font-black text-slate-800 uppercase italic border-l-4 border-emerald-500 pl-3">Exportação & Coleta</h3>
-          <div className="grid gap-6">{exportTrips.map(renderTripCard)}</div>
+          <div className="grid gap-6">
+            {exportTrips.map(renderTripCard)}
+            {exportTrips.length === 0 && (
+              <div className="bg-white/50 p-10 rounded-2xl border border-dashed border-slate-200 text-center text-[10px] font-black text-slate-300 uppercase italic">
+                Nenhuma viagem de exportação ativa.
+              </div>
+            )}
+          </div>
         </section>
       </div>
 
       <section className="pt-8 border-t border-slate-200">
         <h3 className="text-sm font-black text-slate-400 uppercase mb-6">Projeção Próxima Semana</h3>
         <div className="bg-slate-100/50 rounded-3xl p-10 text-center border-2 border-dashed border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest italic">Aguardando dados de programação para segunda-feira (próxima semana).</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest italic">Aguardando dados de programação.</p>
         </div>
       </section>
     </div>

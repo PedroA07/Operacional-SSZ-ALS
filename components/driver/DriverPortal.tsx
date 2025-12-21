@@ -21,25 +21,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         if (me) setDriverData(me);
         
         // Em um sistema real, buscaríamos as viagens do banco filtradas pelo driverId
-        // Por enquanto, simulamos uma lista
-        setMyTrips([
-          {
-            id: 't-01',
-            type: 'IMPORT_ENTREGA',
-            os: 'OS-99421',
-            container: 'MSCU 123456-7',
-            scheduledDateTime: new Date().toISOString(),
-            customerName: 'VOLKSWAGEN TAUBATÉ',
-            driverId: me?.id || '',
-            driverName: me?.name || '',
-            plateHorse: me?.plateHorse || '',
-            plateTrailer: me?.plateTrailer || '',
-            status: 'EM_ANDAMENTO',
-            milestones: {
-              retiradaVazio: { dt: new Date().toISOString() }
-            }
-          }
-        ]);
+        // Iniciando como array vazio para remover dados fictícios
+        setMyTrips([]);
       }
       setIsLoading(false);
     };
@@ -54,18 +37,18 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         <div className="flex justify-between items-center">
           <div>
             <p className="text-[10px] font-black uppercase opacity-70">Bem-vindo, Motorista</p>
-            <h1 className="text-xl font-black uppercase truncate max-w-[200px]">{driverData?.name}</h1>
+            <h1 className="text-xl font-black uppercase truncate max-w-[200px]">{driverData?.name || '---'}</h1>
           </div>
           <button onClick={onLogout} className="p-2 bg-white/10 rounded-xl"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2.5"/></svg></button>
         </div>
         <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
            <div className="bg-white/10 px-4 py-2 rounded-xl border border-white/20 flex-shrink-0">
              <p className="text-[8px] font-black uppercase">Placa Cavalo</p>
-             <p className="text-sm font-black font-mono">{driverData?.plateHorse}</p>
+             <p className="text-sm font-black font-mono">{driverData?.plateHorse || '---'}</p>
            </div>
            <div className="bg-white/10 px-4 py-2 rounded-xl border border-white/20 flex-shrink-0">
              <p className="text-[8px] font-black uppercase">Placa Carreta</p>
-             <p className="text-sm font-black font-mono">{driverData?.plateTrailer}</p>
+             <p className="text-sm font-black font-mono">{driverData?.plateTrailer || '---'}</p>
            </div>
         </div>
       </header>
@@ -73,7 +56,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       <main className="flex-1 p-4 space-y-4 overflow-y-auto">
         <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Minhas Viagens de Hoje</h2>
         
-        {myTrips.map(trip => (
+        {myTrips.length > 0 ? myTrips.map(trip => (
           <div key={trip.id} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-4">
             <div className="flex justify-between items-start">
               <div>
@@ -105,7 +88,14 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
               </div>
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="bg-white/50 p-12 rounded-[2.5rem] border border-dashed border-slate-200 text-center space-y-3">
+             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-300">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+             </div>
+             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest italic">Nenhuma viagem atribuída para hoje.</p>
+          </div>
+        )}
 
         {driverData?.whatsappGroupLink && (
           <a href={driverData.whatsappGroupLink} target="_blank" className="block w-full p-6 bg-emerald-500 text-white rounded-3xl text-center shadow-xl">
@@ -116,7 +106,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       </main>
 
       <footer className="p-4 bg-white border-t border-slate-200 text-center">
-         <p className="text-[9px] font-bold text-slate-400 uppercase">ALS Profissional v3.0 &bull; Suporte: (13) 9999-9999</p>
+         <p className="text-[9px] font-bold text-slate-400 uppercase">ALS Profissional v3.0 &bull; Suporte Operacional</p>
       </footer>
     </div>
   );
