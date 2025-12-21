@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ADMIN_CREDENTIALS, PASSWORD_REQUIREMENTS } from '../constants';
 import { db } from '../utils/storage';
@@ -25,7 +26,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
     const input = username.trim();
 
-    // 1. Prioridade Master: Admin operacional_ssz
+    // 1. Prioridade Master: Admin operacional_ssz / Operacional_SSZ
     if (input === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
       onLoginSuccess({
         id: 'admin-01',
@@ -70,7 +71,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           setError('Senha incorreta.');
         }
       } else {
-        setError('Usuário ou CPF não encontrado.');
+        setError('Usuário não encontrado.');
       }
     } catch (err) {
       setError('Erro na base de dados.');

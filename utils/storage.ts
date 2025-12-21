@@ -5,7 +5,6 @@ import { Driver, Customer, Port, PreStacking, Staff, User } from '../types';
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
 
-// Inicializa o cliente apenas se houver credenciais
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_KEY) 
   : null;
@@ -27,8 +26,8 @@ export const db = {
     localStorage.setItem(key, JSON.stringify(data));
   },
 
-  // SESSÃO: Usa sessionStorage para que ao fechar a guia a sessão expire
   setSession: (user: User | null) => {
+    // sessionStorage encerra os dados quando a aba é fechada
     if (user) sessionStorage.setItem(KEYS.SESSION, JSON.stringify(user));
     else sessionStorage.removeItem(KEYS.SESSION);
   },
@@ -47,27 +46,33 @@ export const db = {
           db._saveLocal(KEYS.USERS, data);
           return data;
         }
-      } catch (e) { console.warn("Supabase getUsers failed, using local."); }
+      } catch (e) { console.warn("Supabase getUsers offline."); }
     }
     return localData;
   },
 
   saveUser: async (user: User) => {
-    // 1. Garante salvamento local primeiro
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    const idx = current.findIndex((u: any) => u.id === user.id);
-    if (idx >= 0) current[idx] = user; else current.push(user);
-    db._saveLocal(KEYS.USERS, current);
+    const idx = current.findIndex((u: any) => u.id === user.id || u.username === user.username);
+    
+    let updated;
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = { ...updated[idx], ...user };
+    } else {
+      updated = [...current, user];
+    }
+    
+    db._saveLocal(KEYS.USERS, updated);
 
-    // 2. Tenta sincronizar com a nuvem em segundo plano
     if (supabase) {
       try {
         await supabase.from('users').upsert(user);
-      } catch (e) { console.error("Erro ao sincronizar User com Supabase."); }
+      } catch (e) { console.error("Cloud Sync Error (User)"); }
     }
   },
 
-  // STAFF (EQUIPE)
+  // COLABORADORES
   getStaff: async (): Promise<Staff[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     if (supabase) {
@@ -77,21 +82,27 @@ export const db = {
           db._saveLocal(KEYS.STAFF, data);
           return data;
         }
-      } catch (e) { console.warn("Supabase getStaff failed."); }
+      } catch (e) { console.warn("Supabase getStaff offline."); }
     }
     return localData;
   },
 
   saveStaff: async (staff: Staff, passwordOverride?: string) => {
-    // 1. Salvar Staff Localmente
+    // 1. Salvar Staff Local
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
-    if (sIdx >= 0) currentStaff[sIdx] = staff; else currentStaff.push(staff);
-    db._saveLocal(KEYS.STAFF, currentStaff);
+    let updatedStaff;
+    if (sIdx >= 0) {
+      updatedStaff = [...currentStaff];
+      updatedStaff[sIdx] = staff;
+    } else {
+      updatedStaff = [...currentStaff, staff];
+    }
+    db._saveLocal(KEYS.STAFF, updatedStaff);
 
-    // 2. Garantir Usuário de Acesso Localmente
+    // 2. Criar/Atualizar Usuário de Acesso
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    const existingUser = users.find((u: any) => u.staffId === staff.id);
+    const existingUser = users.find((u: any) => u.staffId === staff.id || u.username === staff.username);
     
     const userData: User = {
       id: existingUser?.id || `u-${staff.id}`,
@@ -101,18 +112,16 @@ export const db = {
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
-      // Senha padrão 12345678 se for novo
       password: passwordOverride || existingUser?.password || '12345678',
       position: staff.position
     };
     
     await db.saveUser(userData);
 
-    // 3. Nuvem
     if (supabase) {
       try {
         await supabase.from('staff').upsert(staff);
-      } catch (e) { console.error("Erro ao sincronizar Staff com Supabase."); }
+      } catch (e) { console.error("Cloud Sync Error (Staff)"); }
     }
   },
 
@@ -127,7 +136,7 @@ export const db = {
       try {
         await supabase.from('staff').delete().eq('id', id);
         await supabase.from('users').delete().eq('staffId', id);
-      } catch (e) { console.error("Erro ao deletar Staff do Supabase."); }
+      } catch (e) { console.error("Cloud Sync Error (Delete Staff)"); }
     }
     return true;
   },
@@ -142,7 +151,7 @@ export const db = {
           db._saveLocal(KEYS.DRIVERS, data);
           return data;
         }
-      } catch (e) { console.warn("Supabase getDrivers failed."); }
+      } catch (e) { console.warn("Supabase getDrivers offline."); }
     }
     return localData;
   },
@@ -150,35 +159,32 @@ export const db = {
   saveDriver: async (driver: Driver) => {
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     const idx = current.findIndex((d: any) => d.id === driver.id);
-    if (idx >= 0) current[idx] = driver; else current.push(driver);
-    db._saveLocal(KEYS.DRIVERS, current);
-    
-    if (supabase) {
-      try {
-        await supabase.from('drivers').upsert(driver);
-      } catch (e) { console.error("Erro ao sincronizar Driver com Supabase."); }
+    let updated;
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = driver;
+    } else {
+      updated = [...current, driver];
     }
+    db._saveLocal(KEYS.DRIVERS, updated);
+    if (supabase) await supabase.from('drivers').upsert(driver);
   },
 
   deleteDriver: async (id: string) => {
     const currentDrivers = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     db._saveLocal(KEYS.DRIVERS, currentDrivers.filter((d: any) => d.id !== id));
     if (supabase) {
-      try {
-        await supabase.from('drivers').delete().eq('id', id);
-        await supabase.from('users').delete().eq('driverId', id);
-      } catch (e) { console.error("Erro ao deletar Driver do Supabase."); }
+      await supabase.from('drivers').delete().eq('id', id);
     }
   },
 
-  // CLIENTES
   getCustomers: async (): Promise<Customer[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]');
     if (supabase) {
       try {
         const { data } = await supabase.from('customers').select('*');
         if (data && data.length > 0) { db._saveLocal(KEYS.CUSTOMERS, data); return data; }
-      } catch (e) { console.warn("Supabase getCustomers failed."); }
+      } catch (e) { console.warn("Supabase getCustomers offline."); }
     }
     return localData;
   },
@@ -186,23 +192,19 @@ export const db = {
   saveCustomer: async (customer: Customer) => {
     const current = JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]');
     const idx = current.findIndex((c: any) => c.id === customer.id);
-    if (idx >= 0) current[idx] = customer; else current.push(customer);
-    db._saveLocal(KEYS.CUSTOMERS, current);
-    if (supabase) {
-      try {
-        await supabase.from('customers').upsert(customer);
-      } catch (e) { console.error("Erro ao sincronizar Customer com Supabase."); }
-    }
+    let updated;
+    if (idx >= 0) { updated = [...current]; updated[idx] = customer; } else { updated = [...current, customer]; }
+    db._saveLocal(KEYS.CUSTOMERS, updated);
+    if (supabase) await supabase.from('customers').upsert(customer);
   },
 
-  // PORTOS
   getPorts: async (): Promise<Port[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
     if (supabase) {
       try {
         const { data } = await supabase.from('ports').select('*');
         if (data && data.length > 0) { db._saveLocal(KEYS.PORTS, data); return data; }
-      } catch (e) { console.warn("Supabase getPorts failed."); }
+      } catch (e) { console.warn("Supabase getPorts offline."); }
     }
     return localData;
   },
@@ -210,23 +212,19 @@ export const db = {
   savePort: async (port: Port) => {
     const current = JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
     const idx = current.findIndex((p: any) => p.id === port.id);
-    if (idx >= 0) current[idx] = port; else current.push(port);
-    db._saveLocal(KEYS.PORTS, current);
-    if (supabase) {
-      try {
-        await supabase.from('ports').upsert(port);
-      } catch (e) { console.error("Erro ao sincronizar Port com Supabase."); }
-    }
+    let updated;
+    if (idx >= 0) { updated = [...current]; updated[idx] = port; } else { updated = [...current, port]; }
+    db._saveLocal(KEYS.PORTS, updated);
+    if (supabase) await supabase.from('ports').upsert(port);
   },
 
-  // PRÉ-STACKING
   getPreStacking: async (): Promise<PreStacking[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.PRESTACKING) || '[]');
     if (supabase) {
       try {
         const { data } = await supabase.from('pre_stacking').select('*');
         if (data && data.length > 0) { db._saveLocal(KEYS.PRESTACKING, data); return data; }
-      } catch (e) { console.warn("Supabase getPreStacking failed."); }
+      } catch (e) { console.warn("Supabase getPreStacking offline."); }
     }
     return localData;
   },
@@ -234,13 +232,10 @@ export const db = {
   savePreStacking: async (item: PreStacking) => {
     const current = JSON.parse(localStorage.getItem(KEYS.PRESTACKING) || '[]');
     const idx = current.findIndex((p: any) => p.id === item.id);
-    if (idx >= 0) current[idx] = item; else current.push(item);
-    db._saveLocal(KEYS.PRESTACKING, current);
-    if (supabase) {
-      try {
-        await supabase.from('pre_stacking').upsert(item);
-      } catch (e) { console.error("Erro ao sincronizar PreStacking com Supabase."); }
-    }
+    let updated;
+    if (idx >= 0) { updated = [...current]; updated[idx] = item; } else { updated = [...current, item]; }
+    db._saveLocal(KEYS.PRESTACKING, updated);
+    if (supabase) await supabase.from('pre_stacking').upsert(item);
   },
 
   exportBackup: async () => {
