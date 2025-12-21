@@ -36,14 +36,15 @@ export const db = {
   },
 
   getUsers: async (): Promise<User[]> => {
+    const localData = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     if (supabase) {
       const { data, error } = await supabase.from('users').select('*');
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         db._saveLocal(KEYS.USERS, data);
         return data;
       }
     }
-    return JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
+    return localData;
   },
 
   saveUser: async (user: User) => {
@@ -59,15 +60,17 @@ export const db = {
   },
 
   getStaff: async (): Promise<Staff[]> => {
+    const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     if (supabase) {
       const { data, error } = await supabase.from('staff').select('*');
-      if (!error && data) {
+      // SÓ SUBSTITUI O LOCAL SE A NUVEM TIVER DADOS
+      if (!error && data && data.length > 0) {
         db._saveLocal(KEYS.STAFF, data);
         return data;
       }
       if (error) console.error("Erro ao buscar Staff:", error);
     }
-    return JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    return localData;
   },
 
   saveStaff: async (staff: Staff) => {
@@ -98,7 +101,10 @@ export const db = {
     // 3. Cloud
     if (supabase) {
       const { error } = await supabase.from('staff').upsert(staff);
-      if (error) console.error("Erro Supabase Staff:", error);
+      if (error) {
+        console.error("Erro Supabase Staff:", error);
+        alert(`Erro ao gravar na nuvem: ${error.message}`);
+      }
     }
   },
 
@@ -117,11 +123,15 @@ export const db = {
   },
 
   getDrivers: async (): Promise<Driver[]> => {
+    const localData = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     if (supabase) {
       const { data } = await supabase.from('drivers').select('*');
-      if (data) { db._saveLocal(KEYS.DRIVERS, data); return data; }
+      if (data && data.length > 0) {
+        db._saveLocal(KEYS.DRIVERS, data);
+        return data;
+      }
     }
-    return JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
+    return localData;
   },
 
   saveDriver: async (driver: Driver) => {
@@ -142,11 +152,12 @@ export const db = {
   },
 
   getCustomers: async (): Promise<Customer[]> => {
+    const localData = JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]');
     if (supabase) {
       const { data } = await supabase.from('customers').select('*');
-      if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; }
+      if (data && data.length > 0) { db._saveLocal(KEYS.CUSTOMERS, data); return data; }
     }
-    return JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]');
+    return localData;
   },
 
   saveCustomer: async (customer: Customer) => {
@@ -158,11 +169,12 @@ export const db = {
   },
 
   getPorts: async (): Promise<Port[]> => {
+    const localData = JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
     if (supabase) {
       const { data } = await supabase.from('ports').select('*');
-      if (data) { db._saveLocal(KEYS.PORTS, data); return data; }
+      if (data && data.length > 0) { db._saveLocal(KEYS.PORTS, data); return data; }
     }
-    return JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
+    return localData;
   },
 
   savePort: async (port: Port) => {
@@ -174,11 +186,12 @@ export const db = {
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
+    const localData = JSON.parse(localStorage.getItem(KEYS.PRESTACKING) || '[]');
     if (supabase) {
       const { data } = await supabase.from('pre_stacking').select('*');
-      if (data) { db._saveLocal(KEYS.PRESTACKING, data); return data; }
+      if (data && data.length > 0) { db._saveLocal(KEYS.PRESTACKING, data); return data; }
     }
-    return JSON.parse(localStorage.getItem(KEYS.PRESTACKING) || '[]');
+    return localData;
   },
 
   savePreStacking: async (item: PreStacking) => {
