@@ -41,19 +41,26 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     }
 
     // 2. Banco de Usuários
+    // Se o usuário digitado for composto apenas por números e tiver entre 11 e 14 dígitos, 
+    // tratamos como CPF/CNPJ (motorista). Caso contrário, é usuário da equipe (staff).
+    const isOnlyDigits = /^\d+$/.test(username.replace(/\D/g, ''));
+    const cleanUsername = (isOnlyDigits && username.length >= 11) 
+      ? username.replace(/\D/g, '') 
+      : username.trim();
+
     const users = await db.getUsers();
-    const cleanUsername = username.replace(/\D/g, '') || username;
     const foundUser = users.find(u => u.username === cleanUsername);
 
     if (foundUser) {
-       // Verificação de Senha (Motorista: Nome+CPF | Staff: 12345678 inicial)
+       // Verificação de Senha
        let isValid = false;
        if (foundUser.role === 'driver') {
-          // Motoristas não cadastrados têm senha padrão se forem gerados agora
-          // ou senhas salvas em um sistema de auth real. Aqui simulamos o match.
-          isValid = password.length >= 4; // Simplificado para o protótipo
+          // Motoristas: senha inicial costuma ser os 4 últimos dígitos do CPF ou nome (conforme lógica do DriversTab)
+          // Em um sistema real, haveria um hash de senha.
+          isValid = password.length >= 4; 
        } else {
-          isValid = password === '12345678' || password === foundUser.position; // Simulando match de senha
+          // Staff: senha padrão inicial '12345678' ou o cargo (position) se for bypass
+          isValid = password === '12345678' || password === foundUser.position;
        }
 
        if (isValid) {

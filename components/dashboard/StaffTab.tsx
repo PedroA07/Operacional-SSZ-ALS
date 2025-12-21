@@ -1,22 +1,30 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Staff } from '../../types';
 import { db } from '../../utils/storage';
 
 interface StaffTabProps {
   staffList: Staff[];
   onSaveStaff: (staff: Partial<Staff>, id?: string) => void;
+  onDeleteStaff: (id: string) => void;
 }
 
-const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff }) => {
+const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteStaff }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [form, setForm] = useState<Partial<Staff>>({ name: '', position: '', username: '', role: 'staff' });
   const photoRef = useRef<HTMLInputElement>(null);
 
+  // Memoriza os cargos existentes para sugerir no datalist
+  const existingPositions = useMemo(() => {
+    const pos = staffList.map(s => s.position).filter(p => !!p);
+    return Array.from(new Set(pos)).sort();
+  }, [staffList]);
+
   const handleCreateUser = (name: string) => {
     const parts = name.trim().toLowerCase().split(' ');
     if (parts.length < 2) return '';
+    // Formato: nome.ultimoSobrenome
     return `${parts[0]}.${parts[parts.length - 1]}`;
   };
 
@@ -24,8 +32,11 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff }) => {
     e.preventDefault();
     const staffId = editingId || `stf-${Date.now()}`;
     const staffData = { ...form, id: staffId } as Staff;
+    
+    // Salva o cadastro do colaborador
     onSaveStaff(staffData, editingId);
     
+    // Se for um novo cadastro, cria o acesso de usuário correspondente
     if (!editingId) {
       await db.saveUser({
         id: `u-${staffId}`,
@@ -70,10 +81,22 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff }) => {
             </div>
             <div className="mt-6 pt-6 border-t border-slate-50 flex justify-between items-center">
                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">User: <span className="text-slate-800">{s.username}</span></div>
-               <button onClick={() => { setForm(s); setEditingId(s.id); setIsModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-600 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
+               <div className="flex gap-2">
+                 <button onClick={() => { setForm(s); setEditingId(s.id); setIsModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-600 transition-colors" title="Editar">
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg>
+                 </button>
+                 <button onClick={() => onDeleteStaff(s.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors" title="Apagar">
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+                 </button>
+               </div>
             </div>
           </div>
         ))}
+        {staffList.length === 0 && (
+          <div className="col-span-full py-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
+            <p className="text-[11px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum colaborador cadastrado.</p>
+          </div>
+        )}
       </div>
 
       {isModalOpen && (
@@ -101,15 +124,31 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff }) => {
                  <div className="space-y-4">
                     <div className="space-y-1">
                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Completo</label>
-                       <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900" value={form.name} onChange={e => {
-                          const val = e.target.value;
-                          setForm({...form, name: val, username: handleCreateUser(val)});
-                       }} />
+                       <input 
+                         required 
+                         className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 placeholder-slate-300" 
+                         value={form.name} 
+                         placeholder="DIGITE O NOME..."
+                         onChange={e => {
+                            const val = e.target.value;
+                            setForm({...form, name: val, username: handleCreateUser(val)});
+                         }} 
+                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cargo</label>
-                          <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900" value={form.position} onChange={e => setForm({...form, position: e.target.value})} />
+                          <input 
+                            required 
+                            list="positions-list"
+                            className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 placeholder-slate-300" 
+                            value={form.position} 
+                            placeholder="EX: ANALISTA..."
+                            onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} 
+                          />
+                          <datalist id="positions-list">
+                            {existingPositions.map(p => <option key={p} value={p} />)}
+                          </datalist>
                        </div>
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Permissão</label>
@@ -120,7 +159,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff }) => {
                        </div>
                     </div>
                     <div className="space-y-1">
-                       <label className="text-[9px] font-black text-blue-500 uppercase ml-1">Usuário Gerado</label>
+                       <label className="text-[9px] font-black text-blue-500 uppercase ml-1">Usuário de Acesso (Gerado)</label>
                        <input readOnly className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 font-black text-blue-600 outline-none" value={form.username} />
                     </div>
                  </div>

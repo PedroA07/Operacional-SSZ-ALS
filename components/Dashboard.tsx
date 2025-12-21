@@ -267,7 +267,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onSavePreStacking={async (ps, id) => { await db.savePreStacking({...ps, id: id || `ps-${Date.now()}`} as PreStacking); loadAllData(); }} 
              />
            )}
-           {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} onSaveStaff={async (s, id) => { await db.saveStaff({...s, id: id || `stf-${Date.now()}`} as Staff); loadAllData(); }} />}
+           {activeTab === DashboardTab.COLABORADORES && (
+              <StaffTab 
+                staffList={staffList} 
+                onSaveStaff={async (s, id) => { await db.saveStaff({...s, id: id || `stf-${Date.now()}`} as Staff); loadAllData(); }} 
+                onDeleteStaff={async id => { if(confirm("Deseja realmente excluir este colaborador e seu acesso?")) { await db.deleteStaff(id); loadAllData(); } }}
+              />
+           )}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
            {activeTab === DashboardTab.FORMULARIOS && (
              <FormsTab drivers={drivers} customers={customers} ports={ports} initialFormId={autoOpenFormId} />

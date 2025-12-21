@@ -32,7 +32,7 @@ export const db = {
     return s ? JSON.parse(s) : null;
   },
 
-  // USERS (Auth Simulado para Motoristas e Staff)
+  // USERS
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
       const { data } = await supabase.from('users').select('*');
@@ -46,6 +46,11 @@ export const db = {
     const idx = current.findIndex(u => u.id === user.id);
     if (idx >= 0) current[idx] = user; else current.push(user);
     localStorage.setItem(KEYS.USERS, JSON.stringify(current));
+  },
+  deleteUser: async (id: string) => {
+    if (supabase) await supabase.from('users').delete().eq('id', id);
+    const current = await db.getUsers();
+    localStorage.setItem(KEYS.USERS, JSON.stringify(current.filter(u => u.id !== id)));
   },
 
   // STAFF
@@ -62,6 +67,13 @@ export const db = {
     const idx = current.findIndex(s => s.id === staff.id);
     if (idx >= 0) current[idx] = staff; else current.push(staff);
     localStorage.setItem(KEYS.STAFF, JSON.stringify(current));
+  },
+  deleteStaff: async (id: string) => {
+    if (supabase) await supabase.from('staff').delete().eq('id', id);
+    const current = await db.getStaff();
+    localStorage.setItem(KEYS.STAFF, JSON.stringify(current.filter(s => s.id !== id)));
+    // Remove o usuário associado
+    await db.deleteUser(`u-${id}`);
   },
 
   // DRIVERS
@@ -83,6 +95,7 @@ export const db = {
     if (supabase) await supabase.from('drivers').delete().eq('id', id);
     const current = await db.getDrivers();
     localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current.filter(d => d.id !== id)));
+    await db.deleteUser(`u-${id}`);
   },
 
   // OUTROS
