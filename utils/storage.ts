@@ -22,7 +22,6 @@ const KEYS = {
 export const db = {
   isCloudActive: () => !!supabase,
 
-  // SESSION
   setSession: (user: User | null) => {
     if (user) localStorage.setItem(KEYS.SESSION, JSON.stringify(user));
     else localStorage.removeItem(KEYS.SESSION);
@@ -32,16 +31,16 @@ export const db = {
     return s ? JSON.parse(s) : null;
   },
 
-  // USERS (Logins)
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
       const { data } = await supabase.from('users').select('*');
       if (data) return data;
     }
-    return JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
+    const local = localStorage.getItem(KEYS.USERS);
+    return local ? JSON.parse(local) : [];
   },
+
   saveUser: async (user: User) => {
-    // Forçar conversão para string para evitar erros de numérico com zeros à esquerda
     const userToSave = { 
       ...user, 
       id: String(user.id), 
@@ -56,6 +55,7 @@ export const db = {
     if (idx >= 0) current[idx] = userToSave; else current.push(userToSave);
     localStorage.setItem(KEYS.USERS, JSON.stringify(current));
   },
+
   deleteUser: async (id: string) => {
     const strId = String(id);
     if (supabase) await supabase.from('users').delete().eq('id', strId);
@@ -63,23 +63,24 @@ export const db = {
     localStorage.setItem(KEYS.USERS, JSON.stringify(current.filter(u => String(u.id) !== strId)));
   },
 
-  // STAFF
   getStaff: async (): Promise<Staff[]> => {
     if (supabase) {
       const { data } = await supabase.from('staff').select('*');
       if (data) return data;
     }
-    return JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    const local = localStorage.getItem(KEYS.STAFF);
+    return local ? JSON.parse(local) : [];
   },
+
   saveStaff: async (staff: Staff) => {
     const staffToSave = { ...staff, id: String(staff.id), username: String(staff.username) };
     if (supabase) await supabase.from('staff').upsert(staffToSave);
-    
     const current = await db.getStaff();
     const idx = current.findIndex(s => String(s.id) === staffToSave.id);
     if (idx >= 0) current[idx] = staffToSave; else current.push(staffToSave);
     localStorage.setItem(KEYS.STAFF, JSON.stringify(current));
   },
+
   deleteStaff: async (id: string) => {
     const strId = String(id);
     if (supabase) await supabase.from('staff').delete().eq('id', strId);
@@ -88,23 +89,24 @@ export const db = {
     await db.deleteUser(`u-${strId}`);
   },
 
-  // DRIVERS
   getDrivers: async (): Promise<Driver[]> => {
     if (supabase) {
       const { data } = await supabase.from('drivers').select('*');
       if (data) return data;
     }
-    return JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
+    const local = localStorage.getItem(KEYS.DRIVERS);
+    return local ? JSON.parse(local) : [];
   },
+
   saveDriver: async (driver: Driver) => {
     const driverToSave = { ...driver, id: String(driver.id), cpf: String(driver.cpf).replace(/\D/g, '') };
     if (supabase) await supabase.from('drivers').upsert(driverToSave);
-    
     const current = await db.getDrivers();
     const idx = current.findIndex(d => String(d.id) === driverToSave.id);
     if (idx >= 0) current[idx] = driverToSave; else current.push(driverToSave);
     localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current));
   },
+
   deleteDriver: async (id: string) => {
     const strId = String(id);
     if (supabase) await supabase.from('drivers').delete().eq('id', strId);
@@ -113,14 +115,15 @@ export const db = {
     await db.deleteUser(`u-${strId}`);
   },
 
-  // CUSTOMERS
   getCustomers: async (): Promise<Customer[]> => {
     if (supabase) {
       const { data } = await supabase.from('customers').select('*');
       if (data) return data;
     }
-    return JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]');
+    const local = localStorage.getItem(KEYS.CUSTOMERS);
+    return local ? JSON.parse(local) : [];
   },
+
   saveCustomer: async (customer: Customer) => {
     const customerToSave = { ...customer, id: String(customer.id) };
     if (supabase) await supabase.from('customers').upsert(customerToSave);
@@ -130,14 +133,15 @@ export const db = {
     localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(current));
   },
 
-  // PORTS
   getPorts: async (): Promise<Port[]> => {
     if (supabase) {
       const { data } = await supabase.from('ports').select('*');
       if (data) return data;
     }
-    return JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
+    const local = localStorage.getItem(KEYS.PORTS);
+    return local ? JSON.parse(local) : [];
   },
+
   savePort: async (port: Port) => {
     const portToSave = { ...port, id: String(port.id) };
     if (supabase) await supabase.from('ports').upsert(portToSave);
@@ -147,14 +151,15 @@ export const db = {
     localStorage.setItem(KEYS.PORTS, JSON.stringify(current));
   },
 
-  // PRE-STACKING
   getPreStacking: async (): Promise<PreStacking[]> => {
     if (supabase) {
       const { data } = await supabase.from('pre_stacking').select('*');
       if (data) return data;
     }
-    return JSON.parse(localStorage.getItem(KEYS.PRESTACKING) || '[]');
+    const local = localStorage.getItem(KEYS.PRESTACKING);
+    return local ? JSON.parse(local) : [];
   },
+
   savePreStacking: async (item: PreStacking) => {
     const itemToSave = { ...item, id: String(item.id) };
     if (supabase) await supabase.from('pre_stacking').upsert(itemToSave);
@@ -164,8 +169,6 @@ export const db = {
     localStorage.setItem(KEYS.PRESTACKING, JSON.stringify(current));
   },
 
-  // BACKUP & IMPORT
-  // Adds exportBackup to the db object to allow full local data export
   exportBackup: async () => {
     const data = {
       drivers: await db.getDrivers(),
@@ -184,19 +187,16 @@ export const db = {
     URL.revokeObjectURL(url);
   },
 
-  // Adds importBackup to the db object to allow full local data restoration
   importBackup: async (file: File): Promise<boolean> => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      
       if (data.drivers) localStorage.setItem(KEYS.DRIVERS, JSON.stringify(data.drivers));
       if (data.customers) localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(data.customers));
       if (data.ports) localStorage.setItem(KEYS.PORTS, JSON.stringify(data.ports));
       if (data.preStacking) localStorage.setItem(KEYS.PRESTACKING, JSON.stringify(data.preStacking));
       if (data.staff) localStorage.setItem(KEYS.STAFF, JSON.stringify(data.staff));
       if (data.users) localStorage.setItem(KEYS.USERS, JSON.stringify(data.users));
-
       return true;
     } catch (e) {
       console.error("Erro na importação:", e);
