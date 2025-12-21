@@ -41,26 +41,17 @@ export const db = {
   },
 
   saveUser: async (user: User) => {
-    const userToSave = { 
-      ...user, 
-      id: String(user.id), 
-      username: String(user.username),
-      password: user.password ? String(user.password) : undefined
-    };
-    
-    if (supabase) await supabase.from('users').upsert(userToSave);
-    
+    if (supabase) await supabase.from('users').upsert(user);
     const current = await db.getUsers();
-    const idx = current.findIndex(u => String(u.id) === userToSave.id);
-    if (idx >= 0) current[idx] = userToSave; else current.push(userToSave);
+    const idx = current.findIndex(u => u.id === user.id);
+    if (idx >= 0) current[idx] = user; else current.push(user);
     localStorage.setItem(KEYS.USERS, JSON.stringify(current));
   },
 
   deleteUser: async (id: string) => {
-    const strId = String(id);
-    if (supabase) await supabase.from('users').delete().eq('id', strId);
+    if (supabase) await supabase.from('users').delete().eq('id', id);
     const current = await db.getUsers();
-    localStorage.setItem(KEYS.USERS, JSON.stringify(current.filter(u => String(u.id) !== strId)));
+    localStorage.setItem(KEYS.USERS, JSON.stringify(current.filter(u => u.id !== id)));
   },
 
   getStaff: async (): Promise<Staff[]> => {
@@ -73,20 +64,35 @@ export const db = {
   },
 
   saveStaff: async (staff: Staff) => {
-    const staffToSave = { ...staff, id: String(staff.id), username: String(staff.username) };
-    if (supabase) await supabase.from('staff').upsert(staffToSave);
+    if (supabase) await supabase.from('staff').upsert(staff);
     const current = await db.getStaff();
-    const idx = current.findIndex(s => String(s.id) === staffToSave.id);
-    if (idx >= 0) current[idx] = staffToSave; else current.push(staffToSave);
+    const idx = current.findIndex(s => s.id === staff.id);
+    if (idx >= 0) current[idx] = staff; else current.push(staff);
     localStorage.setItem(KEYS.STAFF, JSON.stringify(current));
+
+    // Lógica de Usuário para Colaborador
+    const users = await db.getUsers();
+    const existingUser = users.find(u => u.staffId === staff.id);
+    if (!existingUser) {
+      await db.saveUser({
+        id: `u-${staff.id}`,
+        username: staff.username,
+        displayName: staff.name,
+        role: staff.role as any,
+        staffId: staff.id,
+        lastLogin: new Date().toISOString(),
+        isFirstLogin: true,
+        password: '12345678',
+        position: staff.position
+      });
+    }
   },
 
   deleteStaff: async (id: string) => {
-    const strId = String(id);
-    if (supabase) await supabase.from('staff').delete().eq('id', strId);
+    if (supabase) await supabase.from('staff').delete().eq('id', id);
     const current = await db.getStaff();
-    localStorage.setItem(KEYS.STAFF, JSON.stringify(current.filter(s => String(s.id) !== strId)));
-    await db.deleteUser(`u-${strId}`);
+    localStorage.setItem(KEYS.STAFF, JSON.stringify(current.filter(s => s.id !== id)));
+    await db.deleteUser(`u-${id}`);
   },
 
   getDrivers: async (): Promise<Driver[]> => {
@@ -99,20 +105,20 @@ export const db = {
   },
 
   saveDriver: async (driver: Driver) => {
-    const driverToSave = { ...driver, id: String(driver.id), cpf: String(driver.cpf).replace(/\D/g, '') };
-    if (supabase) await supabase.from('drivers').upsert(driverToSave);
+    if (supabase) await supabase.from('drivers').upsert(driver);
     const current = await db.getDrivers();
-    const idx = current.findIndex(d => String(d.id) === driverToSave.id);
-    if (idx >= 0) current[idx] = driverToSave; else current.push(driverToSave);
+    const idx = current.findIndex(d => d.id === driver.id);
+    if (idx >= 0) current[idx] = driver; else current.push(driver);
     localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current));
+
+    // A criação do usuário de motorista é disparada pelo componente DriversTab
   },
 
   deleteDriver: async (id: string) => {
-    const strId = String(id);
-    if (supabase) await supabase.from('drivers').delete().eq('id', strId);
+    if (supabase) await supabase.from('drivers').delete().eq('id', id);
     const current = await db.getDrivers();
-    localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current.filter(d => String(d.id) !== strId)));
-    await db.deleteUser(`u-${strId}`);
+    localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current.filter(d => d.id !== id)));
+    await db.deleteUser(`u-${id}`);
   },
 
   getCustomers: async (): Promise<Customer[]> => {
@@ -125,11 +131,10 @@ export const db = {
   },
 
   saveCustomer: async (customer: Customer) => {
-    const customerToSave = { ...customer, id: String(customer.id) };
-    if (supabase) await supabase.from('customers').upsert(customerToSave);
+    if (supabase) await supabase.from('customers').upsert(customer);
     const current = await db.getCustomers();
-    const idx = current.findIndex(c => String(c.id) === customerToSave.id);
-    if (idx >= 0) current[idx] = customerToSave; else current.push(customerToSave);
+    const idx = current.findIndex(c => c.id === customer.id);
+    if (idx >= 0) current[idx] = customer; else current.push(customer);
     localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(current));
   },
 
@@ -143,11 +148,10 @@ export const db = {
   },
 
   savePort: async (port: Port) => {
-    const portToSave = { ...port, id: String(port.id) };
-    if (supabase) await supabase.from('ports').upsert(portToSave);
+    if (supabase) await supabase.from('ports').upsert(port);
     const current = await db.getPorts();
-    const idx = current.findIndex(p => String(p.id) === portToSave.id);
-    if (idx >= 0) current[idx] = portToSave; else current.push(portToSave);
+    const idx = current.findIndex(p => p.id === port.id);
+    if (idx >= 0) current[idx] = port; else current.push(port);
     localStorage.setItem(KEYS.PORTS, JSON.stringify(current));
   },
 
@@ -161,20 +165,20 @@ export const db = {
   },
 
   savePreStacking: async (item: PreStacking) => {
-    const itemToSave = { ...item, id: String(item.id) };
-    if (supabase) await supabase.from('pre_stacking').upsert(itemToSave);
+    if (supabase) await supabase.from('pre_stacking').upsert(item);
     const current = await db.getPreStacking();
-    const idx = current.findIndex(p => String(p.id) === itemToSave.id);
-    if (idx >= 0) current[idx] = itemToSave; else current.push(itemToSave);
+    const idx = current.findIndex(p => p.id === item.id);
+    if (idx >= 0) current[idx] = item; else current.push(item);
     localStorage.setItem(KEYS.PRESTACKING, JSON.stringify(current));
   },
 
+  // FIX: Adicionando função de exportação de backup ausente exigida pelo SystemTab.tsx
   exportBackup: async () => {
     const data = {
       drivers: await db.getDrivers(),
       customers: await db.getCustomers(),
       ports: await db.getPorts(),
-      preStacking: await db.getPreStacking(),
+      prestacking: await db.getPreStacking(),
       staff: await db.getStaff(),
       users: await db.getUsers()
     };
@@ -187,19 +191,23 @@ export const db = {
     URL.revokeObjectURL(url);
   },
 
+  // FIX: Adicionando função de importação de backup ausente exigida pelo SystemTab.tsx
   importBackup: async (file: File): Promise<boolean> => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
+      
       if (data.drivers) localStorage.setItem(KEYS.DRIVERS, JSON.stringify(data.drivers));
       if (data.customers) localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(data.customers));
       if (data.ports) localStorage.setItem(KEYS.PORTS, JSON.stringify(data.ports));
-      if (data.preStacking) localStorage.setItem(KEYS.PRESTACKING, JSON.stringify(data.preStacking));
+      if (data.prestacking) localStorage.setItem(KEYS.PRESTACKING, JSON.stringify(data.prestacking));
       if (data.staff) localStorage.setItem(KEYS.STAFF, JSON.stringify(data.staff));
       if (data.users) localStorage.setItem(KEYS.USERS, JSON.stringify(data.users));
+
+      // A importação de backup sobrescreve os dados locais para restauração rápida.
       return true;
     } catch (e) {
-      console.error("Erro na importação:", e);
+      console.error("Erro na importação de backup:", e);
       return false;
     }
   }

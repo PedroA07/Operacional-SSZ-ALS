@@ -15,7 +15,7 @@ const App: React.FC = () => {
     const savedSession = db.getSession();
     if (savedSession) {
       setUser(savedSession);
-      if (savedSession.role === 'driver') {
+      if (savedSession.role === 'driver' || savedSession.role === 'motoboy') {
         setCurrentScreen(AppScreen.DRIVER_PORTAL);
       } else {
         setCurrentScreen(AppScreen.DASHBOARD);
@@ -27,7 +27,7 @@ const App: React.FC = () => {
   const handleLoginSuccess = (userData: User) => {
     setUser(userData);
     db.setSession(userData);
-    if (userData.role === 'driver') {
+    if (userData.role === 'driver' || userData.role === 'motoboy') {
       setCurrentScreen(AppScreen.DRIVER_PORTAL);
     } else {
       setCurrentScreen(AppScreen.DASHBOARD);

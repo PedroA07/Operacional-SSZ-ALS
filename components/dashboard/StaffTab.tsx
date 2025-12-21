@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { Staff, User } from '../../types';
 import { db } from '../../utils/storage';
@@ -20,10 +19,23 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
     return Array.from(new Set(pos)).sort();
   }, [staffList]);
 
-  const handleCreateUser = (name: string) => {
+  const generateUsername = (name: string) => {
     const parts = name.trim().toLowerCase().split(' ');
-    if (parts.length < 2) return parts[0] || '';
-    return `${parts[0]}.${parts[parts.length - 1]}`;
+    if (parts.length < 1) return '';
+    
+    const first = parts[0];
+    const last = parts.length > 1 ? parts[parts.length - 1] : '';
+    let base = last ? `${first}.${last}` : first;
+    
+    // Tratamento de duplicidade
+    let final = base;
+    let count = 0;
+    while (staffList.some(s => s.username === final && s.id !== editingId)) {
+      final = base + '_';
+      // Se houver mais de uma duplicata, poderíamos adicionar mais _, mas _ resolve o pedido
+    }
+    
+    return final;
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -32,36 +44,12 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
     const staffData = { 
       ...form, 
       id: staffId, 
-      username: String(form.username).toLowerCase(), // Garantindo string
+      username: form.username || generateUsername(form.name || ''),
       registrationDate: form.registrationDate || new Date().toISOString() 
     } as Staff;
     
-    // 1. Salva o perfil do colaborador
     onSaveStaff(staffData, editingId);
-    
-    // 2. Salva ou atualiza o usuário de acesso (Logins)
-    const accessUser: User = {
-      id: `u-${staffId}`,
-      username: String(form.username).toLowerCase(),
-      displayName: String(form.name),
-      role: form.role as any,
-      staffId: staffId,
-      lastLogin: new Date().toISOString(),
-      isFirstLogin: editingId ? false : true, // Se for novo, pede troca de senha
-      position: form.position,
-      avatar: form.photo,
-      password: '12345678' // Senha padrão
-    };
-
-    await db.saveUser(accessUser);
-    
     setIsModalOpen(false);
-  };
-
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Deseja realmente apagar o colaborador ${name} e remover seu acesso ao sistema?`)) {
-      onDeleteStaff(id);
-    }
   };
 
   return (
@@ -92,12 +80,8 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
             <div className="mt-6 pt-6 border-t border-slate-50 flex justify-between items-center">
                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">User: <span className="text-slate-800">{s.username}</span></div>
                <div className="flex gap-2">
-                 <button onClick={() => { setForm(s); setEditingId(s.id); setIsModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-600 transition-colors" title="Editar">
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg>
-                 </button>
-                 <button onClick={() => handleDelete(s.id, s.name)} className="p-2 text-slate-300 hover:text-red-500 transition-colors" title="Apagar">
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
-                 </button>
+                 <button onClick={() => { setForm(s); setEditingId(s.id); setIsModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-600 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
+                 <button onClick={() => onDeleteStaff(s.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
                </div>
             </div>
           </div>
@@ -131,12 +115,11 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Completo</label>
                        <input 
                          required 
-                         className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 placeholder-slate-300" 
+                         className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900" 
                          value={form.name} 
-                         placeholder="DIGITE O NOME..."
                          onChange={e => {
                             const val = e.target.value;
-                            setForm({...form, name: val, username: handleCreateUser(val)});
+                            setForm({...form, name: val, username: generateUsername(val)});
                          }} 
                        />
                     </div>
@@ -146,9 +129,8 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
                           <input 
                             required 
                             list="positions-list"
-                            className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 placeholder-slate-300" 
+                            className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900" 
                             value={form.position} 
-                            placeholder="EX: ANALISTA..."
                             onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} 
                           />
                           <datalist id="positions-list">
@@ -169,9 +151,9 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
                     </div>
                  </div>
 
-                 <div className="pt-4 space-y-3 text-center">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase italic">Acesso será criado/atualizado com sucesso no banco.</p>
-                    <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all">Salvar e Sincronizar</button>
+                 <div className="pt-4 text-center">
+                    <p className="text-[8px] font-bold text-slate-400 uppercase italic">A senha padrão no primeiro acesso será 12345678.</p>
+                    <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all mt-4">Salvar e Sincronizar</button>
                  </div>
               </form>
            </div>

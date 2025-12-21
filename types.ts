@@ -4,7 +4,7 @@ export interface User {
   username: string;
   password?: string;
   displayName: string;
-  role: 'admin' | 'staff' | 'driver';
+  role: 'admin' | 'staff' | 'driver' | 'motoboy';
   driverId?: string;
   staffId?: string;
   lastLogin: string;
@@ -74,7 +74,7 @@ export interface Driver {
   yearHorse: string;
   plateTrailer: string;
   yearTrailer: string;
-  driverType: 'Frota' | 'Externo';
+  driverType: 'Frota' | 'Externo' | 'Motoboy';
   status: 'Ativo' | 'Inativo';
   statusLastChangeDate: string;
   beneficiaryName: string;
