@@ -27,11 +27,12 @@ export const db = {
   },
 
   setSession: (user: User | null) => {
-    if (user) localStorage.setItem(KEYS.SESSION, JSON.stringify(user));
-    else localStorage.removeItem(KEYS.SESSION);
+    // sessionStorage encerra os dados quando a aba é fechada
+    if (user) sessionStorage.setItem(KEYS.SESSION, JSON.stringify(user));
+    else sessionStorage.removeItem(KEYS.SESSION);
   },
   getSession: (): User | null => {
-    const s = localStorage.getItem(KEYS.SESSION);
+    const s = sessionStorage.getItem(KEYS.SESSION);
     return s ? JSON.parse(s) : null;
   },
 
@@ -63,7 +64,6 @@ export const db = {
     const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     if (supabase) {
       const { data, error } = await supabase.from('staff').select('*');
-      // SÓ SUBSTITUI O LOCAL SE A NUVEM TIVER DADOS
       if (!error && data && data.length > 0) {
         db._saveLocal(KEYS.STAFF, data);
         return data;
@@ -74,13 +74,11 @@ export const db = {
   },
 
   saveStaff: async (staff: Staff) => {
-    // 1. Local
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
     if (sIdx >= 0) currentStaff[sIdx] = staff; else currentStaff.push(staff);
     db._saveLocal(KEYS.STAFF, currentStaff);
 
-    // 2. Gerar Acesso
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const existingUser = users.find((u: any) => u.staffId === staff.id);
     
@@ -98,13 +96,9 @@ export const db = {
     
     await db.saveUser(userData);
 
-    // 3. Cloud
     if (supabase) {
       const { error } = await supabase.from('staff').upsert(staff);
-      if (error) {
-        console.error("Erro Supabase Staff:", error);
-        alert(`Erro ao gravar na nuvem: ${error.message}`);
-      }
+      if (error) console.error("Erro Supabase Staff:", error);
     }
   },
 

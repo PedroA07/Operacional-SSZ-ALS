@@ -92,7 +92,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const toggleMenu = (menu: string) => setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
 
   const MenuItem = ({ tab, label, subItems, adminOnly }: { tab?: DashboardTab, label: string, subItems?: { label: string, onClick: () => void }[], adminOnly?: boolean }) => {
-    // REGRA DE ACESSO: Se for adminOnly e o usuário não for admin, não renderiza
     if (adminOnly && user.role !== 'admin') return null;
     
     const isExpanded = expandedMenus[label];
@@ -136,7 +135,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     );
   };
 
-  // Encontrar data de cadastro do staff atual
   const myStaffData = staffList.find(s => s.id === user.staffId);
 
   return (
@@ -227,7 +225,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </button>
 
               {isProfileMenuOpen && (
-                <div className="absolute top-full right-0 mt-3 w-72 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-6 animate-in slide-in-from-top-4 duration-300 z-[100]">
+                <div className="absolute top-full right-0 mt-3 w-72 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-6 animate-in slide-in-from-top-4 duration-300 z-[100] backdrop-blur-xl bg-white/95">
                   <div className="text-center mb-6 pb-6 border-b border-slate-50">
                     <div className="w-16 h-16 rounded-3xl bg-blue-600 text-white flex items-center justify-center text-2xl font-black mx-auto mb-4 shadow-xl">
                       {user.displayName.substring(0,1).toUpperCase()}
@@ -244,7 +242,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     <div className="flex flex-col gap-1 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100">
                       <span className="text-[8px] font-black text-slate-400 uppercase">Membro Desde</span>
                       <span className="text-xs font-black text-slate-800">
-                        {myStaffData ? new Date(myStaffData.registrationDate).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
+                        {myStaffData ? new Date(myStaffData.registrationDate).toLocaleDateString('pt-BR') : 'Aguardando Sinc.'}
                       </span>
                     </div>
                   </div>
@@ -256,7 +254,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                         if (user.role === 'admin') {
                           setActiveTab(DashboardTab.COLABORADORES);
                         } else {
-                          alert("Apenas administradores podem editar perfis diretamente.");
+                          alert("Acesso restrito ao Administrador para edição de dados sensíveis.");
                         }
                       }}
                       className="w-full py-3.5 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95"

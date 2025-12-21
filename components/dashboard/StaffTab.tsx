@@ -14,7 +14,6 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
-  // REGRA: Novos cadastros começam com a senha padrão 12345678
   const [form, setForm] = useState<Partial<Staff & { password?: string }>>({ 
     name: '', position: '', username: '', role: 'staff', password: '12345678' 
   });
@@ -59,14 +58,12 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
     try {
       await onSaveStaff(staffData, editingId);
       
-      // Atualizar ou criar senha do usuário correspondente
-      const currentUser = users.find(u => u.staffId === staffId);
       const passToSave = form.password || '12345678';
+      const currentUser = users.find(u => u.staffId === staffId);
       
       if (currentUser) {
-        await db.saveUser({ ...currentUser, password: passToSave, position: staffData.position });
+        await db.saveUser({ ...currentUser, password: passToSave, position: staffData.position, role: staffData.role as any });
       } else {
-        // O db.saveStaff já cria um usuário padrão, mas garantimos a sincronia aqui se necessário
         await db.saveUser({
           id: `u-${staffId}`,
           username: staffData.username,
@@ -82,7 +79,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
       
       setIsModalOpen(false);
     } catch (err) {
-      alert("Erro ao salvar.");
+      alert("Erro ao salvar informações do colaborador.");
     } finally {
       setIsProcessing(false);
     }
@@ -106,12 +103,14 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Equipe ALS</h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão Administrativa do Portal</p>
         </div>
-        <button 
-          onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678' }); setEditingId(undefined); setIsModalOpen(true); }} 
-          className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all active:scale-95"
-        >
-          Novo Colaborador
-        </button>
+        {currentUserRole === 'admin' && (
+          <button 
+            onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678' }); setEditingId(undefined); setIsModalOpen(true); }} 
+            className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all active:scale-95"
+          >
+            Novo Colaborador
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -140,10 +139,9 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
                     <span className="text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">{s.username}</span>
                  </div>
                  
-                 {/* VISUALIZAÇÃO DE SENHA PARA ADMINS */}
                  {currentUserRole === 'admin' && (
                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                      <span className="text-slate-400">Senha</span>
+                      <span className="text-slate-400">Senha Master</span>
                       <div className="flex items-center gap-2">
                         <span className="text-blue-600 font-mono text-[10px] font-black">{isPassVisible ? (linkedUser?.password || '---') : '••••••••'}</span>
                         <button 
@@ -151,7 +149,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
                           className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-400"
                         >
                           {isPassVisible ? (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" strokeWidth="2.5"/></svg>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" strokeWidth="2.5"/></svg>
                           ) : (
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
                           )}
@@ -161,16 +159,18 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
                  )}
               </div>
 
-              <div className="mt-6 flex gap-2">
-                 <button onClick={() => handleEdit(s)} className="flex-1 py-2.5 bg-slate-50 text-slate-500 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">Editar</button>
-                 <button 
-                   disabled={isProcessing}
-                   onClick={() => onDeleteStaff(s.id)} 
-                   className="px-4 py-2.5 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all active:scale-95"
-                 >
-                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
-                 </button>
-              </div>
+              {currentUserRole === 'admin' && (
+                <div className="mt-6 flex gap-2">
+                   <button onClick={() => handleEdit(s)} className="flex-1 py-2.5 bg-slate-50 text-slate-500 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">Editar</button>
+                   <button 
+                     disabled={isProcessing}
+                     onClick={() => onDeleteStaff(s.id)} 
+                     className="px-4 py-2.5 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all active:scale-95"
+                   >
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+                   </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -180,7 +180,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Editar Perfil' : 'Novo Colaborador'}</h3>
+                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Dados do Perfil' : 'Novo Colaborador'}</h3>
                  <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
               </div>
               <form onSubmit={handleSave} className="p-10 space-y-5">
@@ -238,9 +238,6 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
                           />
                        </div>
                     </div>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase text-center italic mt-2">
-                       * Senha padrão para novos cadastros: <span className="text-emerald-500">12345678</span>
-                    </p>
                  </div>
 
                  <div className="pt-6">
@@ -249,7 +246,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
                       disabled={isProcessing}
                       className={`w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
                     >
-                      {isProcessing ? 'Sincronizando...' : editingId ? 'Salvar Alterações' : 'Criar Colaborador'}
+                      {isProcessing ? 'Gravando...' : editingId ? 'Salvar Perfil' : 'Criar Colaborador'}
                     </button>
                  </div>
               </form>
