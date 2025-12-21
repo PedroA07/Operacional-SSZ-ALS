@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ADMIN_CREDENTIALS } from '../constants';
+import { ADMIN_CREDENTIALS, PASSWORD_REQUIREMENTS } from '../constants';
 import { db } from '../utils/storage';
 import { User } from '../types';
 
@@ -25,10 +25,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     setError('');
     setIsLoading(true);
 
-    // Pequeno delay para UX
     await new Promise(r => setTimeout(r, 600));
 
-    // 1. Admin Master Estático (Prioridade)
+    // 1. Admin Master Estático
     if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
       onLoginSuccess({
         id: 'admin-01',
@@ -47,7 +46,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     // Tentativa 1: Busca exata (Funciona para staff "nome.sobrenome")
     let foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase().trim());
 
-    // Tentativa 2: Busca por CPF limpo (Se o usuário digitou com pontos/traços e for motorista)
+    // Tentativa 2: Busca por CPF limpo (Se o usuário for motorista)
     if (!foundUser) {
       const cleanInput = username.replace(/\D/g, '');
       if (cleanInput.length >= 11) {
@@ -58,13 +57,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     if (foundUser) {
        let isValid = false;
        
-       // Se o usuário já trocou a senha (não é mais primeiro acesso), verificamos a senha salva
        if (!foundUser.isFirstLogin && foundUser.password) {
           isValid = password === foundUser.password;
        } else {
-          // Lógica de Primeiro Acesso ou Bypass
           if (foundUser.role === 'driver') {
-             // Motoristas aceitam qualquer senha de 4 dígitos no primeiro acesso
              isValid = password.length >= 4; 
           } else {
              // Staff aceita '12345678' ou o próprio cargo no primeiro acesso
@@ -94,7 +90,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     setError('');
     
     if (newPassword !== confirmPassword) { setError('As senhas não conferem.'); return; }
-    if (newPassword.length < 8) { setError('A senha deve ter no mínimo 8 caracteres.'); return; }
+    // Única validação: Mínimo de caracteres
+    if (newPassword.length < PASSWORD_REQUIREMENTS.minLength) { 
+      setError(`A senha deve ter no mínimo ${PASSWORD_REQUIREMENTS.minLength} caracteres.`); 
+      return; 
+    }
 
     if (pendingUser) {
        setIsLoading(true);
@@ -109,7 +109,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
          await db.saveUser(updated);
          onLoginSuccess(updated);
        } catch (err) {
-         setError('Erro ao salvar nova senha. Tente novamente.');
+         setError('Erro ao salvar nova senha.');
        } finally {
          setIsLoading(false);
        }
@@ -136,7 +136,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               <div className="space-y-4">
                  <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Nova Senha</label>
-                    <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" placeholder="MÍNIMO 8 DÍGITOS" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                    <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" placeholder={`MÍNIMO ${PASSWORD_REQUIREMENTS.minLength} CARACTERES`} value={newPassword} onChange={e => setNewPassword(e.target.value)} />
                  </div>
                  <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Confirmar Senha</label>
