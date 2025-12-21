@@ -26,7 +26,6 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff }) => {
     const staffData = { ...form, id: staffId } as Staff;
     onSaveStaff(staffData, editingId);
     
-    // Se for novo, cria o usuário correspondente no sistema de login
     if (!editingId) {
       await db.saveUser({
         id: `u-${staffId}`,
@@ -51,7 +50,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff }) => {
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Equipe ALS</h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Colaboradores e Administradores</p>
         </div>
-        <button onClick={() => { setForm({ role: 'staff' }); setEditingId(undefined); setIsModalOpen(true); }} className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all">Novo Colaborador</button>
+        <button onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '' }); setEditingId(undefined); setIsModalOpen(true); }} className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all">Novo Colaborador</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -102,7 +101,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff }) => {
                  <div className="space-y-4">
                     <div className="space-y-1">
                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Completo</label>
-                       <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500" value={form.name} onChange={e => {
+                       <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900" value={form.name} onChange={e => {
                           const val = e.target.value;
                           setForm({...form, name: val, username: handleCreateUser(val)});
                        }} />
@@ -110,11 +109,11 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff }) => {
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cargo</label>
-                          <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500" value={form.position} onChange={e => setForm({...form, position: e.target.value})} />
+                          <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900" value={form.position} onChange={e => setForm({...form, position: e.target.value})} />
                        </div>
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Permissão</label>
-                          <select className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500" value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
+                          <select className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900" value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
                              <option value="staff">Staff Geral</option>
                              <option value="admin">Administrador</option>
                           </select>

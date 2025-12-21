@@ -9,6 +9,7 @@ import PortsTab from './dashboard/PortsTab';
 import PreStackingTab from './dashboard/PreStackingTab';
 import OperationsTab from './dashboard/OperationsTab';
 import StaffTab from './dashboard/StaffTab';
+import SystemTab from './dashboard/SystemTab';
 import { DEFAULT_OPERATIONS } from '../constants/operations';
 import { db } from '../utils/storage';
 
@@ -25,6 +26,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [onlineUsersCount, setOnlineUsersCount] = useState(1);
   const [isCloud, setIsCloud] = useState(false);
+  const [autoOpenFormId, setAutoOpenFormId] = useState<string | null>(null);
   
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -45,7 +47,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         db.getDrivers(), db.getCustomers(), db.getPorts(), db.getPreStacking(), db.getStaff()
       ]);
       setDrivers(d); setCustomers(c); setPorts(p); setPreStacking(ps); setStaffList(s);
-      // Mantém contador em 1 (usuário atual) até integração de presença real
       setOnlineUsersCount(1);
     } catch (e) { console.error("Falha ao carregar dados:", e); }
     setIsSyncing(false);
@@ -65,7 +66,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           forecastNextDay: { temp: Math.round(data.daily.temperature_2m_max[1]), condition: conds[data.daily.weathercode[1]] || 'Estável' }
         });
       } catch (e) { console.error("Erro clima:", e); }
-    });
+    }, () => {});
   };
 
   useEffect(() => {
@@ -87,6 +88,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             onClick={() => {
               if (tab) {
                 setActiveTab(tab);
+                setAutoOpenFormId(null);
                 if (tab === DashboardTab.OPERACOES) {
                   setOpsView({ type: 'list', id: '', categoryName: '', clientName: '' });
                 }
@@ -156,6 +158,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               label: op.category, 
               onClick: () => {
                 setActiveTab(DashboardTab.OPERACOES);
+                setAutoOpenFormId(null);
                 setOpsView({ type: 'category', id: op.id, categoryName: op.category, clientName: '' });
               } 
             }))} 
@@ -165,8 +168,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             tab={DashboardTab.FORMULARIOS} 
             label="Formulários" 
             subItems={[
-              { label: 'Ordem de Coleta', onClick: () => setActiveTab(DashboardTab.FORMULARIOS) },
-              { label: 'Pré-Stacking', onClick: () => setActiveTab(DashboardTab.FORMULARIOS) }
+              { label: 'Ordem de Coleta', onClick: () => { setActiveTab(DashboardTab.FORMULARIOS); setAutoOpenFormId('ORDEM_COLETA'); } },
+              { label: 'Pré-Stacking', onClick: () => { setActiveTab(DashboardTab.FORMULARIOS); setAutoOpenFormId('PRE_STACKING'); } }
             ]}
           />
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" />
@@ -176,6 +179,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <div className="pt-6 px-4">
               <p className="text-[8px] font-black text-slate-600 uppercase tracking-[0.2em] mb-3">Administração</p>
               <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" />
+              <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" />
             </div>
           )}
         </nav>
@@ -264,8 +268,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              />
            )}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} onSaveStaff={async (s, id) => { await db.saveStaff({...s, id: id || `stf-${Date.now()}`} as Staff); loadAllData(); }} />}
+           {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
            {activeTab === DashboardTab.FORMULARIOS && (
-             <FormsTab drivers={drivers} customers={customers} ports={ports} />
+             <FormsTab drivers={drivers} customers={customers} ports={ports} initialFormId={autoOpenFormId} />
            )}
         </div>
       </main>

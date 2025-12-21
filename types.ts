@@ -109,7 +109,8 @@ export enum DashboardTab {
   PORTOS = 'PORTOS',
   PRE_STACKING = 'PRE_STACKING',
   FORMULARIOS = 'FORMULARIOS',
-  COLABORADORES = 'COLABORADORES'
+  COLABORADORES = 'COLABORADORES',
+  SISTEMA = 'SISTEMA'
 }
 
 export interface WeatherData {
@@ -128,7 +129,6 @@ export interface OperationDefinition {
   clients: { name: string; hasDedicatedPage: boolean }[];
 }
 
-// Added types for Volkswagen operation monitoring
 export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
 
 export interface VWStatusUpdate {
@@ -152,7 +152,6 @@ export interface VWSchedule {
   statusHistory: VWStatusUpdate[];
 }
 
-// Added missing interfaces for Trip monitoring features
 export interface Milestone {
   dt: string;
   location?: string;
