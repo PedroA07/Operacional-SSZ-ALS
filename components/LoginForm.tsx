@@ -25,10 +25,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     setError('');
     setIsLoading(true);
 
+    // Simulação de delay para feedback visual
     await new Promise(r => setTimeout(r, 600));
 
-    // 1. Admin Master Estático
-    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+    const inputTrimmed = String(username).trim();
+
+    // 1. Prioridade: Admin Master (operacional_ssz)
+    if (inputTrimmed === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
       onLoginSuccess({
         id: 'admin-01',
         username: 'operacional_ssz',
@@ -40,79 +43,94 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // 2. Busca no banco
-    const users = await db.getUsers();
-    
-    // Tentativa 1: Busca exata (Funciona para staff "nome.sobrenome")
-    let foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase().trim());
+    // 2. Busca no banco de usuários
+    try {
+      const users = await db.getUsers();
+      
+      // Tentativa 1: Busca exata por string (Prioridade Equipe: nome.sobrenome)
+      let foundUser = users.find(u => 
+        String(u.username).toLowerCase() === inputTrimmed.toLowerCase()
+      );
 
-    // Tentativa 2: Busca por CPF limpo (Se o usuário for motorista)
-    if (!foundUser) {
-      const cleanInput = username.replace(/\D/g, '');
-      if (cleanInput.length >= 11) {
-        foundUser = users.find(u => u.username === cleanInput);
+      // Tentativa 2: Busca por CPF (Fallback Motoristas: apenas números)
+      if (!foundUser) {
+        const numericInput = inputTrimmed.replace(/\D/g, '');
+        if (numericInput.length >= 11) {
+          foundUser = users.find(u => String(u.username) === numericInput);
+        }
       }
-    }
 
-    if (foundUser) {
-       let isValid = false;
-       
-       if (!foundUser.isFirstLogin && foundUser.password) {
+      if (foundUser) {
+        let isValid = false;
+        
+        // Verificação da senha
+        if (!foundUser.isFirstLogin && foundUser.password) {
+          // Senha personalizada já definida
           isValid = password === foundUser.password;
-       } else {
+        } else {
+          // Lógica de Primeiro Acesso
           if (foundUser.role === 'driver') {
-             isValid = password.length >= 4; 
+            // Motoristas no 1º acesso aceitam qualquer senha de 4+ dígitos para forçar troca
+            isValid = password.length >= 4; 
           } else {
-             // Staff aceita '12345678' ou o próprio cargo no primeiro acesso
-             isValid = password === '12345678' || (foundUser.position && password === foundUser.position);
+            // Staff no 1º acesso aceita '12345678' ou o cargo (position)
+            const defaultPass = '12345678';
+            isValid = password === defaultPass || (foundUser.position && password === String(foundUser.position).toUpperCase());
           }
-       }
+        }
 
-       if (isValid) {
+        if (isValid) {
           if (foundUser.isFirstLogin) {
-             setPendingUser(foundUser);
-             setIsChangingPassword(true);
+            setPendingUser(foundUser);
+            setIsChangingPassword(true);
           } else {
-             onLoginSuccess({ ...foundUser, lastLogin: new Date().toISOString() });
+            onLoginSuccess({ ...foundUser, lastLogin: new Date().toISOString() });
           }
-       } else {
+        } else {
           setError('Senha incorreta.');
-       }
-    } else {
-       setError('Credenciais não encontradas.');
+        }
+      } else {
+        setError('Credenciais não encontradas.');
+      }
+    } catch (err) {
+      setError('Erro ao conectar com o banco de dados.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
-    if (newPassword !== confirmPassword) { setError('As senhas não conferem.'); return; }
-    // Única validação: Mínimo de caracteres
+    if (newPassword !== confirmPassword) {
+      setError('As senhas não conferem.');
+      return;
+    }
+
+    // ÚNICA VALIDAÇÃO: Mínimo de caracteres (definido em constants como 8)
     if (newPassword.length < PASSWORD_REQUIREMENTS.minLength) { 
       setError(`A senha deve ter no mínimo ${PASSWORD_REQUIREMENTS.minLength} caracteres.`); 
       return; 
     }
 
     if (pendingUser) {
-       setIsLoading(true);
-       const updated: User = { 
-         ...pendingUser, 
-         password: newPassword,
-         isFirstLogin: false, 
-         lastLogin: new Date().toISOString() 
-       };
-       
-       try {
-         await db.saveUser(updated);
-         onLoginSuccess(updated);
-       } catch (err) {
-         setError('Erro ao salvar nova senha.');
-       } finally {
-         setIsLoading(false);
-       }
+      setIsLoading(true);
+      try {
+        const updated: User = { 
+          ...pendingUser, 
+          password: newPassword,
+          isFirstLogin: false, 
+          lastLogin: new Date().toISOString() 
+        };
+        
+        await db.saveUser(updated);
+        onLoginSuccess(updated);
+      } catch (err) {
+        setError('Erro ao salvar nova senha. Tente novamente.');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -136,15 +154,33 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               <div className="space-y-4">
                  <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Nova Senha</label>
-                    <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" placeholder={`MÍNIMO ${PASSWORD_REQUIREMENTS.minLength} CARACTERES`} value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                    <input 
+                      type="password" 
+                      required 
+                      className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" 
+                      placeholder={`MÍNIMO ${PASSWORD_REQUIREMENTS.minLength} CARACTERES`} 
+                      value={newPassword} 
+                      onChange={e => setNewPassword(e.target.value)} 
+                    />
                  </div>
                  <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Confirmar Senha</label>
-                    <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" placeholder="REPETIR SENHA" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                    <input 
+                      type="password" 
+                      required 
+                      className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" 
+                      placeholder="REPETIR SENHA" 
+                      value={confirmPassword} 
+                      onChange={e => setConfirmPassword(e.target.value)} 
+                    />
                  </div>
               </div>
               {error && <div className="p-4 text-[10px] font-bold uppercase text-red-500 bg-red-50 rounded-xl">{error}</div>}
-              <button type="submit" disabled={isLoading} className="w-full py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl hover:bg-emerald-600 transition-all">
+              <button 
+                type="submit" 
+                disabled={isLoading} 
+                className="w-full py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl hover:bg-emerald-600 transition-all"
+              >
                 {isLoading ? 'Salvando...' : 'Atualizar e Acessar'}
               </button>
            </form>
@@ -153,15 +189,31 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               <div className="space-y-4">
                  <div className="group">
                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-2">Acesso (Usuário ou CPF)</label>
-                    <input type="text" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-400 outline-none transition-all" value={username} onChange={(e) => setUsername(e.target.value)} />
+                    <input 
+                      type="text" 
+                      required 
+                      className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-400 outline-none transition-all" 
+                      value={username} 
+                      onChange={(e) => setUsername(e.target.value)} 
+                    />
                  </div>
                  <div className="group">
                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-2">Senha</label>
-                    <input type="password" required className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-400 outline-none transition-all" value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <input 
+                      type="password" 
+                      required 
+                      className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-400 outline-none transition-all" 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                    />
                  </div>
               </div>
               {error && <div className="p-4 text-[10px] font-bold uppercase text-red-500 bg-red-50 rounded-xl">{error}</div>}
-              <button type="submit" disabled={isLoading} className="w-full py-5 bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-blue-600 transition-all shadow-xl">
+              <button 
+                type="submit" 
+                disabled={isLoading} 
+                className="w-full py-5 bg-slate-900 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-blue-600 transition-all shadow-xl"
+              >
                  {isLoading ? 'Verificando...' : 'Acessar Sistema'}
               </button>
            </form>

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useMemo } from 'react';
-import { Staff } from '../../types';
+import { Staff, User } from '../../types';
 import { db } from '../../utils/storage';
 
 interface StaffTabProps {
@@ -15,7 +15,6 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
   const [form, setForm] = useState<Partial<Staff>>({ name: '', position: '', username: '', role: 'staff' });
   const photoRef = useRef<HTMLInputElement>(null);
 
-  // Armazena cargos únicos existentes para sugerir no datalist
   const existingPositions = useMemo(() => {
     const pos = staffList.map(s => s.position).filter(p => !!p);
     return Array.from(new Set(pos)).sort();
@@ -24,33 +23,37 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
   const handleCreateUser = (name: string) => {
     const parts = name.trim().toLowerCase().split(' ');
     if (parts.length < 2) return parts[0] || '';
-    // Formato: nome.ultimoSobrenome
     return `${parts[0]}.${parts[parts.length - 1]}`;
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const staffId = editingId || `stf-${Date.now()}`;
-    const staffData = { ...form, id: staffId, registrationDate: form.registrationDate || new Date().toISOString() } as Staff;
+    const staffData = { 
+      ...form, 
+      id: staffId, 
+      username: String(form.username).toLowerCase(), // Garantindo string
+      registrationDate: form.registrationDate || new Date().toISOString() 
+    } as Staff;
     
-    // Salva o cadastro do colaborador
+    // 1. Salva o perfil do colaborador
     onSaveStaff(staffData, editingId);
     
-    // Se for um novo cadastro, cria o acesso de usuário correspondente
-    if (!editingId) {
-      await db.saveUser({
-        id: `u-${staffId}`,
-        username: form.username!,
-        displayName: form.name!,
-        role: form.role as any,
-        staffId: staffId,
-        lastLogin: new Date().toISOString(),
-        isFirstLogin: true,
-        position: form.position,
-        avatar: form.photo,
-        password: '12345678' // Senha padrão inicial
-      });
-    }
+    // 2. Salva ou atualiza o usuário de acesso (Logins)
+    const accessUser: User = {
+      id: `u-${staffId}`,
+      username: String(form.username).toLowerCase(),
+      displayName: String(form.name),
+      role: form.role as any,
+      staffId: staffId,
+      lastLogin: new Date().toISOString(),
+      isFirstLogin: editingId ? false : true, // Se for novo, pede troca de senha
+      position: form.position,
+      avatar: form.photo,
+      password: '12345678' // Senha padrão
+    };
+
+    await db.saveUser(accessUser);
     
     setIsModalOpen(false);
   };
@@ -99,11 +102,6 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
             </div>
           </div>
         ))}
-        {staffList.length === 0 && (
-          <div className="col-span-full py-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
-            <p className="text-[11px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum colaborador cadastrado.</p>
-          </div>
-        )}
       </div>
 
       {isModalOpen && (
@@ -171,9 +169,9 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, onSaveStaff, onDeleteSta
                     </div>
                  </div>
 
-                 <div className="pt-4 space-y-3">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase italic text-center">Senha inicial padrão: 12345678 (Será trocada no 1º acesso)</p>
-                    <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all">Salvar Cadastro</button>
+                 <div className="pt-4 space-y-3 text-center">
+                    <p className="text-[8px] font-bold text-slate-400 uppercase italic">Acesso será criado/atualizado com sucesso no banco.</p>
+                    <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all">Salvar e Sincronizar</button>
                  </div>
               </form>
            </div>
