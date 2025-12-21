@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, WeatherData } from '../types';
 import OverviewTab from './dashboard/OverviewTab';
 import DriversTab from './dashboard/DriversTab';
@@ -22,11 +22,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [sessionStartTime] = useState(new Date());
+  const [sessionDuration, setSessionDuration] = useState('00:00:00');
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [onlineUsersCount, setOnlineUsersCount] = useState(1);
   const [isCloud, setIsCloud] = useState(false);
   const [autoOpenFormId, setAutoOpenFormId] = useState<string | null>(null);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -62,32 +65,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   };
 
-  const loadWeather = async () => {
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      try {
-        const { latitude, longitude } = pos.coords;
-        const resp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&daily=temperature_2m_max,weathercode&timezone=auto`);
-        const data = await resp.json();
-        const conds: any = { 0: 'Céu Limpo', 1: 'Pouco Nublado', 2: 'Nublado', 3: 'Encoberto', 61: 'Chuva' };
-        setWeather({
-          temp: Math.round(data.current_weather.temperature),
-          condition: conds[data.current_weather.weathercode] || 'Estável',
-          icon: data.current_weather.weathercode === 0 ? '☀️' : '☁️',
-          forecastNextDay: { temp: Math.round(data.daily.temperature_2m_max[1]), condition: conds[data.daily.weathercode[1]] || 'Estável' }
-        });
-      } catch (e) { console.error("Erro clima:", e); }
-    }, () => {});
-  };
-
   useEffect(() => {
-    loadAllData(); loadWeather();
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+    loadAllData();
+    const timer = setInterval(() => {
+      const now = new Date();
+      setCurrentTime(now);
+      
+      const diff = Math.floor((now.getTime() - sessionStartTime.getTime()) / 1000);
+      const h = Math.floor(diff / 3600).toString().padStart(2, '0');
+      const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+      const s = (diff % 60).toString().padStart(2, '0');
+      setSessionDuration(`${h}:${m}:${s}`);
+    }, 1000);
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [sessionStartTime]);
 
   const toggleMenu = (menu: string) => setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
 
-  const MenuItem = ({ tab, label, subItems }: { tab?: DashboardTab, label: string, subItems?: { label: string, onClick: () => void }[] }) => {
+  const MenuItem = ({ tab, label, subItems, adminOnly }: { tab?: DashboardTab, label: string, subItems?: { label: string, onClick: () => void }[], adminOnly?: boolean }) => {
+    if (adminOnly && user.role !== 'admin') return null;
+    
     const isExpanded = expandedMenus[label];
     const isActive = tab ? activeTab === tab : false;
 
@@ -147,15 +155,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                <span className="text-slate-500">{currentTime.toLocaleDateString('pt-BR')}</span>
              </div>
              <div className="text-2xl font-black text-white font-mono tracking-tighter mt-1">{currentTime.toLocaleTimeString('pt-BR')}</div>
-             {weather && (
-               <div className="pt-3 border-t border-slate-700/50 mt-3 flex items-center gap-3">
-                  <span className="text-xl">{weather.icon}</span>
-                  <div>
-                    <p className="text-sm font-black text-white leading-none">{weather.temp}°C</p>
-                    <p className="text-[8px] font-bold uppercase text-slate-500">{weather.condition}</p>
-                  </div>
-               </div>
-             )}
           </div>
         </div>
 
@@ -168,7 +167,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               label: op.category, 
               onClick: () => {
                 setActiveTab(DashboardTab.OPERACOES);
-                setAutoOpenFormId(null);
                 setOpsView({ type: 'category', id: op.id, categoryName: op.category, clientName: '' });
               } 
             }))} 
@@ -185,21 +183,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" />
           <MenuItem tab={DashboardTab.PORTOS} label="Portos" />
           <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" />
-          {user.role === 'admin' && (
-            <div className="pt-6 px-4">
-              <p className="text-[8px] font-black text-slate-600 uppercase tracking-[0.2em] mb-3">Administração</p>
-              <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" />
-              <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" />
-            </div>
-          )}
+          
+          <div className="pt-6 px-4">
+            <p className="text-[8px] font-black text-slate-600 uppercase tracking-[0.2em] mb-3">Administração</p>
+            <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" adminOnly />
+            <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" adminOnly />
+          </div>
         </nav>
 
-        <div className="p-6 border-t border-slate-800/50 bg-[#0f172a] space-y-4">
-           <div className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-500/5 rounded-xl border border-blue-500/10">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
-              <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">{onlineUsersCount} Usuário Ativo</span>
-           </div>
-           <button onClick={onLogout} className="w-full text-[9px] text-red-500 font-black uppercase hover:bg-red-500/10 py-3.5 rounded-xl transition-all tracking-widest border border-red-900/20 shadow-sm active:scale-95">
+        <div className="p-6 border-t border-slate-800/50 bg-[#0f172a]">
+           <button onClick={onLogout} className="w-full text-[9px] text-red-500 font-black uppercase hover:bg-red-500/10 py-3.5 rounded-xl transition-all tracking-widest border border-red-900/20 shadow-sm">
              Sair do Portal
            </button>
         </div>
@@ -213,22 +206,66 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <div className={`px-2.5 py-1 rounded-lg border flex items-center gap-2 ${isCloud ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${isCloud ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
                 <span className={`text-[8px] font-black uppercase tracking-tighter ${isCloud ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  Database: {isCloud ? 'Cloud Sync' : 'Local Mode'}
+                  Database: {isCloud ? 'Cloud' : 'Local'}
                 </span>
               </div>
            </div>
            
-           <div className="flex items-center gap-6">
-              {isSyncing && <span className="text-[8px] font-black text-blue-500 animate-pulse uppercase tracking-widest">Sincronizando...</span>}
-              <div className="flex items-center gap-3">
-                 <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-800 uppercase">{user.displayName}</p>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase">{user.position || user.role}</p>
+           <div className="flex items-center gap-6 relative" ref={profileMenuRef}>
+              <button 
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-2xl transition-all group"
+              >
+                 <div className="text-right hidden sm:block">
+                    <p className="text-[10px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors">{user.displayName}</p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{user.role === 'admin' ? 'Administrador' : 'Colaborador'}</p>
                  </div>
-                 <div className="w-10 h-10 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-blue-400 shadow-xl">
+                 <div className="w-10 h-10 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-blue-400 shadow-lg group-hover:scale-105 transition-all">
                     {user.displayName.substring(0,2).toUpperCase()}
                  </div>
-              </div>
+              </button>
+
+              {isProfileMenuOpen && (
+                <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-[2rem] shadow-2xl border border-slate-100 p-6 animate-in slide-in-from-top-4 duration-300 z-[100]">
+                  <div className="text-center mb-6 pb-6 border-b border-slate-50">
+                    <div className="w-16 h-16 rounded-[1.5rem] bg-blue-600 text-white flex items-center justify-center text-2xl font-black mx-auto mb-4 shadow-xl">
+                      {user.displayName.substring(0,1).toUpperCase()}
+                    </div>
+                    <h4 className="font-black text-slate-800 uppercase text-xs">{user.displayName}</h4>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">{user.position || 'OPERACIONAL'}</p>
+                  </div>
+
+                  <div className="space-y-4 mb-6">
+                    <div className="flex justify-between items-center px-4 py-3 bg-slate-50 rounded-2xl">
+                      <span className="text-[9px] font-black text-slate-400 uppercase">Tempo Logado</span>
+                      <span className="text-[11px] font-mono font-black text-blue-600">{sessionDuration}</span>
+                    </div>
+                    <div className="flex justify-between items-center px-4 py-3 bg-slate-50 rounded-2xl">
+                      <span className="text-[9px] font-black text-slate-400 uppercase">Membro Desde</span>
+                      <span className="text-[10px] font-black text-slate-800">{new Date(user.lastLogin || Date.now()).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <button 
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        // Aqui poderíamos abrir o modal de edição do próprio perfil
+                        setActiveTab(DashboardTab.COLABORADORES);
+                      }}
+                      className="w-full py-3.5 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md"
+                    >
+                      Editar Perfil
+                    </button>
+                    <button 
+                      onClick={onLogout}
+                      className="w-full py-3.5 bg-red-50 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                    >
+                      Sair do Sistema
+                    </button>
+                  </div>
+                </div>
+              )}
            </div>
         </header>
 
@@ -322,12 +359,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                }} 
              />
            )}
-           {activeTab === DashboardTab.COLABORADORES && (
+           {user.role === 'admin' && activeTab === DashboardTab.COLABORADORES && (
               <StaffTab 
                 staffList={staffList} 
+                currentUserRole={user.role}
                 onSaveStaff={async (s, id) => { 
                   const newStaff = {...s, id: id || `stf-${Date.now()}`} as Staff;
-                  // Atualização otimista na tela
                   setStaffList(prev => {
                     const idx = prev.findIndex(item => item.id === newStaff.id);
                     if (idx >= 0) {
@@ -347,7 +384,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 }}
               />
            )}
-           {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
+           {user.role === 'admin' && activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
            {activeTab === DashboardTab.FORMULARIOS && (
              <FormsTab drivers={drivers} customers={customers} ports={ports} initialFormId={autoOpenFormId} />
            )}
