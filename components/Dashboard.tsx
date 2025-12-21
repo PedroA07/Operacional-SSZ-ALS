@@ -10,6 +10,7 @@ import PreStackingTab from './dashboard/PreStackingTab';
 import OperationsTab from './dashboard/OperationsTab';
 import StaffTab from './dashboard/StaffTab';
 import SystemTab from './dashboard/SystemTab';
+import WeatherWidget from './dashboard/WeatherWidget';
 import { DEFAULT_OPERATIONS } from '../constants/operations';
 import { db } from '../utils/storage';
 
@@ -148,13 +149,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             </div>
           </div>
 
-          <div className="bg-[#1e293b] p-5 rounded-[2rem] border border-slate-700/30 shadow-inner">
+          <div className="bg-[#1e293b] p-5 rounded-[2rem] border border-slate-700/30 shadow-inner mb-4">
              <div className="flex justify-between items-center text-[9px] font-black uppercase text-blue-400 tracking-tighter">
                <span>{currentTime.toLocaleDateString('pt-BR', { weekday: 'long' })}</span>
                <span className="text-slate-500">{currentTime.toLocaleDateString('pt-BR')}</span>
              </div>
              <div className="text-2xl font-black text-white font-mono tracking-tighter mt-1">{currentTime.toLocaleTimeString('pt-BR')}</div>
           </div>
+
+          <WeatherWidget />
         </div>
 
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">

@@ -27,7 +27,6 @@ export const db = {
   },
 
   setSession: (user: User | null) => {
-    // sessionStorage encerra os dados quando a aba é fechada
     if (user) sessionStorage.setItem(KEYS.SESSION, JSON.stringify(user));
     else sessionStorage.removeItem(KEYS.SESSION);
   },
@@ -36,7 +35,6 @@ export const db = {
     return s ? JSON.parse(s) : null;
   },
 
-  // USUÁRIOS
   getUsers: async (): Promise<User[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     if (supabase) {
@@ -72,7 +70,6 @@ export const db = {
     }
   },
 
-  // COLABORADORES
   getStaff: async (): Promise<Staff[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     if (supabase) {
@@ -88,7 +85,6 @@ export const db = {
   },
 
   saveStaff: async (staff: Staff, passwordOverride?: string) => {
-    // 1. Salvar Staff Local
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
     let updatedStaff;
@@ -100,7 +96,6 @@ export const db = {
     }
     db._saveLocal(KEYS.STAFF, updatedStaff);
 
-    // 2. Criar/Atualizar Usuário de Acesso
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const existingUser = users.find((u: any) => u.staffId === staff.id || u.username === staff.username);
     
@@ -111,6 +106,7 @@ export const db = {
       role: staff.role as any,
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
+      // MANDATÓRIO: Se for novo usuário, isFirstLogin é sempre TRUE
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
       password: passwordOverride || existingUser?.password || '12345678',
       position: staff.position
@@ -141,7 +137,6 @@ export const db = {
     return true;
   },
 
-  // MOTORISTAS
   getDrivers: async (): Promise<Driver[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     if (supabase) {
