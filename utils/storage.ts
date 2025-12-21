@@ -3,27 +3,19 @@ import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking } from '../types';
 
 /**
- * No Vercel, as variáveis de ambiente para o FRONTEND devem começar com NEXT_PUBLIC_ 
- * ou serem injetadas via DefinePlugin. Aqui usamos uma abordagem resiliente.
+ * Accessing environment variables via process.env as per the execution context's configuration.
  */
-const getEnv = (key: string): string => {
-  // Tenta buscar de diferentes lugares onde o Vercel ou Bundlers podem injetar
-  const value = (window as any).process?.env?.[key] || 
-                (window as any).__env?.[key] ||
-                "";
-  return value;
-};
+// Fix: Property 'env' does not exist on type 'ImportMeta'. Using process.env instead.
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
+// Fix: Property 'env' does not exist on type 'ImportMeta'. Using process.env instead.
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
 
-const SUPABASE_URL = getEnv('SUPABASE_URL');
-const SUPABASE_KEY = getEnv('SUPABASE_ANON_KEY');
-
-// Inicializa o cliente apenas se as chaves existirem para evitar crash
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_KEY) 
   : null;
 
 if (!supabase) {
-  console.warn("AVISO: Supabase não configurado. O sistema está operando em MODO LOCAL (LocalStorage).");
+  console.warn("MODO LOCAL: Para ativar a Nuvem, configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no Vercel.");
 }
 
 const KEYS = {
@@ -36,7 +28,6 @@ const KEYS = {
 export const db = {
   isCloudActive: () => !!supabase,
 
-  // MOTORISTAS
   getDrivers: async (): Promise<Driver[]> => {
     try {
       if (supabase) {
@@ -44,7 +35,7 @@ export const db = {
         if (!error && data) return data;
       }
     } catch (e) {
-      console.error("Erro ao buscar drivers na nuvem:", e);
+      console.error("Erro Supabase:", e);
     }
     return JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
   },
@@ -52,13 +43,11 @@ export const db = {
   saveDriver: async (driver: Driver) => {
     try {
       if (supabase) {
-        const { error } = await supabase.from('drivers').upsert(driver);
-        if (error) throw error;
+        await supabase.from('drivers').upsert(driver);
       }
     } catch (e) {
-      console.error("Erro ao salvar driver na nuvem:", e);
+      console.error("Erro Supabase:", e);
     }
-    // Sempre salva local como redundância
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     const index = current.findIndex((d: any) => d.id === driver.id);
     if (index >= 0) current[index] = driver;
@@ -67,18 +56,11 @@ export const db = {
   },
 
   deleteDriver: async (id: string) => {
-    try {
-      if (supabase) {
-        await supabase.from('drivers').delete().eq('id', id);
-      }
-    } catch (e) {
-      console.error("Erro ao excluir na nuvem:", e);
-    }
+    if (supabase) await supabase.from('drivers').delete().eq('id', id);
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current.filter((d: any) => d.id !== id)));
   },
 
-  // CLIENTES
   getCustomers: async (): Promise<Customer[]> => {
     if (supabase) {
       const { data, error } = await supabase.from('customers').select('*');
@@ -95,7 +77,6 @@ export const db = {
     localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(current));
   },
 
-  // PORTOS
   getPorts: async (): Promise<Port[]> => {
     if (supabase) {
       const { data, error } = await supabase.from('ports').select('*');
@@ -112,7 +93,6 @@ export const db = {
     localStorage.setItem(KEYS.PORTS, JSON.stringify(current));
   },
 
-  // PRE-STACKING
   getPreStacking: async (): Promise<PreStacking[]> => {
     if (supabase) {
       const { data, error } = await supabase.from('pre_stacking').select('*');
@@ -141,9 +121,8 @@ export const db = {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `ALS_BACKUP_COMPLETO_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.json`;
+    link.download = `ALS_BACKUP_${new Date().getTime()}.json`;
     link.click();
-    URL.revokeObjectURL(url);
   },
 
   importBackup: async (file: File): Promise<boolean> => {
