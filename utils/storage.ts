@@ -2,7 +2,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User } from '../types';
 
-// Tenta pegar as chaves do ambiente VITE
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
 
@@ -23,6 +22,10 @@ const KEYS = {
 export const db = {
   isCloudActive: () => !!supabase,
 
+  _saveLocal: (key: string, data: any) => {
+    localStorage.setItem(key, JSON.stringify(data));
+  },
+
   setSession: (user: User | null) => {
     if (user) localStorage.setItem(KEYS.SESSION, JSON.stringify(user));
     else localStorage.removeItem(KEYS.SESSION);
@@ -30,11 +33,6 @@ export const db = {
   getSession: (): User | null => {
     const s = localStorage.getItem(KEYS.SESSION);
     return s ? JSON.parse(s) : null;
-  },
-
-  // FUNÇÃO AUXILIAR PARA GARANTIR PERSISTÊNCIA LOCAL IMEDIATA
-  _saveLocal: (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
   },
 
   getUsers: async (): Promise<User[]> => {
@@ -49,15 +47,14 @@ export const db = {
   },
 
   saveUser: async (user: User) => {
-    // 1. Local
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const idx = current.findIndex((u: any) => u.id === user.id);
     if (idx >= 0) current[idx] = user; else current.push(user);
     db._saveLocal(KEYS.USERS, current);
 
-    // 2. Cloud
     if (supabase) {
-      await supabase.from('users').upsert(user);
+      const { error } = await supabase.from('users').upsert(user);
+      if (error) console.error("Erro Supabase User:", error);
     }
   },
 
@@ -68,18 +65,19 @@ export const db = {
         db._saveLocal(KEYS.STAFF, data);
         return data;
       }
+      if (error) console.error("Erro ao buscar Staff:", error);
     }
     return JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
   },
 
   saveStaff: async (staff: Staff) => {
-    // 1. Atualiza Local Staff
+    // 1. Local
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
     if (sIdx >= 0) currentStaff[sIdx] = staff; else currentStaff.push(staff);
     db._saveLocal(KEYS.STAFF, currentStaff);
 
-    // 2. Cria/Atualiza Usuário vinculado
+    // 2. Gerar Acesso
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const existingUser = users.find((u: any) => u.staffId === staff.id);
     
@@ -97,22 +95,20 @@ export const db = {
     
     await db.saveUser(userData);
 
-    // 3. Sincroniza Cloud
+    // 3. Cloud
     if (supabase) {
-      await supabase.from('staff').upsert(staff);
+      const { error } = await supabase.from('staff').upsert(staff);
+      if (error) console.error("Erro Supabase Staff:", error);
     }
   },
 
   deleteStaff: async (id: string) => {
-    // 1. Delete Local (Staff)
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     db._saveLocal(KEYS.STAFF, currentStaff.filter((s: any) => s.id !== id));
     
-    // 2. Delete Local (Usuário vinculado)
     const currentUsers = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     db._saveLocal(KEYS.USERS, currentUsers.filter((u: any) => u.staffId !== id));
 
-    // 3. Delete Cloud
     if (supabase) {
       await supabase.from('staff').delete().eq('id', id);
       await supabase.from('users').delete().eq('staffId', id);
@@ -123,10 +119,7 @@ export const db = {
   getDrivers: async (): Promise<Driver[]> => {
     if (supabase) {
       const { data } = await supabase.from('drivers').select('*');
-      if (data) {
-        db._saveLocal(KEYS.DRIVERS, data);
-        return data;
-      }
+      if (data) { db._saveLocal(KEYS.DRIVERS, data); return data; }
     }
     return JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
   },
@@ -142,10 +135,6 @@ export const db = {
   deleteDriver: async (id: string) => {
     const currentDrivers = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     db._saveLocal(KEYS.DRIVERS, currentDrivers.filter((d: any) => d.id !== id));
-    
-    const currentUsers = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    db._saveLocal(KEYS.USERS, currentUsers.filter((u: any) => u.driverId !== id));
-
     if (supabase) {
       await supabase.from('drivers').delete().eq('id', id);
       await supabase.from('users').delete().eq('driverId', id);
@@ -200,7 +189,6 @@ export const db = {
     if (supabase) await supabase.from('pre_stacking').upsert(item);
   },
 
-  // Fix: Adding missing exportBackup method used in SystemTab.tsx
   exportBackup: async () => {
     const data = {
       drivers: JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]'),
@@ -219,40 +207,20 @@ export const db = {
     URL.revokeObjectURL(url);
   },
 
-  // Fix: Adding missing importBackup method used in SystemTab.tsx
   importBackup: async (file: File): Promise<boolean> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const data = JSON.parse(e.target?.result as string);
-          if (data.drivers) {
-            db._saveLocal(KEYS.DRIVERS, data.drivers);
-            if (supabase) await supabase.from('drivers').upsert(data.drivers);
-          }
-          if (data.customers) {
-            db._saveLocal(KEYS.CUSTOMERS, data.customers);
-            if (supabase) await supabase.from('customers').upsert(data.customers);
-          }
-          if (data.ports) {
-            db._saveLocal(KEYS.PORTS, data.ports);
-            if (supabase) await supabase.from('ports').upsert(data.ports);
-          }
-          if (data.preStacking) {
-            db._saveLocal(KEYS.PRESTACKING, data.preStacking);
-            if (supabase) await supabase.from('pre_stacking').upsert(data.preStacking);
-          }
-          if (data.staff) {
-            db._saveLocal(KEYS.STAFF, data.staff);
-            if (supabase) await supabase.from('staff').upsert(data.staff);
-          }
-          if (data.users) {
-            db._saveLocal(KEYS.USERS, data.users);
-            if (supabase) await supabase.from('users').upsert(data.users);
-          }
+          if (data.drivers) db._saveLocal(KEYS.DRIVERS, data.drivers);
+          if (data.customers) db._saveLocal(KEYS.CUSTOMERS, data.customers);
+          if (data.ports) db._saveLocal(KEYS.PORTS, data.ports);
+          if (data.preStacking) db._saveLocal(KEYS.PRESTACKING, data.preStacking);
+          if (data.staff) db._saveLocal(KEYS.STAFF, data.staff);
+          if (data.users) db._saveLocal(KEYS.USERS, data.users);
           resolve(true);
         } catch (error) {
-          console.error(error);
           resolve(false);
         }
       };

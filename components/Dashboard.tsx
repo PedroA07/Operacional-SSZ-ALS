@@ -250,11 +250,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              <DriversTab 
                drivers={drivers} 
                onSaveDriver={async (d, id) => { 
-                 await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver); 
+                 const newDriver = {...d, id: id || `drv-${Date.now()}`} as Driver;
+                 setDrivers(prev => {
+                   const idx = prev.findIndex(item => item.id === newDriver.id);
+                   if (idx >= 0) {
+                     const copy = [...prev]; copy[idx] = newDriver; return copy;
+                   }
+                   return [...prev, newDriver];
+                 });
+                 await db.saveDriver(newDriver); 
                  loadAllData(); 
                }} 
                onDeleteDriver={async id => { 
                  if(confirm("Deseja realmente excluir este motorista?")) { 
+                    setDrivers(prev => prev.filter(d => d.id !== id));
                     await db.deleteDriver(id); 
                     loadAllData(); 
                  } 
@@ -266,7 +275,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              <CustomersTab 
                customers={customers} 
                onSaveCustomer={async (c, id) => { 
-                 await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); 
+                 const newCust = {...c, id: id || `cust-${Date.now()}`} as Customer;
+                 setCustomers(prev => {
+                   const idx = prev.findIndex(item => item.id === newCust.id);
+                   if (idx >= 0) {
+                     const copy = [...prev]; copy[idx] = newCust; return copy;
+                   }
+                   return [...prev, newCust];
+                 });
+                 await db.saveCustomer(newCust); 
                  loadAllData(); 
                }} 
              />
@@ -275,7 +292,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              <PortsTab 
                ports={ports} 
                onSavePort={async (p, id) => { 
-                 await db.savePort({...p, id: id || `port-${Date.now()}`} as Port); 
+                 const newPort = {...p, id: id || `port-${Date.now()}`} as Port;
+                 setPorts(prev => {
+                   const idx = prev.findIndex(item => item.id === newPort.id);
+                   if (idx >= 0) {
+                     const copy = [...prev]; copy[idx] = newPort; return copy;
+                   }
+                   return [...prev, newPort];
+                 });
+                 await db.savePort(newPort); 
                  loadAllData(); 
                }} 
              />
@@ -284,7 +309,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              <PreStackingTab 
                preStacking={preStacking} 
                onSavePreStacking={async (ps, id) => { 
-                 await db.savePreStacking({...ps, id: id || `ps-${Date.now()}`} as PreStacking); 
+                 const newItem = {...ps, id: id || `ps-${Date.now()}`} as PreStacking;
+                 setPreStacking(prev => {
+                   const idx = prev.findIndex(item => item.id === newItem.id);
+                   if (idx >= 0) {
+                     const copy = [...prev]; copy[idx] = newItem; return copy;
+                   }
+                   return [...prev, newItem];
+                 });
+                 await db.savePreStacking(newItem); 
                  loadAllData(); 
                }} 
              />
@@ -293,11 +326,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <StaffTab 
                 staffList={staffList} 
                 onSaveStaff={async (s, id) => { 
-                  await db.saveStaff({...s, id: id || `stf-${Date.now()}`} as Staff); 
+                  const newStaff = {...s, id: id || `stf-${Date.now()}`} as Staff;
+                  // Atualização otimista na tela
+                  setStaffList(prev => {
+                    const idx = prev.findIndex(item => item.id === newStaff.id);
+                    if (idx >= 0) {
+                      const copy = [...prev]; copy[idx] = newStaff; return copy;
+                    }
+                    return [...prev, newStaff];
+                  });
+                  await db.saveStaff(newStaff); 
                   await loadAllData(); 
                 }} 
                 onDeleteStaff={async id => { 
                   if(confirm("Deseja realmente excluir este colaborador e seu acesso?")) { 
+                    setStaffList(prev => prev.filter(s => s.id !== id));
                     await db.deleteStaff(id); 
                     await loadAllData(); 
                   } 
