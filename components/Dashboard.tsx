@@ -24,10 +24,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sessionStartTime] = useState(new Date());
   const [sessionDuration, setSessionDuration] = useState('00:00:00');
-  const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCloud, setIsCloud] = useState(false);
-  const [autoOpenFormId, setAutoOpenFormId] = useState<string | null>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   
@@ -59,7 +57,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       setPreStacking(ps || []); 
       setStaffList(s || []);
     } catch (e) { 
-      console.error("Falha ao carregar dados do banco:", e); 
+      console.error("Falha ao carregar dados:", e); 
     } finally {
       setIsSyncing(false);
     }
@@ -94,6 +92,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const toggleMenu = (menu: string) => setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
 
   const MenuItem = ({ tab, label, subItems, adminOnly }: { tab?: DashboardTab, label: string, subItems?: { label: string, onClick: () => void }[], adminOnly?: boolean }) => {
+    // REGRA DE ACESSO: Se for adminOnly e o usuário não for admin, não renderiza
     if (adminOnly && user.role !== 'admin') return null;
     
     const isExpanded = expandedMenus[label];
@@ -106,7 +105,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             onClick={() => {
               if (tab) {
                 setActiveTab(tab);
-                setAutoOpenFormId(null);
                 if (tab === DashboardTab.OPERACOES) {
                   setOpsView({ type: 'list', id: '', categoryName: '', clientName: '' });
                 }
@@ -137,6 +135,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       </div>
     );
   };
+
+  // Encontrar data de cadastro do staff atual
+  const myStaffData = staffList.find(s => s.id === user.staffId);
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans">
@@ -176,8 +177,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             tab={DashboardTab.FORMULARIOS} 
             label="Formulários" 
             subItems={[
-              { label: 'Ordem de Coleta', onClick: () => { setActiveTab(DashboardTab.FORMULARIOS); setAutoOpenFormId('ORDEM_COLETA'); } },
-              { label: 'Pré-Stacking', onClick: () => { setActiveTab(DashboardTab.FORMULARIOS); setAutoOpenFormId('PRE_STACKING'); } }
+              { label: 'Ordem de Coleta', onClick: () => { setActiveTab(DashboardTab.FORMULARIOS); } },
+              { label: 'Pré-Stacking', onClick: () => { setActiveTab(DashboardTab.FORMULARIOS); } }
             ]}
           />
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" />
@@ -185,14 +186,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" />
           
           <div className="pt-6 px-4">
-            <p className="text-[8px] font-black text-slate-600 uppercase tracking-[0.2em] mb-3">Administração</p>
+            <p className="text-[8px] font-black text-slate-600 uppercase tracking-[0.2em] mb-3">Gerenciamento ALS</p>
             <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" adminOnly />
             <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" adminOnly />
           </div>
         </nav>
 
         <div className="p-6 border-t border-slate-800/50 bg-[#0f172a]">
-           <button onClick={onLogout} className="w-full text-[9px] text-red-500 font-black uppercase hover:bg-red-500/10 py-3.5 rounded-xl transition-all tracking-widest border border-red-900/20 shadow-sm">
+           <button onClick={onLogout} className="w-full text-[9px] text-red-500 font-black uppercase hover:bg-red-500/10 py-3.5 rounded-xl transition-all tracking-widest border border-red-900/20 shadow-sm active:scale-95">
              Sair do Portal
            </button>
         </div>
@@ -206,7 +207,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <div className={`px-2.5 py-1 rounded-lg border flex items-center gap-2 ${isCloud ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${isCloud ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
                 <span className={`text-[8px] font-black uppercase tracking-tighter ${isCloud ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  Database: {isCloud ? 'Cloud' : 'Local'}
+                  DB: {isCloud ? 'Nuvem' : 'Local'}
                 </span>
               </div>
            </div>
@@ -214,7 +215,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            <div className="flex items-center gap-6 relative" ref={profileMenuRef}>
               <button 
                 onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-2xl transition-all group"
+                className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-2xl transition-all group border border-transparent hover:border-slate-100"
               >
                  <div className="text-right hidden sm:block">
                     <p className="text-[10px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors">{user.displayName}</p>
@@ -226,23 +227,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </button>
 
               {isProfileMenuOpen && (
-                <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-[2rem] shadow-2xl border border-slate-100 p-6 animate-in slide-in-from-top-4 duration-300 z-[100]">
+                <div className="absolute top-full right-0 mt-3 w-72 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-6 animate-in slide-in-from-top-4 duration-300 z-[100]">
                   <div className="text-center mb-6 pb-6 border-b border-slate-50">
-                    <div className="w-16 h-16 rounded-[1.5rem] bg-blue-600 text-white flex items-center justify-center text-2xl font-black mx-auto mb-4 shadow-xl">
+                    <div className="w-16 h-16 rounded-3xl bg-blue-600 text-white flex items-center justify-center text-2xl font-black mx-auto mb-4 shadow-xl">
                       {user.displayName.substring(0,1).toUpperCase()}
                     </div>
                     <h4 className="font-black text-slate-800 uppercase text-xs">{user.displayName}</h4>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">{user.position || 'OPERACIONAL'}</p>
+                    <p className="text-[8px] text-blue-500 font-bold uppercase tracking-widest mt-1">{user.position || 'OPERACIONAL'}</p>
                   </div>
 
-                  <div className="space-y-4 mb-6">
-                    <div className="flex justify-between items-center px-4 py-3 bg-slate-50 rounded-2xl">
-                      <span className="text-[9px] font-black text-slate-400 uppercase">Tempo Logado</span>
-                      <span className="text-[11px] font-mono font-black text-blue-600">{sessionDuration}</span>
+                  <div className="space-y-3 mb-6">
+                    <div className="flex flex-col gap-1 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[8px] font-black text-slate-400 uppercase">Tempo Logado</span>
+                      <span className="text-xs font-mono font-black text-slate-800">{sessionDuration}</span>
                     </div>
-                    <div className="flex justify-between items-center px-4 py-3 bg-slate-50 rounded-2xl">
-                      <span className="text-[9px] font-black text-slate-400 uppercase">Membro Desde</span>
-                      <span className="text-[10px] font-black text-slate-800">{new Date(user.lastLogin || Date.now()).toLocaleDateString('pt-BR')}</span>
+                    <div className="flex flex-col gap-1 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="text-[8px] font-black text-slate-400 uppercase">Membro Desde</span>
+                      <span className="text-xs font-black text-slate-800">
+                        {myStaffData ? new Date(myStaffData.registrationDate).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
+                      </span>
                     </div>
                   </div>
 
@@ -250,16 +253,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     <button 
                       onClick={() => {
                         setIsProfileMenuOpen(false);
-                        // Aqui poderíamos abrir o modal de edição do próprio perfil
-                        setActiveTab(DashboardTab.COLABORADORES);
+                        if (user.role === 'admin') {
+                          setActiveTab(DashboardTab.COLABORADORES);
+                        } else {
+                          alert("Apenas administradores podem editar perfis diretamente.");
+                        }
                       }}
-                      className="w-full py-3.5 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md"
+                      className="w-full py-3.5 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95"
                     >
                       Editar Perfil
                     </button>
                     <button 
                       onClick={onLogout}
-                      className="w-full py-3.5 bg-red-50 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                      className="w-full py-3.5 bg-red-50 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95"
                     >
                       Sair do Sistema
                     </button>
@@ -299,7 +305,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                  loadAllData(); 
                }} 
                onDeleteDriver={async id => { 
-                 if(confirm("Deseja realmente excluir este motorista?")) { 
+                 if(confirm("Deseja realmente excluir?")) { 
                     setDrivers(prev => prev.filter(d => d.id !== id));
                     await db.deleteDriver(id); 
                     loadAllData(); 
@@ -376,7 +382,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   await loadAllData(); 
                 }} 
                 onDeleteStaff={async id => { 
-                  if(confirm("Deseja realmente excluir este colaborador e seu acesso?")) { 
+                  if(confirm("Deseja realmente excluir este colaborador?")) { 
                     setStaffList(prev => prev.filter(s => s.id !== id));
                     await db.deleteStaff(id); 
                     await loadAllData(); 
@@ -386,7 +392,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            )}
            {user.role === 'admin' && activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
            {activeTab === DashboardTab.FORMULARIOS && (
-             <FormsTab drivers={drivers} customers={customers} ports={ports} initialFormId={autoOpenFormId} />
+             <FormsTab drivers={drivers} customers={customers} ports={ports} />
            )}
         </div>
       </main>
