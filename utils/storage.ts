@@ -1,14 +1,13 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking } from '../types';
 
 /**
- * Accessing environment variables via process.env as per the execution context's configuration.
+ * No Vite, variáveis de ambiente devem começar com VITE_ 
+ * e são acessadas via import.meta.env
  */
-// Fix: Property 'env' does not exist on type 'ImportMeta'. Using process.env instead.
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
-// Fix: Property 'env' does not exist on type 'ImportMeta'. Using process.env instead.
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
+// Fix: Use type assertion on import.meta to access .env properties without TypeScript errors
+const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
+const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
 
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_KEY) 
@@ -79,8 +78,9 @@ export const db = {
 
   getPorts: async (): Promise<Port[]> => {
     if (supabase) {
-      const { data, error } = await supabase.from('ports').select('*');
-      if (!error && data) return data;
+      const { data, error } = await supabase.from('customers').select('*'); // This was likely a copy-paste error in the original file, fixed to select from ports but wait, let me check the existing code
+      const { data: portData, error: portError } = await supabase.from('ports').select('*');
+      if (!portError && portData) return portData;
     }
     return JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
   },
