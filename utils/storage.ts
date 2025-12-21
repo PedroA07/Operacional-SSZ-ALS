@@ -2,14 +2,29 @@
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking } from '../types';
 
-// O sistema buscará estas chaves nas variáveis de ambiente da sua hospedagem
-const SUPABASE_URL = (window as any).process?.env?.SUPABASE_URL || '';
-const SUPABASE_KEY = (window as any).process?.env?.SUPABASE_ANON_KEY || '';
+/**
+ * No Vercel, as variáveis de ambiente para o FRONTEND devem começar com NEXT_PUBLIC_ 
+ * ou serem injetadas via DefinePlugin. Aqui usamos uma abordagem resiliente.
+ */
+const getEnv = (key: string): string => {
+  // Tenta buscar de diferentes lugares onde o Vercel ou Bundlers podem injetar
+  const value = (window as any).process?.env?.[key] || 
+                (window as any).__env?.[key] ||
+                "";
+  return value;
+};
 
-// Inicializa o cliente apenas se as chaves existirem
+const SUPABASE_URL = getEnv('SUPABASE_URL');
+const SUPABASE_KEY = getEnv('SUPABASE_ANON_KEY');
+
+// Inicializa o cliente apenas se as chaves existirem para evitar crash
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_KEY) 
   : null;
+
+if (!supabase) {
+  console.warn("AVISO: Supabase não configurado. O sistema está operando em MODO LOCAL (LocalStorage).");
+}
 
 const KEYS = {
   DRIVERS: 'als_db_drivers',
@@ -23,16 +38,25 @@ export const db = {
 
   // MOTORISTAS
   getDrivers: async (): Promise<Driver[]> => {
-    if (supabase) {
-      const { data, error } = await supabase.from('drivers').select('*');
-      if (!error && data) return data;
+    try {
+      if (supabase) {
+        const { data, error } = await supabase.from('drivers').select('*');
+        if (!error && data) return data;
+      }
+    } catch (e) {
+      console.error("Erro ao buscar drivers na nuvem:", e);
     }
     return JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
   },
+
   saveDriver: async (driver: Driver) => {
-    if (supabase) {
-      const { error } = await supabase.from('drivers').upsert(driver);
-      if (error) console.error("Erro nuvem:", error);
+    try {
+      if (supabase) {
+        const { error } = await supabase.from('drivers').upsert(driver);
+        if (error) throw error;
+      }
+    } catch (e) {
+      console.error("Erro ao salvar driver na nuvem:", e);
     }
     // Sempre salva local como redundância
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
@@ -41,9 +65,14 @@ export const db = {
     else current.push(driver);
     localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current));
   },
+
   deleteDriver: async (id: string) => {
-    if (supabase) {
-      await supabase.from('drivers').delete().eq('id', id);
+    try {
+      if (supabase) {
+        await supabase.from('drivers').delete().eq('id', id);
+      }
+    } catch (e) {
+      console.error("Erro ao excluir na nuvem:", e);
     }
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     localStorage.setItem(KEYS.DRIVERS, JSON.stringify(current.filter((d: any) => d.id !== id)));
@@ -100,7 +129,6 @@ export const db = {
     localStorage.setItem(KEYS.PRESTACKING, JSON.stringify(current));
   },
 
-  // Utilitários de Backup
   exportBackup: async () => {
     const data = {
       drivers: await db.getDrivers(),
