@@ -62,7 +62,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   };
 
   useEffect(() => {
+    // Carga inicial
     loadAllData();
+
+    // REALTIME: Escutar mudanças em todas as tabelas principais
+    const subscriptions = [
+      db.subscribe('staff', loadAllData),
+      db.subscribe('users', loadAllData),
+      db.subscribe('drivers', loadAllData),
+      db.subscribe('customers', loadAllData),
+      db.subscribe('ports', loadAllData),
+      db.subscribe('pre_stacking', loadAllData)
+    ];
+
+    // Timer de Sessão e Heartbeat
     const timer = setInterval(async () => {
       const now = new Date();
       const loginTime = new Date(user.lastLogin).getTime();
@@ -75,30 +88,39 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setSessionDuration(`${hours}:${minutes}:${seconds}`);
       }
 
-      // 1. HEARTBEAT: Só envia sinal se a aba estiver VISÍVEL e ATIVA
       if (now.getSeconds() % 30 === 0 && document.visibilityState === 'visible') {
         db.updateHeartbeat(user.id);
       }
-
-      // 2. SEGURANÇA: Verifica se houve alteração de privilégios a cada 60 segundos
-      if (now.getSeconds() === 0) {
-        const isValid = await sessionManager.validateIntegrity(user);
-        if (!isValid) {
-          alert("Sua sessão expirou devido a uma alteração cadastral ou de segurança.");
-          onLogout();
-        }
-      }
     }, 1000);
+
+    // SEGURANÇA: Verificador de Integridade disparado por qualquer mudança em 'users'
+    // Como loadAllData é chamado pela subscription, o user local será validado
+    // em relação às permissões atuais.
+    const checkIntegrity = async () => {
+      const isValid = await sessionManager.validateIntegrity(user);
+      if (!isValid) {
+        alert("Sua sessão expirou devido a uma alteração cadastral ou de segurança.");
+        onLogout();
+      }
+    };
+
+    // Adiciona o verificador de integridade às mudanças do banco
+    const integritySub = db.subscribe('users', checkIntegrity);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setIsProfileMenuOpen(false);
       }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
+    
     return () => {
       clearInterval(timer);
       document.removeEventListener('mousedown', handleClickOutside);
+      // Remove todas as assinaturas realtime no unmount
+      subscriptions.forEach(sub => sub?.unsubscribe());
+      integritySub?.unsubscribe();
     };
   }, [user, onLogout]);
 

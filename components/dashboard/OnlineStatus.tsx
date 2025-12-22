@@ -17,20 +17,21 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     const users = await db.getUsers();
     const now = new Date().getTime();
     
-    // FILTRAGEM RIGOROSA: 
-    // Como o Dashboard só envia o heartbeat se a aba estiver VISÍVEL, 
-    // reduzimos a janela de "Online" para 45 segundos para refletir apenas quem está com a guia ativa.
+    // FILTRAGEM RIGOROSA: 45 segundos de tolerância
     const online = users.filter(u => {
       if (!u.lastSeen) return false;
       const last = new Date(u.lastSeen).getTime();
-      return (now - last) < (45 * 1000); // 45 segundos de tolerância
+      return (now - last) < (45 * 1000);
     });
     setActiveUsers(online);
   };
 
   useEffect(() => {
     fetchStatus();
-    const statusInterval = setInterval(fetchStatus, 15000); // Atualiza lista a cada 15s
+    // A lista geral agora é alimentada pelas Realtime Subscriptions do Dashboard
+    // mas mantemos um poll leve para garantir que o tempo de "Online" expire
+    // mesmo se ninguém mudar nada no banco.
+    const statusInterval = setInterval(fetchStatus, 30000); 
     const clockInterval = setInterval(() => setTrigger(t => t + 1), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,6 +47,11 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Recarrega quando a staffList muda via Realtime
+  useEffect(() => {
+    fetchStatus();
+  }, [staffList]);
 
   const getSessionTime = (lastLogin: string) => {
     try {

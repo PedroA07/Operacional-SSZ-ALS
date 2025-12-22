@@ -1,5 +1,5 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User } from '../types';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
@@ -30,15 +30,28 @@ export const db = {
     if (user) sessionStorage.setItem(KEYS.SESSION, JSON.stringify(user));
     else sessionStorage.removeItem(KEYS.SESSION);
   },
+  
   getSession: (): User | null => {
     const s = sessionStorage.getItem(KEYS.SESSION);
     return s ? JSON.parse(s) : null;
   },
 
+  /**
+   * Assina mudanças em tempo real para qualquer tabela
+   */
+  subscribe: (table: string, callback: () => void): RealtimeChannel | null => {
+    if (!supabase) return null;
+    return supabase
+      .channel(`public:${table}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: table }, () => {
+        callback();
+      })
+      .subscribe();
+  },
+
   updateHeartbeat: async (userId: string) => {
     if (!supabase) return;
     try {
-      // Atualiza a presença em tempo real
       const { error } = await supabase.from('users').update({ lastseen: new Date().toISOString() }).eq('id', userId);
       if (error) console.warn("Erro Heartbeat:", error.message);
     } catch (e) { /* fail silent */ }
@@ -131,20 +144,16 @@ export const db = {
     const lowerUsername = staff.username.toLowerCase();
     const sIdx = currentStaffList.findIndex((s: any) => s.id === staff.id);
     
-    // Lógica inteligente de Auditoria
     let finalStaffData = { ...staff };
     if (sIdx >= 0) {
       const existing = currentStaffList[sIdx];
-      // Mantém a data de registro original
       finalStaffData.registrationDate = existing.registrationDate;
-      // Se o status mudou, atualizamos a data da mudança de status (ex: Inativação)
       if (existing.status !== staff.status) {
         finalStaffData.statusSince = new Date().toISOString();
       } else {
         finalStaffData.statusSince = existing.statusSince;
       }
     } else {
-      // Novo cadastro: Ambas as datas são agora
       finalStaffData.registrationDate = new Date().toISOString();
       finalStaffData.statusSince = new Date().toISOString();
     }
@@ -158,7 +167,6 @@ export const db = {
     }
     db._saveLocal(KEYS.STAFF, updatedList);
 
-    // Sincroniza com a conta de usuário
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const existingUser = users.find((u: any) => u.staffId === staff.id);
     
@@ -166,7 +174,7 @@ export const db = {
       id: existingUser?.id || `u-${staff.id}`,
       username: lowerUsername,
       displayName: staff.name,
-      role: staff.role as any, // Admin ou Staff
+      role: staff.role as any,
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       lastSeen: new Date().toISOString(),
