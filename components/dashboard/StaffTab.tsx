@@ -38,7 +38,11 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
     const parts = fullName.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/);
     if (parts.length === 0) return '';
     
+    // Lógica: primeiro.ultimo
     let baseUser = parts.length > 1 ? `${parts[0]}.${parts[parts.length - 1]}` : parts[0];
+    
+    // Remove caracteres especiais que sobraram
+    baseUser = baseUser.replace(/[^a-z.]/g, '');
     
     // Verifica se já existe esse username na lista (excluindo o atual em edição)
     let finalUser = baseUser;
@@ -54,7 +58,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
     if (form.name && !editingId) {
       setForm(prev => ({ ...prev, username: generateUsername(prev.name || '') }));
     }
-  }, [form.name]);
+  }, [form.name, editingId]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,9 +88,9 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
       
       await onSaveStaff(staffData, form.password);
       setIsModalOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao salvar colaborador:", err);
-      alert("ERRO NO BANCO DE DADOS: Ocorreu uma falha na sincronização cloud. Tente novamente em alguns instantes.");
+      alert(`ERRO DE BANCO: ${err.message || 'Falha na sincronização cloud.'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -226,20 +230,17 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                  <div className="space-y-4">
                     <div className="space-y-1">
                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Nome Completo</label>
-                       <input required className={inputClasses} placeholder="EX: JOÃO SILVA" value={form.name} onChange={e => {
-                            setForm({...form, name: e.target.value});
-                         }} />
+                       <input required className={inputClasses} placeholder="EX: JOÃO SILVA" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
                     </div>
 
-                    <div className="space-y-1 bg-blue-50 p-4 rounded-2xl border border-blue-100">
-                       <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">Usuário de Acesso Gerado</label>
+                    {/* CAMPO VISÍVEL DO USUÁRIO CRIADO */}
+                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-2">
+                       <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">Usuário de Acesso (Gerado)</label>
                        <div className="flex items-center gap-3">
-                         <input readOnly disabled className="w-full px-5 py-3 rounded-xl border border-blue-200 bg-white font-black text-blue-600 outline-none text-xs lowercase opacity-80" value={form.username} />
-                         <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center animate-pulse">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="3"/></svg>
-                         </div>
+                         <input readOnly disabled className="flex-1 px-4 py-2 rounded-xl border border-blue-200 bg-white font-black text-blue-600 outline-none text-xs lowercase" value={form.username} />
+                         <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-black animate-pulse">!</div>
                        </div>
-                       <p className="text-[7px] text-blue-400 font-bold uppercase mt-2 tracking-tighter">* Geração automática: primeiro.ultimo</p>
+                       <p className="text-[7px] text-blue-400 font-bold uppercase mt-1">* Formato: primeiro.ultimo</p>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">

@@ -41,12 +41,13 @@ export const db = {
       try {
         const { data, error } = await supabase.from('users').select('*');
         if (!error && data) {
-          // Normaliza dados da nuvem (minúsculo -> camelCase) para o App
           const normalized = data.map((u: any) => ({
             ...u,
             displayName: u.name || u.displayName,
             lastLogin: u.lastlogin || u.lastLogin,
-            staffId: u.staffid || u.staffId
+            staffId: u.staffid || u.staffId,
+            emailCorp: u.emailcorp || u.emailCorp,
+            phoneCorp: u.phonecorp || u.phoneCorp
           }));
           db._saveLocal(KEYS.USERS, normalized);
           return normalized;
@@ -71,17 +72,17 @@ export const db = {
 
     if (supabase) {
       try {
-        // MAPEAMENTO PARA COLUNAS MINÚSCULAS DO SUPABASE
+        // MAPEAMENTO RÍGIDO PARA COLUNAS MINÚSCULAS VISTAS NO PRINT
         const payload = {
           id: user.id,
           username: user.username.toLowerCase(),
           password: user.password,
-          name: user.displayName.toUpperCase(), // displayName vira 'name' no banco
+          name: user.displayName.toUpperCase(), 
           role: user.role,
           staffid: user.staffId,
           lastlogin: user.lastLogin,
           position: user.position?.toUpperCase(),
-          status: user.status,
+          status: user.status || 'Ativo',
           phonecorp: user.phoneCorp,
           emailcorp: user.emailCorp?.toLowerCase()
         };
@@ -89,7 +90,7 @@ export const db = {
         const { error } = await supabase.from('users').upsert(payload);
         if (error) throw error;
       } catch (e: any) { 
-        console.error("Erro ao sincronizar Usuário:", e.message); 
+        console.error("Erro Supabase User:", e.message); 
         throw e; 
       }
     }
@@ -104,7 +105,9 @@ export const db = {
           const normalized = data.map((s: any) => ({
             ...s,
             registrationDate: s.registrationdate || s.registrationDate,
-            statusSince: s.statussince || s.statusSince
+            statusSince: s.statussince || s.statusSince,
+            emailCorp: s.emailcorp || s.emailCorp,
+            phoneCorp: s.phonecorp || s.phoneCorp
           }));
           db._saveLocal(KEYS.STAFF, normalized);
           return normalized;
@@ -166,7 +169,7 @@ export const db = {
         const { error } = await supabase.from('staff').upsert(staffPayload);
         if (error) throw error;
       } catch (e: any) { 
-        console.error("Erro ao sincronizar Staff:", e.message); 
+        console.error("Erro Supabase Staff:", e.message); 
         throw e;
       }
     }
