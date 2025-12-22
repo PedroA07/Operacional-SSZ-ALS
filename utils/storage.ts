@@ -59,7 +59,7 @@ export const db = {
 
   saveUser: async (user: User) => {
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    const idx = current.findIndex((u: any) => u.id === user.id || u.username === user.username);
+    const idx = current.findIndex((u: any) => u.id === user.id || u.username === user.username.toLowerCase());
     
     let updated;
     if (idx >= 0) {
@@ -72,10 +72,9 @@ export const db = {
 
     if (supabase) {
       try {
-        // MAPEAMENTO RÍGIDO PARA COLUNAS MINÚSCULAS VISTAS NO PRINT
         const payload = {
           id: user.id,
-          username: user.username.toLowerCase(),
+          username: user.username.toLowerCase(), // SEMPRE MINÚSCULO
           password: user.password,
           name: user.displayName.toUpperCase(), 
           role: user.role,
@@ -134,7 +133,7 @@ export const db = {
     
     const userData: User = {
       id: existingUser?.id || `u-${staff.id}`,
-      username: staff.username,
+      username: staff.username.toLowerCase(),
       displayName: staff.name,
       role: staff.role as any,
       staffId: staff.id,
@@ -185,7 +184,8 @@ export const db = {
     if (supabase) {
       try {
         await supabase.from('staff').delete().eq('id', id);
-        await supabase.from('users').delete().eq('staffId', id);
+        // Deleta o usuário vinculado pelo staffid
+        await supabase.from('users').delete().eq('staffid', id);
       } catch (e) { console.error("Cloud Sync Error (Delete Staff)"); }
     }
     return true;

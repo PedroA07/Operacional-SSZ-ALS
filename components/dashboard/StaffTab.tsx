@@ -34,36 +34,45 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   const isAdmin = currentUser.role === 'admin';
   const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
 
-  // Lógica de geração de sugestões de usuários
+  // Lógica de geração de sugestões de usuários baseada nos sobrenomes
   useEffect(() => {
     if (form.name && !editingId) {
-      const parts = form.name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/);
+      const cleanName = form.name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const parts = cleanName.split(/\s+/);
+      
       if (parts.length > 1) {
         const first = parts[0];
+        // Gera opções pedro.sobrenome1, pedro.sobrenome2, etc.
         const options = parts.slice(1).map(surname => `${first}.${surname}`);
         
-        // Filtra opções que já existem na base (para não dar a opção se for igual a um existente)
-        const uniqueOptions = options.filter(opt => !staffList.some(s => s.username === opt));
+        // Filtra opções que já existem na base (para não permitir duplicidade)
+        const uniqueOptions = options.filter(opt => !users.some(u => u.username === opt));
         
         setUsernameOptions(uniqueOptions);
         
-        // Auto-seleciona a primeira se o campo estiver vazio ou se a anterior não for mais válida
-        if (!form.username || !uniqueOptions.includes(form.username)) {
+        // Se a opção atual não estiver na lista de sugestões, reseta
+        if (!uniqueOptions.includes(form.username || '')) {
            setForm(prev => ({ ...prev, username: uniqueOptions[0] || '' }));
         }
       } else {
         setUsernameOptions([]);
-        setForm(prev => ({ ...prev, username: parts[0] || '' }));
+        const basicUser = parts[0] || '';
+        // Só define se não existir
+        if (!users.some(u => u.username === basicUser)) {
+           setForm(prev => ({ ...prev, username: basicUser }));
+        } else {
+           setForm(prev => ({ ...prev, username: '' }));
+        }
       }
     }
-  }, [form.name, editingId, staffList]);
+  }, [form.name, editingId, users]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessing) return;
     
     if (!form.username) {
-      alert("Por favor, selecione ou defina um usuário válido.");
+      alert("ERRO: É necessário selecionar um nome de usuário válido que não esteja em uso.");
       return;
     }
 
@@ -79,7 +88,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
         id: staffId,
         name: (form.name || '').toUpperCase(),
         position: (form.position || '').toUpperCase(),
-        username: form.username.toLowerCase(),
+        username: (form.username || '').toLowerCase(), // GARANTE MINÚSCULO NO SALVAMENTO
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: form.photo,
         registrationDate: form.registrationDate || new Date().toISOString(),
@@ -93,7 +102,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
       setIsModalOpen(false);
     } catch (err: any) {
       console.error("Erro ao salvar colaborador:", err);
-      alert(`ERRO DE BANCO: ${err.message || 'Falha na sincronização cloud.'}`);
+      alert(`FALHA CRÍTICA: ${err.message || 'Verifique se o usuário já existe no banco de dados.'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -217,7 +226,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
            <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Editar Perfil' : 'Novo Colaborador'}</h3>
+                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Perfil Colaborador' : 'Novo Colaborador'}</h3>
                  <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
               </div>
               <form onSubmit={handleSave} className="p-10 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
@@ -237,7 +246,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
 
                  <div className="space-y-4">
                     <div className="space-y-1">
-                       <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Nome Completo</label>
+                       <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Nome Completo (Caixa Alta)</label>
                        <input 
                         required 
                         className={`${inputClasses} uppercase`} 
@@ -248,7 +257,9 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                     </div>
 
                     <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 space-y-3">
-                       <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">Usuário de Acesso {editingId ? '(Bloqueado)' : '(Escolha um sobrenome)'}</label>
+                       <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">
+                        {editingId ? 'Usuário de Acesso (Imutável)' : 'Selecione o Usuário de Acesso'}
+                       </label>
                        
                        {!editingId ? (
                          <>
@@ -263,18 +274,21 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                                  {opt}
                                </button>
                              )) : (
-                               <p className="text-[8px] text-slate-400 font-bold uppercase italic">Digite o nome para gerar opções...</p>
+                               <p className="text-[8px] text-slate-400 font-bold uppercase italic">Digite o nome para gerar opções de usuário...</p>
                              )}
                            </div>
-                           <p className="text-[7px] text-blue-400 font-bold uppercase tracking-tighter">* O sistema remove usuários já existentes da lista de escolha.</p>
+                           {usernameOptions.length > 0 && (
+                             <div className="mt-2 p-3 bg-white/60 rounded-xl border border-blue-100 flex items-center gap-3">
+                                <span className="text-[10px] font-black text-blue-600 lowercase">{form.username || '---'}</span>
+                                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                             </div>
+                           )}
+                           <p className="text-[7px] text-blue-400 font-bold uppercase tracking-tighter mt-1">* O sistema já remove opções que já existem no banco de dados.</p>
                          </>
                        ) : (
-                         <input 
-                           readOnly 
-                           disabled 
-                           className="w-full px-4 py-2 rounded-xl border border-blue-200 bg-slate-100 font-black text-blue-600 outline-none text-xs lowercase opacity-60" 
-                           value={form.username} 
-                         />
+                         <div className="px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-400 lowercase italic">
+                            {form.username}
+                         </div>
                        )}
                     </div>
                     
@@ -341,7 +355,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                       className={`w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
                     >
                       {isProcessing && <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-                      {isProcessing ? 'Gravando...' : editingId ? 'Atualizar Cadastro' : 'Criar Colaborador'}
+                      {isProcessing ? 'Gravando...' : editingId ? 'Salvar Alterações' : 'Criar Colaborador'}
                     </button>
                  </div>
               </form>
