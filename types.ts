@@ -8,6 +8,7 @@ export interface User {
   driverId?: string;
   staffId?: string;
   lastLogin: string;
+  lastSeen?: string; // Novo campo para real-time
   isFirstLogin?: boolean;
   avatar?: string;
   position?: string;

@@ -49,6 +49,21 @@ export const db = {
     return localData;
   },
 
+  heartbeat: async (userId: string) => {
+    const now = new Date().toISOString();
+    if (supabase) {
+      try {
+        await supabase.from('users').update({ lastSeen: now }).eq('id', userId);
+      } catch (e) { console.warn("Heartbeat cloud failed"); }
+    }
+    const localUsers = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
+    const idx = localUsers.findIndex((u: any) => u.id === userId);
+    if (idx >= 0) {
+      localUsers[idx].lastSeen = now;
+      db._saveLocal(KEYS.USERS, localUsers);
+    }
+  },
+
   saveUser: async (user: User) => {
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const idx = current.findIndex((u: any) => u.id === user.id || u.username === user.username);
@@ -106,6 +121,7 @@ export const db = {
       role: staff.role as any,
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
+      lastSeen: new Date().toISOString(),
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
       password: passwordOverride || existingUser?.password || '12345678',
       position: staff.position,

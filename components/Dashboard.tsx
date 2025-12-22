@@ -28,13 +28,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCloud, setIsCloud] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isOnlinePanelOpen, setIsOnlinePanelOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const onlinePanelRef = useRef<HTMLDivElement>(null);
   
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [ports, setPorts] = useState<Port[]>([]);
   const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [usersList, setUsersList] = useState<User[]>([]);
   const [availableOps, setAvailableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id: string, categoryName: string, clientName: string }>({ 
@@ -45,18 +48,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setIsSyncing(true);
     setIsCloud(db.isCloudActive());
     try {
-      const [d, c, p, ps, s] = await Promise.all([
+      const [d, c, p, ps, s, u] = await Promise.all([
         db.getDrivers(), 
         db.getCustomers(), 
         db.getPorts(), 
         db.getPreStacking(), 
-        db.getStaff()
+        db.getStaff(),
+        db.getUsers()
       ]);
       setDrivers(d || []); 
       setCustomers(c || []); 
       setPorts(p || []); 
       setPreStacking(ps || []); 
       setStaffList(s || []);
+      setUsersList(u || []);
     } catch (e) { 
       console.error("Falha ao carregar dados:", e); 
     } finally {
@@ -66,6 +71,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadAllData();
+    
+    // Heartbeat real-time: Sinaliza que o usuário está ativo
+    const heartbeatTimer = setInterval(() => {
+      db.heartbeat(user.id);
+    }, 30000);
+
     const timer = setInterval(() => {
       const now = new Date();
       setCurrentTime(now);
@@ -81,16 +92,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setIsProfileMenuOpen(false);
       }
+      if (onlinePanelRef.current && !onlinePanelRef.current.contains(event.target as Node)) {
+        setIsOnlinePanelOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
+      clearInterval(heartbeatTimer);
       clearInterval(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [sessionStartTime]);
+  }, [user.id, sessionStartTime]);
 
   const toggleMenu = (menu: string) => setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
+
+  // Usuários online: Visto nos últimos 2 minutos
+  const onlineUsers = usersList.filter(u => {
+    if (!u.lastSeen) return false;
+    const lastSeen = new Date(u.lastSeen);
+    const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000);
+    return lastSeen > twoMinsAgo && (u.role === 'admin' || u.role === 'staff');
+  });
 
   const MenuItem = ({ tab, label, subItems, adminOnly }: { tab?: DashboardTab, label: string, subItems?: { label: string, onClick: () => void }[], adminOnly?: boolean }) => {
     if (adminOnly && user.role !== 'admin') return null;
@@ -194,9 +217,60 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           </div>
         </nav>
 
-        <div className="p-4 border-t border-slate-800/50 bg-[#0f172a]">
+        <div className="p-4 border-t border-slate-800/50 bg-[#0f172a] space-y-2 relative">
+           {/* Usuários Online */}
+           <div className="relative" ref={onlinePanelRef}>
+              <button 
+                onClick={() => setIsOnlinePanelOpen(!isOnlinePanelOpen)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-all group"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Sessões Ativas</span>
+                </div>
+                <span className="text-[10px] font-black text-white">{onlineUsers.length}</span>
+              </button>
+
+              {isOnlinePanelOpen && (
+                <div className="absolute bottom-full left-0 mb-2 w-64 bg-[#0f172a] border border-slate-700 rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2 duration-200 z-[60] backdrop-blur-md bg-opacity-95">
+                   <div className="p-5 bg-slate-800/50 border-b border-slate-700/50">
+                      <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Usuários Online ALS</p>
+                      <p className="text-[7px] text-slate-500 font-bold uppercase mt-1">Tempo Real (heartbeat)</p>
+                   </div>
+                   <div className="max-h-80 overflow-y-auto custom-scrollbar p-3 space-y-2">
+                      {onlineUsers.map(u => {
+                        const isMe = u.id === user.id;
+                        // Busca o staff correspondente para a foto
+                        const staff = staffList.find(s => s.id === u.staffId);
+                        
+                        return (
+                          <div key={u.id} className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-2xl border border-slate-700/30 group hover:bg-slate-800/60 transition-all">
+                             <div className="w-10 h-10 rounded-xl bg-slate-700 border border-slate-600 overflow-hidden flex items-center justify-center text-[11px] font-black text-blue-400 shadow-md flex-shrink-0 group-hover:scale-105 transition-all">
+                                {staff?.photo ? <img src={staff.photo} className="w-full h-full object-cover" /> : u.displayName.substring(0,2).toUpperCase()}
+                             </div>
+                             <div className="flex-1 min-w-0">
+                                <p className="text-[9px] font-black text-slate-100 truncate uppercase leading-tight">{u.displayName}</p>
+                                <p className="text-[7px] text-slate-500 font-bold uppercase tracking-tighter mt-1">
+                                   {isMe ? `Em Sessão: ${sessionDuration}` : (u.position || 'OPERACIONAL')}
+                                </p>
+                             </div>
+                             <div className="flex flex-col items-end gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                                {isMe && <span className="text-[6px] font-black text-blue-500 bg-blue-500/10 px-1 rounded uppercase">Eu</span>}
+                             </div>
+                          </div>
+                        );
+                      })}
+                   </div>
+                </div>
+              )}
+           </div>
+
            <button onClick={onLogout} className="w-full text-[8px] text-red-500 font-black uppercase hover:bg-red-500/10 py-3 rounded-xl transition-all tracking-widest border border-red-900/20 active:scale-95">
-             Sair do Portal
+             Encerrar Sessão
            </button>
         </div>
       </aside>

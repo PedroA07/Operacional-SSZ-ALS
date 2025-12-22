@@ -14,6 +14,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Staff & { password?: string }>>({ 
     name: '', position: '', username: '', role: 'staff', password: '12345678', emailCorp: '', phoneCorp: '', status: 'Ativo' 
   });
@@ -32,27 +33,44 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   const isAdmin = currentUser.role === 'admin';
   const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
 
-  const handleSendWelcomeEmail = (staff: Staff, pass: string) => {
+  const handleSendWelcomeEmail = async (staff: Staff, pass: string) => {
     if (!staff.emailCorp) {
       alert("Colaborador sem e-mail corporativo cadastrado.");
       return;
     }
-    const subject = encodeURIComponent("NOTIFICAÇÃO DE SISTEMA: Credenciais de Acesso - ALS Transportes");
-    const body = encodeURIComponent(
-      `Prezado(a) ${staff.name},\n\n` +
-      `Este é um e-mail gerado automaticamente para informar suas credenciais de acesso ao Portal ALS.\n\n` +
-      `--------------------------------------------------\n` +
-      `DADOS PARA LOGIN:\n` +
-      `Usuário: ${staff.username}\n` +
-      `Senha Provisória: ${pass}\n` +
-      `--------------------------------------------------\n\n` +
-      `IMPORTANTE:\n` +
-      `No primeiro acesso, o sistema exigirá a criação de uma nova senha pessoal e intransferível.\n\n` +
-      `Portal Operacional ALS Transportes\n` +
-      `Gestão de Frota e Monitoramento Logístico`
-    );
-    // Utilizando mailto para que o admin envie via sua conta, mas com corpo formatado como "no-reply"
-    window.location.href = `mailto:${staff.emailCorp}?subject=${subject}&body=${body}`;
+
+    setIsSendingEmail(staff.id);
+
+    try {
+      // Nota: Esta rota /api/send-email deve ser criada no seu ambiente Vercel
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: staff.emailCorp,
+          name: staff.name,
+          username: staff.username,
+          password: pass
+        }),
+      });
+
+      if (response.ok) {
+        alert("E-mail de acesso enviado com sucesso via servidor!");
+      } else {
+        // Fallback manual se a API não estiver configurada ainda
+        const subject = encodeURIComponent("Credenciais de Acesso - ALS Transportes");
+        const body = encodeURIComponent(`Usuário: ${staff.username}\nSenha: ${pass}`);
+        window.location.href = `mailto:${staff.emailCorp}?subject=${subject}&body=${body}`;
+      }
+    } catch (err) {
+      console.error("Erro ao chamar API de e-mail:", err);
+      alert("A API de e-mail não respondeu. Tentando via cliente local...");
+      const subject = encodeURIComponent("Credenciais de Acesso - ALS Transportes");
+      const body = encodeURIComponent(`Usuário: ${staff.username}\nSenha: ${pass}`);
+      window.location.href = `mailto:${staff.emailCorp}?subject=${subject}&body=${body}`;
+    } finally {
+      setIsSendingEmail(null);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -151,7 +169,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                  </div>
                  <div className="flex justify-between items-start text-[9px] font-black uppercase tracking-widest overflow-hidden">
                     <span className="text-slate-400 mt-1 flex-shrink-0 mr-4">E-mail</span>
-                    <span className="text-slate-800 lowercase font-bold truncate text-right flex-1">{s.emailCorp || '---'}</span>
+                    <span className="text-slate-800 lowercase font-bold truncate text-right flex-1 max-w-[140px] break-all">{s.emailCorp || '---'}</span>
                  </div>
                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
                     <span className="text-slate-400">Usuário</span>
@@ -170,9 +188,9 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                           className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-400"
                         >
                           {isPassVisible ? (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" strokeWidth="2.5"/></svg>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" strokeWidth="2.5"/></svg>
                           ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943-9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
                           )}
                         </button>
                       </div>
@@ -192,10 +210,16 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                    </div>
                    {isAdmin && s.emailCorp && (
                      <button 
+                       disabled={isSendingEmail === s.id}
                        onClick={() => handleSendWelcomeEmail(s, linkedUser?.password || '12345678')}
-                       className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[8px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100"
+                       className={`w-full py-2 flex items-center justify-center gap-2 rounded-xl text-[8px] font-black uppercase transition-all border ${isSendingEmail === s.id ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white'}`}
                      >
-                       Gerar E-mail de Acesso
+                       {isSendingEmail === s.id ? (
+                         <>
+                           <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                           Enviando...
+                         </>
+                       ) : 'Gerar E-mail (No-Reply)'}
                      </button>
                    )}
                 </div>
