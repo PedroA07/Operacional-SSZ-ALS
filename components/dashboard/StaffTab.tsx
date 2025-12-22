@@ -14,7 +14,6 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Staff & { password?: string }>>({ 
     name: '', position: '', username: '', role: 'staff', password: '12345678', emailCorp: '', phoneCorp: '', status: 'Ativo' 
   });
@@ -32,46 +31,6 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
 
   const isAdmin = currentUser.role === 'admin';
   const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
-
-  const handleSendWelcomeEmail = async (staff: Staff, pass: string) => {
-    if (!staff.emailCorp) {
-      alert("Colaborador sem e-mail corporativo cadastrado.");
-      return;
-    }
-
-    setIsSendingEmail(staff.id);
-
-    try {
-      // Nota: Esta rota /api/send-email deve ser criada no seu ambiente Vercel
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: staff.emailCorp,
-          name: staff.name,
-          username: staff.username,
-          password: pass
-        }),
-      });
-
-      if (response.ok) {
-        alert("E-mail de acesso enviado com sucesso via servidor!");
-      } else {
-        // Fallback manual se a API não estiver configurada ainda
-        const subject = encodeURIComponent("Credenciais de Acesso - ALS Transportes");
-        const body = encodeURIComponent(`Usuário: ${staff.username}\nSenha: ${pass}`);
-        window.location.href = `mailto:${staff.emailCorp}?subject=${subject}&body=${body}`;
-      }
-    } catch (err) {
-      console.error("Erro ao chamar API de e-mail:", err);
-      alert("A API de e-mail não respondeu. Tentando via cliente local...");
-      const subject = encodeURIComponent("Credenciais de Acesso - ALS Transportes");
-      const body = encodeURIComponent(`Usuário: ${staff.username}\nSenha: ${pass}`);
-      window.location.href = `mailto:${staff.emailCorp}?subject=${subject}&body=${body}`;
-    } finally {
-      setIsSendingEmail(null);
-    }
-  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,20 +167,6 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                        </button>
                      )}
                    </div>
-                   {isAdmin && s.emailCorp && (
-                     <button 
-                       disabled={isSendingEmail === s.id}
-                       onClick={() => handleSendWelcomeEmail(s, linkedUser?.password || '12345678')}
-                       className={`w-full py-2 flex items-center justify-center gap-2 rounded-xl text-[8px] font-black uppercase transition-all border ${isSendingEmail === s.id ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white'}`}
-                     >
-                       {isSendingEmail === s.id ? (
-                         <>
-                           <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                           Enviando...
-                         </>
-                       ) : 'Gerar E-mail (No-Reply)'}
-                     </button>
-                   )}
                 </div>
               )}
             </div>
