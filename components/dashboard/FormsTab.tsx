@@ -67,8 +67,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     obs: ''
   });
 
+  // Reação à navegação da Sidebar
   useEffect(() => {
-    if (initialFormId) {
+    if (initialFormId && formConfigs[initialFormId as FormType]) {
       handleOpenForm(initialFormId as FormType);
     }
   }, [initialFormId]);
@@ -132,13 +133,16 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
-  const handleOpenForm = (type: FormType) => { setSelectedFormType(type); setIsFormModalOpen(true); };
+  const handleOpenForm = (type: FormType) => { 
+    setSelectedFormType(type); 
+    setIsFormModalOpen(true); 
+  };
+  
   const handleSelectDriver = (driver: Driver) => { setFormData(prev => ({ ...prev, driverId: driver.id })); setDriverSearch(`${driver.name} (${driver.plateHorse})`); setShowDriverResults(false); };
   const handleSelectRemetente = (customer: Customer) => { setFormData(prev => ({ ...prev, remetenteId: customer.id, expedidor: customer.name })); setRemetenteSearch(customer.name); setShowRemetenteResults(false); };
   const handleSelectDestinatario = (port: Port) => { setFormData(prev => ({ ...prev, destinatarioId: port.id })); setDestinatarioSearch(port.name); setShowDestinatarioResults(false); };
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all";
-  const selectClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none";
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

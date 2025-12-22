@@ -38,8 +38,10 @@ export const db = {
   updateHeartbeat: async (userId: string) => {
     if (!supabase) return;
     try {
-      await supabase.from('users').update({ lastseen: new Date().toISOString() }).eq('id', userId);
-    } catch (e) { /* silent fail for heartbeat */ }
+      // Atualiza a coluna lastseen no banco
+      const { error } = await supabase.from('users').update({ lastseen: new Date().toISOString() }).eq('id', userId);
+      if (error) console.warn("Erro Heartbeat:", error.message);
+    } catch (e) { /* fail silent */ }
   },
 
   getUsers: async (): Promise<User[]> => {
@@ -56,7 +58,6 @@ export const db = {
             emailCorp: u.emailcorp || u.emailCorp,
             phoneCorp: u.phonecorp || u.phoneCorp,
             lastSeen: u.lastseen || u.lastSeen,
-            // Ensure photo is mapped correctly from DB to match User interface
             photo: u.photo
           }));
           db._saveLocal(KEYS.USERS, normalized);
@@ -96,16 +97,11 @@ export const db = {
           phonecorp: user.phoneCorp,
           emailcorp: user.emailCorp?.toLowerCase(),
           lastseen: user.lastSeen || new Date().toISOString(),
-          // Persist photo to DB
           photo: user.photo
         };
-        
         const { error } = await supabase.from('users').upsert(payload);
         if (error) throw error;
-      } catch (e: any) { 
-        console.error("Erro Supabase User:", e.message); 
-        throw e; 
-      }
+      } catch (e: any) { console.error("Erro Supabase User:", e.message); throw e; }
     }
   },
 
@@ -134,14 +130,29 @@ export const db = {
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const lowerUsername = staff.username.toLowerCase();
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
-    let updatedStaff;
+    
+    // Auditoria de Status
+    let updatedStaffData = { ...staff };
     if (sIdx >= 0) {
-      updatedStaff = [...currentStaff];
-      updatedStaff[sIdx] = { ...staff, username: lowerUsername };
+      const existing = currentStaff[sIdx];
+      // Se o status mudou, atualiza a data da mudança
+      if (existing.status !== staff.status) {
+        updatedStaffData.statusSince = new Date().toISOString();
+      }
     } else {
-      updatedStaff = [...currentStaff, { ...staff, username: lowerUsername }];
+      // Novo cadastro
+      updatedStaffData.registrationDate = new Date().toISOString();
+      updatedStaffData.statusSince = new Date().toISOString();
     }
-    db._saveLocal(KEYS.STAFF, updatedStaff);
+
+    let updatedStaffList;
+    if (sIdx >= 0) {
+      updatedStaffList = [...currentStaff];
+      updatedStaffList[sIdx] = { ...updatedStaffData, username: lowerUsername };
+    } else {
+      updatedStaffList = [...currentStaff, { ...updatedStaffData, username: lowerUsername }];
+    }
+    db._saveLocal(KEYS.STAFF, updatedStaffList);
 
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const existingUser = users.find((u: any) => u.staffId === staff.id);
@@ -160,8 +171,7 @@ export const db = {
       emailCorp: staff.emailCorp,
       phoneCorp: staff.phoneCorp,
       status: staff.status,
-      statusSince: staff.statusSince,
-      // Propagate photo from staff to the linked user account
+      statusSince: updatedStaffData.statusSince,
       photo: staff.photo
     };
     
@@ -176,28 +186,23 @@ export const db = {
           position: staff.position.toUpperCase(),
           username: lowerUsername,
           role: staff.role,
-          registrationdate: staff.registrationDate,
+          registrationdate: updatedStaffData.registrationDate,
           emailcorp: staff.emailCorp?.toLowerCase(),
           phonecorp: staff.phoneCorp,
           status: staff.status,
-          statussince: staff.statusSince
+          statussince: updatedStaffData.statusSince
         };
         const { error } = await supabase.from('staff').upsert(staffPayload);
         if (error) throw error;
-      } catch (e: any) { 
-        console.error("Erro Supabase Staff:", e.message); 
-        throw e;
-      }
+      } catch (e: any) { console.error("Erro Supabase Staff:", e.message); throw e; }
     }
   },
 
   deleteStaff: async (id: string) => {
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     db._saveLocal(KEYS.STAFF, currentStaff.filter((s: any) => s.id !== id));
-    
     const currentUsers = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     db._saveLocal(KEYS.USERS, currentUsers.filter((u: any) => u.staffId !== id));
-
     if (supabase) {
       try {
         await supabase.from('users').delete().eq('staffid', id);
@@ -212,10 +217,7 @@ export const db = {
     if (supabase) {
       try {
         const { data } = await supabase.from('drivers').select('*');
-        if (data) {
-          db._saveLocal(KEYS.DRIVERS, data);
-          return data;
-        }
+        if (data) { db._saveLocal(KEYS.DRIVERS, data); return data; }
       } catch (e) { console.warn("Supabase getDrivers offline."); }
     }
     return localData;
@@ -225,12 +227,7 @@ export const db = {
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     const idx = current.findIndex((d: any) => d.id === driver.id);
     let updated;
-    if (idx >= 0) {
-      updated = [...current];
-      updated[idx] = driver;
-    } else {
-      updated = [...current, driver];
-    }
+    if (idx >= 0) { updated = [...current]; updated[idx] = driver; } else { updated = [...current, driver]; }
     db._saveLocal(KEYS.DRIVERS, updated);
     if (supabase) await supabase.from('drivers').upsert(driver);
   },
@@ -238,9 +235,7 @@ export const db = {
   deleteDriver: async (id: string) => {
     const currentDrivers = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     db._saveLocal(KEYS.DRIVERS, currentDrivers.filter((d: any) => d.id !== id));
-    if (supabase) {
-      await supabase.from('drivers').delete().eq('id', id);
-    }
+    if (supabase) await supabase.from('drivers').delete().eq('id', id);
   },
 
   getCustomers: async (): Promise<Customer[]> => {
@@ -334,9 +329,7 @@ export const db = {
           if (data.staff) db._saveLocal(KEYS.STAFF, data.staff);
           if (data.users) db._saveLocal(KEYS.USERS, data.users);
           resolve(true);
-        } catch (error) {
-          resolve(false);
-        }
+        } catch (error) { resolve(false); }
       };
       reader.readAsText(file);
     });

@@ -74,7 +74,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setSessionDuration(`${hours}:${minutes}:${seconds}`);
       }
 
-      if (now.getSeconds() % 30 === 0) db.updateHeartbeat(user.id);
+      // HEARTBEAT: Só atualiza se a aba estiver visível e ativa
+      if (now.getSeconds() % 30 === 0 && document.visibilityState === 'visible') {
+        db.updateHeartbeat(user.id);
+      }
     }, 1000);
 
     const handleClickOutside = (event: MouseEvent) => {
@@ -91,6 +94,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const toggleMenuExpansion = (key: string) => {
     setExpandedMenus(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleFormClick = (formId: string) => {
+    setSelectedFormId(null);
+    setTimeout(() => {
+      setActiveTab(DashboardTab.FORMULARIOS);
+      setSelectedFormId(formId);
+    }, 10);
   };
 
   const MenuItem = ({ 
@@ -170,7 +181,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
-      {/* SIDEBAR DINÂMICA */}
       <aside className={`
         ${sidebarState === 'open' ? 'w-80' : sidebarState === 'collapsed' ? 'w-20' : 'w-0'} 
         bg-[#0f172a] text-slate-400 flex flex-col shadow-2xl z-50 transition-all duration-300 relative overflow-hidden
@@ -180,31 +190,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <div className="bg-blue-600 w-9 h-9 min-w-[36px] rounded-xl flex items-center justify-center text-white font-black italic">ALS</div>
             {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-wider text-xs uppercase whitespace-nowrap">ALS TRANSPORTES</span>}
           </div>
-          
           {sidebarState === 'open' && <WeatherWidget />}
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
           <MenuItem tab={DashboardTab.INICIO} label="Início" />
-          
           <MenuItem tab={DashboardTab.OPERACOES} label="Operações" forceActive={activeTab === DashboardTab.OPERACOES}>
             {availableOps.map(op => (
               <div key={op.id} className="group/cat">
                 <div className="flex items-center justify-between py-1.5 px-2 hover:bg-slate-800/40 rounded-lg group">
-                  <button 
-                    onClick={() => {
-                      setActiveTab(DashboardTab.OPERACOES);
-                      setOpsView({ type: 'category', id: op.id, categoryName: op.category });
-                    }}
-                    className="text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors flex-1 text-left"
-                  >
-                    • {op.category}
-                  </button>
+                  <button onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors flex-1 text-left">• {op.category}</button>
                   {op.clients.length > 0 && (
-                    <button 
-                      onClick={() => toggleMenuExpansion(`op-${op.id}`)}
-                      className="p-1 text-slate-600 hover:text-blue-400"
-                    >
+                    <button onClick={() => toggleMenuExpansion(`op-${op.id}`)} className="p-1 text-slate-600 hover:text-blue-400">
                       <svg className={`w-2.5 h-2.5 transition-transform ${expandedMenus[`op-${op.id}`] ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
                     </button>
                   )}
@@ -212,38 +209,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 {expandedMenus[`op-${op.id}`] && (
                   <div className="ml-4 space-y-1 mb-2 animate-in slide-in-from-left-1">
                     {op.clients.map((client, idx) => (
-                      <button 
-                        key={idx}
-                        onClick={() => {
-                          if (client.hasDedicatedPage) {
-                            setActiveTab(DashboardTab.OPERACOES);
-                            setOpsView({ type: 'client', id: op.id, categoryName: op.category, clientName: client.name });
-                          }
-                        }}
-                        className={`w-full text-left py-1 text-[8px] font-black uppercase transition-colors px-2 rounded hover:bg-slate-800/30 ${client.hasDedicatedPage ? 'text-blue-500 hover:text-blue-300' : 'text-slate-600 opacity-60 cursor-default'}`}
-                      >
-                        └ {client.name}
-                      </button>
+                      <button key={idx} onClick={() => { if (client.hasDedicatedPage) { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'client', id: op.id, categoryName: op.category, clientName: client.name }); } }} className={`w-full text-left py-1 text-[8px] font-black uppercase transition-colors px-2 rounded hover:bg-slate-800/30 ${client.hasDedicatedPage ? 'text-blue-500 hover:text-blue-300' : 'text-slate-600 opacity-60 cursor-default'}`}>└ {client.name}</button>
                     ))}
                   </div>
                 )}
               </div>
             ))}
           </MenuItem>
-
           <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" />
-          
           <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" forceActive={activeTab === DashboardTab.FORMULARIOS}>
-            <button onClick={() => { setActiveTab(DashboardTab.FORMULARIOS); setSelectedFormId('ORDEM_COLETA'); }} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Ordem de Coleta</button>
-            <button onClick={() => { setActiveTab(DashboardTab.FORMULARIOS); setSelectedFormId('PRE_STACKING'); }} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Pré-Stacking</button>
-            <button onClick={() => { setActiveTab(DashboardTab.FORMULARIOS); setSelectedFormId('LIBERACAO_VAZIO'); }} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Liberação Vazio</button>
-            <button onClick={() => { setActiveTab(DashboardTab.FORMULARIOS); setSelectedFormId('RETIRADA_CHEIO'); }} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Retirada Cheio</button>
+            <button onClick={() => handleFormClick('ORDEM_COLETA')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Ordem de Coleta</button>
+            <button onClick={() => handleFormClick('PRE_STACKING')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Pré-Stacking</button>
+            <button onClick={() => handleFormClick('LIBERACAO_VAZIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Liberação Vazio</button>
+            <button onClick={() => handleFormClick('RETIRADA_CHEIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Retirada Cheio</button>
           </MenuItem>
-
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" />
           <MenuItem tab={DashboardTab.PORTOS} label="Portos" />
           <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" />
-          
           <div className="pt-4 pb-2">
              {sidebarState === 'open' && <p className="px-4 text-[7px] font-black text-slate-600 uppercase mb-2 tracking-[0.2em]">Administração</p>}
              <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" />
@@ -263,11 +245,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-40">
            <div className="flex items-center gap-4">
-              <button onClick={cycleSidebar} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="2.5" strokeLinecap="round"/>
-                </svg>
-              </button>
+              <button onClick={cycleSidebar} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="2.5" strokeLinecap="round"/></svg></button>
               <div className="h-6 w-[1px] bg-slate-200 hidden sm:block"></div>
               <h2 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">{activeTab}</h2>
            </div>
@@ -291,33 +269,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     </div>
                     <h4 className="font-black text-slate-800 uppercase text-xs">{user.displayName}</h4>
                     <p className="text-[8px] text-blue-500 font-bold uppercase tracking-widest mt-1">{user.position || 'OPERACIONAL'}</p>
-                    
                     <div className="mt-4 bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5 overflow-hidden text-left">
                        <p className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Tempo de Sessão</p>
-                       <div className="text-lg font-black font-mono tracking-tighter">
-                          {sessionDuration}
-                       </div>
+                       <div className="text-lg font-black font-mono tracking-tighter">{sessionDuration}</div>
                     </div>
                   </div>
-
                   <div className="space-y-2 mb-5">
-                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span>
-                      <span className="text-[9px] font-bold text-slate-800 lowercase break-all">{displayEmail}</span>
-                    </div>
-                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span>
-                      <span className="text-[9px] font-bold text-slate-800">{displayPhone}</span>
-                    </div>
+                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100"><span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span><span className="text-[9px] font-bold text-slate-800 lowercase break-all">{displayEmail}</span></div>
+                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100"><span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span><span className="text-[9px] font-bold text-slate-800">{displayPhone}</span></div>
                   </div>
-
                   <div className="space-y-1.5">
-                    <button onClick={handleEditProfile} className="w-full py-3 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95">
-                      Editar Perfil
-                    </button>
-                    <button onClick={onLogout} className="w-full py-3 bg-red-50 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95">
-                      Sair do Sistema
-                    </button>
+                    <button onClick={handleEditProfile} className="w-full py-3 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95">Editar Perfil</button>
+                    <button onClick={onLogout} className="w-full py-3 bg-red-50 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95">Sair do Sistema</button>
                   </div>
                 </div>
               )}

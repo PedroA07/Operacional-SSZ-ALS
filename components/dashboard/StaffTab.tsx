@@ -95,9 +95,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
       const staffId = editingId || `stf-${Date.now()}`;
       const existing = staffList.find(s => s.id === staffId);
       
-      const newStatus = isAdmin ? (form.status || 'Ativo') : (existing?.status || 'Ativo');
-      const statusSince = (isAdmin && form.status !== existing?.status) ? new Date().toISOString() : (existing?.statusSince || new Date().toISOString());
-
+      // Lógica de auditoria é tratada no storage.ts, mas garantimos os campos básicos aqui
       const staffData: Staff = { 
         id: staffId,
         name: (form.name || '').toUpperCase(),
@@ -105,14 +103,13 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         username: (form.username || '').toLowerCase(),
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: form.photo,
-        registrationDate: form.registrationDate || new Date().toISOString(),
+        registrationDate: form.registrationDate || existing?.registrationDate || new Date().toISOString(),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
-        status: newStatus as 'Ativo' | 'Inativo',
-        statusSince: statusSince
+        status: (form.status || 'Ativo') as 'Ativo' | 'Inativo',
+        statusSince: existing?.statusSince || new Date().toISOString()
       };
       
-      // Só envia a senha se estiver criando novo ou se clicou em Alterar Senha
       const passwordToSave = (!editingId || isEditingPassword) ? form.password : undefined;
       
       await onSaveStaff(staffData, passwordToSave);
@@ -186,6 +183,18 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                     <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded-lg lowercase font-bold">{s.username}</span>
                  </div>
                  
+                 <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                    <span className="text-slate-400">Desde</span>
+                    <span className="text-slate-700">{new Date(s.registrationDate).toLocaleDateString('pt-BR')}</span>
+                 </div>
+
+                 {s.status === 'Inativo' && (
+                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                       <span className="text-red-500">Inativo desde</span>
+                       <span className="text-red-600">{new Date(s.statusSince).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                 )}
+
                  {isAdmin && (
                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
                       <span className="text-slate-400">Senha</span>
