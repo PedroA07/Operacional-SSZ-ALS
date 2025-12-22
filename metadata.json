@@ -3,6 +3,7 @@
   "description": "A high-end administrative portal with secure authentication and real-time operational dashboard.",
   "requestFramePermissions": [
     "camera",
-    "microphone"
+    "microphone",
+    "geolocation"
   ]
 }

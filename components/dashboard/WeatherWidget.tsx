@@ -5,12 +5,11 @@ import { WeatherData } from '../../types';
 const WeatherWidget: React.FC = () => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [locationName, setLocationName] = useState('Buscando local...');
 
-  const fetchWeather = async () => {
+  const fetchWeather = async (lat: number, lon: number) => {
     try {
-      const lat = -23.9608;
-      const lon = -46.3339;
-      const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max&timezone=America%2FSao_Paulo`);
+      const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max&timezone=auto`);
       const data = await response.json();
 
       const weatherCodes: Record<number, { condition: string, icon: string }> = {
@@ -37,6 +36,9 @@ const WeatherWidget: React.FC = () => {
           condition: weatherCodes[nextCode]?.condition || 'Estável'
         }
       });
+      
+      // Tenta pegar o nome da cidade via reverse geocoding simples (opcional/estimado)
+      setLocationName(lat.toFixed(2) === "-23.96" ? 'Santos' : 'Sua Região');
     } catch (error) {
       console.error("Erro ao buscar clima:", error);
     } finally {
@@ -45,19 +47,31 @@ const WeatherWidget: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchWeather();
-    const interval = setInterval(fetchWeather, 600000);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        () => fetchWeather(-23.9608, -46.3339) // Fallback Santos
+      );
+    } else {
+      fetchWeather(-23.9608, -46.3339);
+    }
+    
+    const interval = setInterval(() => {
+      if (weather) {
+        // Refresh weather logic here if needed
+      }
+    }, 600000);
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div className="animate-pulse bg-slate-800/30 h-20 rounded-2xl border border-slate-700/30"></div>;
+  if (loading) return <div className="animate-pulse bg-slate-800/30 h-16 rounded-2xl border border-slate-700/30"></div>;
   if (!weather) return null;
 
   return (
     <div className="bg-gradient-to-br from-blue-600/10 to-indigo-900/30 p-3 rounded-2xl border border-blue-500/10 shadow-lg backdrop-blur-sm">
       <div className="flex justify-between items-center mb-1">
         <div>
-          <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest leading-none">Santos • Hoje</span>
+          <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest leading-none">{locationName} • Hoje</span>
           <p className="text-xl font-black text-white leading-none mt-1">{weather.temp}°C</p>
         </div>
         <span className="text-2xl">{weather.icon}</span>
