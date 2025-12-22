@@ -49,7 +49,6 @@ export const db = {
     return localData;
   },
 
-  // Escuta mudanças na tabela de usuários em tempo real
   subscribeToUsers: (callback: (users: User[]) => void) => {
     if (!supabase) return () => {};
 
@@ -70,7 +69,6 @@ export const db = {
     const now = new Date().toISOString();
     if (supabase) {
       try {
-        // Atualiza lastSeen no banco
         await supabase.from('users').update({ lastSeen: now }).eq('id', userId);
       } catch (e) { console.warn("Heartbeat cloud failed"); }
     }
@@ -98,8 +96,9 @@ export const db = {
 
     if (supabase) {
       try {
-        await supabase.from('users').upsert(user);
-      } catch (e) { console.error("Cloud Sync Error (User)"); }
+        const { error } = await supabase.from('users').upsert(user);
+        if (error) throw error;
+      } catch (e) { console.error("Cloud Sync Error (User):", e); throw e; }
     }
   },
 
@@ -118,6 +117,7 @@ export const db = {
   },
 
   saveStaff: async (staff: Staff, passwordOverride?: string) => {
+    // 1. Atualizar Local Storage (Staff)
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
     let updatedStaff;
@@ -129,6 +129,7 @@ export const db = {
     }
     db._saveLocal(KEYS.STAFF, updatedStaff);
 
+    // 2. Preparar e Salvar Usuário vinculado
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const existingUser = users.find((u: any) => u.staffId === staff.id || u.username === staff.username);
     
@@ -149,12 +150,18 @@ export const db = {
       statusSince: staff.statusSince
     };
     
+    // Primeiro salva o usuário (tabela principal de login)
     await db.saveUser(userData);
 
+    // 3. Sincronizar Staff na nuvem
     if (supabase) {
       try {
-        await supabase.from('staff').upsert(staff);
-      } catch (e) { console.error("Cloud Sync Error (Staff)"); }
+        const { error } = await supabase.from('staff').upsert(staff);
+        if (error) throw error;
+      } catch (e) { 
+        console.error("Cloud Sync Error (Staff):", e); 
+        throw e;
+      }
     }
   },
 

@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Staff, User } from '../../types';
 import { db } from '../../utils/storage';
+import { maskPhone } from '../../utils/masks';
 
 interface StaffTabProps {
   staffList: Staff[];
@@ -37,31 +38,32 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
     if (isProcessing) return;
     
     setIsProcessing(true);
-    const staffId = editingId || `stf-${Date.now()}`;
-    
-    const existing = staffList.find(s => s.id === staffId);
-    const newStatus = isAdmin ? (form.status || 'Ativo') : (existing?.status || 'Ativo');
-    const statusSince = (isAdmin && form.status !== existing?.status) ? new Date().toISOString() : (existing?.statusSince || new Date().toISOString());
-
-    const staffData: Staff = { 
-      id: staffId,
-      name: form.name || '',
-      position: form.position || '',
-      username: form.username || '',
-      role: (form.role as 'admin' | 'staff') || 'staff',
-      photo: form.photo,
-      registrationDate: form.registrationDate || new Date().toISOString(),
-      emailCorp: form.emailCorp,
-      phoneCorp: form.phoneCorp,
-      status: newStatus as 'Ativo' | 'Inativo',
-      statusSince: statusSince
-    };
-    
     try {
+      const staffId = editingId || `stf-${Date.now()}`;
+      const existing = staffList.find(s => s.id === staffId);
+      
+      const newStatus = isAdmin ? (form.status || 'Ativo') : (existing?.status || 'Ativo');
+      const statusSince = (isAdmin && form.status !== existing?.status) ? new Date().toISOString() : (existing?.statusSince || new Date().toISOString());
+
+      const staffData: Staff = { 
+        id: staffId,
+        name: (form.name || '').toUpperCase(),
+        position: (form.position || '').toUpperCase(),
+        username: (form.username || '').toLowerCase(),
+        role: (form.role as 'admin' | 'staff') || 'staff',
+        photo: form.photo,
+        registrationDate: form.registrationDate || new Date().toISOString(),
+        emailCorp: (form.emailCorp || '').toLowerCase(),
+        phoneCorp: form.phoneCorp || '',
+        status: newStatus as 'Ativo' | 'Inativo',
+        statusSince: statusSince
+      };
+      
       await onSaveStaff(staffData, form.password);
       setIsModalOpen(false);
     } catch (err) {
-      alert("Erro ao salvar informações.");
+      console.error("Erro ao salvar colaborador:", err);
+      alert("Erro crítico ao salvar na nuvem. Verifique sua conexão ou as credenciais do banco.");
     } finally {
       setIsProcessing(false);
     }
@@ -73,6 +75,8 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
     setEditingId(s.id);
     setIsModalOpen(true);
   };
+
+  const inputClasses = "w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold outline-none focus:border-blue-500 text-slate-900 shadow-sm transition-all placeholder:text-slate-300";
 
   return (
     <div className="space-y-6">
@@ -181,10 +185,10 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                  <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Editar Perfil' : 'Novo Colaborador'}</h3>
                  <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
               </div>
-              <form onSubmit={handleSave} className="p-10 space-y-4">
+              <form onSubmit={handleSave} className="p-10 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
                  <div className="flex justify-center mb-4">
-                    <div onClick={() => photoRef.current?.click()} className="w-20 h-20 rounded-3xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-500 transition-all shadow-inner">
-                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <span className="text-[9px] font-black text-slate-400 uppercase text-center p-2 italic leading-tight">FOTO<br/>PERFIL</span>}
+                    <div onClick={() => photoRef.current?.click()} className="w-20 h-20 rounded-3xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-500 transition-all shadow-inner group">
+                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <span className="text-[9px] font-black text-slate-400 uppercase text-center p-2 italic leading-tight group-hover:text-blue-500">FOTO<br/>PERFIL</span>}
                     </div>
                     <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={e => {
                        const f = e.target.files?.[0];
@@ -198,8 +202,8 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
 
                  <div className="space-y-4">
                     <div className="space-y-1">
-                       <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Completo</label>
-                       <input required className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm" value={form.name} onChange={e => {
+                       <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Nome Completo</label>
+                       <input required className={inputClasses} placeholder="EX: JOÃO SILVA" value={form.name} onChange={e => {
                             const val = e.target.value;
                             const parts = val.trim().toLowerCase().split(' ');
                             const user = parts.length > 1 ? `${parts[0]}.${parts[parts.length-1]}` : parts[0];
@@ -209,14 +213,14 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                     
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cargo</label>
-                          <input required className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900" value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Cargo / Função</label>
+                          <input required className={inputClasses} placeholder="EX: OPERACIONAL" value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Permissão</label>
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Permissão</label>
                           <select 
                             disabled={!isAdmin}
-                            className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm disabled:opacity-50" 
+                            className={`${inputClasses} disabled:opacity-50`} 
                             value={form.role} 
                             onChange={e => setForm({...form, role: e.target.value as any})}
                           >
@@ -228,14 +232,14 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
 
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Corp.</label>
-                          <input required type="email" className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold lowercase outline-none focus:border-blue-500 text-slate-900" value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} />
+                          <label className="text-[9px] font-black text-blue-500 uppercase ml-1 tracking-widest">E-mail Corp.</label>
+                          <input required type="email" className={`${inputClasses} lowercase`} placeholder="email@als.com.br" value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status Sistema</label>
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Status Sistema</label>
                           <select 
                             disabled={!isAdmin}
-                            className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm disabled:opacity-50" 
+                            className={`${inputClasses} disabled:opacity-50`} 
                             value={form.status} 
                             onChange={e => setForm({...form, status: e.target.value as any})}
                           >
@@ -247,15 +251,15 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
 
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Telefone Corp.</label>
-                          <input required className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold outline-none focus:border-blue-500 text-slate-900 shadow-sm" value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: e.target.value})} placeholder="(00) 00000-0000" />
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Telefone Corp.</label>
+                          <input required className={inputClasses} value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: maskPhone(e.target.value)})} placeholder="(00) 00000-0000" />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-emerald-500 uppercase ml-1">Senha de Acesso</label>
+                          <label className="text-[9px] font-black text-emerald-500 uppercase ml-1 tracking-widest">Senha de Acesso</label>
                           <input 
                             type="text"
                             required
-                            className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-black outline-none focus:border-emerald-500 text-slate-900" 
+                            className={inputClasses} 
                             value={form.password}
                             onChange={e => setForm({...form, password: e.target.value})}
                           />
@@ -267,8 +271,9 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                     <button 
                       type="submit" 
                       disabled={isProcessing}
-                      className={`w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+                      className={`w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
                     >
+                      {isProcessing && <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
                       {isProcessing ? 'Gravando...' : editingId ? 'Atualizar Meu Perfil' : 'Cadastrar Colaborador'}
                     </button>
                  </div>
