@@ -70,13 +70,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   useEffect(() => {
     loadAllData();
     
-    // Heartbeat: Atualiza o status do usuário atual a cada 1 minuto
     db.heartbeat(user.id);
     const heartbeatTimer = setInterval(() => {
       db.heartbeat(user.id);
     }, 60000);
 
-    // Refresh da lista de usuários a cada 2 minutos para atualizar o contador
     const usersRefreshTimer = setInterval(async () => {
       const updatedUsers = await db.getUsers();
       setUsersList(updatedUsers);
@@ -110,7 +108,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const toggleMenu = (menu: string) => setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
 
-  // Contagem de usuários online: Visto nos últimos 5 minutos
   const onlineCount = usersList.filter(u => {
     if (!u.lastSeen) return false;
     const lastSeen = new Date(u.lastSeen);
@@ -221,7 +218,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </nav>
 
         <div className="p-4 border-t border-slate-800/50 bg-[#0f172a] space-y-2 relative">
-           {/* Indicador de Usuários Online (Simplificado) */}
            <div className="w-full flex items-center justify-between px-4 py-2 bg-slate-800/50 rounded-xl border border-slate-700/50">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
