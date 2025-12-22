@@ -35,6 +35,13 @@ export const db = {
     return s ? JSON.parse(s) : null;
   },
 
+  updateHeartbeat: async (userId: string) => {
+    if (!supabase) return;
+    try {
+      await supabase.from('users').update({ lastseen: new Date().toISOString() }).eq('id', userId);
+    } catch (e) { /* silent fail for heartbeat */ }
+  },
+
   getUsers: async (): Promise<User[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     if (supabase) {
@@ -47,7 +54,10 @@ export const db = {
             lastLogin: u.lastlogin || u.lastLogin,
             staffId: u.staffid || u.staffId,
             emailCorp: u.emailcorp || u.emailCorp,
-            phoneCorp: u.phonecorp || u.phoneCorp
+            phoneCorp: u.phonecorp || u.phoneCorp,
+            lastSeen: u.lastseen || u.lastSeen,
+            // Ensure photo is mapped correctly from DB to match User interface
+            photo: u.photo
           }));
           db._saveLocal(KEYS.USERS, normalized);
           return normalized;
@@ -84,7 +94,10 @@ export const db = {
           position: user.position?.toUpperCase(),
           status: user.status || 'Ativo',
           phonecorp: user.phoneCorp,
-          emailcorp: user.emailCorp?.toLowerCase()
+          emailcorp: user.emailCorp?.toLowerCase(),
+          lastseen: user.lastSeen || new Date().toISOString(),
+          // Persist photo to DB
+          photo: user.photo
         };
         
         const { error } = await supabase.from('users').upsert(payload);
@@ -147,7 +160,9 @@ export const db = {
       emailCorp: staff.emailCorp,
       phoneCorp: staff.phoneCorp,
       status: staff.status,
-      statusSince: staff.statusSince
+      statusSince: staff.statusSince,
+      // Propagate photo from staff to the linked user account
+      photo: staff.photo
     };
     
     await db.saveUser(userData);
@@ -177,17 +192,14 @@ export const db = {
   },
 
   deleteStaff: async (id: string) => {
-    // 1. Deletar localmente
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     db._saveLocal(KEYS.STAFF, currentStaff.filter((s: any) => s.id !== id));
     
     const currentUsers = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     db._saveLocal(KEYS.USERS, currentUsers.filter((u: any) => u.staffId !== id));
 
-    // 2. Deletar na nuvem
     if (supabase) {
       try {
-        // ESSENCIAL: Deletar primeiro na tabela users por causa da FK, depois staff
         await supabase.from('users').delete().eq('staffid', id);
         await supabase.from('staff').delete().eq('id', id);
       } catch (e) { console.error("Cloud Sync Error (Delete Staff)"); }

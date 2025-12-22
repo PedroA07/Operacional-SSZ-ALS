@@ -105,7 +105,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
 
       {/* BLOCO OPERACIONAL */}
       <div style={{ display: 'flex', border: borderStyle, backgroundColor: '#f8fafc', marginBottom: '10px' }}>
-        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle, overflow: 'hidden' }}>
+        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle, }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>ARMADOR</div>
           <div style={{ fontSize: '12px', fontWeight: 900, color: '#1d4ed8', whiteSpace: 'nowrap' }}>{formData.agencia || '---'}</div>
         </div>

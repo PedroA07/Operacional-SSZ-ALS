@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Driver, OperationDefinition, DriverOperation } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
@@ -67,6 +68,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     const statusDate = form.statusLastChangeDate || new Date().toISOString();
 
     if (form.hasAccess) {
+      // Pass the driver photo to the User account for consistent profile display
       await db.saveUser({
         id: `u-${drvId}`,
         username: access.username,
@@ -75,7 +77,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         driverId: drvId,
         lastLogin: new Date().toISOString(),
         position: form.driverType === 'Motoboy' ? 'Motoboy' : 'Motorista',
-        password: access.password
+        password: access.password,
+        photo: form.photo
       });
     }
 

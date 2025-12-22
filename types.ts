@@ -10,7 +10,8 @@ export interface User {
   lastLogin: string;
   lastSeen?: string; // Novo campo para real-time
   isFirstLogin?: boolean;
-  avatar?: string;
+  // Renamed avatar to photo to fix TypeScript errors in components/Dashboard.tsx
+  photo?: string;
   position?: string;
   emailCorp?: string;
   phoneCorp?: string;
