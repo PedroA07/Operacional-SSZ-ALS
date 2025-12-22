@@ -23,8 +23,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [sessionStartTime] = useState(new Date());
-  const [sessionDuration, setSessionDuration] = useState('00:00:00');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCloud, setIsCloud] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -35,7 +33,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [ports, setPorts] = useState<Port[]>([]);
   const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [usersList, setUsersList] = useState<User[]>([]);
   const [availableOps, setAvailableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ 
@@ -46,20 +43,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setIsSyncing(true);
     setIsCloud(db.isCloudActive());
     try {
-      const [d, c, p, ps, s, u] = await Promise.all([
+      const [d, c, p, ps, s] = await Promise.all([
         db.getDrivers(), 
         db.getCustomers(), 
         db.getPorts(), 
         db.getPreStacking(), 
-        db.getStaff(),
-        db.getUsers()
+        db.getStaff()
       ]);
       setDrivers(d || []); 
       setCustomers(c || []); 
       setPorts(p || []); 
       setPreStacking(ps || []); 
       setStaffList(s || []);
-      setUsersList(u || []);
     } catch (e) { 
       console.error("Falha ao carregar dados:", e); 
     } finally {
@@ -69,27 +64,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadAllData();
-    
-    db.heartbeat(user.id);
-    const heartbeatTimer = setInterval(() => {
-      db.heartbeat(user.id);
-    }, 60000);
-
-    const usersRefreshTimer = setInterval(async () => {
-      const updatedUsers = await db.getUsers();
-      setUsersList(updatedUsers);
-    }, 120000);
-
-    const timer = setInterval(() => {
-      const now = new Date();
-      setCurrentTime(now);
-      
-      const diff = Math.floor((now.getTime() - sessionStartTime.getTime()) / 1000);
-      const h = Math.floor(diff / 3600).toString().padStart(2, '0');
-      const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
-      const s = (diff % 60).toString().padStart(2, '0');
-      setSessionDuration(`${h}:${m}:${s}`);
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
@@ -99,21 +74,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
-      clearInterval(heartbeatTimer);
-      clearInterval(usersRefreshTimer);
       clearInterval(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [user.id, sessionStartTime]);
+  }, []);
 
   const toggleMenu = (menu: string) => setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
-
-  const onlineCount = usersList.filter(u => {
-    if (!u.lastSeen) return false;
-    const lastSeen = new Date(u.lastSeen);
-    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
-    return (lastSeen > fiveMinsAgo);
-  }).length;
 
   const MenuItem = ({ tab, label, subItems, adminOnly }: { tab?: DashboardTab, label: string, subItems?: { label: string, onClick: () => void }[], adminOnly?: boolean }) => {
     if (adminOnly && user.role !== 'admin') return null;
@@ -217,15 +183,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           </div>
         </nav>
 
-        <div className="p-4 border-t border-slate-800/50 bg-[#0f172a] space-y-2 relative">
-           <div className="w-full flex items-center justify-between px-4 py-2 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Sessões Ativas</span>
-              </div>
-              <span className="text-[10px] font-black text-white">{onlineCount}</span>
-           </div>
-
+        <div className="p-4 border-t border-slate-800/50 bg-[#0f172a] space-y-2">
            <button onClick={onLogout} className="w-full text-[8px] text-red-500 font-black uppercase hover:bg-red-500/10 py-3 rounded-xl transition-all tracking-widest border border-red-900/20 active:scale-95">
              Encerrar Sessão
            </button>
@@ -279,10 +237,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   </div>
 
                   <div className="space-y-2 mb-4">
-                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-[7px] font-black text-slate-400 uppercase">Tempo Logado</span>
-                      <span className="text-[10px] font-mono font-black text-slate-800">{sessionDuration}</span>
-                    </div>
                     <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span>
                       <span className="text-[9px] font-bold text-slate-800 lowercase break-all">{user.emailCorp || myStaffData?.emailCorp || 'Não cadastrado'}</span>
