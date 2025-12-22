@@ -14,6 +14,7 @@ import WeatherWidget from './dashboard/WeatherWidget';
 import OnlineStatus from './dashboard/OnlineStatus';
 import { DEFAULT_OPERATIONS } from '../constants/operations';
 import { db } from '../utils/storage';
+import { sessionManager } from '../utils/session';
 
 interface DashboardProps {
   user: User;
@@ -62,7 +63,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadAllData();
-    const timer = setInterval(() => {
+    const timer = setInterval(async () => {
       const now = new Date();
       const loginTime = new Date(user.lastLogin).getTime();
       const diff = now.getTime() - loginTime;
@@ -74,10 +75,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setSessionDuration(`${hours}:${minutes}:${seconds}`);
       }
 
-      // HEARTBEAT: Só atualiza se a aba estiver visível e o usuário não estiver inativo
-      // A Page Visibility API garante que se o usuário mudar de aba, o sinal pare.
+      // 1. HEARTBEAT: Só envia sinal se a aba estiver VISÍVEL e ATIVA
       if (now.getSeconds() % 30 === 0 && document.visibilityState === 'visible') {
         db.updateHeartbeat(user.id);
+      }
+
+      // 2. SEGURANÇA: Verifica se houve alteração de privilégios a cada 60 segundos
+      if (now.getSeconds() === 0) {
+        const isValid = await sessionManager.validateIntegrity(user);
+        if (!isValid) {
+          alert("Sua sessão expirou devido a uma alteração cadastral ou de segurança.");
+          onLogout();
+        }
       }
     }, 1000);
 
@@ -91,7 +100,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       clearInterval(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [user.id, user.lastLogin]);
+  }, [user, onLogout]);
 
   const toggleMenuExpansion = (key: string) => {
     setExpandedMenus(prev => ({ ...prev, [key]: !prev[key] }));
@@ -120,7 +129,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     children?: React.ReactNode,
     forceActive?: boolean
   }) => {
-    // Administradores comuns têm acesso igual ao master
     if (adminOnly && user.role !== 'admin') return null;
     const isActive = forceActive || (tab ? activeTab === tab : false);
     const isExpanded = expandedMenus[label];

@@ -4,7 +4,7 @@ import { AppScreen, User } from './types';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
 import DriverPortal from './components/driver/DriverPortal';
-import { db } from './utils/storage';
+import { sessionManager } from './utils/session';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOGIN);
@@ -12,7 +12,7 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    const savedSession = db.getSession();
+    const savedSession = sessionManager.get();
     if (savedSession) {
       setUser(savedSession);
       if (savedSession.role === 'driver' || savedSession.role === 'motoboy') {
@@ -26,7 +26,7 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = (userData: User) => {
     setUser(userData);
-    db.setSession(userData);
+    sessionManager.set(userData);
     if (userData.role === 'driver' || userData.role === 'motoboy') {
       setCurrentScreen(AppScreen.DRIVER_PORTAL);
     } else {
@@ -36,7 +36,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setUser(null);
-    db.setSession(null);
+    sessionManager.set(null);
     setCurrentScreen(AppScreen.LOGIN);
   };
 
