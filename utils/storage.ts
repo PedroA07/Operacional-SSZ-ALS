@@ -38,7 +38,7 @@ export const db = {
   updateHeartbeat: async (userId: string) => {
     if (!supabase) return;
     try {
-      // Atualiza a coluna lastseen no banco
+      // Atualiza a presença em tempo real
       const { error } = await supabase.from('users').update({ lastseen: new Date().toISOString() }).eq('id', userId);
       if (error) console.warn("Erro Heartbeat:", error.message);
     } catch (e) { /* fail silent */ }
@@ -127,33 +127,38 @@ export const db = {
   },
 
   saveStaff: async (staff: Staff, passwordOverride?: string) => {
-    const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    const currentStaffList = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const lowerUsername = staff.username.toLowerCase();
-    const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
+    const sIdx = currentStaffList.findIndex((s: any) => s.id === staff.id);
     
-    // Auditoria de Status
-    let updatedStaffData = { ...staff };
+    // Lógica inteligente de Auditoria
+    let finalStaffData = { ...staff };
     if (sIdx >= 0) {
-      const existing = currentStaff[sIdx];
-      // Se o status mudou, atualiza a data da mudança
+      const existing = currentStaffList[sIdx];
+      // Mantém a data de registro original
+      finalStaffData.registrationDate = existing.registrationDate;
+      // Se o status mudou, atualizamos a data da mudança de status (ex: Inativação)
       if (existing.status !== staff.status) {
-        updatedStaffData.statusSince = new Date().toISOString();
+        finalStaffData.statusSince = new Date().toISOString();
+      } else {
+        finalStaffData.statusSince = existing.statusSince;
       }
     } else {
-      // Novo cadastro
-      updatedStaffData.registrationDate = new Date().toISOString();
-      updatedStaffData.statusSince = new Date().toISOString();
+      // Novo cadastro: Ambas as datas são agora
+      finalStaffData.registrationDate = new Date().toISOString();
+      finalStaffData.statusSince = new Date().toISOString();
     }
 
-    let updatedStaffList;
+    let updatedList;
     if (sIdx >= 0) {
-      updatedStaffList = [...currentStaff];
-      updatedStaffList[sIdx] = { ...updatedStaffData, username: lowerUsername };
+      updatedList = [...currentStaffList];
+      updatedList[sIdx] = { ...finalStaffData, username: lowerUsername };
     } else {
-      updatedStaffList = [...currentStaff, { ...updatedStaffData, username: lowerUsername }];
+      updatedList = [...currentStaffList, { ...finalStaffData, username: lowerUsername }];
     }
-    db._saveLocal(KEYS.STAFF, updatedStaffList);
+    db._saveLocal(KEYS.STAFF, updatedList);
 
+    // Sincroniza com a conta de usuário
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const existingUser = users.find((u: any) => u.staffId === staff.id);
     
@@ -161,7 +166,7 @@ export const db = {
       id: existingUser?.id || `u-${staff.id}`,
       username: lowerUsername,
       displayName: staff.name,
-      role: staff.role as any,
+      role: staff.role as any, // Admin ou Staff
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       lastSeen: new Date().toISOString(),
@@ -171,7 +176,7 @@ export const db = {
       emailCorp: staff.emailCorp,
       phoneCorp: staff.phoneCorp,
       status: staff.status,
-      statusSince: updatedStaffData.statusSince,
+      statusSince: finalStaffData.statusSince,
       photo: staff.photo
     };
     
@@ -186,11 +191,11 @@ export const db = {
           position: staff.position.toUpperCase(),
           username: lowerUsername,
           role: staff.role,
-          registrationdate: updatedStaffData.registrationDate,
+          registrationdate: finalStaffData.registrationDate,
           emailcorp: staff.emailCorp?.toLowerCase(),
           phonecorp: staff.phoneCorp,
           status: staff.status,
-          statussince: updatedStaffData.statusSince
+          statussince: finalStaffData.statusSince
         };
         const { error } = await supabase.from('staff').upsert(staffPayload);
         if (error) throw error;
@@ -207,7 +212,7 @@ export const db = {
       try {
         await supabase.from('users').delete().eq('staffid', id);
         await supabase.from('staff').delete().eq('id', id);
-      } catch (e) { console.error("Cloud Sync Error (Delete Staff)"); }
+      } catch (e) { console.error("Erro ao deletar na nuvem"); }
     }
     return true;
   },

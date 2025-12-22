@@ -74,7 +74,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setSessionDuration(`${hours}:${minutes}:${seconds}`);
       }
 
-      // HEARTBEAT: Só atualiza se a aba estiver visível e ativa
+      // HEARTBEAT: Só atualiza se a aba estiver visível e o usuário não estiver inativo
+      // A Page Visibility API garante que se o usuário mudar de aba, o sinal pare.
       if (now.getSeconds() % 30 === 0 && document.visibilityState === 'visible') {
         db.updateHeartbeat(user.id);
       }
@@ -119,6 +120,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     children?: React.ReactNode,
     forceActive?: boolean
   }) => {
+    // Administradores comuns têm acesso igual ao master
     if (adminOnly && user.role !== 'admin') return null;
     const isActive = forceActive || (tab ? activeTab === tab : false);
     const isExpanded = expandedMenus[label];

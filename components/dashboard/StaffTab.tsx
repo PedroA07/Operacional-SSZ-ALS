@@ -95,7 +95,6 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
       const staffId = editingId || `stf-${Date.now()}`;
       const existing = staffList.find(s => s.id === staffId);
       
-      // Lógica de auditoria é tratada no storage.ts, mas garantimos os campos básicos aqui
       const staffData: Staff = { 
         id: staffId,
         name: (form.name || '').toUpperCase(),
@@ -103,7 +102,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         username: (form.username || '').toLowerCase(),
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: form.photo,
-        registrationDate: form.registrationDate || existing?.registrationDate || new Date().toISOString(),
+        registrationDate: existing?.registrationDate || new Date().toISOString(),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
         status: (form.status || 'Ativo') as 'Ativo' | 'Inativo',
@@ -172,7 +171,10 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                     <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${s.status === 'Ativo' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
                  </div>
                  <div className="flex-1 min-w-0">
-                    <h4 className="font-black text-slate-800 uppercase text-sm leading-tight truncate">{s.name}</h4>
+                    <div className="flex items-center gap-2">
+                       <h4 className="font-black text-slate-800 uppercase text-sm leading-tight truncate">{s.name}</h4>
+                       {s.role === 'admin' && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-[6px] font-black uppercase">Admin</span>}
+                    </div>
                     <p className="text-[10px] text-blue-500 font-bold uppercase mt-1">{s.position}</p>
                  </div>
               </div>
@@ -184,14 +186,14 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                  </div>
                  
                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                    <span className="text-slate-400">Desde</span>
+                    <span className="text-slate-400">Cadastrado em</span>
                     <span className="text-slate-700">{new Date(s.registrationDate).toLocaleDateString('pt-BR')}</span>
                  </div>
 
                  {s.status === 'Inativo' && (
                     <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
                        <span className="text-red-500">Inativo desde</span>
-                       <span className="text-red-600">{new Date(s.statusSince).toLocaleDateString('pt-BR')}</span>
+                       <span className="text-red-600 font-black">{new Date(s.statusSince).toLocaleDateString('pt-BR')}</span>
                     </div>
                  )}
 
@@ -268,10 +270,18 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                        )}
                     </div>
                     
+                    <div className="space-y-1">
+                       <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cargo</label>
+                       <input required className={`${inputClasses} uppercase`} value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cargo</label>
-                          <input required className={`${inputClasses} uppercase`} value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Privilégio (Nível de Acesso)</label>
+                          <select disabled={!isAdmin} className={inputClasses} value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
+                             <option value="staff">Comum</option>
+                             <option value="admin">Administrador (Master)</option>
+                          </select>
                        </div>
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status</label>
@@ -303,7 +313,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                                 )}
                              </button>
                           </div>
-                          {editingId && (
+                          {editingId && isAdmin && (
                             <button 
                               type="button" 
                               onClick={() => { 
