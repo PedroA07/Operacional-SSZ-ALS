@@ -33,6 +33,21 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   const isAdmin = currentUser.role === 'admin';
   const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
 
+  const generateUsername = (fullName: string) => {
+    const parts = fullName.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/);
+    if (parts.length === 0) return '';
+    
+    let baseUser = parts.length > 1 ? `${parts[0]}.${parts[parts.length - 1]}` : parts[0];
+    
+    // Verifica se já existe esse username na lista (excluindo o atual em edição)
+    let finalUser = baseUser;
+    while (staffList.some(s => s.username === finalUser && s.id !== editingId)) {
+      finalUser += '_';
+    }
+    
+    return finalUser;
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessing) return;
@@ -45,11 +60,14 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
       const newStatus = isAdmin ? (form.status || 'Ativo') : (existing?.status || 'Ativo');
       const statusSince = (isAdmin && form.status !== existing?.status) ? new Date().toISOString() : (existing?.statusSince || new Date().toISOString());
 
+      // Gera o username final caso o nome tenha mudado ou seja novo
+      const finalUsername = generateUsername(form.name || '');
+
       const staffData: Staff = { 
         id: staffId,
         name: (form.name || '').toUpperCase(),
         position: (form.position || '').toUpperCase(),
-        username: (form.username || '').toLowerCase(),
+        username: finalUsername,
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: form.photo,
         registrationDate: form.registrationDate || new Date().toISOString(),
@@ -63,7 +81,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
       setIsModalOpen(false);
     } catch (err) {
       console.error("Erro ao salvar colaborador:", err);
-      alert("Erro crítico ao salvar na nuvem. Verifique sua conexão ou as credenciais do banco.");
+      alert("Erro ao gravar dados. Verifique a conexão com o banco de dados.");
     } finally {
       setIsProcessing(false);
     }
@@ -183,7 +201,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                  <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Editar Perfil' : 'Novo Colaborador'}</h3>
-                 <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+                 <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
               </div>
               <form onSubmit={handleSave} className="p-10 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
                  <div className="flex justify-center mb-4">
@@ -204,10 +222,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                     <div className="space-y-1">
                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Nome Completo</label>
                        <input required className={inputClasses} placeholder="EX: JOÃO SILVA" value={form.name} onChange={e => {
-                            const val = e.target.value;
-                            const parts = val.trim().toLowerCase().split(' ');
-                            const user = parts.length > 1 ? `${parts[0]}.${parts[parts.length-1]}` : parts[0];
-                            setForm({...form, name: val, username: user});
+                            setForm({...form, name: e.target.value});
                          }} />
                     </div>
                     

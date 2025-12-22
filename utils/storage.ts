@@ -50,7 +50,7 @@ export const db = {
   },
 
   saveUser: async (user: User) => {
-    // 1. Salva Localmente Primeiro
+    // 1. Salva Localmente Primeiro para não travar o UI
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const idx = current.findIndex((u: any) => u.id === user.id || u.username === user.username);
     
@@ -63,12 +63,17 @@ export const db = {
     }
     db._saveLocal(KEYS.USERS, updated);
 
-    // 2. Sincroniza Nuvem
+    // 2. Sincroniza Nuvem com mapeamento flexível (Supabase costuma ignorar case se não for explicitado)
     if (supabase) {
       try {
-        const { error } = await supabase.from('users').upsert(user);
+        const payload = {
+          ...user,
+          registrationdate: user.lastLogin, // Fallback para colunas minúsculas vistas no print
+          lastlogin: user.lastLogin
+        };
+        const { error } = await supabase.from('users').upsert(payload);
         if (error) {
-          console.error("Erro Supabase (User Upsert):", error.message);
+          console.error("Supabase User Error:", error.message);
           throw error;
         }
       } catch (e) { 
@@ -107,34 +112,40 @@ export const db = {
 
     // 2. Preparar Usuário vinculado
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    const existingUser = users.find((u: any) => u.staffId === staff.id || (u.username === staff.username && u.role !== 'driver'));
+    const existingUser = users.find((u: any) => u.staffId === staff.id);
     
     const userData: User = {
       id: existingUser?.id || `u-${staff.id}`,
-      username: staff.username.toLowerCase(),
-      displayName: staff.name.toUpperCase(),
+      username: staff.username,
+      displayName: staff.name,
       role: staff.role as any,
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       lastSeen: new Date().toISOString(),
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
       password: passwordOverride || existingUser?.password || '12345678',
-      position: staff.position.toUpperCase(),
-      emailCorp: staff.emailCorp.toLowerCase(),
+      position: staff.position,
+      emailCorp: staff.emailCorp,
       phoneCorp: staff.phoneCorp,
       status: staff.status,
       statusSince: staff.statusSince
     };
     
-    // 3. Salva Usuário (Crítico para login)
+    // 3. Salva Usuário no Supabase (Crítico)
     await db.saveUser(userData);
 
     // 4. Sincronizar Staff na nuvem
     if (supabase) {
       try {
-        const { error } = await supabase.from('staff').upsert(staff);
+        // Mapeia para suportar colunas minúsculas e camelCase vistas no seu print
+        const staffPayload = {
+          ...staff,
+          registrationdate: staff.registrationDate, // Fallback minúsculo
+          lastlogin: staff.registrationDate // Fallback para sincronizar
+        };
+        const { error } = await supabase.from('staff').upsert(staffPayload);
         if (error) {
-          console.error("Erro Supabase (Staff Upsert):", error.message);
+          console.error("Supabase Staff Error:", error.message);
           throw error;
         }
       } catch (e) { 

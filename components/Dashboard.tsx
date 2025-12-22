@@ -23,6 +23,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [sessionDuration, setSessionDuration] = useState('00:00:00');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCloud, setIsCloud] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -64,7 +65,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadAllData();
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const timer = setInterval(() => {
+      const now = new Date();
+      setCurrentTime(now);
+      
+      // Calcular tempo desde login
+      const loginTime = new Date(user.lastLogin).getTime();
+      const diff = now.getTime() - loginTime;
+      
+      if (diff > 0) {
+        const hours = Math.floor(diff / 3600000).toString().padStart(2, '0');
+        const minutes = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+        const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+        setSessionDuration(`${hours}:${minutes}:${seconds}`);
+      }
+    }, 1000);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
@@ -77,7 +92,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       clearInterval(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [user.lastLogin]);
 
   const toggleMenu = (menu: string) => setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
 
@@ -220,14 +235,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               {isProfileMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in slide-in-from-top-4 duration-300 z-[100] backdrop-blur-xl bg-white/95">
                   <div className="text-center mb-4 pb-4 border-b border-slate-50 relative">
-                    {/* CRONÔMETRO NO DROP DOWN */}
-                    <div className="mb-4 bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5">
-                       <p className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Status em Tempo Real</p>
-                       <div className="text-xl font-black font-mono tracking-tighter">
-                          {currentTime.toLocaleTimeString('pt-BR')}
-                       </div>
-                    </div>
-
                     <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl font-black mx-auto mb-3 shadow-lg">
                       {user.displayName.substring(0,1).toUpperCase()}
                     </div>
@@ -241,6 +248,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                       <span className={`px-2 py-0.5 rounded-lg text-[7px] font-black uppercase border bg-slate-100 text-slate-600 border-slate-200`}>
                         {user.role === 'admin' ? 'Administrador' : 'Comum'}
                       </span>
+                    </div>
+
+                    {/* TIMER DE LOGIN */}
+                    <div className="mt-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                       <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Tempo em Sessão</p>
+                       <div className="text-sm font-black text-slate-800 font-mono tracking-tighter">
+                          {sessionDuration}
+                       </div>
                     </div>
                   </div>
 
