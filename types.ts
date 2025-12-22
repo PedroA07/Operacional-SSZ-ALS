@@ -13,6 +13,8 @@ export interface User {
   position?: string;
   emailCorp?: string;
   phoneCorp?: string;
+  status?: 'Ativo' | 'Inativo';
+  statusSince?: string;
 }
 
 export enum AppScreen {
@@ -104,6 +106,8 @@ export interface Staff {
   lastLogin?: string;
   emailCorp?: string;
   phoneCorp?: string;
+  status: 'Ativo' | 'Inativo';
+  statusSince: string;
 }
 
 export enum DashboardTab {

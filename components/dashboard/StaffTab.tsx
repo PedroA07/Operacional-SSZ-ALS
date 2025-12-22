@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Staff, User } from '../../types';
 import { db } from '../../utils/storage';
 
@@ -15,7 +15,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
   const [form, setForm] = useState<Partial<Staff & { password?: string }>>({ 
-    name: '', position: '', username: '', role: 'staff', password: '12345678', emailCorp: '', phoneCorp: '' 
+    name: '', position: '', username: '', role: 'staff', password: '12345678', emailCorp: '', phoneCorp: '', status: 'Ativo' 
   });
   const [users, setUsers] = useState<User[]>([]);
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
@@ -29,25 +29,23 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
     loadUsers();
   }, [staffList, isModalOpen]);
 
-  const canEdit = (staffId: string) => {
-    return currentUser.role === 'admin' || currentUser.staffId === staffId;
-  };
+  const isAdmin = currentUser.role === 'admin';
+  const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
 
   const handleSendWelcomeEmail = (staff: Staff, pass: string) => {
     if (!staff.emailCorp) {
       alert("Colaborador sem e-mail corporativo cadastrado.");
       return;
     }
-    const subject = encodeURIComponent("Bem-vindo ao Portal ALS Transportes - Suas Credenciais");
+    const subject = encodeURIComponent("Bem-vindo ao Portal ALS - Suas Credenciais");
     const body = encodeURIComponent(
       `Olá ${staff.name},\n\n` +
-      `Seu cadastro no Portal ALS Transportes foi concluído com sucesso.\n\n` +
-      `Seguem seus dados para acesso:\n` +
+      `Seu cadastro no Portal ALS Transportes foi concluído.\n\n` +
+      `Dados para acesso:\n` +
       `Usuário: ${staff.username}\n` +
       `Senha: ${pass}\n\n` +
-      `Link do Portal: https://als-portal.com.br\n\n` +
-      `Ao realizar o primeiro acesso, você será solicitado a redefinir sua senha para garantir sua segurança.\n\n` +
-      `Atenciosamente,\nALS Transportes - Gestão de Frota`
+      `Ao realizar o primeiro acesso, você deverá redefinir sua senha.\n\n` +
+      `Atenciosamente,\nALS Transportes`
     );
     window.location.href = `mailto:${staff.emailCorp}?subject=${subject}&body=${body}`;
   };
@@ -59,6 +57,10 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
     setIsProcessing(true);
     const staffId = editingId || `stf-${Date.now()}`;
     
+    const existing = staffList.find(s => s.id === staffId);
+    const newStatus = isAdmin ? (form.status || 'Ativo') : (existing?.status || 'Ativo');
+    const statusSince = (isAdmin && form.status !== existing?.status) ? new Date().toISOString() : (existing?.statusSince || new Date().toISOString());
+
     const staffData: Staff = { 
       id: staffId,
       name: form.name || '',
@@ -68,14 +70,16 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
       photo: form.photo,
       registrationDate: form.registrationDate || new Date().toISOString(),
       emailCorp: form.emailCorp,
-      phoneCorp: form.phoneCorp
+      phoneCorp: form.phoneCorp,
+      status: newStatus as 'Ativo' | 'Inativo',
+      statusSince: statusSince
     };
     
     try {
       await onSaveStaff(staffData, form.password);
       setIsModalOpen(false);
     } catch (err) {
-      alert("Erro ao salvar informações do colaborador.");
+      alert("Erro ao salvar informações.");
     } finally {
       setIsProcessing(false);
     }
@@ -95,9 +99,9 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Equipe ALS</h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Contatos e Acessos</p>
         </div>
-        {currentUser.role === 'admin' && (
+        {isAdmin && (
           <button 
-            onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678', emailCorp: '', phoneCorp: '' }); setEditingId(undefined); setIsModalOpen(true); }} 
+            onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678', emailCorp: '', phoneCorp: '', status: 'Ativo' }); setEditingId(undefined); setIsModalOpen(true); }} 
             className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all active:scale-95"
           >
             Novo Colaborador
@@ -112,13 +116,19 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
           const hasEditRights = canEdit(s.id);
           
           return (
-            <div key={s.id} className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col">
-              <div className={`absolute top-0 right-0 px-4 py-1 rounded-bl-2xl text-[8px] font-black uppercase tracking-widest ${s.role === 'admin' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
-                {s.role === 'admin' ? 'Administrador' : 'Comum'}
+            <div key={s.id} className={`bg-white rounded-[2.5rem] p-8 border ${s.status === 'Inativo' ? 'border-red-100 opacity-80' : 'border-slate-200'} shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col`}>
+              <div className="absolute top-0 right-0 flex">
+                <div className={`px-4 py-1 rounded-bl-2xl text-[8px] font-black uppercase tracking-widest ${s.role === 'admin' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                  {s.role === 'admin' ? 'Administrador' : 'Comum'}
+                </div>
               </div>
+
               <div className="flex items-center gap-6">
-                 <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                    {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="font-black text-slate-300 italic text-[10px]">3x4</span>}
+                 <div className="relative">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                        {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="font-black text-slate-300 italic text-[10px]">3x4</span>}
+                    </div>
+                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${s.status === 'Ativo' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
                  </div>
                  <div className="flex-1 min-w-0">
                     <h4 className="font-black text-slate-800 uppercase text-sm leading-tight truncate">{s.name}</h4>
@@ -127,22 +137,25 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
               </div>
 
               <div className="mt-6 space-y-3 pt-6 border-t border-slate-50 flex-1">
+                 <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                    <span className="text-slate-400">Status</span>
+                    <div className="text-right">
+                       <span className={`font-bold ${s.status === 'Ativo' ? 'text-emerald-600' : 'text-red-500'}`}>{s.status}</span>
+                       <p className="text-[7px] text-slate-400 font-bold mt-0.5">Desde: {new Date(s.statusSince).toLocaleDateString('pt-BR')}</p>
+                    </div>
+                 </div>
                  <div className="flex justify-between items-start text-[9px] font-black uppercase tracking-widest">
                     <span className="text-slate-400 mt-1">E-mail</span>
                     <span className="text-slate-800 lowercase font-bold break-all text-right max-w-[150px]">{s.emailCorp || '---'}</span>
-                 </div>
-                 <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                    <span className="text-slate-400">Telefone</span>
-                    <span className="text-slate-800">{s.phoneCorp || '---'}</span>
                  </div>
                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
                     <span className="text-slate-400">Usuário</span>
                     <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded-lg lowercase font-bold">{s.username}</span>
                  </div>
                  
-                 {currentUser.role === 'admin' && (
+                 {isAdmin && (
                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                      <span className="text-slate-400">Senha Padrão</span>
+                      <span className="text-slate-400">Senha Acesso</span>
                       <div className="flex items-center gap-2">
                         <span className="text-emerald-600 font-mono text-[10px] font-black">
                           {isPassVisible ? (linkedUser?.password || '---') : '••••••••'}
@@ -165,14 +178,14 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
               {hasEditRights && (
                 <div className="mt-6 space-y-2">
                    <div className="flex gap-2">
-                     <button onClick={() => handleEdit(s)} className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 transition-all active:scale-95 shadow-md">Editar Dados</button>
-                     {currentUser.role === 'admin' && (
+                     <button onClick={() => handleEdit(s)} className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 transition-all active:scale-95 shadow-md">Editar Cadastro</button>
+                     {isAdmin && (
                        <button onClick={() => onDeleteStaff(s.id)} className="px-4 py-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all active:scale-95 shadow-sm">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
                        </button>
                      )}
                    </div>
-                   {currentUser.role === 'admin' && s.emailCorp && (
+                   {isAdmin && s.emailCorp && (
                      <button 
                        onClick={() => handleSendWelcomeEmail(s, linkedUser?.password || '12345678')}
                        className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[8px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100"
@@ -228,7 +241,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Permissão</label>
                           <select 
-                            disabled={currentUser.role !== 'admin'}
+                            disabled={!isAdmin}
                             className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm disabled:opacity-50" 
                             value={form.role} 
                             onChange={e => setForm({...form, role: e.target.value as any})}
@@ -239,9 +252,23 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                        </div>
                     </div>
 
-                    <div className="space-y-1">
-                       <label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Corporativo</label>
-                       <input required type="email" className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold lowercase outline-none focus:border-blue-500 text-slate-900" value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} />
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-1">
+                          <label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Corp.</label>
+                          <input required type="email" className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold lowercase outline-none focus:border-blue-500 text-slate-900" value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status Sistema</label>
+                          <select 
+                            disabled={!isAdmin}
+                            className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm disabled:opacity-50" 
+                            value={form.status} 
+                            onChange={e => setForm({...form, status: e.target.value as any})}
+                          >
+                             <option value="Ativo">Ativo</option>
+                             <option value="Inativo">Inativo</option>
+                          </select>
+                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -250,7 +277,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                           <input required className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold outline-none focus:border-blue-500 text-slate-900 shadow-sm" value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: e.target.value})} placeholder="(00) 00000-0000" />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-emerald-500 uppercase ml-1">Senha (Exato)</label>
+                          <label className="text-[9px] font-black text-emerald-500 uppercase ml-1">Senha de Acesso</label>
                           <input 
                             type="text"
                             required

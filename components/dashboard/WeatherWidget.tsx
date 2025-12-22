@@ -57,17 +57,18 @@ const WeatherWidget: React.FC = () => {
     <div className="bg-gradient-to-br from-blue-600/10 to-indigo-900/30 p-3 rounded-2xl border border-blue-500/10 shadow-lg backdrop-blur-sm">
       <div className="flex justify-between items-center mb-1">
         <div>
-          <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest">SSZ • Santos</span>
-          <p className="text-xl font-black text-white leading-none mt-0.5">{weather.temp}°C</p>
+          <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest leading-none">Santos • Hoje</span>
+          <p className="text-xl font-black text-white leading-none mt-1">{weather.temp}°C</p>
         </div>
         <span className="text-2xl">{weather.icon}</span>
       </div>
-      <div className="flex justify-between items-end">
+      <div className="flex justify-between items-end border-t border-white/5 pt-1.5 mt-1">
         <div>
-          <p className="text-[8px] font-bold text-slate-400 uppercase leading-none">{weather.condition}</p>
+          <p className="text-[7px] font-bold text-slate-400 uppercase leading-none">{weather.condition}</p>
         </div>
         <div className="text-right">
-          <p className="text-[8px] font-bold text-blue-400/80 leading-none">Amanhã {weather.forecastNextDay.temp}°C</p>
+          <p className="text-[7px] font-black text-slate-500 uppercase leading-none mb-0.5">Amanhã</p>
+          <p className="text-[9px] font-black text-blue-400/90 leading-none">{weather.forecastNextDay.temp}°C</p>
         </div>
       </div>
     </div>

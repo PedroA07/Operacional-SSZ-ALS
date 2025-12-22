@@ -137,6 +137,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   };
 
   const myStaffData = staffList.find(s => s.id === user.staffId);
+  const displayStatus = user.status || myStaffData?.status || 'Ativo';
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans">
@@ -228,19 +229,33 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </button>
 
               {isProfileMenuOpen && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 p-5 animate-in slide-in-from-top-4 duration-300 z-[100] backdrop-blur-xl bg-white/95">
-                  <div className="text-center mb-4 pb-4 border-b border-slate-50">
+                <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in slide-in-from-top-4 duration-300 z-[100] backdrop-blur-xl bg-white/95">
+                  <div className="text-center mb-4 pb-4 border-b border-slate-50 relative">
                     <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl font-black mx-auto mb-3 shadow-lg">
                       {user.displayName.substring(0,1).toUpperCase()}
                     </div>
                     <h4 className="font-black text-slate-800 uppercase text-[10px]">{user.displayName}</h4>
                     <p className="text-[7px] text-blue-500 font-bold uppercase tracking-widest mt-0.5">{user.position || 'OPERACIONAL'}</p>
+                    
+                    <div className="absolute top-0 right-0">
+                      <span className={`px-2 py-0.5 rounded-lg text-[7px] font-black uppercase border ${displayStatus === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                        {displayStatus}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-2 mb-4">
                     <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="text-[7px] font-black text-slate-400 uppercase">Tempo Logado</span>
                       <span className="text-[10px] font-mono font-black text-slate-800">{sessionDuration}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span>
+                      <span className="text-[9px] font-bold text-slate-800 lowercase break-all">{user.emailCorp || myStaffData?.emailCorp || 'Não cadastrado'}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span>
+                      <span className="text-[9px] font-bold text-slate-800">{user.phoneCorp || myStaffData?.phoneCorp || '---'}</span>
                     </div>
                   </div>
 

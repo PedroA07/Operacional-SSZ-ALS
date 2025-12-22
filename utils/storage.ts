@@ -110,7 +110,9 @@ export const db = {
       password: passwordOverride || existingUser?.password || '12345678',
       position: staff.position,
       emailCorp: staff.emailCorp,
-      phoneCorp: staff.phoneCorp
+      phoneCorp: staff.phoneCorp,
+      status: staff.status,
+      statusSince: staff.statusSince
     };
     
     await db.saveUser(userData);
