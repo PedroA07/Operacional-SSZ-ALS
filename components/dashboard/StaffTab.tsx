@@ -20,6 +20,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   });
   const [users, setUsers] = useState<User[]>([]);
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [usernameOptions, setUsernameOptions] = useState<string[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -33,37 +34,39 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   const isAdmin = currentUser.role === 'admin';
   const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
 
-  const generateUsername = (fullName: string) => {
-    if (!fullName) return '';
-    const parts = fullName.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/);
-    if (parts.length === 0) return '';
-    
-    // Lógica: primeiro.ultimo
-    let baseUser = parts.length > 1 ? `${parts[0]}.${parts[parts.length - 1]}` : parts[0];
-    
-    // Remove caracteres especiais que sobraram
-    baseUser = baseUser.replace(/[^a-z.]/g, '');
-    
-    // Verifica se já existe esse username na lista (excluindo o atual em edição)
-    let finalUser = baseUser;
-    while (staffList.some(s => s.username === finalUser && s.id !== editingId)) {
-      finalUser += '_';
-    }
-    
-    return finalUser;
-  };
-
-  // Atualiza o username em tempo real quando o nome muda
+  // Lógica de geração de sugestões de usuários
   useEffect(() => {
     if (form.name && !editingId) {
-      setForm(prev => ({ ...prev, username: generateUsername(prev.name || '') }));
+      const parts = form.name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/);
+      if (parts.length > 1) {
+        const first = parts[0];
+        const options = parts.slice(1).map(surname => `${first}.${surname}`);
+        
+        // Filtra opções que já existem na base (para não dar a opção se for igual a um existente)
+        const uniqueOptions = options.filter(opt => !staffList.some(s => s.username === opt));
+        
+        setUsernameOptions(uniqueOptions);
+        
+        // Auto-seleciona a primeira se o campo estiver vazio ou se a anterior não for mais válida
+        if (!form.username || !uniqueOptions.includes(form.username)) {
+           setForm(prev => ({ ...prev, username: uniqueOptions[0] || '' }));
+        }
+      } else {
+        setUsernameOptions([]);
+        setForm(prev => ({ ...prev, username: parts[0] || '' }));
+      }
     }
-  }, [form.name, editingId]);
+  }, [form.name, editingId, staffList]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessing) return;
     
+    if (!form.username) {
+      alert("Por favor, selecione ou defina um usuário válido.");
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const staffId = editingId || `stf-${Date.now()}`;
@@ -76,7 +79,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
         id: staffId,
         name: (form.name || '').toUpperCase(),
         position: (form.position || '').toUpperCase(),
-        username: form.username || generateUsername(form.name || ''),
+        username: form.username.toLowerCase(),
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: form.photo,
         registrationDate: form.registrationDate || new Date().toISOString(),
@@ -114,7 +117,12 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
         </div>
         {isAdmin && (
           <button 
-            onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678', emailCorp: '', phoneCorp: '', status: 'Ativo' }); setEditingId(undefined); setIsModalOpen(true); }} 
+            onClick={() => { 
+              setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678', emailCorp: '', phoneCorp: '', status: 'Ativo' }); 
+              setEditingId(undefined); 
+              setUsernameOptions([]);
+              setIsModalOpen(true); 
+            }} 
             className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all active:scale-95"
           >
             Novo Colaborador
@@ -207,7 +215,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
-           <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
+           <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                  <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Editar Perfil' : 'Novo Colaborador'}</h3>
                  <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
@@ -230,23 +238,50 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                  <div className="space-y-4">
                     <div className="space-y-1">
                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Nome Completo</label>
-                       <input required className={inputClasses} placeholder="EX: JOÃO SILVA" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                       <input 
+                        required 
+                        className={`${inputClasses} uppercase`} 
+                        placeholder="EX: JOÃO SILVA" 
+                        value={form.name} 
+                        onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} 
+                       />
                     </div>
 
-                    {/* CAMPO VISÍVEL DO USUÁRIO CRIADO */}
-                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-2">
-                       <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">Usuário de Acesso (Gerado)</label>
-                       <div className="flex items-center gap-3">
-                         <input readOnly disabled className="flex-1 px-4 py-2 rounded-xl border border-blue-200 bg-white font-black text-blue-600 outline-none text-xs lowercase" value={form.username} />
-                         <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-black animate-pulse">!</div>
-                       </div>
-                       <p className="text-[7px] text-blue-400 font-bold uppercase mt-1">* Formato: primeiro.ultimo</p>
+                    <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 space-y-3">
+                       <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">Usuário de Acesso {editingId ? '(Bloqueado)' : '(Escolha um sobrenome)'}</label>
+                       
+                       {!editingId ? (
+                         <>
+                           <div className="flex flex-wrap gap-2">
+                             {usernameOptions.length > 0 ? usernameOptions.map(opt => (
+                               <button
+                                 key={opt}
+                                 type="button"
+                                 onClick={() => setForm(prev => ({ ...prev, username: opt }))}
+                                 className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${form.username === opt ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-blue-400 border-blue-200 hover:border-blue-400'}`}
+                               >
+                                 {opt}
+                               </button>
+                             )) : (
+                               <p className="text-[8px] text-slate-400 font-bold uppercase italic">Digite o nome para gerar opções...</p>
+                             )}
+                           </div>
+                           <p className="text-[7px] text-blue-400 font-bold uppercase tracking-tighter">* O sistema remove usuários já existentes da lista de escolha.</p>
+                         </>
+                       ) : (
+                         <input 
+                           readOnly 
+                           disabled 
+                           className="w-full px-4 py-2 rounded-xl border border-blue-200 bg-slate-100 font-black text-blue-600 outline-none text-xs lowercase opacity-60" 
+                           value={form.username} 
+                         />
+                       )}
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Cargo / Função</label>
-                          <input required className={inputClasses} placeholder="EX: OPERACIONAL" value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
+                          <input required className={`${inputClasses} uppercase`} placeholder="EX: OPERACIONAL" value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
                        </div>
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Permissão</label>
@@ -306,7 +341,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                       className={`w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
                     >
                       {isProcessing && <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-                      {isProcessing ? 'Gravando...' : editingId ? 'Atualizar Meu Perfil' : 'Cadastrar Colaborador'}
+                      {isProcessing ? 'Gravando...' : editingId ? 'Atualizar Cadastro' : 'Criar Colaborador'}
                     </button>
                  </div>
               </form>
