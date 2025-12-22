@@ -11,6 +11,8 @@ export interface User {
   isFirstLogin?: boolean;
   avatar?: string;
   position?: string;
+  emailCorp?: string;
+  phoneCorp?: string;
 }
 
 export enum AppScreen {
@@ -100,6 +102,8 @@ export interface Staff {
   role: 'admin' | 'staff';
   registrationDate: string;
   lastLogin?: string;
+  emailCorp?: string;
+  phoneCorp?: string;
 }
 
 export enum DashboardTab {

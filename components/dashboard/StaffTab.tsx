@@ -5,17 +5,17 @@ import { db } from '../../utils/storage';
 
 interface StaffTabProps {
   staffList: Staff[];
-  currentUserRole: string;
+  currentUser: User;
   onSaveStaff: (staff: Staff, password?: string) => Promise<void>;
   onDeleteStaff: (id: string) => Promise<void>;
 }
 
-const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveStaff, onDeleteStaff }) => {
+const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff, onDeleteStaff }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
   const [form, setForm] = useState<Partial<Staff & { password?: string }>>({ 
-    name: '', position: '', username: '', role: 'staff', password: '12345678' 
+    name: '', position: '', username: '', role: 'staff', password: '12345678', emailCorp: '', phoneCorp: '' 
   });
   const [users, setUsers] = useState<User[]>([]);
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
@@ -29,17 +29,27 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
     loadUsers();
   }, [staffList, isModalOpen]);
 
-  const existingPositions = useMemo(() => {
-    const pos = staffList.map(s => s.position).filter(p => !!p);
-    return Array.from(new Set(pos)).sort();
-  }, [staffList]);
+  const canEdit = (staffId: string) => {
+    return currentUser.role === 'admin' || currentUser.staffId === staffId;
+  };
 
-  const generateUsername = (name: string) => {
-    const parts = name.trim().toLowerCase().split(' ');
-    if (parts.length < 1) return '';
-    const first = parts[0];
-    const last = parts.length > 1 ? parts[parts.length - 1] : '';
-    return last ? `${first}.${last}` : first;
+  const handleSendWelcomeEmail = (staff: Staff, pass: string) => {
+    if (!staff.emailCorp) {
+      alert("Colaborador sem e-mail corporativo cadastrado.");
+      return;
+    }
+    const subject = encodeURIComponent("Bem-vindo ao Portal ALS Transportes - Suas Credenciais");
+    const body = encodeURIComponent(
+      `Olá ${staff.name},\n\n` +
+      `Seu cadastro no Portal ALS Transportes foi concluído com sucesso.\n\n` +
+      `Seguem seus dados para acesso:\n` +
+      `Usuário: ${staff.username}\n` +
+      `Senha: ${pass}\n\n` +
+      `Link do Portal: https://als-portal.com.br\n\n` +
+      `Ao realizar o primeiro acesso, você será solicitado a redefinir sua senha para garantir sua segurança.\n\n` +
+      `Atenciosamente,\nALS Transportes - Gestão de Frota`
+    );
+    window.location.href = `mailto:${staff.emailCorp}?subject=${subject}&body=${body}`;
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -53,14 +63,15 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
       id: staffId,
       name: form.name || '',
       position: form.position || '',
-      username: form.username || generateUsername(form.name || ''),
+      username: form.username || '',
       role: (form.role as 'admin' | 'staff') || 'staff',
       photo: form.photo,
-      registrationDate: form.registrationDate || new Date().toISOString() 
+      registrationDate: form.registrationDate || new Date().toISOString(),
+      emailCorp: form.emailCorp,
+      phoneCorp: form.phoneCorp
     };
     
     try {
-      // O Dashboard agora chama db.saveStaff que cuida de Staff e User
       await onSaveStaff(staffData, form.password);
       setIsModalOpen(false);
     } catch (err) {
@@ -77,20 +88,16 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
     setIsModalOpen(true);
   };
 
-  const togglePasswordVisibility = (staffId: string) => {
-    setShowPasswords(prev => ({ ...prev, [staffId]: !prev[staffId] }));
-  };
-
   return (
     <div className="space-y-6">
-      <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex items-center justify-between">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Equipe ALS</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão Administrativa do Portal</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Contatos e Acessos</p>
         </div>
-        {currentUserRole === 'admin' && (
+        {currentUser.role === 'admin' && (
           <button 
-            onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678' }); setEditingId(undefined); setIsModalOpen(true); }} 
+            onClick={() => { setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678', emailCorp: '', phoneCorp: '' }); setEditingId(undefined); setIsModalOpen(true); }} 
             className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all active:scale-95"
           >
             Novo Colaborador
@@ -102,41 +109,52 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
         {staffList.map(s => {
           const linkedUser = users.find(u => u.staffId === s.id);
           const isPassVisible = showPasswords[s.id];
+          const hasEditRights = canEdit(s.id);
           
           return (
-            <div key={s.id} className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
+            <div key={s.id} className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col">
               <div className={`absolute top-0 right-0 px-4 py-1 rounded-bl-2xl text-[8px] font-black uppercase tracking-widest ${s.role === 'admin' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
-                {s.role}
+                {s.role === 'admin' ? 'Administrador' : 'Comum'}
               </div>
               <div className="flex items-center gap-6">
                  <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
                     {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="font-black text-slate-300 italic text-[10px]">3x4</span>}
                  </div>
-                 <div>
-                    <h4 className="font-black text-slate-800 uppercase text-sm leading-tight">{s.name}</h4>
+                 <div className="flex-1 min-w-0">
+                    <h4 className="font-black text-slate-800 uppercase text-sm leading-tight truncate">{s.name}</h4>
                     <p className="text-[10px] text-blue-500 font-bold uppercase tracking-tighter mt-1">{s.position}</p>
                  </div>
               </div>
 
-              <div className="mt-6 space-y-3 pt-6 border-t border-slate-50">
+              <div className="mt-6 space-y-3 pt-6 border-t border-slate-50 flex-1">
+                 <div className="flex justify-between items-start text-[9px] font-black uppercase tracking-widest">
+                    <span className="text-slate-400 mt-1">E-mail</span>
+                    <span className="text-slate-800 lowercase font-bold break-all text-right max-w-[150px]">{s.emailCorp || '---'}</span>
+                 </div>
+                 <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                    <span className="text-slate-400">Telefone</span>
+                    <span className="text-slate-800">{s.phoneCorp || '---'}</span>
+                 </div>
                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
                     <span className="text-slate-400">Usuário</span>
-                    <span className="text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">{s.username}</span>
+                    <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded-lg lowercase font-bold">{s.username}</span>
                  </div>
                  
-                 {currentUserRole === 'admin' && (
+                 {currentUser.role === 'admin' && (
                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                      <span className="text-slate-400">Senha Master</span>
+                      <span className="text-slate-400">Senha Padrão</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-blue-600 font-mono text-[10px] font-black">{isPassVisible ? (linkedUser?.password || '---') : '••••••••'}</span>
+                        <span className="text-emerald-600 font-mono text-[10px] font-black">
+                          {isPassVisible ? (linkedUser?.password || '---') : '••••••••'}
+                        </span>
                         <button 
-                          onClick={() => togglePasswordVisibility(s.id)}
+                          onClick={() => setShowPasswords(prev => ({ ...prev, [s.id]: !prev[s.id] }))}
                           className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-400"
                         >
                           {isPassVisible ? (
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" strokeWidth="2.5"/></svg>
                           ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
                           )}
                         </button>
                       </div>
@@ -144,16 +162,24 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
                  )}
               </div>
 
-              {currentUserRole === 'admin' && (
-                <div className="mt-6 flex gap-2">
-                   <button onClick={() => handleEdit(s)} className="flex-1 py-2.5 bg-slate-50 text-slate-500 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all active:scale-95">Editar</button>
-                   <button 
-                     disabled={isProcessing}
-                     onClick={() => onDeleteStaff(s.id)} 
-                     className="px-4 py-2.5 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all active:scale-95"
-                   >
-                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
-                   </button>
+              {hasEditRights && (
+                <div className="mt-6 space-y-2">
+                   <div className="flex gap-2">
+                     <button onClick={() => handleEdit(s)} className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 transition-all active:scale-95 shadow-md">Editar Dados</button>
+                     {currentUser.role === 'admin' && (
+                       <button onClick={() => onDeleteStaff(s.id)} className="px-4 py-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all active:scale-95 shadow-sm">
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+                       </button>
+                     )}
+                   </div>
+                   {currentUser.role === 'admin' && s.emailCorp && (
+                     <button 
+                       onClick={() => handleSendWelcomeEmail(s, linkedUser?.password || '12345678')}
+                       className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[8px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100"
+                     >
+                       Enviar Boas-Vindas p/ E-mail
+                     </button>
+                   )}
                 </div>
               )}
             </div>
@@ -162,16 +188,16 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Dados do Perfil' : 'Novo Colaborador'}</h3>
+                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingId ? 'Editar Perfil' : 'Novo Colaborador'}</h3>
                  <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
               </div>
-              <form onSubmit={handleSave} className="p-10 space-y-5">
-                 <div className="flex justify-center mb-6">
-                    <div onClick={() => photoRef.current?.click()} className="w-24 h-24 rounded-[2rem] bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-500 transition-all">
-                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-slate-400 uppercase text-center p-2 italic">FOTO 3x4</span>}
+              <form onSubmit={handleSave} className="p-10 space-y-4">
+                 <div className="flex justify-center mb-4">
+                    <div onClick={() => photoRef.current?.click()} className="w-20 h-20 rounded-3xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-500 transition-all shadow-inner">
+                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <span className="text-[9px] font-black text-slate-400 uppercase text-center p-2 italic leading-tight">FOTO<br/>PERFIL</span>}
                     </div>
                     <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={e => {
                        const f = e.target.files?.[0];
@@ -186,38 +212,49 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
                  <div className="space-y-4">
                     <div className="space-y-1">
                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Completo</label>
-                       <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm" value={form.name} onChange={e => {
+                       <input required className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm" value={form.name} onChange={e => {
                             const val = e.target.value;
-                            setForm({...form, name: val, username: generateUsername(val)});
+                            const parts = val.trim().toLowerCase().split(' ');
+                            const user = parts.length > 1 ? `${parts[0]}.${parts[parts.length-1]}` : parts[0];
+                            setForm({...form, name: val, username: user});
                          }} />
                     </div>
+                    
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cargo</label>
-                          <input required list="positions-list" className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm" value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
-                          <datalist id="positions-list">
-                            {existingPositions.map(p => <option key={p} value={p} />)}
-                          </datalist>
+                          <input required className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900" value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
                        </div>
                        <div className="space-y-1">
                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Permissão</label>
-                          <select className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm" value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
-                             <option value="staff">Colaborador (Comum)</option>
+                          <select 
+                            disabled={currentUser.role !== 'admin'}
+                            className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold uppercase outline-none focus:border-blue-500 text-slate-900 shadow-sm disabled:opacity-50" 
+                            value={form.role} 
+                            onChange={e => setForm({...form, role: e.target.value as any})}
+                          >
+                             <option value="staff">Comum</option>
                              <option value="admin">Administrador</option>
                           </select>
                        </div>
                     </div>
+
+                    <div className="space-y-1">
+                       <label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Corporativo</label>
+                       <input required type="email" className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold lowercase outline-none focus:border-blue-500 text-slate-900" value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-blue-500 uppercase ml-1">Usuário</label>
-                          <input readOnly className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 font-black text-blue-600 outline-none" value={form.username} />
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Telefone Corp.</label>
+                          <input required className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold outline-none focus:border-blue-500 text-slate-900 shadow-sm" value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: e.target.value})} placeholder="(00) 00000-0000" />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-emerald-500 uppercase ml-1">Senha</label>
+                          <label className="text-[9px] font-black text-emerald-500 uppercase ml-1">Senha (Exato)</label>
                           <input 
                             type="text"
                             required
-                            className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white font-black outline-none focus:border-emerald-500 text-slate-900 shadow-sm" 
+                            className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-black outline-none focus:border-emerald-500 text-slate-900" 
                             value={form.password}
                             onChange={e => setForm({...form, password: e.target.value})}
                           />
@@ -225,13 +262,13 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUserRole, onSaveS
                     </div>
                  </div>
 
-                 <div className="pt-6">
+                 <div className="pt-4">
                     <button 
                       type="submit" 
                       disabled={isProcessing}
                       className={`w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
                     >
-                      {isProcessing ? 'Gravando...' : editingId ? 'Salvar Perfil' : 'Criar Colaborador'}
+                      {isProcessing ? 'Gravando...' : editingId ? 'Atualizar Meu Perfil' : 'Cadastrar Colaborador'}
                     </button>
                  </div>
               </form>

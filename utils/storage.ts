@@ -106,10 +106,11 @@ export const db = {
       role: staff.role as any,
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
-      // MANDATÓRIO: Se for novo usuário, isFirstLogin é sempre TRUE
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
       password: passwordOverride || existingUser?.password || '12345678',
-      position: staff.position
+      position: staff.position,
+      emailCorp: staff.emailCorp,
+      phoneCorp: staff.phoneCorp
     };
     
     await db.saveUser(userData);

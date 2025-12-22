@@ -8,7 +8,6 @@ const WeatherWidget: React.FC = () => {
 
   const fetchWeather = async () => {
     try {
-      // Coordenadas de Santos, SP (SSZ)
       const lat = -23.9608;
       const lon = -46.3339;
       const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max&timezone=America%2FSao_Paulo`);
@@ -47,29 +46,28 @@ const WeatherWidget: React.FC = () => {
 
   useEffect(() => {
     fetchWeather();
-    const interval = setInterval(fetchWeather, 600000); // Atualiza a cada 10 min
+    const interval = setInterval(fetchWeather, 600000);
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div className="animate-pulse bg-slate-800/50 h-24 rounded-3xl border border-slate-700/50"></div>;
+  if (loading) return <div className="animate-pulse bg-slate-800/30 h-20 rounded-2xl border border-slate-700/30"></div>;
   if (!weather) return null;
 
   return (
-    <div className="bg-gradient-to-br from-blue-600/20 to-indigo-900/40 p-5 rounded-[2rem] border border-blue-500/20 shadow-xl backdrop-blur-sm">
-      <div className="flex justify-between items-start mb-2">
+    <div className="bg-gradient-to-br from-blue-600/10 to-indigo-900/30 p-3 rounded-2xl border border-blue-500/10 shadow-lg backdrop-blur-sm">
+      <div className="flex justify-between items-center mb-1">
         <div>
-          <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Santos • SSZ</span>
-          <p className="text-2xl font-black text-white mt-1">{weather.temp}°C</p>
+          <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest">SSZ • Santos</span>
+          <p className="text-xl font-black text-white leading-none mt-0.5">{weather.temp}°C</p>
         </div>
-        <span className="text-3xl">{weather.icon}</span>
+        <span className="text-2xl">{weather.icon}</span>
       </div>
       <div className="flex justify-between items-end">
         <div>
-          <p className="text-[9px] font-bold text-slate-300 uppercase">{weather.condition}</p>
+          <p className="text-[8px] font-bold text-slate-400 uppercase leading-none">{weather.condition}</p>
         </div>
         <div className="text-right">
-          <p className="text-[7px] font-black text-slate-500 uppercase">Amanhã</p>
-          <p className="text-[9px] font-bold text-blue-400">{weather.forecastNextDay.temp}°C</p>
+          <p className="text-[8px] font-bold text-blue-400/80 leading-none">Amanhã {weather.forecastNextDay.temp}°C</p>
         </div>
       </div>
     </div>
