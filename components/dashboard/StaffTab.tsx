@@ -37,16 +37,21 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
       alert("Colaborador sem e-mail corporativo cadastrado.");
       return;
     }
-    const subject = encodeURIComponent("Bem-vindo ao Portal ALS - Suas Credenciais");
+    const subject = encodeURIComponent("NOTIFICAÇÃO DE SISTEMA: Credenciais de Acesso - ALS Transportes");
     const body = encodeURIComponent(
-      `Olá ${staff.name},\n\n` +
-      `Seu cadastro no Portal ALS Transportes foi concluído.\n\n` +
-      `Dados para acesso:\n` +
+      `Prezado(a) ${staff.name},\n\n` +
+      `Este é um e-mail gerado automaticamente para informar suas credenciais de acesso ao Portal ALS.\n\n` +
+      `--------------------------------------------------\n` +
+      `DADOS PARA LOGIN:\n` +
       `Usuário: ${staff.username}\n` +
-      `Senha: ${pass}\n\n` +
-      `Ao realizar o primeiro acesso, você deverá redefinir sua senha.\n\n` +
-      `Atenciosamente,\nALS Transportes`
+      `Senha Provisória: ${pass}\n` +
+      `--------------------------------------------------\n\n` +
+      `IMPORTANTE:\n` +
+      `No primeiro acesso, o sistema exigirá a criação de uma nova senha pessoal e intransferível.\n\n` +
+      `Portal Operacional ALS Transportes\n` +
+      `Gestão de Frota e Monitoramento Logístico`
     );
+    // Utilizando mailto para que o admin envie via sua conta, mas com corpo formatado como "no-reply"
     window.location.href = `mailto:${staff.emailCorp}?subject=${subject}&body=${body}`;
   };
 
@@ -144,9 +149,9 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                        <p className="text-[7px] text-slate-400 font-bold mt-0.5">Desde: {new Date(s.statusSince).toLocaleDateString('pt-BR')}</p>
                     </div>
                  </div>
-                 <div className="flex justify-between items-start text-[9px] font-black uppercase tracking-widest">
-                    <span className="text-slate-400 mt-1">E-mail</span>
-                    <span className="text-slate-800 lowercase font-bold break-all text-right max-w-[150px]">{s.emailCorp || '---'}</span>
+                 <div className="flex justify-between items-start text-[9px] font-black uppercase tracking-widest overflow-hidden">
+                    <span className="text-slate-400 mt-1 flex-shrink-0 mr-4">E-mail</span>
+                    <span className="text-slate-800 lowercase font-bold truncate text-right flex-1">{s.emailCorp || '---'}</span>
                  </div>
                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
                     <span className="text-slate-400">Usuário</span>
@@ -190,7 +195,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                        onClick={() => handleSendWelcomeEmail(s, linkedUser?.password || '12345678')}
                        className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[8px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100"
                      >
-                       Enviar Boas-Vindas p/ E-mail
+                       Gerar E-mail de Acesso
                      </button>
                    )}
                 </div>

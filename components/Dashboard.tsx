@@ -220,8 +220,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 className="flex items-center gap-2.5 p-1.5 hover:bg-slate-50 rounded-xl transition-all group border border-transparent hover:border-slate-100"
               >
                  <div className="text-right hidden sm:block">
-                    <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors">{user.displayName}</p>
-                    <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">{user.role === 'admin' ? 'Administrador' : 'Colaborador'}</p>
+                    <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors leading-none">{user.displayName}</p>
+                    <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-none">{user.position || 'OPERACIONAL'}</p>
                  </div>
                  <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-blue-400 text-xs shadow-md group-hover:scale-105 transition-all">
                     {user.displayName.substring(0,2).toUpperCase()}
@@ -237,9 +237,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     <h4 className="font-black text-slate-800 uppercase text-[10px]">{user.displayName}</h4>
                     <p className="text-[7px] text-blue-500 font-bold uppercase tracking-widest mt-0.5">{user.position || 'OPERACIONAL'}</p>
                     
-                    <div className="absolute top-0 right-0">
-                      <span className={`px-2 py-0.5 rounded-lg text-[7px] font-black uppercase border ${displayStatus === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                    <div className="mt-3 flex items-center justify-center gap-2">
+                       <span className={`px-2 py-0.5 rounded-lg text-[7px] font-black uppercase border ${displayStatus === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
                         {displayStatus}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-lg text-[7px] font-black uppercase border bg-slate-100 text-slate-600 border-slate-200`}>
+                        {user.role === 'admin' ? 'Administrador' : 'Comum'}
                       </span>
                     </div>
                   </div>
