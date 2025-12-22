@@ -40,7 +40,7 @@ export const db = {
     if (supabase) {
       try {
         const { data, error } = await supabase.from('users').select('*');
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           db._saveLocal(KEYS.USERS, data);
           return data;
         }
@@ -49,10 +49,28 @@ export const db = {
     return localData;
   },
 
+  // Escuta mudanças na tabela de usuários em tempo real
+  subscribeToUsers: (callback: (users: User[]) => void) => {
+    if (!supabase) return () => {};
+
+    const channel = supabase
+      .channel('public:users')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async () => {
+        const users = await db.getUsers();
+        callback(users);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
   heartbeat: async (userId: string) => {
     const now = new Date().toISOString();
     if (supabase) {
       try {
+        // Atualiza lastSeen no banco
         await supabase.from('users').update({ lastSeen: now }).eq('id', userId);
       } catch (e) { console.warn("Heartbeat cloud failed"); }
     }
@@ -90,7 +108,7 @@ export const db = {
     if (supabase) {
       try {
         const { data, error } = await supabase.from('staff').select('*');
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           db._saveLocal(KEYS.STAFF, data);
           return data;
         }
@@ -161,7 +179,7 @@ export const db = {
     if (supabase) {
       try {
         const { data } = await supabase.from('drivers').select('*');
-        if (data && data.length > 0) {
+        if (data) {
           db._saveLocal(KEYS.DRIVERS, data);
           return data;
         }
@@ -197,7 +215,7 @@ export const db = {
     if (supabase) {
       try {
         const { data } = await supabase.from('customers').select('*');
-        if (data && data.length > 0) { db._saveLocal(KEYS.CUSTOMERS, data); return data; }
+        if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; }
       } catch (e) { console.warn("Supabase getCustomers offline."); }
     }
     return localData;
@@ -217,7 +235,7 @@ export const db = {
     if (supabase) {
       try {
         const { data } = await supabase.from('ports').select('*');
-        if (data && data.length > 0) { db._saveLocal(KEYS.PORTS, data); return data; }
+        if (data) { db._saveLocal(KEYS.PORTS, data); return data; }
       } catch (e) { console.warn("Supabase getPorts offline."); }
     }
     return localData;
@@ -237,7 +255,7 @@ export const db = {
     if (supabase) {
       try {
         const { data } = await supabase.from('pre_stacking').select('*');
-        if (data && data.length > 0) { db._saveLocal(KEYS.PRESTACKING, data); return data; }
+        if (data) { db._saveLocal(KEYS.PRESTACKING, data); return data; }
       } catch (e) { console.warn("Supabase getPreStacking offline."); }
     }
     return localData;
