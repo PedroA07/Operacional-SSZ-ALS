@@ -23,13 +23,11 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [sessionDuration, setSessionDuration] = useState('00:00:00');
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isCloud, setIsCloud] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
   const [forceProfileModal, setForceProfileModal] = useState<string | null>(null);
+  const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
   
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -44,8 +42,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   });
 
   const loadAllData = async () => {
-    setIsSyncing(true);
-    setIsCloud(db.isCloudActive());
     try {
       const [d, c, p, ps, s] = await Promise.all([
         db.getDrivers(), 
@@ -61,8 +57,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       setStaffList(s || []);
     } catch (e) { 
       console.error("Erro ao carregar dados:", e); 
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -70,8 +64,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     loadAllData();
     const timer = setInterval(() => {
       const now = new Date();
-      setCurrentTime(now);
-      
       const loginTime = new Date(user.lastLogin).getTime();
       const diff = now.getTime() - loginTime;
       
@@ -106,16 +98,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     label, 
     icon, 
     adminOnly, 
-    children 
+    children,
+    forceActive = false
   }: { 
     tab?: DashboardTab, 
     label: string, 
     icon?: React.ReactNode, 
     adminOnly?: boolean,
-    children?: React.ReactNode
+    children?: React.ReactNode,
+    forceActive?: boolean
   }) => {
     if (adminOnly && user.role !== 'admin') return null;
-    const isActive = tab ? activeTab === tab : false;
+    const isActive = forceActive || (tab ? activeTab === tab : false);
     const isExpanded = expandedMenus[label];
 
     return (
@@ -126,6 +120,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               if (tab) {
                 setActiveTab(tab);
                 if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' });
+                if (tab !== DashboardTab.FORMULARIOS) setSelectedFormId(null);
               } else if (children) {
                 toggleMenuExpansion(label);
               }
@@ -163,14 +158,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   };
 
-  const myStaffData = staffList.find(s => s.id === user.staffId);
-  const displayStatus = user.status || myStaffData?.status || 'Ativo';
-
   const cycleSidebar = () => {
     if (sidebarState === 'open') setSidebarState('collapsed');
     else if (sidebarState === 'collapsed') setSidebarState('hidden');
     else setSidebarState('open');
   };
+
+  const myStaffData = staffList.find(s => s.id === user.staffId);
+  const displayEmail = user.emailCorp || myStaffData?.emailCorp || 'financeiro@als.com.br';
+  const displayPhone = user.phoneCorp || myStaffData?.phoneCorp || '(13) 99762-0041';
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
@@ -185,26 +181,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-wider text-xs uppercase whitespace-nowrap">ALS TRANSPORTES</span>}
           </div>
           
-          {sidebarState === 'open' && (
-            <div className="space-y-4 animate-in fade-in">
-              <div className="bg-slate-800/40 p-3 rounded-2xl border border-slate-700/30">
-                <div className="flex justify-between items-center text-[7px] font-black text-blue-400 uppercase tracking-tighter mb-0.5">
-                   <span>{currentTime.toLocaleDateString('pt-BR', { weekday: 'long' })}</span>
-                   <span>{currentTime.toLocaleDateString('pt-BR')}</span>
-                </div>
-                <div className="text-xl font-black text-white font-mono tracking-tighter">
-                  {currentTime.toLocaleTimeString('pt-BR')}
-                </div>
-              </div>
-              <WeatherWidget />
-            </div>
-          )}
+          {sidebarState === 'open' && <WeatherWidget />}
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
           <MenuItem tab={DashboardTab.INICIO} label="Início" />
           
-          <MenuItem tab={DashboardTab.OPERACOES} label="Operações">
+          <MenuItem tab={DashboardTab.OPERACOES} label="Operações" forceActive={activeTab === DashboardTab.OPERACOES}>
             {availableOps.map(op => (
               <div key={op.id} className="group/cat">
                 <div className="flex items-center justify-between py-1.5 px-2 hover:bg-slate-800/40 rounded-lg group">
@@ -213,7 +196,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                       setActiveTab(DashboardTab.OPERACOES);
                       setOpsView({ type: 'category', id: op.id, categoryName: op.category });
                     }}
-                    className="text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors"
+                    className="text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors flex-1 text-left"
                   >
                     • {op.category}
                   </button>
@@ -237,7 +220,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                             setOpsView({ type: 'client', id: op.id, categoryName: op.category, clientName: client.name });
                           }
                         }}
-                        className={`w-full text-left py-1 text-[8px] font-black uppercase transition-colors ${client.hasDedicatedPage ? 'text-blue-500 hover:text-blue-300' : 'text-slate-600 opacity-60 cursor-default'}`}
+                        className={`w-full text-left py-1 text-[8px] font-black uppercase transition-colors px-2 rounded hover:bg-slate-800/30 ${client.hasDedicatedPage ? 'text-blue-500 hover:text-blue-300' : 'text-slate-600 opacity-60 cursor-default'}`}
                       >
                         └ {client.name}
                       </button>
@@ -250,11 +233,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
           <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" />
           
-          <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários">
-            <button onClick={() => setActiveTab(DashboardTab.FORMULARIOS)} className="w-full text-left py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white">• Ordem de Coleta</button>
-            <button onClick={() => setActiveTab(DashboardTab.FORMULARIOS)} className="w-full text-left py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white">• Pré-Stacking</button>
-            <button onClick={() => setActiveTab(DashboardTab.FORMULARIOS)} className="w-full text-left py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white">• Liberação Vazio</button>
-            <button onClick={() => setActiveTab(DashboardTab.FORMULARIOS)} className="w-full text-left py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white">• Retirada Cheio</button>
+          <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" forceActive={activeTab === DashboardTab.FORMULARIOS}>
+            <button onClick={() => { setActiveTab(DashboardTab.FORMULARIOS); setSelectedFormId('ORDEM_COLETA'); }} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Ordem de Coleta</button>
+            <button onClick={() => { setActiveTab(DashboardTab.FORMULARIOS); setSelectedFormId('PRE_STACKING'); }} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Pré-Stacking</button>
+            <button onClick={() => { setActiveTab(DashboardTab.FORMULARIOS); setSelectedFormId('LIBERACAO_VAZIO'); }} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Liberação Vazio</button>
+            <button onClick={() => { setActiveTab(DashboardTab.FORMULARIOS); setSelectedFormId('RETIRADA_CHEIO'); }} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Retirada Cheio</button>
           </MenuItem>
 
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" />
@@ -320,11 +303,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   <div className="space-y-2 mb-5">
                     <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span>
-                      <span className="text-[9px] font-bold text-slate-800 lowercase break-all">{user.emailCorp || 'financeiro@als.com.br'}</span>
+                      <span className="text-[9px] font-bold text-slate-800 lowercase break-all">{displayEmail}</span>
                     </div>
                     <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span>
-                      <span className="text-[9px] font-bold text-slate-800">{user.phoneCorp || '(13) 99762-0041'}</span>
+                      <span className="text-[9px] font-bold text-slate-800">{displayPhone}</span>
                     </div>
                   </div>
 
@@ -349,7 +332,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} />}
            {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `port-${Date.now()}`} as Port); loadAllData(); }} />}
            {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (ps, id) => { await db.savePreStacking({...ps, id: id || `ps-${Date.now()}`} as PreStacking); loadAllData(); }} />}
-           {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} />}
+           {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} initialFormId={selectedFormId} />}
            {user.role === 'admin' && activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
         </div>
       </main>
