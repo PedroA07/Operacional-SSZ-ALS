@@ -41,8 +41,15 @@ export const db = {
       try {
         const { data, error } = await supabase.from('users').select('*');
         if (!error && data) {
-          db._saveLocal(KEYS.USERS, data);
-          return data;
+          // Normaliza dados da nuvem (minúsculo -> camelCase) para o App
+          const normalized = data.map((u: any) => ({
+            ...u,
+            displayName: u.name || u.displayName,
+            lastLogin: u.lastlogin || u.lastLogin,
+            staffId: u.staffid || u.staffId
+          }));
+          db._saveLocal(KEYS.USERS, normalized);
+          return normalized;
         }
       } catch (e) { console.warn("Supabase getUsers offline."); }
     }
@@ -50,7 +57,6 @@ export const db = {
   },
 
   saveUser: async (user: User) => {
-    // 1. Salva Localmente Primeiro para não travar o UI
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const idx = current.findIndex((u: any) => u.id === user.id || u.username === user.username);
     
@@ -63,21 +69,27 @@ export const db = {
     }
     db._saveLocal(KEYS.USERS, updated);
 
-    // 2. Sincroniza Nuvem com mapeamento flexível (Supabase costuma ignorar case se não for explicitado)
     if (supabase) {
       try {
+        // MAPEAMENTO PARA COLUNAS MINÚSCULAS DO SUPABASE
         const payload = {
-          ...user,
-          registrationdate: user.lastLogin, // Fallback para colunas minúsculas vistas no print
-          lastlogin: user.lastLogin
+          id: user.id,
+          username: user.username.toLowerCase(),
+          password: user.password,
+          name: user.displayName.toUpperCase(), // displayName vira 'name' no banco
+          role: user.role,
+          staffid: user.staffId,
+          lastlogin: user.lastLogin,
+          position: user.position?.toUpperCase(),
+          status: user.status,
+          phonecorp: user.phoneCorp,
+          emailcorp: user.emailCorp?.toLowerCase()
         };
+        
         const { error } = await supabase.from('users').upsert(payload);
-        if (error) {
-          console.error("Supabase User Error:", error.message);
-          throw error;
-        }
-      } catch (e) { 
-        console.error("Falha Crítica Cloud User:", e); 
+        if (error) throw error;
+      } catch (e: any) { 
+        console.error("Erro ao sincronizar Usuário:", e.message); 
         throw e; 
       }
     }
@@ -89,8 +101,13 @@ export const db = {
       try {
         const { data, error } = await supabase.from('staff').select('*');
         if (!error && data) {
-          db._saveLocal(KEYS.STAFF, data);
-          return data;
+          const normalized = data.map((s: any) => ({
+            ...s,
+            registrationDate: s.registrationdate || s.registrationDate,
+            statusSince: s.statussince || s.statusSince
+          }));
+          db._saveLocal(KEYS.STAFF, normalized);
+          return normalized;
         }
       } catch (e) { console.warn("Supabase getStaff offline."); }
     }
@@ -98,7 +115,6 @@ export const db = {
   },
 
   saveStaff: async (staff: Staff, passwordOverride?: string) => {
-    // 1. Atualizar Local Storage (Staff)
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
     let updatedStaff;
@@ -110,7 +126,6 @@ export const db = {
     }
     db._saveLocal(KEYS.STAFF, updatedStaff);
 
-    // 2. Preparar Usuário vinculado
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const existingUser = users.find((u: any) => u.staffId === staff.id);
     
@@ -131,25 +146,27 @@ export const db = {
       statusSince: staff.statusSince
     };
     
-    // 3. Salva Usuário no Supabase (Crítico)
     await db.saveUser(userData);
 
-    // 4. Sincronizar Staff na nuvem
     if (supabase) {
       try {
-        // Mapeia para suportar colunas minúsculas e camelCase vistas no seu print
         const staffPayload = {
-          ...staff,
-          registrationdate: staff.registrationDate, // Fallback minúsculo
-          lastlogin: staff.registrationDate // Fallback para sincronizar
+          id: staff.id,
+          photo: staff.photo,
+          name: staff.name.toUpperCase(),
+          position: staff.position.toUpperCase(),
+          username: staff.username.toLowerCase(),
+          role: staff.role,
+          registrationdate: staff.registrationDate,
+          emailcorp: staff.emailCorp?.toLowerCase(),
+          phonecorp: staff.phoneCorp,
+          status: staff.status,
+          statussince: staff.statusSince
         };
         const { error } = await supabase.from('staff').upsert(staffPayload);
-        if (error) {
-          console.error("Supabase Staff Error:", error.message);
-          throw error;
-        }
-      } catch (e) { 
-        console.error("Falha Crítica Cloud Staff:", e); 
+        if (error) throw error;
+      } catch (e: any) { 
+        console.error("Erro ao sincronizar Staff:", e.message); 
         throw e;
       }
     }

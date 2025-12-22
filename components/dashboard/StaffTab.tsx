@@ -34,6 +34,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
 
   const generateUsername = (fullName: string) => {
+    if (!fullName) return '';
     const parts = fullName.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/);
     if (parts.length === 0) return '';
     
@@ -48,6 +49,13 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
     return finalUser;
   };
 
+  // Atualiza o username em tempo real quando o nome muda
+  useEffect(() => {
+    if (form.name && !editingId) {
+      setForm(prev => ({ ...prev, username: generateUsername(prev.name || '') }));
+    }
+  }, [form.name]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessing) return;
@@ -60,14 +68,11 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
       const newStatus = isAdmin ? (form.status || 'Ativo') : (existing?.status || 'Ativo');
       const statusSince = (isAdmin && form.status !== existing?.status) ? new Date().toISOString() : (existing?.statusSince || new Date().toISOString());
 
-      // Gera o username final caso o nome tenha mudado ou seja novo
-      const finalUsername = generateUsername(form.name || '');
-
       const staffData: Staff = { 
         id: staffId,
         name: (form.name || '').toUpperCase(),
         position: (form.position || '').toUpperCase(),
-        username: finalUsername,
+        username: form.username || generateUsername(form.name || ''),
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: form.photo,
         registrationDate: form.registrationDate || new Date().toISOString(),
@@ -81,7 +86,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
       setIsModalOpen(false);
     } catch (err) {
       console.error("Erro ao salvar colaborador:", err);
-      alert("Erro ao gravar dados. Verifique a conexão com o banco de dados.");
+      alert("ERRO NO BANCO DE DADOS: Ocorreu uma falha na sincronização cloud. Tente novamente em alguns instantes.");
     } finally {
       setIsProcessing(false);
     }
@@ -224,6 +229,17 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                        <input required className={inputClasses} placeholder="EX: JOÃO SILVA" value={form.name} onChange={e => {
                             setForm({...form, name: e.target.value});
                          }} />
+                    </div>
+
+                    <div className="space-y-1 bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                       <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">Usuário de Acesso Gerado</label>
+                       <div className="flex items-center gap-3">
+                         <input readOnly disabled className="w-full px-5 py-3 rounded-xl border border-blue-200 bg-white font-black text-blue-600 outline-none text-xs lowercase opacity-80" value={form.username} />
+                         <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center animate-pulse">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="3"/></svg>
+                         </div>
+                       </div>
+                       <p className="text-[7px] text-blue-400 font-bold uppercase mt-2 tracking-tighter">* Geração automática: primeiro.ultimo</p>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">

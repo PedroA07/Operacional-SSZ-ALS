@@ -250,10 +250,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                       </span>
                     </div>
 
-                    {/* TIMER DE LOGIN */}
-                    <div className="mt-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                       <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Tempo em Sessão</p>
-                       <div className="text-sm font-black text-slate-800 font-mono tracking-tighter">
+                    {/* TIMER DE LOGIN - POSICIONADO ACIMA DOS DADOS DE CONTATO */}
+                    <div className="mt-4 bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5 overflow-hidden">
+                       <p className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Tempo de Sessão</p>
+                       <div className="text-lg font-black font-mono tracking-tighter">
                           {sessionDuration}
                        </div>
                     </div>
