@@ -23,18 +23,19 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
   const [usernameOptions, setUsernameOptions] = useState<string[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
 
+  // Carregar usuários sempre que abrir o modal ou mudar a lista
   useEffect(() => {
     const loadUsers = async () => {
       const u = await db.getUsers();
       setUsers(u);
     };
-    loadUsers();
+    if (isModalOpen) loadUsers();
   }, [staffList, isModalOpen]);
 
   const isAdmin = currentUser.role === 'admin';
   const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
 
-  // Lógica de geração de sugestões de usuários baseada nos sobrenomes
+  // Lógica de geração de sugestões de usuários
   useEffect(() => {
     if (form.name && !editingId) {
       const cleanName = form.name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -42,22 +43,22 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
       
       if (parts.length > 1) {
         const first = parts[0];
-        // Gera opções pedro.sobrenome1, pedro.sobrenome2, etc.
+        // Gera opções baseadas em sobrenomes
         const options = parts.slice(1).map(surname => `${first}.${surname}`);
         
-        // Filtra opções que já existem na base (para não permitir duplicidade)
+        // Filtra opções que já existem na base ATUAL (vinda do banco)
+        // Se foi deletado, não estará em 'users', logo aparecerá como opção
         const uniqueOptions = options.filter(opt => !users.some(u => u.username === opt));
         
         setUsernameOptions(uniqueOptions);
         
-        // Se a opção atual não estiver na lista de sugestões, reseta
+        // Se o usuário selecionado sumiu ou mudou, reseta para a primeira opção válida
         if (!uniqueOptions.includes(form.username || '')) {
            setForm(prev => ({ ...prev, username: uniqueOptions[0] || '' }));
         }
       } else {
         setUsernameOptions([]);
         const basicUser = parts[0] || '';
-        // Só define se não existir
         if (!users.some(u => u.username === basicUser)) {
            setForm(prev => ({ ...prev, username: basicUser }));
         } else {
@@ -88,7 +89,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
         id: staffId,
         name: (form.name || '').toUpperCase(),
         position: (form.position || '').toUpperCase(),
-        username: (form.username || '').toLowerCase(), // GARANTE MINÚSCULO NO SALVAMENTO
+        username: (form.username || '').toLowerCase(), // Username sempre lowercase
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: form.photo,
         registrationDate: form.registrationDate || new Date().toISOString(),
@@ -274,7 +275,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                                  {opt}
                                </button>
                              )) : (
-                               <p className="text-[8px] text-slate-400 font-bold uppercase italic">Digite o nome para gerar opções de usuário...</p>
+                               <p className="text-[8px] text-slate-400 font-bold uppercase italic">Digite o nome completo para gerar usuários...</p>
                              )}
                            </div>
                            {usernameOptions.length > 0 && (
@@ -283,7 +284,7 @@ const StaffTab: React.FC<StaffTabProps> = ({ staffList, currentUser, onSaveStaff
                                 <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
                              </div>
                            )}
-                           <p className="text-[7px] text-blue-400 font-bold uppercase tracking-tighter mt-1">* O sistema já remove opções que já existem no banco de dados.</p>
+                           <p className="text-[7px] text-blue-400 font-bold uppercase tracking-tighter mt-1">* Se um usuário não aparece, é porque ele já está em uso no banco.</p>
                          </>
                        ) : (
                          <div className="px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-400 lowercase italic">

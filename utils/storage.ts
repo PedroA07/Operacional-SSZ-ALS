@@ -59,14 +59,15 @@ export const db = {
 
   saveUser: async (user: User) => {
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    const idx = current.findIndex((u: any) => u.id === user.id || u.username === user.username.toLowerCase());
+    const lowerUsername = user.username.toLowerCase();
+    const idx = current.findIndex((u: any) => u.id === user.id || u.username === lowerUsername);
     
     let updated;
     if (idx >= 0) {
       updated = [...current];
-      updated[idx] = { ...updated[idx], ...user };
+      updated[idx] = { ...updated[idx], ...user, username: lowerUsername };
     } else {
-      updated = [...current, user];
+      updated = [...current, { ...user, username: lowerUsername }];
     }
     db._saveLocal(KEYS.USERS, updated);
 
@@ -74,7 +75,7 @@ export const db = {
       try {
         const payload = {
           id: user.id,
-          username: user.username.toLowerCase(), // SEMPRE MINÚSCULO
+          username: lowerUsername,
           password: user.password,
           name: user.displayName.toUpperCase(), 
           role: user.role,
@@ -118,13 +119,14 @@ export const db = {
 
   saveStaff: async (staff: Staff, passwordOverride?: string) => {
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    const lowerUsername = staff.username.toLowerCase();
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
     let updatedStaff;
     if (sIdx >= 0) {
       updatedStaff = [...currentStaff];
-      updatedStaff[sIdx] = staff;
+      updatedStaff[sIdx] = { ...staff, username: lowerUsername };
     } else {
-      updatedStaff = [...currentStaff, staff];
+      updatedStaff = [...currentStaff, { ...staff, username: lowerUsername }];
     }
     db._saveLocal(KEYS.STAFF, updatedStaff);
 
@@ -133,7 +135,7 @@ export const db = {
     
     const userData: User = {
       id: existingUser?.id || `u-${staff.id}`,
-      username: staff.username.toLowerCase(),
+      username: lowerUsername,
       displayName: staff.name,
       role: staff.role as any,
       staffId: staff.id,
@@ -157,7 +159,7 @@ export const db = {
           photo: staff.photo,
           name: staff.name.toUpperCase(),
           position: staff.position.toUpperCase(),
-          username: staff.username.toLowerCase(),
+          username: lowerUsername,
           role: staff.role,
           registrationdate: staff.registrationDate,
           emailcorp: staff.emailCorp?.toLowerCase(),
@@ -175,17 +177,19 @@ export const db = {
   },
 
   deleteStaff: async (id: string) => {
+    // 1. Deletar localmente
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     db._saveLocal(KEYS.STAFF, currentStaff.filter((s: any) => s.id !== id));
     
     const currentUsers = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     db._saveLocal(KEYS.USERS, currentUsers.filter((u: any) => u.staffId !== id));
 
+    // 2. Deletar na nuvem
     if (supabase) {
       try {
-        await supabase.from('staff').delete().eq('id', id);
-        // Deleta o usuário vinculado pelo staffid
+        // ESSENCIAL: Deletar primeiro na tabela users por causa da FK, depois staff
         await supabase.from('users').delete().eq('staffid', id);
+        await supabase.from('staff').delete().eq('id', id);
       } catch (e) { console.error("Cloud Sync Error (Delete Staff)"); }
     }
     return true;
