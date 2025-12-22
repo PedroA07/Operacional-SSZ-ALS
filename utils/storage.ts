@@ -49,38 +49,8 @@ export const db = {
     return localData;
   },
 
-  subscribeToUsers: (callback: (users: User[]) => void) => {
-    if (!supabase) return () => {};
-
-    const channel = supabase
-      .channel('public:users')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async () => {
-        const users = await db.getUsers();
-        callback(users);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  },
-
-  heartbeat: async (userId: string) => {
-    const now = new Date().toISOString();
-    if (supabase) {
-      try {
-        await supabase.from('users').update({ lastSeen: now }).eq('id', userId);
-      } catch (e) { console.warn("Heartbeat cloud failed"); }
-    }
-    const localUsers = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    const idx = localUsers.findIndex((u: any) => u.id === userId);
-    if (idx >= 0) {
-      localUsers[idx].lastSeen = now;
-      db._saveLocal(KEYS.USERS, localUsers);
-    }
-  },
-
   saveUser: async (user: User) => {
+    // 1. Salva Localmente Primeiro
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const idx = current.findIndex((u: any) => u.id === user.id || u.username === user.username);
     
@@ -91,14 +61,20 @@ export const db = {
     } else {
       updated = [...current, user];
     }
-    
     db._saveLocal(KEYS.USERS, updated);
 
+    // 2. Sincroniza Nuvem
     if (supabase) {
       try {
         const { error } = await supabase.from('users').upsert(user);
-        if (error) throw error;
-      } catch (e) { console.error("Cloud Sync Error (User):", e); throw e; }
+        if (error) {
+          console.error("Erro Supabase (User Upsert):", error.message);
+          throw error;
+        }
+      } catch (e) { 
+        console.error("Falha Crítica Cloud User:", e); 
+        throw e; 
+      }
     }
   },
 
@@ -129,37 +105,40 @@ export const db = {
     }
     db._saveLocal(KEYS.STAFF, updatedStaff);
 
-    // 2. Preparar e Salvar Usuário vinculado
+    // 2. Preparar Usuário vinculado
     const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    const existingUser = users.find((u: any) => u.staffId === staff.id || u.username === staff.username);
+    const existingUser = users.find((u: any) => u.staffId === staff.id || (u.username === staff.username && u.role !== 'driver'));
     
     const userData: User = {
       id: existingUser?.id || `u-${staff.id}`,
-      username: staff.username,
-      displayName: staff.name,
+      username: staff.username.toLowerCase(),
+      displayName: staff.name.toUpperCase(),
       role: staff.role as any,
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       lastSeen: new Date().toISOString(),
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
       password: passwordOverride || existingUser?.password || '12345678',
-      position: staff.position,
-      emailCorp: staff.emailCorp,
+      position: staff.position.toUpperCase(),
+      emailCorp: staff.emailCorp.toLowerCase(),
       phoneCorp: staff.phoneCorp,
       status: staff.status,
       statusSince: staff.statusSince
     };
     
-    // Primeiro salva o usuário (tabela principal de login)
+    // 3. Salva Usuário (Crítico para login)
     await db.saveUser(userData);
 
-    // 3. Sincronizar Staff na nuvem
+    // 4. Sincronizar Staff na nuvem
     if (supabase) {
       try {
         const { error } = await supabase.from('staff').upsert(staff);
-        if (error) throw error;
+        if (error) {
+          console.error("Erro Supabase (Staff Upsert):", error.message);
+          throw error;
+        }
       } catch (e) { 
-        console.error("Cloud Sync Error (Staff):", e); 
+        console.error("Falha Crítica Cloud Staff:", e); 
         throw e;
       }
     }

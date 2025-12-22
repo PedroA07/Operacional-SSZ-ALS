@@ -220,6 +220,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               {isProfileMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 animate-in slide-in-from-top-4 duration-300 z-[100] backdrop-blur-xl bg-white/95">
                   <div className="text-center mb-4 pb-4 border-b border-slate-50 relative">
+                    {/* CRONÔMETRO NO DROP DOWN */}
+                    <div className="mb-4 bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5">
+                       <p className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Status em Tempo Real</p>
+                       <div className="text-xl font-black font-mono tracking-tighter">
+                          {currentTime.toLocaleTimeString('pt-BR')}
+                       </div>
+                    </div>
+
                     <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl font-black mx-auto mb-3 shadow-lg">
                       {user.displayName.substring(0,1).toUpperCase()}
                     </div>
@@ -237,11 +245,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   </div>
 
                   <div className="space-y-2 mb-4">
-                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 text-left">
                       <span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span>
                       <span className="text-[9px] font-bold text-slate-800 lowercase break-all">{user.emailCorp || myStaffData?.emailCorp || 'Não cadastrado'}</span>
                     </div>
-                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 text-left">
                       <span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span>
                       <span className="text-[9px] font-bold text-slate-800">{user.phoneCorp || myStaffData?.phoneCorp || '---'}</span>
                     </div>
