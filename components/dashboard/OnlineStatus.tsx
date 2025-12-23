@@ -20,7 +20,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
-    const statusInterval = setInterval(fetchStatus, 10000); 
+    // Atualiza a cada 5 segundos para maior precisão
+    const statusInterval = setInterval(fetchStatus, 5000); 
     const clockInterval = setInterval(() => setTrigger(t => t + 1), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -43,7 +44,9 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     const last = new Date(user.lastSeen).getTime();
     const diff = (now - last) / 1000;
 
-    if (diff > 45) return 'OFFLINE';
+    // Se a última atividade foi há mais de 60 segundos, considera offline
+    if (diff > 60) return 'OFFLINE';
+    // Se a aba estiver oculta, aparece como ausente
     return user.isOnlineVisible ? 'ATIVO' : 'AUSENTE';
   };
 

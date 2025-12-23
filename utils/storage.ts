@@ -34,16 +34,19 @@ export const db = {
   },
 
   /**
-   * Atualiza a presença online do usuário
+   * Atualiza a presença online do usuário e a visibilidade da aba
    */
   updatePresence: async (userId: string, isVisible: boolean) => {
     if (!supabase) return;
     try {
-      await supabase.from('users').update({ 
+      const { error } = await supabase.from('users').update({ 
         lastseen: new Date().toISOString(),
         isonlinevisible: isVisible 
       }).eq('id', userId);
-    } catch (e) { /* silent */ }
+      if (error) throw error;
+    } catch (e) { 
+      console.warn("Erro ao atualizar presença:", e);
+    }
   },
 
   getUsers: async (): Promise<User[]> => {
@@ -100,6 +103,7 @@ export const db = {
           position: user.position?.toUpperCase(),
           status: user.status || 'Ativo',
           isfirstlogin: user.isFirstLogin ?? true,
+          isonlinevisible: user.isOnlineVisible ?? true,
           photo: user.photo
         };
         const { error } = await supabase.from('users').upsert(payload);
@@ -171,13 +175,13 @@ export const db = {
           year_horse: driver.yearHorse || null,
           plate_trailer: driver.plateTrailer || null,
           year_trailer: driver.yearTrailer || null,
-          driver_type: driver.driverType || 'Externo', // Corrigido para match com ALTER TABLE
+          driver_type: driver.driverType || 'Externo',
           status: driver.status || 'Ativo',
           status_last_change_date: driver.statusLastChangeDate || new Date().toISOString(),
           beneficiary_name: driver.beneficiaryName?.toUpperCase() || null,
           beneficiary_phone: driver.beneficiaryPhone || null,
           beneficiary_email: driver.beneficiaryEmail?.toLowerCase() || null,
-          beneficiary_cnpj: driver.beneficiaryCnpj || null, // Corrigido para match com ALTER TABLE
+          beneficiary_cnpj: driver.beneficiaryCnpj || null,
           payment_preference: driver.paymentPreference || 'PIX',
           whatsapp_group_name: driver.whatsappGroupName?.toUpperCase() || null,
           whatsapp_group_link: driver.whatsappGroupLink || null,
@@ -190,7 +194,7 @@ export const db = {
         if (error) throw error;
       } catch (e: any) { 
         console.error("Erro Supabase Driver:", e.message || e);
-        throw new Error(e.message || "Falha crítica no banco de dados. Verifique a estrutura da tabela 'drivers'.");
+        throw new Error(e.message || "Falha na comunicação com o banco de dados. Execute o script SQL de atualização de colunas.");
       }
     }
   },
