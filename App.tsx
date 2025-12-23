@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { AppScreen, User } from './types';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
+import { db } from './utils/storage';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOGIN);
@@ -10,7 +11,6 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    // Verifica se há sessão salva no sessionStorage
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) {
       const userData = JSON.parse(saved);
@@ -19,6 +19,26 @@ const App: React.FC = () => {
     }
     setIsInitializing(false);
   }, []);
+
+  // Monitor de Status Online (Visibilidade da Aba)
+  useEffect(() => {
+    if (!user) return;
+
+    const updatePresence = async () => {
+      const isVisible = document.visibilityState === 'visible';
+      await db.updatePresence(user.id, isVisible);
+    };
+
+    // Atualiza ao carregar, ao mudar visibilidade e a cada 30s
+    updatePresence();
+    const interval = setInterval(updatePresence, 30000);
+    document.addEventListener('visibilitychange', updatePresence);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', updatePresence);
+    };
+  }, [user]);
 
   const handleLoginSuccess = (userData: User) => {
     setUser(userData);

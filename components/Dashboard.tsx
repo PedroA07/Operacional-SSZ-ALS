@@ -32,6 +32,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
   const [forceProfileModal, setForceProfileModal] = useState<string | null>(null);
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
+  const [sessionTime, setSessionTime] = useState('00:00:00');
   
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -46,7 +47,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     type: 'list'
   });
 
-  // Fechar menu de perfil ao clicar fora
+  // Cronômetro da Sessão
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const start = new Date(user.lastLogin).getTime();
+      const now = new Date().getTime();
+      const diff = now - start;
+      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      setSessionTime(`${h}:${m}:${s}`);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [user.lastLogin]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
@@ -222,10 +236,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </button>
 
               {isProfileMenuOpen && (
-                <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="p-4 bg-slate-50 border-b border-slate-100">
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="p-5 bg-slate-50 border-b border-slate-100">
                     <p className="text-[10px] font-black text-slate-800 uppercase truncate">{user.displayName}</p>
                     <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{user.position}</p>
+                    <div className="mt-4 flex items-center justify-between bg-blue-600/5 p-3 rounded-2xl border border-blue-600/10">
+                       <span className="text-[8px] font-black text-blue-600 uppercase">Tempo de Sessão:</span>
+                       <span className="text-[10px] font-mono font-black text-blue-700">{sessionTime}</span>
+                    </div>
                   </div>
                   <div className="p-2">
                     <button 
