@@ -72,6 +72,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   }, [user]);
 
   const handleFormClick = (formId: string) => {
+    // Primeiro limpamos a seleção para garantir que o useEffect do FormsTab detecte a mudança
     setSelectedFormId(null);
     setTimeout(() => {
       setActiveTab(DashboardTab.FORMULARIOS);
@@ -154,19 +155,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
           <MenuItem tab={DashboardTab.INICIO} label="Início" icon={<Icons.Inicio />} />
-          <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
+          
+          <MenuItem label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
             {availableOps.map(op => (
-              <button key={op.id} onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="w-full text-left py-1.5 px-2 hover:bg-slate-800/40 rounded-lg text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors">• {op.category}</button>
+              <button key={op.id} onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="w-full text-left py-1.5 px-3 hover:bg-slate-800/40 rounded-lg text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors">• {op.category}</button>
             ))}
           </MenuItem>
+
           <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" icon={<Icons.Motoristas />} />
+          
           <MenuItem label="Formulários" icon={<Icons.Formularios />} forceActive={activeTab === DashboardTab.FORMULARIOS}>
-            <button onClick={() => handleFormClick('ORDEM_COLETA')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Ordem de Coleta</button>
-            <button onClick={() => handleFormClick('PRE_STACKING')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Pré-Stacking</button>
-            <button onClick={() => handleFormClick('LIBERACAO_VAZIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Liberação Vazio</button>
-            <button onClick={() => handleFormClick('DEVOLUCAO_VAZIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Devolução Vazio</button>
-            <button onClick={() => handleFormClick('RETIRADA_CHEIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Retirada Cheio</button>
+            <button onClick={() => handleFormClick('ORDEM_COLETA')} className="w-full text-left px-3 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded transition-all">• Ordem de Coleta</button>
+            <button onClick={() => handleFormClick('PRE_STACKING')} className="w-full text-left px-3 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded transition-all">• Pré-Stacking</button>
+            <button onClick={() => handleFormClick('LIBERACAO_VAZIO')} className="w-full text-left px-3 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded transition-all">• Liberação Vazio</button>
+            <button onClick={() => handleFormClick('DEVOLUCAO_VAZIO')} className="w-full text-left px-3 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded transition-all">• Devolução Vazio</button>
+            <button onClick={() => handleFormClick('RETIRADA_CHEIO')} className="w-full text-left px-3 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded transition-all">• Retirada Cheio</button>
           </MenuItem>
+
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" icon={<Icons.Clientes />} />
           <MenuItem tab={DashboardTab.PORTOS} label="Portos" icon={<Icons.Portos />} />
           <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" icon={<Icons.PreStacking />} />
@@ -226,8 +231,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 activeView={opsView} 
                 setActiveView={setOpsView}
                 vwSchedules={vwSchedules}
-                onSaveVWSchedule={async (s, id) => { /* VW Persistence logic */ loadAllData(); }}
-                onUpdateVWStatus={async (id, status, time) => { /* VW Persistence logic */ loadAllData(); }}
+                onSaveVWSchedule={async (s, id) => { loadAllData(); }}
+                onUpdateVWStatus={async (id, status, time) => { loadAllData(); }}
              />
            )}
         </div>

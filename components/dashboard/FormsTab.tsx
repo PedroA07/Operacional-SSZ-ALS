@@ -95,7 +95,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   const handleInputChange = (field: string, value: string) => {
     const upValue = value.toUpperCase();
     if (field === 'container') {
-      // Inteligência compatível com track-trace.com via carrierService
+      // Inteligência de preenchimento automático baseada no BIC Code (bic-code.org)
       const carrier = lookupCarrierByContainer(upValue);
       setFormData(prev => ({ 
         ...prev, 
@@ -128,7 +128,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all";
+  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -140,7 +140,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
       </div>
 
       <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm">
-        <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-8 text-center">Central de Emissões</h2>
+        <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-8 text-center">Central de Emissões Operacionais</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(Object.keys(formConfigs) as FormType[]).map(type => (
             <button key={type} onClick={() => { setSelectedFormType(type); setIsFormModalOpen(true); }} className="flex items-center gap-6 p-6 bg-slate-50 border border-slate-100 rounded-[2rem] hover:bg-white hover:border-blue-500 hover:shadow-xl transition-all group text-left">
@@ -165,32 +165,32 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
               <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-5 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Emissão (Auto)</label><div className="px-4 py-3 bg-slate-200 rounded-xl text-slate-500 font-black text-xs">{new Date().toLocaleDateString('pt-BR')}</div></div>
+                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Emissão (Automática)</label><div className="px-4 py-3 bg-slate-200 rounded-xl text-slate-500 font-black text-xs">{new Date().toLocaleDateString('pt-BR')}</div></div>
                   <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nº OS</label><input type="text" className={inputClasses} value={formData.os} onChange={e => handleInputChange('os', e.target.value)} /></div>
                 </div>
 
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Remetente</label>
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Remetente (Cliente)</label>
                   <input type="text" placeholder="BUSCAR CLIENTE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); }} />
                   {showRemetenteResults && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-                      {customers.filter(c => c.name.toUpperCase().includes(remetenteSearch)).map(c => <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.name); setShowRemetenteResults(false); }}>{c.name}</button>)}
+                      {customers.filter(c => c.name.toUpperCase().includes(remetenteSearch)).map(c => <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.name); setShowRemetenteResults(false); }}>{c.name}</button>)}
                     </div>
                   )}
                 </div>
 
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Destinatário</label>
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Destinatário (Terminal)</label>
                   <input type="text" placeholder="BUSCAR PORTO..." className={inputClasses} value={destinatarioSearch} onFocus={() => setShowDestinatarioResults(true)} onChange={e => { setDestinatarioSearch(e.target.value.toUpperCase()); setShowDestinatarioResults(true); }} />
                   {showDestinatarioResults && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch)).map(p => <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase" onClick={() => { setFormData({...formData, destinatarioId: p.id}); setDestinatarioSearch(p.name); setShowDestinatarioResults(false); }}>{p.name}</button>)}
+                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch)).map(p => <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, destinatarioId: p.id}); setDestinatarioSearch(p.name); setShowDestinatarioResults(false); }}>{p.name}</button>)}
                     </div>
                   )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Armador</label><input type="text" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
+                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Armador (BIC Code)</label><input type="text" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
                   <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo Equip.</label><input type="text" className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)} /></div>
                 </div>
 
@@ -212,26 +212,26 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 </div>
 
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Motorista</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Motorista Autorizado</label>
                   <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setShowDriverResults(true); }} />
                   {showDriverResults && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-                      {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name}</button>)}
+                      {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name}</button>)}
                     </div>
                   )}
                 </div>
 
-                <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 space-y-2">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Agendamento de Coleta</label>
+                <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 space-y-2 shadow-inner">
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Agendamento de Coleta (Data/Hora)</label>
                   <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => setFormData({...formData, horarioAgendado: e.target.value})} />
                 </div>
 
-                <button disabled={isExporting} onClick={downloadPDF} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all">
-                  {isExporting ? 'GERANDO PDF...' : 'BAIXAR DOCUMENTO'}
+                <button disabled={isExporting} onClick={downloadPDF} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
+                  {isExporting ? 'PROCESSANDO PDF...' : 'BAIXAR DOCUMENTO'}
                 </button>
               </div>
 
-              <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10">
+              <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
                 <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
                   {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                   {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
