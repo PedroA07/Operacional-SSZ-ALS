@@ -33,9 +33,6 @@ export const db = {
       .subscribe();
   },
 
-  /**
-   * Atualiza a presença online do usuário
-   */
   updatePresence: async (userId: string, isVisible: boolean) => {
     if (!supabase) return;
     try {
@@ -160,7 +157,7 @@ export const db = {
 
     if (supabase) {
       try {
-        // Mapeamento ULTRA-RIGOROSO para o Supabase (snake_case)
+        // Mapeamento COMPLETO para o Supabase (snake_case)
         const payload = {
           id: driver.id,
           photo: driver.photo || null,
@@ -194,10 +191,9 @@ export const db = {
         if (error) throw error;
       } catch (e: any) { 
         console.error("Erro Crítico no Driver:", e.message || e);
-        // Mensagem de erro que explica exatamente o que fazer
         throw new Error(
-          `ERRO DE BANCO: A coluna '${e.message?.split("'")[1] || "payment_preference"}' não existe no Supabase. ` +
-          `Ação Necessária: Execute o script SQL fornecido para atualizar a tabela 'drivers'.`
+          `FALHA AO SALVAR: Certifique-se de que a tabela 'drivers' possui todas as colunas. ` +
+          `Execute o script SQL fornecido no painel do Supabase para corrigir o schema.`
         );
       }
     }
