@@ -10,45 +10,49 @@ export const authService = {
   async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string; forceChange?: boolean }> {
     const inputUser = username.trim().toLowerCase();
     
-    // Buscar todos os usuários
-    const users = await db.getUsers();
-    
-    // Tentar encontrar o usuário no banco
-    let foundUser = users.find(u => u.username.toLowerCase() === inputUser);
-
-    // Se não encontrar no banco e for o admin master, podemos criar ou validar via constante
-    // Mas para seguir a regra de "senha padrão no primeiro acesso", o admin deve estar no banco
-    if (!foundUser && inputUser === ADMIN_CREDENTIALS.username) {
-      // Caso especial: se o admin master não existir no DB, ele nasce com a regra de primeiro acesso
-      const adminUser: User = {
-        id: 'admin-master',
-        username: ADMIN_CREDENTIALS.username,
-        password: '12345678', // Senha padrão inicial
-        displayName: 'Administrador Master',
-        role: 'admin',
-        lastLogin: new Date().toISOString(),
-        isFirstLogin: true,
-        position: 'Operacional'
+    // 1. Tentar Admin Master Hardcoded Primeiro (operacional_ssz)
+    if (inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && password === ADMIN_CREDENTIALS.password) {
+      return {
+        success: true,
+        user: {
+          id: 'admin-master',
+          username: ADMIN_CREDENTIALS.username,
+          displayName: 'Operacional Master',
+          role: 'admin',
+          lastLogin: new Date().toISOString(),
+          isFirstLogin: false,
+          position: 'Diretoria'
+        },
+        forceChange: false
       };
-      await db.saveUser(adminUser);
-      foundUser = adminUser;
     }
 
-    if (!foundUser) {
-      return { success: false, error: 'Usuário não localizado.' };
-    }
+    try {
+      // 2. Buscar todos os usuários do Banco
+      const users = await db.getUsers();
+      
+      // Busca ignorando case
+      let foundUser = users.find(u => u.username.toLowerCase() === inputUser);
 
-    // Verificar senha
-    if (foundUser.password !== password) {
-      return { success: false, error: 'Senha incorreta.' };
-    }
+      if (!foundUser) {
+        return { success: false, error: 'Usuário não localizado no sistema.' };
+      }
 
-    // Verificar se é primeiro acesso
-    if (foundUser.isFirstLogin) {
-      return { success: true, user: foundUser, forceChange: true };
-    }
+      // 3. Verificar senha
+      if (foundUser.password !== password) {
+        return { success: false, error: 'Senha incorreta.' };
+      }
 
-    return { success: true, user: foundUser, forceChange: false };
+      // 4. Se a senha for a padrão '12345678', obriga a troca
+      if (foundUser.password === '12345678' || foundUser.isFirstLogin) {
+        return { success: true, user: foundUser, forceChange: true };
+      }
+
+      return { success: true, user: foundUser, forceChange: false };
+    } catch (err) {
+      console.error("Auth error:", err);
+      return { success: false, error: 'Erro de conexão com a base de dados.' };
+    }
   },
 
   /**

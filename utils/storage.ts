@@ -69,18 +69,16 @@ export const db = {
   },
 
   saveUser: async (user: User) => {
-    const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const lowerUsername = user.username.toLowerCase();
+    const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     const idx = current.findIndex((u: any) => u.id === user.id || u.username.toLowerCase() === lowerUsername);
     
-    let updated;
     if (idx >= 0) {
-      updated = [...current];
-      updated[idx] = { ...updated[idx], ...user, username: lowerUsername };
+      current[idx] = { ...current[idx], ...user, username: lowerUsername };
     } else {
-      updated = [...current, { ...user, username: lowerUsername }];
+      current.push({ ...user, username: lowerUsername });
     }
-    db._saveLocal(KEYS.USERS, updated);
+    db._saveLocal(KEYS.USERS, current);
 
     if (supabase) {
       try {
@@ -97,7 +95,8 @@ export const db = {
           isfirstlogin: user.isFirstLogin ?? true,
           photo: user.photo
         };
-        await supabase.from('users').upsert(payload);
+        const { error } = await supabase.from('users').upsert(payload);
+        if (error) throw error;
       } catch (e: any) { console.error("Erro Supabase User:", e.message); }
     }
   },
@@ -126,11 +125,10 @@ export const db = {
   saveStaff: async (staff: Staff, password?: string) => {
     const current = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const idx = current.findIndex((s: any) => s.id === staff.id);
-    let updated;
     let isNew = idx < 0;
 
-    if (!isNew) { updated = [...current]; updated[idx] = staff; } else { updated = [...current, staff]; }
-    db._saveLocal(KEYS.STAFF, updated);
+    if (!isNew) { current[idx] = staff; } else { current.push(staff); }
+    db._saveLocal(KEYS.STAFF, current);
 
     if (supabase) {
       try {
@@ -164,7 +162,6 @@ export const db = {
       position: staff.position,
       photo: staff.photo,
       status: staff.status,
-      // Se for novo ou não tiver flag, assume primeiro acesso com senha padrão
       isFirstLogin: isNew ? true : (existingUser?.isFirstLogin ?? true),
       password: password || existingUser?.password || '12345678'
     };
@@ -201,9 +198,8 @@ export const db = {
   saveDriver: async (driver: Driver) => {
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     const idx = current.findIndex((d: any) => d.id === driver.id);
-    let updated;
-    if (idx >= 0) { updated = [...current]; updated[idx] = driver; } else { updated = [...current, driver]; }
-    db._saveLocal(KEYS.DRIVERS, updated);
+    if (idx >= 0) { current[idx] = driver; } else { current.push(driver); }
+    db._saveLocal(KEYS.DRIVERS, current);
     if (supabase) await supabase.from('drivers').upsert(driver);
   },
 
@@ -228,9 +224,8 @@ export const db = {
   saveCustomer: async (customer: Customer) => {
     const current = JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]');
     const idx = current.findIndex((c: any) => c.id === customer.id);
-    let updated;
-    if (idx >= 0) { updated = [...current]; updated[idx] = customer; } else { updated = [...current, customer]; }
-    db._saveLocal(KEYS.CUSTOMERS, updated);
+    if (idx >= 0) { current[idx] = customer; } else { current.push(customer); }
+    db._saveLocal(KEYS.CUSTOMERS, current);
     if (supabase) await supabase.from('customers').upsert(customer);
   },
 
@@ -255,9 +250,8 @@ export const db = {
   savePort: async (port: Port) => {
     const current = JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
     const idx = current.findIndex((p: any) => p.id === port.id);
-    let updated;
-    if (idx >= 0) { updated = [...current]; updated[idx] = port; } else { updated = [...current, port]; }
-    db._saveLocal(KEYS.PORTS, updated);
+    if (idx >= 0) { current[idx] = port; } else { current.push(port); }
+    db._saveLocal(KEYS.PORTS, current);
     if (supabase) await supabase.from('ports').upsert(port);
   },
 
@@ -282,9 +276,8 @@ export const db = {
   savePreStacking: async (ps: PreStacking) => {
     const current = JSON.parse(localStorage.getItem(KEYS.PRE_STACKING) || '[]');
     const idx = current.findIndex((p: any) => p.id === ps.id);
-    let updated;
-    if (idx >= 0) { updated = [...current]; updated[idx] = ps; } else { updated = [...current, ps]; }
-    db._saveLocal(KEYS.PRE_STACKING, updated);
+    if (idx >= 0) { current[idx] = ps; } else { current.push(ps); }
+    db._saveLocal(KEYS.PRE_STACKING, current);
     if (supabase) await supabase.from('pre_stacking').upsert(ps);
   },
 
