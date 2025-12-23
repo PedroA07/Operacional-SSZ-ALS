@@ -92,7 +92,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setSessionDuration(`${hours}:${minutes}:${seconds}`);
       }
 
-      // Heartbeat a cada 15 segundos para monitoramento Ativo/Ausente
+      // Heartbeat para monitoramento Ativo/Ausente
       if (now.getSeconds() % 15 === 0) {
         db.updateHeartbeat(user.id);
       }
@@ -296,14 +296,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     </div>
                     <h4 className="font-black text-slate-800 uppercase text-xs">{user.displayName}</h4>
                     <p className="text-[8px] text-blue-500 font-bold uppercase tracking-widest mt-1">{user.position || 'OPERACIONAL'}</p>
-                    <div className="mt-4 bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5 overflow-hidden text-center">
+                    <div className="mt-4 bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5 overflow-hidden text-center flex flex-col items-center">
                        <p className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Tempo de Sessão</p>
                        <div className="text-lg font-black font-mono tracking-tighter">{sessionDuration}</div>
                     </div>
                   </div>
                   <div className="space-y-2 mb-5">
-                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100"><span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span><span className="text-[9px] font-bold text-slate-800 lowercase break-all">{displayEmail}</span></div>
-                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100"><span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span><span className="text-[9px] font-bold text-slate-800">{displayPhone}</span></div>
+                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 text-center"><span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span><span className="text-[9px] font-bold text-slate-800 lowercase break-all">{displayEmail}</span></div>
+                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 text-center"><span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span><span className="text-[9px] font-bold text-slate-800">{displayPhone}</span></div>
                   </div>
                   <div className="space-y-1.5">
                     <button onClick={handleEditProfile} className="w-full py-3 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95">Editar Perfil</button>

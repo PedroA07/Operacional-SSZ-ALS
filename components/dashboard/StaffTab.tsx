@@ -36,6 +36,9 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   const [usernameOptions, setUsernameOptions] = useState<string[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
 
+  // Extrair todos os cargos únicos existentes na equipe para o datalist
+  const existingPositions = Array.from(new Set(staffList.map(s => s.position).filter(Boolean))).sort();
+
   const loadUsers = async () => {
     const u = await db.getUsers();
     setUsers(u);
@@ -58,6 +61,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   const isAdmin = currentUser.role === 'admin';
   const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
 
+  // Gerador automático de sugestões de usuário baseado no nome
   useEffect(() => {
     if (form.name && !editingId) {
       const cleanName = form.name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -100,7 +104,9 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         registrationDate: existing?.registrationDate || new Date().toISOString(),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
-        status: (form.status || 'Ativo') as 'Ativo' | 'Inativo',
+        // Removido do formulário: Status é sempre Ativo no cadastro inicial 
+        // ou mantém o atual se estiver editando
+        status: existing?.status || 'Ativo',
         statusSince: existing?.statusSince || new Date().toISOString()
       };
       
@@ -281,24 +287,28 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                     
                     <div className="space-y-1">
                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cargo</label>
-                       <input required className={`${inputClasses} uppercase`} value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
+                       <input 
+                         required 
+                         list="positions-list" 
+                         className={`${inputClasses} uppercase`} 
+                         value={form.position} 
+                         onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} 
+                         placeholder="DIGITE OU SELECIONE UM CARGO"
+                       />
+                       <datalist id="positions-list">
+                         {existingPositions.map(pos => (
+                           <option key={pos} value={pos} />
+                         ))}
+                       </datalist>
+                       <p className="text-[7px] text-slate-400 font-bold uppercase italic mt-1 ml-1">* Você pode criar um novo cargo simplesmente digitando-o.</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Privilégio</label>
-                          <select disabled={!isAdmin} className={inputClasses} value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
-                             <option value="staff">Comum</option>
-                             <option value="admin">Administrador</option>
-                          </select>
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status</label>
-                          <select disabled={!isAdmin} className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}>
-                             <option value="Ativo">Ativo</option>
-                             <option value="Inativo">Inativo</option>
-                          </select>
-                       </div>
+                    <div className="space-y-1">
+                       <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Privilégio de Sistema</label>
+                       <select disabled={!isAdmin} className={inputClasses} value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
+                          <option value="staff">OPERACIONAL COMUM</option>
+                          <option value="admin">ADMINISTRADOR MASTER</option>
+                       </select>
                     </div>
 
                     <div className="space-y-1">
@@ -310,7 +320,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                                required={!editingId || isEditingPassword}
                                disabled={editingId && !isEditingPassword}
                                className={`${inputClasses} pr-12`} 
-                               placeholder={editingId && !isEditingPassword ? "••••••••" : "DIGITE A NOVA SENHA"}
+                               placeholder={editingId && !isEditingPassword ? "••••••••" : "DEFINIR NOVA SENHA"}
                                value={isEditingPassword || !editingId ? form.password : ""}
                                onChange={e => setForm({...form, password: e.target.value})}
                              />
