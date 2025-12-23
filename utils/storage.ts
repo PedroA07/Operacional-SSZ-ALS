@@ -36,9 +36,6 @@ export const db = {
     return s ? JSON.parse(s) : null;
   },
 
-  /**
-   * Assina mudanças em tempo real para qualquer tabela.
-   */
   subscribe: (table: string, callback: (payload?: any) => void): RealtimeChannel | null => {
     if (!supabase) return null;
     const channel = supabase
@@ -54,10 +51,14 @@ export const db = {
   },
 
   updateHeartbeat: async (userId: string) => {
-    if (!supabase || document.visibilityState !== 'visible') return;
+    if (!supabase) return;
     try {
-      // Atualiza lastseen apenas se a aba estiver ativa
-      await supabase.from('users').update({ lastseen: new Date().toISOString() }).eq('id', userId);
+      // Atualiza lastseen e o novo status de visibilidade
+      const isVisible = document.visibilityState === 'visible';
+      await supabase.from('users').update({ 
+        lastseen: new Date().toISOString(),
+        isOnlineVisible: isVisible 
+      }).eq('id', userId);
     } catch (e) { /* silent */ }
   },
 
@@ -75,6 +76,7 @@ export const db = {
             emailCorp: u.emailcorp || u.emailCorp,
             phoneCorp: u.phonecorp || u.phoneCorp,
             lastSeen: u.lastseen || u.lastSeen,
+            isOnlineVisible: u.isOnlineVisible !== undefined ? u.isOnlineVisible : true,
             isFirstLogin: u.isfirstlogin !== undefined ? u.isfirstlogin : u.isFirstLogin,
             photo: u.photo
           }));
@@ -115,6 +117,7 @@ export const db = {
           phonecorp: user.phoneCorp,
           emailcorp: user.emailCorp?.toLowerCase(),
           lastseen: user.lastSeen || new Date().toISOString(),
+          isOnlineVisible: user.isOnlineVisible ?? true,
           isfirstlogin: user.isFirstLogin,
           photo: user.photo
         };
@@ -186,6 +189,7 @@ export const db = {
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       lastSeen: new Date().toISOString(),
+      isOnlineVisible: true,
       isFirstLogin: isNew ? true : (existingUser?.isFirstLogin ?? true),
       password: passwordOverride || existingUser?.password || '12345678',
       position: staff.position,

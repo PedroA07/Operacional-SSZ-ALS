@@ -62,16 +62,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   };
 
   useEffect(() => {
-    // Carga inicial
     loadAllData();
 
-    // REALTIME: Escutar mudanças em todas as tabelas principais
     const subscriptions = [
       db.subscribe('staff', loadAllData),
       db.subscribe('users', async (payload) => {
-        // Quando qualquer mudança ocorre na tabela users, atualizamos os dados
         await loadAllData();
-        // E verificamos integridade (auto-logout se role mudou)
         const isValid = await sessionManager.validateIntegrity(user);
         if (!isValid) {
           alert("Sua sessão expirou devido a uma alteração cadastral ou de segurança.");
@@ -84,7 +80,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       db.subscribe('pre_stacking', loadAllData)
     ];
 
-    // Timer de Sessão e Heartbeat
     const timer = setInterval(() => {
       const now = new Date();
       const loginTime = new Date(user.lastLogin).getTime();
@@ -97,17 +92,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setSessionDuration(`${hours}:${minutes}:${seconds}`);
       }
 
-      // Heartbeat a cada 20 segundos se a aba estiver visível
-      if (now.getSeconds() % 20 === 0 && document.visibilityState === 'visible') {
+      // Heartbeat a cada 15 segundos para monitoramento Ativo/Ausente
+      if (now.getSeconds() % 15 === 0) {
         db.updateHeartbeat(user.id);
       }
     }, 1000);
 
-    // Heartbeat imediato quando a aba volta a ficar visível
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        db.updateHeartbeat(user.id);
-      }
+      db.updateHeartbeat(user.id);
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
@@ -304,7 +296,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     </div>
                     <h4 className="font-black text-slate-800 uppercase text-xs">{user.displayName}</h4>
                     <p className="text-[8px] text-blue-500 font-bold uppercase tracking-widest mt-1">{user.position || 'OPERACIONAL'}</p>
-                    <div className="mt-4 bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5 overflow-hidden text-left">
+                    <div className="mt-4 bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5 overflow-hidden text-center">
                        <p className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Tempo de Sessão</p>
                        <div className="text-lg font-black font-mono tracking-tighter">{sessionDuration}</div>
                     </div>

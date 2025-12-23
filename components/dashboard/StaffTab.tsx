@@ -42,7 +42,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   };
 
   useEffect(() => {
-    if (isModalOpen) loadUsers();
+    loadUsers();
   }, [staffList, isModalOpen]);
 
   useEffect(() => {
@@ -85,11 +85,6 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
     e.preventDefault();
     if (isProcessing) return;
     
-    if (!form.username) {
-      alert("ERRO: Selecione um usuário válido.");
-      return;
-    }
-
     setIsProcessing(true);
     try {
       const staffId = editingId || `stf-${Date.now()}`;
@@ -115,6 +110,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
       setIsModalOpen(false);
       setIsEditingPassword(false);
       setShowPass(false);
+      loadUsers();
     } catch (err: any) {
       alert(`FALHA: ${err.message || 'Erro ao salvar.'}`);
     } finally {
@@ -186,26 +182,28 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                  </div>
                  
                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                    <span className="text-slate-400">Cadastrado em</span>
-                    <span className="text-slate-700">{new Date(s.registrationDate).toLocaleDateString('pt-BR')}</span>
-                 </div>
-
-                 {s.status === 'Inativo' && (
-                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                       <span className="text-red-500">Inativo desde</span>
-                       <span className="text-red-600 font-black">{new Date(s.statusSince).toLocaleDateString('pt-BR')}</span>
+                    <span className="text-slate-400">Contatos</span>
+                    <div className="text-right">
+                       <p className="text-[9px] font-bold text-slate-700">{s.phoneCorp || '(13) ---- ----'}</p>
+                       <p className="text-[8px] font-bold text-blue-500 lowercase">{s.emailCorp || 'sem e-mail corp.'}</p>
                     </div>
-                 )}
+                 </div>
 
                  {isAdmin && (
                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                      <span className="text-slate-400">Senha</span>
+                      <span className="text-slate-400">Senha Operacional</span>
                       <div className="flex items-center gap-2">
                         <span className="text-emerald-600 font-mono text-[10px] font-black">
                           {isPassVisible ? (linkedUser?.password || '---') : '••••••••'}
                         </span>
-                        <button onClick={() => setShowPasswordsList(prev => ({ ...prev, [s.id]: !prev[s.id] }))} className="p-1 text-slate-300 hover:text-blue-500">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943-9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
+                        <button onClick={() => setShowPasswordsList(prev => ({ ...prev, [s.id]: !prev[s.id] }))} className="p-1 text-slate-300 hover:text-blue-500 transition-colors">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {isPassVisible ? (
+                               <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" strokeWidth="2.5"/>
+                            ) : (
+                               <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943-9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/>
+                            )}
+                          </svg>
                         </button>
                       </div>
                    </div>
@@ -251,8 +249,19 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
 
                  <div className="space-y-4">
                     <div className="space-y-1">
-                       <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Completo (CAIXA ALTA)</label>
+                       <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Completo</label>
                        <input required className={`${inputClasses} uppercase`} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Telefone Corp. (Opcional)</label>
+                          <input className={inputClasses} value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: maskPhone(e.target.value)})} placeholder="(13) 99999-9999" />
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">E-mail Corp. (Opcional)</label>
+                          <input className={`${inputClasses} lowercase`} value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} placeholder="nome@als.com.br" />
+                       </div>
                     </div>
 
                     <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 space-y-3">
@@ -277,10 +286,10 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
 
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Privilégio (Nível de Acesso)</label>
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Privilégio</label>
                           <select disabled={!isAdmin} className={inputClasses} value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
                              <option value="staff">Comum</option>
-                             <option value="admin">Administrador (Master)</option>
+                             <option value="admin">Administrador</option>
                           </select>
                        </div>
                        <div className="space-y-1">

@@ -58,7 +58,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 type="text" 
                 required 
                 className="w-full px-6 py-5 bg-white/5 border border-white/10 text-white font-bold rounded-2xl focus:border-blue-500 focus:bg-white/10 outline-none transition-all placeholder:text-slate-700" 
-                placeholder="operacional_ssz"
+                placeholder="usuario"
                 value={username} 
                 onChange={(e) => setUsername(e.target.value)} 
               />

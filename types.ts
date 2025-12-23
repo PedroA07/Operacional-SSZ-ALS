@@ -8,9 +8,9 @@ export interface User {
   driverId?: string;
   staffId?: string;
   lastLogin: string;
-  lastSeen?: string; // Novo campo para real-time
+  lastSeen?: string;
+  isOnlineVisible?: boolean; // Novo: Indica se a aba está em foco
   isFirstLogin?: boolean;
-  // Renamed avatar to photo to fix TypeScript errors in components/Dashboard.tsx
   photo?: string;
   position?: string;
   emailCorp?: string;

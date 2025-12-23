@@ -8,29 +8,19 @@ interface OnlineStatusProps {
 }
 
 const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
-  const [activeUsers, setActiveUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [trigger, setTrigger] = useState(0);
 
   const fetchStatus = async () => {
-    const users = await db.getUsers();
-    const now = new Date().getTime();
-    
-    // FILTRAGEM RIGOROSA: 35 segundos de tolerância
-    // Como o heartbeat é a cada 20s na aba ativa, 35s é o ideal para remover quem minimizou.
-    const online = users.filter(u => {
-      if (!u.lastSeen) return false;
-      const last = new Date(u.lastSeen).getTime();
-      return (now - last) < (35 * 1000);
-    });
-    setActiveUsers(online);
+    const u = await db.getUsers();
+    setUsers(u);
   };
 
   useEffect(() => {
     fetchStatus();
-    // Atualiza a lista a cada 15 segundos para manter a interface fresca
-    const statusInterval = setInterval(fetchStatus, 15000); 
+    const statusInterval = setInterval(fetchStatus, 10000); 
     const clockInterval = setInterval(() => setTrigger(t => t + 1), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -47,10 +37,15 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     };
   }, []);
 
-  // Recarrega imediatamente quando a staffList muda via Realtime Subscriptions do Dashboard
-  useEffect(() => {
-    fetchStatus();
-  }, [staffList]);
+  const getStatus = (user: User) => {
+    if (!user.lastSeen) return 'OFFLINE';
+    const now = new Date().getTime();
+    const last = new Date(user.lastSeen).getTime();
+    const diff = (now - last) / 1000;
+
+    if (diff > 45) return 'OFFLINE';
+    return user.isOnlineVisible ? 'ATIVO' : 'AUSENTE';
+  };
 
   const getSessionTime = (lastLogin: string) => {
     try {
@@ -65,36 +60,44 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     } catch { return '00:00:00'; }
   };
 
+  const activeCount = users.filter(u => getStatus(u) === 'ATIVO').length;
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button onClick={() => setIsOpen(!isOpen)} className="w-full bg-slate-800/40 border border-white/5 rounded-2xl p-3 flex items-center justify-between hover:bg-slate-800 transition-all">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className={`w-2 h-2 rounded-full ${activeUsers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`}></div>
+            <div className={`w-2 h-2 rounded-full ${activeCount > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`}></div>
           </div>
-          <span className="text-[9px] font-black text-slate-100 uppercase tracking-widest">{activeUsers.length} Online</span>
+          <span className="text-[9px] font-black text-slate-100 uppercase tracking-widest">{activeCount} Ativo{activeCount !== 1 ? 's' : ''}</span>
         </div>
         <svg className={`w-3 h-3 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
       </button>
 
-      {isOpen && (activeUsers.length > 0) && (
-        <div className="absolute bottom-full left-0 mb-2 w-64 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2 z-[100]">
+      {isOpen && (
+        <div className="absolute bottom-full left-0 mb-2 w-72 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2 z-[100]">
           <div className="p-3 bg-slate-800/50 border-b border-white/5">
-             <h4 className="text-[8px] font-black text-blue-400 uppercase tracking-widest text-center">Aba Ativa Agora</h4>
+             <h4 className="text-[8px] font-black text-blue-400 uppercase tracking-widest text-center">Monitoramento em Tempo Real</h4>
           </div>
-          <div className="max-h-60 overflow-y-auto custom-scrollbar">
-            {activeUsers.map(u => {
-              const staff = staffList.find(s => s.id === u.staffId);
+          <div className="max-h-72 overflow-y-auto custom-scrollbar">
+            {staffList.map(s => {
+              const u = users.find(user => user.staffId === s.id);
+              const status = u ? getStatus(u) : 'OFFLINE';
+              const statusColor = status === 'ATIVO' ? 'bg-emerald-500' : status === 'AUSENTE' ? 'bg-amber-500' : 'bg-slate-600';
+              
               return (
-                <div key={u.id} className="p-3 flex items-center gap-3 hover:bg-white/5 border-b border-white/5 last:border-0">
-                  <div className="w-8 h-8 rounded-lg bg-slate-700 overflow-hidden flex items-center justify-center border border-white/10">
-                    {staff?.photo ? <img src={staff.photo} className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-slate-500">{(u.displayName || 'A').substring(0,1)}</span>}
+                <div key={s.id} className="p-3 flex items-center gap-3 hover:bg-white/5 border-b border-white/5 last:border-0">
+                  <div className="relative">
+                    <div className="w-8 h-8 rounded-lg bg-slate-700 overflow-hidden flex items-center justify-center border border-white/10">
+                      {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-slate-500">{s.name.substring(0,1)}</span>}
+                    </div>
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${statusColor}`}></div>
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-[9px] font-black text-slate-200 uppercase truncate">{u.displayName || 'Usuário'}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                       <p className="text-[7px] font-bold text-blue-400 uppercase">{getSessionTime(u.lastLogin)}</p>
+                    <p className="text-[9px] font-black text-slate-200 uppercase truncate">{s.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className={`text-[7px] font-black uppercase ${status === 'ATIVO' ? 'text-emerald-400' : status === 'AUSENTE' ? 'text-amber-400' : 'text-slate-500'}`}>{status}</p>
+                      {status !== 'OFFLINE' && u && <span className="text-[7px] font-bold text-blue-400/60 uppercase">{getSessionTime(u.lastLogin)}</span>}
                     </div>
                   </div>
                 </div>
