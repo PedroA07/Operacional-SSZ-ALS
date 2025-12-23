@@ -150,6 +150,7 @@ export const db = {
   },
 
   saveDriver: async (driver: Driver) => {
+    // Salva localmente primeiro
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     const idx = current.findIndex((d: any) => d.id === driver.id);
     if (idx >= 0) { current[idx] = driver; } else { current.push(driver); }
@@ -157,7 +158,7 @@ export const db = {
 
     if (supabase) {
       try {
-        // Mapeamento COMPLETO para o Supabase (snake_case)
+        // Mapeamento RIGOROSO para snake_case no Supabase
         const payload = {
           id: driver.id,
           photo: driver.photo || null,
@@ -191,9 +192,10 @@ export const db = {
         if (error) throw error;
       } catch (e: any) { 
         console.error("Erro Crítico no Driver:", e.message || e);
+        const missingColumn = e.message?.includes('column') ? e.message.split('"')[1] : 'desconhecida';
         throw new Error(
-          `FALHA AO SALVAR: Certifique-se de que a tabela 'drivers' possui todas as colunas. ` +
-          `Execute o script SQL fornecido no painel do Supabase para corrigir o schema.`
+          `ERRO DE SCHEMA: A coluna '${missingColumn}' não foi encontrada no banco. ` +
+          `AÇÃO: Copie e execute o script SQL de atualização de tabelas no painel do Supabase.`
         );
       }
     }
