@@ -37,24 +37,28 @@ export const db = {
   },
 
   /**
-   * Assina mudanças em tempo real para qualquer tabela
+   * Assina mudanças em tempo real para qualquer tabela.
    */
-  subscribe: (table: string, callback: () => void): RealtimeChannel | null => {
+  subscribe: (table: string, callback: (payload?: any) => void): RealtimeChannel | null => {
     if (!supabase) return null;
-    return supabase
-      .channel(`public:${table}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: table }, () => {
-        callback();
+    const channel = supabase
+      .channel(`table_db_changes_${table}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: table }, (payload) => {
+        console.debug(`Mudança detectada na tabela ${table}:`, payload.eventType);
+        callback(payload);
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.debug(`Inscrito em tempo real: ${table}`);
+      });
+    return channel;
   },
 
   updateHeartbeat: async (userId: string) => {
-    if (!supabase) return;
+    if (!supabase || document.visibilityState !== 'visible') return;
     try {
-      const { error } = await supabase.from('users').update({ lastseen: new Date().toISOString() }).eq('id', userId);
-      if (error) console.warn("Erro Heartbeat:", error.message);
-    } catch (e) { /* fail silent */ }
+      // Atualiza lastseen apenas se a aba estiver ativa
+      await supabase.from('users').update({ lastseen: new Date().toISOString() }).eq('id', userId);
+    } catch (e) { /* silent */ }
   },
 
   getUsers: async (): Promise<User[]> => {
@@ -71,6 +75,7 @@ export const db = {
             emailCorp: u.emailcorp || u.emailCorp,
             phoneCorp: u.phonecorp || u.phoneCorp,
             lastSeen: u.lastseen || u.lastSeen,
+            isFirstLogin: u.isfirstlogin !== undefined ? u.isfirstlogin : u.isFirstLogin,
             photo: u.photo
           }));
           db._saveLocal(KEYS.USERS, normalized);
@@ -110,6 +115,7 @@ export const db = {
           phonecorp: user.phoneCorp,
           emailcorp: user.emailCorp?.toLowerCase(),
           lastseen: user.lastSeen || new Date().toISOString(),
+          isfirstlogin: user.isFirstLogin,
           photo: user.photo
         };
         const { error } = await supabase.from('users').upsert(payload);
@@ -145,7 +151,9 @@ export const db = {
     const sIdx = currentStaffList.findIndex((s: any) => s.id === staff.id);
     
     let finalStaffData = { ...staff };
-    if (sIdx >= 0) {
+    let isNew = sIdx < 0;
+
+    if (!isNew) {
       const existing = currentStaffList[sIdx];
       finalStaffData.registrationDate = existing.registrationDate;
       if (existing.status !== staff.status) {
@@ -159,7 +167,7 @@ export const db = {
     }
 
     let updatedList;
-    if (sIdx >= 0) {
+    if (!isNew) {
       updatedList = [...currentStaffList];
       updatedList[sIdx] = { ...finalStaffData, username: lowerUsername };
     } else {
@@ -167,7 +175,7 @@ export const db = {
     }
     db._saveLocal(KEYS.STAFF, updatedList);
 
-    const users = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
+    const users = await db.getUsers();
     const existingUser = users.find((u: any) => u.staffId === staff.id);
     
     const userData: User = {
@@ -178,7 +186,7 @@ export const db = {
       staffId: staff.id,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       lastSeen: new Date().toISOString(),
-      isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
+      isFirstLogin: isNew ? true : (existingUser?.isFirstLogin ?? true),
       password: passwordOverride || existingUser?.password || '12345678',
       position: staff.position,
       emailCorp: staff.emailCorp,

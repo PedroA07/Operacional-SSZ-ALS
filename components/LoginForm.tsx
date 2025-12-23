@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-import { ADMIN_CREDENTIALS, PASSWORD_REQUIREMENTS } from '../constants';
-import { db } from '../utils/storage';
+import { ADMIN_CREDENTIALS } from '../constants';
 import { User } from '../types';
 
 interface LoginFormProps {
@@ -13,180 +12,94 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [pendingUser, setPendingUser] = useState<User | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    const input = username.trim();
-
-    // 1. Prioridade Master: Admin operacional_ssz / Operacional_SSZ
-    if (input === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-      onLoginSuccess({
-        id: 'admin-01',
-        username: 'operacional_ssz',
-        displayName: 'Administrador Master',
-        role: 'admin',
-        lastLogin: new Date().toISOString(),
-        position: 'Sócio-Diretor'
-      });
-      return;
-    }
-
-    try {
-      const users = await db.getUsers();
-      
-      // Limpeza para verificar se o input é CPF (só números)
-      const cleanInput = input.replace(/\D/g, '');
-      
-      let foundUser = users.find(u => {
-        const dbUser = u.username.toLowerCase();
-        const searchInput = input.toLowerCase();
-        
-        // Se for motorista/motoboy, busca pelo CPF limpo
-        if (u.role === 'driver' || u.role === 'motoboy') {
-          return dbUser === cleanInput;
-        }
-        
-        // Se for staff/admin, busca pelo nome.sobrenome
-        return dbUser === searchInput;
-      });
-
-      if (foundUser) {
-        if (password === foundUser.password) {
-          // Verifica troca de senha obrigatória (apenas staff/admin)
-          if (foundUser.isFirstLogin && (foundUser.role === 'staff' || foundUser.role === 'admin')) {
-            setPendingUser(foundUser);
-            setIsChangingPassword(true);
-          } else {
-            onLoginSuccess({ ...foundUser, lastLogin: new Date().toISOString() });
-          }
-        } else {
-          setError('Senha incorreta.');
-        }
+    // Simulação de latência de rede para UX
+    setTimeout(() => {
+      if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+        onLoginSuccess({
+          id: 'admin-master',
+          username: 'operacional_ssz',
+          displayName: 'Operacional SSZ',
+          role: 'admin',
+          lastLogin: new Date().toISOString(),
+          position: 'Diretoria de Operações'
+        });
       } else {
-        setError('Usuário não encontrado.');
-      }
-    } catch (err) {
-      setError('Erro na base de dados.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePasswordUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    
-    if (newPassword !== confirmPassword) {
-      setError('As senhas não coincidem.');
-      return;
-    }
-
-    if (newPassword.length < PASSWORD_REQUIREMENTS.minLength) { 
-      setError(`Mínimo ${PASSWORD_REQUIREMENTS.minLength} caracteres.`); 
-      return; 
-    }
-
-    if (pendingUser) {
-      setIsLoading(true);
-      try {
-        const updated: User = { 
-          ...pendingUser, 
-          password: newPassword,
-          isFirstLogin: false, 
-          lastLogin: new Date().toISOString() 
-        };
-        
-        await db.saveUser(updated);
-        onLoginSuccess(updated);
-      } catch (err) {
-        setError('Erro ao salvar senha.');
-      } finally {
+        setError('Credenciais inválidas. Verifique usuário e senha.');
         setIsLoading(false);
       }
-    }
+    }, 1000);
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-[#0f172a]">
-      <div className="w-full max-w-md p-10 space-y-8 bg-white rounded-[3rem] shadow-2xl">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-24 h-24 mb-6 rounded-3xl bg-blue-700 text-white shadow-xl">
-            <span className="text-4xl font-black italic">ALS</span>
+    <div className="flex items-center justify-center min-h-screen px-4 overflow-hidden">
+      <div className="w-full max-w-md relative group">
+        {/* Efeito de brilho ao redor */}
+        <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[3rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+        
+        <div className="relative bg-slate-950/80 backdrop-blur-2xl p-10 space-y-8 rounded-[3rem] shadow-2xl border border-white/10 animate-in fade-in zoom-in-95 duration-700">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center justify-center w-24 h-24 mb-6 rounded-3xl bg-blue-600 text-white shadow-2xl shadow-blue-500/20 rotate-3">
+              <span className="text-4xl font-black italic tracking-tighter">ALS</span>
+            </div>
+            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Portal de Acesso</h2>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.4em]">Logística & Transportes</p>
           </div>
-          <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-             {isChangingPassword ? 'Redefinir Senha' : 'Portal Operacional'}
-          </h2>
-          <p className="mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em]">
-             {isChangingPassword ? 'Crie sua senha pessoal' : 'Login Integrado'}
-          </p>
-        </div>
 
-        {isChangingPassword ? (
-           <form className="mt-8 space-y-6" onSubmit={handlePasswordUpdate}>
-              <div className="space-y-4">
-                 <input 
-                    type="password" 
-                    required 
-                    autoFocus
-                    className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" 
-                    placeholder="NOVA SENHA" 
-                    value={newPassword} 
-                    onChange={e => setNewPassword(e.target.value)} 
-                 />
-                 <input 
-                    type="password" 
-                    required 
-                    className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-500 outline-none" 
-                    placeholder="REPETIR SENHA" 
-                    value={confirmPassword} 
-                    onChange={e => setConfirmPassword(e.target.value)} 
-                 />
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Usuário Operacional</label>
+              <input 
+                type="text" 
+                required 
+                className="w-full px-6 py-5 bg-white/5 border border-white/10 text-white font-bold rounded-2xl focus:border-blue-500 focus:bg-white/10 outline-none transition-all placeholder:text-slate-700" 
+                placeholder="operacional_ssz"
+                value={username} 
+                onChange={(e) => setUsername(e.target.value)} 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Chave Secreta</label>
+              <input 
+                type="password" 
+                required 
+                className="w-full px-6 py-5 bg-white/5 border border-white/10 text-white font-bold rounded-2xl focus:border-blue-500 focus:bg-white/10 outline-none transition-all placeholder:text-slate-700" 
+                placeholder="••••••••"
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+              />
+            </div>
+
+            {error && (
+              <div className="p-4 text-[10px] font-black uppercase text-red-400 bg-red-500/10 rounded-2xl border border-red-500/20 animate-shake">
+                {error}
               </div>
-              {error && <div className="p-4 text-[10px] font-bold uppercase text-red-500 bg-red-50 rounded-xl">{error}</div>}
-              <button type="submit" className="w-full py-5 bg-blue-600 text-white font-black uppercase rounded-2xl shadow-xl hover:bg-emerald-600 transition-all">
-                Salvar e Entrar
-              </button>
-           </form>
-        ) : (
-           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                 <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-2">Usuário ou CPF</label>
-                    <input 
-                      type="text" 
-                      required 
-                      className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-400 outline-none" 
-                      placeholder="USUÁRIO"
-                      value={username} 
-                      onChange={(e) => setUsername(e.target.value)} 
-                    />
-                 </div>
-                 <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-2">Senha</label>
-                    <input 
-                      type="password" 
-                      required 
-                      className="w-full px-5 py-4 border border-slate-200 bg-slate-50 text-slate-900 font-bold rounded-2xl focus:border-blue-400 outline-none" 
-                      placeholder="********"
-                      value={password} 
-                      onChange={(e) => setPassword(e.target.value)} 
-                    />
-                 </div>
-              </div>
-              {error && <div className="p-4 text-[10px] font-bold uppercase text-red-500 bg-red-50 rounded-xl">{error}</div>}
-              <button type="submit" disabled={isLoading} className="w-full py-5 bg-slate-900 text-white font-black uppercase rounded-2xl hover:bg-blue-600 shadow-xl transition-all">
-                 {isLoading ? 'Autenticando...' : 'Entrar no Sistema'}
-              </button>
-           </form>
-        )}
+            )}
+
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full py-6 bg-blue-600 text-white font-black uppercase text-xs tracking-[0.2em] rounded-2xl shadow-xl hover:bg-blue-500 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
+            >
+              {isLoading ? (
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : 'Autenticar'}
+            </button>
+          </form>
+
+          <div className="pt-4 text-center">
+            <p className="text-[8px] text-slate-600 font-bold uppercase tracking-[0.5em]">© 2025 ALS SISTEMAS INTELIGENTES</p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ export const ADMIN_CREDENTIALS = {
   password: 'Operacional_SSZ'
 };
 
-export const PASSWORD_REQUIREMENTS = {
-  minLength: 8
+export const APP_CONFIG = {
+  companyName: 'ALS Transportes',
+  version: '4.0.0'
 };

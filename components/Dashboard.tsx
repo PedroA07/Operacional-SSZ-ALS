@@ -68,7 +68,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     // REALTIME: Escutar mudanças em todas as tabelas principais
     const subscriptions = [
       db.subscribe('staff', loadAllData),
-      db.subscribe('users', loadAllData),
+      db.subscribe('users', async (payload) => {
+        // Quando qualquer mudança ocorre na tabela users, atualizamos os dados
+        await loadAllData();
+        // E verificamos integridade (auto-logout se role mudou)
+        const isValid = await sessionManager.validateIntegrity(user);
+        if (!isValid) {
+          alert("Sua sessão expirou devido a uma alteração cadastral ou de segurança.");
+          onLogout();
+        }
+      }),
       db.subscribe('drivers', loadAllData),
       db.subscribe('customers', loadAllData),
       db.subscribe('ports', loadAllData),
@@ -76,7 +85,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     ];
 
     // Timer de Sessão e Heartbeat
-    const timer = setInterval(async () => {
+    const timer = setInterval(() => {
       const now = new Date();
       const loginTime = new Date(user.lastLogin).getTime();
       const diff = now.getTime() - loginTime;
@@ -88,24 +97,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setSessionDuration(`${hours}:${minutes}:${seconds}`);
       }
 
-      if (now.getSeconds() % 30 === 0 && document.visibilityState === 'visible') {
+      // Heartbeat a cada 20 segundos se a aba estiver visível
+      if (now.getSeconds() % 20 === 0 && document.visibilityState === 'visible') {
         db.updateHeartbeat(user.id);
       }
     }, 1000);
 
-    // SEGURANÇA: Verificador de Integridade disparado por qualquer mudança em 'users'
-    // Como loadAllData é chamado pela subscription, o user local será validado
-    // em relação às permissões atuais.
-    const checkIntegrity = async () => {
-      const isValid = await sessionManager.validateIntegrity(user);
-      if (!isValid) {
-        alert("Sua sessão expirou devido a uma alteração cadastral ou de segurança.");
-        onLogout();
+    // Heartbeat imediato quando a aba volta a ficar visível
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        db.updateHeartbeat(user.id);
       }
     };
-
-    // Adiciona o verificador de integridade às mudanças do banco
-    const integritySub = db.subscribe('users', checkIntegrity);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
@@ -118,9 +122,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     return () => {
       clearInterval(timer);
       document.removeEventListener('mousedown', handleClickOutside);
-      // Remove todas as assinaturas realtime no unmount
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       subscriptions.forEach(sub => sub?.unsubscribe());
-      integritySub?.unsubscribe();
     };
   }, [user, onLogout]);
 
