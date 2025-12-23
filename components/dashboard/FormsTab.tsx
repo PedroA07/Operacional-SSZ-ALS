@@ -40,6 +40,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
 
   const captureRef = useRef<HTMLDivElement>(null);
 
+  // Mantém a data de emissão como a data do momento da criação (hoje)
+  const [emissionDate] = useState(new Date().toLocaleDateString('pt-BR'));
+
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     driverId: '',
@@ -95,7 +98,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   const handleInputChange = (field: string, value: string) => {
     const upValue = value.toUpperCase();
     if (field === 'container') {
-      // Inteligência de preenchimento automático baseada no BIC Code (bic-code.org)
       const carrier = lookupCarrierByContainer(upValue);
       setFormData(prev => ({ 
         ...prev, 
@@ -134,7 +136,14 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     <div className="max-w-5xl mx-auto space-y-6">
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
-          {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+          {selectedFormType === 'ORDEM_COLETA' && (
+            <OrdemColetaTemplate 
+              formData={{...formData, displayDate: emissionDate}} 
+              selectedDriver={selectedDriver} 
+              selectedRemetente={selectedRemetente} 
+              selectedDestinatario={selectedDestinatario} 
+            />
+          )}
           {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
         </div>
       </div>
@@ -165,8 +174,16 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
               <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-5 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Emissão (Automática)</label><div className="px-4 py-3 bg-slate-200 rounded-xl text-slate-500 font-black text-xs">{new Date().toLocaleDateString('pt-BR')}</div></div>
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nº OS</label><input type="text" className={inputClasses} value={formData.os} onChange={e => handleInputChange('os', e.target.value)} /></div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Emissão (Automática)</label>
+                    <div className="px-4 py-3 bg-slate-200 rounded-xl text-slate-500 font-black text-xs border border-slate-300">
+                      {emissionDate}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nº OS</label>
+                    <input type="text" className={inputClasses} value={formData.os} onChange={e => handleInputChange('os', e.target.value)} />
+                  </div>
                 </div>
 
                 <div className="space-y-1 relative">
@@ -190,16 +207,31 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Armador (BIC Code)</label><input type="text" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo Equip.</label><input type="text" className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)} /></div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Armador (BIC Code)</label>
+                    <input type="text" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo Equip.</label>
+                    <input type="text" className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)} />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Padrão</label><input type="text" className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)} /></div>
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Operação</label><input type="text" className={inputClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)} /></div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Padrão</label>
+                    <input type="text" className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Operação</label>
+                    <input type="text" className={inputClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)} />
+                  </div>
                 </div>
 
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Aut. Coleta / CVA</label><input type="text" className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} /></div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Aut. Coleta / CVA</label>
+                  <input type="text" className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} />
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Container</label><input type="text" className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
@@ -233,7 +265,14 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
 
               <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
                 <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
-                  {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+                  {selectedFormType === 'ORDEM_COLETA' && (
+                    <OrdemColetaTemplate 
+                      formData={{...formData, displayDate: emissionDate}} 
+                      selectedDriver={selectedDriver} 
+                      selectedRemetente={selectedRemetente} 
+                      selectedDestinatario={selectedDestinatario} 
+                    />
+                  )}
                   {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                 </div>
               </div>

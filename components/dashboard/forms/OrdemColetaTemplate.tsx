@@ -46,7 +46,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
         <div style={{ textAlign: 'right', width: '300px' }}>
           <div style={{ fontSize: '24px', fontWeight: 900, color: '#000000' }}>ORDEM DE COLETA</div>
           <div style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', marginTop: '4px' }}>
-            EMISSÃO: <span style={{ fontSize: '18px', color: '#000000' }}>{formData.date ? new Date(formData.date + 'T12:00:00').toLocaleDateString('pt-BR') : '--/--/----'}</span>
+            EMISSÃO: <span style={{ fontSize: '18px', color: '#000000' }}>{formData.displayDate || '--/--/----'}</span>
           </div>
         </div>
       </div>

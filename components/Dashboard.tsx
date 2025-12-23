@@ -72,7 +72,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   }, [user]);
 
   const handleFormClick = (formId: string) => {
-    // Primeiro limpamos a seleção para garantir que o useEffect do FormsTab detecte a mudança
     setSelectedFormId(null);
     setTimeout(() => {
       setActiveTab(DashboardTab.FORMULARIOS);
