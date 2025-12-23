@@ -1,6 +1,7 @@
 
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User } from '../types';
+import { driverRepository } from './driverRepository';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
@@ -111,100 +112,29 @@ export const db = {
     const localData = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     if (supabase) {
       try {
-        const { data, error } = await supabase.from('drivers').select('*');
-        if (!error && data) {
-          const normalized = data.map((d: any) => ({
-            id: d.id,
-            photo: d.photo,
-            name: d.name,
-            cpf: d.cpf,
-            rg: d.rg,
-            cnh: d.cnh,
-            phone: d.phone,
-            email: d.email,
-            plateHorse: d.plate_horse || d.plateHorse,
-            yearHorse: d.year_horse || d.yearHorse,
-            plateTrailer: d.plate_trailer || d.plateTrailer,
-            yearTrailer: d.year_trailer || d.yearTrailer,
-            driverType: d.driver_type || d.driverType,
-            status: d.status,
-            statusLastChangeDate: d.status_last_change_date || d.statusLastChangeDate,
-            beneficiaryName: d.beneficiary_name || d.beneficiaryName,
-            beneficiaryPhone: d.beneficiary_phone || d.beneficiaryPhone,
-            beneficiaryEmail: d.beneficiary_email || d.beneficiaryEmail,
-            beneficiaryCnpj: d.beneficiary_cnpj || d.beneficiaryCnpj,
-            paymentPreference: d.payment_preference || d.paymentPreference,
-            whatsappGroupName: d.whatsapp_group_name || d.whatsappGroupName,
-            whatsappGroupLink: d.whatsapp_group_link || d.whatsappGroupLink,
-            registrationDate: d.registration_date || d.registrationDate,
-            operations: d.operations || [],
-            tripsCount: d.trips_count || 0,
-            generatedPassword: d.generated_password || d.generatedPassword
-          }));
-          db._saveLocal(KEYS.DRIVERS, normalized);
-          return normalized;
-        }
+        const drivers = await driverRepository.getAll(supabase);
+        db._saveLocal(KEYS.DRIVERS, drivers);
+        return drivers;
       } catch (e) { console.warn("Supabase getDrivers offline."); }
     }
     return localData;
   },
 
   saveDriver: async (driver: Driver) => {
-    // Salva localmente primeiro
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     const idx = current.findIndex((d: any) => d.id === driver.id);
     if (idx >= 0) { current[idx] = driver; } else { current.push(driver); }
     db._saveLocal(KEYS.DRIVERS, current);
 
     if (supabase) {
-      try {
-        // Mapeamento RIGOROSO para snake_case no Supabase
-        const payload = {
-          id: driver.id,
-          photo: driver.photo || null,
-          name: driver.name?.toUpperCase() || '',
-          cpf: driver.cpf || '',
-          rg: driver.rg || null,
-          cnh: driver.cnh || null,
-          phone: driver.phone || null,
-          email: driver.email?.toLowerCase() || null,
-          plate_horse: driver.plateHorse || null,
-          year_horse: driver.yearHorse || null,
-          plate_trailer: driver.plateTrailer || null,
-          year_trailer: driver.yearTrailer || null,
-          driver_type: driver.driverType || 'Externo',
-          status: driver.status || 'Ativo',
-          status_last_change_date: driver.statusLastChangeDate || new Date().toISOString(),
-          beneficiary_name: driver.beneficiaryName?.toUpperCase() || null,
-          beneficiary_phone: driver.beneficiaryPhone || null,
-          beneficiary_email: driver.beneficiaryEmail?.toLowerCase() || null,
-          beneficiary_cnpj: driver.beneficiaryCnpj || null,
-          payment_preference: driver.paymentPreference || 'PIX',
-          whatsapp_group_name: driver.whatsappGroupName?.toUpperCase() || null,
-          whatsapp_group_link: driver.whatsappGroupLink || null,
-          registration_date: driver.registrationDate || new Date().toISOString(),
-          operations: driver.operations || [],
-          trips_count: driver.tripsCount || 0,
-          generated_password: driver.generatedPassword || null
-        };
-
-        const { error } = await supabase.from('drivers').upsert(payload);
-        if (error) throw error;
-      } catch (e: any) { 
-        console.error("Erro Crítico no Driver:", e.message || e);
-        const missingColumn = e.message?.includes('column') ? e.message.split('"')[1] : 'desconhecida';
-        throw new Error(
-          `ERRO DE SCHEMA: A coluna '${missingColumn}' não foi encontrada no banco. ` +
-          `AÇÃO: Copie e execute o script SQL de atualização de tabelas no painel do Supabase.`
-        );
-      }
+      await driverRepository.save(supabase, driver);
     }
   },
 
   deleteDriver: async (id: string) => {
     const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     db._saveLocal(KEYS.DRIVERS, current.filter((d: any) => d.id !== id));
-    if (supabase) await supabase.from('drivers').delete().eq('id', id);
+    if (supabase) await driverRepository.delete(supabase, id);
     return true;
   },
 
