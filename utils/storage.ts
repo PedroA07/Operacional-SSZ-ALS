@@ -221,13 +221,13 @@ export const db = {
       try {
         const payload = {
           id: driver.id,
-          photo: driver.photo,
-          name: driver.name.toUpperCase(),
+          photo: driver.photo || null,
+          name: driver.name?.toUpperCase(),
           cpf: driver.cpf,
-          rg: driver.rg,
-          cnh: driver.cnh,
+          rg: driver.rg || null,
+          cnh: driver.cnh || null,
           phone: driver.phone,
-          email: driver.email?.toLowerCase(),
+          email: driver.email?.toLowerCase() || null, // Permite nulo se vazio
           plate_horse: driver.plateHorse,
           year_horse: driver.yearHorse,
           plate_trailer: driver.plateTrailer,
@@ -235,21 +235,24 @@ export const db = {
           driver_type: driver.driverType,
           status: driver.status,
           status_last_change_date: driver.statusLastChangeDate,
-          beneficiary_name: driver.beneficiaryName?.toUpperCase(),
-          beneficiary_phone: driver.beneficiaryPhone,
-          beneficiary_email: driver.beneficiaryEmail?.toLowerCase(),
-          beneficiary_cnpj: driver.beneficiaryCnpj,
-          payment_preference: driver.paymentPreference,
-          whatsapp_group_name: driver.whatsappGroupName?.toUpperCase(),
-          whatsapp_group_link: driver.whatsappGroupLink,
+          beneficiary_name: driver.beneficiaryName?.toUpperCase() || null,
+          beneficiary_phone: driver.beneficiaryPhone || null,
+          beneficiary_email: driver.beneficiaryEmail?.toLowerCase() || null,
+          beneficiary_cnpj: driver.beneficiaryCnpj || null,
+          payment_preference: driver.paymentPreference || 'PIX',
+          whatsapp_group_name: driver.whatsappGroupName?.toUpperCase() || null,
+          whatsapp_group_link: driver.whatsappGroupLink || null,
           registration_date: driver.registrationDate,
-          operations: driver.operations,
-          trips_count: driver.tripsCount,
-          generated_password: driver.generatedPassword
+          operations: driver.operations || [],
+          trips_count: driver.tripsCount || 0,
+          generated_password: driver.generatedPassword || null
         };
         const { error } = await supabase.from('drivers').upsert(payload);
         if (error) throw error;
-      } catch (e: any) { console.error("Erro Supabase Driver:", e.message); }
+      } catch (e: any) { 
+        console.error("Erro Supabase Driver:", e.message);
+        // Pode indicar que a tabela não existe ou colunas estão erradas
+      }
     }
   },
 

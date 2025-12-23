@@ -68,7 +68,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     const statusDate = form.statusLastChangeDate || new Date().toISOString();
 
     if (form.hasAccess) {
-      // Pass the driver photo to the User account for consistent profile display
       await db.saveUser({
         id: `u-${drvId}`,
         username: access.username,
@@ -259,8 +258,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CPF</label><input required className={inputClasses} value={form.cpf} onChange={e => setForm({...form, cpf: maskCPF(e.target.value)})} /></div>
-                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">RG</label><input required className={inputClasses} value={form.rg} onChange={e => setForm({...form, rg: maskRG(e.target.value)})} /></div>
-                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNH</label><input required className={inputClasses} value={form.cnh} onChange={e => setForm({...form, cnh: e.target.value})} /></div>
+                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">RG</label><input className={inputClasses} value={form.rg} onChange={e => setForm({...form, rg: maskRG(e.target.value)})} /></div>
+                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNH</label><input className={inputClasses} value={form.cnh} onChange={e => setForm({...form, cnh: e.target.value})} /></div>
                     </div>
                   </div>
                 </div>

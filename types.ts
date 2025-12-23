@@ -75,7 +75,7 @@ export interface Driver {
   rg: string;
   cnh: string;
   phone: string;
-  email?: string;
+  email?: string; // Campo agora opcional
   plateHorse: string;
   yearHorse: string;
   plateTrailer: string;
