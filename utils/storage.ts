@@ -1,88 +1,44 @@
 
-import { createClient, RealtimeChannel } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User } from '../types';
 
-const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || "";
-const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
+// Obtain environment variables for Supabase configuration
+const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
-  ? createClient(SUPABASE_URL, SUPABASE_KEY) 
-  : null;
+// Initialize Supabase client if credentials are provided
+export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-const KEYS = {
-  DRIVERS: 'als_db_drivers',
-  CUSTOMERS: 'als_db_customers',
-  PORTS: 'als_db_ports',
-  PRESTACKING: 'als_db_prestacking',
-  STAFF: 'als_db_staff',
-  USERS: 'als_db_users',
-  SESSION: 'als_session'
+// Storage keys for local persistence
+export const KEYS = {
+  DRIVERS: 'als_drivers',
+  CUSTOMERS: 'als_customers',
+  PORTS: 'als_ports',
+  PRE_STACKING: 'als_pre_stacking',
+  STAFF: 'als_staff',
+  USERS: 'als_users'
 };
 
+/**
+ * db object provides an abstraction layer for data management, 
+ * handling both local storage for offline use and Supabase for cloud sync.
+ */
 export const db = {
-  isCloudActive: () => !!supabase,
-
+  // Helper to persist data to localStorage
   _saveLocal: (key: string, data: any) => {
     localStorage.setItem(key, JSON.stringify(data));
   },
 
-  setSession: (user: User | null) => {
-    if (user) sessionStorage.setItem(KEYS.SESSION, JSON.stringify(user));
-    else sessionStorage.removeItem(KEYS.SESSION);
-  },
-  
-  getSession: (): User | null => {
-    const s = sessionStorage.getItem(KEYS.SESSION);
-    return s ? JSON.parse(s) : null;
-  },
+  // Checks if the cloud connection is active
+  isCloudActive: () => !!supabase,
 
-  subscribe: (table: string, callback: (payload?: any) => void): RealtimeChannel | null => {
-    if (!supabase) return null;
-    const channel = supabase
-      .channel(`table_db_changes_${table}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: table }, (payload) => {
-        console.debug(`Mudança detectada na tabela ${table}:`, payload.eventType);
-        callback(payload);
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') console.debug(`Inscrito em tempo real: ${table}`);
-      });
-    return channel;
-  },
-
-  updateHeartbeat: async (userId: string) => {
-    if (!supabase) return;
-    try {
-      // Atualiza lastseen e o novo status de visibilidade
-      const isVisible = document.visibilityState === 'visible';
-      await supabase.from('users').update({ 
-        lastseen: new Date().toISOString(),
-        isOnlineVisible: isVisible 
-      }).eq('id', userId);
-    } catch (e) { /* silent */ }
-  },
-
+  // --- User Management ---
   getUsers: async (): Promise<User[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
     if (supabase) {
       try {
-        const { data, error } = await supabase.from('users').select('*');
-        if (!error && data) {
-          const normalized = data.map((u: any) => ({
-            ...u,
-            displayName: u.name || u.displayName,
-            lastLogin: u.lastlogin || u.lastLogin,
-            staffId: u.staffid || u.staffId,
-            emailCorp: u.emailcorp || u.emailCorp,
-            phoneCorp: u.phonecorp || u.phoneCorp,
-            lastSeen: u.lastseen || u.lastSeen,
-            isOnlineVisible: u.isOnlineVisible !== undefined ? u.isOnlineVisible : true,
-            isFirstLogin: u.isfirstlogin !== undefined ? u.isfirstlogin : u.isFirstLogin,
-            photo: u.photo
-          }));
-          db._saveLocal(KEYS.USERS, normalized);
-          return normalized;
-        }
+        const { data } = await supabase.from('users').select('*');
+        if (data) { db._saveLocal(KEYS.USERS, data); return data; }
       } catch (e) { console.warn("Supabase getUsers offline."); }
     }
     return localData;
@@ -90,153 +46,14 @@ export const db = {
 
   saveUser: async (user: User) => {
     const current = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    const lowerUsername = user.username.toLowerCase();
-    const idx = current.findIndex((u: any) => u.id === user.id || u.username === lowerUsername);
-    
+    const idx = current.findIndex((u: any) => u.id === user.id);
     let updated;
-    if (idx >= 0) {
-      updated = [...current];
-      updated[idx] = { ...updated[idx], ...user, username: lowerUsername };
-    } else {
-      updated = [...current, { ...user, username: lowerUsername }];
-    }
+    if (idx >= 0) { updated = [...current]; updated[idx] = user; } else { updated = [...current, user]; }
     db._saveLocal(KEYS.USERS, updated);
-
-    if (supabase) {
-      try {
-        const payload = {
-          id: user.id,
-          username: lowerUsername,
-          password: user.password,
-          name: user.displayName.toUpperCase(), 
-          role: user.role,
-          staffid: user.staffId,
-          lastlogin: user.lastLogin,
-          position: user.position?.toUpperCase(),
-          status: user.status || 'Ativo',
-          phonecorp: user.phoneCorp,
-          emailcorp: user.emailCorp?.toLowerCase(),
-          lastseen: user.lastSeen || new Date().toISOString(),
-          isOnlineVisible: user.isOnlineVisible ?? true,
-          isfirstlogin: user.isFirstLogin,
-          photo: user.photo
-        };
-        const { error } = await supabase.from('users').upsert(payload);
-        if (error) throw error;
-      } catch (e: any) { console.error("Erro Supabase User:", e.message); throw e; }
-    }
+    if (supabase) await supabase.from('users').upsert(user);
   },
 
-  getStaff: async (): Promise<Staff[]> => {
-    const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.from('staff').select('*');
-        if (!error && data) {
-          const normalized = data.map((s: any) => ({
-            ...s,
-            registrationDate: s.registrationdate || s.registrationDate,
-            statusSince: s.statussince || s.statusSince,
-            emailCorp: s.emailcorp || s.emailCorp,
-            phoneCorp: s.phonecorp || s.phoneCorp
-          }));
-          db._saveLocal(KEYS.STAFF, normalized);
-          return normalized;
-        }
-      } catch (e) { console.warn("Supabase getStaff offline."); }
-    }
-    return localData;
-  },
-
-  saveStaff: async (staff: Staff, passwordOverride?: string) => {
-    const currentStaffList = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
-    const lowerUsername = staff.username.toLowerCase();
-    const sIdx = currentStaffList.findIndex((s: any) => s.id === staff.id);
-    
-    let finalStaffData = { ...staff };
-    let isNew = sIdx < 0;
-
-    if (!isNew) {
-      const existing = currentStaffList[sIdx];
-      finalStaffData.registrationDate = existing.registrationDate;
-      if (existing.status !== staff.status) {
-        finalStaffData.statusSince = new Date().toISOString();
-      } else {
-        finalStaffData.statusSince = existing.statusSince;
-      }
-    } else {
-      finalStaffData.registrationDate = new Date().toISOString();
-      finalStaffData.statusSince = new Date().toISOString();
-    }
-
-    let updatedList;
-    if (!isNew) {
-      updatedList = [...currentStaffList];
-      updatedList[sIdx] = { ...finalStaffData, username: lowerUsername };
-    } else {
-      updatedList = [...currentStaffList, { ...finalStaffData, username: lowerUsername }];
-    }
-    db._saveLocal(KEYS.STAFF, updatedList);
-
-    const users = await db.getUsers();
-    const existingUser = users.find((u: any) => u.staffId === staff.id);
-    
-    const userData: User = {
-      id: existingUser?.id || `u-${staff.id}`,
-      username: lowerUsername,
-      displayName: staff.name,
-      role: staff.role as any,
-      staffId: staff.id,
-      lastLogin: existingUser?.lastLogin || new Date().toISOString(),
-      lastSeen: new Date().toISOString(),
-      isOnlineVisible: true,
-      isFirstLogin: isNew ? true : (existingUser?.isFirstLogin ?? true),
-      password: passwordOverride || existingUser?.password || '12345678',
-      position: staff.position,
-      emailCorp: staff.emailCorp,
-      phoneCorp: staff.phoneCorp,
-      status: staff.status,
-      statusSince: finalStaffData.statusSince,
-      photo: staff.photo
-    };
-    
-    await db.saveUser(userData);
-
-    if (supabase) {
-      try {
-        const staffPayload = {
-          id: staff.id,
-          photo: staff.photo,
-          name: staff.name.toUpperCase(),
-          position: staff.position.toUpperCase(),
-          username: lowerUsername,
-          role: staff.role,
-          registrationdate: finalStaffData.registrationDate,
-          emailcorp: staff.emailCorp?.toLowerCase(),
-          phonecorp: staff.phoneCorp,
-          status: staff.status,
-          statussince: finalStaffData.statusSince
-        };
-        const { error } = await supabase.from('staff').upsert(staffPayload);
-        if (error) throw error;
-      } catch (e: any) { console.error("Erro Supabase Staff:", e.message); throw e; }
-    }
-  },
-
-  deleteStaff: async (id: string) => {
-    const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
-    db._saveLocal(KEYS.STAFF, currentStaff.filter((s: any) => s.id !== id));
-    const currentUsers = JSON.parse(localStorage.getItem(KEYS.USERS) || '[]');
-    db._saveLocal(KEYS.USERS, currentUsers.filter((u: any) => u.staffId !== id));
-    if (supabase) {
-      try {
-        await supabase.from('users').delete().eq('staffid', id);
-        await supabase.from('staff').delete().eq('id', id);
-      } catch (e) { console.error("Erro ao deletar na nuvem"); }
-    }
-    return true;
-  },
-
+  // --- Driver Management ---
   getDrivers: async (): Promise<Driver[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     if (supabase) {
@@ -258,11 +75,13 @@ export const db = {
   },
 
   deleteDriver: async (id: string) => {
-    const currentDrivers = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
-    db._saveLocal(KEYS.DRIVERS, currentDrivers.filter((d: any) => d.id !== id));
+    const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
+    db._saveLocal(KEYS.DRIVERS, current.filter((d: any) => d.id !== id));
     if (supabase) await supabase.from('drivers').delete().eq('id', id);
+    return true;
   },
 
+  // --- Customer Management ---
   getCustomers: async (): Promise<Customer[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]');
     if (supabase) {
@@ -283,6 +102,14 @@ export const db = {
     if (supabase) await supabase.from('customers').upsert(customer);
   },
 
+  deleteCustomer: async (id: string) => {
+    const current = JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]');
+    db._saveLocal(KEYS.CUSTOMERS, current.filter((c: any) => c.id !== id));
+    if (supabase) await supabase.from('customers').delete().eq('id', id);
+    return true;
+  },
+
+  // --- Port Management ---
   getPorts: async (): Promise<Port[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
     if (supabase) {
@@ -303,41 +130,113 @@ export const db = {
     if (supabase) await supabase.from('ports').upsert(port);
   },
 
+  deletePort: async (id: string) => {
+    const current = JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]');
+    db._saveLocal(KEYS.PORTS, current.filter((p: any) => p.id !== id));
+    if (supabase) await supabase.from('ports').delete().eq('id', id);
+    return true;
+  },
+
+  // --- PreStacking Management ---
   getPreStacking: async (): Promise<PreStacking[]> => {
-    const localData = JSON.parse(localStorage.getItem(KEYS.PRESTACKING) || '[]');
+    const localData = JSON.parse(localStorage.getItem(KEYS.PRE_STACKING) || '[]');
     if (supabase) {
       try {
         const { data } = await supabase.from('pre_stacking').select('*');
-        if (data) { db._saveLocal(KEYS.PRESTACKING, data); return data; }
+        if (data) { db._saveLocal(KEYS.PRE_STACKING, data); return data; }
       } catch (e) { console.warn("Supabase getPreStacking offline."); }
     }
     return localData;
   },
 
-  savePreStacking: async (item: PreStacking) => {
-    const current = JSON.parse(localStorage.getItem(KEYS.PRESTACKING) || '[]');
-    const idx = current.findIndex((p: any) => p.id === item.id);
+  savePreStacking: async (ps: PreStacking) => {
+    const current = JSON.parse(localStorage.getItem(KEYS.PRE_STACKING) || '[]');
+    const idx = current.findIndex((p: any) => p.id === ps.id);
     let updated;
-    if (idx >= 0) { updated = [...current]; updated[idx] = item; } else { updated = [...current, item]; }
-    db._saveLocal(KEYS.PRESTACKING, updated);
-    if (supabase) await supabase.from('pre_stacking').upsert(item);
+    if (idx >= 0) { updated = [...current]; updated[idx] = ps; } else { updated = [...current, ps]; }
+    db._saveLocal(KEYS.PRE_STACKING, updated);
+    if (supabase) await supabase.from('pre_stacking').upsert(ps);
   },
 
-  exportBackup: async () => {
-    const data = {
-      drivers: JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]'),
-      customers: JSON.parse(localStorage.getItem(KEYS.CUSTOMERS) || '[]'),
-      ports: JSON.parse(localStorage.getItem(KEYS.PORTS) || '[]'),
-      preStacking: JSON.parse(localStorage.getItem(KEYS.PRESTACKING) || '[]'),
-      staff: JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]'),
-      users: JSON.parse(localStorage.getItem(KEYS.USERS) || '[]'),
+  deletePreStacking: async (id: string) => {
+    const current = JSON.parse(localStorage.getItem(KEYS.PRE_STACKING) || '[]');
+    db._saveLocal(KEYS.PRE_STACKING, current.filter((p: any) => p.id !== id));
+    if (supabase) await supabase.from('pre_stacking').delete().eq('id', id);
+    return true;
+  },
+
+  // --- Staff Management ---
+  getStaff: async (): Promise<Staff[]> => {
+    const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('staff').select('*');
+        if (data) { db._saveLocal(KEYS.STAFF, data); return data; }
+      } catch (e) { console.warn("Supabase getStaff offline."); }
+    }
+    return localData;
+  },
+
+  saveStaff: async (staff: Staff, password?: string) => {
+    const current = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    const idx = current.findIndex((s: any) => s.id === staff.id);
+    let updated;
+    if (idx >= 0) { updated = [...current]; updated[idx] = staff; } else { updated = [...current, staff]; }
+    db._saveLocal(KEYS.STAFF, updated);
+    if (supabase) await supabase.from('staff').upsert(staff);
+
+    // Sync with User table for authentication
+    const users = await db.getUsers();
+    const existingUser = users.find(u => u.staffId === staff.id);
+    
+    const userData: User = {
+      id: existingUser?.id || `u-${staff.id}`,
+      username: staff.username,
+      displayName: staff.name,
+      role: staff.role,
+      staffId: staff.id,
+      lastLogin: existingUser?.lastLogin || new Date().toISOString(),
+      position: staff.position,
+      photo: staff.photo,
+      status: staff.status,
+      password: password || existingUser?.password
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    
+    await db.saveUser(userData);
+  },
+
+  deleteStaff: async (id: string) => {
+    const current = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    db._saveLocal(KEYS.STAFF, current.filter((s: any) => s.id !== id));
+    if (supabase) await supabase.from('staff').delete().eq('id', id);
+    
+    // Also delete associated user record
+    const users = await db.getUsers();
+    const user = users.find(u => u.staffId === id);
+    if (user) {
+      const remainingUsers = users.filter(u => u.id !== user.id);
+      db._saveLocal(KEYS.USERS, remainingUsers);
+      if (supabase) await supabase.from('users').delete().eq('id', user.id);
+    }
+    return true;
+  },
+
+  // --- Backup & Restore ---
+  exportBackup: async () => {
+    const backup = {
+      drivers: await db.getDrivers(),
+      customers: await db.getCustomers(),
+      ports: await db.getPorts(),
+      preStacking: await db.getPreStacking(),
+      staff: await db.getStaff(),
+      users: await db.getUsers()
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `als-backup-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `als_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
     URL.revokeObjectURL(url);
   },
 
@@ -346,15 +245,36 @@ export const db = {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const data = JSON.parse(e.target?.result as string);
-          if (data.drivers) db._saveLocal(KEYS.DRIVERS, data.drivers);
-          if (data.customers) db._saveLocal(KEYS.CUSTOMERS, data.customers);
-          if (data.ports) db._saveLocal(KEYS.PORTS, data.ports);
-          if (data.preStacking) db._saveLocal(KEYS.PRESTACKING, data.preStacking);
-          if (data.staff) db._saveLocal(KEYS.STAFF, data.staff);
-          if (data.users) db._saveLocal(KEYS.USERS, data.users);
+          const content = JSON.parse(e.target?.result as string);
+          if (content.drivers) {
+            db._saveLocal(KEYS.DRIVERS, content.drivers);
+            if (supabase) await supabase.from('drivers').upsert(content.drivers);
+          }
+          if (content.customers) {
+            db._saveLocal(KEYS.CUSTOMERS, content.customers);
+            if (supabase) await supabase.from('customers').upsert(content.customers);
+          }
+          if (content.ports) {
+            db._saveLocal(KEYS.PORTS, content.ports);
+            if (supabase) await supabase.from('ports').upsert(content.ports);
+          }
+          if (content.preStacking) {
+            db._saveLocal(KEYS.PRE_STACKING, content.preStacking);
+            if (supabase) await supabase.from('pre_stacking').upsert(content.pre_stacking);
+          }
+          if (content.staff) {
+            db._saveLocal(KEYS.STAFF, content.staff);
+            if (supabase) await supabase.from('staff').upsert(content.staff);
+          }
+          if (content.users) {
+            db._saveLocal(KEYS.USERS, content.users);
+            if (supabase) await supabase.from('users').upsert(content.users);
+          }
           resolve(true);
-        } catch (error) { resolve(false); }
+        } catch (err) {
+          console.error("Import failed:", err);
+          resolve(false);
+        }
       };
       reader.readAsText(file);
     });

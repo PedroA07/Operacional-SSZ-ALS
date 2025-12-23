@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff } from '../types';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, VWSchedule, VWStatus } from '../types';
 import OverviewTab from './dashboard/OverviewTab';
 import DriversTab from './dashboard/DriversTab';
 import FormsTab from './dashboard/FormsTab';
@@ -16,6 +16,7 @@ import DatabaseStatus from './dashboard/DatabaseStatus';
 import { DEFAULT_OPERATIONS } from '../constants/operations';
 import { db } from '../utils/storage';
 import { sessionManager } from '../utils/session';
+import { Icons } from '../constants/icons';
 
 interface DashboardProps {
   user: User;
@@ -38,6 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [availableOps, setAvailableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
+  const [vwSchedules, setVwSchedules] = useState<VWSchedule[]>([]);
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ 
     type: 'list'
@@ -64,73 +66,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadAllData();
-
-    const subscriptions = [
-      db.subscribe('staff', loadAllData),
-      db.subscribe('users', async (payload) => {
-        await loadAllData();
-        const isValid = await sessionManager.validateIntegrity(user);
-        if (!isValid) {
-          alert("Sua sessão expirou devido a uma alteração cadastral ou de segurança.");
-          onLogout();
-        }
-      }),
-      db.subscribe('drivers', loadAllData),
-      db.subscribe('customers', loadAllData),
-      db.subscribe('ports', loadAllData),
-      db.subscribe('pre_stacking', loadAllData)
-    ];
-
-    const timer = setInterval(() => {
-      const now = new Date();
-      const loginTime = new Date(user.lastLogin).getTime();
-      const diff = now.getTime() - loginTime;
-      
-      if (diff > 0) {
-        const hours = Math.floor(diff / 3600000).toString().padStart(2, '0');
-        const minutes = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-        const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-        setSessionDuration(`${hours}:${minutes}:${seconds}`);
-      }
-
-      // Heartbeat para monitoramento Ativo/Ausente
-      if (now.getSeconds() % 15 === 0) {
-        db.updateHeartbeat(user.id);
-      }
-    }, 1000);
-
-    const handleVisibilityChange = () => {
-      db.updateHeartbeat(user.id);
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
-        setIsProfileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      subscriptions.forEach(sub => sub?.unsubscribe());
-    };
-  }, [user, onLogout]);
-
-  const toggleMenuExpansion = (key: string) => {
-    setExpandedMenus(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const handleFormClick = (formId: string) => {
-    setSelectedFormId(null);
-    setTimeout(() => {
-      setActiveTab(DashboardTab.FORMULARIOS);
-      setSelectedFormId(formId);
-    }, 10);
-  };
+  }, [user]);
 
   const MenuItem = ({ 
     tab, 
@@ -161,18 +97,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' });
                 if (tab !== DashboardTab.FORMULARIOS) setSelectedFormId(null);
               } else if (children) {
-                toggleMenuExpansion(label);
+                setExpandedMenus(prev => ({ ...prev, [label]: !prev[label] }));
               }
             }}
             className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-800/60 text-slate-400'}`}
           >
-            {icon || <div className="w-4 h-4 rounded bg-white/10 flex-shrink-0" />}
+            <div className={`${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'} transition-colors`}>
+              {icon}
+            </div>
             {sidebarState === 'open' && <span className="truncate">{label}</span>}
           </button>
           
           {children && sidebarState === 'open' && (
             <button 
-              onClick={(e) => { e.stopPropagation(); toggleMenuExpansion(label); }}
+              onClick={(e) => { e.stopPropagation(); setExpandedMenus(prev => ({ ...prev, [label]: !prev[label] })); }}
               className={`p-3 text-slate-500 hover:text-white transition-all ${isExpanded ? 'rotate-180' : ''}`}
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
@@ -189,24 +127,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     );
   };
 
-  const handleEditProfile = () => {
-    setIsProfileMenuOpen(false);
-    if (user.staffId) {
-       setActiveTab(DashboardTab.COLABORADORES);
-       setForceProfileModal(user.staffId);
-    }
-  };
-
-  const cycleSidebar = () => {
-    if (sidebarState === 'open') setSidebarState('collapsed');
-    else if (sidebarState === 'collapsed') setSidebarState('hidden');
-    else setSidebarState('open');
-  };
-
-  const myStaffData = staffList.find(s => s.id === user.staffId);
-  const displayEmail = user.emailCorp || myStaffData?.emailCorp || 'suporte@als.com.br';
-  const displayPhone = user.phoneCorp || myStaffData?.phoneCorp || '(13) 99762-0041';
-
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
       <aside className={`
@@ -222,42 +142,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
-          <MenuItem tab={DashboardTab.INICIO} label="Início" />
-          <MenuItem tab={DashboardTab.OPERACOES} label="Operações" forceActive={activeTab === DashboardTab.OPERACOES}>
+          <MenuItem tab={DashboardTab.INICIO} label="Início" icon={<Icons.Inicio />} />
+          <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
             {availableOps.map(op => (
-              <div key={op.id} className="group/cat">
-                <div className="flex items-center justify-between py-1.5 px-2 hover:bg-slate-800/40 rounded-lg group">
-                  <button onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors flex-1 text-left">• {op.category}</button>
-                  {op.clients.length > 0 && (
-                    <button onClick={() => toggleMenuExpansion(`op-${op.id}`)} className="p-1 text-slate-600 hover:text-blue-400">
-                      <svg className={`w-2.5 h-2.5 transition-transform ${expandedMenus[`op-${op.id}`] ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
-                    </button>
-                  )}
-                </div>
-                {expandedMenus[`op-${op.id}`] && (
-                  <div className="ml-4 space-y-1 mb-2 animate-in slide-in-from-left-1">
-                    {op.clients.map((client, idx) => (
-                      <button key={idx} onClick={() => { if (client.hasDedicatedPage) { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'client', id: op.id, categoryName: op.category, clientName: client.name }); } }} className={`w-full text-left py-1 text-[8px] font-black uppercase transition-colors px-2 rounded hover:bg-slate-800/30 ${client.hasDedicatedPage ? 'text-blue-500 hover:text-blue-300' : 'text-slate-600 opacity-60 cursor-default'}`}>└ {client.name}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <button key={op.id} onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="w-full text-left py-1.5 px-2 hover:bg-slate-800/40 rounded-lg text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors">• {op.category}</button>
             ))}
           </MenuItem>
-          <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" />
-          <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" forceActive={activeTab === DashboardTab.FORMULARIOS}>
-            <button onClick={() => handleFormClick('ORDEM_COLETA')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Ordem de Coleta</button>
-            <button onClick={() => handleFormClick('PRE_STACKING')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Pré-Stacking</button>
-            <button onClick={() => handleFormClick('LIBERACAO_VAZIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Liberação Vazio</button>
-            <button onClick={() => handleFormClick('RETIRADA_CHEIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Retirada Cheio</button>
-          </MenuItem>
-          <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" />
-          <MenuItem tab={DashboardTab.PORTOS} label="Portos" />
-          <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" />
+          <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" icon={<Icons.Motoristas />} />
+          <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" icon={<Icons.Formularios />} forceActive={activeTab === DashboardTab.FORMULARIOS} />
+          <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" icon={<Icons.Clientes />} />
+          <MenuItem tab={DashboardTab.PORTOS} label="Portos" icon={<Icons.Portos />} />
+          <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" icon={<Icons.PreStacking />} />
+          
           <div className="pt-4 pb-2">
              {sidebarState === 'open' && <p className="px-4 text-[7px] font-black text-slate-600 uppercase mb-2 tracking-[0.2em]">Administração</p>}
-             <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" />
-             <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" adminOnly />
+             <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" icon={<Icons.Equipe />} />
+             <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" icon={<Icons.Configuracoes />} adminOnly />
           </div>
         </nav>
 
@@ -273,62 +173,46 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-40">
            <div className="flex items-center gap-4">
-              <button onClick={cycleSidebar} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="2.5" strokeLinecap="round"/></svg></button>
-              <div className="h-6 w-[1px] bg-slate-200 hidden sm:block"></div>
+              <button onClick={() => setSidebarState(s => s === 'open' ? 'collapsed' : 'open')} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="2.5" strokeLinecap="round"/></svg></button>
+              <div className="h-6 w-[1px] bg-slate-200"></div>
               <h2 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">{activeTab}</h2>
            </div>
            
-           <div className="flex items-center gap-4 relative" ref={profileMenuRef}>
-              <div className="hidden lg:flex items-center">
-                 <DatabaseStatus />
-              </div>
-              
-              <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center gap-2.5 p-1.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
+           <div className="flex items-center gap-4 relative">
+              <DatabaseStatus />
+              <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center gap-2.5 p-1.5 hover:bg-slate-50 rounded-xl transition-all">
                  <div className="text-right hidden sm:block">
-                    <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors leading-none">{user.displayName || 'Usuário'}</p>
-                    <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-none">{user.position || 'Operacional'}</p>
+                    <p className="text-[9px] font-black text-slate-800 uppercase leading-none">{user.displayName}</p>
+                    <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-none">{user.position}</p>
                  </div>
-                 <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center font-black text-blue-400 text-xs overflow-hidden shadow-md group-hover:scale-105 transition-all">
-                    {user.photo ? <img src={user.photo} className="w-full h-full object-cover" /> : (user.displayName || 'A').substring(0,1).toUpperCase()}
+                 <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center font-black text-blue-400 text-xs overflow-hidden shadow-md">
+                    {user.photo ? <img src={user.photo} className="w-full h-full object-cover" /> : user.displayName[0]}
                  </div>
               </button>
-
-              {isProfileMenuOpen && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 z-[100] animate-in slide-in-from-top-4 backdrop-blur-xl bg-white/95">
-                  <div className="text-center mb-5 pb-5 border-b border-slate-50 flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-2xl font-black mb-3 overflow-hidden shadow-lg border-4 border-white">
-                      {user.photo ? <img src={user.photo} className="w-full h-full object-cover" /> : (user.displayName || 'A').substring(0,1).toUpperCase()}
-                    </div>
-                    <h4 className="font-black text-slate-800 uppercase text-xs">{user.displayName}</h4>
-                    <p className="text-[8px] text-blue-500 font-bold uppercase tracking-widest mt-1">{user.position || 'OPERACIONAL'}</p>
-                    <div className="mt-4 w-full bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5 overflow-hidden text-center flex flex-col items-center">
-                       <p className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Tempo de Sessão</p>
-                       <div className="text-lg font-black font-mono tracking-tighter">{sessionDuration}</div>
-                    </div>
-                  </div>
-                  <div className="space-y-2 mb-5">
-                    <div className="flex flex-col items-center gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100"><span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span><span className="text-[9px] font-bold text-slate-800 lowercase break-all">{displayEmail}</span></div>
-                    <div className="flex flex-col items-center gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100"><span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span><span className="text-[9px] font-bold text-slate-800">{displayPhone}</span></div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <button onClick={handleEditProfile} className="w-full py-3 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95">Editar Perfil</button>
-                    <button onClick={onLogout} className="w-full py-3 bg-red-50 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95">Sair do Sistema</button>
-                  </div>
-                </div>
-              )}
            </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-8 bg-[#f8fafc] custom-scrollbar">
            {activeTab === DashboardTab.INICIO && <OverviewTab trips={[]} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver); loadAllData(); }} onDeleteDriver={async id => { if(confirm("Apagar?")) { await db.deleteDriver(id); loadAllData(); } }} availableOps={availableOps} />}
+           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} onDeleteCustomer={async id => { if(confirm("Deseja realmente apagar este cliente?")) { await db.deleteCustomer(id); loadAllData(); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} forceEditStaffId={forceProfileModal} onCloseForceEdit={() => setForceProfileModal(null)} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(); }} onDeleteStaff={async id => { if(confirm("Apagar?")) { await db.deleteStaff(id); loadAllData(); } }} />}
-           {activeTab === DashboardTab.OPERACOES && <OperationsTab availableOps={availableOps} setAvailableOps={setAvailableOps} drivers={drivers} activeView={opsView} setActiveView={setOpsView} vwSchedules={[]} onSaveVWSchedule={()=>{}} onUpdateVWStatus={()=>{}} />}
-           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} />}
-           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `port-${Date.now()}`} as Port); loadAllData(); }} />}
-           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (ps, id) => { await db.savePreStacking({...ps, id: id || `ps-${Date.now()}`} as PreStacking); loadAllData(); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} initialFormId={selectedFormId} />}
-           {user.role === 'admin' && activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
+           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port); loadAllData(); }} />}
+           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (ps, id) => { await db.savePreStacking({...ps, id: id || `ps-${Date.now()}`} as PreStacking); loadAllData(); }} />}
+           {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
+           {activeTab === DashboardTab.OPERACOES && (
+             <OperationsTab 
+                availableOps={availableOps} 
+                setAvailableOps={setAvailableOps} 
+                drivers={drivers} 
+                activeView={opsView} 
+                setActiveView={setOpsView}
+                vwSchedules={vwSchedules}
+                onSaveVWSchedule={async (s, id) => { /* VW Persistence logic */ loadAllData(); }}
+                onUpdateVWStatus={async (id, status, time) => { /* VW Persistence logic */ loadAllData(); }}
+             />
+           )}
         </div>
       </main>
     </div>

@@ -13,7 +13,7 @@ const DatabaseStatus: React.FC = () => {
     }`}>
       <div className={`w-1.5 h-1.5 rounded-full ${isCloud ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></div>
       <span className="text-[8px] font-black uppercase tracking-widest whitespace-nowrap">
-        Banco: {isCloud ? 'Nuvem' : 'Local'}
+        BD: {isCloud ? 'Nuvem' : 'Local'}
       </span>
     </div>
   );
