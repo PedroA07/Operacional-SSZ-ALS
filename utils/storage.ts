@@ -101,74 +101,6 @@ export const db = {
     }
   },
 
-  getStaff: async (): Promise<Staff[]> => {
-    const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.from('staff').select('*');
-        if (!error && data) {
-          const normalized = data.map((s: any) => ({
-            ...s,
-            registrationDate: s.registrationdate || s.registrationDate,
-            statusSince: s.statussince || s.statusSince,
-            emailCorp: s.emailcorp || s.emailCorp,
-            phoneCorp: s.phonecorp || s.phoneCorp
-          }));
-          db._saveLocal(KEYS.STAFF, normalized);
-          return normalized;
-        }
-      } catch (e) { console.warn("Supabase getStaff offline."); }
-    }
-    return localData;
-  },
-
-  saveStaff: async (staff: Staff, password?: string) => {
-    const current = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
-    const idx = current.findIndex((s: any) => s.id === staff.id);
-    let isNew = idx < 0;
-
-    if (!isNew) { current[idx] = staff; } else { current.push(staff); }
-    db._saveLocal(KEYS.STAFF, current);
-
-    if (supabase) {
-      try {
-        const staffPayload = {
-          id: staff.id,
-          photo: staff.photo,
-          name: staff.name.toUpperCase(),
-          position: staff.position.toUpperCase(),
-          username: staff.username.toLowerCase(),
-          role: staff.role,
-          registrationdate: staff.registrationDate,
-          emailcorp: staff.emailCorp?.toLowerCase(),
-          phonecorp: staff.phoneCorp,
-          status: staff.status,
-          statussince: staff.statusSince
-        };
-        await supabase.from('staff').upsert(staffPayload);
-      } catch (e) { console.error("Erro Supabase Staff:", e); }
-    }
-
-    const users = await db.getUsers();
-    const existingUser = users.find(u => u.staffId === staff.id);
-    
-    const userData: User = {
-      id: existingUser?.id || `u-${staff.id}`,
-      username: staff.username.toLowerCase(),
-      displayName: staff.name,
-      role: staff.role,
-      staffId: staff.id,
-      lastLogin: existingUser?.lastLogin || new Date().toISOString(),
-      position: staff.position,
-      photo: staff.photo,
-      status: staff.status,
-      isFirstLogin: isNew ? true : (existingUser?.isFirstLogin ?? true),
-      password: password || existingUser?.password || '12345678'
-    };
-    
-    await db.saveUser(userData);
-  },
-
   getDrivers: async (): Promise<Driver[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     if (supabase) {
@@ -222,19 +154,19 @@ export const db = {
         const payload = {
           id: driver.id,
           photo: driver.photo || null,
-          name: driver.name?.toUpperCase(),
-          cpf: driver.cpf,
+          name: driver.name?.toUpperCase() || '',
+          cpf: driver.cpf || '',
           rg: driver.rg || null,
           cnh: driver.cnh || null,
-          phone: driver.phone,
+          phone: driver.phone || null,
           email: driver.email?.toLowerCase() || null,
-          plate_horse: driver.plateHorse,
-          year_horse: driver.yearHorse,
-          plate_trailer: driver.plateTrailer,
-          year_trailer: driver.yearTrailer,
-          driver_type: driver.driverType,
-          status: driver.status,
-          status_last_change_date: driver.statusLastChangeDate,
+          plate_horse: driver.plateHorse || null,
+          year_horse: driver.yearHorse || null,
+          plate_trailer: driver.plateTrailer || null,
+          year_trailer: driver.yearTrailer || null,
+          driver_type: driver.driverType || 'Externo',
+          status: driver.status || 'Ativo',
+          status_last_change_date: driver.statusLastChangeDate || new Date().toISOString(),
           beneficiary_name: driver.beneficiaryName?.toUpperCase() || null,
           beneficiary_phone: driver.beneficiaryPhone || null,
           beneficiary_email: driver.beneficiaryEmail?.toLowerCase() || null,
@@ -242,7 +174,7 @@ export const db = {
           payment_preference: driver.paymentPreference || 'PIX',
           whatsapp_group_name: driver.whatsappGroupName?.toUpperCase() || null,
           whatsapp_group_link: driver.whatsappGroupLink || null,
-          registration_date: driver.registrationDate,
+          registration_date: driver.registrationDate || new Date().toISOString(),
           operations: driver.operations || [],
           trips_count: driver.tripsCount || 0,
           generated_password: driver.generatedPassword || null
@@ -250,8 +182,8 @@ export const db = {
         const { error } = await supabase.from('drivers').upsert(payload);
         if (error) throw error;
       } catch (e: any) { 
-        console.error("Erro Supabase Driver:", e.message);
-        throw e;
+        console.error("Erro Supabase Driver:", e.message || e);
+        throw new Error(e.message || "Falha na comunicação com o banco de dados.");
       }
     }
   },
@@ -339,6 +271,97 @@ export const db = {
     db._saveLocal(KEYS.PRE_STACKING, current.filter((p: any) => p.id !== id));
     if (supabase) await supabase.from('pre_stacking').delete().eq('id', id);
     return true;
+  },
+
+  /**
+   * Obtém a lista de colaboradores (staff)
+   */
+  getStaff: async (): Promise<Staff[]> => {
+    const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from('staff').select('*');
+        if (!error && data) {
+          const normalized = data.map((s: any) => ({
+            id: s.id,
+            photo: s.photo,
+            name: s.name,
+            position: s.position,
+            username: s.username,
+            role: s.role,
+            registrationDate: s.registration_date || s.registrationDate,
+            lastLogin: s.last_login || s.lastLogin,
+            emailCorp: s.email_corp || s.emailCorp,
+            phoneCorp: s.phone_corp || s.phoneCorp,
+            status: s.status || 'Ativo',
+            statusSince: s.status_since || s.statusSince
+          }));
+          db._saveLocal(KEYS.STAFF, normalized);
+          return normalized;
+        }
+      } catch (e) { console.warn("Supabase getStaff offline."); }
+    }
+    return localData;
+  },
+
+  /**
+   * Salva ou atualiza um colaborador (staff) e seu respectivo usuário de acesso
+   */
+  saveStaff: async (staff: Staff, password?: string) => {
+    // 1. Salva localmente
+    const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
+    if (sIdx >= 0) { currentStaff[sIdx] = staff; } else { currentStaff.push(staff); }
+    db._saveLocal(KEYS.STAFF, currentStaff);
+
+    // 2. Sincroniza com Supabase
+    if (supabase) {
+      try {
+        const payload = {
+          id: staff.id,
+          photo: staff.photo || null,
+          name: staff.name.toUpperCase(),
+          position: staff.position.toUpperCase(),
+          username: staff.username.toLowerCase(),
+          role: staff.role,
+          registration_date: staff.registrationDate,
+          last_login: staff.lastLogin || null,
+          email_corp: staff.email_corp?.toLowerCase() || null,
+          phone_corp: staff.phoneCorp || null,
+          status: staff.status || 'Ativo',
+          status_since: staff.statusSince || new Date().toISOString()
+        };
+        const { error } = await supabase.from('staff').upsert(payload);
+        if (error) throw error;
+      } catch (e: any) {
+        console.error("Erro Supabase Staff:", e.message);
+      }
+    }
+
+    // 3. Sincroniza Usuário (visto que todo staff tem login)
+    const users = await db.getUsers();
+    const existingUser = users.find(u => u.staffId === staff.id);
+
+    const userData: User = {
+      id: existingUser?.id || `u-${staff.id}`,
+      username: staff.username.toLowerCase(),
+      displayName: staff.name.toUpperCase(),
+      role: staff.role,
+      staffId: staff.id,
+      lastLogin: staff.lastLogin || staff.registrationDate,
+      position: staff.position.toUpperCase(),
+      photo: staff.photo,
+      status: staff.status as 'Ativo' | 'Inativo',
+      isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
+      password: existingUser?.password
+    };
+    
+    if (password) {
+      userData.password = password;
+      userData.isFirstLogin = true;
+    }
+
+    await db.saveUser(userData);
   },
 
   exportBackup: async () => {

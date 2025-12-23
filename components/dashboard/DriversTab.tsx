@@ -90,14 +90,16 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
       await onSaveDriver({ 
         ...form, 
+        id: drvId,
         registrationDate,
         statusLastChangeDate: statusDate,
         generatedPassword: form.hasAccess ? access.password : undefined 
       }, editingId);
       
       setIsModalOpen(false);
-    } catch (err) {
-      alert("Erro ao salvar motorista. Verifique a conexão.");
+    } catch (err: any) {
+      console.error("Erro ao salvar:", err);
+      alert(`FALHA AO SALVAR: ${err.message || "Erro desconhecido. Verifique se a tabela 'drivers' foi criada no Supabase."}`);
     } finally {
       setIsSaving(false);
     }
