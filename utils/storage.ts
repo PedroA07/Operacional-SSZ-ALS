@@ -127,7 +127,9 @@ export const db = {
     const current = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const idx = current.findIndex((s: any) => s.id === staff.id);
     let updated;
-    if (idx >= 0) { updated = [...current]; updated[idx] = staff; } else { updated = [...current, staff]; }
+    let isNew = idx < 0;
+
+    if (!isNew) { updated = [...current]; updated[idx] = staff; } else { updated = [...current, staff]; }
     db._saveLocal(KEYS.STAFF, updated);
 
     if (supabase) {
@@ -162,7 +164,8 @@ export const db = {
       position: staff.position,
       photo: staff.photo,
       status: staff.status,
-      isFirstLogin: existingUser ? existingUser.isFirstLogin : true,
+      // Se for novo ou não tiver flag, assume primeiro acesso com senha padrão
+      isFirstLogin: isNew ? true : (existingUser?.isFirstLogin ?? true),
       password: password || existingUser?.password || '12345678'
     };
     
