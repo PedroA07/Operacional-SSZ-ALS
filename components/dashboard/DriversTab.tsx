@@ -6,7 +6,7 @@ import { db } from '../../utils/storage';
 
 interface DriversTabProps {
   drivers: Driver[];
-  onSaveDriver: (driver: Partial<Driver>, id?: string) => void;
+  onSaveDriver: (driver: Partial<Driver>, id?: string) => Promise<void>;
   onDeleteDriver: (id: string) => void;
   availableOps: OperationDefinition[];
 }
@@ -15,6 +15,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const initialForm: Partial<Driver> = {
@@ -25,7 +26,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '',
     beneficiaryCnpj: '', paymentPreference: 'PIX',
     whatsappGroupName: '', whatsappGroupLink: '',
-    operations: [], hasAccess: false
+    operations: [], hasAccess: false,
+    tripsCount: 0
   };
 
   const [form, setForm] = useState<Partial<Driver>>(initialForm);
@@ -63,31 +65,42 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const drvId = editingId || `drv-${Date.now()}`;
-    const access = handleCreateAccess(form);
-    const statusDate = form.statusLastChangeDate || new Date().toISOString();
-
-    if (form.hasAccess) {
-      await db.saveUser({
-        id: `u-${drvId}`,
-        username: access.username,
-        displayName: form.name!,
-        role: form.driverType === 'Motoboy' ? 'motoboy' : 'driver',
-        driverId: drvId,
-        lastLogin: new Date().toISOString(),
-        position: form.driverType === 'Motoboy' ? 'Motoboy' : 'Motorista',
-        password: access.password,
-        photo: form.photo
-      });
-    }
-
-    onSaveDriver({ 
-      ...form, 
-      statusLastChangeDate: statusDate,
-      generatedPassword: form.hasAccess ? access.password : undefined 
-    }, editingId);
+    if (isSaving) return;
     
-    setIsModalOpen(false);
+    setIsSaving(true);
+    try {
+      const drvId = editingId || `drv-${Date.now()}`;
+      const access = handleCreateAccess(form);
+      const statusDate = form.statusLastChangeDate || new Date().toISOString();
+      const registrationDate = form.registrationDate || new Date().toISOString();
+
+      if (form.hasAccess) {
+        await db.saveUser({
+          id: `u-${drvId}`,
+          username: access.username,
+          displayName: form.name!,
+          role: form.driverType === 'Motoboy' ? 'motoboy' : 'driver',
+          driverId: drvId,
+          lastLogin: new Date().toISOString(),
+          position: form.driverType === 'Motoboy' ? 'Motoboy' : 'Motorista',
+          password: access.password,
+          photo: form.photo
+        });
+      }
+
+      await onSaveDriver({ 
+        ...form, 
+        registrationDate,
+        statusLastChangeDate: statusDate,
+        generatedPassword: form.hasAccess ? access.password : undefined 
+      }, editingId);
+      
+      setIsModalOpen(false);
+    } catch (err) {
+      alert("Erro ao salvar motorista. Verifique a conexão.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const filteredDrivers = drivers.filter(d => 
@@ -96,7 +109,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     d.plateHorse.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
+  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:opacity-50";
 
   return (
     <div className="max-w-full mx-auto space-y-6">
@@ -388,8 +401,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                    </div>
                 </div>
 
-                <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[12px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3">
-                  Salvar Registro
+                <button type="submit" disabled={isSaving} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[12px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3 disabled:bg-slate-400">
+                  {isSaving ? 'Salvando...' : 'Salvar Registro'}
                 </button>
               </div>
             </form>

@@ -227,7 +227,7 @@ export const db = {
           rg: driver.rg || null,
           cnh: driver.cnh || null,
           phone: driver.phone,
-          email: driver.email?.toLowerCase() || null, // Permite nulo se vazio
+          email: driver.email?.toLowerCase() || null,
           plate_horse: driver.plateHorse,
           year_horse: driver.yearHorse,
           plate_trailer: driver.plateTrailer,
@@ -251,7 +251,7 @@ export const db = {
         if (error) throw error;
       } catch (e: any) { 
         console.error("Erro Supabase Driver:", e.message);
-        // Pode indicar que a tabela não existe ou colunas estão erradas
+        throw e;
       }
     }
   },
