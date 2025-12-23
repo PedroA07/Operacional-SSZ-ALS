@@ -34,7 +34,7 @@ export const db = {
   },
 
   /**
-   * Atualiza a presença online do usuário e a visibilidade da aba
+   * Atualiza a presença online do usuário
    */
   updatePresence: async (userId: string, isVisible: boolean) => {
     if (!supabase) return;
@@ -102,7 +102,6 @@ export const db = {
           position: user.position?.toUpperCase(),
           status: user.status || 'Ativo',
           isfirstlogin: user.isFirstLogin ?? true,
-          isonlinevisible: user.isOnlineVisible ?? true,
           photo: user.photo
         };
         const { error } = await supabase.from('users').upsert(payload);
@@ -161,7 +160,7 @@ export const db = {
 
     if (supabase) {
       try {
-        // Mapeamento explícito de campos para o Supabase (snake_case)
+        // Mapeamento ULTRA-RIGOROSO para o Supabase (snake_case)
         const payload = {
           id: driver.id,
           photo: driver.photo || null,
@@ -192,16 +191,13 @@ export const db = {
         };
 
         const { error } = await supabase.from('drivers').upsert(payload);
-        if (error) {
-          console.error("Erro Supabase Detalhado:", error);
-          throw error;
-        }
+        if (error) throw error;
       } catch (e: any) { 
-        console.error("Erro Supabase Driver:", e.message || e);
-        // Lançar erro amigável que explica a necessidade do SQL
+        console.error("Erro Crítico no Driver:", e.message || e);
+        // Mensagem de erro que explica exatamente o que fazer
         throw new Error(
-          `Erro no Banco de Dados: Coluna '${e.message?.split("'")[1] || "desconhecida"}' não encontrada. ` +
-          `Certifique-se de executar o script SQL de atualização de colunas no painel do Supabase.`
+          `ERRO DE BANCO: A coluna '${e.message?.split("'")[1] || "payment_preference"}' não existe no Supabase. ` +
+          `Ação Necessária: Execute o script SQL fornecido para atualizar a tabela 'drivers'.`
         );
       }
     }
