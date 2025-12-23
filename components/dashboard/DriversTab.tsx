@@ -267,7 +267,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">Telefone Principal</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
-                   <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Operacional</label><input required className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
+                   <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Operacional (Opcional)</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
                 </div>
 
                 <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200 space-y-5">
