@@ -36,7 +36,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   const [usernameOptions, setUsernameOptions] = useState<string[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
 
-  // Extrair todos os cargos únicos existentes na equipe para o datalist
+  // Extrair todos os cargos únicos existentes para o datalist (Autocomplete)
   const existingPositions = Array.from(new Set(staffList.map(s => s.position).filter(Boolean))).sort();
 
   const loadUsers = async () => {
@@ -61,7 +61,6 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   const isAdmin = currentUser.role === 'admin';
   const canEdit = (staffId: string) => isAdmin || currentUser.staffId === staffId;
 
-  // Gerador automático de sugestões de usuário baseado no nome
   useEffect(() => {
     if (form.name && !editingId) {
       const cleanName = form.name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -104,9 +103,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         registrationDate: existing?.registrationDate || new Date().toISOString(),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
-        // Removido do formulário: Status é sempre Ativo no cadastro inicial 
-        // ou mantém o atual se estiver editando
-        status: existing?.status || 'Ativo',
+        status: existing?.status || 'Ativo', // Cadastro padrão como Ativo
         statusSince: existing?.statusSince || new Date().toISOString()
       };
       
@@ -207,7 +204,10 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                             {isPassVisible ? (
                                <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" strokeWidth="2.5"/>
                             ) : (
-                               <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943-9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/>
+                               <React.Fragment>
+                                 <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/>
+                                 <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943-9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/>
+                               </React.Fragment>
                             )}
                           </svg>
                         </button>
@@ -261,11 +261,11 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
 
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Telefone Corp. (Opcional)</label>
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Telefone Corp.</label>
                           <input className={inputClasses} value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: maskPhone(e.target.value)})} placeholder="(13) 99999-9999" />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">E-mail Corp. (Opcional)</label>
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">E-mail Corp.</label>
                           <input className={`${inputClasses} lowercase`} value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} placeholder="nome@als.com.br" />
                        </div>
                     </div>
@@ -328,7 +328,12 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                                 {showPass ? (
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" strokeWidth="2.5"/></svg>
                                 ) : (
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943-9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
+                                  <React.Fragment>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/>
+                                      <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943-9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/>
+                                    </svg>
+                                  </React.Fragment>
                                 )}
                              </button>
                           </div>

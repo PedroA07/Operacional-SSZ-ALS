@@ -203,7 +203,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   };
 
   const myStaffData = staffList.find(s => s.id === user.staffId);
-  const displayEmail = user.emailCorp || myStaffData?.emailCorp || 'financeiro@als.com.br';
+  const displayEmail = user.emailCorp || myStaffData?.emailCorp || 'suporte@als.com.br';
   const displayPhone = user.phoneCorp || myStaffData?.phoneCorp || '(13) 99762-0041';
 
   return (
@@ -290,20 +290,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
               {isProfileMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 z-[100] animate-in slide-in-from-top-4 backdrop-blur-xl bg-white/95">
-                  <div className="text-center mb-5 pb-5 border-b border-slate-50">
-                    <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-2xl font-black mx-auto mb-3 overflow-hidden shadow-lg border-4 border-white">
+                  <div className="text-center mb-5 pb-5 border-b border-slate-50 flex flex-col items-center">
+                    <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-2xl font-black mb-3 overflow-hidden shadow-lg border-4 border-white">
                       {user.photo ? <img src={user.photo} className="w-full h-full object-cover" /> : (user.displayName || 'A').substring(0,1).toUpperCase()}
                     </div>
                     <h4 className="font-black text-slate-800 uppercase text-xs">{user.displayName}</h4>
                     <p className="text-[8px] text-blue-500 font-bold uppercase tracking-widest mt-1">{user.position || 'OPERACIONAL'}</p>
-                    <div className="mt-4 bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5 overflow-hidden text-center flex flex-col items-center">
+                    <div className="mt-4 w-full bg-slate-900 text-white p-3 rounded-2xl shadow-inner border border-white/5 overflow-hidden text-center flex flex-col items-center">
                        <p className="text-[7px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Tempo de Sessão</p>
                        <div className="text-lg font-black font-mono tracking-tighter">{sessionDuration}</div>
                     </div>
                   </div>
                   <div className="space-y-2 mb-5">
-                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 text-center"><span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span><span className="text-[9px] font-bold text-slate-800 lowercase break-all">{displayEmail}</span></div>
-                    <div className="flex flex-col gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 text-center"><span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span><span className="text-[9px] font-bold text-slate-800">{displayPhone}</span></div>
+                    <div className="flex flex-col items-center gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100"><span className="text-[7px] font-black text-slate-400 uppercase">E-mail Corporativo</span><span className="text-[9px] font-bold text-slate-800 lowercase break-all">{displayEmail}</span></div>
+                    <div className="flex flex-col items-center gap-0.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100"><span className="text-[7px] font-black text-slate-400 uppercase">Telefone Corp.</span><span className="text-[9px] font-bold text-slate-800">{displayPhone}</span></div>
                   </div>
                   <div className="space-y-1.5">
                     <button onClick={handleEditProfile} className="w-full py-3 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-md active:scale-95">Editar Perfil</button>
