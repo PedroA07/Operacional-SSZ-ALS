@@ -15,7 +15,6 @@ import OnlineStatus from './dashboard/OnlineStatus';
 import DatabaseStatus from './dashboard/DatabaseStatus';
 import { DEFAULT_OPERATIONS } from '../constants/operations';
 import { db } from '../utils/storage';
-import { sessionManager } from '../utils/session';
 import { Icons } from '../constants/icons';
 
 interface DashboardProps {
@@ -29,7 +28,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     'Operações': false,
     'Formulários': false
   });
-  const [sessionDuration, setSessionDuration] = useState('00:00:00');
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
   const [forceProfileModal, setForceProfileModal] = useState<string | null>(null);
@@ -47,6 +45,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ 
     type: 'list'
   });
+
+  // Fechar menu de perfil ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadAllData = async () => {
     try {
@@ -200,7 +209,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <h2 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">{activeTab}</h2>
            </div>
            
-           <div className="flex items-center gap-4 relative">
+           <div className="flex items-center gap-4 relative" ref={profileMenuRef}>
               <DatabaseStatus />
               <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center gap-2.5 p-1.5 hover:bg-slate-50 rounded-xl transition-all">
                  <div className="text-right hidden sm:block">
@@ -208,9 +217,41 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-none">{user.position}</p>
                  </div>
                  <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center font-black text-blue-400 text-xs overflow-hidden shadow-md">
-                    {user.photo ? <img src={user.photo} className="w-full h-full object-cover" /> : user.displayName[0]}
+                    {user.photo ? <img src={user.photo} className="w-full h-full object-cover" alt="" /> : user.displayName[0]}
                  </div>
               </button>
+
+              {isProfileMenuOpen && (
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="p-4 bg-slate-50 border-b border-slate-100">
+                    <p className="text-[10px] font-black text-slate-800 uppercase truncate">{user.displayName}</p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{user.position}</p>
+                  </div>
+                  <div className="p-2">
+                    <button 
+                      onClick={() => {
+                        if (user.staffId) {
+                          setForceProfileModal(user.staffId);
+                          setActiveTab(DashboardTab.COLABORADORES);
+                        }
+                        setIsProfileMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-3 rounded-xl text-[10px] font-black text-slate-600 uppercase hover:bg-blue-50 hover:text-blue-600 transition-all flex items-center gap-3"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>
+                      Meu Perfil
+                    </button>
+                    <div className="h-[1px] bg-slate-100 my-1 mx-2"></div>
+                    <button 
+                      onClick={onLogout}
+                      className="w-full text-left px-4 py-3 rounded-xl text-[10px] font-black text-red-500 uppercase hover:bg-red-50 transition-all flex items-center gap-3"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7" strokeWidth="2.5"/></svg>
+                      Sair do Sistema
+                    </button>
+                  </div>
+                </div>
+              )}
            </div>
         </header>
 

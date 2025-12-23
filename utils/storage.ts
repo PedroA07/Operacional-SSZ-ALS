@@ -183,7 +183,7 @@ export const db = {
         if (error) throw error;
       } catch (e: any) { 
         console.error("Erro Supabase Driver:", e.message || e);
-        throw new Error(e.message || "Falha na comunicação com o banco de dados.");
+        throw new Error(e.message || "Falha na comunicação com o banco de dados. Verifique a estrutura da tabela 'drivers'.");
       }
     }
   },
@@ -318,8 +318,8 @@ export const db = {
           role: staff.role,
           registration_date: staff.registrationDate,
           last_login: staff.lastLogin || null,
-          email_corp: staff.emailCorp?.toLowerCase() || null, // Corrigido: email_corp mapeia para staff.emailCorp
-          phone_corp: staff.phoneCorp || null, // Corrigido: phone_corp mapeia para staff.phoneCorp
+          email_corp: staff.emailCorp?.toLowerCase() || null, 
+          phone_corp: staff.phoneCorp || null, 
           status: staff.status || 'Ativo',
           status_since: staff.statusSince || new Date().toISOString()
         };
