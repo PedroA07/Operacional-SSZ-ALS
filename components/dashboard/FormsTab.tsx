@@ -55,7 +55,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     booking: '',
     ship: '',
     expedidor: '',
-    agencia: 'ALIANÇA',
+    agencia: '', // Começa vazio conforme solicitado
     tipo: '40HC',
     padrao: 'EXPORTAÇÃO',
     tipoOperacao: 'EXPORTAÇÃO',
@@ -98,6 +98,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   const handleInputChange = (field: string, value: string) => {
     const upValue = value.toUpperCase();
     if (field === 'container') {
+      // Inteligência de preenchimento automático baseada no BIC Code (bic-code.org)
       const carrier = lookupCarrierByContainer(upValue);
       setFormData(prev => ({ 
         ...prev, 
@@ -168,7 +169,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
             <div className={`p-6 ${formConfigs[selectedFormType].color} text-white flex justify-between items-center`}>
               <h3 className="font-black text-sm uppercase tracking-widest">{formConfigs[selectedFormType].title}</h3>
-              <button onClick={() => setIsFormModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button>
+              <button onClick={() => setIsFormModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
             </div>
 
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
@@ -206,41 +207,73 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* BLOCO DE INSERÇÃO - ORDEM SOLICITADA */}
+                <div className="space-y-4 pt-4 border-t border-slate-200">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Armador (BIC Code)</label>
-                    <input type="text" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Container</label>
+                    <input type="text" placeholder="EX: MAEU1234567" className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} />
                   </div>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">2. Armador (Preenchimento Automático)</label>
+                    <input type="text" placeholder="SERÁ PREENCHIDO PELO CONTAINER" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">3. Tara</label>
+                      <input type="text" className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">4. Lacre</label>
+                      <input type="text" className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">5. Genset</label>
+                    <input type="text" className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo Equip.</label>
-                    <input type="text" className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)} />
+                    <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
+                      <option value="40HC">40HC</option>
+                      <option value="40HR">40HR</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Navio</label>
+                    <input type="text" className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Padrão</label>
-                    <input type="text" className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)} />
+                    <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
+                      <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
+                      <option value="COLETA">COLETA</option>
+                      <option value="ENTREGA">ENTREGA</option>
+                      <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
+                    </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Operação</label>
-                    <input type="text" className={inputClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)} />
+                    <select className={inputClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)}>
+                      <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
+                      <option value="COLETA">COLETA</option>
+                      <option value="ENTREGA">ENTREGA</option>
+                      <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
+                    </select>
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Aut. Coleta / CVA</label>
                   <input type="text" className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Container</label><input type="text" className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tara</label><input type="text" className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Lacre</label><input type="text" className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Genset</label><input type="text" className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
                 </div>
 
                 <div className="space-y-1 relative">

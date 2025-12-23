@@ -103,12 +103,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <div className="flex items-center group">
           <button 
             onClick={() => {
-              if (tab && !children) {
+              if (tab) {
                 setActiveTab(tab);
                 if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' });
                 if (tab !== DashboardTab.FORMULARIOS) setSelectedFormId(null);
-              } else {
-                setExpandedMenus(prev => ({ ...prev, [label]: !prev[label] }));
               }
             }}
             className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-800/60 text-slate-400'}`}
@@ -121,10 +119,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           
           {children && sidebarState === 'open' && (
             <button 
-              onClick={(e) => { e.stopPropagation(); setExpandedMenus(prev => ({ ...prev, [label]: !prev[label] })); }}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setExpandedMenus(prev => ({ ...prev, [label]: !prev[label] })); 
+              }}
               className={`p-3 text-slate-500 hover:text-white transition-all ${isExpanded ? 'rotate-180' : ''}`}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
           )}
         </div>
@@ -155,7 +156,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
           <MenuItem tab={DashboardTab.INICIO} label="Início" icon={<Icons.Inicio />} />
           
-          <MenuItem label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
+          <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
             {availableOps.map(op => (
               <button key={op.id} onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="w-full text-left py-1.5 px-3 hover:bg-slate-800/40 rounded-lg text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors">• {op.category}</button>
             ))}
@@ -163,7 +164,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
           <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" icon={<Icons.Motoristas />} />
           
-          <MenuItem label="Formulários" icon={<Icons.Formularios />} forceActive={activeTab === DashboardTab.FORMULARIOS}>
+          <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" icon={<Icons.Formularios />} forceActive={activeTab === DashboardTab.FORMULARIOS}>
             <button onClick={() => handleFormClick('ORDEM_COLETA')} className="w-full text-left px-3 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded transition-all">• Ordem de Coleta</button>
             <button onClick={() => handleFormClick('PRE_STACKING')} className="w-full text-left px-3 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded transition-all">• Pré-Stacking</button>
             <button onClick={() => handleFormClick('LIBERACAO_VAZIO')} className="w-full text-left px-3 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded transition-all">• Liberação Vazio</button>
@@ -185,7 +186,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <div className="p-4 border-t border-slate-800/50 bg-[#0f172a] space-y-3">
            {sidebarState === 'open' && <OnlineStatus staffList={staffList} />}
            <button onClick={onLogout} className="w-full text-[8px] text-red-500 font-black uppercase hover:bg-red-500/10 py-3 rounded-xl flex items-center justify-center gap-2 border border-red-900/20 active:scale-95 transition-all">
-             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7" strokeWidth="3"/></svg>
+             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
              {sidebarState === 'open' && <span>Encerrar Sessão</span>}
            </button>
         </div>
@@ -194,7 +195,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-40">
            <div className="flex items-center gap-4">
-              <button onClick={() => setSidebarState(s => s === 'open' ? 'collapsed' : 'open')} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="2.5" strokeLinecap="round"/></svg></button>
+              <button onClick={() => setSidebarState(s => s === 'open' ? 'collapsed' : 'open')} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
               <div className="h-6 w-[1px] bg-slate-200"></div>
               <h2 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">{activeTab}</h2>
            </div>
