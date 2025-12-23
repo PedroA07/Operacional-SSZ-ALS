@@ -12,6 +12,7 @@ import StaffTab from './dashboard/StaffTab';
 import SystemTab from './dashboard/SystemTab';
 import WeatherWidget from './dashboard/WeatherWidget';
 import OnlineStatus from './dashboard/OnlineStatus';
+import DatabaseStatus from './dashboard/DatabaseStatus';
 import { DEFAULT_OPERATIONS } from '../constants/operations';
 import { db } from '../utils/storage';
 import { sessionManager } from '../utils/session';
@@ -278,6 +279,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </div>
            
            <div className="flex items-center gap-4 relative" ref={profileMenuRef}>
+              <div className="hidden lg:flex items-center">
+                 <DatabaseStatus />
+              </div>
+              
               <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center gap-2.5 p-1.5 hover:bg-slate-50 rounded-xl transition-all border border-transparent hover:border-slate-100 group">
                  <div className="text-right hidden sm:block">
                     <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors leading-none">{user.displayName || 'Usuário'}</p>
