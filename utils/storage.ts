@@ -39,11 +39,10 @@ export const db = {
   updatePresence: async (userId: string, isVisible: boolean) => {
     if (!supabase) return;
     try {
-      const { error } = await supabase.from('users').update({ 
+      await supabase.from('users').update({ 
         lastseen: new Date().toISOString(),
         isonlinevisible: isVisible 
       }).eq('id', userId);
-      if (error) throw error;
     } catch (e) { 
       console.warn("Erro ao atualizar presença:", e);
     }
@@ -162,6 +161,7 @@ export const db = {
 
     if (supabase) {
       try {
+        // Mapeamento explícito de campos para o Supabase (snake_case)
         const payload = {
           id: driver.id,
           photo: driver.photo || null,
@@ -190,11 +190,19 @@ export const db = {
           trips_count: driver.tripsCount || 0,
           generated_password: driver.generatedPassword || null
         };
+
         const { error } = await supabase.from('drivers').upsert(payload);
-        if (error) throw error;
+        if (error) {
+          console.error("Erro Supabase Detalhado:", error);
+          throw error;
+        }
       } catch (e: any) { 
         console.error("Erro Supabase Driver:", e.message || e);
-        throw new Error(e.message || "Falha na comunicação com o banco de dados. Execute o script SQL de atualização de colunas.");
+        // Lançar erro amigável que explica a necessidade do SQL
+        throw new Error(
+          `Erro no Banco de Dados: Coluna '${e.message?.split("'")[1] || "desconhecida"}' não encontrada. ` +
+          `Certifique-se de executar o script SQL de atualização de colunas no painel do Supabase.`
+        );
       }
     }
   },
