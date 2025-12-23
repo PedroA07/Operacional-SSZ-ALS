@@ -169,27 +169,43 @@ export const db = {
     await db.saveUser(userData);
   },
 
-  deleteStaff: async (id: string) => {
-    const current = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
-    db._saveLocal(KEYS.STAFF, current.filter((s: any) => s.id !== id));
-    if (supabase) await supabase.from('staff').delete().eq('id', id);
-    
-    const users = await db.getUsers();
-    const user = users.find(u => u.staffId === id);
-    if (user) {
-      const remainingUsers = users.filter(u => u.id !== user.id);
-      db._saveLocal(KEYS.USERS, remainingUsers);
-      if (supabase) await supabase.from('users').delete().eq('id', user.id);
-    }
-    return true;
-  },
-
   getDrivers: async (): Promise<Driver[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
     if (supabase) {
       try {
-        const { data } = await supabase.from('drivers').select('*');
-        if (data) { db._saveLocal(KEYS.DRIVERS, data); return data; }
+        const { data, error } = await supabase.from('drivers').select('*');
+        if (!error && data) {
+          const normalized = data.map((d: any) => ({
+            id: d.id,
+            photo: d.photo,
+            name: d.name,
+            cpf: d.cpf,
+            rg: d.rg,
+            cnh: d.cnh,
+            phone: d.phone,
+            email: d.email,
+            plateHorse: d.plate_horse || d.plateHorse,
+            yearHorse: d.year_horse || d.yearHorse,
+            plateTrailer: d.plate_trailer || d.plateTrailer,
+            yearTrailer: d.year_trailer || d.yearTrailer,
+            driverType: d.driver_type || d.driverType,
+            status: d.status,
+            statusLastChangeDate: d.status_last_change_date || d.statusLastChangeDate,
+            beneficiaryName: d.beneficiary_name || d.beneficiaryName,
+            beneficiaryPhone: d.beneficiary_phone || d.beneficiaryPhone,
+            beneficiaryEmail: d.beneficiary_email || d.beneficiaryEmail,
+            beneficiaryCnpj: d.beneficiary_cnpj || d.beneficiaryCnpj,
+            paymentPreference: d.payment_preference || d.paymentPreference,
+            whatsappGroupName: d.whatsapp_group_name || d.whatsappGroupName,
+            whatsappGroupLink: d.whatsapp_group_link || d.whatsappGroupLink,
+            registrationDate: d.registration_date || d.registrationDate,
+            operations: d.operations || [],
+            tripsCount: d.trips_count || 0,
+            generatedPassword: d.generated_password || d.generatedPassword
+          }));
+          db._saveLocal(KEYS.DRIVERS, normalized);
+          return normalized;
+        }
       } catch (e) { console.warn("Supabase getDrivers offline."); }
     }
     return localData;
@@ -200,7 +216,41 @@ export const db = {
     const idx = current.findIndex((d: any) => d.id === driver.id);
     if (idx >= 0) { current[idx] = driver; } else { current.push(driver); }
     db._saveLocal(KEYS.DRIVERS, current);
-    if (supabase) await supabase.from('drivers').upsert(driver);
+
+    if (supabase) {
+      try {
+        const payload = {
+          id: driver.id,
+          photo: driver.photo,
+          name: driver.name.toUpperCase(),
+          cpf: driver.cpf,
+          rg: driver.rg,
+          cnh: driver.cnh,
+          phone: driver.phone,
+          email: driver.email?.toLowerCase(),
+          plate_horse: driver.plateHorse,
+          year_horse: driver.yearHorse,
+          plate_trailer: driver.plateTrailer,
+          year_trailer: driver.yearTrailer,
+          driver_type: driver.driverType,
+          status: driver.status,
+          status_last_change_date: driver.statusLastChangeDate,
+          beneficiary_name: driver.beneficiaryName?.toUpperCase(),
+          beneficiary_phone: driver.beneficiaryPhone,
+          beneficiary_email: driver.beneficiaryEmail?.toLowerCase(),
+          beneficiary_cnpj: driver.beneficiaryCnpj,
+          payment_preference: driver.paymentPreference,
+          whatsapp_group_name: driver.whatsappGroupName?.toUpperCase(),
+          whatsapp_group_link: driver.whatsappGroupLink,
+          registration_date: driver.registrationDate,
+          operations: driver.operations,
+          trips_count: driver.tripsCount,
+          generated_password: driver.generatedPassword
+        };
+        const { error } = await supabase.from('drivers').upsert(payload);
+        if (error) throw error;
+      } catch (e: any) { console.error("Erro Supabase Driver:", e.message); }
+    }
   },
 
   deleteDriver: async (id: string) => {
@@ -323,5 +373,20 @@ export const db = {
       };
       reader.readAsText(file);
     });
+  },
+
+  deleteStaff: async (id: string) => {
+    const current = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
+    db._saveLocal(KEYS.STAFF, current.filter((s: any) => s.id !== id));
+    if (supabase) await supabase.from('staff').delete().eq('id', id);
+    
+    const users = await db.getUsers();
+    const user = users.find(u => u.staffId === id);
+    if (user) {
+      const remainingUsers = users.filter(u => u.id !== user.id);
+      db._saveLocal(KEYS.USERS, remainingUsers);
+      if (supabase) await supabase.from('users').delete().eq('id', user.id);
+    }
+    return true;
   }
 };
