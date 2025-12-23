@@ -25,7 +25,10 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
+    'Operações': false,
+    'Formulários': false
+  });
   const [sessionDuration, setSessionDuration] = useState('00:00:00');
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
@@ -68,6 +71,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     loadAllData();
   }, [user]);
 
+  const handleFormClick = (formId: string) => {
+    setSelectedFormId(null);
+    setTimeout(() => {
+      setActiveTab(DashboardTab.FORMULARIOS);
+      setSelectedFormId(formId);
+    }, 10);
+  };
+
   const MenuItem = ({ 
     tab, 
     label, 
@@ -92,11 +103,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <div className="flex items-center group">
           <button 
             onClick={() => {
-              if (tab) {
+              if (tab && !children) {
                 setActiveTab(tab);
                 if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' });
                 if (tab !== DashboardTab.FORMULARIOS) setSelectedFormId(null);
-              } else if (children) {
+              } else {
                 setExpandedMenus(prev => ({ ...prev, [label]: !prev[label] }));
               }
             }}
@@ -149,7 +160,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             ))}
           </MenuItem>
           <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" icon={<Icons.Motoristas />} />
-          <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" icon={<Icons.Formularios />} forceActive={activeTab === DashboardTab.FORMULARIOS} />
+          <MenuItem label="Formulários" icon={<Icons.Formularios />} forceActive={activeTab === DashboardTab.FORMULARIOS}>
+            <button onClick={() => handleFormClick('ORDEM_COLETA')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Ordem de Coleta</button>
+            <button onClick={() => handleFormClick('PRE_STACKING')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Pré-Stacking</button>
+            <button onClick={() => handleFormClick('LIBERACAO_VAZIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Liberação Vazio</button>
+            <button onClick={() => handleFormClick('DEVOLUCAO_VAZIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Devolução Vazio</button>
+            <button onClick={() => handleFormClick('RETIRADA_CHEIO')} className="w-full text-left px-2 py-2 text-[9px] font-black uppercase text-slate-500 hover:text-white hover:bg-slate-800/30 rounded">• Retirada Cheio</button>
+          </MenuItem>
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" icon={<Icons.Clientes />} />
           <MenuItem tab={DashboardTab.PORTOS} label="Portos" icon={<Icons.Portos />} />
           <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" icon={<Icons.PreStacking />} />

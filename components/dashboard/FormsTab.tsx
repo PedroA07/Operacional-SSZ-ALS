@@ -7,7 +7,7 @@ import JsBarcode from 'jsbarcode';
 import OrdemColetaTemplate from './forms/OrdemColetaTemplate';
 import PreStackingTemplate from './forms/PreStackingTemplate';
 import { maskSeal } from '../../utils/masks';
-import { findCarrierByPrefix } from '../../constants/carriers';
+import { lookupCarrierByContainer } from '../../utils/carrierService';
 
 interface FormsTabProps {
   drivers: Driver[];
@@ -95,8 +95,13 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   const handleInputChange = (field: string, value: string) => {
     const upValue = value.toUpperCase();
     if (field === 'container') {
-      const carrier = findCarrierByPrefix(upValue);
-      setFormData(prev => ({ ...prev, container: upValue, agencia: carrier ? carrier.name : prev.agencia }));
+      // Inteligência compatível com track-trace.com via carrierService
+      const carrier = lookupCarrierByContainer(upValue);
+      setFormData(prev => ({ 
+        ...prev, 
+        container: upValue, 
+        agencia: carrier ? carrier.name : prev.agencia 
+      }));
     } else if (field === 'seal') {
       setFormData(prev => ({ ...prev, seal: maskSeal(upValue, formData.agencia) }));
     } else {
