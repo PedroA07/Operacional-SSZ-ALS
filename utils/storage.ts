@@ -273,9 +273,6 @@ export const db = {
     return true;
   },
 
-  /**
-   * Obtém a lista de colaboradores (staff)
-   */
   getStaff: async (): Promise<Staff[]> => {
     const localData = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     if (supabase) {
@@ -304,17 +301,12 @@ export const db = {
     return localData;
   },
 
-  /**
-   * Salva ou atualiza um colaborador (staff) e seu respectivo usuário de acesso
-   */
   saveStaff: async (staff: Staff, password?: string) => {
-    // 1. Salva localmente
     const currentStaff = JSON.parse(localStorage.getItem(KEYS.STAFF) || '[]');
     const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
     if (sIdx >= 0) { currentStaff[sIdx] = staff; } else { currentStaff.push(staff); }
     db._saveLocal(KEYS.STAFF, currentStaff);
 
-    // 2. Sincroniza com Supabase
     if (supabase) {
       try {
         const payload = {
@@ -326,8 +318,8 @@ export const db = {
           role: staff.role,
           registration_date: staff.registrationDate,
           last_login: staff.lastLogin || null,
-          email_corp: staff.email_corp?.toLowerCase() || null,
-          phone_corp: staff.phoneCorp || null,
+          email_corp: staff.emailCorp?.toLowerCase() || null, // Corrigido: email_corp mapeia para staff.emailCorp
+          phone_corp: staff.phoneCorp || null, // Corrigido: phone_corp mapeia para staff.phoneCorp
           status: staff.status || 'Ativo',
           status_since: staff.statusSince || new Date().toISOString()
         };
@@ -338,7 +330,6 @@ export const db = {
       }
     }
 
-    // 3. Sincroniza Usuário (visto que todo staff tem login)
     const users = await db.getUsers();
     const existingUser = users.find(u => u.staffId === staff.id);
 
