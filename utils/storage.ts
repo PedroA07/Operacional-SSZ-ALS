@@ -59,6 +59,7 @@ export const db = {
             displayName: u.name || u.displayName,
             role: u.role,
             staffId: u.staffid || u.staffId,
+            driverId: u.driverid || u.driverId,
             lastLogin: u.lastlogin || u.lastLogin,
             lastSeen: u.lastseen || u.lastSeen,
             position: u.position,
@@ -96,6 +97,7 @@ export const db = {
           name: user.displayName.toUpperCase(), 
           role: user.role,
           staffid: user.staffId,
+          driverid: user.driverId,
           lastlogin: user.lastLogin,
           position: user.position?.toUpperCase(),
           status: user.status || 'Ativo',
@@ -132,9 +134,27 @@ export const db = {
   },
 
   deleteDriver: async (id: string) => {
-    const current = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
-    db._saveLocal(KEYS.DRIVERS, current.filter((d: any) => d.id !== id));
-    if (supabase) await driverRepository.delete(supabase, id);
+    // 1. Remove o registro do motorista
+    const currentDrivers = JSON.parse(localStorage.getItem(KEYS.DRIVERS) || '[]');
+    db._saveLocal(KEYS.DRIVERS, currentDrivers.filter((d: any) => d.id !== id));
+    
+    if (supabase) {
+      await driverRepository.delete(supabase, id);
+    }
+
+    // 2. Localiza e remove o usuário vinculado
+    const users = await db.getUsers();
+    const user = users.find(u => u.driverId === id);
+    
+    if (user) {
+      const remainingUsers = users.filter(u => u.id !== user.id);
+      db._saveLocal(KEYS.USERS, remainingUsers);
+      
+      if (supabase) {
+        await supabase.from('users').delete().eq('id', user.id);
+      }
+    }
+    
     return true;
   },
 
