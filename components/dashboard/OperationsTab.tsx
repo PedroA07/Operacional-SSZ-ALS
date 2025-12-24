@@ -1,239 +1,168 @@
 
-import React, { useState } from 'react';
-import { OperationDefinition, Driver, VWSchedule, VWStatus, Customer } from '../../types';
-import GenericOperationView from './operations/GenericOperationView';
-import VWTab from './VWTab';
+import React, { useState, useEffect, useMemo } from 'react';
+import { OperationDefinition, Driver, Customer, User, Trip, TripStatus } from '../../types';
+import SmartOperationTable from './operations/SmartOperationTable';
+import { db } from '../../utils/storage';
 
 interface OperationsTabProps {
-  availableOps: OperationDefinition[];
-  setAvailableOps: React.Dispatch<React.SetStateAction<OperationDefinition[]>>;
+  user: User;
   drivers: Driver[];
   customers: Customer[];
-  activeView: { type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string };
-  setActiveView: (view: any) => void;
-  vwSchedules: VWSchedule[];
-  onSaveVWSchedule: (schedule: Partial<VWSchedule>, id?: string) => void;
-  onUpdateVWStatus: (id: string, status: VWStatus, time: string) => void;
+  availableOps: OperationDefinition[];
+  activeView: any;
+  setActiveView: any;
 }
 
-const OperationsTab: React.FC<OperationsTabProps> = ({ 
-  availableOps, 
-  setAvailableOps, 
-  drivers,
-  customers,
-  activeView,
-  setActiveView,
-  vwSchedules,
-  onSaveVWSchedule,
-  onUpdateVWStatus
-}) => {
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [newCatName, setNewCatName] = useState('');
-  const [isAddingClient, setIsAddingClient] = useState<{ open: boolean, categoryId?: string }>({ open: false });
-  const [newClientName, setNewClientName] = useState('');
-  const [createDedicatedPage, setCreateDedicatedPage] = useState(false);
+const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, availableOps, activeView, setActiveView }) => {
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
+  const [statusTime, setStatusTime] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('TODAS');
 
-  const handleAddCategory = () => {
-    if (!newCatName.trim()) return;
-    const newOp: OperationDefinition = {
-      id: `op-${Math.random().toString(36).substr(2, 9)}`,
-      category: newCatName.toUpperCase(),
-      clients: []
-    };
-    setAvailableOps([...availableOps, newOp]);
-    setNewCatName('');
-    setIsAddingCategory(false);
+  const loadTrips = async () => {
+    const data = await db.getTrips();
+    setTrips(data);
   };
 
-  const handleAddClient = () => {
-    const targetCatId = isAddingClient.categoryId || (activeView.type !== 'list' ? activeView.id : '');
-    if (!newClientName.trim() || !targetCatId) return;
-    
-    setAvailableOps(prev => prev.map(op => {
-      if (op.id === targetCatId) {
-        return {
-          ...op,
-          clients: [...op.clients, { name: newClientName.toUpperCase(), hasDedicatedPage: createDedicatedPage }]
-        };
-      }
-      return op;
-    }));
-    setNewClientName('');
-    setCreateDedicatedPage(false);
-    setIsAddingClient({ open: false });
+  useEffect(() => { loadTrips(); }, []);
+
+  const filteredTrips = useMemo(() => {
+    if (filterCategory === 'TODAS') return trips;
+    return trips.filter(t => t.category === filterCategory);
+  }, [trips, filterCategory]);
+
+  const openStatusEditor = (trip: Trip, status: TripStatus) => {
+    setSelectedTrip(trip);
+    setTempStatus(status);
+    setStatusTime(new Date().toISOString().slice(0, 16));
+    setIsStatusModalOpen(true);
   };
 
-  const renderBreadcrumbs = () => (
-    <div className="flex items-center justify-between mb-8">
-      <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em]">
-        <button 
-          onClick={() => setActiveView({ type: 'list' })}
-          className={`transition-colors ${activeView.type === 'list' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-        >
-          GERENCIAMENTO CENTRAL
-        </button>
-        {activeView.type === 'category' && (
-          <>
-            <span className="text-slate-300">/</span>
-            <button 
-              onClick={() => setActiveView({ type: 'category', id: activeView.id, categoryName: activeView.categoryName })}
-              className={`transition-colors ${activeView.type === 'category' ? 'text-blue-600' : 'text-slate-400'}`}
-            >
-              {activeView.categoryName}
-            </button>
-          </>
-        )}
-        {activeView.type === 'client' && (
-          <>
-            <span className="text-slate-300">/</span>
-            <button 
-               onClick={() => setActiveView({ type: 'category', id: activeView.id, categoryName: activeView.categoryName })}
-               className="text-slate-400 hover:text-blue-600"
-            >
-              {activeView.categoryName}
-            </button>
-            <span className="text-slate-300">/</span>
-            <span className="text-blue-600">{activeView.clientName}</span>
-          </>
-        )}
-      </div>
-    </div>
-  );
+  const handleUpdateStatus = async () => {
+    if (!selectedTrip) return;
+    const updatedTrip = { ...selectedTrip, status: tempStatus, statusTime: new Date(statusTime).toISOString() };
+    await db.saveTrip(updatedTrip);
+    setIsStatusModalOpen(false);
+    loadTrips();
+  };
 
-  if (activeView.type === 'client' && (activeView.clientName?.toUpperCase() === 'VOLKSWAGEN')) {
-    return (
-      <div className="space-y-6">
-        {renderBreadcrumbs()}
-        <VWTab 
-          schedules={vwSchedules} 
-          drivers={drivers} 
-          onSaveSchedule={onSaveVWSchedule} 
-          onUpdateStatus={onUpdateVWStatus} 
-        />
-      </div>
-    );
-  }
-
-  if (activeView.type === 'category' || activeView.type === 'client') {
-    return (
-      <div className="space-y-6">
-        {renderBreadcrumbs()}
-        <GenericOperationView 
-          type={activeView.type}
-          categoryName={activeView.categoryName!}
-          clientName={activeView.clientName}
-          drivers={drivers}
-          availableOps={availableOps}
-          onNavigate={(view) => setActiveView(view)}
-        />
-      </div>
-    );
-  }
+  const columns = [
+    { 
+      key: 'dateTime', 
+      label: '1. Programação', 
+      render: (t: Trip) => (
+        <div className="flex flex-col">
+          <span className="font-black text-slate-800">{new Date(t.dateTime).toLocaleDateString('pt-BR')}</span>
+          <span className="text-blue-600 font-bold">{new Date(t.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'os_status', 
+      label: '2. OS / Status', 
+      render: (t: Trip) => (
+        <div className="space-y-1">
+          <p className="font-black text-blue-600 text-sm">{t.os}</p>
+          <div className="flex items-center gap-2">
+            <select 
+              value={t.status}
+              onChange={(e) => openStatusEditor(t, e.target.value as TripStatus)}
+              className="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-[9px] font-black uppercase outline-none hover:border-blue-400"
+            >
+              <option value="Pendente">Pendente</option>
+              <option value="Retirada de vazio">Retirada Vazio</option>
+              <option value="Retirada de cheio">Retirada Cheio</option>
+              <option value="Chegada no cliente">Chegada Cliente</option>
+              <option value="Nota fiscal enviada">NF Enviada</option>
+              <option value="Agendamento Porto/Depot">Agendamento</option>
+              <option value="Viagem concluída">Concluída</option>
+            </select>
+            {t.statusTime && <span className="text-[8px] font-bold text-slate-400">às {new Date(t.statusTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'location',
+      label: '3. Local de Atendimento',
+      render: (t: Trip) => (
+        <div className="flex flex-col">
+          <span className="font-black text-slate-700 uppercase leading-none">{t.customer?.name}</span>
+          <span className="text-[9px] text-slate-400 mt-1">{t.customer?.city} - {t.customer?.state}</span>
+        </div>
+      )
+    },
+    {
+      key: 'container_data',
+      label: '4. Dados Container',
+      render: (t: Trip) => (
+        <div className="flex flex-col">
+          <span className="font-black text-slate-800">{t.container || '---'}</span>
+          <div className="flex gap-2 text-[8px] font-bold text-slate-400 uppercase">
+             <span>T: {t.tara || '---'}</span>
+             <span>L: {t.seal || '---'}</span>
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: 'driver', 
+      label: '5. Motorista', 
+      render: (t: Trip) => (
+        <div className="flex flex-col">
+          <span className="font-black text-slate-800 uppercase leading-none">{t.driver?.name}</span>
+          <span className="text-[8px] font-mono text-slate-400 mt-1">CPF: {t.driver?.cpf} | {t.driver?.plateHorse} / {t.driver?.plateTrailer}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'ship_booking', 
+      label: '6. Navio / Booking', 
+      render: (t: Trip) => (
+        <div className="flex flex-col">
+          <span className="font-bold text-slate-700 uppercase leading-none">{t.ship || '---'}</span>
+          <span className="text-[9px] font-black text-blue-500 mt-1 uppercase">BK: {t.booking || '---'}</span>
+        </div>
+      )
+    }
+  ];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Painel Operacional</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-2">Gestão de Categorias e Monitoramento Dedicado</p>
-        </div>
-        <div className="flex gap-3">
-          <button 
-            onClick={() => setIsAddingCategory(true)}
-            className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl flex items-center gap-3"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-            Nova Categoria
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {availableOps.map(op => (
-          <div key={op.id} className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:border-blue-400 transition-all group">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic shadow-lg text-lg">
-                  {op.category.substring(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="font-black text-slate-800 uppercase text-base">{op.category}</h3>
-                  <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">{op.clients.length} SUB-ITENS OPERACIONAIS</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setActiveView({ type: 'category', id: op.id, categoryName: op.category })}
-                className="px-5 py-2.5 bg-white border border-slate-200 text-slate-400 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all"
-              >
-                Gerenciar
-              </button>
-            </div>
-            <div className="flex-1 p-8 space-y-6">
-              <div className="space-y-4">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-l-2 border-blue-500 pl-3">Clientes Vinculados</p>
-                <div className="flex flex-wrap gap-3">
-                  {op.clients.map((client, i) => (
-                    <button
-                      key={i}
-                      onClick={() => client.hasDedicatedPage && setActiveView({ type: 'client', id: op.id, categoryName: op.category, clientName: client.name })}
-                      className={`px-4 py-3 rounded-2xl text-[9px] font-bold uppercase border transition-all flex items-center gap-2 ${client.hasDedicatedPage ? 'bg-blue-50 border-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white' : 'bg-slate-50 border-slate-100 text-slate-500'}`}
-                    >
-                      {client.name}
-                      {client.hasDedicatedPage && <div className="w-1.5 h-1.5 bg-current rounded-full shadow-sm"></div>}
-                    </button>
-                  ))}
-                  <button 
-                    onClick={() => setIsAddingClient({ open: true, categoryId: op.id })}
-                    className="px-4 py-3 rounded-2xl text-[9px] font-black uppercase border border-dashed border-slate-300 text-slate-300 hover:border-blue-500 hover:text-blue-500 transition-all"
-                  >
-                    + VINCULAR CLIENTE
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {isAddingCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Nova Categoria</h3>
-              <button onClick={() => setIsAddingCategory(false)} className="text-slate-300 hover:text-red-500 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
-            </div>
-            <div className="p-10 space-y-6">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Nome da Categoria</label>
-                <input type="text" className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all" placeholder="EX: CARGA FRACIONADA" value={newCatName} onChange={e => setNewCatName(e.target.value)} autoFocus />
-              </div>
-              <button onClick={handleAddCategory} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all">Criar Categoria</button>
-            </div>
+    <div className="space-y-6">
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <div className="flex bg-slate-100 p-1 rounded-2xl">
+            <button onClick={() => setFilterCategory('TODAS')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${filterCategory === 'TODAS' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Todas</button>
+            {availableOps.map(op => (
+              <button key={op.id} onClick={() => setFilterCategory(op.category)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${filterCategory === op.category ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{op.category}</button>
+            ))}
           </div>
         </div>
-      )}
+        <button onClick={() => setIsModalOpen(true)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-600 transition-all">Nova Programação</button>
+      </div>
 
-      {isAddingClient.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Novo Vínculo</h3>
-              <button onClick={() => setIsAddingClient({ open: false })} className="text-slate-300 hover:text-red-500 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
-            </div>
-            <div className="p-10 space-y-6">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Nome do Cliente</label>
-                <input type="text" className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all" placeholder="EX: SCANIA BRASIL" value={newClientName} onChange={e => setNewClientName(e.target.value)} autoFocus />
-              </div>
-              <div className="flex items-center gap-4 bg-blue-50/50 p-6 rounded-3xl border border-blue-100">
-                <div className="flex-1">
-                  <p className="text-[11px] font-black text-blue-600 uppercase">Página Dedicada?</p>
-                  <p className="text-[8px] text-blue-400 font-bold uppercase leading-tight mt-1">Habilita uma sub-aba com monitoramento específico para este cliente.</p>
-                </div>
-                <button onClick={() => setCreateDedicatedPage(!createDedicatedPage)} className={`w-14 h-8 rounded-full p-1 transition-all flex items-center shadow-inner ${createDedicatedPage ? 'bg-blue-600 justify-end' : 'bg-slate-200 justify-start'}`}><div className="w-6 h-6 bg-white rounded-full shadow-lg"></div></button>
-              </div>
-              <button onClick={handleAddClient} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all">Vincular e Criar</button>
-            </div>
+      <SmartOperationTable 
+        userId={user.id} 
+        componentId={`ops-table-${filterCategory}`} 
+        columns={columns} 
+        data={filteredTrips} 
+        title={`Fila Operacional: ${filterCategory}`} 
+      />
+
+      {/* Modal e Status Modal permanecem similares, apenas garantindo os novos campos */}
+      {isStatusModalOpen && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in slide-in-from-bottom-4">
+             <div className="text-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase">Confirmar Evento:</p>
+                <p className="text-lg font-black text-blue-600 uppercase">{tempStatus}</p>
+             </div>
+             <input type="datetime-local" className="w-full px-4 py-4 rounded-xl border-2 border-blue-100 bg-slate-50 font-black" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
+             <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase">Confirmar e Atualizar</button>
+             <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase">Cancelar</button>
           </div>
         </div>
       )}

@@ -1,8 +1,10 @@
 
 import React from 'react';
-import { Driver, OperationDefinition } from '../../../types';
+import { Driver, OperationDefinition, User } from '../../../types';
+import SmartOperationTable from './SmartOperationTable';
 
 interface GenericOperationViewProps {
+  user: User;
   type: 'category' | 'client';
   categoryName: string;
   clientName?: string;
@@ -12,6 +14,7 @@ interface GenericOperationViewProps {
 }
 
 const GenericOperationView: React.FC<GenericOperationViewProps> = ({ 
+  user,
   type, 
   categoryName, 
   clientName, 
@@ -22,13 +25,36 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   // REGRA: Filtrar apenas motoristas vinculados a esta operação específica
   const filteredDrivers = drivers.filter(d => 
     d.operations.some(op => {
-      // Comparação em caixa alta para evitar erros de digitação
       if (type === 'category') return op.category.toUpperCase() === categoryName.toUpperCase();
       return op.category.toUpperCase() === categoryName.toUpperCase() && op.client.toUpperCase() === clientName?.toUpperCase();
     })
   );
 
   const currentOp = availableOps.find(o => o.category.toUpperCase() === categoryName.toUpperCase());
+
+  // Define columns for the drivers table
+  const driverColumns = [
+    { key: 'name', label: 'Motorista', render: (d: any) => (
+      <div>
+        <p className="font-bold text-slate-800 uppercase">{d.name}</p>
+        <p className="text-[8px] text-slate-400 font-bold mt-0.5">{d.driverType}</p>
+      </div>
+    )},
+    { key: 'documents', label: 'Documentação', render: (d: any) => (
+      <div>
+        <p className="text-slate-500 font-medium">CPF: {d.cpf}</p>
+        <p className="text-slate-400 font-medium">RG: {d.rg}</p>
+      </div>
+    )},
+    { key: 'plateHorse', label: 'Placa Cavalo', render: (d: any) => <span className="font-mono font-black text-blue-600 text-xs">{d.plateHorse}</span> },
+    { key: 'plateTrailer', label: 'Placa Carreta', render: (d: any) => <span className="font-mono font-bold text-slate-400">{d.plateTrailer}</span> },
+    { key: 'phone', label: 'Telefone', render: (d: any) => <span className="text-slate-500">{d.phone}</span> },
+    { key: 'status', label: 'Status', render: (d: any) => (
+      <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+        {d.status}
+      </span>
+    )}
+  ];
 
   return (
     <div className="space-y-8 animate-in slide-in-from-right duration-300">
@@ -56,57 +82,19 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Coluna Principal: Motoristas Ativos na Operação */}
+        {/* Main Column: Personalized Table */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-              <h3 className="font-black text-slate-700 uppercase text-[10px] tracking-widest">Motoristas Autorizados</h3>
-              <p className="text-[8px] font-bold text-slate-400 uppercase italic">* Exibindo apenas motoristas com vínculo no cadastro</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[10px]">
-                <thead className="bg-slate-50 text-slate-400 font-black uppercase tracking-widest">
-                  <tr>
-                    <th className="px-6 py-4">Motorista</th>
-                    <th className="px-6 py-4">Documentos</th>
-                    <th className="px-6 py-4">Placa Cavalo</th>
-                    <th className="px-6 py-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filteredDrivers.map(d => (
-                    <tr key={d.id} className="hover:bg-slate-50/50 transition-all">
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-slate-700 uppercase">{d.name}</p>
-                        <p className="text-[8px] text-slate-400 font-bold mt-0.5">{d.driverType}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-slate-500 font-medium">CPF: {d.cpf}</p>
-                        <p className="text-slate-400 font-medium">RG: {d.rg}</p>
-                      </td>
-                      <td className="px-6 py-4 font-mono font-black text-blue-600 uppercase text-xs">{d.plateHorse}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                          {d.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredDrivers.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-20 text-center text-slate-300 font-bold uppercase italic border-2 border-dashed border-slate-100 rounded-b-3xl">
-                        Nenhum motorista possui vínculo direto com esta operação.<br/>
-                        <span className="text-[9px] mt-2 block">Adicione esta operação ao cadastro do motorista para visualizá-lo aqui.</span>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <SmartOperationTable 
+            userId={user.id}
+            componentId={`op-drivers-${type}-${categoryName}-${clientName || 'all'}`}
+            title="Motoristas Autorizados na Operação"
+            columns={driverColumns}
+            data={filteredDrivers}
+            defaultVisibleKeys={['name', 'plateHorse', 'status']}
+          />
         </div>
 
-        {/* Sidebar da Operação: Subcategorias / Clientes */}
+        {/* Sidebar della Operazione: Subcategorias / Clientes */}
         <div className="lg:col-span-4 space-y-6">
           {type === 'category' && (
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">

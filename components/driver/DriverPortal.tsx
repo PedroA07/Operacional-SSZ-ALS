@@ -62,7 +62,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
               <div>
                 <span className="bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded text-[8px] font-black uppercase">{trip.type}</span>
                 <h3 className="text-lg font-black text-slate-800 mt-1">{trip.os}</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">{trip.customerName}</p>
+                {/* Fix: Property 'customerName' does not exist on type 'Trip'. Use 'customer.name'. */}
+                <p className="text-[10px] font-bold text-slate-400 uppercase">{trip.customer?.name}</p>
               </div>
               <div className="text-right">
                  <p className="text-[10px] font-black text-blue-600">{trip.container}</p>

@@ -60,7 +60,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     const index = currentOps.findIndex(op => op.category === category && op.client === clientName);
     if (index >= 0) currentOps.splice(index, 1);
     else currentOps.push({ category, client: clientName });
-    setForm({ ...form, operations: currentOps });
+    // Fix: Explicitly handle state update for nested array
+    setForm(prev => ({ ...prev, operations: currentOps }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -275,16 +276,16 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                       <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-black uppercase text-xl focus:border-blue-500 outline-none shadow-sm transition-all" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CPF</label><input required className={inputClasses} value={form.cpf} onChange={e => setForm({...form, cpf: maskCPF(e.target.value)})} /></div>
-                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">RG</label><input className={inputClasses} value={form.rg} onChange={e => setForm({...form, rg: maskRG(e.target.value)})} /></div>
-                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNH</label><input className={inputClasses} value={form.cnh} onChange={e => setForm({...form, cnh: e.target.value})} /></div>
+                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CPF</label><input required className={inputClasses} value={form.cpf} onChange={e => setForm(prev => ({...prev, cpf: maskCPF(e.target.value)}))} /></div>
+                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">RG</label><input className={inputClasses} value={form.rg} onChange={e => setForm(prev => ({...prev, rg: maskRG(e.target.value)}))} /></div>
+                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNH</label><input className={inputClasses} value={form.cnh} onChange={e => setForm(prev => ({...prev, cnh: e.target.value}))} /></div>
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                   <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">Telefone Principal</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
-                   <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Operacional (Opcional)</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
+                   <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">Telefone Principal</label><input required className={inputClasses} value={form.phone} onChange={e => setForm(prev => ({...prev, phone: maskPhone(e.target.value)}))} /></div>
+                   <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Operacional (Opcional)</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm(prev => ({...prev, email: e.target.value}))} /></div>
                 </div>
 
                 <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200 space-y-5">
@@ -331,7 +332,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                      <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">Dados do Beneficiário</h4>
                      <div className="flex bg-white/60 p-1 rounded-xl border border-emerald-200">
                         {['PIX', 'TED'].map(pref => (
-                          <button key={pref} type="button" onClick={() => setForm({...form, paymentPreference: pref as any})} className={`px-4 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${form.paymentPreference === pref ? 'bg-emerald-600 text-white shadow-md' : 'text-emerald-400 hover:text-emerald-600'}`}>
+                          <button key={pref} type="button" onClick={() => setForm(prev => ({...prev, paymentPreference: pref as any}))} className={`px-4 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${form.paymentPreference === pref ? 'bg-emerald-600 text-white shadow-md' : 'text-emerald-400 hover:text-emerald-600'}`}>
                             {pref}
                           </button>
                         ))}
@@ -339,12 +340,12 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                    </div>
                    <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">Nome Completo</label><input className={inputClasses} value={form.beneficiaryName} onChange={e => setForm({...form, beneficiaryName: e.target.value})} /></div>
-                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">CNPJ (Se houver)</label><input className={inputClasses} value={form.beneficiaryCnpj} onChange={e => setForm({...form, beneficiaryCnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" /></div>
+                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">Nome Completo</label><input className={inputClasses} value={form.beneficiaryName} onChange={e => setForm(prev => ({...prev, beneficiaryName: e.target.value}))} /></div>
+                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">CNPJ (Se houver)</label><input className={inputClasses} value={form.beneficiaryCnpj} onChange={e => setForm(prev => ({...prev, beneficiaryCnpj: maskCNPJ(e.target.value)}))} placeholder="00.000.000/0000-00" /></div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">Telefone</label><input className={inputClasses} value={form.beneficiaryPhone} onChange={e => setForm({...form, beneficiaryPhone: maskPhone(e.target.value)})} /></div>
-                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">E-mail</label><input className={`${inputClasses} lowercase`} value={form.beneficiaryEmail} onChange={e => setForm({...form, beneficiaryEmail: e.target.value})} /></div>
+                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">Telefone</label><input className={inputClasses} value={form.beneficiaryPhone} onChange={e => setForm(prev => ({...prev, beneficiaryPhone: maskPhone(e.target.value)}))} /></div>
+                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">E-mail</label><input className={`${inputClasses} lowercase`} value={form.beneficiaryEmail} onChange={e => setForm(prev => ({...prev, beneficiaryEmail: e.target.value}))} /></div>
                       </div>
                    </div>
                 </div>
@@ -352,8 +353,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                 <div className="bg-indigo-50/40 p-8 rounded-[2.5rem] border border-indigo-100 space-y-5">
                    <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">WhatsApp do Grupo</h4>
                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1"><label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm({...form, whatsappGroupName: e.target.value})} placeholder="EX: FROTA ALS 01" /></div>
-                      <div className="space-y-1"><label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Link do Grupo</label><input className={inputClasses} value={form.whatsappGroupLink} onChange={e => setForm({...form, whatsappGroupLink: e.target.value})} placeholder="https://chat.whatsapp.com/..." /></div>
+                      <div className="space-y-1"><label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm(prev => ({...prev, whatsappGroupName: e.target.value}))} placeholder="EX: FROTA ALS 01" /></div>
+                      <div className="space-y-1"><label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Link do Grupo</label><input className={inputClasses} value={form.whatsappGroupLink} onChange={e => setForm(prev => ({...prev, whatsappGroupLink: e.target.value}))} placeholder="https://chat.whatsapp.com/..." /></div>
                    </div>
                 </div>
               </div>
@@ -363,7 +364,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Acesso ao Portal</h4>
                    <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
                       <span className="text-[9px] font-black uppercase">Liberar Login?</span>
-                      <button type="button" onClick={() => setForm({...form, hasAccess: !form.hasAccess})} className={`w-12 h-7 rounded-full p-1 transition-all ${form.hasAccess ? 'bg-blue-600' : 'bg-white/10'}`}>
+                      <button type="button" onClick={() => setForm(prev => ({...prev, hasAccess: !prev.hasAccess}))} className={`w-12 h-7 rounded-full p-1 transition-all ${form.hasAccess ? 'bg-blue-600' : 'bg-white/10'}`}>
                         <div className={`w-5 h-5 bg-white rounded-full transition-all shadow-md ${form.hasAccess ? 'translate-x-5' : ''}`}></div>
                       </button>
                    </div>
@@ -389,11 +390,11 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                    <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1"><label className="text-[8px] font-black text-blue-400 uppercase">Placa Cavalo</label><input required className={inputClasses} value={form.plateHorse} onChange={e => setForm({...form, plateHorse: maskPlate(e.target.value)})} /></div>
-                        <div className="space-y-1"><label className="text-[8px] font-black text-blue-400 uppercase">Ano Cav.</label><input required className={inputClasses} value={form.yearHorse} onChange={e => setForm({...form, yearHorse: e.target.value})} /></div>
+                        <div className="space-y-1"><label className="text-[8px] font-black text-blue-400 uppercase">Ano Cav.</label><input required className={inputClasses} value={form.yearHorse} onChange={e => setForm(prev => ({...prev, yearHorse: e.target.value}))} /></div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Placa Carr.</label><input required className={inputClasses} value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: maskPlate(e.target.value)})} /></div>
-                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Ano Carr.</label><input required className={inputClasses} value={form.yearTrailer} onChange={e => setForm({...form, yearTrailer: e.target.value})} /></div>
+                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Placa Carr.</label><input required className={inputClasses} value={form.plateTrailer} onChange={e => setForm(prev => ({...prev, plateTrailer: maskPlate(e.target.value)}))} /></div>
+                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Ano Carr.</label><input required className={inputClasses} value={form.yearTrailer} onChange={e => setForm(prev => ({...prev, yearTrailer: e.target.value}))} /></div>
                       </div>
                    </div>
                 </div>
@@ -401,7 +402,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                 <div className="bg-blue-50/40 p-6 rounded-[2rem] border border-blue-100 space-y-4">
                    <h4 className="text-[10px] font-black text-blue-600 uppercase">Parâmetros</h4>
                    <div className="space-y-4">
-                      <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Tipo</label><select className={inputClasses} value={form.driverType} onChange={e => setForm({...form, driverType: e.target.value as any})}><option value="Externo">Externo (Terceiro)</option><option value="Frota">Frota ALS</option><option value="Motoboy">Motoboy</option></select></div>
+                      <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Tipo</label><select className={inputClasses} value={form.driverType} onChange={e => setForm(prev => ({...prev, driverType: e.target.value as any}))}><option value="Externo">Externo (Terceiro)</option><option value="Frota">Frota ALS</option><option value="Motoboy">Motoboy</option></select></div>
                       <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Status</label><select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option></select></div>
                    </div>
                 </div>

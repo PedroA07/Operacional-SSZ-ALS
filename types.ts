@@ -1,145 +1,179 @@
 
+export enum AppScreen {
+  LOGIN = 'LOGIN',
+  DASHBOARD = 'DASHBOARD'
+}
+
 export interface User {
   id: string;
   username: string;
   password?: string;
   displayName: string;
   role: 'admin' | 'staff' | 'driver' | 'motoboy';
-  driverId?: string;
-  staffId?: string;
   lastLogin: string;
-  lastSeen?: string;
-  isOnlineVisible?: boolean;
-  isFirstLogin?: boolean;
   photo?: string;
   position?: string;
-  emailCorp?: string;
-  phoneCorp?: string;
+  driverId?: string;
+  staffId?: string;
   status?: 'Ativo' | 'Inativo';
-  statusSince?: string;
-}
-
-export enum AppScreen {
-  LOGIN = 'LOGIN',
-  DASHBOARD = 'DASHBOARD',
-  DRIVER_PORTAL = 'DRIVER_PORTAL'
-}
-
-export interface Port {
-  id: string;
-  name: string;
-  address: string;
-  neighborhood?: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  cnpj: string;
-  registrationDate: string;
-}
-
-export interface PreStacking {
-  id: string;
-  name: string;
-  cnpj: string;
-  zipCode: string;
-  address: string;
-  neighborhood?: string;
-  city: string;
-  state: string;
-  registrationDate: string;
-}
-
-export interface Customer {
-  id: string;
-  name: string;
-  address: string;
-  neighborhood?: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  cnpj: string;
-  registrationDate: string;
-  operations: string[];
-}
-
-export interface DriverOperation {
-  category: string;
-  client: string;
-}
-
-export interface Driver {
-  id: string;
-  photo?: string;
-  name: string;
-  cpf: string;
-  rg: string;
-  cnh: string;
-  phone: string;
-  email?: string;
-  plateHorse: string;
-  yearHorse: string;
-  plateTrailer: string;
-  yearTrailer: string;
-  driverType: 'Frota' | 'Externo' | 'Motoboy';
-  status: 'Ativo' | 'Inativo';
-  statusLastChangeDate: string;
-  beneficiaryName: string;
-  beneficiaryPhone: string;
-  beneficiaryEmail: string;
-  beneficiaryCnpj?: string;
-  paymentPreference?: 'TED' | 'PIX';
-  whatsappGroupName: string;
-  whatsappGroupLink: string;
-  registrationDate: string;
-  operations: DriverOperation[];
-  tripsCount: number;
-  hasAccess?: boolean;
-  generatedPassword?: string;
-}
-
-export interface Staff {
-  id: string;
-  photo?: string;
-  name: string;
-  position: string;
-  username: string;
-  role: 'admin' | 'staff';
-  registrationDate: string;
-  lastLogin?: string;
-  emailCorp?: string;
-  phoneCorp?: string;
-  status: 'Ativo' | 'Inativo';
-  statusSince: string;
+  isFirstLogin?: boolean;
+  lastSeen?: string;
+  isOnlineVisible?: boolean;
 }
 
 export enum DashboardTab {
   INICIO = 'INICIO',
   OPERACOES = 'OPERACOES',
+  ADMINISTRATIVO = 'ADMINISTRATIVO',
   MOTORISTAS = 'MOTORISTAS',
   CLIENTES = 'CLIENTES',
-  PORTOS = 'PORTOS',
-  PRE_STACKING = 'PRE_STACKING',
+  SISTEMA = 'SISTEMA',
   FORMULARIOS = 'FORMULARIOS',
   COLABORADORES = 'COLABORADORES',
-  SISTEMA = 'SISTEMA'
+  PORTOS = 'PORTOS',
+  PRE_STACKING = 'PRE_STACKING'
 }
 
-export interface WeatherData {
-  temp: number;
-  condition: string;
-  icon: string;
-  forecastNextDay: {
-    temp: number;
-    condition: string;
-  };
+export type TripStatus = 
+  | 'Pendente' 
+  | 'Retirada de vazio'
+  | 'Retirada de cheio'
+  | 'Chegada no cliente'
+  | 'Nota fiscal enviada'
+  | 'Agendamento Porto/Depot'
+  | 'Viagem concluída';
+
+export interface PaymentStatus {
+  status: 'BLOQUEADO' | 'LIBERAR' | 'PAGO' | 'AGUARDANDO_DOCS';
+  liberatedAt?: string;
+  paidDate?: string;
 }
 
-export interface OperationDefinition {
+export interface TripDocument {
   id: string;
-  category: string;
-  clients: { name: string; hasDedicatedPage: boolean }[];
+  type: 'COMPLETO' | 'NF' | 'OC' | 'MINUTA';
+  url: string;
+  fileName: string;
+  uploadDate: string;
 }
 
+export interface Trip {
+  id: string;
+  os: string;
+  booking: string;
+  ship: string;
+  dateTime: string;
+  statusTime?: string;
+  isLate: boolean;
+  type: 'EXPORTAÇÃO' | 'IMPORTAÇÃO' | 'COLETA' | 'ENTREGA';
+  category: string;
+  container: string;
+  tara?: string;
+  seal?: string;
+  customer: { id: string; name: string; city: string; state?: string };
+  driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string };
+  status: TripStatus;
+  advancePayment: PaymentStatus;
+  balancePayment: PaymentStatus;
+  documents: TripDocument[];
+}
+
+// Added DriverOperation to support Driver interface
+export interface DriverOperation {
+  category: string;
+  client: string;
+}
+
+// Updated Driver interface with missing properties reported in errors
+export interface Driver {
+  id: string;
+  name: string;
+  cpf: string;
+  rg?: string;
+  cnh?: string;
+  photo?: string;
+  phone: string;
+  email?: string;
+  plateHorse: string;
+  yearHorse?: string;
+  plateTrailer: string;
+  yearTrailer?: string;
+  driverType: 'Frota' | 'Externo' | 'Motoboy';
+  status: 'Ativo' | 'Inativo';
+  statusLastChangeDate?: string;
+  beneficiaryName?: string;
+  beneficiaryPhone?: string;
+  beneficiaryEmail?: string;
+  beneficiaryCnpj?: string;
+  paymentPreference?: 'PIX' | 'TED';
+  whatsappGroupName?: string;
+  whatsappGroupLink?: string;
+  registrationDate?: string;
+  operations: DriverOperation[];
+  tripsCount?: number;
+  generatedPassword?: string;
+  hasAccess?: boolean;
+}
+
+// Updated Customer interface with missing properties
+export interface Customer { 
+  id: string; 
+  name: string; 
+  cnpj: string; 
+  city: string; 
+  state: string; 
+  address?: string;
+  neighborhood?: string;
+  zipCode?: string;
+  operations?: string[];
+}
+
+// Updated Port interface with missing properties
+export interface Port { 
+  id: string; 
+  name: string; 
+  city: string; 
+  state: string; 
+  cnpj: string; 
+  address: string; 
+  neighborhood?: string;
+  zipCode?: string;
+}
+
+// Updated PreStacking interface with missing properties
+export interface PreStacking { 
+  id: string; 
+  name: string; 
+  city: string; 
+  state: string; 
+  cnpj: string; 
+  address: string; 
+  neighborhood?: string;
+  zipCode?: string;
+}
+
+export interface Staff { 
+  id: string; 
+  name: string; 
+  username: string; 
+  role: 'admin' | 'staff'; 
+  position: string; 
+  registrationDate: string; 
+  status: 'Ativo' | 'Inativo'; 
+  statusSince: string; 
+  photo?: string; 
+  lastLogin?: string; 
+  emailCorp?: string; 
+  phoneCorp?: string; 
+}
+
+export interface OperationDefinition { 
+  id: string; 
+  category: string; 
+  clients: { name: string; hasDedicatedPage: boolean }[]; 
+}
+
+// Added VW types for monitoring
 export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
 
 export interface VWStatusUpdate {
@@ -163,38 +197,23 @@ export interface VWSchedule {
   statusHistory: VWStatusUpdate[];
 }
 
-export interface Milestone {
-  dt: string;
-  location?: string;
+// Added UserPreferences for storage
+export interface UserPreferences {
+  visibleColumns: Record<string, string[]>;
 }
 
-export interface TripMilestones {
-  retiradaVazio?: Milestone;
-  chegadaCliente?: Milestone;
-  retiradaCheio?: Milestone;
-  agendamento?: Milestone;
-  entregaFinal?: Milestone;
-  liberacaoRetirada?: Milestone;
-  baixaNF?: Milestone;
-  saidaCliente?: Milestone;
+// Added WeatherData for WeatherWidget
+export interface WeatherData {
+  temp: number;
+  condition: string;
+  icon: string;
+  forecastNextDay: {
+    temp: number;
+    condition: string;
+  };
 }
 
-export interface Trip {
-  id: string;
-  os: string;
-  status: string;
-  type: 'IMPORT_ENTREGA' | 'EXPORT_COLETA';
-  customerName: string;
-  scheduledDateTime: string;
-  driverName: string;
-  driverId: string;
-  plateHorse: string;
-  plateTrailer: string;
-  container: string;
-  milestones: TripMilestones;
-}
-
-// OpentechTrip interface for SIL Opentech integration modules
+// Added OpentechTrip for SIL monitoring
 export interface OpentechTrip {
   id: string;
   smNumber: string;
@@ -206,6 +225,6 @@ export interface OpentechTrip {
   destination: string;
   startTime: string;
   eta: string;
-  status: 'Em Viagem' | 'Concluída' | 'Alerta' | 'Sinistrada' | 'Iniciada' | string;
-  riskLevel: 'Baixo' | 'Médio' | 'Alto' | 'Crítico' | string;
+  status: string;
+  riskLevel: 'Baixo' | 'Médio' | 'Alto' | 'Crítico';
 }

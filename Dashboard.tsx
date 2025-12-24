@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, VWSchedule, VWStatus, Trip } from '../types';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, VWSchedule, VWStatus, Trip } from './types';
 import OverviewTab from './dashboard/OverviewTab';
 import DriversTab from './dashboard/DriversTab';
 import FormsTab from './dashboard/FormsTab';
@@ -14,9 +14,9 @@ import SystemTab from './dashboard/SystemTab';
 import WeatherWidget from './dashboard/WeatherWidget';
 import OnlineStatus from './dashboard/OnlineStatus';
 import DatabaseStatus from './dashboard/DatabaseStatus';
-import { DEFAULT_OPERATIONS } from '../constants/operations';
-import { db } from '../utils/storage';
-import { Icons } from '../constants/icons';
+import { DEFAULT_OPERATIONS } from './constants/operations';
+import { db } from './utils/storage';
+import { Icons } from './constants/icons';
 
 interface DashboardProps {
   user: User;
@@ -29,7 +29,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionTime, setSessionTime] = useState('00:00:00');
-  
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [ports, setPorts] = useState<Port[]>([]);
@@ -81,7 +80,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <div className={`${isActive ? 'text-white' : 'text-slate-50 group-hover:text-white'}`}>{icon}</div>
             {sidebarState === 'open' && <span className="truncate">{label}</span>}
           </button>
-          {children && sidebarState === 'open' && <button onClick={(e) => { e.stopPropagation(); setExpandedMenus(p => ({ ...p, [label]: !p[label] })); }} className={`p-3 text-slate-500 transition-all ${isExpanded ? 'rotate-180' : ''}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>}
+          {children && sidebarState === 'open' && <button onClick={(e) => { e.stopPropagation(); setExpandedMenus(p => ({ ...p, [label]: !p[label] })); }} className={`p-3 text-slate-500 transition-all ${isExpanded ? 'rotate-180' : ''}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg></button>}
         </div>
         {children && isExpanded && sidebarState === 'open' && <div className="ml-8 mt-1 space-y-1 border-l border-slate-800/50 pl-4 animate-in slide-in-from-top-2">{children}</div>}
       </div>
