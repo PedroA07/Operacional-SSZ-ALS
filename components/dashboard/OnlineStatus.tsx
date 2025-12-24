@@ -14,15 +14,16 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
 
   const fetchStatus = useCallback(async () => {
+    // Busca direta do banco para evitar cache local atrasado
     const u = await db.getUsers();
     setUsers(u);
   }, []);
 
   useEffect(() => {
     fetchStatus();
-    // Atualiza a lista de usuários a cada 20 segundos (Polling)
-    const syncInterval = setInterval(fetchStatus, 20000);
-    // Atualiza os timers internos a cada segundo
+    // Polling a cada 15 segundos para atualizar a lista de quem está logado
+    const syncInterval = setInterval(fetchStatus, 15000);
+    // Timer interno para os cronômetros individuais (segundo a segundo)
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -45,13 +46,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
     
-    // Se o último sinal foi há mais de 5 minutos
-    if (diffSeconds > 300) return 'OFFLINE';
+    // Se o sinal de vida sumiu há mais de 3 minutos
+    if (diffSeconds > 180) return 'OFFLINE';
     
-    // Se está visível e sinal recente (menos de 60s)
-    if (user.isOnlineVisible && diffSeconds < 60) return 'ONLINE';
+    // Se está visível e enviou heartbeat recentemente (< 45s)
+    if (user.isOnlineVisible && diffSeconds < 45) return 'ONLINE';
     
-    // Logado mas aba oculta ou sem interação recente
+    // Logado mas aba oculta ou sem sinal recente (estilo "Away" do Skype/Discord)
     return 'AUSENTE';
   };
 
@@ -86,11 +87,11 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
           <div className="relative">
             <div className={`w-3 h-3 rounded-full ${onlineCount > 0 ? 'bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.6)]' : 'bg-slate-600'}`}></div>
           </div>
-          <div className="flex flex-col items-start">
+          <div className="flex flex-col items-start text-left">
             <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
               {onlineCount} Online
             </span>
-            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">Painel de Presença</span>
+            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">Monitoramento ALS</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -100,8 +101,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
         <div className="absolute bottom-full left-0 mb-4 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] overflow-hidden animate-in slide-in-from-bottom-6 zoom-in-95 duration-500 z-[200]">
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
              <div className="flex flex-col">
-               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Conectados</h4>
-               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Sincronização via Heartbeat</p>
+               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Painel de Presença</h4>
+               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Sincronização em Tempo Real</p>
              </div>
              <span className="text-[8px] font-black bg-blue-600 text-white px-3 py-1.5 rounded-xl uppercase shadow-lg shadow-blue-600/20 animate-pulse">Live</span>
           </div>

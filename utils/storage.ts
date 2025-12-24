@@ -33,9 +33,9 @@ const userMapper = {
     driver_id: u.driverId,
     staff_id: u.staffId,
     status: u.status,
-    is_first_login: u.isFirstLogin,
+    is_first_login: u.isFirstLogin ?? false,
     last_seen: u.lastSeen,
-    is_online_visible: u.isOnlineVisible
+    is_online_visible: u.isOnlineVisible ?? true
   }),
   mapFromDb: (u: any): User => ({
     id: u.id,
@@ -49,8 +49,8 @@ const userMapper = {
     driverId: u.driver_id || u.driverId,
     staffId: u.staff_id || u.staffId,
     status: u.status,
-    isFirstLogin: u.is_first_login || u.isFirstLogin,
-    lastSeen: u.last_seen || u.lastSeen || u.lastseen,
+    isFirstLogin: !!u.is_first_login, // Converte explicitamente para booleano
+    lastSeen: u.last_seen || u.lastSeen,
     isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
   })
 };
@@ -60,18 +60,6 @@ export const db = {
   _getLocal: (key: string) => JSON.parse(localStorage.getItem(key) || '[]'),
 
   isCloudActive: () => !!supabase,
-
-  getPreferences: (userId: string) => {
-    const allPrefs = JSON.parse(localStorage.getItem(KEYS.PREFERENCES) || '{}');
-    return allPrefs[userId] || { visibleColumns: {} };
-  },
-
-  savePreference: (userId: string, componentId: string, columns: string[]) => {
-    const allPrefs = JSON.parse(localStorage.getItem(KEYS.PREFERENCES) || '{}');
-    if (!allPrefs[userId]) allPrefs[userId] = { visibleColumns: {} };
-    allPrefs[userId].visibleColumns[componentId] = columns;
-    localStorage.setItem(KEYS.PREFERENCES, JSON.stringify(allPrefs));
-  },
 
   updatePresence: async (userId: string, isVisible: boolean) => {
     const now = new Date().toISOString();
@@ -128,11 +116,13 @@ export const db = {
       staffId: staff.id,
       position: staff.position,
       status: staff.status,
-      photo: staff.photo
+      photo: staff.photo,
+      isFirstLogin: existingUser ? existingUser.isFirstLogin : true
     };
     
     if (password) {
       userToSave.password = password;
+      userToSave.isFirstLogin = false; // Se o admin definiu uma senha, desativa a troca obrigatória
     } else if (!existingUser) {
       userToSave.password = '12345678';
     } else {
@@ -277,6 +267,18 @@ export const db = {
     const current = db._getLocal(KEYS.STAFF).filter((s: Staff) => s.id !== id);
     db._saveLocal(KEYS.STAFF, current);
     return true;
+  },
+
+  getPreferences: (userId: string) => {
+    const allPrefs = JSON.parse(localStorage.getItem(KEYS.PREFERENCES) || '{}');
+    return allPrefs[userId] || { visibleColumns: {} };
+  },
+
+  savePreference: (userId: string, componentId: string, columns: string[]) => {
+    const allPrefs = JSON.parse(localStorage.getItem(KEYS.PREFERENCES) || '{}');
+    if (!allPrefs[userId]) allPrefs[userId] = { visibleColumns: {} };
+    allPrefs[userId].visibleColumns[componentId] = columns;
+    localStorage.setItem(KEYS.PREFERENCES, JSON.stringify(allPrefs));
   },
 
   exportBackup: async () => {

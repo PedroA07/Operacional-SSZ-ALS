@@ -2,21 +2,20 @@
 import { User } from '../types';
 
 /**
- * Lógica centralizada de segurança para troca de senha.
- * Isolada para evitar alterações acidentais em outros módulos.
+ * Lógica de segurança isolada para troca de senha.
+ * Define se o fluxo de 'Primeiro Acesso' deve ser ativado.
  */
 export const authSecurity = {
   /**
    * Verifica se o usuário deve ser forçado a mudar a senha.
-   * Regra: Se isFirstLogin for true OU se a senha for a padrão '12345678'.
+   * REGRA ATUALIZADA: Só força se isFirstLogin for EXPLICITAMENTE true.
    */
   mustChangePassword: (user: User): boolean => {
-    // Admin master hardcoded nunca é forçado a trocar por aqui
-    if (user.id === 'admin-master') return false;
+    // Admin Master hardcoded nunca troca
+    if (user.id === 'admin-master' || user.username === 'operacional_ssz') return false;
 
-    const isDefaultPassword = user.password === '12345678';
-    const isExplicitFirstLogin = user.isFirstLogin === true;
-
-    return isExplicitFirstLogin || isDefaultPassword;
+    // Se o campo for false, null ou undefined, NÃO força a troca.
+    // Isso evita o loop caso o banco não tenha o campo preenchido.
+    return user.isFirstLogin === true;
   }
 };
