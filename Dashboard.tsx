@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
 import DriversTab from './components/dashboard/DriversTab';
@@ -28,9 +28,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ 'Operações': false, 'Administrativo': false });
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
-  
-  // Ref para marcar o início REAL da sessão no navegador (sempre começa do zero)
-  const sessionStartTimeRef = useRef<number>(Date.now());
   
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -128,7 +125,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </div>
            <div className="flex items-center gap-6">
               <DatabaseStatus />
-              <UserProfile user={user} sessionStartTime={sessionStartTimeRef.current} />
+              <UserProfile user={user} />
            </div>
         </header>
         <div className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">

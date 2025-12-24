@@ -5,10 +5,9 @@ import { db } from '../../utils/storage';
 
 interface UserProfileProps {
   user: User;
-  sessionStartTime: number;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ user, sessionStartTime }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [staffData, setStaffData] = useState<Staff | null>(null);
   const [sessionTime, setSessionTime] = useState('00:00:00');
@@ -25,8 +24,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, sessionStartTime }) => 
     loadStaffInfo();
 
     const updateTimer = () => {
+      const startTime = new Date(user.lastLogin).getTime();
       const now = new Date().getTime();
-      const diff = now - sessionStartTime;
+      const diff = now - startTime;
       
       const safeDiff = diff > 0 ? diff : 0;
       
@@ -50,7 +50,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, sessionStartTime }) => 
       clearInterval(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [sessionStartTime, user.staffId]);
+  }, [user.lastLogin, user.staffId]);
 
   return (
     <div className="relative" ref={dropdownRef}>

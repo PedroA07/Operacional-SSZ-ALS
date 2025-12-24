@@ -14,16 +14,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
 
   const fetchStatus = useCallback(async () => {
-    // Busca direta do banco para refletir o status real de todos os terminais
     const u = await db.getUsers();
     setUsers(u);
   }, []);
 
   useEffect(() => {
     fetchStatus();
-    // Heartbeat de interface: atualiza lista a cada 10 segundos para maior precisão
     const syncInterval = setInterval(fetchStatus, 10000);
-    // Timer de precisão visual: atualiza cronômetros a cada segundo
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,13 +43,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
     
-    // Se o sinal de vida sumiu há mais de 3 minutos (heartbeat parado)
     if (diffSeconds > 180) return 'OFFLINE';
-    
-    // Se está com a aba visível e enviou heartbeat recentemente (< 45s)
     if (user.isOnlineVisible && diffSeconds < 45) return 'ONLINE';
-    
-    // Logado mas aba em segundo plano ou sem atividade recente
     return 'AUSENTE';
   };
 
