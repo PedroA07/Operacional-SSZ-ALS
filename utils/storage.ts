@@ -34,7 +34,7 @@ const userMapper = {
     staff_id: u.staffId,
     status: u.status,
     is_first_login: u.isFirstLogin,
-    last_seen: u.last_seen,
+    last_seen: u.lastSeen,
     is_online_visible: u.isOnlineVisible
   }),
   mapFromDb: (u: any): User => ({
@@ -75,17 +75,25 @@ export const db = {
 
   updatePresence: async (userId: string, isVisible: boolean) => {
     const now = new Date().toISOString();
+    
+    // Atualização no Supabase (usa snake_case para as colunas do DB)
     if (supabase) {
       await supabase.from('users').update({ 
         last_seen: now, 
         is_online_visible: isVisible 
       }).eq('id', userId);
     }
-    // Update local for fallback
+    
+    // Atualização no LocalStorage (usa CamelCase para o objeto User do frontend)
     const users = db._getLocal(KEYS.USERS);
     const idx = users.findIndex((u: User) => u.id === userId);
     if (idx >= 0) {
-      users[idx] = { ...users[idx], lastSeen: now, isOnlineVisible: isVisible };
+      // CORREÇÃO AQUI: Propriedades devem ser CamelCase para bater com a interface User
+      users[idx] = { 
+        ...users[idx], 
+        lastSeen: now, 
+        isOnlineVisible: isVisible 
+      };
       db._saveLocal(KEYS.USERS, users);
     }
   },
@@ -98,7 +106,6 @@ export const db = {
     return db._getLocal(KEYS.CATEGORIES);
   },
 
-  // Fix for error in CategoryManagerModal: Added saveCategory method
   saveCategory: async (category: Partial<Category>) => {
     const newCat = { ...category, id: category.id || `cat-${Date.now()}` } as Category;
     if (supabase) await supabase.from('categories').upsert(newCat);
@@ -137,7 +144,6 @@ export const db = {
     return db._getLocal(KEYS.DRIVERS);
   },
 
-  // Fix for error in Dashboard: Added saveDriver method
   saveDriver: async (driver: Driver) => {
     if (supabase) await driverRepository.save(supabase, driver);
     const current = db._getLocal(KEYS.DRIVERS);
@@ -147,7 +153,6 @@ export const db = {
     return true;
   },
 
-  // Fix for error in Dashboard: Added deleteDriver method
   deleteDriver: async (id: string) => {
     if (supabase) await driverRepository.delete(supabase, id);
     const current = db._getLocal(KEYS.DRIVERS).filter((d: Driver) => d.id !== id);
@@ -163,7 +168,6 @@ export const db = {
     return db._getLocal(KEYS.CUSTOMERS);
   },
 
-  // Fix for error in Dashboard: Added saveCustomer method
   saveCustomer: async (customer: Customer) => {
     if (supabase) await supabase.from('customers').upsert(customer);
     const current = db._getLocal(KEYS.CUSTOMERS);
@@ -173,7 +177,6 @@ export const db = {
     return true;
   },
 
-  // Fix for error in Dashboard: Added deleteCustomer method
   deleteCustomer: async (id: string) => {
     if (supabase) await supabase.from('customers').delete().eq('id', id);
     const current = db._getLocal(KEYS.CUSTOMERS).filter((c: Customer) => c.id !== id);
@@ -189,7 +192,6 @@ export const db = {
     return db._getLocal(KEYS.PORTS);
   },
 
-  // Fix for error in Dashboard: Added savePort method
   savePort: async (port: Port) => {
     if (supabase) await supabase.from('ports').upsert(port);
     const current = db._getLocal(KEYS.PORTS);
@@ -207,7 +209,6 @@ export const db = {
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
-  // Fix for error in Dashboard: Added savePreStacking method
   savePreStacking: async (ps: PreStacking) => {
     if (supabase) await supabase.from('pre_stacking').upsert(ps);
     const current = db._getLocal(KEYS.PRE_STACKING);
@@ -225,7 +226,6 @@ export const db = {
     return db._getLocal(KEYS.STAFF);
   },
 
-  // Fix for error in Dashboard: Added saveStaff method
   saveStaff: async (staff: Staff, password?: string) => {
     if (supabase) await supabase.from('staff').upsert(staff);
     const current = db._getLocal(KEYS.STAFF);
@@ -233,7 +233,6 @@ export const db = {
     if (idx >= 0) current[idx] = staff; else current.push(staff);
     db._saveLocal(KEYS.STAFF, current);
 
-    // Synchronize linked user in the users table
     const users = await db.getUsers();
     const existingUser = users.find(u => u.staffId === staff.id);
     
@@ -261,7 +260,6 @@ export const db = {
     return true;
   },
 
-  // Fix for error in Dashboard: Added deleteStaff method
   deleteStaff: async (id: string) => {
     if (supabase) await supabase.from('staff').delete().eq('id', id);
     const current = db._getLocal(KEYS.STAFF).filter((s: Staff) => s.id !== id);
