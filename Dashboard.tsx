@@ -1,19 +1,19 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, VWSchedule, VWStatus, Trip } from './types';
-import OverviewTab from './dashboard/OverviewTab';
-import DriversTab from './dashboard/DriversTab';
-import FormsTab from './dashboard/FormsTab';
-import CustomersTab from './dashboard/CustomersTab';
-import PortsTab from './dashboard/PortsTab';
-import PreStackingTab from './dashboard/PreStackingTab';
-import OperationsTab from './dashboard/OperationsTab';
-import AdminTab from './dashboard/AdminTab';
-import StaffTab from './dashboard/StaffTab';
-import SystemTab from './dashboard/SystemTab';
-import WeatherWidget from './dashboard/WeatherWidget';
-import OnlineStatus from './dashboard/OnlineStatus';
-import DatabaseStatus from './dashboard/DatabaseStatus';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip } from './types';
+import OverviewTab from './components/dashboard/OverviewTab';
+import DriversTab from './components/dashboard/DriversTab';
+import FormsTab from './components/dashboard/FormsTab';
+import CustomersTab from './components/dashboard/CustomersTab';
+import PortsTab from './components/dashboard/PortsTab';
+import PreStackingTab from './components/dashboard/PreStackingTab';
+import OperationsTab from './components/dashboard/OperationsTab';
+import AdminTab from './components/dashboard/AdminTab';
+import StaffTab from './components/dashboard/StaffTab';
+import SystemTab from './components/dashboard/SystemTab';
+import WeatherWidget from './components/dashboard/WeatherWidget';
+import OnlineStatus from './components/dashboard/OnlineStatus';
+import DatabaseStatus from './components/dashboard/DatabaseStatus';
 import { DEFAULT_OPERATIONS } from './constants/operations';
 import { db } from './utils/storage';
 import { Icons } from './constants/icons';
@@ -27,15 +27,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ 'Operações': false, 'Administrativo': false });
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionTime, setSessionTime] = useState('00:00:00');
+  
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [ports, setPorts] = useState<Port[]>([]);
   const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [availableOps, setAvailableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
+  const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 

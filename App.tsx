@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppScreen, User } from './types';
 import LoginForm from './components/LoginForm';
-import Dashboard from './components/Dashboard';
+import Dashboard from './Dashboard'; // Importando da raiz onde as correções de path foram aplicadas
 import { db } from './utils/storage';
 
 const App: React.FC = () => {
