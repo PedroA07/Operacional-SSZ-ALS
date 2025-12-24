@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppScreen, User } from './types';
 import LoginForm from './components/LoginForm';
-import Dashboard from './Dashboard'; // Importando da raiz onde as correções de path foram aplicadas
+import Dashboard from './Dashboard';
 import { db } from './utils/storage';
 
 const App: React.FC = () => {
@@ -13,32 +13,36 @@ const App: React.FC = () => {
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) {
-      const userData = JSON.parse(saved);
-      setUser(userData);
-      setCurrentScreen(AppScreen.DASHBOARD);
+      try {
+        const userData = JSON.parse(saved);
+        setUser(userData);
+        setCurrentScreen(AppScreen.DASHBOARD);
+      } catch (e) {
+        sessionStorage.removeItem('als_active_session');
+      }
     }
     setIsInitializing(false);
   }, []);
 
-  // Monitor de Status Online (Visibilidade da Aba)
+  // Monitor de Status Online (Visibilidade e Heartbeat)
   useEffect(() => {
-    if (!user) return;
+    if (!user || currentScreen !== AppScreen.DASHBOARD) return;
 
     const updatePresence = async () => {
       const isVisible = document.visibilityState === 'visible';
       await db.updatePresence(user.id, isVisible);
     };
 
-    // Atualiza ao carregar, ao mudar visibilidade e a cada 30s
+    // Heartbeat a cada 20 segundos para manter o status "LIVE"
     updatePresence();
-    const interval = setInterval(updatePresence, 30000);
+    const interval = setInterval(updatePresence, 20000);
     document.addEventListener('visibilitychange', updatePresence);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', updatePresence);
     };
-  }, [user]);
+  }, [user, currentScreen]);
 
   const handleLoginSuccess = (userData: User) => {
     setUser(userData);

@@ -24,10 +24,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     loadStaffInfo();
 
     const updateTimer = () => {
-      if (!user.lastLogin) return;
+      if (!user.lastLogin) {
+        setSessionTime('00:00:00');
+        return;
+      }
+      
       const startTime = new Date(user.lastLogin).getTime();
       const now = new Date().getTime();
-      const diff = Math.max(0, now - startTime);
+      const diff = now - startTime;
+      
+      // Validação para evitar NaN ou tempos negativos
+      if (isNaN(diff) || diff <= 0) {
+        setSessionTime('00:00:00');
+        return;
+      }
       
       const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
       const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
@@ -50,24 +60,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [user.lastLogin, user.staffId]);
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '--/--/----';
-    try {
-      return new Date(dateStr).toLocaleDateString('pt-BR');
-    } catch {
-      return '--/--/----';
-    }
-  };
-
-  const formatTime = (dateStr?: string) => {
-    if (!dateStr) return '--:--';
-    try {
-      return new Date(dateStr).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-    } catch {
-      return '--:--';
-    }
-  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -100,41 +92,29 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                 </div>
                 <div>
                    <h4 className="font-black text-slate-800 uppercase text-xs leading-none">{user.displayName}</h4>
-                   <span className="inline-block mt-2 px-2 py-0.5 bg-blue-100 text-blue-600 text-[7px] font-black uppercase rounded">{user.role === 'admin' ? 'Acesso Administrativo' : 'Acesso Operacional'}</span>
+                   <span className="inline-block mt-2 px-2 py-0.5 bg-blue-100 text-blue-600 text-[7px] font-black uppercase rounded-full">{user.role}</span>
                 </div>
              </div>
           </div>
-
-          <div className="p-8 space-y-6">
-             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Cargo Atual</p>
-                   <p className="text-[10px] font-black text-slate-700 uppercase">{user.position || 'Não Definido'}</p>
-                </div>
-                <div className="space-y-1">
-                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Desde</p>
-                   <p className="text-[10px] font-black text-slate-700">{formatDate(staffData?.registrationDate)}</p>
-                </div>
+          
+          <div className="p-6 space-y-4">
+             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Duração da Sessão</p>
+                <p className="text-xl font-black text-slate-800 font-mono tracking-tighter">{sessionTime}</p>
              </div>
-
-             <div className="space-y-3 pt-4 border-t border-slate-50">
-                <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Dados de Contato</p>
-                <div className="flex items-center gap-3">
-                   <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeWidth="2.5"/></svg></div>
-                   <p className="text-[9px] font-bold text-slate-600 lowercase">{staffData?.emailCorp || 'e-mail não cadastrado'}</p>
+             
+             {staffData && (
+                <div className="space-y-3 px-2">
+                   <div className="flex justify-between items-center">
+                      <span className="text-[8px] font-black text-slate-400 uppercase">Cargo</span>
+                      <span className="text-[9px] font-bold text-slate-700 uppercase">{staffData.position}</span>
+                   </div>
+                   <div className="flex justify-between items-center">
+                      <span className="text-[8px] font-black text-slate-400 uppercase">Contratação</span>
+                      <span className="text-[9px] font-bold text-slate-700">{new Date(staffData.registrationDate).toLocaleDateString('pt-BR')}</span>
+                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                   <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" strokeWidth="2.5"/></svg></div>
-                   <p className="text-[9px] font-bold text-slate-600">{staffData?.phoneCorp || 'Telefone não cadastrado'}</p>
-                </div>
-             </div>
-
-             <div className="bg-slate-900 rounded-3xl p-5 text-center relative overflow-hidden shadow-xl">
-                <div className="absolute top-0 left-0 w-full h-full bg-blue-600/10 pointer-events-none"></div>
-                <p className="text-[8px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Tempo de Sessão Ativa</p>
-                <p className="text-2xl font-black text-white font-mono tracking-widest">{sessionTime}</p>
-                <p className="text-[7px] font-bold text-slate-500 uppercase mt-2 italic">Acesso iniciado em {formatTime(user.lastLogin)}</p>
-             </div>
+             )}
           </div>
         </div>
       )}

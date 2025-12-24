@@ -41,17 +41,17 @@ const userMapper = {
     id: u.id,
     username: u.username,
     password: u.password,
-    displayName: u.display_name,
+    displayName: u.display_name || u.displayName,
     role: u.role,
-    lastLogin: u.last_login || new Date().toISOString(),
+    lastLogin: u.last_login || u.lastLogin || new Date().toISOString(),
     photo: u.photo,
     position: u.position,
-    driverId: u.driver_id,
-    staffId: u.staff_id,
+    driverId: u.driver_id || u.driverId,
+    staffId: u.staff_id || u.staffId,
     status: u.status,
-    isFirstLogin: u.is_first_login,
-    lastSeen: u.last_seen,
-    isOnlineVisible: u.is_online_visible
+    isFirstLogin: u.is_first_login || u.isFirstLogin,
+    lastSeen: u.last_seen || u.lastseen || u.lastSeen,
+    isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
   })
 };
 
@@ -75,20 +75,17 @@ export const db = {
 
   updatePresence: async (userId: string, isVisible: boolean) => {
     const now = new Date().toISOString();
-    
-    // Atualização no Supabase (usa snake_case para as colunas do DB)
     if (supabase) {
+      // Atualização padrão via REST (Não requer replication/realtime)
       await supabase.from('users').update({ 
         last_seen: now, 
         is_online_visible: isVisible 
       }).eq('id', userId);
     }
-    
-    // Atualização no LocalStorage (usa CamelCase para o objeto User do frontend)
     const users = db._getLocal(KEYS.USERS);
     const idx = users.findIndex((u: User) => u.id === userId);
     if (idx >= 0) {
-      // CORREÇÃO AQUI: Propriedades devem ser CamelCase para bater com a interface User
+      // CORREÇÃO TS2551: Usando CamelCase para bater com a interface User
       users[idx] = { 
         ...users[idx], 
         lastSeen: now, 

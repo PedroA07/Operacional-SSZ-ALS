@@ -20,7 +20,11 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
-    const statusInterval = setInterval(fetchStatus, 15000); // Polling a cada 15s
+    
+    // Polling: Busca atualizações no banco a cada 20 segundos
+    // Isso substitui o Realtime do Supabase para quem não tem plano com Replicação
+    const syncInterval = setInterval(fetchStatus, 20000);
+
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -31,7 +35,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     document.addEventListener('mousedown', handleClickOutside);
     
     return () => {
-      clearInterval(statusInterval);
+      clearInterval(syncInterval);
       clearInterval(clockInterval);
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -39,10 +43,12 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
     if (!user.lastSeen) return 'OFFLINE';
-    const last = new Date(user.lastSeen).getTime();
-    const diff = (currentTime - last) / 1000;
     
-    if (diff > 90) return 'OFFLINE'; // Mais de 1min e meio sem heartbeat = offline
+    const lastSeenDate = new Date(user.lastSeen);
+    const diff = (currentTime - lastSeenDate.getTime()) / 1000;
+    
+    // Se não houver sinal por mais de 60 segundos, consideramos Offline
+    if (diff > 60) return 'OFFLINE';
     
     return user.isOnlineVisible ? 'ONLINE' : 'AUSENTE';
   };
@@ -81,7 +87,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
             <span className={`text-[11px] font-black uppercase tracking-[0.1em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
               {activeCount} Operadores
             </span>
-            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Em tempo real</span>
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Live Monitor</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -129,12 +135,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
                 </div>
               );
             })}
-            
-            {staffList.length === 0 && (
-              <div className="p-16 text-center text-slate-700">
-                <p className="text-[10px] font-black uppercase italic tracking-widest">Nenhum registro</p>
-              </div>
-            )}
           </div>
         </div>
       )}
