@@ -31,10 +31,17 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
       
       const startTime = new Date(user.lastLogin).getTime();
       const now = new Date().getTime();
+      
+      if (isNaN(startTime)) {
+        setSessionTime('00:00:00');
+        return;
+      }
+
       const diff = now - startTime;
       
-      if (isNaN(diff) || diff <= 0) {
-        setSessionTime('00:00:00');
+      // Validação para evitar NaN ou tempos negativos
+      if (diff <= 0) {
+        setSessionTime('00:00:01'); // Fallback mínimo
         return;
       }
       
@@ -64,18 +71,22 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     <div className="relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-3 pl-4 border-l border-slate-200 group transition-all"
+        className="flex items-center gap-4 pl-6 border-l border-slate-200 group transition-all"
       >
-        <div className="text-right hidden sm:block">
-          <p className="text-[9px] font-black text-slate-800 uppercase leading-none group-hover:text-blue-600 transition-colors">{user.displayName}</p>
-          <p className="text-[7px] font-bold text-slate-400 uppercase mt-1 tracking-tighter">{user.position || user.role}</p>
+        <div className="text-right flex flex-col items-end">
+          <p className="text-[10px] font-black text-slate-800 uppercase leading-none group-hover:text-blue-600 transition-colors">
+            {user.displayName || user.username}
+          </p>
+          <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 tracking-tighter">
+            {user.position || user.role}
+          </p>
         </div>
         <div className="relative">
-          <div className={`w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center font-black text-blue-400 text-sm shadow-lg overflow-hidden border-2 transition-all ${isOpen ? 'ring-4 ring-blue-500/20 border-blue-500 scale-105' : 'border-white group-hover:border-blue-200'}`}>
+          <div className={`w-11 h-11 rounded-xl bg-slate-900 flex items-center justify-center font-black text-blue-400 text-sm shadow-lg overflow-hidden border-2 transition-all ${isOpen ? 'ring-4 ring-blue-500/20 border-blue-500 scale-105' : 'border-white group-hover:border-blue-200'}`}>
             {user.photo ? (
               <img src={user.photo} className="w-full h-full object-cover" alt="" />
             ) : (
-              <span>{user.displayName.charAt(0).toUpperCase()}</span>
+              <span>{(user.displayName || user.username).charAt(0).toUpperCase()}</span>
             )}
           </div>
           <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full shadow-sm"></div>
@@ -87,17 +98,16 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
           <div className="p-8 bg-slate-50 border-b border-slate-100">
              <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-slate-900 overflow-hidden border-2 border-white shadow-md">
-                   {user.photo ? <img src={user.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-blue-400 font-black text-xl">{user.displayName[0]}</div>}
+                   {user.photo ? <img src={user.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-blue-400 font-black text-xl">{(user.displayName || user.username)[0]}</div>}
                 </div>
                 <div>
-                   <h4 className="font-black text-slate-800 uppercase text-xs leading-none">{user.displayName}</h4>
+                   <h4 className="font-black text-slate-800 uppercase text-xs leading-none">{user.displayName || user.username}</h4>
                    <span className="inline-block mt-2 px-2 py-0.5 bg-blue-100 text-blue-600 text-[7px] font-black uppercase rounded-full">{user.role}</span>
                 </div>
              </div>
           </div>
           
           <div className="p-6 space-y-5">
-             {/* Dados de Contato */}
              <div className="space-y-3 bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
                 <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Contato Profissional</p>
                 <div className="flex items-center gap-3">

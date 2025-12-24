@@ -41,7 +41,7 @@ const userMapper = {
     id: u.id,
     username: u.username,
     password: u.password,
-    displayName: u.display_name || u.displayName,
+    displayName: u.display_name || u.displayName || u.username,
     role: u.role,
     lastLogin: u.last_login || u.lastLogin || new Date().toISOString(),
     photo: u.photo,
@@ -50,8 +50,8 @@ const userMapper = {
     staffId: u.staff_id || u.staffId,
     status: u.status,
     isFirstLogin: u.is_first_login || u.isFirstLogin,
-    lastSeen: u.last_seen || u.lastseen || u.lastSeen,
-    isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
+    lastSeen: u.last_seen || u.lastSeen || u.lastseen,
+    isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
   })
 };
 
@@ -76,40 +76,79 @@ export const db = {
   updatePresence: async (userId: string, isVisible: boolean) => {
     const now = new Date().toISOString();
     if (supabase) {
-      // Atualização padrão via REST (Não requer replication/realtime)
       await supabase.from('users').update({ 
         last_seen: now, 
         is_online_visible: isVisible 
       }).eq('id', userId);
     }
     const users = db._getLocal(KEYS.USERS);
-    const idx = users.findIndex((u: User) => u.id === userId);
+    const idx = users.findIndex((u: any) => u.id === userId);
     if (idx >= 0) {
-      // CORREÇÃO TS2551: Usando CamelCase para bater com a interface User
-      users[idx] = { 
-        ...users[idx], 
-        lastSeen: now, 
-        isOnlineVisible: isVisible 
-      };
+      users[idx] = { ...users[idx], lastSeen: now, isOnlineVisible: isVisible };
       db._saveLocal(KEYS.USERS, users);
     }
   },
 
-  getCategories: async (): Promise<Category[]> => {
+  getUsers: async (): Promise<User[]> => {
     if (supabase) {
-      const { data } = await supabase.from('categories').select('*');
-      if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; }
+      const { data } = await supabase.from('users').select('*');
+      if (data) {
+        const mapped = data.map(u => userMapper.mapFromDb(u));
+        db._saveLocal(KEYS.USERS, mapped);
+        return mapped;
+      }
     }
-    return db._getLocal(KEYS.CATEGORIES);
+    return db._getLocal(KEYS.USERS).map((u: any) => userMapper.mapFromDb(u));
   },
 
-  saveCategory: async (category: Partial<Category>) => {
-    const newCat = { ...category, id: category.id || `cat-${Date.now()}` } as Category;
-    if (supabase) await supabase.from('categories').upsert(newCat);
-    const current = db._getLocal(KEYS.CATEGORIES);
-    const idx = current.findIndex((c: Category) => c.id === newCat.id);
-    if (idx >= 0) current[idx] = newCat; else current.push(newCat);
-    db._saveLocal(KEYS.CATEGORIES, current);
+  getStaff: async (): Promise<Staff[]> => {
+    if (supabase) {
+      const { data } = await supabase.from('staff').select('*').order('name');
+      if (data) { db._saveLocal(KEYS.STAFF, data); return data; }
+    }
+    return db._getLocal(KEYS.STAFF);
+  },
+
+  saveStaff: async (staff: Staff, password?: string) => {
+    if (supabase) await supabase.from('staff').upsert(staff);
+    const current = db._getLocal(KEYS.STAFF);
+    const idx = current.findIndex((s: Staff) => s.id === staff.id);
+    if (idx >= 0) current[idx] = staff; else current.push(staff);
+    db._saveLocal(KEYS.STAFF, current);
+
+    const users = await db.getUsers();
+    const existingUser = users.find(u => u.staffId === staff.id);
+    
+    const userToSave: User = {
+      id: existingUser?.id || `u-${staff.id}`,
+      username: staff.username,
+      displayName: staff.name,
+      role: staff.role,
+      lastLogin: existingUser?.lastLogin || new Date().toISOString(),
+      staffId: staff.id,
+      position: staff.position,
+      status: staff.status,
+      photo: staff.photo
+    };
+    
+    if (password) {
+      userToSave.password = password;
+    } else if (!existingUser) {
+      userToSave.password = '12345678';
+    } else {
+      userToSave.password = existingUser.password;
+    }
+
+    await db.saveUser(userToSave);
+    return true;
+  },
+
+  saveUser: async (user: User) => {
+    if (supabase) await supabase.from('users').upsert(userMapper.mapToDb(user));
+    const current = db._getLocal(KEYS.USERS);
+    const idx = current.findIndex((u: any) => u.id === user.id);
+    if (idx >= 0) current[idx] = user; else current.push(user);
+    db._saveLocal(KEYS.USERS, current);
     return true;
   },
 
@@ -215,45 +254,21 @@ export const db = {
     return true;
   },
 
-  getStaff: async (): Promise<Staff[]> => {
+  getCategories: async (): Promise<Category[]> => {
     if (supabase) {
-      const { data } = await supabase.from('staff').select('*').order('name');
-      if (data) { db._saveLocal(KEYS.STAFF, data); return data; }
+      const { data } = await supabase.from('categories').select('*');
+      if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; }
     }
-    return db._getLocal(KEYS.STAFF);
+    return db._getLocal(KEYS.CATEGORIES);
   },
 
-  saveStaff: async (staff: Staff, password?: string) => {
-    if (supabase) await supabase.from('staff').upsert(staff);
-    const current = db._getLocal(KEYS.STAFF);
-    const idx = current.findIndex((s: Staff) => s.id === staff.id);
-    if (idx >= 0) current[idx] = staff; else current.push(staff);
-    db._saveLocal(KEYS.STAFF, current);
-
-    const users = await db.getUsers();
-    const existingUser = users.find(u => u.staffId === staff.id);
-    
-    const userToSave: User = {
-      id: existingUser?.id || `u-${staff.id}`,
-      username: staff.username,
-      displayName: staff.name,
-      role: staff.role,
-      lastLogin: staff.lastLogin || new Date().toISOString(),
-      staffId: staff.id,
-      position: staff.position,
-      status: staff.status,
-      photo: staff.photo
-    };
-    
-    if (password) {
-      userToSave.password = password;
-    } else if (!existingUser) {
-      userToSave.password = '12345678';
-    } else {
-      userToSave.password = existingUser.password;
-    }
-
-    await db.saveUser(userToSave);
+  saveCategory: async (category: Partial<Category>) => {
+    const newCat = { ...category, id: category.id || `cat-${Date.now()}` } as Category;
+    if (supabase) await supabase.from('categories').upsert(newCat);
+    const current = db._getLocal(KEYS.CATEGORIES);
+    const idx = current.findIndex((c: Category) => c.id === newCat.id);
+    if (idx >= 0) current[idx] = newCat; else current.push(newCat);
+    db._saveLocal(KEYS.CATEGORIES, current);
     return true;
   },
 
@@ -261,27 +276,6 @@ export const db = {
     if (supabase) await supabase.from('staff').delete().eq('id', id);
     const current = db._getLocal(KEYS.STAFF).filter((s: Staff) => s.id !== id);
     db._saveLocal(KEYS.STAFF, current);
-    return true;
-  },
-
-  getUsers: async (): Promise<User[]> => {
-    if (supabase) {
-      const { data } = await supabase.from('users').select('*');
-      if (data) {
-        const mapped = data.map(u => userMapper.mapFromDb(u));
-        db._saveLocal(KEYS.USERS, mapped);
-        return mapped;
-      }
-    }
-    return db._getLocal(KEYS.USERS).map((u: any) => userMapper.mapFromDb(u));
-  },
-
-  saveUser: async (user: User) => {
-    if (supabase) await supabase.from('users').upsert(userMapper.mapToDb(user));
-    const current = db._getLocal(KEYS.USERS);
-    const idx = current.findIndex((u: User) => u.id === user.id);
-    if (idx >= 0) current[idx] = user; else current.push(user);
-    db._saveLocal(KEYS.USERS, current);
     return true;
   },
 

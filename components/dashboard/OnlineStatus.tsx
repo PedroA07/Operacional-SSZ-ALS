@@ -14,12 +14,14 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
 
   const fetchStatus = useCallback(async () => {
+    // Busca forçada no banco para ignorar cache de status antigo
     const u = await db.getUsers();
     setUsers(u);
   }, []);
 
   useEffect(() => {
     fetchStatus();
+    // Polling a cada 20 segundos para manter a lista fresca
     const syncInterval = setInterval(fetchStatus, 20000);
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
@@ -39,18 +41,30 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
     if (!user.lastSeen) return 'OFFLINE';
+    
     const lastSeenDate = new Date(user.lastSeen);
-    const diff = (currentTime - lastSeenDate.getTime()) / 1000;
-    if (diff > 60) return 'OFFLINE';
-    return user.isOnlineVisible ? 'ONLINE' : 'AUSENTE';
+    if (isNaN(lastSeenDate.getTime())) return 'OFFLINE';
+
+    const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
+    
+    // Se não houver sinal por mais de 5 minutos, consideramos Offline
+    if (diffSeconds > 300) return 'OFFLINE';
+    
+    // Se houver sinal mas a aba estiver oculta ou ociosa por mais de 2 minutos, Ausente
+    if (!user.isOnlineVisible || diffSeconds > 120) return 'AUSENTE';
+    
+    return 'ONLINE';
   };
 
   const getSessionTime = (lastLogin?: string) => {
     if (!lastLogin) return '00:00:00';
     try {
       const start = new Date(lastLogin).getTime();
+      if (isNaN(start)) return '00:00:00';
+      
       const diff = currentTime - start;
-      if (isNaN(diff) || diff <= 0) return '00:00:00';
+      if (diff <= 0) return '00:00:00';
+      
       const hours = Math.floor(diff / 3600000).toString().padStart(2, '0');
       const minutes = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
       const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
@@ -79,7 +93,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
             <span className={`text-[11px] font-black uppercase tracking-[0.1em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
               {activeCount} Online
             </span>
-            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Status em Tempo Real</span>
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Live Monitor</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -88,13 +102,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
       {isOpen && (
         <div className="absolute bottom-full left-0 mb-3 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.6)] overflow-hidden animate-in slide-in-from-bottom-6 zoom-in-95 duration-500 z-[100]">
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
-             <h4 className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">Conectados Agora</h4>
-             <span className="text-[8px] font-black bg-blue-600 text-white px-2.5 py-1 rounded-lg uppercase shadow-lg shadow-blue-600/20">LIVE</span>
+             <h4 className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">Monitoramento ALS</h4>
+             <span className="text-[8px] font-black bg-blue-600 text-white px-2.5 py-1 rounded-lg uppercase shadow-lg shadow-blue-600/20">Live</span>
           </div>
 
           <div className="max-h-96 overflow-y-auto custom-scrollbar p-3 space-y-2 bg-[#0a0f1e]">
             {staffList.map(s => {
-              const u = users.find(user => user.staffId === s.id);
+              const u = users.find(user => user.staffId === s.id || (s.role === 'admin' && user.username === 'operacional_ssz' && user.id === 'admin-master'));
               const status = u ? getStatus(u) : 'OFFLINE';
               
               const statusConfig = {
