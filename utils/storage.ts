@@ -21,9 +21,8 @@ export const KEYS = {
 };
 
 /**
- * Mapper ultra-resiliente para lidar com a duplicidade de colunas no seu Supabase.
- * Ele grava em todas as variações (isFirstLogin, isfirstlogin, is_first_login) 
- * para garantir que o loop de senha pare.
+ * Mapper simplificado após a limpeza das colunas duplicadas no banco.
+ * Foca na coluna isFirstLogin para controle de acesso.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -38,37 +37,29 @@ const userMapper = {
     driver_id: u.driverId,
     staff_id: u.staffId,
     status: u.status,
-    // GRAVA EM TODAS AS COLUNAS POSSÍVEIS PARA EVITAR LOOP
+    // Gravação direta na coluna unificada
     isFirstLogin: u.isFirstLogin ?? false,
-    isfirstlogin: u.isFirstLogin ?? false,
-    is_first_login: u.isFirstLogin ?? false,
     last_seen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
   }),
-  mapFromDb: (u: any): User => {
-    // Lógica de leitura: Se QUALQUER uma das colunas for FALSE, 
-    // consideramos que ele já trocou a senha (prioridade para o acesso liberado).
-    const dbFirstLogin = u.isFirstLogin ?? u.isfirstlogin ?? u.is_first_login;
-    
-    return {
-      id: u.id,
-      username: u.username,
-      password: u.password,
-      displayName: u.displayName || u.displayname || u.display_name || u.username || 'Usuário',
-      role: u.role,
-      lastLogin: u.lastLogin || u.lastlogin || u.last_login || new Date().toISOString(),
-      photo: u.photo || u.avatar,
-      position: u.position,
-      driverId: u.driver_id || u.driverid || u.driverId,
-      staffId: u.staff_id || u.staffid || u.staffId,
-      status: u.status,
-      // Se o valor no banco for explicitamente true em todas, ele troca. 
-      // Se for nulo ou false em qualquer uma, libera.
-      isFirstLogin: dbFirstLogin === true,
-      lastSeen: u.last_seen || u.lastSeen,
-      isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
-    };
-  }
+  mapFromDb: (u: any): User => ({
+    id: u.id,
+    username: u.username,
+    password: u.password,
+    // Fallbacks para nomes de exibição e fotos
+    displayName: u.displayName || u.displayname || u.display_name || u.username || 'Usuário',
+    role: u.role,
+    lastLogin: u.lastLogin || u.lastlogin || u.last_login || new Date().toISOString(),
+    photo: u.photo || u.avatar,
+    position: u.position,
+    driverId: u.driver_id || u.driverid || u.driverId,
+    staffId: u.staff_id || u.staffid || u.staffId,
+    status: u.status,
+    // Verifica a coluna unificada (aceita CamelCase ou lowercase vindo do Postgres)
+    isFirstLogin: (u.isFirstLogin === true || u.isfirstlogin === true),
+    lastSeen: u.last_seen || u.lastSeen,
+    isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
+  })
 };
 
 export const db = {
@@ -95,7 +86,7 @@ export const db = {
 
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
-      const { data, error } = await supabase.from('users').select('*');
+      const { data } = await supabase.from('users').select('*');
       if (data) {
         const mapped = data.map(u => userMapper.mapFromDb(u));
         db._saveLocal(KEYS.USERS, mapped);
