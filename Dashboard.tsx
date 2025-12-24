@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
 import DriversTab from './components/dashboard/DriversTab';
@@ -39,7 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     const [d, c, p, ps, s, t] = await Promise.all([
       db.getDrivers(), 
       db.getCustomers(), 
@@ -54,9 +54,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setPreStacking(ps || []); 
     setStaffList(s || []);
     setTrips(t || []);
-  };
+  }, []);
 
-  useEffect(() => { loadAllData(); }, [user]);
+  useEffect(() => { 
+    loadAllData();
+    // Sincronização automática em tempo real para todos os terminais (Polling de 30s)
+    const syncInterval = setInterval(loadAllData, 30000);
+    return () => clearInterval(syncInterval);
+  }, [loadAllData]);
 
   const MenuItem = ({ tab, label, icon, adminOnly, children, forceActive = false }: any) => {
     if (adminOnly && user.role !== 'admin') return null;

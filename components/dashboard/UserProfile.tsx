@@ -23,13 +23,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     };
     loadStaffInfo();
 
-    const timer = setInterval(() => {
-      const diff = new Date().getTime() - new Date(user.lastLogin).getTime();
+    const updateTimer = () => {
+      if (!user.lastLogin) return;
+      const startTime = new Date(user.lastLogin).getTime();
+      const now = new Date().getTime();
+      const diff = Math.max(0, now - startTime);
+      
       const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
       const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
       const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
       setSessionTime(`${h}:${m}:${s}`);
-    }, 1000);
+    };
+
+    updateTimer();
+    const timer = setInterval(updateTimer, 1000);
 
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -42,7 +49,25 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
       clearInterval(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [user]);
+  }, [user.lastLogin, user.staffId]);
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '--/--/----';
+    try {
+      return new Date(dateStr).toLocaleDateString('pt-BR');
+    } catch {
+      return '--/--/----';
+    }
+  };
+
+  const formatTime = (dateStr?: string) => {
+    if (!dateStr) return '--:--';
+    try {
+      return new Date(dateStr).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    } catch {
+      return '--:--';
+    }
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -68,7 +93,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
 
       {isOpen && (
         <div className="absolute top-full right-0 mt-3 w-80 bg-white rounded-[2.5rem] shadow-[0_20px_70px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden animate-in slide-in-from-top-4 zoom-in-95 duration-300 z-[110]">
-          {/* Header do Dropdown */}
           <div className="p-8 bg-slate-50 border-b border-slate-100">
              <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-slate-900 overflow-hidden border-2 border-white shadow-md">
@@ -82,7 +106,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
           </div>
 
           <div className="p-8 space-y-6">
-             {/* Informações de Cargo e Cadastro */}
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Cargo Atual</p>
@@ -90,16 +113,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                 </div>
                 <div className="space-y-1">
                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Desde</p>
-                   <p className="text-[10px] font-black text-slate-700">{staffData?.registrationDate ? new Date(staffData.registrationDate).toLocaleDateString('pt-BR') : '--/--/----'}</p>
+                   <p className="text-[10px] font-black text-slate-700">{formatDate(staffData?.registrationDate)}</p>
                 </div>
              </div>
 
-             {/* Contatos Corporativos */}
              <div className="space-y-3 pt-4 border-t border-slate-50">
                 <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Dados de Contato</p>
                 <div className="flex items-center gap-3">
                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeWidth="2.5"/></svg></div>
-                   <p className="text-[9px] font-bold text-slate-600 lowercase">{staffData?.emailCorp || 'E-mail não cadastrado'}</p>
+                   <p className="text-[9px] font-bold text-slate-600 lowercase">{staffData?.emailCorp || 'e-mail não cadastrado'}</p>
                 </div>
                 <div className="flex items-center gap-3">
                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" strokeWidth="2.5"/></svg></div>
@@ -107,12 +129,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                 </div>
              </div>
 
-             {/* Cronômetro da Sessão */}
              <div className="bg-slate-900 rounded-3xl p-5 text-center relative overflow-hidden shadow-xl">
                 <div className="absolute top-0 left-0 w-full h-full bg-blue-600/10 pointer-events-none"></div>
                 <p className="text-[8px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Tempo de Sessão Ativa</p>
                 <p className="text-2xl font-black text-white font-mono tracking-widest">{sessionTime}</p>
-                <p className="text-[7px] font-bold text-slate-500 uppercase mt-2 italic">Acesso iniciado em {new Date(user.lastLogin).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
+                <p className="text-[7px] font-bold text-slate-500 uppercase mt-2 italic">Acesso iniciado em {formatTime(user.lastLogin)}</p>
              </div>
           </div>
         </div>

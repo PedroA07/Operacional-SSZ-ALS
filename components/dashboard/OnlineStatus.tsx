@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, Staff } from '../../types';
 import { db } from '../../utils/storage';
 
@@ -13,14 +13,14 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     const u = await db.getUsers();
     setUsers(u);
-  };
+  }, []);
 
   useEffect(() => {
     fetchStatus();
-    const statusInterval = setInterval(fetchStatus, 10000); 
+    const statusInterval = setInterval(fetchStatus, 15000); // Polling a cada 15s
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -35,21 +35,20 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
       clearInterval(clockInterval);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [fetchStatus]);
 
   const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
     if (!user.lastSeen) return 'OFFLINE';
     const last = new Date(user.lastSeen).getTime();
     const diff = (currentTime - last) / 1000;
     
-    // Se a última atividade foi há mais de 60 segundos, está offline
-    if (diff > 60) return 'OFFLINE';
+    if (diff > 90) return 'OFFLINE'; // Mais de 1min e meio sem heartbeat = offline
     
-    // Se a aba estiver visível no navegador do usuário
     return user.isOnlineVisible ? 'ONLINE' : 'AUSENTE';
   };
 
-  const getSessionTime = (lastLogin: string) => {
+  const getSessionTime = (lastLogin?: string) => {
+    if (!lastLogin) return '00:00:00';
     try {
       const start = new Date(lastLogin).getTime();
       const diff = currentTime - start;
@@ -66,7 +65,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
-      {/* Botão Gatilho (Igual à imagem) */}
       <button 
         onClick={() => setIsOpen(!isOpen)} 
         className={`w-full rounded-2xl p-4 flex items-center justify-between transition-all duration-500 border ${
@@ -89,16 +87,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </button>
 
-      {/* Menu Dropdown (Igual à imagem) */}
       {isOpen && (
         <div className="absolute bottom-full left-0 mb-3 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.6)] overflow-hidden animate-in slide-in-from-bottom-6 zoom-in-95 duration-500 z-[100]">
-          {/* Header do Menu */}
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
              <h4 className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">Monitoramento ALS</h4>
              <span className="text-[8px] font-black bg-blue-600 text-white px-2.5 py-1 rounded-lg uppercase shadow-lg shadow-blue-600/20">Live</span>
           </div>
 
-          {/* Lista de Usuários com Scroll Customizado */}
           <div className="max-h-96 overflow-y-auto custom-scrollbar p-3 space-y-2 bg-[#0a0f1e]">
             {staffList.map(s => {
               const u = users.find(user => user.staffId === s.id);
