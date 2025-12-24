@@ -97,23 +97,6 @@ export interface Driver {
   generatedPassword?: string;
 }
 
-export interface OpentechTrip {
-  id: string;
-  smNumber: string; // Solicitação de Monitoramento
-  clientName: string;
-  driverName: string;
-  driverCpf: string;
-  plateHorse: string;
-  origin: string;
-  destination: string;
-  startTime: string;
-  eta: string; // Previsão de Chegada
-  status: 'Em Viagem' | 'Concluída' | 'Alerta' | 'Pendente' | 'Sinistrada';
-  riskLevel: 'Baixo' | 'Médio' | 'Alto' | 'Crítico';
-  lastPosition?: string;
-  lastUpdate?: string;
-}
-
 export interface Staff {
   id: string;
   photo?: string;
@@ -209,4 +192,20 @@ export interface Trip {
   plateTrailer: string;
   container: string;
   milestones: TripMilestones;
+}
+
+// OpentechTrip interface for SIL Opentech integration modules
+export interface OpentechTrip {
+  id: string;
+  smNumber: string;
+  clientName: string;
+  driverName: string;
+  driverCpf: string;
+  plateHorse: string;
+  origin: string;
+  destination: string;
+  startTime: string;
+  eta: string;
+  status: 'Em Viagem' | 'Concluída' | 'Alerta' | 'Sinistrada' | 'Iniciada' | string;
+  riskLevel: 'Baixo' | 'Médio' | 'Alto' | 'Crítico' | string;
 }

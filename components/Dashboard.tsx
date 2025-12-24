@@ -43,8 +43,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [availableOps, setAvailableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
   const [vwSchedules, setVwSchedules] = useState<VWSchedule[]>([]);
 
-  // Fix: Updated opsView state type to include 'sil' to align with OperationsTabProps
-  const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client' | 'sil', id?: string, categoryName?: string, clientName?: string }>({ 
+  const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ 
     type: 'list'
   });
 
@@ -263,7 +262,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     <div className="h-[1px] bg-slate-100 my-1 mx-2"></div>
                     <button 
                       onClick={onLogout}
-                      className="w-full text-left px-4 py-3 rounded-xl text-[10px] font-black text-red-500 uppercase hover:bg-red-50 transition-all flex items-center gap-3"
+                      className="w-full text-left px-4 py-3 rounded-xl text-[10px] font-black text-red-500 uppercase hover:bg-red transition-all flex items-center gap-3"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7" strokeWidth="2.5"/></svg>
                       Sair do Sistema

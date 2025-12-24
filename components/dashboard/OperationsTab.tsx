@@ -3,14 +3,13 @@ import React, { useState } from 'react';
 import { OperationDefinition, Driver, VWSchedule, VWStatus, Customer } from '../../types';
 import GenericOperationView from './operations/GenericOperationView';
 import VWTab from './VWTab';
-import SILBrowserFrame from './operations/sil/SILBrowserFrame';
 
 interface OperationsTabProps {
   availableOps: OperationDefinition[];
   setAvailableOps: React.Dispatch<React.SetStateAction<OperationDefinition[]>>;
   drivers: Driver[];
   customers: Customer[];
-  activeView: { type: 'list' | 'category' | 'client' | 'sil', id?: string, categoryName?: string, clientName?: string };
+  activeView: { type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string };
   setActiveView: (view: any) => void;
   vwSchedules: VWSchedule[];
   onSaveVWSchedule: (schedule: Partial<VWSchedule>, id?: string) => void;
@@ -73,12 +72,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         >
           GERENCIAMENTO CENTRAL
         </button>
-        {activeView.type === 'sil' && (
-          <>
-            <span className="text-slate-300">/</span>
-            <span className="text-[#001e50] bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">NAVEGADOR SIL OPENTECH</span>
-          </>
-        )}
         {activeView.type === 'category' && (
           <>
             <span className="text-slate-300">/</span>
@@ -104,27 +97,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
           </>
         )}
       </div>
-      
-      <div className="flex gap-3">
-        <button 
-          onClick={() => setActiveView({ type: 'sil' })}
-          className={`px-6 py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-3 border shadow-sm ${activeView.type === 'sil' ? 'bg-[#001e50] text-white border-[#001e50]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-          Abrir Módulo SIL
-        </button>
-      </div>
     </div>
   );
-
-  if (activeView.type === 'sil') {
-    return (
-      <div className="space-y-6 max-w-7xl mx-auto">
-        {renderBreadcrumbs()}
-        <SILBrowserFrame />
-      </div>
-    );
-  }
 
   if (activeView.type === 'client' && (activeView.clientName?.toUpperCase() === 'VOLKSWAGEN')) {
     return (
@@ -161,16 +135,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Painel Operacional</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-2">Gestão de Categorias, Clientes e Monitoramento SIL</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-2">Gestão de Categorias e Monitoramento Dedicado</p>
         </div>
         <div className="flex gap-3">
-           <button 
-            onClick={() => setActiveView({ type: 'sil' })}
-            className="px-8 py-4 bg-[#001e50] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-900 transition-all shadow-xl flex items-center gap-3"
-          >
-            <div className="w-6 h-6 bg-white/10 rounded-lg flex items-center justify-center text-xs italic">SIL</div>
-            Acessar SIL Real
-          </button>
           <button 
             onClick={() => setIsAddingCategory(true)}
             className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl flex items-center gap-3"
