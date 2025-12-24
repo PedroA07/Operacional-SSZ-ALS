@@ -21,44 +21,54 @@ export const KEYS = {
 };
 
 /**
- * Mapper ajustado conforme a imagem do Table Editor fornecida.
- * A tabela usa nomes como: isFirstLogin, lastLogin, displayName, staff_id, driver_id.
+ * Mapper ultra-resiliente para lidar com a duplicidade de colunas no seu Supabase.
+ * Ele grava em todas as variações (isFirstLogin, isfirstlogin, is_first_login) 
+ * para garantir que o loop de senha pare.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
     id: u.id,
     username: u.username,
     password: u.password,
-    displayName: u.displayName, // conforme print
+    displayName: u.displayName,
     role: u.role,
-    lastLogin: u.lastLogin, // conforme print
+    lastLogin: u.lastLogin,
     photo: u.photo,
     position: u.position,
-    driver_id: u.driverId, // conforme print
-    staff_id: u.staffId, // conforme print
+    driver_id: u.driverId,
+    staff_id: u.staffId,
     status: u.status,
-    isFirstLogin: u.isFirstLogin ?? false, // conforme print
+    // GRAVA EM TODAS AS COLUNAS POSSÍVEIS PARA EVITAR LOOP
+    isFirstLogin: u.isFirstLogin ?? false,
+    isfirstlogin: u.isFirstLogin ?? false,
+    is_first_login: u.isFirstLogin ?? false,
     last_seen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
   }),
-  mapFromDb: (u: any): User => ({
-    id: u.id,
-    username: u.username,
-    password: u.password,
-    // Tenta ler de múltiplas variações caso o banco esteja inconsistente
-    displayName: u.displayName || u.displayname || u.display_name || u.username || 'Usuário',
-    role: u.role,
-    lastLogin: u.lastLogin || u.lastlogin || u.last_login || new Date().toISOString(),
-    photo: u.photo || u.avatar,
-    position: u.position,
-    driverId: u.driver_id || u.driverid || u.driverId,
-    staffId: u.staff_id || u.staffid || u.staffId,
-    status: u.status,
-    // Verifica todas as colunas possíveis de "first login" que aparecem na imagem
-    isFirstLogin: u.isFirstLogin === true || u.isfirstlogin === true || u.is_first_login === true,
-    lastSeen: u.last_seen || u.lastSeen,
-    isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
-  })
+  mapFromDb: (u: any): User => {
+    // Lógica de leitura: Se QUALQUER uma das colunas for FALSE, 
+    // consideramos que ele já trocou a senha (prioridade para o acesso liberado).
+    const dbFirstLogin = u.isFirstLogin ?? u.isfirstlogin ?? u.is_first_login;
+    
+    return {
+      id: u.id,
+      username: u.username,
+      password: u.password,
+      displayName: u.displayName || u.displayname || u.display_name || u.username || 'Usuário',
+      role: u.role,
+      lastLogin: u.lastLogin || u.lastlogin || u.last_login || new Date().toISOString(),
+      photo: u.photo || u.avatar,
+      position: u.position,
+      driverId: u.driver_id || u.driverid || u.driverId,
+      staffId: u.staff_id || u.staffid || u.staffId,
+      status: u.status,
+      // Se o valor no banco for explicitamente true em todas, ele troca. 
+      // Se for nulo ou false em qualquer uma, libera.
+      isFirstLogin: dbFirstLogin === true,
+      lastSeen: u.last_seen || u.lastSeen,
+      isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
+    };
+  }
 };
 
 export const db = {
@@ -85,7 +95,7 @@ export const db = {
 
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
-      const { data } = await supabase.from('users').select('*');
+      const { data, error } = await supabase.from('users').select('*');
       if (data) {
         const mapped = data.map(u => userMapper.mapFromDb(u));
         db._saveLocal(KEYS.USERS, mapped);
@@ -142,7 +152,8 @@ export const db = {
   saveUser: async (user: User) => {
     if (supabase) {
       const payload = userMapper.mapToDb(user);
-      await supabase.from('users').upsert(payload);
+      const { error } = await supabase.from('users').upsert(payload);
+      if (error) console.error("Erro ao salvar usuário:", error);
     }
     const current = db._getLocal(KEYS.USERS);
     const idx = current.findIndex((u: any) => u.id === user.id);

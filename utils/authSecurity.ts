@@ -3,7 +3,7 @@ import { User } from '../types';
 
 /**
  * Lógica centralizada para determinar se o fluxo de troca de senha obrigatória deve ser exibido.
- * Ajustada para ignorar campos nulos e duplicados do banco, focando no valor booleano real.
+ * Ajustada para ignorar campos duplicados do banco e focar no estado final mapeado.
  */
 export const authSecurity = {
   /**
@@ -14,8 +14,8 @@ export const authSecurity = {
     // Admin Master hardcoded (operacional_ssz) nunca troca de senha por este fluxo.
     if (user.id === 'admin-master' || user.username === 'operacional_ssz') return false;
 
-    // Conforme a imagem do seu banco, existem colunas isFirstLogin e isfirstlogin.
-    // O mapper do storage já consolida isso. Aqui checamos o resultado final.
+    // Se o banco retornar nulo ou false (através do mapper consolidado),
+    // o usuário já passou pelo processo ou não precisa dele.
     return user.isFirstLogin === true;
   }
 };
