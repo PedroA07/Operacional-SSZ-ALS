@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
 import DriversTab from './components/dashboard/DriversTab';
@@ -28,6 +28,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ 'Operações': false, 'Administrativo': false });
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
+  
+  // Ref para marcar o início REAL da sessão no navegador (sempre começa do zero)
+  const sessionStartTimeRef = useRef<number>(Date.now());
   
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -58,7 +61,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => { 
     loadAllData();
-    // Sincronização automática em tempo real para todos os terminais (Polling de 30s)
     const syncInterval = setInterval(loadAllData, 30000);
     return () => clearInterval(syncInterval);
   }, [loadAllData]);
@@ -100,6 +102,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" icon={<Icons.Motoristas />} />
           <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" icon={<Icons.Formularios />} />
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" icon={<Icons.Clientes />} />
+          <MenuItem tab={DashboardTab.PORTOS} label="Portos" icon={<Icons.Portos />} />
+          <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" icon={<Icons.PreStacking />} />
           <div className="pt-6 pb-2">
              {sidebarState === 'open' && <p className="px-5 text-[8px] font-black text-slate-600 uppercase mb-3 tracking-[0.3em]">Administração</p>}
              <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" icon={<Icons.Equipe />} />
@@ -124,7 +128,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </div>
            <div className="flex items-center gap-6">
               <DatabaseStatus />
-              <UserProfile user={user} />
+              <UserProfile user={user} sessionStartTime={sessionStartTimeRef.current} />
            </div>
         </header>
         <div className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">

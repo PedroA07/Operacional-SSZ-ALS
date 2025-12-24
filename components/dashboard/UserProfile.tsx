@@ -5,9 +5,10 @@ import { db } from '../../utils/storage';
 
 interface UserProfileProps {
   user: User;
+  sessionStartTime: number;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ user, sessionStartTime }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [staffData, setStaffData] = useState<Staff | null>(null);
   const [sessionTime, setSessionTime] = useState('00:00:00');
@@ -24,20 +25,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     loadStaffInfo();
 
     const updateTimer = () => {
-      if (!user.lastLogin) return;
-      
-      const startTime = new Date(user.lastLogin).getTime();
       const now = new Date().getTime();
-      const diff = now - startTime;
+      const diff = now - sessionStartTime;
       
-      if (diff <= 0) {
-        setSessionTime('00:00:01');
-        return;
-      }
+      const safeDiff = diff > 0 ? diff : 0;
       
-      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      const h = Math.floor(safeDiff / 3600000).toString().padStart(2, '0');
+      const m = Math.floor((safeDiff % 3600000) / 60000).toString().padStart(2, '0');
+      const s = Math.floor((safeDiff % 60000) / 1000).toString().padStart(2, '0');
       setSessionTime(`${h}:${m}:${s}`);
     };
 
@@ -55,7 +50,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
       clearInterval(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [user.lastLogin, user.staffId]);
+  }, [sessionStartTime, user.staffId]);
 
   return (
     <div className="relative" ref={dropdownRef}>
