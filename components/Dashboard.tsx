@@ -43,7 +43,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [availableOps, setAvailableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
   const [vwSchedules, setVwSchedules] = useState<VWSchedule[]>([]);
 
-  const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ 
+  // Fix: Updated opsView state type to include 'sil' to align with OperationsTabProps
+  const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client' | 'sil', id?: string, categoryName?: string, clientName?: string }>({ 
     type: 'list'
   });
 
@@ -287,6 +288,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 availableOps={availableOps} 
                 setAvailableOps={setAvailableOps} 
                 drivers={drivers} 
+                customers={customers}
                 activeView={opsView} 
                 setActiveView={setOpsView}
                 vwSchedules={vwSchedules}

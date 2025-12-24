@@ -54,10 +54,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     seal: '',
     booking: '',
     ship: '',
-    expedidor: '',
-    agencia: '', // Começa vazio conforme solicitado
+    agencia: '', 
     tipo: '40HC',
-    padrao: 'EXPORTAÇÃO',
+    padrao: 'CARGA GERAL',
     tipoOperacao: 'EXPORTAÇÃO',
     autColeta: '',
     embarcador: '',
@@ -98,7 +97,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   const handleInputChange = (field: string, value: string) => {
     const upValue = value.toUpperCase();
     if (field === 'container') {
-      // Inteligência de preenchimento automático baseada no BIC Code (bic-code.org)
       const carrier = lookupCarrierByContainer(upValue);
       setFormData(prev => ({ 
         ...prev, 
@@ -132,6 +130,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   };
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
+  
+  // Classe específica para inputs de data que não podem ter uppercase para não quebrar o calendário nativo
+  const dateInputClasses = "w-full px-4 py-4 rounded-2xl border-2 border-slate-200 bg-white text-slate-700 font-black focus:border-blue-600 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-md cursor-pointer";
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -145,7 +146,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
               selectedDestinatario={selectedDestinatario} 
             />
           )}
-          {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+          {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
         </div>
       </div>
 
@@ -169,7 +170,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
             <div className={`p-6 ${formConfigs[selectedFormType].color} text-white flex justify-between items-center`}>
               <h3 className="font-black text-sm uppercase tracking-widest">{formConfigs[selectedFormType].title}</h3>
-              <button onClick={() => setIsFormModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              <button onClick={() => setIsFormModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
             </div>
 
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
@@ -207,7 +208,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   )}
                 </div>
 
-                {/* BLOCO DE INSERÇÃO - ORDEM SOLICITADA */}
                 <div className="space-y-4 pt-4 border-t border-slate-200">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Container</label>
@@ -236,17 +236,15 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-4">
+                {/* BLOCO REORGANIZADO CONFORME SOLICITAÇÃO */}
+                <div className="grid grid-cols-1 gap-3 pt-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo Equip.</label>
                     <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
                       <option value="40HC">40HC</option>
                       <option value="40HR">40HR</option>
+                      <option value="40DC">40DC</option>
                     </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Navio</label>
-                    <input type="text" className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} />
                   </div>
                 </div>
 
@@ -254,10 +252,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Padrão</label>
                     <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
-                      <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
-                      <option value="COLETA">COLETA</option>
-                      <option value="ENTREGA">ENTREGA</option>
-                      <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
+                      <option value="CARGA GERAL">CARGA GERAL</option>
+                      <option value="CARGO PREMIUM">CARGO PREMIUM</option>
+                      <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -271,24 +268,53 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Aut. Coleta / CVA</label>
-                  <input type="text" className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} />
+                <div className="space-y-4 pt-2 border-t border-slate-100">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Navio</label>
+                    <input type="text" className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Booking</label>
+                    <input type="text" placeholder="DIGITE O BOOKING..." className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} />
+                  </div>
                 </div>
 
                 <div className="space-y-1 relative">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Motorista Autorizado</label>
                   <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setShowDriverResults(true); }} />
                   {showDriverResults && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
                       {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name}</button>)}
                     </div>
                   )}
                 </div>
 
-                <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 space-y-2 shadow-inner">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Agendamento de Coleta (Data/Hora)</label>
-                  <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => setFormData({...formData, horarioAgendado: e.target.value})} />
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Aut. Coleta / CVA</label>
+                  <input type="text" className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Embarcador</label>
+                  <input type="text" className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} placeholder="NOME DO EMBARCADOR" />
+                </div>
+
+                <div className="bg-blue-600/5 p-8 rounded-[2.5rem] border-2 border-blue-100/50 space-y-3 shadow-xl shadow-blue-500/5 transition-all hover:border-blue-300 calendar-container-focus">
+                  <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    Agendamento de Coleta
+                  </label>
+                  <input 
+                    type="datetime-local" 
+                    className={dateInputClasses} 
+                    value={formData.horarioAgendado} 
+                    onChange={e => setFormData({...formData, horarioAgendado: e.target.value})} 
+                    onClick={(e) => {
+                      // @ts-ignore - Alguns navegadores precisam desse trigger para abrir o calendário nativo
+                      if (e.target.showPicker) e.target.showPicker();
+                    }}
+                  />
+                  <p className="text-[8px] text-blue-400 font-bold uppercase tracking-tight text-center mt-2 italic">Clique no ícone de calendário para selecionar</p>
                 </div>
 
                 <button disabled={isExporting} onClick={downloadPDF} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
@@ -306,7 +332,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                       selectedDestinatario={selectedDestinatario} 
                     />
                   )}
-                  {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+                  {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                 </div>
               </div>
             </div>

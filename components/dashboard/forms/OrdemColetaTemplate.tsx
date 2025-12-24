@@ -124,17 +124,13 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
       </div>
 
       <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px' }}>
-        <div style={{ width: '238px', padding: '8px', borderRight: borderStyle, overflow: 'hidden' }}>
+        <div style={{ flex: '1', padding: '8px', borderRight: borderStyle, overflow: 'hidden' }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>NAVIO</div>
-          <div style={{ fontSize: '11px', fontWeight: 900, whiteSpace: 'nowrap' }}>{formData.ship || '---'}</div>
+          <div style={{ fontSize: '14px', fontWeight: 900, whiteSpace: 'nowrap' }}>{formData.ship || '---'}</div>
         </div>
-        <div style={{ width: '238px', padding: '8px', borderRight: borderStyle, overflow: 'hidden' }}>
+        <div style={{ flex: '1', padding: '8px', overflow: 'hidden' }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>BOOKING</div>
-          <div style={{ fontSize: '11px', fontWeight: 900, color: '#1e40af', whiteSpace: 'nowrap' }}>{formData.booking || '---'}</div>
-        </div>
-        <div style={{ width: '238px', padding: '8px', overflow: 'hidden' }}>
-          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>EXPEDIDOR</div>
-          <div style={{ fontSize: '11px', fontWeight: 900, whiteSpace: 'nowrap' }}>{formData.expedidor || '---'}</div>
+          <div style={{ fontSize: '14px', fontWeight: 900, color: '#1e40af', whiteSpace: 'nowrap' }}>{formData.booking || '---'}</div>
         </div>
       </div>
 

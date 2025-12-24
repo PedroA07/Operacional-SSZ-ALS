@@ -9,7 +9,7 @@ export interface User {
   staffId?: string;
   lastLogin: string;
   lastSeen?: string;
-  isOnlineVisible?: boolean; // Novo: Indica se a aba está em foco
+  isOnlineVisible?: boolean;
   isFirstLogin?: boolean;
   photo?: string;
   position?: string;
@@ -75,7 +75,7 @@ export interface Driver {
   rg: string;
   cnh: string;
   phone: string;
-  email?: string; // Campo agora opcional
+  email?: string;
   plateHorse: string;
   yearHorse: string;
   plateTrailer: string;
@@ -95,6 +95,23 @@ export interface Driver {
   tripsCount: number;
   hasAccess?: boolean;
   generatedPassword?: string;
+}
+
+export interface OpentechTrip {
+  id: string;
+  smNumber: string; // Solicitação de Monitoramento
+  clientName: string;
+  driverName: string;
+  driverCpf: string;
+  plateHorse: string;
+  origin: string;
+  destination: string;
+  startTime: string;
+  eta: string; // Previsão de Chegada
+  status: 'Em Viagem' | 'Concluída' | 'Alerta' | 'Pendente' | 'Sinistrada';
+  riskLevel: 'Baixo' | 'Médio' | 'Alto' | 'Crítico';
+  lastPosition?: string;
+  lastUpdate?: string;
 }
 
 export interface Staff {
