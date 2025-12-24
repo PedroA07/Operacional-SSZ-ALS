@@ -1,5 +1,4 @@
 
-
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category } from '../types';
 import { driverRepository } from './driverRepository';
@@ -21,6 +20,41 @@ export const KEYS = {
   PREFERENCES: 'als_ui_preferences'
 };
 
+const userMapper = {
+  mapToDb: (u: User) => ({
+    id: u.id,
+    username: u.username,
+    password: u.password,
+    display_name: u.displayName,
+    role: u.role,
+    last_login: u.lastLogin,
+    photo: u.photo,
+    position: u.position,
+    driver_id: u.driverId,
+    staff_id: u.staffId,
+    status: u.status,
+    is_first_login: u.isFirstLogin,
+    last_seen: u.lastSeen,
+    is_online_visible: u.isOnlineVisible
+  }),
+  mapFromDb: (u: any): User => ({
+    id: u.id,
+    username: u.username,
+    password: u.password,
+    displayName: u.display_name,
+    role: u.role,
+    lastLogin: u.last_login,
+    photo: u.photo,
+    position: u.position,
+    driverId: u.driver_id,
+    staffId: u.staff_id,
+    status: u.status,
+    isFirstLogin: u.is_first_login,
+    lastSeen: u.last_seen,
+    isOnlineVisible: u.is_online_visible
+  })
+};
+
 export const db = {
   _saveLocal: (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data)),
   _getLocal: (key: string) => JSON.parse(localStorage.getItem(key) || '[]'),
@@ -39,14 +73,18 @@ export const db = {
     localStorage.setItem(KEYS.PREFERENCES, JSON.stringify(allPrefs));
   },
 
-  /* Added missing methods for presence and entity management */
   updatePresence: async (userId: string, isVisible: boolean) => {
     const users = db._getLocal(KEYS.USERS);
     const idx = users.findIndex((u: User) => u.id === userId);
     if (idx >= 0) {
       users[idx] = { ...users[idx], lastSeen: new Date().toISOString(), isOnlineVisible: isVisible };
       db._saveLocal(KEYS.USERS, users);
-      if (supabase) await supabase.from('users').upsert({ id: userId, last_seen: users[idx].lastSeen, is_online_visible: isVisible });
+      if (supabase) {
+        await supabase.from('users').update({ 
+          last_seen: users[idx].lastSeen, 
+          is_online_visible: isVisible 
+        }).eq('id', userId);
+      }
     }
   },
 
@@ -205,23 +243,25 @@ export const db = {
     db._saveLocal(KEYS.STAFF, current);
     if (supabase) await supabase.from('staff').upsert(staff);
 
-    // Also update/create linked user
     if (password !== undefined) {
       const users = db._getLocal(KEYS.USERS);
       const userIdx = users.findIndex((u: User) => u.staffId === staff.id);
+      
       const userData: User = {
         id: userIdx >= 0 ? users[userIdx].id : `u-stf-${staff.id}`,
         username: staff.username,
         displayName: staff.name,
         role: staff.role,
-        lastLogin: new Date().toISOString(),
+        lastLogin: userIdx >= 0 ? users[userIdx].lastLogin : new Date().toISOString(),
         staffId: staff.id,
         password: password,
-        photo: staff.photo
+        photo: staff.photo,
+        isFirstLogin: userIdx >= 0 ? users[userIdx].isFirstLogin : true
       };
+
       if (userIdx >= 0) users[userIdx] = userData; else users.push(userData);
       db._saveLocal(KEYS.USERS, users);
-      if (supabase) await supabase.from('users').upsert(userData);
+      if (supabase) await supabase.from('users').upsert(userMapper.mapToDb(userData));
     }
     return true;
   },
@@ -244,7 +284,11 @@ export const db = {
     const localData = db._getLocal(KEYS.USERS);
     if (supabase) {
       const { data } = await supabase.from('users').select('*');
-      if (data) return data;
+      if (data) {
+        const mapped = data.map(u => userMapper.mapFromDb(u));
+        db._saveLocal(KEYS.USERS, mapped);
+        return mapped;
+      }
     }
     return localData;
   },
@@ -254,7 +298,7 @@ export const db = {
     const idx = current.findIndex((u: User) => u.id === user.id);
     if (idx >= 0) current[idx] = user; else current.push(user);
     db._saveLocal(KEYS.USERS, current);
-    if (supabase) await supabase.from('users').upsert(user);
+    if (supabase) await supabase.from('users').upsert(userMapper.mapToDb(user));
     return true;
   },
 

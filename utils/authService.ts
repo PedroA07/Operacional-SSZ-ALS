@@ -43,8 +43,12 @@ export const authService = {
         return { success: false, error: 'Senha incorreta.' };
       }
 
-      // 4. Se a senha for a padrão '12345678', obriga a troca
-      if (foundUser.password === '12345678' || foundUser.isFirstLogin) {
+      // 4. Se a senha for a padrão '12345678' OU a flag isFirstLogin for explicitamente true
+      // Garantimos que se isFirstLogin for falso ou indefinido, ele não força a troca se a senha for diferente da padrão.
+      const isUsingDefaultPassword = foundUser.password === '12345678';
+      const isForcedByFlag = foundUser.isFirstLogin === true;
+
+      if (isUsingDefaultPassword || isForcedByFlag) {
         return { success: true, user: foundUser, forceChange: true };
       }
 
