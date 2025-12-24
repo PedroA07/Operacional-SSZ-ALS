@@ -30,19 +30,22 @@ const App: React.FC = () => {
 
     const updatePresence = async () => {
       const isVisible = document.visibilityState === 'visible';
+      // Envia pulso de vida e estado da aba para o DB
       await db.updatePresence(user.id, isVisible);
     };
 
-    // Heartbeat a cada 20 segundos para manter o status "LIVE"
+    // Heartbeat a cada 15 segundos para manter o status ativo no terminal
     updatePresence();
-    const interval = setInterval(updatePresence, 20000);
-    document.addEventListener('visibilitychange', updatePresence);
+    const interval = setInterval(updatePresence, 15000);
+    
+    const handleVisibility = () => updatePresence();
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', updatePresence);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [user, currentScreen]);
+  }, [user?.id, currentScreen]);
 
   const handleLoginSuccess = (userData: User) => {
     setUser(userData);
