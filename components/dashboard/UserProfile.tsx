@@ -24,19 +24,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     loadStaffInfo();
 
     const updateTimer = () => {
-      if (!user.lastLogin) {
-        setSessionTime('00:00:00');
-        return;
-      }
+      if (!user.lastLogin) return;
       
       const startTime = new Date(user.lastLogin).getTime();
       const now = new Date().getTime();
-      
-      if (isNaN(startTime)) {
-        setSessionTime('00:00:00');
-        return;
-      }
-
       const diff = now - startTime;
       
       if (diff <= 0) {
@@ -107,27 +98,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
           </div>
           
           <div className="p-6 space-y-5">
-             <div className="space-y-3 bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
-                <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Dados de Contato</p>
-                <div className="flex items-center gap-3">
-                  <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" strokeWidth="2.5"/></svg>
-                  <span className="text-[10px] font-black text-slate-700">{staffData?.phoneCorp || '(13) ---- ----'}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeWidth="2.5"/></svg>
-                  <span className="text-[10px] font-bold text-blue-600 lowercase">{staffData?.emailCorp || 'sem@email.com.br'}</span>
-                </div>
-             </div>
-
              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Tempo de Sessão ALS</p>
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Duração da Sessão</p>
                 <p className="text-2xl font-black text-slate-800 font-mono tracking-tighter">{sessionTime}</p>
              </div>
              
              {staffData && (
                 <div className="space-y-3 px-2 pt-2">
                    <div className="flex justify-between items-center">
-                      <span className="text-[8px] font-black text-slate-400 uppercase">Cargo Atual</span>
+                      <span className="text-[8px] font-black text-slate-400 uppercase">Cargo / Função</span>
                       <span className="text-[9px] font-bold text-slate-700 uppercase">{staffData.position}</span>
                    </div>
                    <div className="flex justify-between items-center">

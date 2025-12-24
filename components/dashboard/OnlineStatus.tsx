@@ -14,16 +14,16 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
 
   const fetchStatus = useCallback(async () => {
-    // Busca direta do banco para evitar cache local atrasado
+    // Busca direta do banco para refletir o status real de todos os terminais
     const u = await db.getUsers();
     setUsers(u);
   }, []);
 
   useEffect(() => {
     fetchStatus();
-    // Polling a cada 15 segundos para atualizar a lista de quem está logado
-    const syncInterval = setInterval(fetchStatus, 15000);
-    // Timer interno para os cronômetros individuais (segundo a segundo)
+    // Heartbeat de interface: atualiza lista a cada 10 segundos para maior precisão
+    const syncInterval = setInterval(fetchStatus, 10000);
+    // Timer de precisão visual: atualiza cronômetros a cada segundo
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,13 +46,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
     
-    // Se o sinal de vida sumiu há mais de 3 minutos
+    // Se o sinal de vida sumiu há mais de 3 minutos (heartbeat parado)
     if (diffSeconds > 180) return 'OFFLINE';
     
-    // Se está visível e enviou heartbeat recentemente (< 45s)
+    // Se está com a aba visível e enviou heartbeat recentemente (< 45s)
     if (user.isOnlineVisible && diffSeconds < 45) return 'ONLINE';
     
-    // Logado mas aba oculta ou sem sinal recente (estilo "Away" do Skype/Discord)
+    // Logado mas aba em segundo plano ou sem atividade recente
     return 'AUSENTE';
   };
 
@@ -91,7 +91,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
             <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
               {onlineCount} Online
             </span>
-            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">Monitoramento ALS</span>
+            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Presença em Tempo Real</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -101,20 +101,20 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
         <div className="absolute bottom-full left-0 mb-4 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] overflow-hidden animate-in slide-in-from-bottom-6 zoom-in-95 duration-500 z-[200]">
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
              <div className="flex flex-col">
-               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Painel de Presença</h4>
-               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Sincronização em Tempo Real</p>
+               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Painel Conectados</h4>
+               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Atualização Automática</p>
              </div>
-             <span className="text-[8px] font-black bg-blue-600 text-white px-3 py-1.5 rounded-xl uppercase shadow-lg shadow-blue-600/20 animate-pulse">Live</span>
+             <span className="text-[8px] font-black bg-blue-600 text-white px-3 py-1.5 rounded-xl uppercase shadow-lg shadow-blue-600/20 animate-pulse">Monitorando</span>
           </div>
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
-              const u = users.find(user => user.staffId === s.id || (s.role === 'admin' && user.username === 'operacional_ssz' && user.id === 'admin-master'));
+              const u = users.find(user => user.staffId === s.id || (s.role === 'admin' && user.username === 'operacional_ssz'));
               const status = u ? getStatus(u) : 'OFFLINE';
               
               const statusConfigs = {
-                ONLINE: { color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Em Atividade', shadow: 'shadow-emerald-500/40' },
-                AUSENTE: { color: 'bg-amber-500', text: 'text-amber-400', label: 'Aba Inativa', shadow: 'shadow-amber-500/40' },
+                ONLINE: { color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online / Ativo', shadow: 'shadow-emerald-500/40' },
+                AUSENTE: { color: 'bg-amber-500', text: 'text-amber-400', label: 'Ausente / Inativo', shadow: 'shadow-amber-500/40' },
                 OFFLINE: { color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado', shadow: 'shadow-transparent' }
               };
 
@@ -122,7 +122,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
               const sessionTime = u ? calculateSessionTime(u.lastLogin) : '00:00:00';
 
               return (
-                <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${status === 'OFFLINE' ? 'opacity-30 border-transparent' : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'}`}>
+                <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${status === 'OFFLINE' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'}`}>
                   <div className="relative shrink-0">
                     <div className={`w-12 h-12 rounded-2xl bg-slate-800 overflow-hidden flex items-center justify-center border transition-all ${status === 'OFFLINE' ? 'border-white/5' : 'border-white/20'}`}>
                       {s.photo ? <img src={s.photo} className="w-full h-full object-cover" alt="" /> : <span className="text-sm font-black text-slate-600">{s.name.charAt(0)}</span>}

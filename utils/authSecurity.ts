@@ -2,20 +2,20 @@
 import { User } from '../types';
 
 /**
- * Lógica de segurança isolada para troca de senha.
- * Define se o fluxo de 'Primeiro Acesso' deve ser ativado.
+ * Lógica centralizada para determinar se o fluxo de troca de senha obrigatória deve ser exibido.
+ * Ajustada para ignorar campos nulos e duplicados do banco, focando no valor booleano real.
  */
 export const authSecurity = {
   /**
-   * Verifica se o usuário deve ser forçado a mudar a senha.
-   * REGRA ATUALIZADA: Só força se isFirstLogin for EXPLICITAMENTE true.
+   * Verifica se o usuário deve mudar a senha.
+   * REGRA: Só força se isFirstLogin for EXPLICITAMENTE true.
    */
   mustChangePassword: (user: User): boolean => {
-    // Admin Master hardcoded nunca troca
+    // Admin Master hardcoded (operacional_ssz) nunca troca de senha por este fluxo.
     if (user.id === 'admin-master' || user.username === 'operacional_ssz') return false;
 
-    // Se o campo for false, null ou undefined, NÃO força a troca.
-    // Isso evita o loop caso o banco não tenha o campo preenchido.
+    // Conforme a imagem do seu banco, existem colunas isFirstLogin e isfirstlogin.
+    // O mapper do storage já consolida isso. Aqui checamos o resultado final.
     return user.isFirstLogin === true;
   }
 };

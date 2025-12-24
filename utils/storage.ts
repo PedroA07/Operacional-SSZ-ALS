@@ -20,20 +20,24 @@ export const KEYS = {
   PREFERENCES: 'als_ui_preferences'
 };
 
+/**
+ * Mapper ajustado conforme a imagem do Table Editor fornecida.
+ * A tabela usa nomes como: isFirstLogin, lastLogin, displayName, staff_id, driver_id.
+ */
 const userMapper = {
   mapToDb: (u: User) => ({
     id: u.id,
     username: u.username,
     password: u.password,
-    display_name: u.displayName,
+    displayName: u.displayName, // conforme print
     role: u.role,
-    last_login: u.lastLogin,
+    lastLogin: u.lastLogin, // conforme print
     photo: u.photo,
     position: u.position,
-    driver_id: u.driverId,
-    staff_id: u.staffId,
+    driver_id: u.driverId, // conforme print
+    staff_id: u.staffId, // conforme print
     status: u.status,
-    is_first_login: u.isFirstLogin ?? false,
+    isFirstLogin: u.isFirstLogin ?? false, // conforme print
     last_seen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
   }),
@@ -41,15 +45,17 @@ const userMapper = {
     id: u.id,
     username: u.username,
     password: u.password,
-    displayName: u.display_name || u.displayName || u.username,
+    // Tenta ler de múltiplas variações caso o banco esteja inconsistente
+    displayName: u.displayName || u.displayname || u.display_name || u.username || 'Usuário',
     role: u.role,
-    lastLogin: u.last_login || u.lastLogin || new Date().toISOString(),
-    photo: u.photo,
+    lastLogin: u.lastLogin || u.lastlogin || u.last_login || new Date().toISOString(),
+    photo: u.photo || u.avatar,
     position: u.position,
-    driverId: u.driver_id || u.driverId,
-    staffId: u.staff_id || u.staffId,
+    driverId: u.driver_id || u.driverid || u.driverId,
+    staffId: u.staff_id || u.staffid || u.staffId,
     status: u.status,
-    isFirstLogin: !!u.is_first_login, // Converte explicitamente para booleano
+    // Verifica todas as colunas possíveis de "first login" que aparecem na imagem
+    isFirstLogin: u.isFirstLogin === true || u.isfirstlogin === true || u.is_first_login === true,
     lastSeen: u.last_seen || u.lastSeen,
     isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
   })
@@ -122,7 +128,7 @@ export const db = {
     
     if (password) {
       userToSave.password = password;
-      userToSave.isFirstLogin = false; // Se o admin definiu uma senha, desativa a troca obrigatória
+      userToSave.isFirstLogin = false;
     } else if (!existingUser) {
       userToSave.password = '12345678';
     } else {
@@ -134,7 +140,10 @@ export const db = {
   },
 
   saveUser: async (user: User) => {
-    if (supabase) await supabase.from('users').upsert(userMapper.mapToDb(user));
+    if (supabase) {
+      const payload = userMapper.mapToDb(user);
+      await supabase.from('users').upsert(payload);
+    }
     const current = db._getLocal(KEYS.USERS);
     const idx = current.findIndex((u: any) => u.id === user.id);
     if (idx >= 0) current[idx] = user; else current.push(user);
