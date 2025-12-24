@@ -1,4 +1,5 @@
 
+
 export enum AppScreen {
   LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD'
@@ -57,6 +58,12 @@ export interface TripDocument {
   uploadDate: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  parentId?: string; // Para subcategorias
+}
+
 export interface Trip {
   id: string;
   os: string;
@@ -67,9 +74,11 @@ export interface Trip {
   isLate: boolean;
   type: 'EXPORTAÇÃO' | 'IMPORTAÇÃO' | 'COLETA' | 'ENTREGA';
   category: string;
+  subCategory?: string;
   container: string;
   tara?: string;
   seal?: string;
+  cva?: string; // Novo campo
   customer: { id: string; name: string; city: string; state?: string };
   driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string };
   status: TripStatus;
@@ -78,13 +87,11 @@ export interface Trip {
   documents: TripDocument[];
 }
 
-// Added DriverOperation to support Driver interface
 export interface DriverOperation {
   category: string;
   client: string;
 }
 
-// Updated Driver interface with missing properties reported in errors
 export interface Driver {
   id: string;
   name: string;
@@ -115,7 +122,6 @@ export interface Driver {
   hasAccess?: boolean;
 }
 
-// Updated Customer interface with missing properties
 export interface Customer { 
   id: string; 
   name: string; 
@@ -128,7 +134,6 @@ export interface Customer {
   operations?: string[];
 }
 
-// Updated Port interface with missing properties
 export interface Port { 
   id: string; 
   name: string; 
@@ -136,11 +141,10 @@ export interface Port {
   state: string; 
   cnpj: string; 
   address: string; 
-  neighborhood?: string;
-  zipCode?: string;
+  neighborhood?: string; 
+  zipCode?: string; 
 }
 
-// Updated PreStacking interface with missing properties
 export interface PreStacking { 
   id: string; 
   name: string; 
@@ -148,8 +152,8 @@ export interface PreStacking {
   state: string; 
   cnpj: string; 
   address: string; 
-  neighborhood?: string;
-  zipCode?: string;
+  neighborhood?: string; 
+  zipCode?: string; 
 }
 
 export interface Staff { 
@@ -173,7 +177,17 @@ export interface OperationDefinition {
   clients: { name: string; hasDedicatedPage: boolean }[]; 
 }
 
-// Added VW types for monitoring
+/* Added missing types for errors */
+export interface WeatherData {
+  temp: number;
+  condition: string;
+  icon: string;
+  forecastNextDay: {
+    temp: number;
+    condition: string;
+  };
+}
+
 export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
 
 export interface VWStatusUpdate {
@@ -197,23 +211,6 @@ export interface VWSchedule {
   statusHistory: VWStatusUpdate[];
 }
 
-// Added UserPreferences for storage
-export interface UserPreferences {
-  visibleColumns: Record<string, string[]>;
-}
-
-// Added WeatherData for WeatherWidget
-export interface WeatherData {
-  temp: number;
-  condition: string;
-  icon: string;
-  forecastNextDay: {
-    temp: number;
-    condition: string;
-  };
-}
-
-// Added OpentechTrip for SIL monitoring
 export interface OpentechTrip {
   id: string;
   smNumber: string;
@@ -226,5 +223,5 @@ export interface OpentechTrip {
   startTime: string;
   eta: string;
   status: string;
-  riskLevel: 'Baixo' | 'Médio' | 'Alto' | 'Crítico';
+  riskLevel: string;
 }

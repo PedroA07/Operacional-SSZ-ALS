@@ -1,6 +1,7 @@
 
-import { createClient, RealtimeChannel } from '@supabase/supabase-js';
-import { Driver, Customer, Port, PreStacking, Staff, User, UserPreferences, Trip, TripStatus } from '../types';
+
+import { createClient } from '@supabase/supabase-js';
+import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category } from '../types';
 import { driverRepository } from './driverRepository';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
@@ -16,22 +17,17 @@ export const KEYS = {
   STAFF: 'als_staff',
   USERS: 'als_users',
   TRIPS: 'als_trips',
+  CATEGORIES: 'als_categories',
   PREFERENCES: 'als_ui_preferences'
 };
 
 export const db = {
-  _saveLocal: (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
-  },
-
-  _getLocal: (key: string) => {
-    return JSON.parse(localStorage.getItem(key) || '[]');
-  },
+  _saveLocal: (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data)),
+  _getLocal: (key: string) => JSON.parse(localStorage.getItem(key) || '[]'),
 
   isCloudActive: () => !!supabase,
 
-  // UI Preferences
-  getPreferences: (userId: string): UserPreferences => {
+  getPreferences: (userId: string) => {
     const allPrefs = JSON.parse(localStorage.getItem(KEYS.PREFERENCES) || '{}');
     return allPrefs[userId] || { visibleColumns: {} };
   },
@@ -43,7 +39,38 @@ export const db = {
     localStorage.setItem(KEYS.PREFERENCES, JSON.stringify(allPrefs));
   },
 
-  // TRIP MANAGEMENT (OPERATIONS)
+  /* Added missing methods for presence and entity management */
+  updatePresence: async (userId: string, isVisible: boolean) => {
+    const users = db._getLocal(KEYS.USERS);
+    const idx = users.findIndex((u: User) => u.id === userId);
+    if (idx >= 0) {
+      users[idx] = { ...users[idx], lastSeen: new Date().toISOString(), isOnlineVisible: isVisible };
+      db._saveLocal(KEYS.USERS, users);
+      if (supabase) await supabase.from('users').upsert({ id: userId, last_seen: users[idx].lastSeen, is_online_visible: isVisible });
+    }
+  },
+
+  // CATEGORIES
+  getCategories: async (): Promise<Category[]> => {
+    const local = db._getLocal(KEYS.CATEGORIES);
+    if (supabase) {
+      const { data } = await supabase.from('categories').select('*');
+      if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; }
+    }
+    return local;
+  },
+
+  saveCategory: async (cat: Partial<Category>) => {
+    const current = db._getLocal(KEYS.CATEGORIES);
+    const newCat = { ...cat, id: cat.id || `cat-${Date.now()}` } as Category;
+    const idx = current.findIndex((c: any) => c.id === newCat.id);
+    if (idx >= 0) current[idx] = newCat; else current.push(newCat);
+    db._saveLocal(KEYS.CATEGORIES, current);
+    if (supabase) await supabase.from('categories').upsert(newCat);
+    return newCat;
+  },
+
+  // TRIPS
   getTrips: async (): Promise<Trip[]> => {
     const local = db._getLocal(KEYS.TRIPS);
     if (supabase) {
@@ -55,74 +82,14 @@ export const db = {
 
   saveTrip: async (trip: Trip) => {
     const current = db._getLocal(KEYS.TRIPS);
-    
-    // Bloqueio de OS Duplicada
-    const isDuplicate = current.some((t: Trip) => t.os === trip.os && t.id !== trip.id);
-    if (isDuplicate) {
-      throw new Error(`A OS Nº ${trip.os} já existe no sistema.`);
-    }
-
     const idx = current.findIndex((t: Trip) => t.id === trip.id);
-    if (idx >= 0) { current[idx] = trip; } else { current.push(trip); }
+    if (idx >= 0) current[idx] = trip; else current.push(trip);
     db._saveLocal(KEYS.TRIPS, current);
-
-    if (supabase) {
-      try {
-        await supabase.from('trips').upsert(trip);
-      } catch (e) {
-        console.error("Supabase trip save error:", e);
-      }
-    }
+    if (supabase) await supabase.from('trips').upsert(trip);
     return true;
   },
 
-  // Presence & User logic
-  updatePresence: async (userId: string, isVisible: boolean) => {
-    if (!supabase) return;
-    try {
-      await supabase.from('users').update({ 
-        lastseen: new Date().toISOString(),
-        isonlinevisible: isVisible 
-      }).eq('id', userId);
-    } catch (e) { }
-  },
-
-  getUsers: async (): Promise<User[]> => {
-    const localData = db._getLocal(KEYS.USERS);
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.from('users').select('*');
-        if (!error && data) {
-          const normalized = data.map((u: any) => ({
-            id: u.id, username: u.username, password: u.password, displayName: u.name || u.displayName,
-            role: u.role, staffId: u.staffid || u.staffId, driverId: u.driverid || u.driverId,
-            lastLogin: u.lastlogin || u.lastLogin, lastSeen: u.lastseen || u.lastSeen,
-            position: u.position, photo: u.photo, isOnlineVisible: u.isonlinevisible ?? true,
-            isFirstLogin: u.isfirstlogin ?? (u.isFirstLogin ?? true), status: u.status || 'Ativo'
-          }));
-          db._saveLocal(KEYS.USERS, normalized);
-          return normalized;
-        }
-      } catch (e) { }
-    }
-    return localData;
-  },
-
-  saveUser: async (user: User) => {
-    const lowerUsername = user.username.toLowerCase();
-    const current = db._getLocal(KEYS.USERS);
-    const idx = current.findIndex((u: any) => u.id === user.id || u.username.toLowerCase() === lowerUsername);
-    if (idx >= 0) { current[idx] = { ...current[idx], ...user, username: lowerUsername }; } else { current.push({ ...user, username: lowerUsername }); }
-    db._saveLocal(KEYS.USERS, current);
-    if (supabase) {
-      await supabase.from('users').upsert({
-        id: user.id, username: lowerUsername, password: user.password, name: user.displayName.toUpperCase(),
-        role: user.role, staffid: user.staffId, driverid: user.driverId, lastlogin: user.lastLogin,
-        position: user.position?.toUpperCase(), status: user.status || 'Ativo', isfirstlogin: user.isFirstLogin ?? true, photo: user.photo
-      });
-    }
-  },
-
+  // DRIVERS
   getDrivers: async (): Promise<Driver[]> => {
     const localData = db._getLocal(KEYS.DRIVERS);
     if (supabase) {
@@ -135,27 +102,25 @@ export const db = {
     return localData;
   },
 
-  saveDriver: async (driver: Driver) => {
+  saveDriver: async (driver: Driver, id?: string) => {
     const current = db._getLocal(KEYS.DRIVERS);
-    const idx = current.findIndex((d: any) => d.id === driver.id);
-    if (idx >= 0) { current[idx] = driver; } else { current.push(driver); }
+    const drvId = id || driver.id;
+    const idx = current.findIndex((d: Driver) => d.id === drvId);
+    if (idx >= 0) current[idx] = { ...driver, id: drvId }; else current.push({ ...driver, id: drvId });
     db._saveLocal(KEYS.DRIVERS, current);
-    if (supabase) await driverRepository.save(supabase, driver);
-  },
-
-  deleteDriver: async (id: string) => {
-    const currentDrivers = db._getLocal(KEYS.DRIVERS);
-    db._saveLocal(KEYS.DRIVERS, currentDrivers.filter((d: any) => d.id !== id));
-    if (supabase) await driverRepository.delete(supabase, id);
-    const users = await db.getUsers();
-    const user = users.find(u => u.driverId === id);
-    if (user) {
-      db._saveLocal(KEYS.USERS, users.filter(u => u.id !== user.id));
-      if (supabase) await supabase.from('users').delete().eq('id', user.id);
-    }
+    if (supabase) await driverRepository.save(supabase, { ...driver, id: drvId });
     return true;
   },
 
+  deleteDriver: async (id: string) => {
+    const current = db._getLocal(KEYS.DRIVERS);
+    const filtered = current.filter((d: Driver) => d.id !== id);
+    db._saveLocal(KEYS.DRIVERS, filtered);
+    if (supabase) await driverRepository.delete(supabase, id);
+    return true;
+  },
+
+  // CUSTOMERS
   getCustomers: async (): Promise<Customer[]> => {
     const localData = db._getLocal(KEYS.CUSTOMERS);
     if (supabase) {
@@ -165,21 +130,25 @@ export const db = {
     return localData;
   },
 
-  saveCustomer: async (customer: Customer) => {
+  saveCustomer: async (customer: Customer, id?: string) => {
     const current = db._getLocal(KEYS.CUSTOMERS);
-    const idx = current.findIndex((c: any) => c.id === customer.id);
-    if (idx >= 0) { current[idx] = customer; } else { current.push(customer); }
+    const custId = id || customer.id;
+    const idx = current.findIndex((c: Customer) => c.id === custId);
+    if (idx >= 0) current[idx] = { ...customer, id: custId }; else current.push({ ...customer, id: custId });
     db._saveLocal(KEYS.CUSTOMERS, current);
-    if (supabase) await supabase.from('customers').upsert(customer);
+    if (supabase) await supabase.from('customers').upsert({ ...customer, id: custId });
+    return true;
   },
 
   deleteCustomer: async (id: string) => {
     const current = db._getLocal(KEYS.CUSTOMERS);
-    db._saveLocal(KEYS.CUSTOMERS, current.filter((c: any) => c.id !== id));
+    const filtered = current.filter((c: Customer) => c.id !== id);
+    db._saveLocal(KEYS.CUSTOMERS, filtered);
     if (supabase) await supabase.from('customers').delete().eq('id', id);
     return true;
   },
 
+  // PORTS
   getPorts: async (): Promise<Port[]> => {
     const localData = db._getLocal(KEYS.PORTS);
     if (supabase) {
@@ -189,14 +158,17 @@ export const db = {
     return localData;
   },
 
-  savePort: async (port: Port) => {
+  savePort: async (port: Port, id?: string) => {
     const current = db._getLocal(KEYS.PORTS);
-    const idx = current.findIndex((p: any) => p.id === port.id);
-    if (idx >= 0) { current[idx] = port; } else { current.push(port); }
+    const portId = id || port.id;
+    const idx = current.findIndex((p: Port) => p.id === portId);
+    if (idx >= 0) current[idx] = { ...port, id: portId }; else current.push({ ...port, id: portId });
     db._saveLocal(KEYS.PORTS, current);
-    if (supabase) await supabase.from('ports').upsert(port);
+    if (supabase) await supabase.from('ports').upsert({ ...port, id: portId });
+    return true;
   },
 
+  // PRE STACKING
   getPreStacking: async (): Promise<PreStacking[]> => {
     const localData = db._getLocal(KEYS.PRE_STACKING);
     if (supabase) {
@@ -206,97 +178,111 @@ export const db = {
     return localData;
   },
 
-  savePreStacking: async (ps: PreStacking) => {
+  savePreStacking: async (ps: PreStacking, id?: string) => {
     const current = db._getLocal(KEYS.PRE_STACKING);
-    const idx = current.findIndex((p: any) => p.id === ps.id);
-    if (idx >= 0) { current[idx] = ps; } else { current.push(ps); }
+    const psId = id || ps.id;
+    const idx = current.findIndex((p: PreStacking) => p.id === psId);
+    if (idx >= 0) current[idx] = { ...ps, id: psId }; else current.push({ ...ps, id: psId });
     db._saveLocal(KEYS.PRE_STACKING, current);
-    if (supabase) await supabase.from('pre_stacking').upsert(ps);
+    if (supabase) await supabase.from('pre_stacking').upsert({ ...ps, id: psId });
+    return true;
   },
 
+  // STAFF
   getStaff: async (): Promise<Staff[]> => {
     const localData = db._getLocal(KEYS.STAFF);
     if (supabase) {
-      try {
-        const { data, error } = await supabase.from('staff').select('*');
-        if (!error && data) {
-          const normalized = data.map((s: any) => ({
-            id: s.id, photo: s.photo, name: s.name, position: s.position, username: s.username, role: s.role,
-            registrationDate: s.registration_date || s.registrationDate, lastLogin: s.last_login || s.lastLogin,
-            emailCorp: s.email_corp || s.emailCorp, phoneCorp: s.phone_corp || s.phoneCorp,
-            status: s.status || 'Ativo', statusSince: s.status_since || s.statusSince
-          }));
-          db._saveLocal(KEYS.STAFF, normalized);
-          return normalized;
-        }
-      } catch (e) { }
+      const { data } = await supabase.from('staff').select('*');
+      if (data) { db._saveLocal(KEYS.STAFF, data); return data; }
     }
     return localData;
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
-    const currentStaff = db._getLocal(KEYS.STAFF);
-    const sIdx = currentStaff.findIndex((s: any) => s.id === staff.id);
-    if (sIdx >= 0) { currentStaff[sIdx] = staff; } else { currentStaff.push(staff); }
-    db._saveLocal(KEYS.STAFF, currentStaff);
-    if (supabase) {
-      await supabase.from('staff').upsert({
-        id: staff.id, photo: staff.photo || null, name: staff.name.toUpperCase(), position: staff.position.toUpperCase(),
-        username: staff.username.toLowerCase(), role: staff.role, registration_date: staff.registrationDate,
-        // Fix: Use camelCase property names from the Staff interface
-        last_login: staff.lastLogin || null, email_corp: staff.emailCorp || null, 
-        phone_corp: staff.phoneCorp || null, status: staff.status || 'Ativo', status_since: staff.statusSince || new Date().toISOString()
-      });
-    }
-    const users = await db.getUsers();
-    const existingUser = users.find(u => u.staffId === staff.id);
-    const userData: User = {
-      id: existingUser?.id || `u-${staff.id}`, username: staff.username.toLowerCase(), displayName: staff.name.toUpperCase(),
-      role: staff.role, staffId: staff.id, lastLogin: staff.lastLogin || staff.registrationDate,
-      position: staff.position.toUpperCase(), photo: staff.photo, status: staff.status as 'Ativo' | 'Inativo',
-      isFirstLogin: existingUser ? existingUser.isFirstLogin : true, password: existingUser?.password
-    };
-    if (password) { userData.password = password; userData.isFirstLogin = true; }
-    await db.saveUser(userData);
-  },
+    const current = db._getLocal(KEYS.STAFF);
+    const idx = current.findIndex((s: Staff) => s.id === staff.id);
+    if (idx >= 0) current[idx] = staff; else current.push(staff);
+    db._saveLocal(KEYS.STAFF, current);
+    if (supabase) await supabase.from('staff').upsert(staff);
 
-  deleteStaff: async (id: string) => {
-    const currentStaff = db._getLocal(KEYS.STAFF);
-    db._saveLocal(KEYS.STAFF, currentStaff.filter((s: any) => s.id !== id));
-    if (supabase) await supabase.from('staff').delete().eq('id', id);
-    const users = await db.getUsers();
-    const user = users.find(u => u.staffId === id);
-    if (user) {
-      db._saveLocal(KEYS.USERS, users.filter((u: any) => u.id !== user.id));
-      if (supabase) await supabase.from('users').delete().eq('id', user.id);
+    // Also update/create linked user
+    if (password !== undefined) {
+      const users = db._getLocal(KEYS.USERS);
+      const userIdx = users.findIndex((u: User) => u.staffId === staff.id);
+      const userData: User = {
+        id: userIdx >= 0 ? users[userIdx].id : `u-stf-${staff.id}`,
+        username: staff.username,
+        displayName: staff.name,
+        role: staff.role,
+        lastLogin: new Date().toISOString(),
+        staffId: staff.id,
+        password: password,
+        photo: staff.photo
+      };
+      if (userIdx >= 0) users[userIdx] = userData; else users.push(userData);
+      db._saveLocal(KEYS.USERS, users);
+      if (supabase) await supabase.from('users').upsert(userData);
     }
     return true;
   },
 
-  exportBackup: async () => {
-    const backup = { drivers: await db.getDrivers(), customers: await db.getCustomers(), ports: await db.getPorts(), preStacking: await db.getPreStacking(), staff: await db.getStaff(), users: await db.getUsers(), trips: await db.getTrips() };
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `als_backup_${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(url);
+  deleteStaff: async (id: string) => {
+    const current = db._getLocal(KEYS.STAFF);
+    const filtered = current.filter((s: Staff) => s.id !== id);
+    db._saveLocal(KEYS.STAFF, filtered);
+    if (supabase) await supabase.from('staff').delete().eq('id', id);
+
+    const users = db._getLocal(KEYS.USERS);
+    const filteredUsers = users.filter((u: User) => u.staffId !== id);
+    db._saveLocal(KEYS.USERS, filteredUsers);
+    if (supabase) await supabase.from('users').delete().eq('staffId', id);
+    return true;
   },
 
-  importBackup: async (file: File): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const content = JSON.parse(e.target?.result as string);
-          if (content.drivers) db._saveLocal(KEYS.DRIVERS, content.drivers);
-          if (content.customers) db._saveLocal(KEYS.CUSTOMERS, content.customers);
-          if (content.ports) db._saveLocal(KEYS.PORTS, content.ports);
-          if (content.preStacking) db._saveLocal(KEYS.PRE_STACKING, content.preStacking);
-          if (content.staff) db._saveLocal(KEYS.STAFF, content.staff);
-          if (content.users) db._saveLocal(KEYS.USERS, content.users);
-          if (content.trips) db._saveLocal(KEYS.TRIPS, content.trips);
-          resolve(true);
-        } catch (err) { resolve(false); }
-      };
-      reader.readAsText(file);
-    });
+  // USERS
+  getUsers: async (): Promise<User[]> => {
+    const localData = db._getLocal(KEYS.USERS);
+    if (supabase) {
+      const { data } = await supabase.from('users').select('*');
+      if (data) return data;
+    }
+    return localData;
+  },
+
+  saveUser: async (user: User) => {
+    const current = db._getLocal(KEYS.USERS);
+    const idx = current.findIndex((u: User) => u.id === user.id);
+    if (idx >= 0) current[idx] = user; else current.push(user);
+    db._saveLocal(KEYS.USERS, current);
+    if (supabase) await supabase.from('users').upsert(user);
+    return true;
+  },
+
+  // BACKUP
+  exportBackup: async () => {
+    const backup: any = {};
+    for (const key of Object.values(KEYS)) {
+      backup[key] = localStorage.getItem(key);
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ALS_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  importBackup: async (file: File) => {
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      for (const key of Object.values(KEYS)) {
+        if (backup[key]) localStorage.setItem(key, backup[key]);
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
 };
