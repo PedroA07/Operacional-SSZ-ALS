@@ -21,8 +21,8 @@ export const KEYS = {
 };
 
 /**
- * Mapper para sincronizar o Banco de Dados com o Código.
- * Ajustado para a coluna 'lastlogin' conforme imagem do banco de dados.
+ * Mapper rigoroso para o Supabase.
+ * Usa 'lastlogin' e 'isfirstlogin' exatamente como aparecem na estrutura do PostgreSQL.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -31,20 +31,20 @@ const userMapper = {
     password: u.password,
     display_name: u.displayName,
     role: u.role,
-    lastlogin: u.lastLogin, // Mapeia para a coluna exata do seu banco
+    lastlogin: u.lastLogin,
     photo: u.photo,
     position: u.position,
     staff_id: u.staffId,
     driver_id: u.driverId,
     status: u.status,
-    is_first_login: u.isFirstLogin === true,
+    isfirstlogin: u.isFirstLogin === true,
     last_seen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
   }),
   mapFromDb: (u: any): User => {
-    // Tenta ler de lastlogin (banco) ou lastLogin (legado/local)
+    // Tenta ler de várias combinações possíveis para garantir compatibilidade
     const finalLoginDate = u.lastlogin || u.last_login || u.lastLogin || new Date().toISOString();
-    const isFirst = u.is_first_login ?? u.isfirstlogin ?? u.isFirstLogin ?? false;
+    const isFirst = u.isfirstlogin ?? u.is_first_login ?? u.isFirstLogin ?? false;
 
     return {
       id: u.id,
@@ -52,7 +52,7 @@ const userMapper = {
       password: u.password,
       displayName: u.display_name || u.displayname || u.displayName || u.username,
       role: u.role,
-      lastLogin: finalLoginDate, // Propriedade usada no código
+      lastLogin: finalLoginDate,
       photo: u.photo,
       position: u.position,
       staffId: u.staff_id || u.staffid || u.staffId,
@@ -90,7 +90,7 @@ export const db = {
 
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
-      const { data } = await supabase.from('users').select('*');
+      const { data, error } = await supabase.from('users').select('*');
       if (data) {
         const mapped = data.map(u => userMapper.mapFromDb(u));
         db._saveLocal(KEYS.USERS, data); 
@@ -103,8 +103,8 @@ export const db = {
   saveUser: async (user: User) => {
     const payload = userMapper.mapToDb(user);
     if (supabase) {
-      const { error } = await supabase.from('users').upsert(payload);
-      if (error) console.error("Erro ao salvar usuário:", error);
+      const { error } = await supabase.from('users').upsert(payload, { onConflict: 'id' });
+      if (error) console.error("Erro ao sincronizar lastlogin no banco:", error);
     }
     const current = db._getLocal(KEYS.USERS);
     const idx = current.findIndex((u: any) => u.id === user.id);

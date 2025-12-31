@@ -18,13 +18,15 @@ const App: React.FC = () => {
         try {
           const sessionData: User = JSON.parse(saved);
           
-          // BUSCA NO BANCO: Garante que o lastLogin venha da base de dados oficial
-          // e não de um estado antigo do navegador.
+          // BUSCA NO BANCO: Forçamos a leitura do Banco de Dados oficial.
+          // Isso garante que se o usuário der F5, o 'lastlogin' lido venha do Supabase.
           const allUsers = await db.getUsers();
           const dbUser = allUsers.find(u => u.id === sessionData.id);
 
           if (dbUser && dbUser.status !== 'Inativo') {
             setUser(dbUser);
+            // Atualiza o cache local com os dados frescos do banco
+            sessionStorage.setItem('als_active_session', JSON.stringify(dbUser));
             setCurrentScreen(AppScreen.DASHBOARD);
           } else {
             sessionStorage.removeItem('als_active_session');
@@ -61,7 +63,7 @@ const App: React.FC = () => {
   }, [user?.id, currentScreen]);
 
   const handleLoginSuccess = async (userData: User) => {
-    // Ao logar, os dados já foram salvos no banco pelo authService
+    // Ao logar, o authService já garantiu que o 'lastlogin' é AGORA e salvou no banco.
     setUser(userData);
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);
