@@ -44,24 +44,23 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   }, [fetchStatus]);
 
   const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
-    // Se for o próprio usuário, sempre online
     if (currentUser && user.id === currentUser.id) return 'ONLINE';
     
     if (!user.lastSeen) return 'OFFLINE';
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
     
-    // Regras de timeout (3 minutos)
     if (diffSeconds > 180) return 'OFFLINE';
     if (diffSeconds < 60) return 'ONLINE';
     return 'AUSENTE';
   };
 
   /**
-   * Cálculo padronizado de Tempo de Sessão
+   * Cálculo exato do tempo de sessão sem travas artificiais.
+   * O App.tsx agora garante que o lastLogin seja renovado ao abrir o sistema.
    */
   const calculateSessionTime = (lastLoginStr?: string, userId?: string) => {
-    // Prioriza o dado local se for o próprio usuário para evitar delay de rede
+    // Se for o próprio usuário, usa a referência local para precisão milimétrica
     let baseTimeStr = lastLoginStr;
     if (currentUser && userId === currentUser.id) {
       baseTimeStr = currentUser.lastLogin;
@@ -73,20 +72,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
       const startTime = new Date(baseTimeStr).getTime();
       const diff = currentTime - startTime;
       
-      // Se o tempo for inválido ou futuro (devido a relógios dessincronizados), mostra 0
+      // Se houver qualquer inconsistência de relógio ou tempo negativo, mostra zerado
       if (isNaN(diff) || diff < 0) return '00:00:00';
       
-      // CÁPULA DE SEGURANÇA VISUAL:
-      // Se o timer for maior que 24h, mostra apenas o excedente do dia ou trava em 23:59:59
-      // Isso ajuda a disfarçar dados sujos que ainda não foram limpos pelo App.tsx
       const totalSeconds = Math.floor(diff / 1000);
-      if (totalSeconds > 86400) {
-         return '00:00:01'; // Indica que o sistema precisa atualizar o lastLogin do alvo
-      }
-      
-      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+      const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+      const s = (totalSeconds % 60).toString().padStart(2, '0');
       
       return `${h}:${m}:${s}`;
     } catch { 
@@ -114,7 +106,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
             <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
               {onlineCount} Online agora
             </span>
-            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Presença em tempo real</span>
+            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Status em Tempo Real</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -124,12 +116,12 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
         <div className="absolute bottom-full left-0 mb-4 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] overflow-hidden animate-in slide-in-from-bottom-6 zoom-in-95 duration-500 z-[200]">
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
              <div className="flex flex-col">
-               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Painel Conectados</h4>
-               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Sincronização Ativa</p>
+               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Monitor de Sessões</h4>
+               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Dados Sincronizados</p>
              </div>
              <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
-                <span className="text-[8px] font-black bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl uppercase border border-blue-500/20">LIVE</span>
+                <span className="text-[8px] font-black bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl uppercase border border-blue-500/20">Monitorando</span>
              </div>
           </div>
 

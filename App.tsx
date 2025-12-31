@@ -13,25 +13,29 @@ const App: React.FC = () => {
   useEffect(() => {
     const initSession = async () => {
       const saved = sessionStorage.getItem('als_active_session');
+      const sessionInitialized = sessionStorage.getItem('als_tab_initialized');
+
       if (saved) {
         try {
           const userData: User = JSON.parse(saved);
           const now = new Date();
           const lastLoginDate = new Date(userData.lastLogin);
           
-          // LÓGICA DE SINCRONIZAÇÃO DE TIMER DIÁRIO:
-          // Se o dia mudou (ex: login ontem, abriu hoje) OU se passou mais de 12h,
-          // resetamos o lastLogin para "agora" tanto localmente quanto no DB.
+          // REGRA DE OURO PARA SINCRONIA DE TIMERS:
+          // Se é uma nova aba/janela (tab_initialized vazio) OU o dia mudou OU passaram 12h,
+          // forçamos o início de uma nova contagem de tempo de sessão.
           const isDifferentDay = now.toLocaleDateString() !== lastLoginDate.toLocaleDateString();
           const isTooOld = (now.getTime() - lastLoginDate.getTime()) > (12 * 60 * 60 * 1000);
+          const isNewTab = !sessionInitialized;
 
-          if (isDifferentDay || isTooOld) {
+          if (isNewTab || isDifferentDay || isTooOld) {
             const freshTimestamp = now.toISOString();
             const updatedUser = { ...userData, lastLogin: freshTimestamp };
             
-            // Atualiza Estado, SessionStorage e o Banco de Dados (Supabase/Local)
+            // Persiste o novo horário de início de sessão no DB para todos verem
             setUser(updatedUser);
             sessionStorage.setItem('als_active_session', JSON.stringify(updatedUser));
+            sessionStorage.setItem('als_tab_initialized', 'true');
             await db.saveUser(updatedUser);
           } else {
             setUser(userData);
@@ -72,12 +76,14 @@ const App: React.FC = () => {
   const handleLoginSuccess = (userData: User) => {
     setUser(userData);
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
+    sessionStorage.setItem('als_tab_initialized', 'true');
     setCurrentScreen(AppScreen.DASHBOARD);
   };
 
   const handleLogout = () => {
     setUser(null);
     sessionStorage.removeItem('als_active_session');
+    sessionStorage.removeItem('als_tab_initialized');
     setCurrentScreen(AppScreen.LOGIN);
   };
 
