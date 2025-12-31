@@ -24,16 +24,17 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     loadStaffInfo();
 
     const updateTimer = () => {
-      // Usa o lastLogin que foi resetado no App.tsx
+      // Puxa o lastLogin que foi definido no momento do LOGIN real
       const startTime = new Date(user.lastLogin).getTime();
-      const now = new Date().getTime();
+      const now = Date.now();
       const diff = now - startTime;
       
-      const safeDiff = diff > 0 ? diff : 0;
+      const totalSeconds = Math.floor(Math.max(0, diff) / 1000);
       
-      const h = Math.floor(safeDiff / 3600000).toString().padStart(2, '0');
-      const m = Math.floor((safeDiff % 3600000) / 60000).toString().padStart(2, '0');
-      const s = Math.floor((safeDiff % 60000) / 1000).toString().padStart(2, '0');
+      const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+      const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+      const s = (totalSeconds % 60).toString().padStart(2, '0');
+      
       setSessionTime(`${h}:${m}:${s}`);
     };
 

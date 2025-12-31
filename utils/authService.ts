@@ -16,11 +16,12 @@ export const authService = {
         username: ADMIN_CREDENTIALS.username,
         displayName: 'Operacional Master',
         role: 'admin',
-        lastLogin: now,
+        lastLogin: now, // Define o início do timer AGORA
         isFirstLogin: false,
         position: 'Diretoria'
       };
       
+      // Salva no Banco de Dados
       await db.saveUser(adminUser);
 
       return {
@@ -42,26 +43,30 @@ export const authService = {
         return { success: false, error: 'Senha incorreta.' };
       }
 
-      // IMPORTANTE: Atualiza o lastLogin
-      foundUser.lastLogin = now;
-      await db.saveUser(foundUser); 
+      // Prepara o usuário com o novo horário de login (zera o timer)
+      const updatedLoginUser: User = {
+        ...foundUser,
+        lastLogin: now
+      };
+      
+      // Persiste no banco de dados global
+      await db.saveUser(updatedLoginUser); 
 
-      // Aplica a nova regra centralizada
-      const forceChange = passwordRule.shouldForceChange(foundUser);
+      const forceChange = passwordRule.shouldForceChange(updatedLoginUser);
 
-      return { success: true, user: foundUser, forceChange };
+      return { success: true, user: updatedLoginUser, forceChange };
     } catch (err) {
       return { success: false, error: 'Erro de conexão com a base de dados.' };
     }
   },
 
   async updateFirstPassword(user: User, newPassword: string): Promise<User> {
+    const now = new Date().toISOString();
     const updatedUser: User = {
       ...user,
       password: newPassword,
-      // MARCAÇÃO CRÍTICA: Define como FALSE após a alteração bem sucedida
       isFirstLogin: false,
-      lastLogin: new Date().toISOString()
+      lastLogin: now // Também inicia o timer ao trocar a senha
     };
     
     await db.saveUser(updatedUser);

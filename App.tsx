@@ -18,18 +18,10 @@ const App: React.FC = () => {
         try {
           const userData: User = JSON.parse(saved);
           
-          // REGRA: ZERAR TIMER EM CADA NOVO ACESSO
-          // Sempre que a página carregar (F5 ou abrir aba), definimos o início como "agora"
-          const freshTimestamp = new Date().toISOString();
-          const updatedUser = { ...userData, lastLogin: freshTimestamp };
-          
-          // Atualiza estado local, storage da aba e o Banco de Dados Global
-          setUser(updatedUser);
-          sessionStorage.setItem('als_active_session', JSON.stringify(updatedUser));
-          
-          // Salva no DB para que outros usuários vejam o timer começando do zero
-          await db.saveUser(updatedUser);
-          
+          // Agora NÃO geramos um freshTimestamp aqui.
+          // Apenas carregamos o usuário com o lastLogin que ele já possuía
+          // quando realizou o login oficial.
+          setUser(userData);
           setCurrentScreen(AppScreen.DASHBOARD);
         } catch (e) {
           sessionStorage.removeItem('als_active_session');
@@ -63,14 +55,10 @@ const App: React.FC = () => {
   }, [user?.id, currentScreen]);
 
   const handleLoginSuccess = async (userData: User) => {
-    // Ao logar pela primeira vez, também garantimos o timestamp atual
-    const now = new Date().toISOString();
-    const userWithTime = { ...userData, lastLogin: now };
-    
-    setUser(userWithTime);
-    sessionStorage.setItem('als_active_session', JSON.stringify(userWithTime));
-    await db.saveUser(userWithTime);
-    
+    // No momento do LOGIN SUCESSO (quando clica no botão entrar), 
+    // o timestamp já foi definido pelo authService e salvo no banco.
+    setUser(userData);
+    sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);
   };
 
