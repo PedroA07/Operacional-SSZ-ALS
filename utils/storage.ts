@@ -22,7 +22,7 @@ export const KEYS = {
 
 /**
  * Mapper para sincronizar o Banco de Dados com o Código.
- * Usa o padrão last_login para consistência com o banco SQL.
+ * Ajustado para a coluna 'lastlogin' conforme imagem do banco de dados.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -31,20 +31,19 @@ const userMapper = {
     password: u.password,
     display_name: u.displayName,
     role: u.role,
-    last_login: u.lastLogin, // Padrão SQL
+    lastlogin: u.lastLogin, // Mapeia para a coluna exata do seu banco
     photo: u.photo,
     position: u.position,
     staff_id: u.staffId,
     driver_id: u.driverId,
     status: u.status,
     is_first_login: u.isFirstLogin === true,
-    last_seen: u.lastSeen,   // Padrão SQL
+    last_seen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
   }),
   mapFromDb: (u: any): User => {
-    // Tenta ler de várias nomenclaturas possíveis para evitar quebra de dados antigos
-    const finalLoginDate = u.last_login || u.lastlogin || u.lastLogin || new Date().toISOString();
-    const finalSeenDate = u.last_seen || u.lastseen || u.lastSeen;
+    // Tenta ler de lastlogin (banco) ou lastLogin (legado/local)
+    const finalLoginDate = u.lastlogin || u.last_login || u.lastLogin || new Date().toISOString();
     const isFirst = u.is_first_login ?? u.isfirstlogin ?? u.isFirstLogin ?? false;
 
     return {
@@ -53,14 +52,14 @@ const userMapper = {
       password: u.password,
       displayName: u.display_name || u.displayname || u.displayName || u.username,
       role: u.role,
-      lastLogin: finalLoginDate,
+      lastLogin: finalLoginDate, // Propriedade usada no código
       photo: u.photo,
       position: u.position,
       staffId: u.staff_id || u.staffid || u.staffId,
       driverId: u.driver_id || u.driverid || u.driverId,
       status: u.status,
       isFirstLogin: isFirst === true || isFirst === 'true',
-      lastSeen: finalSeenDate,
+      lastSeen: u.last_seen || u.lastseen || u.lastSeen,
       isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
     };
   }
