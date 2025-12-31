@@ -16,13 +16,19 @@ const App: React.FC = () => {
 
       if (saved) {
         try {
-          const userData: User = JSON.parse(saved);
+          const sessionData: User = JSON.parse(saved);
           
-          // Agora NÃO geramos um freshTimestamp aqui.
-          // Apenas carregamos o usuário com o lastLogin que ele já possuía
-          // quando realizou o login oficial.
-          setUser(userData);
-          setCurrentScreen(AppScreen.DASHBOARD);
+          // BUSCA NO BANCO: Garante que o lastLogin venha da base de dados oficial
+          // e não de um estado antigo do navegador.
+          const allUsers = await db.getUsers();
+          const dbUser = allUsers.find(u => u.id === sessionData.id);
+
+          if (dbUser && dbUser.status !== 'Inativo') {
+            setUser(dbUser);
+            setCurrentScreen(AppScreen.DASHBOARD);
+          } else {
+            sessionStorage.removeItem('als_active_session');
+          }
         } catch (e) {
           sessionStorage.removeItem('als_active_session');
         }
@@ -55,8 +61,7 @@ const App: React.FC = () => {
   }, [user?.id, currentScreen]);
 
   const handleLoginSuccess = async (userData: User) => {
-    // No momento do LOGIN SUCESSO (quando clica no botão entrar), 
-    // o timestamp já foi definido pelo authService e salvo no banco.
+    // Ao logar, os dados já foram salvos no banco pelo authService
     setUser(userData);
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);

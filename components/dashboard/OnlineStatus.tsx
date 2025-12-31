@@ -21,13 +21,16 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   }, []);
 
   const fetchStatus = useCallback(async () => {
+    // Busca os usuários do banco (incluindo o last_login oficial)
     const u = await db.getUsers();
     setUsers(u);
   }, []);
 
   useEffect(() => {
     fetchStatus();
+    // Atualiza os dados do banco a cada 15s
     const syncInterval = setInterval(fetchStatus, 15000);
+    // Atualiza o relógio interno a cada 1s para o cronômetro correr suavemente
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -97,6 +100,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
+              // Localiza o usuário correspondente no banco para pegar o lastLogin real
               const u = users.find(user => 
                 (user.staffId === s.id) || 
                 (s.role === 'admin' && user.username.toLowerCase() === s.username.toLowerCase()) ||
@@ -111,7 +115,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
               };
 
               const config = statusConfigs[status];
-              // USA O UTILITÁRIO PRÓPRIO:
+              // Usa o utilitário PRÓPRIO baseado na data do banco:
               const displayTime = u ? timeUtils.calculateDuration(u.lastLogin) : '00:00:00';
 
               return (
