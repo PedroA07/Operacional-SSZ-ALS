@@ -7,6 +7,7 @@ import { authSecurity } from './authSecurity';
 export const authService = {
   async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string; forceChange?: boolean }> {
     const inputUser = username.trim().toLowerCase();
+    const now = new Date().toISOString();
     
     if (inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && password === ADMIN_CREDENTIALS.password) {
       return {
@@ -16,7 +17,7 @@ export const authService = {
           username: ADMIN_CREDENTIALS.username,
           displayName: 'Operacional Master',
           role: 'admin',
-          lastLogin: new Date().toISOString(),
+          lastLogin: now, // Reset do timer para o admin master
           isFirstLogin: false,
           position: 'Diretoria'
         },
@@ -36,7 +37,10 @@ export const authService = {
         return { success: false, error: 'Senha incorreta.' };
       }
 
-      // Utiliza o módulo de segurança isolado
+      // IMPORTANTE: Atualiza o lastLogin no objeto e persiste no banco para zerar o timer globalmente
+      foundUser.lastLogin = now;
+      await db.saveUser(foundUser);
+
       const forceChange = authSecurity.mustChangePassword(foundUser);
 
       return { success: true, user: foundUser, forceChange };
@@ -49,7 +53,7 @@ export const authService = {
     const updatedUser: User = {
       ...user,
       password: newPassword,
-      isFirstLogin: false, // Desativa permanentemente a flag
+      isFirstLogin: false,
       lastLogin: new Date().toISOString()
     };
     
