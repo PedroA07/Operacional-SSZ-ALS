@@ -14,16 +14,10 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Sincroniza o usuário da sessão para clonar o timer exato
+  // Sincroniza o usuário da sessão local
   useEffect(() => {
-    const syncSession = () => {
-      const saved = sessionStorage.getItem('als_active_session');
-      if (saved) setCurrentUser(JSON.parse(saved));
-    };
-    syncSession();
-    // Re-checa a cada 30 segundos caso haja atualização de perfil
-    const sessionInterval = setInterval(syncSession, 30000);
-    return () => clearInterval(sessionInterval);
+    const saved = sessionStorage.getItem('als_active_session');
+    if (saved) setCurrentUser(JSON.parse(saved));
   }, []);
 
   const fetchStatus = useCallback(async () => {
@@ -33,9 +27,14 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
+    // Busca novos dados do banco a cada 15s (presença)
     const syncInterval = setInterval(fetchStatus, 15000);
-    // Timer de altíssima precisão para atualização visual por segundo
-    const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
+    
+    // ATUALIZAÇÃO VISUAL: Incrementa o relógio interno a cada 1 segundo
+    // Isso força o React a re-renderizar a lista inteira e recalcular os timers
+    const clockInterval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -52,7 +51,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   }, [fetchStatus]);
 
   const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
-    // Se for o usuário logado na máquina, está online por definição
     if (currentUser && user.id === currentUser.id) return 'ONLINE';
     
     if (!user.lastSeen) return 'OFFLINE';
@@ -65,30 +63,34 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   };
 
   /**
-   * CLONAGEM DO TIMER:
-   * Usa a exata mesma lógica do UserProfile.tsx
+   * CÁLCULO DINÂMICO DE TEMPO DE SESSÃO
+   * Esta função é chamada para cada linha da tabela a cada segundo
    */
-  const calculateSessionTime = (dbLastLogin?: string, userId?: string) => {
-    // REGRA DE OURO: Se o ID for do usuário atual, IGNORA o banco e usa a SESSION
-    let startTimeStr = dbLastLogin;
-    if (currentUser && (userId === currentUser.id || userId === 'admin-master')) {
-      startTimeStr = currentUser.lastLogin;
+  const calculateSessionTime = (startTimeStr?: string, userId?: string) => {
+    // Se for o usuário da máquina atual, prioriza o login da sessão para precisão milimétrica
+    let effectiveStartStr = startTimeStr;
+    if (currentUser && userId === currentUser.id) {
+      effectiveStartStr = currentUser.lastLogin;
     }
 
-    if (!startTimeStr) return '00:00:00';
+    if (!effectiveStartStr) return '00:00:00';
     
     try {
-      const startTime = new Date(startTimeStr).getTime();
+      const startTime = new Date(effectiveStartStr).getTime();
       const diff = currentTime - startTime;
       
-      // Bloqueia tempos absurdos (acima de 24h ou negativos) resultantes de lixo no DB
-      if (isNaN(diff) || diff < 0 || diff > 86400000) return '00:00:01';
+      // Se o tempo for negativo (erro de fuso) ou absurdamente alto (lixo no DB), reseta visualmente
+      if (isNaN(diff) || diff < 0) return '00:00:00';
       
+      // Formatação HH:MM:SS
       const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
       const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
       const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      
       return `${h}:${m}:${s}`;
-    } catch { return '00:00:00'; }
+    } catch { 
+      return '00:00:00'; 
+    }
   };
 
   const onlineCount = users.filter(u => getStatus(u) === 'ONLINE').length;
@@ -105,13 +107,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
       >
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className={`w-3 h-3 rounded-full ${onlineCount > 0 ? 'bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.6)]' : 'bg-slate-600'}`}></div>
+            <div className={`w-3.5 h-3.5 rounded-full ${onlineCount > 0 ? 'bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.6)]' : 'bg-slate-600'}`}></div>
           </div>
           <div className="flex flex-col items-start text-left">
             <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
-              {onlineCount} Online
+              {onlineCount} Online agora
             </span>
-            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Presença em Tempo Real</span>
+            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Monitoramento Ativo</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -122,14 +124,16 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
              <div className="flex flex-col">
                <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Painel Conectados</h4>
-               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Atualização Automática</p>
+               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Sincronização em Tempo Real</p>
              </div>
-             <span className="text-[8px] font-black bg-blue-600 text-white px-3 py-1.5 rounded-xl uppercase shadow-lg shadow-blue-600/20 animate-pulse">Monitorando</span>
+             <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
+                <span className="text-[8px] font-black bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl uppercase border border-blue-500/20">Monitorando</span>
+             </div>
           </div>
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
-              // Busca usuário correspondente (por ID ou por Username para Admin)
               const u = users.find(user => 
                 (user.staffId === s.id) || 
                 (s.role === 'admin' && user.username.toLowerCase() === s.username.toLowerCase()) ||
@@ -144,6 +148,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
               };
 
               const config = statusConfigs[status];
+              // O displayTime agora mudará a cada segundo para todos os usuários ONLINE
               const displayTime = u ? calculateSessionTime(u.lastLogin, u.id) : '00:00:00';
 
               return (
@@ -158,10 +163,10 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-black text-slate-100 uppercase truncate tracking-tight">{s.name}</p>
                     <div className="flex items-center justify-between mt-1">
-                      <p className={`text-[8px] font-black uppercase tracking-tighter {config.text}`}>{config.label}</p>
+                      <p className={`text-[8px] font-black uppercase tracking-tighter ${config.text}`}>{config.label}</p>
                       {status !== 'OFFLINE' && (
                         <div className="flex items-center gap-1.5 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/10">
-                           <svg className="w-2.5 h-2.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3"/></svg>
+                           <svg className="w-2.5 h-2.5 text-blue-400 animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ animationDuration: '3s' }}><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3"/></svg>
                            <span className="text-[8px] font-mono font-black text-blue-400">{displayTime}</span>
                         </div>
                       )}
