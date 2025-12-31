@@ -21,7 +21,8 @@ export const KEYS = {
 };
 
 /**
- * Mapper rigoroso para sincronizar o Banco de Dados com o Código.
+ * Mapper para sincronizar o Banco de Dados com o Código.
+ * Corrigido para não resetar o lastLogin durante a sincronização automática.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -37,18 +38,19 @@ const userMapper = {
     staff_id: u.staffId,
     driver_id: u.driverId,
     status: u.status,
-    // Garante que o boolean seja salvo corretamente
     is_first_login: u.isFirstLogin === true,
     last_seen: u.lastSeen,
     lastseen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
   }),
   mapFromDb: (u: any): User => {
-    const isCurrentYear = (dateStr: string) => dateStr && dateStr.startsWith('2025');
+    // Busca a data de login original sem criar uma nova se ela já existir
     const rawDate = u.last_login || u.lastlogin || u.lastLogin;
-    const finalDate = isCurrentYear(rawDate) ? rawDate : new Date().toISOString();
+    
+    // Se não houver data nenhuma no banco, apenas aí definimos uma base
+    // mas se houver, mantemos a string original para não resetar os timers
+    const finalDate = rawDate || new Date().toISOString();
 
-    // Tenta ler de várias nomenclaturas possíveis vindas do Supabase
     const isFirst = u.is_first_login ?? u.isfirstlogin ?? u.isFirstLogin ?? false;
 
     return {
@@ -63,7 +65,6 @@ const userMapper = {
       staffId: u.staff_id || u.staffid || u.staffId,
       driverId: u.driver_id || u.driverid || u.driverId,
       status: u.status,
-      // Converte para booleano estrito para evitar o loop
       isFirstLogin: isFirst === true || isFirst === 'true',
       lastSeen: u.last_seen || u.lastseen || u.lastSeen,
       isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
@@ -148,7 +149,6 @@ export const db = {
       position: staff.position,
       status: staff.status,
       photo: staff.photo,
-      // Se já existe usuário, mantém o estado dele. Se for novo, marca como primeiro acesso.
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true
     };
     

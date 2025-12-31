@@ -14,7 +14,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Sincroniza o usuário da sessão local
+  // Sincroniza o usuário da sessão local para precisão do timer próprio
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) setCurrentUser(JSON.parse(saved));
@@ -27,11 +27,11 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
-    // Busca novos dados do banco a cada 15s (presença)
+    // Heartbeat de dados (presença) a cada 15s
     const syncInterval = setInterval(fetchStatus, 15000);
     
-    // ATUALIZAÇÃO VISUAL: Incrementa o relógio interno a cada 1 segundo
-    // Isso força o React a re-renderizar a lista inteira e recalcular os timers
+    // LOOP DE CRONÔMETRO (1 segundo):
+    // Essencial para manter todos os contadores da lista se movendo simultaneamente
     const clockInterval = setInterval(() => {
       setCurrentTime(Date.now());
     }, 1000);
@@ -63,26 +63,25 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   };
 
   /**
-   * CÁLCULO DINÂMICO DE TEMPO DE SESSÃO
-   * Esta função é chamada para cada linha da tabela a cada segundo
+   * Cálculo de tempo de sessão para QUALQUER usuário da lista.
+   * Utiliza a variável currentTime que muda a cada segundo para forçar o incremento visual.
    */
-  const calculateSessionTime = (startTimeStr?: string, userId?: string) => {
-    // Se for o usuário da máquina atual, prioriza o login da sessão para precisão milimétrica
-    let effectiveStartStr = startTimeStr;
+  const calculateSessionTime = (lastLoginStr?: string, userId?: string) => {
+    // Regra: Se for o usuário da máquina atual, usa o lastLogin da sessão para evitar lag de rede
+    let startStr = lastLoginStr;
     if (currentUser && userId === currentUser.id) {
-      effectiveStartStr = currentUser.lastLogin;
+      startStr = currentUser.lastLogin;
     }
 
-    if (!effectiveStartStr) return '00:00:00';
+    if (!startStr) return '00:00:00';
     
     try {
-      const startTime = new Date(effectiveStartStr).getTime();
+      const startTime = new Date(startStr).getTime();
       const diff = currentTime - startTime;
       
-      // Se o tempo for negativo (erro de fuso) ou absurdamente alto (lixo no DB), reseta visualmente
-      if (isNaN(diff) || diff < 0) return '00:00:00';
+      // Se a data for inválida ou o tempo for negativo (delay de fuso), trava no 00:00:01
+      if (isNaN(diff) || diff < 0) return '00:00:01';
       
-      // Formatação HH:MM:SS
       const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
       const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
       const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
@@ -113,7 +112,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
             <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
               {onlineCount} Online agora
             </span>
-            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Monitoramento Ativo</span>
+            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Presença em tempo real</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -123,17 +122,18 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
         <div className="absolute bottom-full left-0 mb-4 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] overflow-hidden animate-in slide-in-from-bottom-6 zoom-in-95 duration-500 z-[200]">
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
              <div className="flex flex-col">
-               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Painel Conectados</h4>
-               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Sincronização em Tempo Real</p>
+               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Monitor de Sessões</h4>
+               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Sincronização Ativa</p>
              </div>
              <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
-                <span className="text-[8px] font-black bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl uppercase border border-blue-500/20">Monitorando</span>
+                <span className="text-[8px] font-black bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl uppercase border border-blue-500/20">Live</span>
              </div>
           </div>
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
+              // Localiza o objeto de usuário correspondente ao colaborador na lista
               const u = users.find(user => 
                 (user.staffId === s.id) || 
                 (s.role === 'admin' && user.username.toLowerCase() === s.username.toLowerCase()) ||
@@ -148,7 +148,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
               };
 
               const config = statusConfigs[status];
-              // O displayTime agora mudará a cada segundo para todos os usuários ONLINE
+              // Recalcula o tempo a cada segundo para todos os itens da lista
               const displayTime = u ? calculateSessionTime(u.lastLogin, u.id) : '00:00:00';
 
               return (
@@ -165,8 +165,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
                     <div className="flex items-center justify-between mt-1">
                       <p className={`text-[8px] font-black uppercase tracking-tighter ${config.text}`}>{config.label}</p>
                       {status !== 'OFFLINE' && (
-                        <div className="flex items-center gap-1.5 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/10">
-                           <svg className="w-2.5 h-2.5 text-blue-400 animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ animationDuration: '3s' }}><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3"/></svg>
+                        <div className="flex items-center gap-1.5 bg-blue-500/5 px-2 py-0.5 rounded-lg border border-blue-500/10">
+                           <svg className="w-2.5 h-2.5 text-blue-400/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3.5"/></svg>
                            <span className="text-[8px] font-mono font-black text-blue-400">{displayTime}</span>
                         </div>
                       )}
