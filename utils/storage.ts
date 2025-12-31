@@ -21,8 +21,7 @@ export const KEYS = {
 };
 
 /**
- * Mapper inteligente e rigoroso.
- * Prioriza last_login (com underscore) para evitar ler dados lixo de colunas antigas.
+ * Mapper rigoroso para sincronizar o Banco de Dados com o Código.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -32,7 +31,7 @@ const userMapper = {
     display_name: u.displayName,
     role: u.role,
     last_login: u.lastLogin,
-    lastlogin: u.lastLogin, // Atualiza também a coluna sem underscore por segurança
+    lastlogin: u.lastLogin, // Sincroniza coluna antiga
     photo: u.photo,
     position: u.position,
     staff_id: u.staffId,
@@ -40,21 +39,22 @@ const userMapper = {
     status: u.status,
     is_first_login: u.isFirstLogin ?? false,
     last_seen: u.lastSeen,
-    lastseen: u.lastSeen, // Sincroniza presença
+    lastseen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
   }),
   mapFromDb: (u: any): User => {
-    // REGRA DE OURO: Se last_login existe e é recente, usa ele. 
-    // Evita usar o 'lastlogin' se ele contiver datas de 2024.
-    const dbDate = u.last_login || u.lastlogin || u.lastLogin;
-    
+    // FILTRO DE SEGURANÇA: Se a data for de 2024 ou anterior, ignoramos para não bugar o timer
+    const rawDate = u.last_login || u.lastlogin || u.lastLogin;
+    const isValidDate = rawDate && !rawDate.startsWith('2024');
+    const finalDate = isValidDate ? rawDate : new Date().toISOString();
+
     return {
       id: u.id,
       username: u.username,
       password: u.password,
       displayName: u.display_name || u.displayname || u.displayName || u.username,
       role: u.role,
-      lastLogin: dbDate || new Date().toISOString(),
+      lastLogin: finalDate,
       photo: u.photo,
       position: u.position,
       staffId: u.staff_id || u.staffid || u.staffId,

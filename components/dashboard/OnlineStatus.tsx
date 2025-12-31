@@ -50,17 +50,22 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     return 'AUSENTE';
   };
 
+  /**
+   * Sincronizado com UserProfile: Usa a exata mesma lógica de cálculo
+   */
   const calculateSessionTime = (lastLogin?: string) => {
     if (!lastLogin) return '00:00:00';
     try {
-      const start = new Date(lastLogin).getTime();
-      const diff = currentTime - start;
-      if (isNaN(diff) || diff <= 0) return '00:00:00';
+      const startTime = new Date(lastLogin).getTime();
+      const diff = currentTime - startTime;
       
-      const hours = Math.floor(diff / 3600000).toString().padStart(2, '0');
-      const minutes = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-      const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-      return `${hours}:${minutes}:${seconds}`;
+      // Proteção contra tempos negativos ou absurdos (fallback para agora)
+      if (isNaN(diff) || diff <= 0 || diff > 86400000) return '00:00:01';
+      
+      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      return `${h}:${m}:${s}`;
     } catch { return '00:00:00'; }
   };
 
@@ -102,14 +107,12 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
-              // BUSCA AVANÇADA: Tenta encontrar o usuário pelo staffId ou pelo username (Admin Master)
               const u = users.find(user => 
                 (user.staffId === s.id) || 
                 (s.role === 'admin' && user.username.toLowerCase() === s.username.toLowerCase())
               );
               
               const status = u ? getStatus(u) : 'OFFLINE';
-              
               const statusConfigs = {
                 ONLINE: { color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online / Ativo', shadow: 'shadow-emerald-500/40' },
                 AUSENTE: { color: 'bg-amber-500', text: 'text-amber-400', label: 'Ausente / Inativo', shadow: 'shadow-amber-500/40' },
