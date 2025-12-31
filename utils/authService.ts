@@ -16,12 +16,12 @@ export const authService = {
         username: ADMIN_CREDENTIALS.username,
         displayName: 'Operacional Master',
         role: 'admin',
-        lastLogin: now,
+        lastLogin: now, // Zera o timer
         isFirstLogin: false,
         position: 'Diretoria'
       };
       
-      // Persiste o login do admin no banco para que o timer global funcione
+      // PERSISTÊNCIA: Grava o novo lastLogin no banco
       await db.saveUser(adminUser);
 
       return {
@@ -43,9 +43,9 @@ export const authService = {
         return { success: false, error: 'Senha incorreta.' };
       }
 
-      // IMPORTANTE: Atualiza o lastLogin para zerar o timer de sessão globalmente
+      // IMPORTANTE: Atualiza o lastLogin para zerar o timer de sessão
       foundUser.lastLogin = now;
-      await db.saveUser(foundUser);
+      await db.saveUser(foundUser); // Grava a atualização no banco
 
       const forceChange = authSecurity.mustChangePassword(foundUser);
 

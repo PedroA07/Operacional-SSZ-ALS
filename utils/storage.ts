@@ -21,22 +21,22 @@ export const KEYS = {
 };
 
 /**
- * Mapper ajustado para garantir consistência entre CamelCase do app e snake_case do DB.
+ * Mapper rigoroso para garantir que lastLogin no código seja SEMPRE last_login no banco.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
     id: u.id,
     username: u.username,
     password: u.password,
-    displayName: u.displayName,
+    display_name: u.displayName,
     role: u.role,
-    last_login: u.lastLogin, // CORRIGIDO: Nome da coluna no DB
+    last_login: u.lastLogin, // Campo crucial para o timer
     photo: u.photo,
     position: u.position,
-    driver_id: u.driverId,
     staff_id: u.staffId,
+    driver_id: u.driverId,
     status: u.status,
-    isFirstLogin: u.isFirstLogin ?? false,
+    is_first_login: u.isFirstLogin ?? false,
     last_seen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
   }),
@@ -44,15 +44,15 @@ const userMapper = {
     id: u.id,
     username: u.username,
     password: u.password,
-    displayName: u.displayName || u.displayname || u.display_name || u.username || 'Usuário',
+    displayName: u.display_name || u.displayName || u.username,
     role: u.role,
-    lastLogin: u.last_login || u.lastLogin || u.lastlogin || new Date().toISOString(), // Fallbacks consistentes
-    photo: u.photo || u.avatar,
+    lastLogin: u.last_login || u.lastLogin || new Date().toISOString(),
+    photo: u.photo,
     position: u.position,
-    driverId: u.driver_id || u.driverid || u.driverId,
-    staffId: u.staff_id || u.staffid || u.staffId,
+    staffId: u.staff_id || u.staffId,
+    driverId: u.driver_id || u.driverId,
     status: u.status,
-    isFirstLogin: (u.isFirstLogin === true || u.isfirstlogin === true),
+    isFirstLogin: u.is_first_login ?? u.isFirstLogin ?? false,
     lastSeen: u.last_seen || u.lastSeen,
     isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
   })
@@ -75,7 +75,7 @@ export const db = {
     const users = db._getLocal(KEYS.USERS);
     const idx = users.findIndex((u: any) => u.id === userId);
     if (idx >= 0) {
-      users[idx] = { ...users[idx], lastSeen: now, isOnlineVisible: isVisible };
+      users[idx] = { ...users[idx], last_seen: now, is_online_visible: isVisible };
       db._saveLocal(KEYS.USERS, users);
     }
   },
@@ -90,6 +90,19 @@ export const db = {
       }
     }
     return db._getLocal(KEYS.USERS).map((u: any) => userMapper.mapFromDb(u));
+  },
+
+  saveUser: async (user: User) => {
+    if (supabase) {
+      const payload = userMapper.mapToDb(user);
+      await supabase.from('users').upsert(payload);
+    }
+    const current = db._getLocal(KEYS.USERS);
+    const idx = current.findIndex((u: any) => u.id === user.id);
+    const dbFormat = userMapper.mapToDb(user);
+    if (idx >= 0) current[idx] = dbFormat; else current.push(dbFormat);
+    db._saveLocal(KEYS.USERS, current);
+    return true;
   },
 
   getStaff: async (): Promise<Staff[]> => {
@@ -133,19 +146,6 @@ export const db = {
     }
 
     await db.saveUser(userToSave);
-    return true;
-  },
-
-  saveUser: async (user: User) => {
-    if (supabase) {
-      const payload = userMapper.mapToDb(user);
-      const { error } = await supabase.from('users').upsert(payload);
-      if (error) console.error("Erro ao salvar usuário:", error);
-    }
-    const current = db._getLocal(KEYS.USERS);
-    const idx = current.findIndex((u: any) => u.id === user.id);
-    if (idx >= 0) current[idx] = user; else current.push(user);
-    db._saveLocal(KEYS.USERS, current);
     return true;
   },
 

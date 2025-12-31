@@ -24,11 +24,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     loadStaffInfo();
 
     const updateTimer = () => {
-      // Usa o lastLogin do objeto user (que vem do authService)
+      // Usa o lastLogin persistido que foi setado no momento do clique em "Entrar"
       const startTime = new Date(user.lastLogin).getTime();
       const now = new Date().getTime();
       const diff = now - startTime;
       
+      // Garante que o timer nunca seja negativo se houver atraso de rede
       const safeDiff = diff > 0 ? diff : 0;
       
       const h = Math.floor(safeDiff / 3600000).toString().padStart(2, '0');
@@ -56,6 +57,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
   const formatDate = (dateString?: string) => {
     if (!dateString) return '---';
     const d = new Date(dateString);
+    // Proteção contra Unix Epoch (1969/1970)
     if (isNaN(d.getTime()) || d.getFullYear() <= 1970) return '---';
     return d.toLocaleDateString('pt-BR');
   };
@@ -106,18 +108,16 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                 <p className="text-2xl font-black text-slate-800 font-mono tracking-tighter">{sessionTime}</p>
              </div>
              
-             {staffData && (
-                <div className="space-y-3 px-2 pt-2">
-                   <div className="flex justify-between items-center">
-                      <span className="text-[8px] font-black text-slate-400 uppercase">Cargo / Função</span>
-                      <span className="text-[9px] font-bold text-slate-700 uppercase">{staffData.position}</span>
-                   </div>
-                   <div className="flex justify-between items-center">
-                      <span className="text-[8px] font-black text-slate-400 uppercase">Data Admissão</span>
-                      <span className="text-[9px] font-bold text-slate-700">{formatDate(staffData.registrationDate)}</span>
-                   </div>
+             <div className="space-y-3 px-2 pt-2">
+                <div className="flex justify-between items-center">
+                   <span className="text-[8px] font-black text-slate-400 uppercase">Cargo / Função</span>
+                   <span className="text-[9px] font-bold text-slate-700 uppercase">{user.position || 'OPERACIONAL'}</span>
                 </div>
-             )}
+                <div className="flex justify-between items-center">
+                   <span className="text-[8px] font-black text-slate-400 uppercase">Data Admissão</span>
+                   <span className="text-[9px] font-bold text-slate-700">{formatDate(staffData?.registrationDate)}</span>
+                </div>
+             </div>
           </div>
         </div>
       )}
