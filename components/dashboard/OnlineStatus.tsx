@@ -12,6 +12,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Carrega o usuário da sessão para clonar o timer
+  useEffect(() => {
+    const saved = sessionStorage.getItem('als_active_session');
+    if (saved) setCurrentUser(JSON.parse(saved));
+  }, []);
 
   const fetchStatus = useCallback(async () => {
     const u = await db.getUsers();
@@ -38,33 +45,39 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   }, [fetchStatus]);
 
   const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
-    if (!user.lastSeen) return 'OFFLINE';
+    // Se for o usuário atual, ele está sempre ONLINE enquanto a aba estiver aberta
+    if (currentUser && user.id === currentUser.id) return 'ONLINE';
     
+    if (!user.lastSeen) return 'OFFLINE';
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
     
-    // Considera offline se não der sinal por mais de 3 minutos
     if (diffSeconds > 180) return 'OFFLINE';
-    // Considera online se deu sinal nos últimos 60 segundos
     if (diffSeconds < 60) return 'ONLINE';
     return 'AUSENTE';
   };
 
   /**
-   * Sincronizado com UserProfile: Usa a exata mesma lógica de cálculo
+   * Lógica de cálculo idêntica ao UserProfile
    */
-  const calculateSessionTime = (lastLogin?: string) => {
-    if (!lastLogin) return '00:00:00';
+  const calculateSessionTime = (lastLogin?: string, userId?: string) => {
+    // Se estiver calculando para o usuário logado, "clona" a lógica do Perfil usando o lastLogin da sessão
+    let startTimeStr = lastLogin;
+    if (currentUser && userId === currentUser.id) {
+      startTimeStr = currentUser.lastLogin;
+    }
+
+    if (!startTimeStr) return '00:00:00';
+    
     try {
-      const startTime = new Date(lastLogin).getTime();
+      const startTime = new Date(startTimeStr).getTime();
       const diff = currentTime - startTime;
       
-      // Proteção contra tempos negativos ou absurdos (fallback para agora)
-      if (isNaN(diff) || diff <= 0 || diff > 86400000) return '00:00:01';
+      const safeDiff = diff > 0 ? diff : 0;
       
-      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      const h = Math.floor(safeDiff / 3600000).toString().padStart(2, '0');
+      const m = Math.floor((safeDiff % 3600000) / 60000).toString().padStart(2, '0');
+      const s = Math.floor((safeDiff % 60000) / 1000).toString().padStart(2, '0');
       return `${h}:${m}:${s}`;
     } catch { return '00:00:00'; }
   };
@@ -120,7 +133,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
               };
 
               const config = statusConfigs[status];
-              const displayTime = u ? calculateSessionTime(u.lastLogin) : '00:00:00';
+              const displayTime = u ? calculateSessionTime(u.lastLogin, u.id) : '00:00:00';
 
               return (
                 <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${status === 'OFFLINE' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'}`}>
