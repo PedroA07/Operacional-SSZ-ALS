@@ -21,8 +21,8 @@ export const KEYS = {
 };
 
 /**
- * Mapper inteligente: Tenta ler tanto camelCase quanto snake_case para evitar erros 
- * causados por colunas duplicadas ou nomes diferentes no Supabase.
+ * Mapper inteligente e rigoroso.
+ * Prioriza last_login (com underscore) para evitar ler dados lixo de colunas antigas.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -32,6 +32,7 @@ const userMapper = {
     display_name: u.displayName,
     role: u.role,
     last_login: u.lastLogin,
+    lastlogin: u.lastLogin, // Atualiza também a coluna sem underscore por segurança
     photo: u.photo,
     position: u.position,
     staff_id: u.staffId,
@@ -39,25 +40,31 @@ const userMapper = {
     status: u.status,
     is_first_login: u.isFirstLogin ?? false,
     last_seen: u.lastSeen,
+    lastseen: u.lastSeen, // Sincroniza presença
     is_online_visible: u.isOnlineVisible ?? true
   }),
-  mapFromDb: (u: any): User => ({
-    id: u.id,
-    username: u.username,
-    password: u.password,
-    // Tenta todas as variações de nome de coluna encontradas na imagem do DB
-    displayName: u.display_name || u.displayname || u.displayName || u.username,
-    role: u.role,
-    lastLogin: u.last_login || u.lastlogin || u.lastLogin || new Date().toISOString(),
-    photo: u.photo,
-    position: u.position,
-    staffId: u.staff_id || u.staffid || u.staffId,
-    driverId: u.driver_id || u.driverid || u.driverId,
-    status: u.status,
-    isFirstLogin: u.is_first_login ?? u.isfirstlogin ?? u.isFirstLogin ?? false,
-    lastSeen: u.last_seen || u.lastseen || u.lastSeen,
-    isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
-  })
+  mapFromDb: (u: any): User => {
+    // REGRA DE OURO: Se last_login existe e é recente, usa ele. 
+    // Evita usar o 'lastlogin' se ele contiver datas de 2024.
+    const dbDate = u.last_login || u.lastlogin || u.lastLogin;
+    
+    return {
+      id: u.id,
+      username: u.username,
+      password: u.password,
+      displayName: u.display_name || u.displayname || u.displayName || u.username,
+      role: u.role,
+      lastLogin: dbDate || new Date().toISOString(),
+      photo: u.photo,
+      position: u.position,
+      staffId: u.staff_id || u.staffid || u.staffId,
+      driverId: u.driver_id || u.driverid || u.driverId,
+      status: u.status,
+      isFirstLogin: u.is_first_login ?? u.isfirstlogin ?? u.isFirstLogin ?? false,
+      lastSeen: u.last_seen || u.lastseen || u.lastSeen,
+      isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
+    };
+  }
 };
 
 export const db = {
@@ -69,7 +76,6 @@ export const db = {
   updatePresence: async (userId: string, isVisible: boolean) => {
     const now = new Date().toISOString();
     if (supabase) {
-      // Atualiza ambas as colunas (com e sem _) para garantir que o sistema leia de qualquer uma
       await supabase.from('users').update({ 
         last_seen: now, 
         lastseen: now,
