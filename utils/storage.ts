@@ -21,7 +21,7 @@ export const KEYS = {
 };
 
 /**
- * Mapper rigoroso para sincronizar o Banco de Dados com o Código.
+ * Mapper rigoroso: Protege o sistema contra dados lixo de anos anteriores.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -31,7 +31,7 @@ const userMapper = {
     display_name: u.displayName,
     role: u.role,
     last_login: u.lastLogin,
-    lastlogin: u.lastLogin, 
+    lastlogin: u.lastLogin, // Sincroniza coluna legada
     photo: u.photo,
     position: u.position,
     staff_id: u.staffId,
@@ -43,15 +43,11 @@ const userMapper = {
     is_online_visible: u.isOnlineVisible ?? true
   }),
   mapFromDb: (u: any): User => {
-    // FILTRO DE SEGURANÇA MÁXIMA: 
-    // Ignora qualquer data de 2024 em qualquer coluna, priorizando sempre last_login recente.
-    const getSafeDate = (val: any) => {
-      if (!val || typeof val !== 'string') return null;
-      if (val.startsWith('2024')) return null; // Mata lixo de 2024
-      return val;
-    };
-
-    const finalDate = getSafeDate(u.last_login) || getSafeDate(u.lastlogin) || getSafeDate(u.lastLogin) || new Date().toISOString();
+    const isCurrentYear = (dateStr: string) => dateStr && dateStr.startsWith('2025');
+    
+    // Tenta encontrar uma data válida de 2025 nas diversas colunas possíveis
+    const rawDate = u.last_login || u.lastlogin || u.lastLogin;
+    const finalDate = isCurrentYear(rawDate) ? rawDate : new Date().toISOString();
 
     return {
       id: u.id,

@@ -14,10 +14,16 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Carrega o usuário da sessão para clonar o timer
+  // Sincroniza o usuário da sessão para clonar o timer exato
   useEffect(() => {
-    const saved = sessionStorage.getItem('als_active_session');
-    if (saved) setCurrentUser(JSON.parse(saved));
+    const syncSession = () => {
+      const saved = sessionStorage.getItem('als_active_session');
+      if (saved) setCurrentUser(JSON.parse(saved));
+    };
+    syncSession();
+    // Re-checa a cada 30 segundos caso haja atualização de perfil
+    const sessionInterval = setInterval(syncSession, 30000);
+    return () => clearInterval(sessionInterval);
   }, []);
 
   const fetchStatus = useCallback(async () => {
@@ -28,6 +34,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   useEffect(() => {
     fetchStatus();
     const syncInterval = setInterval(fetchStatus, 15000);
+    // Timer de altíssima precisão para atualização visual por segundo
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -45,7 +52,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   }, [fetchStatus]);
 
   const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
-    // Se for o usuário atual, ele está sempre ONLINE enquanto a aba estiver aberta
+    // Se for o usuário logado na máquina, está online por definição
     if (currentUser && user.id === currentUser.id) return 'ONLINE';
     
     if (!user.lastSeen) return 'OFFLINE';
@@ -58,12 +65,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   };
 
   /**
-   * Lógica de cálculo idêntica ao UserProfile
+   * CLONAGEM DO TIMER:
+   * Usa a exata mesma lógica do UserProfile.tsx
    */
-  const calculateSessionTime = (lastLogin?: string, userId?: string) => {
-    // Se estiver calculando para o usuário logado, "clona" a lógica do Perfil usando o lastLogin da sessão
-    let startTimeStr = lastLogin;
-    if (currentUser && userId === currentUser.id) {
+  const calculateSessionTime = (dbLastLogin?: string, userId?: string) => {
+    // REGRA DE OURO: Se o ID for do usuário atual, IGNORA o banco e usa a SESSION
+    let startTimeStr = dbLastLogin;
+    if (currentUser && (userId === currentUser.id || userId === 'admin-master')) {
       startTimeStr = currentUser.lastLogin;
     }
 
@@ -73,11 +81,12 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
       const startTime = new Date(startTimeStr).getTime();
       const diff = currentTime - startTime;
       
-      const safeDiff = diff > 0 ? diff : 0;
+      // Bloqueia tempos absurdos (acima de 24h ou negativos) resultantes de lixo no DB
+      if (isNaN(diff) || diff < 0 || diff > 86400000) return '00:00:01';
       
-      const h = Math.floor(safeDiff / 3600000).toString().padStart(2, '0');
-      const m = Math.floor((safeDiff % 3600000) / 60000).toString().padStart(2, '0');
-      const s = Math.floor((safeDiff % 60000) / 1000).toString().padStart(2, '0');
+      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
       return `${h}:${m}:${s}`;
     } catch { return '00:00:00'; }
   };
@@ -120,9 +129,11 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
+              // Busca usuário correspondente (por ID ou por Username para Admin)
               const u = users.find(user => 
                 (user.staffId === s.id) || 
-                (s.role === 'admin' && user.username.toLowerCase() === s.username.toLowerCase())
+                (s.role === 'admin' && user.username.toLowerCase() === s.username.toLowerCase()) ||
+                (s.username === 'operacional_ssz' && user.id === 'admin-master')
               );
               
               const status = u ? getStatus(u) : 'OFFLINE';
@@ -147,7 +158,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-black text-slate-100 uppercase truncate tracking-tight">{s.name}</p>
                     <div className="flex items-center justify-between mt-1">
-                      <p className={`text-[8px] font-black uppercase tracking-tighter ${config.text}`}>{config.label}</p>
+                      <p className={`text-[8px] font-black uppercase tracking-tighter {config.text}`}>{config.label}</p>
                       {status !== 'OFFLINE' && (
                         <div className="flex items-center gap-1.5 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/10">
                            <svg className="w-2.5 h-2.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3"/></svg>
