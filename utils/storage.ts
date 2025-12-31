@@ -21,7 +21,8 @@ export const KEYS = {
 };
 
 /**
- * Mapper rigoroso para garantir que lastLogin no código seja SEMPRE last_login no banco.
+ * Mapper inteligente: Tenta ler tanto camelCase quanto snake_case para evitar erros 
+ * causados por colunas duplicadas ou nomes diferentes no Supabase.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -30,7 +31,7 @@ const userMapper = {
     password: u.password,
     display_name: u.displayName,
     role: u.role,
-    last_login: u.lastLogin, // Campo crucial para o timer
+    last_login: u.lastLogin,
     photo: u.photo,
     position: u.position,
     staff_id: u.staffId,
@@ -44,17 +45,18 @@ const userMapper = {
     id: u.id,
     username: u.username,
     password: u.password,
-    displayName: u.display_name || u.displayName || u.username,
+    // Tenta todas as variações de nome de coluna encontradas na imagem do DB
+    displayName: u.display_name || u.displayname || u.displayName || u.username,
     role: u.role,
-    lastLogin: u.last_login || u.lastLogin || new Date().toISOString(),
+    lastLogin: u.last_login || u.lastlogin || u.lastLogin || new Date().toISOString(),
     photo: u.photo,
     position: u.position,
-    staffId: u.staff_id || u.staffId,
-    driverId: u.driver_id || u.driverId,
+    staffId: u.staff_id || u.staffid || u.staffId,
+    driverId: u.driver_id || u.driverid || u.driverId,
     status: u.status,
-    isFirstLogin: u.is_first_login ?? u.isFirstLogin ?? false,
-    lastSeen: u.last_seen || u.lastSeen,
-    isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
+    isFirstLogin: u.is_first_login ?? u.isfirstlogin ?? u.isFirstLogin ?? false,
+    lastSeen: u.last_seen || u.lastseen || u.lastSeen,
+    isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
   })
 };
 
@@ -67,15 +69,18 @@ export const db = {
   updatePresence: async (userId: string, isVisible: boolean) => {
     const now = new Date().toISOString();
     if (supabase) {
+      // Atualiza ambas as colunas (com e sem _) para garantir que o sistema leia de qualquer uma
       await supabase.from('users').update({ 
         last_seen: now, 
+        lastseen: now,
         is_online_visible: isVisible 
       }).eq('id', userId);
     }
+    
     const users = db._getLocal(KEYS.USERS);
     const idx = users.findIndex((u: any) => u.id === userId);
     if (idx >= 0) {
-      users[idx] = { ...users[idx], last_seen: now, is_online_visible: isVisible };
+      users[idx] = { ...users[idx], last_seen: now, lastseen: now, is_online_visible: isVisible };
       db._saveLocal(KEYS.USERS, users);
     }
   },
@@ -85,7 +90,7 @@ export const db = {
       const { data } = await supabase.from('users').select('*');
       if (data) {
         const mapped = data.map(u => userMapper.mapFromDb(u));
-        db._saveLocal(KEYS.USERS, mapped);
+        db._saveLocal(KEYS.USERS, data); 
         return mapped;
       }
     }
@@ -93,14 +98,13 @@ export const db = {
   },
 
   saveUser: async (user: User) => {
+    const payload = userMapper.mapToDb(user);
     if (supabase) {
-      const payload = userMapper.mapToDb(user);
       await supabase.from('users').upsert(payload);
     }
     const current = db._getLocal(KEYS.USERS);
     const idx = current.findIndex((u: any) => u.id === user.id);
-    const dbFormat = userMapper.mapToDb(user);
-    if (idx >= 0) current[idx] = dbFormat; else current.push(dbFormat);
+    if (idx >= 0) current[idx] = payload; else current.push(payload);
     db._saveLocal(KEYS.USERS, current);
     return true;
   },

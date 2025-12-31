@@ -20,9 +20,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
-    // Atualiza lista de usuários a cada 10s
-    const syncInterval = setInterval(fetchStatus, 10000);
-    // Atualiza relógio local a cada 1s para o timer fluir suavemente
+    const syncInterval = setInterval(fetchStatus, 15000);
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -45,8 +43,10 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
     
+    // Considera offline se não der sinal por mais de 3 minutos
     if (diffSeconds > 180) return 'OFFLINE';
-    if (user.isOnlineVisible && diffSeconds < 45) return 'ONLINE';
+    // Considera online se deu sinal nos últimos 60 segundos
+    if (diffSeconds < 60) return 'ONLINE';
     return 'AUSENTE';
   };
 
@@ -64,8 +64,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     } catch { return '00:00:00'; }
   };
 
-  const activeUsers = users.filter(u => getStatus(u) !== 'OFFLINE');
-  const onlineCount = activeUsers.filter(u => getStatus(u) === 'ONLINE').length;
+  const onlineCount = users.filter(u => getStatus(u) === 'ONLINE').length;
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -103,8 +102,12 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
-              // Tenta localizar o registro do usuário para este colaborador
-              const u = users.find(user => user.staffId === s.id || (s.role === 'admin' && user.username === 'operacional_ssz'));
+              // BUSCA AVANÇADA: Tenta encontrar o usuário pelo staffId ou pelo username (Admin Master)
+              const u = users.find(user => 
+                (user.staffId === s.id) || 
+                (s.role === 'admin' && user.username.toLowerCase() === s.username.toLowerCase())
+              );
+              
               const status = u ? getStatus(u) : 'OFFLINE';
               
               const statusConfigs = {
@@ -114,8 +117,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
               };
 
               const config = statusConfigs[status];
-              // O tempo de sessão usa o lastLogin do banco, que é atualizado no momento do login de cada um
-              const sessionTime = u ? calculateSessionTime(u.lastLogin) : '00:00:00';
+              const displayTime = u ? calculateSessionTime(u.lastLogin) : '00:00:00';
 
               return (
                 <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${status === 'OFFLINE' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'}`}>
@@ -133,7 +135,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
                       {status !== 'OFFLINE' && (
                         <div className="flex items-center gap-1.5 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/10">
                            <svg className="w-2.5 h-2.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3"/></svg>
-                           <span className="text-[8px] font-mono font-black text-blue-400">{sessionTime}</span>
+                           <span className="text-[8px] font-mono font-black text-blue-400">{displayTime}</span>
                         </div>
                       )}
                     </div>
