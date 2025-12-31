@@ -99,6 +99,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         username: (form.username || '').toLowerCase(),
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: form.photo,
+        // REGRA: Data de Admissão é igual ao Registro do Colaborador
         registrationDate: existing?.registrationDate || new Date().toISOString(),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
@@ -181,6 +182,11 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
                     <span className="text-slate-400">Usuário</span>
                     <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded-lg lowercase font-bold">{s.username}</span>
+                 </div>
+
+                 <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                    <span className="text-slate-400">Data Admissão</span>
+                    <span className="text-slate-700 font-bold">{new Date(s.registrationDate).toLocaleDateString('pt-BR')}</span>
                  </div>
                  
                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">

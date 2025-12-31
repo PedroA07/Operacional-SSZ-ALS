@@ -20,7 +20,9 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
+    // Atualiza lista de usuários a cada 10s
     const syncInterval = setInterval(fetchStatus, 10000);
+    // Atualiza relógio local a cada 1s para o timer fluir suavemente
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -101,6 +103,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
+              // Tenta localizar o registro do usuário para este colaborador
               const u = users.find(user => user.staffId === s.id || (s.role === 'admin' && user.username === 'operacional_ssz'));
               const status = u ? getStatus(u) : 'OFFLINE';
               
@@ -111,6 +114,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
               };
 
               const config = statusConfigs[status];
+              // O tempo de sessão usa o lastLogin do banco, que é atualizado no momento do login de cada um
               const sessionTime = u ? calculateSessionTime(u.lastLogin) : '00:00:00';
 
               return (

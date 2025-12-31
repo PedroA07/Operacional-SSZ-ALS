@@ -9,18 +9,24 @@ export const authService = {
     const inputUser = username.trim().toLowerCase();
     const now = new Date().toISOString();
     
+    // Login do Administrador Master operacional_ssz
     if (inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && password === ADMIN_CREDENTIALS.password) {
+      const adminUser: User = {
+        id: 'admin-master',
+        username: ADMIN_CREDENTIALS.username,
+        displayName: 'Operacional Master',
+        role: 'admin',
+        lastLogin: now,
+        isFirstLogin: false,
+        position: 'Diretoria'
+      };
+      
+      // Persiste o login do admin no banco para que o timer global funcione
+      await db.saveUser(adminUser);
+
       return {
         success: true,
-        user: {
-          id: 'admin-master',
-          username: ADMIN_CREDENTIALS.username,
-          displayName: 'Operacional Master',
-          role: 'admin',
-          lastLogin: now, // Reset do timer para o admin master
-          isFirstLogin: false,
-          position: 'Diretoria'
-        },
+        user: adminUser,
         forceChange: false
       };
     }
@@ -37,7 +43,7 @@ export const authService = {
         return { success: false, error: 'Senha incorreta.' };
       }
 
-      // IMPORTANTE: Atualiza o lastLogin no objeto e persiste no banco para zerar o timer globalmente
+      // IMPORTANTE: Atualiza o lastLogin para zerar o timer de sessão globalmente
       foundUser.lastLogin = now;
       await db.saveUser(foundUser);
 
