@@ -24,6 +24,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     loadStaffInfo();
 
     const updateTimer = () => {
+      // Usa o lastLogin do objeto user (que vem do authService)
       const startTime = new Date(user.lastLogin).getTime();
       const now = new Date().getTime();
       const diff = now - startTime;
@@ -51,6 +52,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [user.lastLogin, user.staffId]);
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '---';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime()) || d.getFullYear() <= 1970) return '---';
+    return d.toLocaleDateString('pt-BR');
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -106,7 +114,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                    </div>
                    <div className="flex justify-between items-center">
                       <span className="text-[8px] font-black text-slate-400 uppercase">Data Admissão</span>
-                      <span className="text-[9px] font-bold text-slate-700">{new Date(staffData.registrationDate).toLocaleDateString('pt-BR')}</span>
+                      <span className="text-[9px] font-bold text-slate-700">{formatDate(staffData.registrationDate)}</span>
                    </div>
                 </div>
              )}

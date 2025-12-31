@@ -21,8 +21,7 @@ export const KEYS = {
 };
 
 /**
- * Mapper simplificado após a limpeza das colunas duplicadas no banco.
- * Foca na coluna isFirstLogin para controle de acesso.
+ * Mapper ajustado para garantir consistência entre CamelCase do app e snake_case do DB.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -31,13 +30,12 @@ const userMapper = {
     password: u.password,
     displayName: u.displayName,
     role: u.role,
-    lastLogin: u.lastLogin,
+    last_login: u.lastLogin, // CORRIGIDO: Nome da coluna no DB
     photo: u.photo,
     position: u.position,
     driver_id: u.driverId,
     staff_id: u.staffId,
     status: u.status,
-    // Gravação direta na coluna unificada
     isFirstLogin: u.isFirstLogin ?? false,
     last_seen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
@@ -46,16 +44,14 @@ const userMapper = {
     id: u.id,
     username: u.username,
     password: u.password,
-    // Fallbacks para nomes de exibição e fotos
     displayName: u.displayName || u.displayname || u.display_name || u.username || 'Usuário',
     role: u.role,
-    lastLogin: u.lastLogin || u.lastlogin || u.last_login || new Date().toISOString(),
+    lastLogin: u.last_login || u.lastLogin || u.lastlogin || new Date().toISOString(), // Fallbacks consistentes
     photo: u.photo || u.avatar,
     position: u.position,
     driverId: u.driver_id || u.driverid || u.driverId,
     staffId: u.staff_id || u.staffid || u.staffId,
     status: u.status,
-    // Verifica a coluna unificada (aceita CamelCase ou lowercase vindo do Postgres)
     isFirstLogin: (u.isFirstLogin === true || u.isfirstlogin === true),
     lastSeen: u.last_seen || u.lastSeen,
     isOnlineVisible: u.is_online_visible ?? u.isOnlineVisible ?? true
