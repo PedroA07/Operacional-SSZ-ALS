@@ -16,19 +16,20 @@ const App: React.FC = () => {
       if (saved) {
         try {
           const userData: User = JSON.parse(saved);
+          const now = new Date();
+          const lastLoginDate = new Date(userData.lastLogin);
           
-          // LÓGICA DE RENOVAÇÃO DE TIMER:
-          // Se o login salvo na sessão for de mais de 12 horas atrás, 
-          // consideramos uma "nova jornada" e atualizamos o lastLogin.
-          const lastLoginTime = new Date(userData.lastLogin).getTime();
-          const now = new Date().getTime();
-          const twelveHours = 12 * 60 * 60 * 1000;
+          // LÓGICA DE SINCRONIZAÇÃO DE TIMER DIÁRIO:
+          // Se o dia mudou (ex: login ontem, abriu hoje) OU se passou mais de 12h,
+          // resetamos o lastLogin para "agora" tanto localmente quanto no DB.
+          const isDifferentDay = now.toLocaleDateString() !== lastLoginDate.toLocaleDateString();
+          const isTooOld = (now.getTime() - lastLoginDate.getTime()) > (12 * 60 * 60 * 1000);
 
-          if (now - lastLoginTime > twelveHours) {
-            const freshLogin = new Date().toISOString();
-            const updatedUser = { ...userData, lastLogin: freshLogin };
+          if (isDifferentDay || isTooOld) {
+            const freshTimestamp = now.toISOString();
+            const updatedUser = { ...userData, lastLogin: freshTimestamp };
             
-            // Atualiza local e nuvem
+            // Atualiza Estado, SessionStorage e o Banco de Dados (Supabase/Local)
             setUser(updatedUser);
             sessionStorage.setItem('als_active_session', JSON.stringify(updatedUser));
             await db.saveUser(updatedUser);
@@ -47,17 +48,15 @@ const App: React.FC = () => {
     initSession();
   }, []);
 
-  // Monitor de Status Online (Visibilidade e Heartbeat)
+  // Monitor de Status Online (Presença Real-time)
   useEffect(() => {
     if (!user || currentScreen !== AppScreen.DASHBOARD) return;
 
     const updatePresence = async () => {
       const isVisible = document.visibilityState === 'visible';
-      // Envia pulso de vida e estado da aba para o DB
       await db.updatePresence(user.id, isVisible);
     };
 
-    // Heartbeat a cada 15 segundos para manter o status ativo no terminal
     updatePresence();
     const interval = setInterval(updatePresence, 15000);
     

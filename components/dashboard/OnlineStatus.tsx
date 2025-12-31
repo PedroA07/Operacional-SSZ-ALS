@@ -14,7 +14,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Sincroniza o usuário da sessão local para precisão do timer próprio
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) setCurrentUser(JSON.parse(saved));
@@ -27,13 +26,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
-    // Heartbeat de dados (presença) a cada 15s
     const syncInterval = setInterval(fetchStatus, 15000);
-    
-    // LOOP DE CRONÔMETRO (1 segundo):
-    const clockInterval = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
+    const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -50,37 +44,45 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   }, [fetchStatus]);
 
   const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
+    // Se for o próprio usuário, sempre online
     if (currentUser && user.id === currentUser.id) return 'ONLINE';
     
     if (!user.lastSeen) return 'OFFLINE';
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
     
+    // Regras de timeout (3 minutos)
     if (diffSeconds > 180) return 'OFFLINE';
     if (diffSeconds < 60) return 'ONLINE';
     return 'AUSENTE';
   };
 
   /**
-   * Cálculo de tempo de sessão com trava de segurança para dados corrompidos/antigos
+   * Cálculo padronizado de Tempo de Sessão
    */
   const calculateSessionTime = (lastLoginStr?: string, userId?: string) => {
-    let startStr = lastLoginStr;
+    // Prioriza o dado local se for o próprio usuário para evitar delay de rede
+    let baseTimeStr = lastLoginStr;
     if (currentUser && userId === currentUser.id) {
-      startStr = currentUser.lastLogin;
+      baseTimeStr = currentUser.lastLogin;
     }
 
-    if (!startStr) return '00:00:00';
+    if (!baseTimeStr) return '00:00:00';
     
     try {
-      const startTime = new Date(startStr).getTime();
+      const startTime = new Date(baseTimeStr).getTime();
       const diff = currentTime - startTime;
       
-      // TRAVA DE SEGURANÇA:
-      // Se o tempo for negativo ou maior que 12 horas (43.200.000ms), 
-      // significa que o dado do banco está "sujo" de um dia anterior.
-      // Retornamos 00:00:01 para evitar números gigantescos.
-      if (isNaN(diff) || diff < 0 || diff > 43200000) return '00:00:01';
+      // Se o tempo for inválido ou futuro (devido a relógios dessincronizados), mostra 0
+      if (isNaN(diff) || diff < 0) return '00:00:00';
+      
+      // CÁPULA DE SEGURANÇA VISUAL:
+      // Se o timer for maior que 24h, mostra apenas o excedente do dia ou trava em 23:59:59
+      // Isso ajuda a disfarçar dados sujos que ainda não foram limpos pelo App.tsx
+      const totalSeconds = Math.floor(diff / 1000);
+      if (totalSeconds > 86400) {
+         return '00:00:01'; // Indica que o sistema precisa atualizar o lastLogin do alvo
+      }
       
       const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
       const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
@@ -112,7 +114,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
             <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
               {onlineCount} Online agora
             </span>
-            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Monitoramento Live</span>
+            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Presença em tempo real</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -127,7 +129,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
              </div>
              <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
-                <span className="text-[8px] font-black bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl uppercase border border-blue-500/20">Monitorando</span>
+                <span className="text-[8px] font-black bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl uppercase border border-blue-500/20">LIVE</span>
              </div>
           </div>
 
