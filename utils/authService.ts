@@ -2,7 +2,7 @@
 import { db } from './storage';
 import { User } from '../types';
 import { ADMIN_CREDENTIALS } from '../constants';
-import { authSecurity } from './authSecurity';
+import { passwordRule } from './passwordRule';
 
 export const authService = {
   async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string; forceChange?: boolean }> {
@@ -16,12 +16,11 @@ export const authService = {
         username: ADMIN_CREDENTIALS.username,
         displayName: 'Operacional Master',
         role: 'admin',
-        lastLogin: now, // Zera o timer local
+        lastLogin: now,
         isFirstLogin: false,
         position: 'Diretoria'
       };
       
-      // PERSISTÊNCIA: Grava o novo lastLogin no banco para sincronizar o painel "Online"
       await db.saveUser(adminUser);
 
       return {
@@ -43,11 +42,12 @@ export const authService = {
         return { success: false, error: 'Senha incorreta.' };
       }
 
-      // IMPORTANTE: Atualiza o lastLogin para zerar o timer de sessão globalmente
+      // IMPORTANTE: Atualiza o lastLogin
       foundUser.lastLogin = now;
-      await db.saveUser(foundUser); // Grava a atualização no banco
+      await db.saveUser(foundUser); 
 
-      const forceChange = authSecurity.mustChangePassword(foundUser);
+      // Aplica a nova regra centralizada
+      const forceChange = passwordRule.shouldForceChange(foundUser);
 
       return { success: true, user: foundUser, forceChange };
     } catch (err) {
@@ -59,6 +59,7 @@ export const authService = {
     const updatedUser: User = {
       ...user,
       password: newPassword,
+      // MARCAÇÃO CRÍTICA: Define como FALSE após a alteração bem sucedida
       isFirstLogin: false,
       lastLogin: new Date().toISOString()
     };

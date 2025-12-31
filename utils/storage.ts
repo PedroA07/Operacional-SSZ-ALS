@@ -21,7 +21,7 @@ export const KEYS = {
 };
 
 /**
- * Mapper rigoroso: Protege o sistema contra dados lixo de anos anteriores.
+ * Mapper rigoroso para sincronizar o Banco de Dados com o Código.
  */
 const userMapper = {
   mapToDb: (u: User) => ({
@@ -31,23 +31,25 @@ const userMapper = {
     display_name: u.displayName,
     role: u.role,
     last_login: u.lastLogin,
-    lastlogin: u.lastLogin, // Sincroniza coluna legada
+    lastlogin: u.lastLogin, 
     photo: u.photo,
     position: u.position,
     staff_id: u.staffId,
     driver_id: u.driverId,
     status: u.status,
-    is_first_login: u.isFirstLogin ?? false,
+    // Garante que o boolean seja salvo corretamente
+    is_first_login: u.isFirstLogin === true,
     last_seen: u.lastSeen,
     lastseen: u.lastSeen,
     is_online_visible: u.isOnlineVisible ?? true
   }),
   mapFromDb: (u: any): User => {
     const isCurrentYear = (dateStr: string) => dateStr && dateStr.startsWith('2025');
-    
-    // Tenta encontrar uma data válida de 2025 nas diversas colunas possíveis
     const rawDate = u.last_login || u.lastlogin || u.lastLogin;
     const finalDate = isCurrentYear(rawDate) ? rawDate : new Date().toISOString();
+
+    // Tenta ler de várias nomenclaturas possíveis vindas do Supabase
+    const isFirst = u.is_first_login ?? u.isfirstlogin ?? u.isFirstLogin ?? false;
 
     return {
       id: u.id,
@@ -61,7 +63,8 @@ const userMapper = {
       staffId: u.staff_id || u.staffid || u.staffId,
       driverId: u.driver_id || u.driverid || u.driverId,
       status: u.status,
-      isFirstLogin: u.is_first_login ?? u.isfirstlogin ?? u.isFirstLogin ?? false,
+      // Converte para booleano estrito para evitar o loop
+      isFirstLogin: isFirst === true || isFirst === 'true',
       lastSeen: u.last_seen || u.lastseen || u.lastSeen,
       isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
     };
@@ -107,7 +110,8 @@ export const db = {
   saveUser: async (user: User) => {
     const payload = userMapper.mapToDb(user);
     if (supabase) {
-      await supabase.from('users').upsert(payload);
+      const { error } = await supabase.from('users').upsert(payload);
+      if (error) console.error("Erro ao salvar usuário:", error);
     }
     const current = db._getLocal(KEYS.USERS);
     const idx = current.findIndex((u: any) => u.id === user.id);
@@ -144,6 +148,7 @@ export const db = {
       position: staff.position,
       status: staff.status,
       photo: staff.photo,
+      // Se já existe usuário, mantém o estado dele. Se for novo, marca como primeiro acesso.
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true
     };
     
