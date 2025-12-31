@@ -11,17 +11,40 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem('als_active_session');
-    if (saved) {
-      try {
-        const userData = JSON.parse(saved);
-        setUser(userData);
-        setCurrentScreen(AppScreen.DASHBOARD);
-      } catch (e) {
-        sessionStorage.removeItem('als_active_session');
+    const initSession = async () => {
+      const saved = sessionStorage.getItem('als_active_session');
+      if (saved) {
+        try {
+          const userData: User = JSON.parse(saved);
+          
+          // LÓGICA DE RENOVAÇÃO DE TIMER:
+          // Se o login salvo na sessão for de mais de 12 horas atrás, 
+          // consideramos uma "nova jornada" e atualizamos o lastLogin.
+          const lastLoginTime = new Date(userData.lastLogin).getTime();
+          const now = new Date().getTime();
+          const twelveHours = 12 * 60 * 60 * 1000;
+
+          if (now - lastLoginTime > twelveHours) {
+            const freshLogin = new Date().toISOString();
+            const updatedUser = { ...userData, lastLogin: freshLogin };
+            
+            // Atualiza local e nuvem
+            setUser(updatedUser);
+            sessionStorage.setItem('als_active_session', JSON.stringify(updatedUser));
+            await db.saveUser(updatedUser);
+          } else {
+            setUser(userData);
+          }
+          
+          setCurrentScreen(AppScreen.DASHBOARD);
+        } catch (e) {
+          sessionStorage.removeItem('als_active_session');
+        }
       }
-    }
-    setIsInitializing(false);
+      setIsInitializing(false);
+    };
+
+    initSession();
   }, []);
 
   // Monitor de Status Online (Visibilidade e Heartbeat)
