@@ -13,33 +13,22 @@ const App: React.FC = () => {
   useEffect(() => {
     const initSession = async () => {
       const saved = sessionStorage.getItem('als_active_session');
-      const sessionInitialized = sessionStorage.getItem('als_tab_initialized');
 
       if (saved) {
         try {
           const userData: User = JSON.parse(saved);
-          const now = new Date();
-          const lastLoginDate = new Date(userData.lastLogin);
           
-          // REGRA DE OURO PARA SINCRONIA DE TIMERS:
-          // Se é uma nova aba/janela (tab_initialized vazio) OU o dia mudou OU passaram 12h,
-          // forçamos o início de uma nova contagem de tempo de sessão.
-          const isDifferentDay = now.toLocaleDateString() !== lastLoginDate.toLocaleDateString();
-          const isTooOld = (now.getTime() - lastLoginDate.getTime()) > (12 * 60 * 60 * 1000);
-          const isNewTab = !sessionInitialized;
-
-          if (isNewTab || isDifferentDay || isTooOld) {
-            const freshTimestamp = now.toISOString();
-            const updatedUser = { ...userData, lastLogin: freshTimestamp };
-            
-            // Persiste o novo horário de início de sessão no DB para todos verem
-            setUser(updatedUser);
-            sessionStorage.setItem('als_active_session', JSON.stringify(updatedUser));
-            sessionStorage.setItem('als_tab_initialized', 'true');
-            await db.saveUser(updatedUser);
-          } else {
-            setUser(userData);
-          }
+          // REGRA: ZERAR TIMER EM CADA NOVO ACESSO
+          // Sempre que a página carregar (F5 ou abrir aba), definimos o início como "agora"
+          const freshTimestamp = new Date().toISOString();
+          const updatedUser = { ...userData, lastLogin: freshTimestamp };
+          
+          // Atualiza estado local, storage da aba e o Banco de Dados Global
+          setUser(updatedUser);
+          sessionStorage.setItem('als_active_session', JSON.stringify(updatedUser));
+          
+          // Salva no DB para que outros usuários vejam o timer começando do zero
+          await db.saveUser(updatedUser);
           
           setCurrentScreen(AppScreen.DASHBOARD);
         } catch (e) {
@@ -73,17 +62,21 @@ const App: React.FC = () => {
     };
   }, [user?.id, currentScreen]);
 
-  const handleLoginSuccess = (userData: User) => {
-    setUser(userData);
-    sessionStorage.setItem('als_active_session', JSON.stringify(userData));
-    sessionStorage.setItem('als_tab_initialized', 'true');
+  const handleLoginSuccess = async (userData: User) => {
+    // Ao logar pela primeira vez, também garantimos o timestamp atual
+    const now = new Date().toISOString();
+    const userWithTime = { ...userData, lastLogin: now };
+    
+    setUser(userWithTime);
+    sessionStorage.setItem('als_active_session', JSON.stringify(userWithTime));
+    await db.saveUser(userWithTime);
+    
     setCurrentScreen(AppScreen.DASHBOARD);
   };
 
   const handleLogout = () => {
     setUser(null);
     sessionStorage.removeItem('als_active_session');
-    sessionStorage.removeItem('als_tab_initialized');
     setCurrentScreen(AppScreen.LOGIN);
   };
 

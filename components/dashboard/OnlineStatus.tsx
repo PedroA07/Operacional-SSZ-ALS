@@ -56,11 +56,11 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   };
 
   /**
-   * Cálculo exato do tempo de sessão sem travas artificiais.
+   * Cálculo exato do tempo de sessão.
    * O App.tsx agora garante que o lastLogin seja renovado ao abrir o sistema.
    */
   const calculateSessionTime = (lastLoginStr?: string, userId?: string) => {
-    // Se for o próprio usuário, usa a referência local para precisão milimétrica
+    // Prioriza dado local do próprio usuário para fluidez visual imediata
     let baseTimeStr = lastLoginStr;
     if (currentUser && userId === currentUser.id) {
       baseTimeStr = currentUser.lastLogin;
@@ -72,7 +72,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
       const startTime = new Date(baseTimeStr).getTime();
       const diff = currentTime - startTime;
       
-      // Se houver qualquer inconsistência de relógio ou tempo negativo, mostra zerado
       if (isNaN(diff) || diff < 0) return '00:00:00';
       
       const totalSeconds = Math.floor(diff / 1000);

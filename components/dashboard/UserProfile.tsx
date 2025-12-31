@@ -24,12 +24,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     loadStaffInfo();
 
     const updateTimer = () => {
-      // Usa o lastLogin persistido que foi setado no momento do clique em "Entrar"
+      // Usa o lastLogin que foi resetado no App.tsx
       const startTime = new Date(user.lastLogin).getTime();
       const now = new Date().getTime();
       const diff = now - startTime;
       
-      // Garante que o timer nunca seja negativo se houver atraso de rede
       const safeDiff = diff > 0 ? diff : 0;
       
       const h = Math.floor(safeDiff / 3600000).toString().padStart(2, '0');
@@ -57,7 +56,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
   const formatDate = (dateString?: string) => {
     if (!dateString) return '---';
     const d = new Date(dateString);
-    // Proteção contra Unix Epoch (1969/1970) que ocorre quando a data está vazia ou zerada
     if (isNaN(d.getTime()) || d.getFullYear() <= 1970) return '---';
     return d.toLocaleDateString('pt-BR');
   };
