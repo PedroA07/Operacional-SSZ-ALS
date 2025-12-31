@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, Staff } from '../../types';
 import { db } from '../../utils/storage';
+import { timeUtils } from '../../utils/timeUtils';
 
 interface OnlineStatusProps {
   staffList: Staff[];
@@ -53,36 +54,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     if (diffSeconds > 180) return 'OFFLINE';
     if (diffSeconds < 60) return 'ONLINE';
     return 'AUSENTE';
-  };
-
-  /**
-   * Cálculo exato do tempo de sessão.
-   * O App.tsx agora garante que o lastLogin seja renovado ao abrir o sistema.
-   */
-  const calculateSessionTime = (lastLoginStr?: string, userId?: string) => {
-    // Prioriza dado local do próprio usuário para fluidez visual imediata
-    let baseTimeStr = lastLoginStr;
-    if (currentUser && userId === currentUser.id) {
-      baseTimeStr = currentUser.lastLogin;
-    }
-
-    if (!baseTimeStr) return '00:00:00';
-    
-    try {
-      const startTime = new Date(baseTimeStr).getTime();
-      const diff = currentTime - startTime;
-      
-      if (isNaN(diff) || diff < 0) return '00:00:00';
-      
-      const totalSeconds = Math.floor(diff / 1000);
-      const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-      const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-      const s = (totalSeconds % 60).toString().padStart(2, '0');
-      
-      return `${h}:${m}:${s}`;
-    } catch { 
-      return '00:00:00'; 
-    }
   };
 
   const onlineCount = users.filter(u => getStatus(u) === 'ONLINE').length;
@@ -140,7 +111,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
               };
 
               const config = statusConfigs[status];
-              const displayTime = u ? calculateSessionTime(u.lastLogin, u.id) : '00:00:00';
+              // USA O UTILITÁRIO PRÓPRIO:
+              const displayTime = u ? timeUtils.calculateDuration(u.lastLogin) : '00:00:00';
 
               return (
                 <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${status === 'OFFLINE' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'}`}>

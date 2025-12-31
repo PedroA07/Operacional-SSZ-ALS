@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Staff } from '../../types';
 import { db } from '../../utils/storage';
+import { timeUtils } from '../../utils/timeUtils';
 
 interface UserProfileProps {
   user: User;
@@ -23,19 +24,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     };
     loadStaffInfo();
 
+    // REGRA: O timer local usa o lastLogin persistido na sessão (que só muda no login real)
     const updateTimer = () => {
-      // Puxa o lastLogin que foi definido no momento do LOGIN real
-      const startTime = new Date(user.lastLogin).getTime();
-      const now = Date.now();
-      const diff = now - startTime;
-      
-      const totalSeconds = Math.floor(Math.max(0, diff) / 1000);
-      
-      const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-      const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-      const s = (totalSeconds % 60).toString().padStart(2, '0');
-      
-      setSessionTime(`${h}:${m}:${s}`);
+      setSessionTime(timeUtils.calculateDuration(user.lastLogin));
     };
 
     updateTimer();
