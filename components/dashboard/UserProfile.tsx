@@ -57,7 +57,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
   const formatDate = (dateString?: string) => {
     if (!dateString) return '---';
     const d = new Date(dateString);
-    // Proteção contra Unix Epoch (1969/1970)
+    // Proteção contra Unix Epoch (1969/1970) que ocorre quando a data está vazia ou zerada
     if (isNaN(d.getTime()) || d.getFullYear() <= 1970) return '---';
     return d.toLocaleDateString('pt-BR');
   };
