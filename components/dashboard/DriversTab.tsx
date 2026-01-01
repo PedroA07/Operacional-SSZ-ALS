@@ -26,12 +26,15 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [users, setUsers] = useState<User[]>([]);
   const [showPassMap, setShowPassMap] = useState<Record<string, boolean>>({});
   
-  // Opções de visibilidade para o PDF
+  // Opções de visibilidade para o PDF conforme solicitado
   const [visibility, setVisibility] = useState({
+    driverInfo: true,
+    contacts: true,
+    equipment: true,
+    type: true,
     beneficiary: false,
-    contacts: false,
+    whatsapp: false,
     operations: false,
-    status: false,
     portal: false
   });
 
@@ -73,12 +76,15 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
   const handleOpenPreview = (d: Driver) => {
     setSelectedDriver(d);
-    // Reseta visibilidade para o padrão (mínimo solicitado pelo usuário)
+    // Padrão de exportação solicitado: Cadastro limpo, sem extras
     setVisibility({
+      driverInfo: true,
+      contacts: true,
+      equipment: true,
+      type: true,
       beneficiary: false,
-      contacts: false,
+      whatsapp: false,
       operations: false,
-      status: false,
       portal: false
     });
     setIsPreviewModalOpen(true);
@@ -183,7 +189,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     try {
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       
-      // PÁGINA 1: DADOS
       const dataEl = document.getElementById(`driver-profile-card-${selectedDriver.id}`);
       if (dataEl) {
         const canvas1 = await html2canvas(dataEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
@@ -191,7 +196,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         pdf.addImage(imgData1, 'JPEG', 0, 0, 210, 297);
       }
 
-      // PÁGINA 2: CNH (SE HOUVER)
       if (selectedDriver.cnhPdfUrl) {
         pdf.addPage();
         const cnhEl = document.getElementById(`driver-cnh-attachment-${selectedDriver.id}`);
@@ -246,7 +250,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                 <th className="px-6 py-5">3. Contatos / Grupo</th>
                 <th className="px-6 py-5">4. Equipamento</th>
                 <th className="px-6 py-5">5. Vínculo</th>
-                <th className="px-6 py-5">6. Status</th>
+                <th className="px-6 py-5">6. Status / Tipo</th>
                 <th className="px-6 py-5">7. Portal</th>
                 <th className="px-6 py-5 text-right">Ações</th>
               </tr>
@@ -270,7 +274,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                                <p className="text-[9px] font-black text-slate-700 uppercase whitespace-normal leading-tight">{d.beneficiaryName || d.name}</p>
                                <p className="text-[8px] font-mono font-bold text-slate-500">{d.beneficiaryCnpj || d.cpf}</p>
                                <p className="text-[8px] font-bold text-slate-500">{d.beneficiaryPhone || d.phone}</p>
-                               <p className="text-[7px] font-medium text-slate-400 lowercase italic">{d.beneficiaryEmail || d.email}</p>
                                <div className="flex items-center gap-1.5 mt-1.5">
                                   <span className="text-[6px] font-black text-slate-300 uppercase">Forma:</span>
                                   <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[7px] font-black text-blue-600">{d.paymentPreference || 'PIX'}</span>
@@ -361,16 +364,24 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                        </div>
                     </td>
 
+                    {/* COLUNA 6: STATUS / TIPO */}
                     <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1.5">
-                        <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase border w-fit ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                          {d.status}
+                      <div className="flex flex-col gap-2">
+                        {/* TAG DE TIPO ADICIONADA AQUI */}
+                        <span className="px-2 py-0.5 bg-blue-600 text-white rounded text-[8px] font-black uppercase w-fit shadow-sm">
+                           {d.driverType || 'Externo'}
                         </span>
-                        <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                          <p className="text-[7px] font-black text-slate-400 uppercase leading-none">Desde:</p>
-                          <p className="text-[9px] font-bold text-slate-600 mt-1">
-                            {d.statusLastChangeDate ? new Date(d.statusLastChangeDate).toLocaleDateString('pt-BR') : '---'}
-                          </p>
+                        
+                        <div className="flex flex-col gap-1">
+                          <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase border w-fit ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                            {d.status}
+                          </span>
+                          <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                            <p className="text-[7px] font-black text-slate-400 uppercase leading-none">Desde:</p>
+                            <p className="text-[9px] font-bold text-slate-600 mt-1">
+                              {d.statusLastChangeDate ? new Date(d.statusLastChangeDate).toLocaleDateString('pt-BR') : '---'}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -426,40 +437,43 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-slate-900/80 backdrop-blur-xl">
            <div className="bg-slate-50 w-full max-w-7xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex animate-in zoom-in-95">
               
-              {/* LADO ESQUERDO: CONTROLES */}
+              {/* LADO ESQUERDO: CONTROLES ORGANIZADOS */}
               <div className="w-96 bg-white border-r border-slate-200 p-10 flex flex-col">
                  <div className="flex items-center gap-4 mb-10">
                     <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic shadow-lg">ALS</div>
                     <div>
-                       <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Exportador Pro</h3>
-                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Privacidade de Dados</p>
+                       <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Editor de Ficha</h3>
+                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Opções de Visibilidade</p>
                     </div>
                  </div>
 
-                 <div className="flex-1 space-y-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Configurar Documento</p>
+                 <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Categorias do Cadastro</p>
                     
                     {[
-                      { id: 'beneficiary', label: 'Dados de Pagamento', sub: 'Exibe Beneficiário e Chaves PIX', icon: '💰' },
-                      { id: 'contacts', label: 'Contatos e Grupos', sub: 'Exibe Telefone e Link de WhatsApp', icon: '📱' },
-                      { id: 'operations', label: 'Vínculo Operacional', sub: 'Exibe Clientes Vinculados', icon: '🚛' },
-                      { id: 'status', label: 'Status e Histórico', sub: 'Exibe Data de Registro e Status', icon: '🕒' },
-                      { id: 'portal', label: 'Credenciais Portal', sub: 'Exibe Login e Senha Gerada', icon: '🔐' },
+                      { id: 'driverInfo', label: 'Dados do Motorista', sub: 'Foto, Nome, CPF, RG e CNH', icon: '👤' },
+                      { id: 'contacts', label: 'Contato', sub: 'Telefone e E-mail principal', icon: '📱' },
+                      { id: 'equipment', label: 'Equipamento', sub: 'Placas e anos (Cavalo/Carreta)', icon: '🚛' },
+                      { id: 'type', label: 'Tipo', sub: 'Classificação operacional', icon: '🏷️' },
+                      { id: 'beneficiary', label: 'Dados do Beneficiário', sub: 'Dados bancários e PIX', icon: '💰' },
+                      { id: 'whatsapp', label: 'Grupo Whatsapp', sub: 'Nome e link do grupo oficial', icon: '💬' },
+                      { id: 'operations', label: 'Vínculo de Operações', sub: 'Listagem de clientes autorizados', icon: '📋' },
+                      { id: 'portal', label: 'Credenciais Portal', sub: 'Usuário e senha de acesso', icon: '🔐' },
                     ].map(opt => (
                       <button 
                         key={opt.id}
                         onClick={() => setVisibility(prev => ({ ...prev, [opt.id]: !prev[opt.id as keyof typeof visibility] }))}
-                        className={`w-full p-5 rounded-3xl border-2 text-left transition-all group flex items-center gap-4 ${visibility[opt.id as keyof typeof visibility] ? 'bg-blue-50 border-blue-200 shadow-md' : 'bg-white border-slate-100 hover:border-slate-200'}`}
+                        className={`w-full p-4 rounded-3xl border-2 text-left transition-all group flex items-center gap-4 ${visibility[opt.id as keyof typeof visibility] ? 'bg-blue-50 border-blue-200 shadow-md' : 'bg-white border-slate-100 hover:border-slate-200'}`}
                       >
-                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${visibility[opt.id as keyof typeof visibility] ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
+                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-md transition-all ${visibility[opt.id as keyof typeof visibility] ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
                             {opt.icon}
                          </div>
                          <div className="flex-1">
                             <p className={`text-[10px] font-black uppercase tracking-tight ${visibility[opt.id as keyof typeof visibility] ? 'text-blue-700' : 'text-slate-500'}`}>{opt.label}</p>
-                            <p className="text-[8px] text-slate-400 font-bold mt-0.5">{opt.sub}</p>
+                            <p className="text-[7px] text-slate-400 font-bold mt-0.5">{opt.sub}</p>
                          </div>
-                         <div className={`w-6 h-6 rounded-full border-4 transition-all flex items-center justify-center ${visibility[opt.id as keyof typeof visibility] ? 'border-blue-600' : 'border-slate-100'}`}>
-                            {visibility[opt.id as keyof typeof visibility] && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}
+                         <div className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center ${visibility[opt.id as keyof typeof visibility] ? 'border-blue-600' : 'border-slate-100'}`}>
+                            {visibility[opt.id as keyof typeof visibility] && <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>}
                          </div>
                       </button>
                     ))}
@@ -473,7 +487,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                     >
                        {isExporting ? (
                          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                       ) : 'Gerar Documento PDF'}
+                       ) : 'Gerar Cadastro (PDF)'}
                     </button>
                     <button onClick={() => setIsPreviewModalOpen(false)} className="w-full py-4 text-slate-400 text-[10px] font-black uppercase hover:text-red-500 transition-all">Cancelar</button>
                  </div>
@@ -482,10 +496,10 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
               {/* LADO DIREITO: PREVIEW EM TEMPO REAL */}
               <div className="flex-1 bg-slate-200 p-12 overflow-y-auto flex flex-col items-center custom-scrollbar">
                  <div className="mb-6 text-center">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Preview do Documento Final</p>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase italic">* A escala abaixo é reduzida apenas para visualização</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visualização do PDF</p>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase italic">* Ajustado para escala A4</p>
                  </div>
-                 <div className="origin-top transform scale-[0.65] xl:scale-[0.8] shadow-[0_30px_100px_rgba(0,0,0,0.2)]">
+                 <div className="origin-top transform scale-[0.6] xl:scale-[0.75] shadow-[0_30px_100px_rgba(0,0,0,0.2)]">
                     <DriverProfileTemplate driver={selectedDriver} visibility={visibility} />
                  </div>
               </div>
