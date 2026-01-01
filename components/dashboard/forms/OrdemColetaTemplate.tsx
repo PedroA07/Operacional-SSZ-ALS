@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface OrdemColetaTemplateProps {
@@ -51,26 +50,41 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
         </div>
       </div>
 
-      {/* BLOCO REMETENTE/DESTINATARIO */}
+      {/* BLOCO REMETENTE/DESTINATARIO - CORRIGIDO PARA NÃO CORTAR */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-        <div style={{ width: '352px', height: '120px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
-          <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px', borderBottom: '1px solid #f1f5f9' }}>REMETENTE (CLIENTE)</div>
-          <div style={{ fontSize: '11px', fontWeight: 'bold', lineHeight: '1.2', marginBottom: '4px', wordBreak: 'break-word' }}>{selectedRemetente?.name || '---'}</div>
-          <div style={{ fontSize: '10px', marginTop: '2px', wordBreak: 'break-word' }}>{selectedRemetente?.address || '---'}</div>
-          <div style={{ fontSize: '10px' }}>{selectedRemetente?.city || '---'} - {selectedRemetente?.state || '--'} | CEP: {selectedRemetente?.zipCode || '---'}</div>
-          <div style={{ fontSize: '10px', fontWeight: 'bold', marginTop: '4px' }}>CNPJ: {selectedRemetente?.cnpj || '---'}</div>
+        <div style={{ width: '352px', minHeight: '120px', border: borderStyle, padding: '10px', overflow: 'hidden' }}>
+          <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '6px', borderBottom: '1px solid #f1f5f9' }}>REMETENTE (CLIENTE)</div>
+          <div style={{ fontSize: '12px', fontWeight: 900, lineHeight: '1.1', marginBottom: '2px', wordBreak: 'break-word', color: '#1e293b' }}>
+            {selectedRemetente?.legalName || selectedRemetente?.name || '---'}
+          </div>
+          {selectedRemetente?.legalName && selectedRemetente.name !== selectedRemetente.legalName && (
+            <div style={{ fontSize: '9px', fontWeight: 800, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase' }}>
+              FANTASIA: {selectedRemetente.name}
+            </div>
+          )}
+          <div style={{ fontSize: '10px', marginTop: '4px', wordBreak: 'break-word', color: '#475569' }}>{selectedRemetente?.address || '---'}</div>
+          <div style={{ fontSize: '10px', color: '#475569' }}>{selectedRemetente?.city || '---'} - {selectedRemetente?.state || '--'} | CEP: {selectedRemetente?.zipCode || '---'}</div>
+          <div style={{ fontSize: '10px', fontWeight: '900', marginTop: '6px', borderTop: '1px dashed #e2e8f0', paddingTop: '4px' }}>CNPJ: {selectedRemetente?.cnpj || '---'}</div>
         </div>
-        <div style={{ width: '352px', height: '120px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
-          <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px', borderBottom: '1px solid #f1f5f9' }}>DESTINATÁRIO (TERMINAL)</div>
-          <div style={{ fontSize: '11px', fontWeight: 'bold', lineHeight: '1.2', marginBottom: '4px', wordBreak: 'break-word' }}>{selectedDestinatario?.name || '---'}</div>
-          <div style={{ fontSize: '10px', marginTop: '2px', wordBreak: 'break-word' }}>{selectedDestinatario?.address || '---'}</div>
-          <div style={{ fontSize: '10px' }}>{selectedDestinatario?.city || '---'} - {selectedDestinatario?.state || '--'} | CEP: {selectedDestinatario?.zipCode || '---'}</div>
-          <div style={{ fontSize: '10px', fontWeight: 'bold', marginTop: '4px' }}>CNPJ: {selectedDestinatario?.cnpj || '---'}</div>
+        
+        <div style={{ width: '352px', minHeight: '120px', border: borderStyle, padding: '10px', overflow: 'hidden' }}>
+          <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '6px', borderBottom: '1px solid #f1f5f9' }}>DESTINATÁRIO (TERMINAL)</div>
+          <div style={{ fontSize: '12px', fontWeight: 900, lineHeight: '1.1', marginBottom: '2px', wordBreak: 'break-word', color: '#1e293b' }}>
+            {selectedDestinatario?.legalName || selectedDestinatario?.name || '---'}
+          </div>
+          {selectedDestinatario?.legalName && selectedDestinatario.name !== selectedDestinatario.legalName && (
+            <div style={{ fontSize: '9px', fontWeight: 800, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase' }}>
+              FANTASIA: {selectedDestinatario.name}
+            </div>
+          )}
+          <div style={{ fontSize: '10px', marginTop: '4px', wordBreak: 'break-word', color: '#475569' }}>{selectedDestinatario?.address || '---'}</div>
+          <div style={{ fontSize: '10px', color: '#475569' }}>{selectedDestinatario?.city || '---'} - {selectedDestinatario?.state || '--'} | CEP: {selectedDestinatario?.zipCode || '---'}</div>
+          <div style={{ fontSize: '10px', fontWeight: '900', marginTop: '6px', borderTop: '1px dashed #e2e8f0', paddingTop: '4px' }}>CNPJ: {selectedDestinatario?.cnpj || '---'}</div>
         </div>
       </div>
 
       {/* BLOCO CONTAINER / BARCODES / GENSET */}
-      <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '115px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '115px' }}>
         <div style={{ width: '400px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>CONTAINER</div>
           <div style={{ fontSize: '20px', fontWeight: 900, lineHeight: '1.2', whiteSpace: 'nowrap', marginBottom: '2px' }}>{formData.container || '---'}</div>
@@ -105,53 +119,54 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
 
       {/* BLOCO OPERACIONAL */}
       <div style={{ display: 'flex', border: borderStyle, backgroundColor: '#f8fafc', marginBottom: '10px' }}>
-        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle, }}>
+        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>ARMADOR</div>
           <div style={{ fontSize: '12px', fontWeight: 900, color: '#1d4ed8', whiteSpace: 'nowrap' }}>{formData.agencia || '---'}</div>
         </div>
-        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle, overflow: 'hidden' }}>
+        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>TIPO</div>
-          <div style={{ fontSize: '12px', fontWeight: 900, whiteSpace: 'nowrap' }}>{formData.tipo}</div>
+          <div style={{ fontSize: '12px', fontWeight: 900 }}>{formData.tipo}</div>
         </div>
-        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle, overflow: 'hidden' }}>
+        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>PADRÃO</div>
-          <div style={{ fontSize: '12px', fontWeight: 900, whiteSpace: 'nowrap' }}>{formData.padrao}</div>
+          <div style={{ fontSize: '12px', fontWeight: 900 }}>{formData.padrao}</div>
         </div>
-        <div style={{ width: '178px', padding: '8px', overflow: 'hidden' }}>
+        <div style={{ width: '178px', padding: '8px' }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>OPERAÇÃO</div>
-          <div style={{ fontSize: '12px', fontWeight: 900, whiteSpace: 'nowrap' }}>{formData.tipoOperacao}</div>
+          <div style={{ fontSize: '12px', fontWeight: 900 }}>{formData.tipoOperacao}</div>
         </div>
       </div>
 
       <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px' }}>
-        <div style={{ flex: '1', padding: '8px', borderRight: borderStyle, overflow: 'hidden' }}>
+        <div style={{ flex: '1', padding: '8px', borderRight: borderStyle }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>NAVIO</div>
-          <div style={{ fontSize: '14px', fontWeight: 900, whiteSpace: 'nowrap' }}>{formData.ship || '---'}</div>
+          <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.ship || '---'}</div>
         </div>
-        <div style={{ flex: '1', padding: '8px', overflow: 'hidden' }}>
+        <div style={{ flex: '1', padding: '8px' }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>BOOKING</div>
-          <div style={{ fontSize: '14px', fontWeight: 900, color: '#1e40af', whiteSpace: 'nowrap' }}>{formData.booking || '---'}</div>
+          <div style={{ fontSize: '14px', fontWeight: 900, color: '#1e40af' }}>{formData.booking || '---'}</div>
         </div>
       </div>
 
-      {/* BLOCO MOTORISTA AJUSTADO PARA EVITAR SOBREPOSIÇÃO */}
+      {/* BLOCO MOTORISTA - PROTEGIDO CONTRA SOBREPOSIÇÃO */}
       <div style={{ border: borderStyle, padding: '12px', marginBottom: '10px' }}>
         <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px' }}>
-          <div style={{ flex: '2', paddingRight: '15px' }}>
+          <div style={{ flex: '2.5', paddingRight: '10px', minWidth: '0' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>MOTORISTA</div>
-            <div style={{ fontSize: '13px', fontWeight: 900, wordBreak: 'break-word', lineHeight: '1.1' }}>{selectedDriver?.name || '---'}</div>
+            <div style={{ fontSize: '14px', fontWeight: 900, wordBreak: 'break-word', lineHeight: '1.1', textTransform: 'uppercase' }}>{selectedDriver?.name || '---'}</div>
           </div>
-          <div style={{ flex: '1', minWidth: '110px' }}>
+          <div style={{ flex: '1', minWidth: '120px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CPF</div>
-            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{selectedDriver?.cpf || '---'}</div>
+            {/* Fix error in file components/dashboard/forms/OrdemColetaTemplate.tsx on line 161: Object literal may only specify known properties, and 'fontMono' does not exist in type 'Properties<string | number, string | number>' */}
+            <div style={{ fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace' }}>{selectedDriver?.cpf || '---'}</div>
           </div>
-          <div style={{ flex: '1', minWidth: '100px' }}>
+          <div style={{ flex: '0.8', minWidth: '90px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>RG</div>
-            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{selectedDriver?.rg || '---'}</div>
+            <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{selectedDriver?.rg || '---'}</div>
           </div>
-          <div style={{ flex: '1', minWidth: '100px' }}>
+          <div style={{ flex: '0.8', minWidth: '90px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CNH</div>
-            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{selectedDriver?.cnh || '---'}</div>
+            <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{selectedDriver?.cnh || '---'}</div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -165,7 +180,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
           </div>
           <div style={{ width: '238px', textAlign: 'right' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CONTATO</div>
-            <div style={{ fontSize: '12px', fontWeight: 900 }}>{selectedDriver?.phone || '---'}</div>
+            <div style={{ fontSize: '14px', fontWeight: 900 }}>{selectedDriver?.phone || '---'}</div>
           </div>
         </div>
       </div>
@@ -175,7 +190,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
         <div style={{ width: '352px', border: borderStyle }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #f1f5f9' }}>
             <span style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>Nº ORDEM SERVIÇO</span>
-            <span style={{ fontSize: '12px', fontWeight: 900, color: '#1e40af' }}>{formData.os || '---'}</span>
+            <span style={{ fontSize: '14px', fontWeight: 900, color: '#1e40af' }}>{formData.os || '---'}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #f1f5f9' }}>
             <span style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>AUT. COLETA</span>
@@ -183,12 +198,12 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px' }}>
             <span style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>EMBARCADOR</span>
-            <span style={{ fontSize: '12px', fontWeight: 900, wordBreak: 'break-word', textAlign: 'right' }}>{formData.embarcador || '---'}</span>
+            <span style={{ fontSize: '11px', fontWeight: 900, wordBreak: 'break-word', textAlign: 'right', flex: 1, marginLeft: '10px' }}>{formData.embarcador || '---'}</span>
           </div>
         </div>
         <div style={{ width: '352px', border: borderStyle, backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
           <div style={{ fontSize: '10px', fontWeight: 900, color: '#64748b', marginBottom: '5px' }}>HORÁRIO AGENDADO COLETA</div>
-          <div style={{ fontSize: '28px', fontWeight: 900 }}>
+          <div style={{ fontSize: '26px', fontWeight: 900, textAlign: 'center' }}>
             {formData.horarioAgendado ? new Date(formData.horarioAgendado).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}).replace(',', '') : '---'}
           </div>
         </div>
@@ -205,7 +220,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
           </div>
         </div>
         <div style={{ flex: '1', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontSize: '12px', fontWeight: 900, color: '#94a3b8', marginBottom: '15px', letterSpacing: '2px' }}>CONTROLE SAÍDA</div>
+          <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', marginBottom: '15px', letterSpacing: '2px' }}>CONTROLE SAÍDA</div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '15px' }}>DATA: __________________ HORA: _________</div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '20px' }}>ASSINATURA: ___________________________</div>
           <div style={{ width: '100%', height: '180px', border: '2px dashed #cbd5e1', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginTop: 'auto', backgroundColor: '#fdfdfd' }}>

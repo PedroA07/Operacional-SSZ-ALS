@@ -39,8 +39,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   const [showDestinatarioResults, setShowDestinatarioResults] = useState(false);
 
   const captureRef = useRef<HTMLDivElement>(null);
-
-  // Mantém a data de emissão como a data do momento da criação (hoje)
   const [emissionDate] = useState(new Date().toLocaleDateString('pt-BR'));
 
   const [formData, setFormData] = useState({
@@ -126,9 +124,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       
-      // Nome do arquivo customizado solicitado
       const driverName = selectedDriver?.name || 'MOTORISTA';
-      const osNum = formData.os || 'S-OS';
+      const osNum = formData.os || 'SEM_OS';
+      
       const fileName = selectedFormType === 'ORDEM_COLETA' 
         ? `OC-${driverName} - ${osNum}.pdf` 
         : `MINUTA-${driverName} - ${osNum}.pdf`;
@@ -140,11 +138,11 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
   const dateInputClasses = "w-full px-4 py-4 rounded-2xl border-2 border-slate-200 bg-white text-slate-700 font-black focus:border-blue-600 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-md cursor-pointer";
 
-  // Filtro de clientes priorizando Razão Social
   const filteredRemetentes = customers.filter(c => 
     (c.legalName || '').toUpperCase().includes(remetenteSearch) || 
     c.name.toUpperCase().includes(remetenteSearch) ||
-    c.city.toUpperCase().includes(remetenteSearch)
+    c.city.toUpperCase().includes(remetenteSearch) ||
+    c.cnpj.includes(remetenteSearch)
   );
 
   return (
@@ -202,8 +200,15 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 </div>
 
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Remetente (Razão Social)</label>
-                  <input type="text" placeholder="PESQUISAR CLIENTE OU CIDADE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); }} />
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Remetente (Razão Social + Fantasia)</label>
+                  <input 
+                    type="text" 
+                    placeholder="PESQUISAR CLIENTE, RAZÃO OU CNPJ..." 
+                    className={inputClasses} 
+                    value={remetenteSearch} 
+                    onFocus={() => setShowRemetenteResults(true)} 
+                    onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); }} 
+                  />
                   {showRemetenteResults && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-blue-500">
                       {filteredRemetentes.map(c => (
@@ -212,18 +217,21 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                           className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50 group" 
                           onClick={() => { 
                             setFormData({...formData, remetenteId: c.id}); 
-                            setRemetenteSearch(c.legalName || c.name); 
+                            setRemetenteSearch(c.legalName ? `${c.legalName} (${c.name})` : c.name); 
                             setShowRemetenteResults(false); 
                           }}
                         >
                           <div className="flex justify-between items-start">
                             <div>
-                              <p className="font-black text-slate-800 group-hover:text-blue-600 leading-tight">{c.legalName || c.name}</p>
+                              <p className="font-black text-slate-800 group-hover:text-blue-600 leading-tight">
+                                {c.legalName || c.name}
+                              </p>
                               {c.legalName && c.name !== c.legalName && (
-                                <p className="text-[8px] text-slate-400 font-bold mt-0.5">FANTASIA: {c.name}</p>
+                                <p className="text-[8px] text-slate-400 font-black mt-0.5 uppercase">FANTASIA: {c.name}</p>
                               )}
+                              <p className="text-[7px] text-slate-400 font-mono mt-0.5">{c.cnpj}</p>
                             </div>
-                            <span className="text-[8px] font-black bg-blue-50 text-blue-400 px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">{c.city} - {c.state}</span>
+                            <span className="text-[8px] font-black bg-blue-50 text-blue-400 px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">{c.city}</span>
                           </div>
                         </button>
                       ))}
@@ -232,23 +240,37 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 </div>
 
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Destinatário (Terminal)</label>
-                  <input type="text" placeholder="BUSCAR PORTO..." className={inputClasses} value={destinatarioSearch} onFocus={() => setShowDestinatarioResults(true)} onChange={e => { setDestinatarioSearch(e.target.value.toUpperCase()); setShowDestinatarioResults(true); }} />
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Destinatário (Terminal / Porto)</label>
+                  <input 
+                    type="text" 
+                    placeholder="BUSCAR TERMINAL..." 
+                    className={inputClasses} 
+                    value={destinatarioSearch} 
+                    onFocus={() => setShowDestinatarioResults(true)} 
+                    onChange={e => { setDestinatarioSearch(e.target.value.toUpperCase()); setShowDestinatarioResults(true); }} 
+                  />
                   {showDestinatarioResults && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-slate-800">
-                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch) || p.city.toUpperCase().includes(destinatarioSearch)).map(p => (
+                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch) || (p.legalName && p.legalName.toUpperCase().includes(destinatarioSearch)) || p.city.toUpperCase().includes(destinatarioSearch)).map(p => (
                         <button 
                           key={p.id} 
                           className="w-full text-left px-4 py-3 hover:bg-slate-50 text-[10px] font-bold uppercase border-b border-slate-50 group" 
                           onClick={() => { 
                             setFormData({...formData, destinatarioId: p.id}); 
-                            setDestinatarioSearch(p.name); 
+                            setDestinatarioSearch(p.legalName ? `${p.legalName} (${p.name})` : p.name); 
                             setShowDestinatarioResults(false); 
                           }}
                         >
                           <div className="flex justify-between items-center">
-                            <span className="font-black text-slate-700 group-hover:text-blue-600">{p.name}</span>
-                            <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{p.city} - {p.state}</span>
+                            <div>
+                              <span className="font-black text-slate-700 group-hover:text-blue-600">
+                                {p.legalName || p.name}
+                              </span>
+                              {p.legalName && p.name !== p.legalName && (
+                                <p className="text-[7px] text-slate-400 font-black uppercase">FANTASIA: {p.name}</p>
+                              )}
+                            </div>
+                            <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{p.city}</span>
                           </div>
                         </button>
                       ))}
@@ -263,8 +285,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   </div>
                   
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">2. Armador (Preenchimento Automático)</label>
-                    <input type="text" placeholder="SERÁ PREENCHIDO PELO CONTAINER" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">2. Armador (Automático)</label>
+                    <input type="text" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -281,17 +303,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">5. Genset</label>
                     <input type="text" className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 pt-4">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo Equip.</label>
-                    <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
-                      <option value="40HC">40HC</option>
-                      <option value="40HR">40HR</option>
-                      <option value="40DC">40DC</option>
-                    </select>
                   </div>
                 </div>
 
@@ -346,7 +357,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <input type="text" className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} placeholder="NOME DO EMBARCADOR" />
                 </div>
 
-                <div className="bg-blue-600/5 p-8 rounded-[2.5rem] border-2 border-blue-100/50 space-y-3 shadow-xl shadow-blue-500/5 transition-all hover:border-blue-300 calendar-container-focus">
+                <div className="bg-blue-600/5 p-8 rounded-[2.5rem] border-2 border-blue-100/50 space-y-3 shadow-xl shadow-blue-500/5 transition-all hover:border-blue-300">
                   <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-2 mb-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     Agendamento de Coleta
@@ -356,12 +367,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                     className={dateInputClasses} 
                     value={formData.horarioAgendado} 
                     onChange={e => setFormData({...formData, horarioAgendado: e.target.value})} 
-                    onClick={(e) => {
-                      // @ts-ignore
-                      if (e.target.showPicker) e.target.showPicker();
-                    }}
                   />
-                  <p className="text-[8px] text-blue-400 font-bold uppercase tracking-tight text-center mt-2 italic">Clique no ícone de calendário para selecionar</p>
                 </div>
 
                 <button disabled={isExporting} onClick={downloadPDF} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
