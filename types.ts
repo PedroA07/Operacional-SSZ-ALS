@@ -97,6 +97,7 @@ export interface Driver {
   cpf: string;
   rg?: string;
   cnh?: string;
+  cnhPdfUrl?: string; // Novo campo para anexo PDF
   photo?: string;
   phone: string;
   email?: string;

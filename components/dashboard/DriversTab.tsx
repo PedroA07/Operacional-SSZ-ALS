@@ -20,9 +20,10 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [users, setUsers] = useState<User[]>([]);
   const [showPassMap, setShowPassMap] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   
   const initialForm: Partial<Driver> = {
-    photo: '', name: '', cpf: '', rg: '', cnh: '', 
+    photo: '', name: '', cpf: '', rg: '', cnh: '', cnhPdfUrl: '',
     phone: '', email: '', 
     plateHorse: '', yearHorse: '', plateTrailer: '', yearTrailer: '',
     driverType: 'Externo', status: 'Ativo',
@@ -56,6 +57,18 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       const reader = new FileReader();
       reader.onloadend = () => setForm(prev => ({ ...prev, photo: reader.result as string }));
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      const reader = new FileReader();
+      reader.onloadend = () => setForm(prev => ({ ...prev, cnhPdfUrl: reader.result as string }));
+      reader.readAsDataURL(file);
+    } else if (file) {
+      alert("Por favor, selecione um arquivo no formato PDF.");
+      e.target.value = '';
     }
   };
 
@@ -113,6 +126,14 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     }
   };
 
+  const openPdf = (url?: string) => {
+    if (!url) return;
+    const win = window.open();
+    if (win) {
+      win.document.write(`<iframe src="${url}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+    }
+  };
+
   const filteredDrivers = drivers.filter(d => 
     d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     d.cpf.includes(searchQuery) ||
@@ -144,7 +165,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
               <tr>
                 <th className="px-6 py-5">Identificação / Beneficiário</th>
                 <th className="px-6 py-5 text-blue-600">Acesso Portal (Credenciais)</th>
-                <th className="px-6 py-5">Contatos</th>
+                <th className="px-6 py-5">Documentação</th>
                 <th className="px-6 py-5">Equipamento</th>
                 <th className="px-6 py-5">Status</th>
                 <th className="px-6 py-5 text-right">Ações</th>
@@ -190,8 +211,19 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-blue-600 font-black text-[10px] leading-none mb-1">{d.phone}</p>
-                      <p className="text-slate-400 font-bold text-[8px] lowercase truncate max-w-[120px]">{d.email || 'sem e-mail'}</p>
+                      <div className="space-y-1.5">
+                        <p className="text-slate-600 font-bold text-[9px] uppercase">CNH: {d.cnh || '---'}</p>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => d.cnhPdfUrl && openPdf(d.cnhPdfUrl)}
+                            disabled={!d.cnhPdfUrl}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[8px] font-black uppercase border transition-all ${d.cnhPdfUrl ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-300 grayscale opacity-50 cursor-not-allowed'}`}
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                            {d.cnhPdfUrl ? 'Ver CNH' : 'Sem Anexo'}
+                          </button>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                        <div className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-200 flex flex-col">
@@ -241,7 +273,30 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CPF</label><input required className={inputClasses} value={form.cpf} onChange={e => setForm(prev => ({...prev, cpf: maskCPF(e.target.value)}))} /></div>
                       <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">RG</label><input className={inputClasses} value={form.rg} onChange={e => setForm(prev => ({...prev, rg: maskRG(e.target.value)}))} /></div>
-                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNH</label><input className={inputClasses} value={form.cnh} onChange={e => setForm(prev => ({...prev, cnh: e.target.value}))} /></div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nº CNH</label>
+                        <input className={inputClasses} value={form.cnh} onChange={e => setForm(prev => ({...prev, cnh: e.target.value}))} />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">Documento CNH (Anexo PDF)</label>
+                      <div className="flex gap-2">
+                        <button 
+                          type="button" 
+                          onClick={() => pdfInputRef.current?.click()} 
+                          className={`flex-1 flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl border-2 border-dashed transition-all ${form.cnhPdfUrl ? 'bg-emerald-50 border-emerald-400 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600'}`}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                          <span className="text-[10px] font-black uppercase tracking-tight">{form.cnhPdfUrl ? 'CNH Anexada ✓' : 'Clique para anexar CNH (PDF)'}</span>
+                        </button>
+                        {form.cnhPdfUrl && (
+                          <>
+                            <button type="button" onClick={() => openPdf(form.cnhPdfUrl)} className="px-4 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg></button>
+                            <button type="button" onClick={() => setForm(prev => ({...prev, cnhPdfUrl: ''}))} className="px-4 bg-red-50 text-red-600 rounded-xl border border-red-100 hover:bg-red-600 hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                          </>
+                        )}
+                      </div>
+                      <input type="file" ref={pdfInputRef} className="hidden" accept="application/pdf" onChange={handlePdfUpload} />
                     </div>
                   </div>
                 </div>
