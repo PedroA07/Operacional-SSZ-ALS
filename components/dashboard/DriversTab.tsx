@@ -17,12 +17,24 @@ interface DriversTabProps {
 
 const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDeleteDriver, availableOps }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
+  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [isExporting, setIsExporting] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [showPassMap, setShowPassMap] = useState<Record<string, boolean>>({});
+  
+  // Opções de visibilidade para o PDF
+  const [visibility, setVisibility] = useState({
+    beneficiary: false,
+    contacts: false,
+    operations: false,
+    status: false,
+    portal: false
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   
@@ -57,6 +69,19 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     setForm(d ? { ...d } : initialForm);
     setEditingId(d?.id);
     setIsModalOpen(true);
+  };
+
+  const handleOpenPreview = (d: Driver) => {
+    setSelectedDriver(d);
+    // Reseta visibilidade para o padrão (mínimo solicitado pelo usuário)
+    setVisibility({
+      beneficiary: false,
+      contacts: false,
+      operations: false,
+      status: false,
+      portal: false
+    });
+    setIsPreviewModalOpen(true);
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,13 +177,14 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     }
   };
 
-  const handleDownloadProfile = async (driver: Driver) => {
-    setIsExporting(driver.id);
+  const handleDownloadProfile = async () => {
+    if (!selectedDriver) return;
+    setIsExporting(true);
     try {
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       
       // PÁGINA 1: DADOS
-      const dataEl = document.getElementById(`driver-profile-card-${driver.id}`);
+      const dataEl = document.getElementById(`driver-profile-card-${selectedDriver.id}`);
       if (dataEl) {
         const canvas1 = await html2canvas(dataEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
         const imgData1 = canvas1.toDataURL('image/jpeg', 0.95);
@@ -166,9 +192,9 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       }
 
       // PÁGINA 2: CNH (SE HOUVER)
-      if (driver.cnhPdfUrl) {
+      if (selectedDriver.cnhPdfUrl) {
         pdf.addPage();
-        const cnhEl = document.getElementById(`driver-cnh-attachment-${driver.id}`);
+        const cnhEl = document.getElementById(`driver-cnh-attachment-${selectedDriver.id}`);
         if (cnhEl) {
           const canvas2 = await html2canvas(cnhEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
           const imgData2 = canvas2.toDataURL('image/jpeg', 0.95);
@@ -176,12 +202,13 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         }
       }
 
-      pdf.save(`FICHA_CADASTRAL_${driver.name.replace(/\s+/g, '_')}.pdf`);
+      pdf.save(`FICHA_CADASTRAL_${selectedDriver.name.replace(/\s+/g, '_')}.pdf`);
+      setIsPreviewModalOpen(false);
     } catch (err) {
       console.error(err);
       alert("Erro ao gerar PDF.");
     } finally {
-      setIsExporting(null);
+      setIsExporting(false);
     }
   };
 
@@ -195,11 +222,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
   return (
     <div className="max-w-full mx-auto space-y-6">
-      {/* RENDERIZADOR OCULTO PARA CAPTURA DE PDF */}
-      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
-        {drivers.map(d => <DriverProfileTemplate key={`tpl-${d.id}`} driver={d} />)}
-      </div>
-
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
         <div className="flex-1 relative max-w-md">
           <input 
@@ -233,7 +255,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
               {filteredDrivers.map(d => {
                 const linkedUser = users.find(u => u.driverId === d.id || (u.username === d.cpf.replace(/\D/g, '')));
                 const isPassVisible = showPassMap[d.id];
-                const exporting = isExporting === d.id;
                 
                 return (
                   <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
@@ -364,7 +385,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                             <span>Senha:</span>
                             <div className="flex items-center gap-2">
                                <span className="text-slate-700 font-mono bg-white px-1.5 py-0.5 rounded border border-blue-100 font-black min-w-[80px] text-center">
-                                 {isPassVisible ? (linkedUser?.password || '---') : '••••••••'}
+                                 {isPassVisible ? (linkedUser?.password || 'als-2025') : '••••••••'}
                                </span>
                                <button onClick={() => setShowPassMap(p => ({...p, [d.id]: !p[d.id]}))} className="text-blue-500 hover:text-blue-700 active:scale-90 transition-transform">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -383,16 +404,11 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
                     <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
                       <button 
-                        onClick={() => handleDownloadProfile(d)} 
-                        disabled={exporting}
-                        className={`p-2 rounded-xl transition-all ${exporting ? 'bg-slate-100 text-slate-300 animate-pulse' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50'}`} 
-                        title="Baixar Ficha Cadastral (PDF)"
+                        onClick={() => handleOpenPreview(d)} 
+                        className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                        title="Personalizar e Baixar Ficha (PDF)"
                       >
-                        {exporting ? (
-                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 11l3 3L15 11" /></svg>
-                        )}
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 11l3 3L15 11" /></svg>
                       </button>
                       <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
                       <button onClick={() => onDeleteDriver(d.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
@@ -405,6 +421,79 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         </div>
       </div>
 
+      {/* MODAL DE PRÉ-VISUALIZAÇÃO DINÂMICA */}
+      {isPreviewModalOpen && selectedDriver && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-slate-900/80 backdrop-blur-xl">
+           <div className="bg-slate-50 w-full max-w-7xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex animate-in zoom-in-95">
+              
+              {/* LADO ESQUERDO: CONTROLES */}
+              <div className="w-96 bg-white border-r border-slate-200 p-10 flex flex-col">
+                 <div className="flex items-center gap-4 mb-10">
+                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic shadow-lg">ALS</div>
+                    <div>
+                       <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Exportador Pro</h3>
+                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Privacidade de Dados</p>
+                    </div>
+                 </div>
+
+                 <div className="flex-1 space-y-4">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Configurar Documento</p>
+                    
+                    {[
+                      { id: 'beneficiary', label: 'Dados de Pagamento', sub: 'Exibe Beneficiário e Chaves PIX', icon: '💰' },
+                      { id: 'contacts', label: 'Contatos e Grupos', sub: 'Exibe Telefone e Link de WhatsApp', icon: '📱' },
+                      { id: 'operations', label: 'Vínculo Operacional', sub: 'Exibe Clientes Vinculados', icon: '🚛' },
+                      { id: 'status', label: 'Status e Histórico', sub: 'Exibe Data de Registro e Status', icon: '🕒' },
+                      { id: 'portal', label: 'Credenciais Portal', sub: 'Exibe Login e Senha Gerada', icon: '🔐' },
+                    ].map(opt => (
+                      <button 
+                        key={opt.id}
+                        onClick={() => setVisibility(prev => ({ ...prev, [opt.id]: !prev[opt.id as keyof typeof visibility] }))}
+                        className={`w-full p-5 rounded-3xl border-2 text-left transition-all group flex items-center gap-4 ${visibility[opt.id as keyof typeof visibility] ? 'bg-blue-50 border-blue-200 shadow-md' : 'bg-white border-slate-100 hover:border-slate-200'}`}
+                      >
+                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${visibility[opt.id as keyof typeof visibility] ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
+                            {opt.icon}
+                         </div>
+                         <div className="flex-1">
+                            <p className={`text-[10px] font-black uppercase tracking-tight ${visibility[opt.id as keyof typeof visibility] ? 'text-blue-700' : 'text-slate-500'}`}>{opt.label}</p>
+                            <p className="text-[8px] text-slate-400 font-bold mt-0.5">{opt.sub}</p>
+                         </div>
+                         <div className={`w-6 h-6 rounded-full border-4 transition-all flex items-center justify-center ${visibility[opt.id as keyof typeof visibility] ? 'border-blue-600' : 'border-slate-100'}`}>
+                            {visibility[opt.id as keyof typeof visibility] && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}
+                         </div>
+                      </button>
+                    ))}
+                 </div>
+
+                 <div className="pt-8 space-y-3">
+                    <button 
+                       disabled={isExporting}
+                       onClick={handleDownloadProfile} 
+                       className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:bg-slate-400"
+                    >
+                       {isExporting ? (
+                         <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                       ) : 'Gerar Documento PDF'}
+                    </button>
+                    <button onClick={() => setIsPreviewModalOpen(false)} className="w-full py-4 text-slate-400 text-[10px] font-black uppercase hover:text-red-500 transition-all">Cancelar</button>
+                 </div>
+              </div>
+
+              {/* LADO DIREITO: PREVIEW EM TEMPO REAL */}
+              <div className="flex-1 bg-slate-200 p-12 overflow-y-auto flex flex-col items-center custom-scrollbar">
+                 <div className="mb-6 text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Preview do Documento Final</p>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase italic">* A escala abaixo é reduzida apenas para visualização</p>
+                 </div>
+                 <div className="origin-top transform scale-[0.65] xl:scale-[0.8] shadow-[0_30px_100px_rgba(0,0,0,0.2)]">
+                    <DriverProfileTemplate driver={selectedDriver} visibility={visibility} />
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* RESTANTE DOS MODAIS EXISTENTES */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 h-[95vh] flex flex-col">
