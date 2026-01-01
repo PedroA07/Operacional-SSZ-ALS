@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Customer } from '../../types';
-import { maskCEP } from '../../utils/masks';
+import { maskCEP, maskCNPJ } from '../../utils/masks';
 import { DEFAULT_OPERATIONS } from '../../constants/operations';
 import { Icons } from '../../constants/icons';
 
@@ -124,7 +124,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                       {c.operations?.map(op => <span key={op} className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-[7px] font-black uppercase">{op}</span>)}
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-mono font-bold text-slate-500">{c.cnpj}</td>
+                  <td className="px-6 py-4 font-mono font-bold text-slate-500">{maskCNPJ(c.cnpj)}</td>
                   <td className="px-6 py-4">
                     <p className="text-slate-500 font-bold uppercase text-[9px] leading-relaxed">{c.address}</p>
                     <p className="text-slate-400 font-bold uppercase text-[8px]">{c.neighborhood}</p>
@@ -157,7 +157,13 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label>
-                  <input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm(prev => ({...prev, cnpj: e.target.value}))} />
+                  <input 
+                    required 
+                    type="text" 
+                    className={inputClasses} 
+                    value={form.cnpj} 
+                    onChange={e => setForm(prev => ({...prev, cnpj: maskCNPJ(e.target.value)}))} 
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label>
