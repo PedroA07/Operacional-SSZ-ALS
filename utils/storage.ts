@@ -70,7 +70,8 @@ const portMapper = {
     cnpj: p.cnpj,
     address: p.address,
     neighborhood: p.neighborhood,
-    zipCode: p.zipCode // Corrigido para CamelCase conforme imagem do DB
+    zipCode: p.zipCode, // CamelCase conforme sua imagem
+    registrationDate: new Date().toISOString()
   }),
   mapFromDb: (p: any): Port => ({
     id: p.id,
@@ -81,7 +82,7 @@ const portMapper = {
     cnpj: p.cnpj,
     address: p.address,
     neighborhood: p.neighborhood,
-    zipCode: p.zipCode // Corrigido para CamelCase conforme imagem do DB
+    zipCode: p.zipCode // CamelCase conforme sua imagem
   })
 };
 
@@ -95,7 +96,8 @@ const preStackingMapper = {
     cnpj: ps.cnpj,
     address: ps.address,
     neighborhood: ps.neighborhood,
-    zipCode: ps.zipCode // Corrigido para CamelCase conforme imagem do DB
+    zipCode: ps.zipCode, // CamelCase conforme sua imagem
+    registrationDate: new Date().toISOString()
   }),
   mapFromDb: (ps: any): PreStacking => ({
     id: ps.id,
@@ -106,7 +108,7 @@ const preStackingMapper = {
     cnpj: ps.cnpj,
     address: ps.address,
     neighborhood: ps.neighborhood,
-    zipCode: ps.zipCode // Corrigido para CamelCase conforme imagem do DB
+    zipCode: ps.zipCode // CamelCase conforme sua imagem
   })
 };
 
@@ -138,11 +140,11 @@ export const db = {
       const { data } = await supabase.from('users').select('*');
       if (data) {
         const mapped = data.map(u => userMapper.mapFromDb(u));
-        db._saveLocal(KEYS.USERS, data); 
+        db._saveLocal(KEYS.USERS, mapped); 
         return mapped;
       }
     }
-    return db._getLocal(KEYS.USERS).map((u: any) => userMapper.mapFromDb(u));
+    return db._getLocal(KEYS.USERS);
   },
 
   saveUser: async (user: User) => {
@@ -152,7 +154,7 @@ export const db = {
     }
     const current = db._getLocal(KEYS.USERS);
     const idx = current.findIndex((u: any) => u.id === user.id);
-    if (idx >= 0) current[idx] = payload; else current.push(payload);
+    if (idx >= 0) current[idx] = user; else current.push(user);
     db._saveLocal(KEYS.USERS, current);
     return true;
   },
@@ -278,7 +280,7 @@ export const db = {
         return mapped; 
       }
     }
-    return db._getLocal(KEYS.PORTS).map((p: any) => portMapper.mapFromDb(p));
+    return db._getLocal(KEYS.PORTS);
   },
 
   savePort: async (port: Port) => {
@@ -289,7 +291,7 @@ export const db = {
     }
     const current = db._getLocal(KEYS.PORTS);
     const idx = current.findIndex((p: any) => p.id === port.id);
-    if (idx >= 0) current[idx] = payload; else current.push(payload);
+    if (idx >= 0) current[idx] = port; else current.push(port);
     db._saveLocal(KEYS.PORTS, current);
     return true;
   },
@@ -310,7 +312,7 @@ export const db = {
         return mapped; 
       }
     }
-    return db._getLocal(KEYS.PRE_STACKING).map((ps: any) => preStackingMapper.mapFromDb(ps));
+    return db._getLocal(KEYS.PRE_STACKING);
   },
 
   savePreStacking: async (ps: PreStacking) => {
@@ -321,7 +323,7 @@ export const db = {
     }
     const current = db._getLocal(KEYS.PRE_STACKING);
     const idx = current.findIndex((p: any) => p.id === ps.id);
-    if (idx >= 0) current[idx] = payload; else current.push(payload);
+    if (idx >= 0) current[idx] = ps; else current.push(ps);
     db._saveLocal(KEYS.PRE_STACKING, current);
     return true;
   },
