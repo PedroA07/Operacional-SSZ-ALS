@@ -135,7 +135,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   // Filtro de clientes priorizando Razão Social
   const filteredRemetentes = customers.filter(c => 
     (c.legalName || '').toUpperCase().includes(remetenteSearch) || 
-    c.name.toUpperCase().includes(remetenteSearch)
+    c.name.toUpperCase().includes(remetenteSearch) ||
+    c.city.toUpperCase().includes(remetenteSearch)
   );
 
   return (
@@ -194,9 +195,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
 
                 <div className="space-y-1 relative">
                   <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Remetente (Razão Social)</label>
-                  <input type="text" placeholder="PESQUISAR RAZÃO SOCIAL..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); }} />
+                  <input type="text" placeholder="PESQUISAR CLIENTE OU CIDADE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); }} />
                   {showRemetenteResults && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-blue-500">
                       {filteredRemetentes.map(c => (
                         <button 
                           key={c.id} 
@@ -207,10 +208,15 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                             setShowRemetenteResults(false); 
                           }}
                         >
-                          <p className="font-black text-slate-800 group-hover:text-blue-600">{c.legalName || c.name}</p>
-                          {c.legalName && c.name !== c.legalName && (
-                            <p className="text-[8px] text-slate-400 font-bold">FANTASIA: {c.name}</p>
-                          )}
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-black text-slate-800 group-hover:text-blue-600 leading-tight">{c.legalName || c.name}</p>
+                              {c.legalName && c.name !== c.legalName && (
+                                <p className="text-[8px] text-slate-400 font-bold mt-0.5">FANTASIA: {c.name}</p>
+                              )}
+                            </div>
+                            <span className="text-[8px] font-black bg-blue-50 text-blue-400 px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">{c.city} - {c.state}</span>
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -221,8 +227,23 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Destinatário (Terminal)</label>
                   <input type="text" placeholder="BUSCAR PORTO..." className={inputClasses} value={destinatarioSearch} onFocus={() => setShowDestinatarioResults(true)} onChange={e => { setDestinatarioSearch(e.target.value.toUpperCase()); setShowDestinatarioResults(true); }} />
                   {showDestinatarioResults && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch)).map(p => <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, destinatarioId: p.id}); setDestinatarioSearch(p.name); setShowDestinatarioResults(false); }}>{p.name}</button>)}
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-slate-800">
+                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch) || p.city.toUpperCase().includes(destinatarioSearch)).map(p => (
+                        <button 
+                          key={p.id} 
+                          className="w-full text-left px-4 py-3 hover:bg-slate-50 text-[10px] font-bold uppercase border-b border-slate-50 group" 
+                          onClick={() => { 
+                            setFormData({...formData, destinatarioId: p.id}); 
+                            setDestinatarioSearch(p.name); 
+                            setShowDestinatarioResults(false); 
+                          }}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-black text-slate-700 group-hover:text-blue-600">{p.name}</span>
+                            <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{p.city} - {p.state}</span>
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
