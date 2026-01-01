@@ -332,6 +332,15 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                    </div>
                 </div>
 
+                {/* RESTAURADO: WhatsApp do Grupo */}
+                <div className="bg-indigo-50/40 p-8 rounded-[2.5rem] border border-indigo-100 space-y-5">
+                   <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">WhatsApp do Grupo</h4>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1"><label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm(prev => ({...prev, whatsappGroupName: e.target.value.toUpperCase()}))} placeholder="EX: FROTA ALS 01" /></div>
+                      <div className="space-y-1"><label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Link do Grupo</label><input className={inputClasses} value={form.whatsappGroupLink} onChange={e => setForm(prev => ({...prev, whatsappGroupLink: e.target.value}))} placeholder="https://chat.whatsapp.com/..." /></div>
+                   </div>
+                </div>
+
                 <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200 space-y-5">
                    <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Vínculo de Operações</h4>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
