@@ -14,7 +14,6 @@ import SystemTab from './components/dashboard/SystemTab';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
 import UserProfile from './components/dashboard/UserProfile';
-import DatabaseStatus from './components/dashboard/DatabaseStatus';
 import { DEFAULT_OPERATIONS } from './constants/operations';
 import { db } from './utils/storage';
 import { Icons } from './constants/icons';
@@ -124,7 +123,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">{activeTab}</h2>
            </div>
            <div className="flex items-center gap-6">
-              <DatabaseStatus />
               <UserProfile user={user} />
            </div>
         </header>
