@@ -20,10 +20,6 @@ export const KEYS = {
   PREFERENCES: 'als_ui_preferences'
 };
 
-/**
- * Mapper rigoroso para o Supabase.
- * Usa 'lastlogin' e 'isfirstlogin' exatamente como aparecem na estrutura do PostgreSQL.
- */
 const userMapper = {
   mapToDb: (u: User) => ({
     id: u.id,
@@ -42,7 +38,6 @@ const userMapper = {
     is_online_visible: u.isOnlineVisible ?? true
   }),
   mapFromDb: (u: any): User => {
-    // Tenta ler de várias combinações possíveis para garantir compatibilidade
     const finalLoginDate = u.lastlogin || u.last_login || u.lastLogin || new Date().toISOString();
     const isFirst = u.isfirstlogin ?? u.is_first_login ?? u.isFirstLogin ?? false;
 
@@ -63,6 +58,56 @@ const userMapper = {
       isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
     };
   }
+};
+
+const portMapper = {
+  mapToDb: (p: Port) => ({
+    id: p.id,
+    name: p.name,
+    legal_name: p.legalName,
+    city: p.city,
+    state: p.state,
+    cnpj: p.cnpj,
+    address: p.address,
+    neighborhood: p.neighborhood,
+    zip_code: p.zipCode
+  }),
+  mapFromDb: (p: any): Port => ({
+    id: p.id,
+    name: p.name,
+    legalName: p.legal_name,
+    city: p.city,
+    state: p.state,
+    cnpj: p.cnpj,
+    address: p.address,
+    neighborhood: p.neighborhood,
+    zipCode: p.zip_code
+  })
+};
+
+const preStackingMapper = {
+  mapToDb: (ps: PreStacking) => ({
+    id: ps.id,
+    name: ps.name,
+    legal_name: ps.legalName,
+    city: ps.city,
+    state: ps.state,
+    cnpj: ps.cnpj,
+    address: ps.address,
+    neighborhood: ps.neighborhood,
+    zip_code: ps.zipCode
+  }),
+  mapFromDb: (ps: any): PreStacking => ({
+    id: ps.id,
+    name: ps.name,
+    legalName: ps.legal_name,
+    city: ps.city,
+    state: ps.state,
+    cnpj: ps.cnpj,
+    address: ps.address,
+    neighborhood: ps.neighborhood,
+    zipCode: ps.zip_code
+  })
 };
 
 export const db = {
@@ -90,7 +135,7 @@ export const db = {
 
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
-      const { data, error } = await supabase.from('users').select('*');
+      const { data } = await supabase.from('users').select('*');
       if (data) {
         const mapped = data.map(u => userMapper.mapFromDb(u));
         db._saveLocal(KEYS.USERS, data); 
@@ -103,8 +148,7 @@ export const db = {
   saveUser: async (user: User) => {
     const payload = userMapper.mapToDb(user);
     if (supabase) {
-      const { error } = await supabase.from('users').upsert(payload, { onConflict: 'id' });
-      if (error) console.error("Erro ao sincronizar lastlogin no banco:", error);
+      await supabase.from('users').upsert(payload, { onConflict: 'id' });
     }
     const current = db._getLocal(KEYS.USERS);
     const idx = current.findIndex((u: any) => u.id === user.id);
@@ -228,13 +272,18 @@ export const db = {
   getPorts: async (): Promise<Port[]> => {
     if (supabase) {
       const { data } = await supabase.from('ports').select('*').order('name');
-      if (data) { db._saveLocal(KEYS.PORTS, data); return data; }
+      if (data) { 
+        const mapped = data.map(p => portMapper.mapFromDb(p));
+        db._saveLocal(KEYS.PORTS, mapped); 
+        return mapped; 
+      }
     }
     return db._getLocal(KEYS.PORTS);
   },
 
   savePort: async (port: Port) => {
-    if (supabase) await supabase.from('ports').upsert(port);
+    const payload = portMapper.mapToDb(port);
+    if (supabase) await supabase.from('ports').upsert(payload);
     const current = db._getLocal(KEYS.PORTS);
     const idx = current.findIndex((p: Port) => p.id === port.id);
     if (idx >= 0) current[idx] = port; else current.push(port);
@@ -242,19 +291,38 @@ export const db = {
     return true;
   },
 
+  deletePort: async (id: string) => {
+    if (supabase) await supabase.from('ports').delete().eq('id', id);
+    const current = db._getLocal(KEYS.PORTS).filter((p: Port) => p.id !== id);
+    db._saveLocal(KEYS.PORTS, current);
+    return true;
+  },
+
   getPreStacking: async (): Promise<PreStacking[]> => {
     if (supabase) {
       const { data } = await supabase.from('pre_stacking').select('*').order('name');
-      if (data) { db._saveLocal(KEYS.PRE_STACKING, data); return data; }
+      if (data) { 
+        const mapped = data.map(ps => preStackingMapper.mapFromDb(ps));
+        db._saveLocal(KEYS.PRE_STACKING, mapped); 
+        return mapped; 
+      }
     }
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
   savePreStacking: async (ps: PreStacking) => {
-    if (supabase) await supabase.from('pre_stacking').upsert(ps);
+    const payload = preStackingMapper.mapToDb(ps);
+    if (supabase) await supabase.from('pre_stacking').upsert(payload);
     const current = db._getLocal(KEYS.PRE_STACKING);
     const idx = current.findIndex((p: PreStacking) => p.id === ps.id);
     if (idx >= 0) current[idx] = ps; else current.push(ps);
+    db._saveLocal(KEYS.PRE_STACKING, current);
+    return true;
+  },
+
+  deletePreStacking: async (id: string) => {
+    if (supabase) await supabase.from('pre_stacking').delete().eq('id', id);
+    const current = db._getLocal(KEYS.PRE_STACKING).filter((ps: PreStacking) => ps.id !== id);
     db._saveLocal(KEYS.PRE_STACKING, current);
     return true;
   },
