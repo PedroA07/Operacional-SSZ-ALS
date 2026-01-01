@@ -1,8 +1,9 @@
 
-import React, { useState, useRef } from 'react';
-import { Driver, OperationDefinition, DriverOperation } from '../../types';
+import React, { useState, useRef, useEffect } from 'react';
+import { Driver, OperationDefinition, User } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
 import { db } from '../../utils/storage';
+import { driverAuthService } from '../../utils/driverAuthService';
 
 interface DriversTabProps {
   drivers: Driver[];
@@ -16,6 +17,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [showPassMap, setShowPassMap] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const initialForm: Partial<Driver> = {
@@ -26,17 +29,20 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '',
     beneficiaryCnpj: '', paymentPreference: 'PIX',
     whatsappGroupName: '', whatsappGroupLink: '',
-    operations: [], hasAccess: false,
+    operations: [], hasAccess: true,
     tripsCount: 0
   };
 
   const [form, setForm] = useState<Partial<Driver>>(initialForm);
 
-  const handleCreateAccess = (driver: Partial<Driver>) => {
-    const cleanCPF = driver.cpf?.replace(/\D/g, '') || '';
-    const firstName = driver.name?.trim().split(' ')[0].toLowerCase() || 'als';
-    return { username: cleanCPF, password: `${firstName}${cleanCPF.slice(-4)}` };
+  const loadData = async () => {
+    const u = await db.getUsers();
+    setUsers(u);
   };
+
+  useEffect(() => {
+    loadData();
+  }, [drivers]);
 
   const handleOpenModal = (d?: Driver) => {
     setForm(d ? { ...d } : initialForm);
@@ -48,9 +54,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setForm(prev => ({ ...prev, photo: reader.result as string }));
-      };
+      reader.onloadend = () => setForm(prev => ({ ...prev, photo: reader.result as string }));
       reader.readAsDataURL(file);
     }
   };
@@ -60,7 +64,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     const index = currentOps.findIndex(op => op.category === category && op.client === clientName);
     if (index >= 0) currentOps.splice(index, 1);
     else currentOps.push({ category, client: clientName });
-    // Fix: Explicitly handle state update for nested array
     setForm(prev => ({ ...prev, operations: currentOps }));
   };
 
@@ -71,38 +74,42 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     setIsSaving(true);
     try {
       const drvId = editingId || `drv-${Date.now()}`;
-      const access = handleCreateAccess(form);
-      const statusDate = form.statusLastChangeDate || new Date().toISOString();
-      const registrationDate = form.registrationDate || new Date().toISOString();
+      
+      // REGRA: Fallback de beneficiário para os dados do próprio motorista
+      const finalForm = {
+        ...form,
+        beneficiaryName: form.beneficiaryName || form.name,
+        beneficiaryPhone: form.beneficiaryPhone || form.phone,
+        beneficiaryCnpj: form.beneficiaryCnpj || form.cpf,
+        beneficiaryEmail: form.beneficiaryEmail || form.email,
+        registrationDate: form.registrationDate || new Date().toISOString(),
+        statusLastChangeDate: form.statusLastChangeDate || new Date().toISOString()
+      };
 
-      if (form.hasAccess) {
-        await db.saveUser({
-          id: `u-${drvId}`,
-          username: access.username,
-          displayName: form.name!,
-          role: form.driverType === 'Motoboy' ? 'motoboy' : 'driver',
-          driverId: drvId,
-          lastLogin: new Date().toISOString(),
-          position: form.driverType === 'Motoboy' ? 'Motoboy' : 'Motorista',
-          password: access.password,
-          photo: form.photo
-        });
-      }
-
+      // Sincroniza usuário de acesso
+      const { password } = await driverAuthService.syncUserRecord(drvId, finalForm, form.generatedPassword);
+      
       await onSaveDriver({ 
-        ...form, 
+        ...finalForm, 
         id: drvId,
-        registrationDate,
-        statusLastChangeDate: statusDate,
-        generatedPassword: form.hasAccess ? access.password : undefined 
+        generatedPassword: password 
       }, editingId);
       
       setIsModalOpen(false);
+      loadData();
     } catch (err: any) {
-      console.error("Erro ao salvar:", err);
-      alert(`FALHA AO SALVAR: ${err.message || "Erro desconhecido. Verifique se a tabela 'drivers' foi criada no Supabase."}`);
+      alert(`FALHA AO SALVAR: ${err.message}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async (driverId: string) => {
+    const newPass = prompt("Digite a nova senha para este motorista:");
+    if (newPass && newPass.length >= 4) {
+      await driverAuthService.updatePassword(driverId, newPass);
+      loadData();
+      alert("Senha atualizada com sucesso!");
     }
   };
 
@@ -112,7 +119,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     d.plateHorse.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:opacity-50";
+  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
 
   return (
     <div className="max-w-full mx-auto space-y-6">
@@ -127,10 +134,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
           />
           <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         </div>
-        
-        <div className="flex gap-2">
-          <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl active:scale-95">Novo Cadastro</button>
-        </div>
+        <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl active:scale-95">Novo Cadastro</button>
       </div>
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
@@ -139,115 +143,74 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
                 <th className="px-6 py-5">Identificação / Beneficiário</th>
-                <th className="px-6 py-5">Documentação</th>
+                <th className="px-6 py-5 text-blue-600">Acesso Portal (Credenciais)</th>
                 <th className="px-6 py-5">Contatos</th>
                 <th className="px-6 py-5">Equipamento</th>
-                <th className="px-6 py-5">Vínculo</th>
                 <th className="px-6 py-5">Status</th>
                 <th className="px-6 py-5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredDrivers.map(d => (
-                <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex gap-4">
-                       <div className="w-12 h-12 rounded-full bg-slate-100 border-2 border-slate-200 overflow-hidden flex-shrink-0 shadow-inner">
-                         {d.photo ? <img src={d.photo} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 italic text-[8px]">3x4</div>}
-                       </div>
-                       <div className="space-y-3">
+              {filteredDrivers.map(d => {
+                const linkedUser = users.find(u => u.driverId === d.id);
+                const isPassVisible = showPassMap[d.id];
+                
+                return (
+                  <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex gap-4">
+                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
+                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 italic text-[8px]">3x4</div>}
+                         </div>
                          <div>
                             <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{d.name}</p>
-                            <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">{d.driverType}</span>
+                            <p className="text-[7px] font-black text-slate-400 uppercase mt-1">Benef: {d.beneficiaryName || 'Mesmo do Motorista'}</p>
+                            <p className="text-[7px] font-bold text-slate-500 font-mono tracking-tighter">CPF: {d.cpf}</p>
                          </div>
-                         {d.beneficiaryName && (
-                           <div className="pl-3 border-l-2 border-emerald-200 py-1 bg-emerald-50/30 pr-4 rounded-r-xl">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="text-[7px] font-black text-emerald-600 uppercase">Beneficiário:</p>
-                                <span className={`px-1.5 py-0.5 rounded text-[6px] font-black uppercase ${d.paymentPreference === 'PIX' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
-                                  {d.paymentPreference || 'PIX'}
-                                </span>
-                              </div>
-                              <p className="text-[9px] font-black text-slate-700 uppercase leading-none">{d.beneficiaryName}</p>
-                              <div className="mt-1.5 space-y-0.5">
-                                {d.beneficiaryCnpj && <p className="text-[8px] font-black text-slate-400 whitespace-nowrap">CNPJ: {d.beneficiaryCnpj}</p>}
-                                <p className="text-[8px] font-bold text-slate-500 whitespace-nowrap">{d.beneficiaryPhone}</p>
-                                {d.beneficiaryEmail && <p className="text-[8px] text-blue-500 font-bold lowercase italic">{d.beneficiaryEmail}</p>}
-                              </div>
-                           </div>
-                         )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-1.5 min-w-[140px]">
+                         <div className="flex justify-between items-center text-[8px] font-black text-blue-400 uppercase tracking-tighter">
+                            <span>Login (CPF):</span>
+                            <span className="text-slate-700 font-mono">{linkedUser?.username || d.cpf.replace(/\D/g, '')}</span>
+                         </div>
+                         <div className="flex justify-between items-center text-[8px] font-black text-blue-400 uppercase tracking-tighter">
+                            <span>Senha:</span>
+                            <div className="flex items-center gap-2">
+                               <span className="text-slate-700 font-mono bg-white px-1.5 py-0.5 rounded border border-blue-100">
+                                 {isPassVisible ? linkedUser?.password : '••••••••'}
+                               </span>
+                               <button onClick={() => setShowPassMap(p => ({...p, [d.id]: !p[d.id]}))} className="text-blue-500 hover:text-blue-700">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
+                               </button>
+                            </div>
+                         </div>
+                         <button onClick={() => handleUpdatePassword(d.id)} className="w-full mt-2 py-1 bg-white text-blue-600 rounded-lg border border-blue-200 text-[7px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">Alterar Senha</button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-blue-600 font-black text-[10px] leading-none mb-1">{d.phone}</p>
+                      <p className="text-slate-400 font-bold text-[8px] lowercase truncate max-w-[120px]">{d.email || 'sem e-mail'}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-200 flex flex-col">
+                          <span className="text-[7px] font-black text-slate-400 uppercase">Equipamento</span>
+                          <p className="text-[10px] font-black text-slate-700 font-mono">{d.plateHorse} / {d.plateTrailer}</p>
                        </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1.5 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[7px] font-black text-slate-300 w-6 uppercase">CPF</span>
-                        <span className="text-[10px] font-black text-slate-600 font-mono tracking-tighter">{d.cpf}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[7px] font-black text-slate-300 w-6 uppercase">RG</span>
-                        <span className="text-[10px] font-black text-slate-600 font-mono tracking-tighter">{d.rg}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[7px] font-black text-slate-300 w-6 uppercase">CNH</span>
-                        <span className="text-[10px] font-black text-slate-600 font-mono tracking-tighter">{d.cnh}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-3 min-w-[150px]">
-                      <div>
-                        <p className="text-blue-600 font-black text-[10px] leading-none mb-1 whitespace-nowrap">{d.phone}</p>
-                        <p className="text-slate-600 font-bold text-[8.5px] lowercase truncate max-w-[140px] border-l-2 border-slate-200 pl-2">{d.email || 'sem e-mail'}</p>
-                      </div>
-                      {d.whatsappGroupLink && (
-                        <a href={d.whatsappGroupLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg text-[7px] font-black uppercase hover:bg-emerald-700 transition-all shadow-sm whitespace-nowrap">
-                          WhatsApp Grupo
-                        </a>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-2 min-w-[150px]">
-                       <div className="bg-blue-50/50 px-2.5 py-2 rounded-xl border border-blue-100 flex items-center justify-between whitespace-nowrap">
-                          <span className="text-[7px] font-black text-blue-400 uppercase">Cavalo</span>
-                          <p className="text-[10px] font-black text-blue-800 font-mono">{d.plateHorse} <span className="text-[8px] font-sans opacity-40">({d.yearHorse})</span></p>
-                       </div>
-                       <div className="bg-slate-50 px-2.5 py-2 rounded-xl border border-slate-200 flex items-center justify-between whitespace-nowrap">
-                          <span className="text-[7px] font-black text-slate-400 uppercase">Carreta</span>
-                          <p className="text-[10px] font-black text-slate-600 font-mono">{d.plateTrailer} <span className="text-[8px] font-sans opacity-40">({d.yearTrailer})</span></p>
-                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1 max-w-[150px]">
-                      {d.operations && d.operations.length > 0 ? d.operations.map((op, idx) => (
-                        <div key={idx} className={`px-2 py-1 rounded border whitespace-nowrap ${op.client === 'GERAL' ? 'bg-slate-900 border-slate-800' : 'bg-white border-blue-100 shadow-sm'}`}>
-                          <p className={`text-[6px] font-black uppercase leading-none ${op.client === 'GERAL' ? 'text-blue-400' : 'text-blue-500'}`}>{op.category}</p>
-                          <p className={`text-[8px] font-bold uppercase leading-tight mt-0.5 ${op.client === 'GERAL' ? 'text-white' : 'text-slate-700'}`}>{op.client}</p>
-                        </div>
-                      )) : <span className="text-[8px] font-bold text-slate-300 italic uppercase">Sem vínculo</span>}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1.5 whitespace-nowrap">
-                      <div className="flex">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                          {d.status}
-                        </span>
-                      </div>
-                      <p className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">
-                        Desde: <span className="text-slate-700">{d.statusLastChangeDate ? new Date(d.statusLastChangeDate).toLocaleDateString('pt-BR') : '--/--/----'}</span>
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right space-x-0.5 whitespace-nowrap">
-                    <button onClick={() => handleOpenModal(d)} className="p-2.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                    <button onClick={() => onDeleteDriver(d.id)} className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                        {d.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right space-x-1">
+                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                      <button onClick={() => onDeleteDriver(d.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -288,8 +251,34 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                    <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Operacional (Opcional)</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm(prev => ({...prev, email: e.target.value}))} /></div>
                 </div>
 
+                <div className="bg-emerald-50/40 p-8 rounded-[2.5rem] border border-emerald-100 space-y-6">
+                   <div className="flex items-center justify-between">
+                     <div>
+                        <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">Dados do Beneficiário</h4>
+                        <p className="text-[7px] text-emerald-400 font-bold uppercase mt-1">* Se deixado em branco, o sistema usará os dados do motorista acima.</p>
+                     </div>
+                     <div className="flex bg-white/60 p-1 rounded-xl border border-emerald-200">
+                        {['PIX', 'TED'].map(pref => (
+                          <button key={pref} type="button" onClick={() => setForm(prev => ({...prev, paymentPreference: pref as any}))} className={`px-4 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${form.paymentPreference === pref ? 'bg-emerald-600 text-white shadow-md' : 'text-emerald-400 hover:text-emerald-600'}`}>
+                            {pref}
+                          </button>
+                        ))}
+                     </div>
+                   </div>
+                   <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">Nome Completo</label><input className={inputClasses} value={form.beneficiaryName} onChange={e => setForm(prev => ({...prev, beneficiaryName: e.target.value.toUpperCase()}))} placeholder={form.name || "NOME DO MOTORISTA"} /></div>
+                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">CNPJ / CPF</label><input className={inputClasses} value={form.beneficiaryCnpj} onChange={e => setForm(prev => ({...prev, beneficiaryCnpj: e.target.value.includes('/') ? maskCNPJ(e.target.value) : maskCPF(e.target.value)}))} placeholder={form.cpf || "CPF DO MOTORISTA"} /></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">Telefone</label><input className={inputClasses} value={form.beneficiaryPhone} onChange={e => setForm(prev => ({...prev, beneficiaryPhone: maskPhone(e.target.value)}))} placeholder={form.phone || "(13) 00000-0000"} /></div>
+                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">E-mail</label><input className={`${inputClasses} lowercase`} value={form.beneficiaryEmail} onChange={e => setForm(prev => ({...prev, beneficiaryEmail: e.target.value}))} placeholder={form.email || "motorista@email.com"} /></div>
+                      </div>
+                   </div>
+                </div>
+
                 <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200 space-y-5">
-                   <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-2">Vínculo de Operações</h4>
+                   <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Vínculo de Operações</h4>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       {availableOps.map(op => (
                         <div key={op.id} className="space-y-3 bg-white/50 p-4 rounded-3xl border border-slate-100">
@@ -304,7 +293,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                                   : 'bg-white text-slate-400 border-slate-200 hover:border-slate-800 hover:text-slate-800'
                                 }`}
                               >
-                                { (form.operations || []).some(o => o.category === op.category && o.client === 'GERAL') ? '✓ CATEGORIA ATIVA' : '+ GERAL' }
+                                { (form.operations || []).some(o => o.category === op.category && o.client === 'GERAL') ? '✓ ATIVO' : '+ GERAL' }
                               </button>
                            </div>
                            <div className="flex flex-wrap gap-2">
@@ -315,7 +304,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                                     key={client.name}
                                     type="button"
                                     onClick={() => toggleOperation(op.category, client.name)}
-                                    className={`px-3 py-2 rounded-xl text-[9px] font-bold uppercase transition-all border ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-200 hover:border-blue-300'}`}
+                                    className={`px-3 py-2 rounded-xl text-[9px] font-bold uppercase transition-all border ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}
                                   >
                                     {client.name}
                                   </button>
@@ -326,63 +315,27 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                       ))}
                    </div>
                 </div>
-
-                <div className="bg-emerald-50/40 p-8 rounded-[2.5rem] border border-emerald-100 space-y-6">
-                   <div className="flex items-center justify-between">
-                     <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">Dados do Beneficiário</h4>
-                     <div className="flex bg-white/60 p-1 rounded-xl border border-emerald-200">
-                        {['PIX', 'TED'].map(pref => (
-                          <button key={pref} type="button" onClick={() => setForm(prev => ({...prev, paymentPreference: pref as any}))} className={`px-4 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${form.paymentPreference === pref ? 'bg-emerald-600 text-white shadow-md' : 'text-emerald-400 hover:text-emerald-600'}`}>
-                            {pref}
-                          </button>
-                        ))}
-                     </div>
-                   </div>
-                   <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">Nome Completo</label><input className={inputClasses} value={form.beneficiaryName} onChange={e => setForm(prev => ({...prev, beneficiaryName: e.target.value}))} /></div>
-                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">CNPJ (Se houver)</label><input className={inputClasses} value={form.beneficiaryCnpj} onChange={e => setForm(prev => ({...prev, beneficiaryCnpj: maskCNPJ(e.target.value)}))} placeholder="00.000.000/0000-00" /></div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">Telefone</label><input className={inputClasses} value={form.beneficiaryPhone} onChange={e => setForm(prev => ({...prev, beneficiaryPhone: maskPhone(e.target.value)}))} /></div>
-                        <div className="space-y-1"><label className="text-[9px] font-black text-emerald-400 uppercase ml-1">E-mail</label><input className={`${inputClasses} lowercase`} value={form.beneficiaryEmail} onChange={e => setForm(prev => ({...prev, beneficiaryEmail: e.target.value}))} /></div>
-                      </div>
-                   </div>
-                </div>
-
-                <div className="bg-indigo-50/40 p-8 rounded-[2.5rem] border border-indigo-100 space-y-5">
-                   <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">WhatsApp do Grupo</h4>
-                   <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1"><label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm(prev => ({...prev, whatsappGroupName: e.target.value}))} placeholder="EX: FROTA ALS 01" /></div>
-                      <div className="space-y-1"><label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Link do Grupo</label><input className={inputClasses} value={form.whatsappGroupLink} onChange={e => setForm(prev => ({...prev, whatsappGroupLink: e.target.value}))} placeholder="https://chat.whatsapp.com/..." /></div>
-                   </div>
-                </div>
               </div>
 
               <div className="col-span-4 space-y-6">
                 <div className="bg-slate-900 p-6 rounded-[2rem] text-white space-y-4 shadow-xl">
-                   <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Acesso ao Portal</h4>
-                   <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
-                      <span className="text-[9px] font-black uppercase">Liberar Login?</span>
-                      <button type="button" onClick={() => setForm(prev => ({...prev, hasAccess: !prev.hasAccess}))} className={`w-12 h-7 rounded-full p-1 transition-all ${form.hasAccess ? 'bg-blue-600' : 'bg-white/10'}`}>
-                        <div className={`w-5 h-5 bg-white rounded-full transition-all shadow-md ${form.hasAccess ? 'translate-x-5' : ''}`}></div>
-                      </button>
+                   <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Credenciais do Portal</h4>
+                   <div className="bg-blue-600/10 p-5 rounded-2xl border border-blue-500/30 space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-blue-300 uppercase">Usuário (CPF)</label>
+                        <div className="px-4 py-3 bg-white/5 rounded-xl text-[11px] font-mono text-white/60 select-all">{form.cpf?.replace(/\D/g, '') || 'Preencha o CPF...'}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-blue-300 uppercase">Senha Personalizada (Opcional)</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-3 bg-white/5 rounded-xl text-[11px] font-mono text-white outline-none focus:bg-white/10 border border-white/10" 
+                          placeholder="Senha padrão automática"
+                          value={form.generatedPassword || ''}
+                          onChange={e => setForm({...form, generatedPassword: e.target.value})}
+                        />
+                      </div>
                    </div>
-                   {form.hasAccess && form.name && form.cpf && (
-                     <div className="bg-blue-600/20 p-5 rounded-2xl border border-blue-500/30">
-                        <p className="text-[9px] font-black text-blue-400 uppercase mb-3 border-b border-blue-400/20 pb-2">Credenciais:</p>
-                        <div className="space-y-2 text-[10px]">
-                           <div className="flex justify-between">
-                              <span className="opacity-60">Usuário (CPF):</span>
-                              <span className="font-mono font-black">{form.cpf.replace(/\D/g, '')}</span>
-                           </div>
-                           <div className="flex justify-between">
-                              <span className="opacity-60">Senha:</span>
-                              <span className="font-mono font-black">{form.name.trim().split(' ')[0].toLowerCase()}{form.cpf.replace(/\D/g, '').slice(-4)}</span>
-                           </div>
-                        </div>
-                     </div>
-                   )}
                 </div>
 
                 <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-200 space-y-4">
@@ -408,7 +361,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                 </div>
 
                 <button type="submit" disabled={isSaving} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[12px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3 disabled:bg-slate-400">
-                  {isSaving ? 'Salvando...' : 'Salvar Registro'}
+                  {isSaving ? 'Salvando...' : 'Finalizar Cadastro'}
                 </button>
               </div>
             </form>
