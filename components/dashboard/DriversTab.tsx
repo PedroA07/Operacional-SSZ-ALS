@@ -96,10 +96,12 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         beneficiaryCnpj: form.beneficiaryCnpj || form.cpf,
         beneficiaryEmail: form.beneficiaryEmail || form.email,
         registrationDate: form.registrationDate || new Date().toISOString(),
-        statusLastChangeDate: form.statusLastChangeDate || new Date().toISOString()
+        // Se mudou o status ou é novo, atualiza a data de mudança
+        statusLastChangeDate: (!editingId || (editingId && drivers.find(d => d.id === editingId)?.status !== form.status)) 
+          ? new Date().toISOString() 
+          : form.statusLastChangeDate || new Date().toISOString()
       };
 
-      // Sincroniza usuário de acesso
       const { password } = await driverAuthService.syncUserRecord(drvId, finalForm, form.generatedPassword);
       
       await onSaveDriver({ 
@@ -163,11 +165,13 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
-                <th className="px-6 py-5">Identificação / Beneficiário</th>
-                <th className="px-6 py-5 text-blue-600">Acesso Portal (Credenciais)</th>
-                <th className="px-6 py-5">Documentação</th>
-                <th className="px-6 py-5">Equipamento</th>
-                <th className="px-6 py-5">Status</th>
+                <th className="px-6 py-5">1. Identificação / Beneficiário</th>
+                <th className="px-6 py-5 text-blue-600">2. Documentos</th>
+                <th className="px-6 py-5">3. Contatos / Grupo</th>
+                <th className="px-6 py-5">4. Equipamento</th>
+                <th className="px-6 py-5">5. Vínculo</th>
+                <th className="px-6 py-5">6. Status</th>
+                <th className="px-6 py-5">7. Portal</th>
                 <th className="px-6 py-5 text-right">Ações</th>
               </tr>
             </thead>
@@ -178,29 +182,128 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                 
                 return (
                   <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
+                    {/* COLUNA 1: FOTO / NOME / BENEFICIARIO */}
                     <td className="px-6 py-4">
                       <div className="flex gap-4">
-                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
-                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 italic text-[8px]">3x4</div>}
+                         <div className="w-12 h-12 rounded-full bg-slate-100 border-2 border-white shadow-sm overflow-hidden flex-shrink-0 ring-1 ring-slate-200">
+                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 italic text-[8px]">ALS</div>}
                          </div>
-                         <div>
-                            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{d.name}</p>
-                            <p className="text-[7px] font-black text-slate-400 uppercase mt-1">Benef: {d.beneficiaryName || 'Mesmo do Motorista'}</p>
-                            <p className="text-[7px] font-bold text-slate-500 font-mono tracking-tighter">CPF: {d.cpf}</p>
+                         <div className="min-w-0">
+                            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight truncate max-w-[180px]">{d.name}</p>
+                            <div className="mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                               <p className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Beneficiário:</p>
+                               <p className="text-[9px] font-bold text-slate-600 uppercase truncate max-w-[150px]">{d.beneficiaryName || d.name}</p>
+                               <p className="text-[8px] font-mono text-slate-400 mt-0.5">{d.beneficiaryCnpj || d.cpf}</p>
+                            </div>
                          </div>
                       </div>
                     </td>
+
+                    {/* COLUNA 2: DOCUMENTOS */}
+                    <td className="px-6 py-4">
+                      <div className="space-y-1">
+                         <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                            <span className="text-[8px] font-black text-slate-400">CPF:</span>
+                            <span className="text-[9px] font-mono font-bold text-slate-700">{d.cpf}</span>
+                         </div>
+                         <div className="flex justify-between items-center px-2 py-1">
+                            <span className="text-[8px] font-black text-slate-400">RG:</span>
+                            <span className="text-[9px] font-mono font-bold text-slate-600">{d.rg || '---'}</span>
+                         </div>
+                         <div className="flex justify-between items-center px-2 py-1">
+                            <span className="text-[8px] font-black text-slate-400">CNH:</span>
+                            <span className="text-[9px] font-mono font-bold text-slate-600">{d.cnh || '---'}</span>
+                         </div>
+                         <button 
+                            onClick={() => d.cnhPdfUrl && openPdf(d.cnhPdfUrl)}
+                            disabled={!d.cnhPdfUrl}
+                            className={`w-full flex items-center justify-center gap-1.5 mt-1 px-2 py-1 rounded-md text-[8px] font-black uppercase border transition-all ${d.cnhPdfUrl ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white' : 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'}`}
+                         >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                            {d.cnhPdfUrl ? 'Ver CNH (PDF)' : 'Sem PDF'}
+                         </button>
+                      </div>
+                    </td>
+
+                    {/* COLUNA 3: CONTATOS / GRUPO */}
+                    <td className="px-6 py-4">
+                      <div className="space-y-1.5">
+                         <p className="text-blue-600 font-black text-[10px] leading-none">{d.phone}</p>
+                         <p className="text-slate-400 font-bold text-[8px] lowercase truncate max-w-[130px]">{d.email || 'sem e-mail'}</p>
+                         {d.whatsappGroupName && (
+                           <div className="mt-2 pt-2 border-t border-slate-100">
+                             <div className="flex items-center gap-1 mb-1">
+                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                               <span className="text-[8px] font-black text-slate-500 uppercase truncate max-w-[100px]">{d.whatsappGroupName}</span>
+                             </div>
+                             {d.whatsappGroupLink && (
+                               <a href={d.whatsappGroupLink} target="_blank" className="text-[7px] font-black text-emerald-600 uppercase hover:underline flex items-center gap-1">
+                                 Abrir Grupo <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" strokeWidth="3"/></svg>
+                               </a>
+                             )}
+                           </div>
+                         )}
+                      </div>
+                    </td>
+
+                    {/* COLUNA 4: EQUIPAMENTO */}
+                    <td className="px-6 py-4">
+                       <div className="space-y-2">
+                          <div className="bg-slate-900 px-3 py-2 rounded-xl text-white">
+                             <p className="text-[7px] font-black text-blue-400 uppercase mb-0.5">Cavalo:</p>
+                             <div className="flex justify-between items-baseline">
+                               <span className="text-[10px] font-black font-mono">{d.plateHorse}</span>
+                               <span className="text-[8px] font-bold text-slate-400">{d.yearHorse || '---'}</span>
+                             </div>
+                          </div>
+                          <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+                             <p className="text-[7px] font-black text-slate-400 uppercase mb-0.5">Carreta:</p>
+                             <div className="flex justify-between items-baseline">
+                               <span className="text-[10px] font-black font-mono text-slate-700">{d.plateTrailer}</span>
+                               <span className="text-[8px] font-bold text-slate-400">{d.yearTrailer || '---'}</span>
+                             </div>
+                          </div>
+                       </div>
+                    </td>
+
+                    {/* COLUNA 5: VÍNCULO */}
+                    <td className="px-6 py-4">
+                       <div className="flex flex-wrap gap-1 max-w-[120px]">
+                          {(d.operations || []).length > 0 ? d.operations.map((op, idx) => (
+                             <span key={idx} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[7px] font-black uppercase">
+                                {op.client === 'GERAL' ? op.category : op.client}
+                             </span>
+                          )) : <span className="text-[8px] font-bold text-slate-300 uppercase italic underline decoration-red-200">Sem Vínculo</span>}
+                       </div>
+                    </td>
+
+                    {/* COLUNA 6: STATUS + DATA */}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1.5">
+                        <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase border w-fit ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                          {d.status}
+                        </span>
+                        <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                          <p className="text-[7px] font-black text-slate-400 uppercase leading-none">Desde:</p>
+                          <p className="text-[9px] font-bold text-slate-600 mt-1">
+                            {d.statusLastChangeDate ? new Date(d.statusLastChangeDate).toLocaleDateString('pt-BR') : '---'}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* COLUNA 7: PORTAL */}
                     <td className="px-6 py-4">
                       <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-1.5 min-w-[140px]">
                          <div className="flex justify-between items-center text-[8px] font-black text-blue-400 uppercase tracking-tighter">
-                            <span>Login (CPF):</span>
-                            <span className="text-slate-700 font-mono">{linkedUser?.username || d.cpf.replace(/\D/g, '')}</span>
+                            <span>Login:</span>
+                            <span className="text-slate-700 font-mono font-black">{linkedUser?.username || d.cpf.replace(/\D/g, '')}</span>
                          </div>
                          <div className="flex justify-between items-center text-[8px] font-black text-blue-400 uppercase tracking-tighter">
                             <span>Senha:</span>
                             <div className="flex items-center gap-2">
-                               <span className="text-slate-700 font-mono bg-white px-1.5 py-0.5 rounded border border-blue-100">
-                                 {isPassVisible ? linkedUser?.password : '••••••••'}
+                               <span className="text-slate-700 font-mono bg-white px-1.5 py-0.5 rounded border border-blue-100 font-black">
+                                 {isPassVisible ? (linkedUser?.password || '---') : '••••••••'}
                                </span>
                                <button onClick={() => setShowPassMap(p => ({...p, [d.id]: !p[d.id]}))} className="text-blue-500 hover:text-blue-700">
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
@@ -210,33 +313,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                          <button onClick={() => handleUpdatePassword(d.id)} className="w-full mt-2 py-1 bg-white text-blue-600 rounded-lg border border-blue-200 text-[7px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">Alterar Senha</button>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1.5">
-                        <p className="text-slate-600 font-bold text-[9px] uppercase">CNH: {d.cnh || '---'}</p>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => d.cnhPdfUrl && openPdf(d.cnhPdfUrl)}
-                            disabled={!d.cnhPdfUrl}
-                            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[8px] font-black uppercase border transition-all ${d.cnhPdfUrl ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-300 grayscale opacity-50 cursor-not-allowed'}`}
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                            {d.cnhPdfUrl ? 'Ver CNH' : 'Sem Anexo'}
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-200 flex flex-col">
-                          <span className="text-[7px] font-black text-slate-400 uppercase">Equipamento</span>
-                          <p className="text-[10px] font-black text-slate-700 font-mono">{d.plateHorse} / {d.plateTrailer}</p>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                        {d.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-1">
+
+                    <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
                       <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
                       <button onClick={() => onDeleteDriver(d.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                     </td>
@@ -332,7 +410,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                    </div>
                 </div>
 
-                {/* RESTAURADO: WhatsApp do Grupo */}
                 <div className="bg-indigo-50/40 p-8 rounded-[2.5rem] border border-indigo-100 space-y-5">
                    <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">WhatsApp do Grupo</h4>
                    <div className="grid grid-cols-2 gap-4">
