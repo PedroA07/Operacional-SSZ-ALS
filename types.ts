@@ -81,8 +81,8 @@ export interface Trip {
   customer: { id: string; name: string; city: string; state?: string };
   driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string };
   status: TripStatus;
-  advancePayment: PaymentStatus;
   balancePayment: PaymentStatus;
+  advancePayment: PaymentStatus;
   documents: TripDocument[];
 }
 
@@ -137,6 +137,7 @@ export interface Customer {
 export interface Port { 
   id: string; 
   name: string; 
+  legalName?: string;
   city: string; 
   state: string; 
   cnpj: string; 
@@ -148,6 +149,7 @@ export interface Port {
 export interface PreStacking { 
   id: string; 
   name: string; 
+  legalName?: string;
   city: string; 
   state: string; 
   cnpj: string; 
@@ -177,7 +179,6 @@ export interface OperationDefinition {
   clients: { name: string; hasDedicatedPage: boolean }[]; 
 }
 
-/* Added missing types for errors */
 export interface WeatherData {
   temp: number;
   condition: string;

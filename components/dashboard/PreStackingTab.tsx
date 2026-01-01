@@ -22,6 +22,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
 
   const initialForm: Partial<PreStacking> = {
     name: '',
+    legalName: '',
     cnpj: '',
     zipCode: '',
     address: '',
@@ -76,6 +77,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
         setForm(prev => ({
           ...prev,
           name: (data.nome_fantasia || data.razao_social || '').toUpperCase(),
+          legalName: (data.razao_social || '').toUpperCase(),
           address: data.logradouro ? `${data.logradouro}${data.numero ? ', ' + data.numero : ''}` : prev.address,
           neighborhood: (data.bairro || prev.neighborhood || '').toUpperCase(),
           city: (data.municipio || prev.city || '').toUpperCase(),
@@ -108,7 +110,11 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
     setIsModalOpen(false);
   };
 
-  const filtered = preStacking.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.cnpj.includes(searchQuery));
+  const filtered = preStacking.filter(p => 
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (p.legalName && p.legalName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    p.cnpj.includes(searchQuery)
+  );
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
 
@@ -118,7 +124,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
         <div className="flex-1 max-w-md relative">
           <input 
             type="text" 
-            placeholder="PESQUISAR PRÉ-STACKING..."
+            placeholder="PESQUISAR PRÉ-STACKING / CNPJ / RAZÃO..."
             className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 text-[10px] font-bold uppercase focus:border-blue-500 outline-none bg-slate-50/50"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -133,7 +139,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
-                <th className="px-8 py-5">Pré-Stacking / Unidade</th>
+                <th className="px-8 py-5">Identificação Jurídica</th>
                 <th className="px-8 py-5">CNPJ</th>
                 <th className="px-8 py-5 min-w-[200px]">Endereço / Bairro</th>
                 <th className="px-8 py-5">Localidade</th>
@@ -143,7 +149,16 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
             <tbody className="divide-y divide-slate-100">
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-8 py-4 font-black text-slate-800 uppercase text-[11px]">{p.name}</td>
+                  <td className="px-8 py-4">
+                    <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">
+                      {p.legalName || p.name}
+                    </p>
+                    {p.legalName && p.name !== p.legalName && (
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 truncate max-w-[250px]">
+                        FANTASIA: {p.name}
+                      </p>
+                    )}
+                  </td>
                   <td className="px-8 py-4 font-mono font-bold text-slate-500 whitespace-nowrap">{maskCNPJ(p.cnpj)}</td>
                   <td className="px-8 py-4">
                     <p className="text-slate-500 font-bold uppercase text-[9px] leading-relaxed">{p.address}</p>
@@ -193,15 +208,22 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
               <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
             </div>
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label>
+                <div className="relative">
+                  <input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" />
+                  {isCnpjLoading && <div className="absolute right-4 top-1/2 -translate-y-1/2"><svg className="animate-spin h-4 w-4 text-blue-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label>
-                  <div className="relative">
-                    <input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" />
-                    {isCnpjLoading && <div className="absolute right-4 top-1/2 -translate-y-1/2"><svg className="animate-spin h-4 w-4 text-blue-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>}
-                  </div>
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Razão Social</label>
+                  <input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} />
                 </div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label><input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} /></div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label>
+                  <input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1 relative">
