@@ -164,13 +164,16 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                       {c.operations?.map(op => <span key={op} className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-[7px] font-black uppercase">{op}</span>)}
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-mono font-bold text-slate-500">{maskCNPJ(c.cnpj)}</td>
+                  <td className="px-6 py-4 font-mono font-bold text-slate-500 whitespace-nowrap">
+                    {maskCNPJ(c.cnpj)}
+                  </td>
                   <td className="px-6 py-4">
                     <p className="text-slate-500 font-bold uppercase text-[9px] leading-relaxed">{c.address}</p>
                     <p className="text-slate-400 font-bold uppercase text-[8px]">{c.neighborhood}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-slate-600 font-black uppercase text-[10px]">{c.city} - {c.state}</span>
+                    <p className="text-slate-600 font-black uppercase text-[10px]">{c.city} - {c.state}</p>
+                    <p className="text-slate-400 font-bold font-mono text-[9px] mt-1">{maskCEP(c.zipCode || '')}</p>
                   </td>
                   <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
                     <button onClick={() => handleOpenModal(c)} className="p-2.5 text-slate-300 hover:text-blue-500 transition-all"><Icons.Equipe /></button>
