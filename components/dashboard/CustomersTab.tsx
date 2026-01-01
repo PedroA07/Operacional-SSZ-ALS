@@ -107,8 +107,8 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
   };
 
   const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.legalName && c.legalName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.cnpj.includes(searchQuery)
   );
 
@@ -120,7 +120,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
         <div className="flex-1 relative">
           <input 
             type="text" 
-            placeholder="PESQUISAR CLIENTE, RAZÃO OU CNPJ..."
+            placeholder="PESQUISAR RAZÃO SOCIAL, FANTASIA OU CNPJ..."
             className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 text-[10px] font-bold uppercase focus:border-blue-500 outline-none bg-slate-50/50"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -143,7 +143,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
-                <th className="px-6 py-5 text-slate-600">Identificação</th>
+                <th className="px-6 py-5 text-slate-600">Identificação Jurídica</th>
                 <th className="px-6 py-5">CNPJ</th>
                 <th className="px-6 py-5">Endereço</th>
                 <th className="px-6 py-5">Localidade</th>
@@ -154,13 +154,15 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
               {filteredCustomers.map(c => (
                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
-                    <p className="font-black text-slate-800 uppercase text-xs leading-tight">{c.name}</p>
-                    {c.legalName && (
+                    <p className="font-black text-slate-800 uppercase text-xs leading-tight">
+                      {c.legalName || c.name}
+                    </p>
+                    {c.legalName && c.name !== c.legalName && (
                       <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 truncate max-w-[250px]">
-                        {c.legalName}
+                        FANTASIA: {c.name}
                       </p>
                     )}
-                    <div className="flex gap-1 mt-1">
+                    <div className="flex gap-1 mt-2">
                       {c.operations?.map(op => <span key={op} className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-[7px] font-black uppercase">{op}</span>)}
                     </div>
                   </td>
@@ -223,12 +225,12 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label>
-                  <input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Razão Social</label>
+                  <input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label>
-                  <input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} />
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label>
+                  <input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
                 </div>
               </div>
 

@@ -130,9 +130,13 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
   };
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
-  
-  // Classe específica para inputs de data que não podem ter uppercase para não quebrar o calendário nativo
   const dateInputClasses = "w-full px-4 py-4 rounded-2xl border-2 border-slate-200 bg-white text-slate-700 font-black focus:border-blue-600 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-md cursor-pointer";
+
+  // Filtro de clientes priorizando Razão Social
+  const filteredRemetentes = customers.filter(c => 
+    (c.legalName || '').toUpperCase().includes(remetenteSearch) || 
+    c.name.toUpperCase().includes(remetenteSearch)
+  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -189,11 +193,26 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 </div>
 
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Remetente (Cliente)</label>
-                  <input type="text" placeholder="BUSCAR CLIENTE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); }} />
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Remetente (Razão Social)</label>
+                  <input type="text" placeholder="PESQUISAR RAZÃO SOCIAL..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); }} />
                   {showRemetenteResults && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-                      {customers.filter(c => c.name.toUpperCase().includes(remetenteSearch)).map(c => <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.name); setShowRemetenteResults(false); }}>{c.name}</button>)}
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
+                      {filteredRemetentes.map(c => (
+                        <button 
+                          key={c.id} 
+                          className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50 group" 
+                          onClick={() => { 
+                            setFormData({...formData, remetenteId: c.id}); 
+                            setRemetenteSearch(c.legalName || c.name); 
+                            setShowRemetenteResults(false); 
+                          }}
+                        >
+                          <p className="font-black text-slate-800 group-hover:text-blue-600">{c.legalName || c.name}</p>
+                          {c.legalName && c.name !== c.legalName && (
+                            <p className="text-[8px] text-slate-400 font-bold">FANTASIA: {c.name}</p>
+                          )}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -236,7 +255,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   </div>
                 </div>
 
-                {/* BLOCO REORGANIZADO CONFORME SOLICITAÇÃO */}
                 <div className="grid grid-cols-1 gap-3 pt-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo Equip.</label>
@@ -310,7 +328,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                     value={formData.horarioAgendado} 
                     onChange={e => setFormData({...formData, horarioAgendado: e.target.value})} 
                     onClick={(e) => {
-                      // @ts-ignore - Alguns navegadores precisam desse trigger para abrir o calendário nativo
+                      // @ts-ignore
                       if (e.target.showPicker) e.target.showPicker();
                     }}
                   />
