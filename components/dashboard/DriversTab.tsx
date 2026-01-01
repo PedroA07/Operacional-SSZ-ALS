@@ -4,6 +4,9 @@ import { Driver, OperationDefinition, User } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
 import { db } from '../../utils/storage';
 import { driverAuthService } from '../../utils/driverAuthService';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import DriverProfileTemplate from './forms/DriverProfileTemplate';
 
 interface DriversTabProps {
   drivers: Driver[];
@@ -17,6 +20,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [showPassMap, setShowPassMap] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -66,12 +70,12 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type === 'application/pdf') {
+    if (file && (file.type === 'application/pdf' || file.type.startsWith('image/'))) {
       const reader = new FileReader();
       reader.onloadend = () => setForm(prev => ({ ...prev, cnhPdfUrl: reader.result as string }));
       reader.readAsDataURL(file);
     } else if (file) {
-      alert("Por favor, selecione um arquivo no formato PDF.");
+      alert("Por favor, selecione um arquivo no formato PDF ou Imagem.");
       e.target.value = '';
     }
   };
@@ -148,6 +152,39 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     }
   };
 
+  const handleDownloadProfile = async (driver: Driver) => {
+    setIsExporting(driver.id);
+    try {
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      
+      // PÁGINA 1: DADOS
+      const dataEl = document.getElementById(`driver-profile-card-${driver.id}`);
+      if (dataEl) {
+        const canvas1 = await html2canvas(dataEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+        const imgData1 = canvas1.toDataURL('image/jpeg', 0.95);
+        pdf.addImage(imgData1, 'JPEG', 0, 0, 210, 297);
+      }
+
+      // PÁGINA 2: CNH (SE HOUVER)
+      if (driver.cnhPdfUrl) {
+        pdf.addPage();
+        const cnhEl = document.getElementById(`driver-cnh-attachment-${driver.id}`);
+        if (cnhEl) {
+          const canvas2 = await html2canvas(cnhEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+          const imgData2 = canvas2.toDataURL('image/jpeg', 0.95);
+          pdf.addImage(imgData2, 'JPEG', 0, 0, 210, 297);
+        }
+      }
+
+      pdf.save(`FICHA_CADASTRAL_${driver.name.replace(/\s+/g, '_')}.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao gerar PDF.");
+    } finally {
+      setIsExporting(null);
+    }
+  };
+
   const filteredDrivers = drivers.filter(d => 
     d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     d.cpf.includes(searchQuery) ||
@@ -158,6 +195,11 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
   return (
     <div className="max-w-full mx-auto space-y-6">
+      {/* RENDERIZADOR OCULTO PARA CAPTURA DE PDF */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        {drivers.map(d => <DriverProfileTemplate key={`tpl-${d.id}`} driver={d} />)}
+      </div>
+
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
         <div className="flex-1 relative max-w-md">
           <input 
@@ -189,13 +231,12 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredDrivers.map(d => {
-                // Localiza o usuário vinculado de forma mais robusta (por driverId ou CPF)
                 const linkedUser = users.find(u => u.driverId === d.id || (u.username === d.cpf.replace(/\D/g, '')));
                 const isPassVisible = showPassMap[d.id];
+                const exporting = isExporting === d.id;
                 
                 return (
                   <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
-                    {/* COLUNA 1: FOTO / NOME / DADOS COMPLETOS BENEFICIARIO */}
                     <td className="px-6 py-4">
                       <div className="flex gap-4">
                          <div className="w-12 h-12 rounded-full bg-slate-100 border-2 border-white shadow-sm overflow-hidden flex-shrink-0 ring-1 ring-slate-200">
@@ -218,7 +259,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                       </div>
                     </td>
 
-                    {/* COLUNA 2: DOCUMENTOS */}
                     <td className="px-6 py-4">
                       <div className="space-y-1">
                          <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded border border-slate-100">
@@ -244,7 +284,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                       </div>
                     </td>
 
-                    {/* COLUNA 3: CONTATOS / GRUPO WHATSAPP */}
                     <td className="px-6 py-4">
                       <div className="space-y-2">
                          <div className="space-y-0.5">
@@ -272,7 +311,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                       </div>
                     </td>
 
-                    {/* COLUNA 4: EQUIPAMENTO */}
                     <td className="px-6 py-4">
                        <div className="space-y-2">
                           <div className="bg-slate-900 px-3 py-2 rounded-xl text-white">
@@ -292,7 +330,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                        </div>
                     </td>
 
-                    {/* COLUNA 5: VÍNCULO */}
                     <td className="px-6 py-4">
                        <div className="flex flex-wrap gap-1 max-w-[120px]">
                           {(d.operations || []).length > 0 ? d.operations.map((op, idx) => (
@@ -303,7 +340,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                        </div>
                     </td>
 
-                    {/* COLUNA 6: STATUS + DATA */}
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1.5">
                         <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase border w-fit ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
@@ -318,7 +354,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                       </div>
                     </td>
 
-                    {/* COLUNA 7: PORTAL */}
                     <td className="px-6 py-4">
                       <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-1.5 min-w-[140px]">
                          <div className="flex justify-between items-center text-[8px] font-black text-blue-400 uppercase tracking-tighter">
@@ -329,7 +364,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                             <span>Senha:</span>
                             <div className="flex items-center gap-2">
                                <span className="text-slate-700 font-mono bg-white px-1.5 py-0.5 rounded border border-blue-100 font-black min-w-[80px] text-center">
-                                 {isPassVisible ? (linkedUser?.password || 'als-2025') : '••••••••'}
+                                 {isPassVisible ? (linkedUser?.password || '---') : '••••••••'}
                                </span>
                                <button onClick={() => setShowPassMap(p => ({...p, [d.id]: !p[d.id]}))} className="text-blue-500 hover:text-blue-700 active:scale-90 transition-transform">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,6 +382,18 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                     </td>
 
                     <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+                      <button 
+                        onClick={() => handleDownloadProfile(d)} 
+                        disabled={exporting}
+                        className={`p-2 rounded-xl transition-all ${exporting ? 'bg-slate-100 text-slate-300 animate-pulse' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50'}`} 
+                        title="Baixar Ficha Cadastral (PDF)"
+                      >
+                        {exporting ? (
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 11l3 3L15 11" /></svg>
+                        )}
+                      </button>
                       <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
                       <button onClick={() => onDeleteDriver(d.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                     </td>
@@ -389,7 +436,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">Documento CNH (Anexo PDF)</label>
+                      <label className="text-[9px] font-black text-blue-600 uppercase ml-1 tracking-widest">Documento CNH (Anexo PDF ou Imagem)</label>
                       <div className="flex gap-2">
                         <button 
                           type="button" 
@@ -397,7 +444,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                           className={`flex-1 flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl border-2 border-dashed transition-all ${form.cnhPdfUrl ? 'bg-emerald-50 border-emerald-400 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600'}`}
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                          <span className="text-[10px] font-black uppercase tracking-tight">{form.cnhPdfUrl ? 'CNH Anexada ✓' : 'Clique para anexar CNH (PDF)'}</span>
+                          <span className="text-[10px] font-black uppercase tracking-tight">{form.cnhPdfUrl ? 'Documento Anexado ✓' : 'Clique para anexar CNH'}</span>
                         </button>
                         {form.cnhPdfUrl && (
                           <>
@@ -406,7 +453,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                           </>
                         )}
                       </div>
-                      <input type="file" ref={pdfInputRef} className="hidden" accept="application/pdf" onChange={handlePdfUpload} />
+                      <input type="file" ref={pdfInputRef} className="hidden" accept="application/pdf,image/*" onChange={handlePdfUpload} />
                     </div>
                   </div>
                 </div>
