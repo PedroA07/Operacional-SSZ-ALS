@@ -273,7 +273,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                   <div className="flex-1 space-y-4">
                     <div className="space-y-1">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
-                      <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-black uppercase text-xl focus:border-blue-500 outline-none shadow-sm transition-all" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                      <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-black uppercase text-xl focus:border-blue-500 outline-none shadow-sm transition-all" value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CPF</label><input required className={inputClasses} value={form.cpf} onChange={e => setForm(prev => ({...prev, cpf: maskCPF(e.target.value)}))} /></div>
@@ -390,11 +390,11 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                    <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1"><label className="text-[8px] font-black text-blue-400 uppercase">Placa Cavalo</label><input required className={inputClasses} value={form.plateHorse} onChange={e => setForm({...form, plateHorse: maskPlate(e.target.value)})} /></div>
-                        <div className="space-y-1"><label className="text-[8px] font-black text-blue-400 uppercase">Ano Cav.</label><input required className={inputClasses} value={form.yearHorse} onChange={e => setForm(prev => ({...prev, yearHorse: e.target.value}))} /></div>
+                        <div className="space-y-1"><label className="text-[8px] font-black text-blue-400 uppercase">Ano Cav.</label><input className={inputClasses} value={form.yearHorse} onChange={e => setForm(prev => ({...prev, yearHorse: e.target.value}))} /></div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Placa Carr.</label><input required className={inputClasses} value={form.plateTrailer} onChange={e => setForm(prev => ({...prev, plateTrailer: maskPlate(e.target.value)}))} /></div>
-                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Ano Carr.</label><input required className={inputClasses} value={form.yearTrailer} onChange={e => setForm(prev => ({...prev, yearTrailer: e.target.value}))} /></div>
+                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase">Ano Carr.</label><input className={inputClasses} value={form.yearTrailer} onChange={e => setForm(prev => ({...prev, yearTrailer: e.target.value}))} /></div>
                       </div>
                    </div>
                 </div>
