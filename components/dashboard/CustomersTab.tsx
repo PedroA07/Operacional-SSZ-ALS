@@ -75,6 +75,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
       if (response.ok) {
         const data = await response.json();
+        
         setForm(prev => ({
           ...prev,
           name: (data.nome_fantasia || data.razao_social || '').toUpperCase(),
@@ -119,7 +120,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
         <div className="flex-1 relative">
           <input 
             type="text" 
-            placeholder="PESQUISAR CLIENTE OU CNPJ..."
+            placeholder="PESQUISAR CLIENTE, RAZÃO OU CNPJ..."
             className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 text-[10px] font-bold uppercase focus:border-blue-500 outline-none bg-slate-50/50"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -154,7 +155,11 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="font-black text-slate-800 uppercase text-xs leading-tight">{c.name}</p>
-                    {c.legalName && <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">{c.legalName}</p>}
+                    {c.legalName && (
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 truncate max-w-[250px]">
+                        {c.legalName}
+                      </p>
+                    )}
                     <div className="flex gap-1 mt-1">
                       {c.operations?.map(op => <span key={op} className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-[7px] font-black uppercase">{op}</span>)}
                     </div>
@@ -188,8 +193,8 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
               <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-1 gap-4">
+            <form onSubmit={handleSubmit} className="p-8 space-y-5">
+              <div className="grid grid-cols-1">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label>
                   <div className="relative">
@@ -216,11 +221,11 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label>
-                  <input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                  <input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label>
-                  <input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value})} />
+                  <input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} />
                 </div>
               </div>
 
@@ -239,16 +244,16 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                     )}
                   </div>
                 </div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm(prev => ({...prev, city: e.target.value}))} /></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm(prev => ({...prev, state: e.target.value}))} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm(prev => ({...prev, city: e.target.value.toUpperCase()}))} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm(prev => ({...prev, state: e.target.value.toUpperCase()}))} /></div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label><input required type="text" className={inputClasses} value={form.address} onChange={e => setForm(prev => ({...prev, address: e.target.value}))} /></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Bairro</label><input required type="text" className={inputClasses} value={form.neighborhood} onChange={e => setForm(prev => ({...prev, neighborhood: e.target.value}))} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label><input required type="text" className={inputClasses} value={form.address} onChange={e => setForm(prev => ({...prev, address: e.target.value.toUpperCase()}))} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Bairro</label><input required type="text" className={inputClasses} value={form.neighborhood} onChange={e => setForm(prev => ({...prev, neighborhood: e.target.value.toUpperCase()}))} /></div>
               </div>
 
-              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all">Salvar Cliente</button>
+              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all mt-4">Salvar Cliente</button>
             </form>
           </div>
         </div>
