@@ -32,7 +32,6 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
 
   const [form, setForm] = useState<Partial<Customer>>(initialForm);
 
-  // Monitor de CEP para busca automática
   useEffect(() => {
     const cep = form.zipCode?.replace(/\D/g, '');
     if (cep && cep.length === 8) {
@@ -40,7 +39,6 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     }
   }, [form.zipCode]);
 
-  // Monitor de CNPJ para busca automática
   useEffect(() => {
     const cnpj = form.cnpj?.replace(/\D/g, '');
     if (cnpj && cnpj.length === 14 && !editingId) {
@@ -75,7 +73,6 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
       if (response.ok) {
         const data = await response.json();
-        
         setForm(prev => ({
           ...prev,
           name: (data.nome_fantasia || data.razao_social || '').toUpperCase(),
@@ -115,12 +112,12 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-full mx-auto space-y-6">
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
         <div className="flex-1 relative">
           <input 
             type="text" 
-            placeholder="PESQUISAR RAZÃO SOCIAL, FANTASIA OU CNPJ..."
+            placeholder="PESQUISAR CLIENTE, RAZÃO OU CNPJ..."
             className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 text-[10px] font-bold uppercase focus:border-blue-500 outline-none bg-slate-50/50"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -133,7 +130,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
           <Icons.Busca />
           Pesquisar
         </button>
-        <button onClick={() => handleOpenModal()} className="px-6 py-3.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-lg">
+        <button onClick={() => handleOpenModal()} className="px-6 py-3.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-lg">
           Novo Cliente
         </button>
       </div>
@@ -143,18 +140,18 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
-                <th className="px-6 py-5 text-slate-600">Identificação Jurídica</th>
-                <th className="px-6 py-5">CNPJ</th>
-                <th className="px-6 py-5">Endereço</th>
-                <th className="px-6 py-5">Localidade</th>
-                <th className="px-6 py-5 text-right">Ações</th>
+                <th className="px-8 py-5 text-slate-600">Identificação Jurídica</th>
+                <th className="px-8 py-5">CNPJ</th>
+                <th className="px-8 py-5">Endereço / Bairro</th>
+                <th className="px-8 py-5">Localidade</th>
+                <th className="px-8 py-5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredCustomers.map(c => (
                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-black text-slate-800 uppercase text-xs leading-tight">
+                  <td className="px-8 py-4">
+                    <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">
                       {c.legalName || c.name}
                     </p>
                     {c.legalName && c.name !== c.legalName && (
@@ -162,26 +159,25 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                         FANTASIA: {c.name}
                       </p>
                     )}
-                    <div className="flex gap-1 mt-2">
-                      {c.operations?.map(op => <span key={op} className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-[7px] font-black uppercase">{op}</span>)}
-                    </div>
                   </td>
-                  <td className="px-6 py-4 font-mono font-bold text-slate-500 whitespace-nowrap">
+                  <td className="px-8 py-4 font-mono font-bold text-slate-500 whitespace-nowrap">
                     {maskCNPJ(c.cnpj)}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-8 py-4">
                     <p className="text-slate-500 font-bold uppercase text-[9px] leading-relaxed">{c.address}</p>
                     <p className="text-slate-400 font-bold uppercase text-[8px]">{c.neighborhood}</p>
                   </td>
-                  <td className="px-6 py-4">
-                    <p className="text-slate-600 font-black uppercase text-[10px]">{c.city} - {c.state}</p>
-                    <p className="text-slate-400 font-bold font-mono text-[9px] mt-1">{maskCEP(c.zipCode || '')}</p>
+                  <td className="px-8 py-4">
+                    <p className="text-slate-600 font-black uppercase text-[10px]">{c.city} <span className="text-slate-300 ml-1">{c.state}</span></p>
+                    <p className="text-slate-400 font-bold font-mono text-[9px] mt-0.5">{maskCEP(c.zipCode || '')}</p>
                   </td>
-                  <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
-                    <button onClick={() => handleOpenModal(c)} className="p-2.5 text-slate-300 hover:text-blue-500 transition-all"><Icons.Equipe /></button>
-                    {isAdmin && (
-                      <button onClick={() => onDeleteCustomer(c.id)} className="p-2.5 text-slate-300 hover:text-red-500 transition-all"><Icons.Excluir /></button>
-                    )}
+                  <td className="px-8 py-4 text-right space-x-1 whitespace-nowrap">
+                    <button onClick={() => handleOpenModal(c)} className="p-2 text-slate-300 hover:text-blue-500 transition-all">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
+                    <button onClick={() => onDeleteCustomer(c.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all">
+                      <Icons.Excluir />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -199,27 +195,11 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
             </div>
             
             <form onSubmit={handleSubmit} className="p-8 space-y-5">
-              <div className="grid grid-cols-1">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label>
-                  <div className="relative">
-                    <input 
-                      required 
-                      type="text" 
-                      className={inputClasses} 
-                      value={form.cnpj} 
-                      onChange={e => setForm(prev => ({...prev, cnpj: maskCNPJ(e.target.value)}))} 
-                      placeholder="00.000.000/0000-00"
-                    />
-                    {isCnpjLoading && (
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                        <svg className="animate-spin h-4 w-4 text-blue-500" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                    )}
-                  </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label>
+                <div className="relative">
+                  <input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm(prev => ({...prev, cnpj: maskCNPJ(e.target.value)}))} placeholder="00.000.000/0000-00" />
+                  {isCnpjLoading && <div className="absolute right-4 top-1/2 -translate-y-1/2"><svg className="animate-spin h-4 w-4 text-blue-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>}
                 </div>
               </div>
 
@@ -239,14 +219,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CEP</label>
                   <div className="relative">
                     <input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm(prev => ({...prev, zipCode: maskCEP(e.target.value)}))} />
-                    {isCepLoading && (
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                        <svg className="animate-spin h-3 w-3 text-blue-500" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                    )}
+                    {isCepLoading && <div className="absolute right-4 top-1/2 -translate-y-1/2"><svg className="animate-spin h-3 w-3 text-blue-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>}
                   </div>
                 </div>
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm(prev => ({...prev, city: e.target.value.toUpperCase()}))} /></div>
