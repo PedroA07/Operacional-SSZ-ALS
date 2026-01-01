@@ -1,5 +1,4 @@
 
-
 export enum AppScreen {
   LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD'
@@ -125,6 +124,7 @@ export interface Driver {
 export interface Customer { 
   id: string; 
   name: string; 
+  legalName?: string;
   cnpj: string; 
   city: string; 
   state: string; 

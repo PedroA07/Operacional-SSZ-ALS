@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Customer } from '../../types';
 import { maskCEP, maskCNPJ } from '../../utils/masks';
-import { DEFAULT_OPERATIONS } from '../../constants/operations';
 import { Icons } from '../../constants/icons';
 
 interface CustomersTabProps {
@@ -17,10 +16,11 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCepLoading, setIsCepLoading] = useState(false);
-  const [cepError, setCepError] = useState<string | null>(null);
+  const [isCnpjLoading, setIsCnpjLoading] = useState(false);
   
   const initialForm: Partial<Customer> = {
     name: '',
+    legalName: '',
     address: '',
     neighborhood: '',
     city: '',
@@ -32,12 +32,21 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
 
   const [form, setForm] = useState<Partial<Customer>>(initialForm);
 
+  // Monitor de CEP para busca automática
   useEffect(() => {
     const cep = form.zipCode?.replace(/\D/g, '');
     if (cep && cep.length === 8) {
       handleCepLookup(cep);
     }
   }, [form.zipCode]);
+
+  // Monitor de CNPJ para busca automática
+  useEffect(() => {
+    const cnpj = form.cnpj?.replace(/\D/g, '');
+    if (cnpj && cnpj.length === 14 && !editingId) {
+      handleCnpjLookup(cnpj);
+    }
+  }, [form.cnpj, editingId]);
 
   const handleCepLookup = async (cep: string) => {
     setIsCepLoading(true);
@@ -60,6 +69,30 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     }
   };
 
+  const handleCnpjLookup = async (cnpj: string) => {
+    setIsCnpjLoading(true);
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      if (response.ok) {
+        const data = await response.json();
+        setForm(prev => ({
+          ...prev,
+          name: (data.nome_fantasia || data.razao_social || '').toUpperCase(),
+          legalName: (data.razao_social || '').toUpperCase(),
+          address: data.logradouro ? `${data.logradouro}${data.numero ? ', ' + data.numero : ''}` : prev.address,
+          neighborhood: (data.bairro || prev.neighborhood || '').toUpperCase(),
+          city: (data.municipio || prev.city || '').toUpperCase(),
+          state: (data.uf || prev.state || '').toUpperCase(),
+          zipCode: data.cep ? maskCEP(data.cep) : prev.zipCode
+        }));
+      }
+    } catch (e) {
+      console.warn("Falha no CNPJ");
+    } finally {
+      setIsCnpjLoading(false);
+    }
+  };
+
   const handleOpenModal = (customer?: Customer) => {
     setForm(customer || initialForm);
     setEditingId(customer?.id);
@@ -74,10 +107,11 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
 
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.legalName && c.legalName.toLowerCase().includes(searchQuery.toLowerCase())) ||
     c.cnpj.includes(searchQuery)
   );
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
+  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -120,6 +154,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="font-black text-slate-800 uppercase text-xs leading-tight">{c.name}</p>
+                    {c.legalName && <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">{c.legalName}</p>}
                     <div className="flex gap-1 mt-1">
                       {c.operations?.map(op => <span key={op} className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-[7px] font-black uppercase">{op}</span>)}
                     </div>
@@ -154,27 +189,55 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
             </div>
             
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label>
-                  <input 
-                    required 
-                    type="text" 
-                    className={inputClasses} 
-                    value={form.cnpj} 
-                    onChange={e => setForm(prev => ({...prev, cnpj: maskCNPJ(e.target.value)}))} 
-                  />
+                  <div className="relative">
+                    <input 
+                      required 
+                      type="text" 
+                      className={inputClasses} 
+                      value={form.cnpj} 
+                      onChange={e => setForm(prev => ({...prev, cnpj: maskCNPJ(e.target.value)}))} 
+                      placeholder="00.000.000/0000-00"
+                    />
+                    {isCnpjLoading && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        <svg className="animate-spin h-4 w-4 text-blue-500" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label>
                   <input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label>
+                  <input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value})} />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CEP</label>
-                  <input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm(prev => ({...prev, zipCode: maskCEP(e.target.value)}))} />
+                  <div className="relative">
+                    <input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm(prev => ({...prev, zipCode: maskCEP(e.target.value)}))} />
+                    {isCepLoading && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        <svg className="animate-spin h-3 w-3 text-blue-500" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm(prev => ({...prev, city: e.target.value}))} /></div>
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm(prev => ({...prev, state: e.target.value}))} /></div>
