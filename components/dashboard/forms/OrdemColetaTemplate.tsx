@@ -53,23 +53,23 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
 
       {/* BLOCO REMETENTE/DESTINATARIO */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-        <div style={{ width: '352px', height: '110px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
+        <div style={{ width: '352px', height: '120px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px', borderBottom: '1px solid #f1f5f9' }}>REMETENTE (CLIENTE)</div>
-          <div style={{ fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedRemetente?.name || '---'}</div>
-          <div style={{ fontSize: '10px', marginTop: '2px' }}>{selectedRemetente?.address || '---'}</div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', lineHeight: '1.2', marginBottom: '4px', wordBreak: 'break-word' }}>{selectedRemetente?.name || '---'}</div>
+          <div style={{ fontSize: '10px', marginTop: '2px', wordBreak: 'break-word' }}>{selectedRemetente?.address || '---'}</div>
           <div style={{ fontSize: '10px' }}>{selectedRemetente?.city || '---'} - {selectedRemetente?.state || '--'} | CEP: {selectedRemetente?.zipCode || '---'}</div>
           <div style={{ fontSize: '10px', fontWeight: 'bold', marginTop: '4px' }}>CNPJ: {selectedRemetente?.cnpj || '---'}</div>
         </div>
-        <div style={{ width: '352px', height: '110px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
+        <div style={{ width: '352px', height: '120px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px', borderBottom: '1px solid #f1f5f9' }}>DESTINATÁRIO (TERMINAL)</div>
-          <div style={{ fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedDestinatario?.name || '---'}</div>
-          <div style={{ fontSize: '10px', marginTop: '2px' }}>{selectedDestinatario?.address || '---'}</div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', lineHeight: '1.2', marginBottom: '4px', wordBreak: 'break-word' }}>{selectedDestinatario?.name || '---'}</div>
+          <div style={{ fontSize: '10px', marginTop: '2px', wordBreak: 'break-word' }}>{selectedDestinatario?.address || '---'}</div>
           <div style={{ fontSize: '10px' }}>{selectedDestinatario?.city || '---'} - {selectedDestinatario?.state || '--'} | CEP: {selectedDestinatario?.zipCode || '---'}</div>
           <div style={{ fontSize: '10px', fontWeight: 'bold', marginTop: '4px' }}>CNPJ: {selectedDestinatario?.cnpj || '---'}</div>
         </div>
       </div>
 
-      {/* BLOCO CONTAINER / BARCODES / GENSET (OTIMIZADO) */}
+      {/* BLOCO CONTAINER / BARCODES / GENSET */}
       <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '115px', overflow: 'hidden' }}>
         <div style={{ width: '400px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>CONTAINER</div>
@@ -134,22 +134,22 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
         </div>
       </div>
 
-      {/* BLOCO MOTORISTA */}
+      {/* BLOCO MOTORISTA AJUSTADO PARA EVITAR SOBREPOSIÇÃO */}
       <div style={{ border: borderStyle, padding: '12px', marginBottom: '10px' }}>
         <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px' }}>
-          <div style={{ width: '250px' }}>
+          <div style={{ flex: '2', paddingRight: '15px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>MOTORISTA</div>
-            <div style={{ fontSize: '14px', fontWeight: 900, whiteSpace: 'nowrap' }}>{selectedDriver?.name || '---'}</div>
+            <div style={{ fontSize: '13px', fontWeight: 900, wordBreak: 'break-word', lineHeight: '1.1' }}>{selectedDriver?.name || '---'}</div>
           </div>
-          <div style={{ width: '150px' }}>
+          <div style={{ flex: '1', minWidth: '110px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CPF</div>
             <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{selectedDriver?.cpf || '---'}</div>
           </div>
-          <div style={{ width: '150px' }}>
+          <div style={{ flex: '1', minWidth: '100px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>RG</div>
             <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{selectedDriver?.rg || '---'}</div>
           </div>
-          <div style={{ width: '150px' }}>
+          <div style={{ flex: '1', minWidth: '100px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CNH</div>
             <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{selectedDriver?.cnh || '---'}</div>
           </div>
@@ -183,7 +183,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px' }}>
             <span style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>EMBARCADOR</span>
-            <span style={{ fontSize: '12px', fontWeight: 900 }}>{formData.embarcador || '---'}</span>
+            <span style={{ fontSize: '12px', fontWeight: 900, wordBreak: 'break-word', textAlign: 'right' }}>{formData.embarcador || '---'}</span>
           </div>
         </div>
         <div style={{ width: '352px', border: borderStyle, backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
@@ -194,7 +194,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
         </div>
       </div>
 
-      {/* PORTARIA (ALTURA MAXIMIZADA PARA CARIMBOS) */}
+      {/* PORTARIA */}
       <div style={{ border: borderStyle, padding: '20px', flex: '1', display: 'flex', gap: '40px' }}>
         <div style={{ flex: '1', borderRight: '1px solid #f1f5f9', paddingRight: '20px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '12px', fontWeight: 900, color: '#94a3b8', marginBottom: '15px', letterSpacing: '2px' }}>CONTROLE ENTRADA</div>

@@ -125,7 +125,15 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      pdf.save(`${selectedFormType === 'ORDEM_COLETA' ? 'OC' : 'MINUTA'}-${formData.os}.pdf`);
+      
+      // Nome do arquivo customizado solicitado
+      const driverName = selectedDriver?.name || 'MOTORISTA';
+      const osNum = formData.os || 'S-OS';
+      const fileName = selectedFormType === 'ORDEM_COLETA' 
+        ? `OC-${driverName} - ${osNum}.pdf` 
+        : `MINUTA-${driverName} - ${osNum}.pdf`;
+        
+      pdf.save(fileName);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
