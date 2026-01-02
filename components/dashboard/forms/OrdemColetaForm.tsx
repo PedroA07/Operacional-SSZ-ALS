@@ -120,6 +120,17 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
 
+  // Filtros avançados para Cliente e Destinatário
+  const filteredCustomers = customers.filter(c => 
+    c.name.toUpperCase().includes(remetenteSearch) || 
+    (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
+  );
+
+  const filteredPorts = ports.filter(p => 
+    p.name.toUpperCase().includes(destinatarioSearch) || 
+    (p.legalName && p.legalName.toUpperCase().includes(destinatarioSearch))
+  );
+
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
       {/* OC HIDDEN PREVIEW FOR PDF */}
@@ -140,12 +151,43 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         {/* 1. Remetente */}
         <div className="relative">
           <label className={labelBlueClass}>1. Remetente (Cliente)</label>
-          <input type="text" placeholder="BUSCAR CLIENTE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} />
+          <input 
+            type="text" 
+            placeholder="BUSCAR RAZÃO OU FANTASIA..." 
+            className={inputClasses} 
+            value={remetenteSearch} 
+            onFocus={() => setShowRemetenteResults(true)} 
+            onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} 
+          />
           {showRemetenteResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
-              {customers.filter(c => c.name.toUpperCase().includes(remetenteSearch)).map(c => (
-                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.name); setShowRemetenteResults(false); }}>{c.name}</button>
-              ))}
+            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
+              {filteredCustomers.length > 0 ? (
+                filteredCustomers.map(c => (
+                  <button 
+                    key={c.id} 
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
+                    onClick={() => { 
+                      setFormData({...formData, remetenteId: c.id}); 
+                      setRemetenteSearch(c.legalName || c.name); 
+                      setShowRemetenteResults(false); 
+                    }}
+                  >
+                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">
+                      {c.legalName || c.name}
+                    </p>
+                    <div className="flex justify-between items-center mt-0.5">
+                      <p className="text-[8px] font-bold text-slate-400 uppercase italic">
+                        {c.legalName && c.name !== c.legalName ? `FANTASIA: ${c.name}` : ''}
+                      </p>
+                      <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">
+                        {c.city} - {c.state}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="p-4 text-center text-[9px] font-bold text-slate-400 uppercase italic">Nenhum cliente localizado</div>
+              )}
             </div>
           )}
         </div>
@@ -153,12 +195,43 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         {/* 2. Destinatário */}
         <div className="relative">
           <label className={labelBlueClass}>2. Destinatário (Terminal/Porto)</label>
-          <input type="text" placeholder="BUSCAR DESTINO..." className={inputClasses} value={destinatarioSearch} onFocus={() => setShowDestinatarioResults(true)} onChange={e => setDestinatarioSearch(e.target.value.toUpperCase())} />
+          <input 
+            type="text" 
+            placeholder="BUSCAR DESTINO..." 
+            className={inputClasses} 
+            value={destinatarioSearch} 
+            onFocus={() => setShowDestinatarioResults(true)} 
+            onChange={e => setDestinatarioSearch(e.target.value.toUpperCase())} 
+          />
           {showDestinatarioResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
-              {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch)).map(p => (
-                <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, destinatarioId: p.id}); setDestinatarioSearch(p.name); setShowDestinatarioResults(false); }}>{p.name}</button>
-              ))}
+            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
+              {filteredPorts.length > 0 ? (
+                filteredPorts.map(p => (
+                  <button 
+                    key={p.id} 
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
+                    onClick={() => { 
+                      setFormData({...formData, destinatarioId: p.id}); 
+                      setDestinatarioSearch(p.legalName || p.name); 
+                      setShowDestinatarioResults(false); 
+                    }}
+                  >
+                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">
+                      {p.legalName || p.name}
+                    </p>
+                    <div className="flex justify-between items-center mt-0.5">
+                      <p className="text-[8px] font-bold text-slate-400 uppercase italic">
+                        {p.legalName && p.name !== p.legalName ? `FANTASIA: ${p.name}` : ''}
+                      </p>
+                      <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">
+                        {p.city} - {p.state}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="p-4 text-center text-[9px] font-bold text-slate-400 uppercase italic">Nenhum destino localizado</div>
+              )}
             </div>
           )}
         </div>
