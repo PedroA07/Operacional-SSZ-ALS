@@ -93,6 +93,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     });
   };
 
+  // Objetos selecionados para o Template
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
   const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
@@ -122,12 +123,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
 
   // Filtros avançados para Cliente e Destinatário
   const filteredCustomers = customers.filter(c => 
-    c.name.toUpperCase().includes(remetenteSearch) || 
+    (c.name && c.name.toUpperCase().includes(remetenteSearch)) || 
     (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
   );
 
   const filteredPorts = ports.filter(p => 
-    p.name.toUpperCase().includes(destinatarioSearch) || 
+    (p.name && p.name.toUpperCase().includes(destinatarioSearch)) || 
     (p.legalName && p.legalName.toUpperCase().includes(destinatarioSearch))
   );
 
@@ -255,6 +256,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                 <option value="40HC">40HC</option>
                 <option value="40HR">40HR</option>
                 <option value="40DC">40DC</option>
+                <option value="20DC">20DC</option>
               </select>
             </div>
             <div className="space-y-1">
@@ -298,7 +300,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
           <div className="space-y-1">
             <label className={labelClass}>Horário Agendado</label>
-            <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
+            <input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm" value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
           </div>
         </div>
 

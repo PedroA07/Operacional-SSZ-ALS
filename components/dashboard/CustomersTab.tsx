@@ -188,7 +188,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
         </div>
       </div>
 
-      {/* MODAL DE MAPA */}
+      {/* MODAL DE MAPA CORRIGIDO */}
       {isMapModalOpen && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-8 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col relative animate-in zoom-in-95">
@@ -206,11 +206,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                     style={{ border: 0 }} 
                     loading="lazy" 
                     allowFullScreen 
-                    src={`https://www.google.com/maps/embed/v1/place?key=SEU_GOOGLE_MAPS_KEY_OU_FALLBACK&q=${encodeURIComponent(selectedMapAddress)}`}
-                    // Nota: Em um ambiente real, deve-se usar uma API Key válida. 
-                    // Como fallback para preview usaremos a URL de busca direta caso a Embed falhe:
-                    onError={(e) => { (e.target as any).src = `https://maps.google.com/maps?q=${encodeURIComponent(selectedMapAddress)}&output=embed`; }}
-                    onLoad={(e) => { if(!(e.target as any).src.includes('key=')) (e.target as any).src = `https://maps.google.com/maps?q=${encodeURIComponent(selectedMapAddress)}&output=embed`; }}
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedMapAddress)}&output=embed`}
                  ></iframe>
               </div>
            </div>
