@@ -147,6 +147,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+      
+      // Regra de nome de arquivo solicitada: "Motorista - (nome motorista)"
       pdf.save(`Motorista - ${selectedDriver.name}.pdf`);
     } catch (error) {
       alert("Falha ao gerar o PDF.");
@@ -167,7 +169,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       setIsPasswordModalOpen(false);
       loadUsers();
     } else {
-      alert("Senha muito curta.");
+      alert("A senha deve ter no mínimo 4 caracteres.");
     }
   };
 
@@ -183,7 +185,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         {visibility[id] && <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>}
       </div>
       <input type="checkbox" className="hidden" checked={visibility[id]} onChange={() => setVisibility(v => ({ ...v, [id]: !v[id] }))} />
-      <span className="text-[10px] font-black uppercase text-slate-500 group-hover:text-slate-800">{label}</span>
+      <span className="text-[10px] font-black uppercase text-slate-500 group-hover:text-slate-800 transition-colors">{label}</span>
     </label>
   );
 
@@ -247,7 +249,17 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CPF: <span className="font-mono text-slate-800 font-bold">{d.cpf}</span></p>
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">RG: <span className="font-mono text-slate-800 font-bold">{d.rg || '---'}</span></p>
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CNH: <span className="font-mono text-slate-800 font-bold">{d.cnh || '---'}</span></p>
-                          {d.cnhPdfUrl && <span className="inline-block mt-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[7px] font-black uppercase">Anexo PDF OK</span>}
+                          
+                          {d.cnhPdfUrl && (
+                             <button 
+                               onClick={() => window.open(d.cnhPdfUrl, '_blank')}
+                               className="inline-flex items-center gap-2 mt-2 px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-[7px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                               title="Visualizar Documento CNH"
+                             >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="3"/></svg>
+                                Visualizar PDF CNH
+                             </button>
+                          )}
                        </div>
                     </td>
                     <td className="px-6 py-4">
@@ -304,9 +316,9 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                        </div>
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
-                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Mudar Senha"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Gerar Ficha PDF"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha do Portal"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Ficha Cadastral ALS"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar Cadastro"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                     </td>
                   </tr>
                 );
