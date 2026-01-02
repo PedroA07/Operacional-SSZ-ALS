@@ -102,7 +102,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
         agencia: carrier ? carrier.name : prev.agencia 
       }));
     } else if (field === 'seal') {
-      setFormData(prev => ({ ...prev, seal: maskSeal(upValue, formData.agencia) }));
+      setFormData(prev => ({ ...prev, seal: maskSeal(upValue) }));
     } else {
       setFormData(prev => ({ ...prev, [field]: upValue }));
     }
@@ -144,6 +144,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     c.city.toUpperCase().includes(remetenteSearch) ||
     c.cnpj.includes(remetenteSearch)
   );
+
+  // Lista única de embarcadores sugeridos baseada em clientes
+  const shipperSuggestions = Array.from(new Set(customers.map(c => c.name.toUpperCase()))).sort();
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -295,8 +298,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                       <input type="text" className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">4. Lacre</label>
-                      <input type="text" className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} />
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">4. Lacre (Alfanumérico)</label>
+                      <input type="text" placeholder="APENAS LETRAS E NÚMEROS" className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} />
                     </div>
                   </div>
 
@@ -354,7 +357,17 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
 
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Embarcador</label>
-                  <input type="text" className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} placeholder="NOME DO EMBARCADOR" />
+                  <input 
+                    type="text" 
+                    list="shippers-list"
+                    className={inputClasses} 
+                    value={formData.embarcador} 
+                    placeholder="NOME DO EMBARCADOR..."
+                    onChange={e => handleInputChange('embarcador', e.target.value)} 
+                  />
+                  <datalist id="shippers-list">
+                    {shipperSuggestions.map(name => <option key={name} value={name} />)}
+                  </datalist>
                 </div>
 
                 <div className="bg-blue-600/5 p-8 rounded-[2.5rem] border-2 border-blue-100/50 space-y-3 shadow-xl shadow-blue-500/5 transition-all hover:border-blue-300">

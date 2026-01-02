@@ -12,6 +12,8 @@ interface PortsTabProps {
 
 const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<Port | null>(null);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCepLoading, setIsCepLoading] = useState(false);
@@ -98,6 +100,19 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
     setIsModalOpen(true);
   };
 
+  const confirmDelete = (port: Port) => {
+    setItemToDelete(port);
+    setIsDeleteModalOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (itemToDelete && onDeletePort) {
+      onDeletePort(itemToDelete.id);
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
+    }
+  };
+
   const handleOpenMap = (port: Port) => {
     const fullAddress = `${port.address}, ${port.neighborhood || ''}, ${port.city} - ${port.state}`;
     setSelectedMapAddress(fullAddress);
@@ -129,11 +144,9 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5" /></svg>
         </div>
-        <button onClick={() => handleOpenModal()} className="px-6 py-3.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg ml-4">Novo Porto</button>
+        <button onClick={() => handleOpenModal()} className="px-6 py-3.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-lg active:scale-95 ml-4">Novo Porto</button>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -141,10 +154,9 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
-                <th className="px-8 py-5">Identificação Jurídica</th>
+                <th className="px-8 py-5">Identificação</th>
                 <th className="px-8 py-5">CNPJ</th>
-                <th className="px-8 py-5 min-w-[200px]">Endereço / Bairro</th>
-                <th className="px-8 py-5">Localidade</th>
+                <th className="px-8 py-5">Endereço / Localidade</th>
                 <th className="px-8 py-5 text-right">Ações</th>
               </tr>
             </thead>
@@ -152,36 +164,18 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
               {filteredPorts.map(p => (
                 <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-8 py-4">
-                    <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">
-                      {p.legalName || p.name}
-                    </p>
-                    {p.legalName && p.name !== p.legalName && (
-                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 truncate max-w-[250px]">
-                        FANTASIA: {p.name}
-                      </p>
-                    )}
+                    <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{p.legalName || p.name}</p>
+                    {p.legalName && p.name !== p.legalName && <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">FANTASIA: {p.name}</p>}
                   </td>
-                  <td className="px-8 py-4 font-mono font-bold text-slate-500 whitespace-nowrap">{maskCNPJ(p.cnpj)}</td>
+                  <td className="px-8 py-4 font-mono font-bold text-slate-500">{maskCNPJ(p.cnpj)}</td>
                   <td className="px-8 py-4">
-                    <p className="text-slate-500 font-bold uppercase text-[9px] leading-relaxed">{p.address}</p>
-                    <p className="text-slate-400 font-medium uppercase text-[8px] mt-0.5">{p.neighborhood || '---'}</p>
-                  </td>
-                  <td className="px-8 py-4">
-                    <p className="text-slate-600 font-black uppercase text-[10px]">{p.city} <span className="text-slate-300 ml-1">{p.state}</span></p>
-                    <p className="text-slate-400 font-bold font-mono text-[9px] mt-0.5">{maskCEP(p.zipCode || '')}</p>
+                    <p className="text-slate-500 font-bold uppercase text-[9px]">{p.address}</p>
+                    <p className="text-slate-400 font-black uppercase text-[10px] mt-1">{p.city} - {p.state}</p>
                   </td>
                   <td className="px-8 py-4 text-right space-x-1 whitespace-nowrap">
-                    <button onClick={() => handleOpenMap(p)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors" title="Ver no Mapa">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    </button>
-                    <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                    </button>
-                    {onDeletePort && (
-                      <button onClick={() => onDeletePort(p.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all">
-                        <Icons.Excluir />
-                      </button>
-                    )}
+                    <button onClick={() => handleOpenMap(p)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5" /></svg></button>
+                    <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5" /></svg></button>
+                    {onDeletePort && <button onClick={() => confirmDelete(p)} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Icons.Excluir /></button>}
                   </td>
                 </tr>
               ))}
@@ -190,15 +184,28 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
         </div>
       </div>
 
-      {isMapModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden h-[80vh] flex flex-col animate-in zoom-in-95">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-700 text-lg uppercase">Visualização de Endereço</h3>
-              <button onClick={() => setIsMapModalOpen(false)} className="text-slate-300 hover:text-red-400"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
-            </div>
-            <iframe width="100%" height="100%" frameBorder="0" src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedMapAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}></iframe>
-          </div>
+      {/* MODAL DE EXCLUSÃO */}
+      {isDeleteModalOpen && itemToDelete && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 text-center space-y-6">
+                 <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Excluir Cadastro Porto</h3>
+                    <p className="text-xs text-slate-400 mt-2">Remover este terminal da base de dados?</p>
+                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
+                       <p className="text-sm font-black text-slate-700 uppercase leading-tight">{itemToDelete.legalName || itemToDelete.name}</p>
+                       <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Localidade: {itemToDelete.city} - {itemToDelete.state}</p>
+                    </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-3 pt-4">
+                    <button onClick={() => { setIsDeleteModalOpen(false); setItemToDelete(null); }} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
+                    <button onClick={executeDelete} className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-red-700 transition-all">Sim, Excluir</button>
+                 </div>
+              </div>
+           </div>
         </div>
       )}
 
@@ -210,37 +217,15 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
               <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
             </div>
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="space-y-1">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CNPJ</label>
-                <div className="relative">
-                  <input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" />
-                  {isCnpjLoading && <div className="absolute right-4 top-1/2 -translate-y-1/2"><svg className="animate-spin h-4 w-4 text-blue-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>}
-                </div>
-              </div>
+              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNPJ</label><input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Razão Social</label>
-                  <input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label>
-                  <input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
-                </div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-blue-600 uppercase ml-1">Razão Social</label><input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Fantasia</label><input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} /></div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CEP</label>
-                  <div className="relative">
-                    <input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm({...form, zipCode: maskCEP(e.target.value)})} />
-                    {isCepLoading && <div className="absolute right-3 top-1/2 -translate-y-1/2"><div className="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div></div>}
-                  </div>
-                </div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm({...form, city: e.target.value.toUpperCase()})} /></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm({...form, state: e.target.value.toUpperCase()})} /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label><input required type="text" className={inputClasses} value={form.address} onChange={e => setForm({...form, address: e.target.value.toUpperCase()})} /></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Bairro</label><input required type="text" className={inputClasses} value={form.neighborhood} onChange={e => setForm({...form, neighborhood: e.target.value.toUpperCase()})} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CEP</label><input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm({...form, zipCode: maskCEP(e.target.value)})} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm({...form, city: e.target.value.toUpperCase()})} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm({...form, state: e.target.value.toUpperCase()})} /></div>
               </div>
               <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all">Salvar Porto</button>
             </form>

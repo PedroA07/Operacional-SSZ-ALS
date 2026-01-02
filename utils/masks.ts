@@ -50,37 +50,10 @@ export const maskCEP = (value: string) => {
     .replace(/(-\d{3})\d+?$/, '$1');
 };
 
-export const maskSeal = (value: string, armador: string) => {
+export const maskSeal = (value: string) => {
   if (!value) return '';
-  const armadorUpper = armador.toUpperCase();
-  let clean = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-  if (armadorUpper.includes('MSC')) {
-    return clean.replace(/\D/g, '').substring(0, 10);
-  }
-
-  if (armadorUpper.includes('MAERSK') || armadorUpper.includes('HAMBURG') || armadorUpper.includes('ALIANÇA') || armadorUpper.includes('MERCOSUL')) {
-    if (clean.startsWith('MLBR')) {
-      return 'ML-BR' + clean.substring(4, 12);
-    }
-    if (clean.length > 0 && !clean.startsWith('ML')) {
-      return 'ML-BR' + clean.substring(0, 8);
-    }
-    return clean.substring(0, 15);
-  }
-
-  if (armadorUpper.includes('CMA') || armadorUpper.includes('CGM')) {
-    if (clean.startsWith('CMA')) {
-      return 'CMA-' + clean.substring(3, 11);
-    }
-    return 'CMA-' + clean.substring(0, 8);
-  }
-
-  if (armadorUpper.includes('HAPAG')) {
-    return clean.substring(0, 12);
-  }
-
-  return clean.substring(0, 15);
+  // Regra solicitada: Remover qualquer caractere especial, deixar apenas letras e números
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 };
 
 export const formatToBRDate = (date: string | Date) => {

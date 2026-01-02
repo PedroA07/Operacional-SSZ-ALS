@@ -22,13 +22,15 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   onCloseForceEdit 
 }, ref) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<Staff | null>(null);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   
   const [form, setForm] = useState<Partial<Staff & { password?: string }>>({ 
-    name: '', position: '', username: '', role: 'staff', password: '', emailCorp: '', phoneCorp: '', status: 'Ativo' 
+    name: '', position: '', username: '', role: 'staff', password: '', emailCorp: '', phoneCorp: '', status: 'Ativo', photo: ''
   });
   
   const [users, setUsers] = useState<User[]>([]);
@@ -98,8 +100,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         position: (form.position || '').toUpperCase(),
         username: (form.username || '').toLowerCase(),
         role: (form.role as 'admin' | 'staff') || 'staff',
-        photo: form.photo,
-        // REGRA: Data de Admissão é igual ao Registro do Colaborador
+        photo: form.photo || existing?.photo || '',
         registrationDate: existing?.registrationDate || new Date().toISOString(),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
@@ -123,11 +124,32 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
 
   const handleEdit = (s: Staff) => {
     const linkedUser = users.find(u => u.staffId === s.id);
-    setForm({ ...s, password: linkedUser?.password || '' });
+    setForm({ 
+      ...s, 
+      password: linkedUser?.password || '',
+      emailCorp: s.emailCorp || '',
+      phoneCorp: s.phoneCorp || '',
+      photo: s.photo || ''
+    });
     setEditingId(s.id);
     setShowPass(false);
     setIsEditingPassword(false);
     setIsModalOpen(true);
+  };
+
+  const confirmDelete = (s: Staff) => {
+    setItemToDelete(s);
+    setIsDeleteModalOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (itemToDelete) {
+      setIsProcessing(true);
+      await onDeleteStaff(itemToDelete.id);
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
+      setIsProcessing(false);
+    }
   };
 
   const inputClasses = "w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold outline-none focus:border-blue-500 text-slate-900 shadow-sm transition-all placeholder:text-slate-300 disabled:bg-slate-50 disabled:text-slate-400";
@@ -142,7 +164,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         {isAdmin && (
           <button 
             onClick={() => { 
-              setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678', emailCorp: '', phoneCorp: '', status: 'Ativo' }); 
+              setForm({ role: 'staff', name: '', position: '', username: '', password: '12345678', emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '' }); 
               setEditingId(undefined); 
               setIsEditingPassword(true);
               setIsModalOpen(true); 
@@ -211,7 +233,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                             ) : (
                                <g strokeWidth="2.5">
                                  <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                 <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943-9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                 <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                </g>
                             )}
                           </svg>
@@ -225,7 +247,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                 <div className="mt-6 flex gap-2">
                    <button onClick={() => handleEdit(s)} className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 transition-all shadow-md">Editar Cadastro</button>
                    {isAdmin && (
-                     <button onClick={() => onDeleteStaff(s.id)} className="px-4 py-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all">
+                     <button onClick={() => confirmDelete(s)} className="px-4 py-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all">
                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
                      </button>
                    )}
@@ -236,6 +258,42 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         })}
       </div>
 
+      {/* MODAL DE EXCLUSÃO CUSTOMIZADO */}
+      {isDeleteModalOpen && itemToDelete && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 text-center space-y-6">
+                 <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase">Confirmar Exclusão</h3>
+                    <p className="text-xs text-slate-400 mt-2">Você está prestes a remover permanentemente:</p>
+                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                       <p className="text-sm font-black text-slate-700 uppercase">{itemToDelete.name}</p>
+                       <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{itemToDelete.position}</p>
+                    </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-3 pt-4">
+                    <button 
+                      onClick={() => { setIsDeleteModalOpen(false); setItemToDelete(null); }}
+                      className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      disabled={isProcessing}
+                      onClick={executeDelete}
+                      className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-red-700 transition-all disabled:opacity-50"
+                    >
+                      {isProcessing ? 'Excluindo...' : 'Sim, Excluir'}
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
            <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
@@ -245,8 +303,8 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
               </div>
               <form onSubmit={handleSave} className="p-10 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
                  <div className="flex justify-center mb-4">
-                    <div onClick={() => photoRef.current?.click()} className="w-20 h-20 rounded-3xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all">
-                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover rounded-3xl" /> : <span className="text-[9px] font-black text-slate-400 uppercase text-center">FOTO</span>}
+                    <div onClick={() => photoRef.current?.click()} className="w-20 h-20 rounded-3xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all overflow-hidden">
+                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <span className="text-[9px] font-black text-slate-400 uppercase text-center">FOTO</span>}
                     </div>
                     <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={e => {
                        const f = e.target.files?.[0];
@@ -305,7 +363,6 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                            <option key={pos} value={pos} />
                          ))}
                        </datalist>
-                       <p className="text-[7px] text-slate-400 font-bold uppercase italic mt-1 ml-1">* Você pode criar um novo cargo simplesmente digitando-o.</p>
                     </div>
 
                     <div className="space-y-1">
@@ -335,7 +392,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                                 ) : (
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/>
-                                    <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943-9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/>
+                                    <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/>
                                   </svg>
                                 )}
                              </button>
