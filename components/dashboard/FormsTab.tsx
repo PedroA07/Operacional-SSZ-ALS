@@ -55,7 +55,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     ship: '',
     agencia: '', 
     tipo: '40HC',
-    qtd: '01',
     padrao: 'CARGA GERAL',
     tipoOperacao: 'EXPORTAÇÃO',
     autColeta: '',
@@ -73,14 +72,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
       setIsFormModalOpen(true);
     }
   }, [initialFormId]);
-
-  useEffect(() => {
-    if (selectedFormType === 'ORDEM_COLETA') {
-      setFormData(prev => ({ ...prev, pod: 'SANTOS', obs: '' }));
-    } else if (selectedFormType === 'LIBERACAO_VAZIO') {
-      setFormData(prev => ({ ...prev, pod: '', obs: '' }));
-    }
-  }, [selectedFormType]);
 
   const generateBarcodes = (container: string, tara: string, seal: string) => {
     if (selectedFormType !== 'ORDEM_COLETA') return;
@@ -161,7 +152,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
         <div ref={captureRef}>
           {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
           {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
-          {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData}} manualPortName={destinatarioSearch} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+          {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
         </div>
       </div>
 
@@ -225,7 +216,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Destinatário (Terminal / Porto)</label>
                   <input 
                     type="text" 
-                    placeholder={selectedFormType === 'LIBERACAO_VAZIO' ? "BUSCAR OU DIGITAR TERMINAL..." : "BUSCAR TERMINAL..."}
+                    placeholder="BUSCAR TERMINAL..." 
                     className={inputClasses} 
                     value={destinatarioSearch} 
                     onFocus={() => setShowDestinatarioResults(true)} 
@@ -257,7 +248,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                    </div>
                    <div className="space-y-1">
                       <label className="text-[9px] font-black text-slate-400 uppercase ml-1">POD (Destino)</label>
-                      <input className={inputClasses} value={formData.pod} onChange={e => handleInputChange('pod', e.target.value)} placeholder={selectedFormType === 'LIBERACAO_VAZIO' ? "EX: SANTOS" : ""} />
+                      <input className={inputClasses} value={formData.pod} onChange={e => handleInputChange('pod', e.target.value)} />
                    </div>
                 </div>
 
@@ -271,22 +262,13 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <input type="text" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
                 </div>
 
-                <div className={`grid ${selectedFormType === 'LIBERACAO_VAZIO' ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
-                  {selectedFormType === 'LIBERACAO_VAZIO' && (
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Qtd</label>
-                      <select className={inputClasses} value={formData.qtd} onChange={e => handleInputChange('qtd', e.target.value)}>
-                        {['01','02','03','04','05'].map(q => <option key={q} value={q}>{q}</option>)}
-                      </select>
-                    </div>
-                  )}
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Tipo Equip.</label>
                     <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
                       <option value="40HC">40HC</option>
                       <option value="20DC">20DC</option>
                       <option value="40DC">40DC</option>
-                      {selectedFormType === 'LIBERACAO_VAZIO' && <option value="40HR">40HR</option>}
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -310,8 +292,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">{selectedFormType === 'ORDEM_COLETA' ? 'Observações / Embarcador' : 'Observações'}</label>
-                  <textarea className={`${inputClasses} h-20 resize-none font-bold`} value={formData.obs} onChange={e => handleInputChange('obs', e.target.value)} placeholder={selectedFormType === 'LIBERACAO_VAZIO' ? "VISTORIA SERÁ FEITO PELO MOTORISTA" : ""} />
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Observações</label>
+                  <textarea className={`${inputClasses} h-20 resize-none font-bold`} value={formData.obs} onChange={e => handleInputChange('obs', e.target.value)} />
                 </div>
 
                 <button disabled={isExporting} onClick={downloadPDF} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
@@ -323,7 +305,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
                   {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                   {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
-                  {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData}} manualPortName={destinatarioSearch} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+                  {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                 </div>
               </div>
             </div>
