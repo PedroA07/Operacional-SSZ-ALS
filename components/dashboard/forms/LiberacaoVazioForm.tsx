@@ -45,7 +45,6 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
 
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
-  const selectedDestinatario = null; // Removida seleção de porto cadastrado
 
   const downloadPDF = async () => {
     setIsExporting(true);
@@ -69,6 +68,12 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
 
+  // Filtro de clientes buscando em ambos os campos
+  const filteredCustomers = customers.filter(c => 
+    c.name.toUpperCase().includes(remetenteSearch) || 
+    (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
+  );
+
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
       {/* HIDDEN PREVIEW */}
@@ -86,7 +91,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
       {/* INPUTS SIDEBAR */}
       <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
         
-        {/* 1. Local de Retirada - APENAS INSERÇÃO MANUAL */}
+        {/* 1. Local de Retirada */}
         <div className="space-y-1">
           <label className={labelBlueClass}>1. Local de Retirada (Terminais não cadastrados)</label>
           <input 
@@ -99,15 +104,43 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
           <p className="text-[8px] font-bold text-slate-400 uppercase italic px-1">Este campo é de preenchimento manual direto.</p>
         </div>
 
-        {/* 2. Cliente */}
+        {/* 2. Cliente - COM EXIBIÇÃO DE RAZÃO SOCIAL E FANTASIA */}
         <div className="relative">
           <label className={labelBlueClass}>2. Cliente (Exportador)</label>
-          <input type="text" placeholder="BUSCAR CLIENTE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} />
+          <input 
+            type="text" 
+            placeholder="BUSCAR RAZÃO SOCIAL OU FANTASIA..." 
+            className={inputClasses} 
+            value={remetenteSearch} 
+            onFocus={() => setShowRemetenteResults(true)} 
+            onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} 
+          />
           {showRemetenteResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
-              {customers.filter(c => c.name.toUpperCase().includes(remetenteSearch)).map(c => (
-                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.name); setShowRemetenteResults(false); }}>{c.name}</button>
-              ))}
+            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
+              {filteredCustomers.length > 0 ? (
+                filteredCustomers.map(c => (
+                  <button 
+                    key={c.id} 
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
+                    onClick={() => { 
+                      setFormData({...formData, remetenteId: c.id}); 
+                      setRemetenteSearch(c.legalName || c.name); 
+                      setShowRemetenteResults(false); 
+                    }}
+                  >
+                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">
+                      {c.legalName || c.name}
+                    </p>
+                    {c.legalName && c.name !== c.legalName && (
+                      <p className="text-[8px] font-bold text-slate-400 uppercase italic mt-0.5">
+                        FANTASIA: {c.name}
+                      </p>
+                    )}
+                  </button>
+                ))
+              ) : (
+                <div className="p-4 text-center text-[9px] font-bold text-slate-400 uppercase italic">Nenhum cliente localizado</div>
+              )}
             </div>
           )}
         </div>
