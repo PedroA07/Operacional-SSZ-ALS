@@ -7,6 +7,7 @@ import { driverAuthService } from '../../utils/driverAuthService';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import DriverProfileTemplate from './forms/DriverProfileTemplate';
+import { Icons } from '../../constants/icons';
 
 interface DriversTabProps {
   drivers: Driver[];
@@ -19,15 +20,19 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  
   const [itemToDelete, setItemToDelete] = useState<Driver | null>(null);
+  const [passwordTargetId, setPasswordTargetId] = useState<string | null>(null);
+  const [newPasswordValue, setNewPasswordValue] = useState('');
+  
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   
-  const [visibility, setVisibility] = useState({
+  const [visibility] = useState({
     driverInfo: true,
     contacts: true,
     equipment: true,
@@ -95,13 +100,19 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     try {
       const drvId = editingId || `drv-${Date.now()}`;
       
+      // Captura o status original para verificar se mudou
+      const original = drivers.find(d => d.id === drvId);
+      const statusChanged = original && original.status !== form.status;
+      const statusDate = statusChanged ? new Date().toISOString() : (form.statusLastChangeDate || new Date().toISOString());
+
       // Sincroniza usuário e gera senha se for novo
       const { password } = await driverAuthService.syncUserRecord(drvId, form, form.generatedPassword);
       
       await onSaveDriver({ 
         ...form, 
         id: drvId,
-        generatedPassword: password 
+        generatedPassword: password,
+        statusLastChangeDate: statusDate
       }, editingId);
       
       setIsModalOpen(false);
@@ -112,11 +123,19 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     }
   };
 
-  const handleUpdatePassword = async (driverId: string) => {
-    const newPass = prompt("Definir nova senha operacional:");
-    if (newPass && newPass.length >= 4) {
-      await driverAuthService.updatePassword(driverId, newPass);
+  const openPasswordModal = (driverId: string) => {
+    setPasswordTargetId(driverId);
+    setNewPasswordValue('');
+    setIsPasswordModalOpen(true);
+  };
+
+  const handleUpdatePassword = async () => {
+    if (passwordTargetId && newPasswordValue.length >= 4) {
+      await driverAuthService.updatePassword(passwordTargetId, newPasswordValue);
+      setIsPasswordModalOpen(false);
       loadUsers();
+    } else {
+      alert("A senha deve ter no mínimo 4 caracteres.");
     }
   };
 
@@ -149,14 +168,15 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse min-w-[1200px]">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
-                <th className="px-6 py-5">Identificação</th>
+                <th className="px-6 py-5">Identificação / Beneficiário</th>
+                <th className="px-6 py-5">Documentação</th>
                 <th className="px-6 py-5">Equipamento (Placa/Ano)</th>
                 <th className="px-6 py-5">Contatos / WhatsApp</th>
                 <th className="px-6 py-5">Portal (Login / Senha)</th>
-                <th className="px-6 py-5">Status</th>
+                <th className="px-6 py-5">Status / Vínculo</th>
                 <th className="px-6 py-5 text-right">Ações</th>
               </tr>
             </thead>
@@ -164,55 +184,89 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
               {filteredDrivers.map(d => {
                 const linkedUser = users.find(u => u.driverId === d.id);
                 return (
-                  <tr key={d.id} className="hover:bg-slate-50/50 align-middle transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
+                  <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
+                    <td className="px-6 py-4 max-w-[200px]">
+                      <div className="flex items-start gap-4">
+                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 mt-1">
                            {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 italic text-[8px]">ALS</div>}
                          </div>
                          <div>
-                            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{d.name}</p>
-                            <p className="text-[9px] text-slate-400 font-bold mt-1">CPF: {d.cpf}</p>
+                            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight mb-2">{d.name}</p>
+                            <div className="bg-blue-50/50 p-2 rounded-xl border border-blue-100/50">
+                               <p className="text-[7px] font-black text-blue-500 uppercase leading-none mb-1">Beneficiário:</p>
+                               <p className="text-[10px] font-bold text-slate-600 uppercase truncate">{d.beneficiaryName || d.name}</p>
+                               <p className="text-[8px] font-bold text-slate-400 mt-1">{d.beneficiaryCnpj || d.cpf} | {d.paymentPreference}</p>
+                            </div>
                          </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                       <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                             <span className="bg-slate-900 text-white px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateHorse}</span>
-                             <span className="text-[9px] font-black text-slate-400">{d.yearHorse || '---'}</span>
+                       <div className="space-y-1 mt-1">
+                          <p className="text-[9px] font-black text-slate-500 uppercase">CPF: <span className="font-mono text-slate-800">{d.cpf}</span></p>
+                          <p className="text-[9px] font-black text-slate-500 uppercase">RG: <span className="font-mono text-slate-800">{d.rg || '---'}</span></p>
+                          <p className="text-[9px] font-black text-slate-500 uppercase">CNH: <span className="font-mono text-slate-800">{d.cnh || '---'}</span></p>
+                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="space-y-3 mt-1">
+                          <div className="flex flex-col">
+                             <span className="text-[7px] font-black text-slate-300 uppercase leading-none mb-1">Cavalo</span>
+                             <div className="flex items-center gap-2">
+                                <span className="bg-slate-900 text-white px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateHorse}</span>
+                                <span className="text-[9px] font-black text-slate-400">{d.yearHorse || '---'}</span>
+                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                             <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateTrailer}</span>
-                             <span className="text-[9px] font-black text-slate-300">{d.yearTrailer || '---'}</span>
+                          <div className="flex flex-col">
+                             <span className="text-[7px] font-black text-slate-300 uppercase leading-none mb-1">Carreta</span>
+                             <div className="flex items-center gap-2">
+                                <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateTrailer}</span>
+                                <span className="text-[9px] font-black text-slate-300">{d.yearTrailer || '---'}</span>
+                             </div>
                           </div>
                        </div>
                     </td>
                     <td className="px-6 py-4">
-                       <p className="text-blue-600 font-black text-[10px]">{d.phone}</p>
-                       <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase truncate max-w-[120px]">{d.whatsappGroupName || 'Sem Grupo'}</p>
+                       <div className="mt-1 space-y-1">
+                          <p className="text-blue-600 font-black text-[10px]">{d.phone}</p>
+                          <p className="text-[9px] text-slate-400 lowercase truncate max-w-[150px]">{d.email || '---'}</p>
+                          {d.whatsappGroupLink && (
+                             <a 
+                               href={d.whatsappGroupLink} 
+                               target="_blank" 
+                               rel="noreferrer"
+                               className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-lg hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20"
+                             >
+                                <Icons.Whatsapp />
+                                Entrar no Grupo
+                             </a>
+                          )}
+                       </div>
                     </td>
                     <td className="px-6 py-4">
-                       <div className="bg-blue-50 p-2 rounded-xl border border-blue-100 space-y-1">
-                          <div className="flex justify-between text-[8px] font-black uppercase text-blue-400">
-                             <span>Login:</span>
-                             <span className="text-slate-800 font-mono">{d.cpf.replace(/\D/g, '')}</span>
+                       <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-100 space-y-1.5 mt-1">
+                          <div className="flex justify-between items-center gap-4">
+                             <span className="text-[8px] font-black uppercase text-blue-400">Login:</span>
+                             <span className="text-slate-800 font-mono font-bold text-[10px]">{d.cpf.replace(/\D/g, '')}</span>
                           </div>
-                          <div className="flex justify-between text-[8px] font-black uppercase text-blue-400">
-                             <span>Senha:</span>
-                             <span className="text-emerald-600 font-mono font-black">{linkedUser?.password || d.generatedPassword || '---'}</span>
+                          <div className="flex justify-between items-center gap-4">
+                             <span className="text-[8px] font-black uppercase text-blue-400">Senha:</span>
+                             <span className="text-emerald-600 font-mono font-black text-[10px]">{linkedUser?.password || d.generatedPassword || '---'}</span>
                           </div>
                        </div>
                     </td>
                     <td className="px-6 py-4">
-                       <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                          {d.status}
-                       </span>
+                       <div className="mt-1 flex flex-col gap-1.5">
+                          <span className={`w-fit px-2.5 py-1 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                             {d.status}
+                          </span>
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{d.driverType}</p>
+                          <p className="text-[8px] text-slate-300 font-bold italic">Desde: {d.statusLastChangeDate ? new Date(d.statusLastChangeDate).toLocaleDateString('pt-BR') : '---'}</p>
+                       </div>
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
-                      <button onClick={() => handleUpdatePassword(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Definir Senha"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Ficha PDF"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Ficha Cadastral PDF"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                     </td>
                   </tr>
                 );
@@ -222,6 +276,39 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         </div>
       </div>
 
+      {/* MODAL REDEFINIR SENHA */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+           <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
+              <div className="p-8 text-center space-y-6">
+                 <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Redefinir Senha</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Senha de acesso ao portal do motorista</p>
+                 </div>
+                 <div className="space-y-1 text-left">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nova Senha Operacional</label>
+                    <input 
+                       type="text"
+                       autoFocus
+                       className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-mono font-black text-blue-600 text-center text-lg outline-none focus:border-emerald-500 transition-all"
+                       placeholder="••••"
+                       value={newPasswordValue}
+                       onChange={e => setNewPasswordValue(e.target.value)}
+                    />
+                 </div>
+                 <div className="grid grid-cols-2 gap-3">
+                    <button onClick={() => setIsPasswordModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
+                    <button onClick={handleUpdatePassword} className="py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-emerald-600 transition-all">Salvar Senha</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL DE CADASTRO/EDIÇÃO */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
           <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
@@ -231,7 +318,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
             </div>
             <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
               
-              {/* SEÇÃO 1: DADOS BÁSICOS */}
               <div className="grid grid-cols-12 gap-8">
                  <div className="col-span-3">
                     <label className={labelClass}>Foto do Motorista</label>
@@ -263,8 +349,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                  </div>
               </div>
 
-              {/* SEÇÃO 2: EQUIPAMENTO (PLACA + ANO) */}
-              <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white">
+              <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white shadow-2xl">
                  <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-6">Informações do Veículo</h4>
                  <div className="grid grid-cols-2 gap-8">
                     <div className="grid grid-cols-3 gap-3">
@@ -278,13 +363,10 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                  </div>
               </div>
 
-              {/* SEÇÃO 3: FINANCEIRO (BENEFICIÁRIO) */}
               <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 space-y-6">
                  <div className="flex items-center justify-between">
                     <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Módulo Financeiro (Beneficiário)</h4>
-                    <div className="flex gap-2">
-                       <button type="button" onClick={() => setForm({...form, beneficiaryName: form.name, beneficiaryCnpj: form.cpf, beneficiaryPhone: form.phone})} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Copiar dados do motorista</button>
-                    </div>
+                    <button type="button" onClick={() => setForm({...form, beneficiaryName: form.name, beneficiaryCnpj: form.cpf, beneficiaryPhone: form.phone})} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Copiar dados do motorista</button>
                  </div>
                  <div className="grid grid-cols-12 gap-5">
                     <div className="col-span-3 space-y-1">
@@ -313,7 +395,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                  </div>
               </div>
 
-              {/* SEÇÃO 4: WHATSAPP E OPERACIONAL */}
               <div className="grid grid-cols-2 gap-8">
                  <div className="p-8 bg-emerald-50 rounded-[2.5rem] border border-emerald-100 space-y-5">
                     <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Comunicação WhatsApp</h4>
