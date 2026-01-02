@@ -11,6 +11,8 @@ interface CustomersTabProps {
   isAdmin: boolean;
 }
 
+const SEGMENTS = ['Aliança', 'Mercosul', 'Indústria', 'Carga Solta', 'Logística Reversa', 'Urgente'];
+
 const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, onDeleteCustomer, isAdmin }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -97,8 +99,18 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     }
   };
 
+  const toggleSegment = (segment: string) => {
+    setForm(prev => {
+      const current = prev.operations || [];
+      const next = current.includes(segment) 
+        ? current.filter(s => s !== segment) 
+        : [...current, segment];
+      return { ...prev, operations: next };
+    });
+  };
+
   const handleOpenModal = (customer?: Customer) => {
-    setForm(customer || initialForm);
+    setForm(customer ? { ...customer, operations: customer.operations || [] } : initialForm);
     setEditingId(customer?.id);
     setIsModalOpen(true);
   };
@@ -155,11 +167,12 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
                 <th className="px-8 py-5">Identificação Jurídica</th>
                 <th className="px-8 py-5">CNPJ</th>
+                <th className="px-8 py-5">Segmentação / Vínculos</th>
                 <th className="px-8 py-5">Endereço / Localidade</th>
                 <th className="px-8 py-5 text-right">Ações</th>
               </tr>
@@ -172,6 +185,15 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                     {c.legalName && c.name !== c.legalName && <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">FANTASIA: {c.name}</p>}
                   </td>
                   <td className="px-8 py-4 font-mono font-bold text-slate-500">{maskCNPJ(c.cnpj)}</td>
+                  <td className="px-8 py-4">
+                    <div className="flex flex-wrap gap-1">
+                       {c.operations && c.operations.length > 0 ? c.operations.map((seg, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-md text-[7px] font-black uppercase tracking-tighter">
+                             {seg}
+                          </span>
+                       )) : <span className="text-[8px] text-slate-300 font-bold uppercase tracking-widest italic">Não classificado</span>}
+                    </div>
+                  </td>
                   <td className="px-8 py-4">
                     <p className="text-slate-500 font-bold uppercase text-[9px]">{c.address}</p>
                     <p className="text-slate-400 font-black uppercase text-[10px] mt-1">{c.city} - {c.state}</p>
@@ -188,7 +210,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
         </div>
       </div>
 
-      {/* MODAL DE MAPA CORRIGIDO */}
+      {/* MODAL DE MAPA */}
       {isMapModalOpen && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-8 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col relative animate-in zoom-in-95">
@@ -200,14 +222,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                  <button onClick={() => setIsMapModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
               </div>
               <div className="flex-1 bg-slate-100 relative">
-                 <iframe 
-                    width="100%" 
-                    height="100%" 
-                    style={{ border: 0 }} 
-                    loading="lazy" 
-                    allowFullScreen 
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedMapAddress)}&output=embed`}
-                 ></iframe>
+                 <iframe width="100%" height="100%" style={{ border: 0 }} loading="lazy" allowFullScreen src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedMapAddress)}&output=embed`}></iframe>
               </div>
            </div>
         </div>
@@ -240,23 +255,44 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 h-[90vh] flex flex-col">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-black text-slate-700 text-sm uppercase tracking-widest">{editingId ? 'Editar Cliente' : 'Novo Cliente'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
             </div>
-            <form onSubmit={handleSubmit} className="p-8 space-y-5">
+            <form onSubmit={handleSubmit} className="p-8 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
               <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNPJ</label><input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1"><label className="text-[9px] font-black text-blue-600 uppercase ml-1">Razão Social</label><input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} /></div>
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Fantasia</label><input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} /></div>
               </div>
+
+              {/* VÍNCULOS / SEGMENTAÇÃO */}
+              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Segmentação / Vínculos de Mercado</label>
+                <div className="flex flex-wrap gap-2">
+                   {SEGMENTS.map(seg => {
+                     const isActive = form.operations?.includes(seg);
+                     return (
+                       <button 
+                         key={seg} 
+                         type="button" 
+                         onClick={() => toggleSegment(seg)}
+                         className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isActive ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}
+                       >
+                         {seg}
+                       </button>
+                     );
+                   })}
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CEP</label><input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm({...form, zipCode: maskCEP(e.target.value)})} /></div>
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm({...form, city: e.target.value.toUpperCase()})} /></div>
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm({...form, state: e.target.value.toUpperCase()})} /></div>
               </div>
-              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all mt-4">Salvar Cliente</button>
+              <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all mt-4">Salvar Cadastro de Cliente</button>
             </form>
           </div>
         </div>

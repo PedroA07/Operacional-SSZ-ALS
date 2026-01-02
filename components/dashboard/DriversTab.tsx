@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, OperationDefinition, User } from '../../types';
+import { Driver, OperationDefinition, User, DriverOperation } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
 import { db } from '../../utils/storage';
 import { driverAuthService } from '../../utils/driverAuthService';
@@ -68,7 +68,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   useEffect(() => { loadUsers(); }, [drivers, isModalOpen]);
 
   const handleOpenModal = (d?: Driver) => {
-    setForm(d ? { ...d } : initialForm);
+    setForm(d ? { ...d, operations: d.operations || [] } : initialForm);
     setEditingId(d?.id);
     setIsModalOpen(true);
   };
@@ -106,6 +106,23 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       reader.onloadend = () => setForm(prev => ({ ...prev, cnhPdfUrl: reader.result as string }));
       reader.readAsDataURL(file);
     }
+  };
+
+  const addOperation = (category: string, client: string) => {
+    if (!category || !client) return;
+    const exists = form.operations?.some(op => op.category === category && op.client === client);
+    if (exists) return;
+    setForm(prev => ({
+      ...prev,
+      operations: [...(prev.operations || []), { category, client }]
+    }));
+  };
+
+  const removeOperation = (idx: number) => {
+    setForm(prev => ({
+      ...prev,
+      operations: prev.operations?.filter((_, i) => i !== idx)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -147,8 +164,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      
-      // Regra de nome de arquivo solicitada: "Motorista - (nome motorista)"
       pdf.save(`Motorista - ${selectedDriver.name}.pdf`);
     } catch (error) {
       alert("Falha ao gerar o PDF.");
@@ -212,11 +227,12 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[1300px]">
+          <table className="w-full text-left text-xs border-collapse min-w-[1400px]">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
                 <th className="px-6 py-5">Identificação / Beneficiário</th>
                 <th className="px-6 py-5">Documentação</th>
+                <th className="px-6 py-5">Vínculos Operacionais</th>
                 <th className="px-6 py-5">Equipamento (Placa/Ano)</th>
                 <th className="px-6 py-5">Contatos / WhatsApp</th>
                 <th className="px-6 py-5">Portal (Login / Senha)</th>
@@ -249,17 +265,21 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CPF: <span className="font-mono text-slate-800 font-bold">{d.cpf}</span></p>
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">RG: <span className="font-mono text-slate-800 font-bold">{d.rg || '---'}</span></p>
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CNH: <span className="font-mono text-slate-800 font-bold">{d.cnh || '---'}</span></p>
-                          
                           {d.cnhPdfUrl && (
-                             <button 
-                               onClick={() => window.open(d.cnhPdfUrl, '_blank')}
-                               className="inline-flex items-center gap-2 mt-2 px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-[7px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-                               title="Visualizar Documento CNH"
-                             >
+                             <button onClick={() => window.open(d.cnhPdfUrl, '_blank')} className="inline-flex items-center gap-2 mt-2 px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-[7px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="3"/></svg>
                                 Visualizar PDF CNH
                              </button>
                           )}
+                       </div>
+                    </td>
+                    <td className="px-6 py-4 max-w-[200px]">
+                       <div className="flex flex-wrap gap-1 mt-1">
+                          {d.operations && d.operations.length > 0 ? d.operations.map((op, i) => (
+                             <span key={i} className="px-2 py-1 bg-blue-600 text-white rounded-lg text-[7px] font-black uppercase tracking-tighter">
+                                {op.category} › {op.client}
+                             </span>
+                          )) : <span className="text-[9px] text-slate-300 font-bold italic uppercase tracking-widest">Sem Vínculos</span>}
                        </div>
                     </td>
                     <td className="px-6 py-4">
@@ -397,6 +417,52 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                        <div className="space-y-1"><label className={labelClass}>Telefone Celular</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
                        <div className="space-y-1"><label className={labelClass}>E-mail</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value.toLowerCase()})} /></div>
                     </div>
+                 </div>
+              </div>
+
+              {/* VÍNCULOS OPERACIONAIS EDITOR */}
+              <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-white/5 space-y-6">
+                 <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Gestão de Vínculos Operacionais</h4>
+                 </div>
+                 <div className="grid grid-cols-12 gap-4">
+                    <div className="col-span-5">
+                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Categoria</label>
+                       <select id="op-cat" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500">
+                          {availableOps.map(op => <option key={op.id} value={op.category} className="bg-slate-900">{op.category}</option>)}
+                       </select>
+                    </div>
+                    <div className="col-span-5">
+                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Cliente</label>
+                       <select id="op-client" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500">
+                          <option value="Geral" className="bg-slate-900">Geral / Todos</option>
+                          {availableOps.find(o => o.category === (document.getElementById('op-cat') as HTMLSelectElement)?.value)?.clients.map((c, i) => (
+                             <option key={i} value={c.name} className="bg-slate-900">{c.name}</option>
+                          ))}
+                       </select>
+                    </div>
+                    <div className="col-span-2 flex items-end">
+                       <button 
+                         type="button" 
+                         onClick={() => {
+                            const cat = (document.getElementById('op-cat') as HTMLSelectElement).value;
+                            const cli = (document.getElementById('op-client') as HTMLSelectElement).value;
+                            addOperation(cat, cli);
+                         }}
+                         className="w-full py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-500 transition-all shadow-lg"
+                       >
+                          Adicionar
+                       </button>
+                    </div>
+                 </div>
+                 <div className="flex flex-wrap gap-2 pt-2">
+                    {form.operations?.map((op, i) => (
+                       <div key={i} className="group flex items-center gap-2 px-3 py-2 bg-white/10 rounded-xl border border-white/5">
+                          <span className="text-[9px] font-black text-white uppercase">{op.category} › {op.client}</span>
+                          <button type="button" onClick={() => removeOperation(i)} className="text-slate-500 hover:text-red-400"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+                       </div>
+                    ))}
+                    {(!form.operations || form.operations.length === 0) && <p className="text-[9px] text-slate-600 font-bold uppercase italic tracking-widest w-full text-center py-4">Nenhum vínculo operacional definido</p>}
                  </div>
               </div>
 
