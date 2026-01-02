@@ -146,6 +146,10 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     c.cnpj.includes(remetenteSearch)
   );
 
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
+  const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
+  const darkInputClass = "w-full px-4 py-3.5 rounded-xl border-none bg-[#333333] text-white font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-500";
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
@@ -172,7 +176,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
       </div>
 
       {isFormModalOpen && selectedFormType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
             <div className={`p-6 ${formConfigs[selectedFormType].color} text-white flex justify-between items-center`}>
               <h3 className="font-black text-sm uppercase tracking-widest">{formConfigs[selectedFormType].title}</h3>
@@ -184,7 +188,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 
                 {/* 1. Remetente (Cliente) */}
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">1. Remetente (Cliente)</label>
+                  <label className={labelBlueClass}>1. Remetente (Cliente)</label>
                   <input 
                     type="text" 
                     placeholder="PESQUISAR CLIENTE, RAZÃO OU CNPJ..." 
@@ -215,7 +219,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
 
                 {/* 2. Destinatário (Terminal/Porto) */}
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">2. Destinatário (Terminal / Porto)</label>
+                  <label className={labelBlueClass}>2. Destinatário (Terminal / Porto)</label>
                   <input 
                     type="text" 
                     placeholder="BUSCAR TERMINAL..." 
@@ -248,27 +252,32 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-200 pb-2">3. Dados do Container</p>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
-                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Tara</label><input className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Container</label><input className={darkInputClass} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Tara</label><input className={darkInputClass} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Lacre</label><input className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
-                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Armador</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={darkInputClass} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Genset (Opcional)</label><input className={darkInputClass} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className={labelClass}>Armador</label>
+                    <input className={darkInputClass} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Tipo</label>
-                      <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
+                      <label className={labelClass}>Tipo</label>
+                      <select className={darkInputClass} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
                         <option value="40HC">40HC</option>
                         <option value="40HR">40HR</option>
                         <option value="40DC">40DC</option>
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Padrão</label>
-                      <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
+                      <label className={labelClass}>Padrão</label>
+                      <select className={darkInputClass} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
                         <option value="CARGA GERAL">CARGA GERAL</option>
                         <option value="CARGO PREMIUM">CARGO PREMIUM</option>
                         <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
@@ -278,14 +287,14 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
-                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Navio</label><input className={darkInputClass} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Booking</label><input className={darkInputClass} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
                   </div>
                 </div>
 
                 {/* 4. Dados do Motorista */}
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">4. Dados do Motorista</label>
+                  <label className={labelBlueClass}>4. Dados do Motorista</label>
                   <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setShowDriverResults(true); }} />
                   {showDriverResults && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
@@ -297,21 +306,21 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 {/* 5, 6, 7. Bloco Operacional */}
                 <div className="bg-slate-50 p-5 rounded-3xl border border-slate-200 space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">5. Nº Ordem de Serviço</label>
+                    <label className={labelClass}>5. Nº Ordem de Serviço</label>
                     <input className={inputClasses} value={formData.os} onChange={e => handleInputChange('os', e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">6. Autorização de Coleta</label>
+                    <label className={labelClass}>6. Autorização de Coleta</label>
                     <input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">7. Embarcador</label>
+                    <label className={labelClass}>7. Embarcador</label>
                     <input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} />
                   </div>
                 </div>
 
                 {/* 8. Horário Agendado */}
-                <div className="bg-blue-600/5 p-8 rounded-[2.5rem] border-2 border-blue-100/50 space-y-3 shadow-xl shadow-blue-500/5 transition-all hover:border-blue-300">
+                <div className="bg-blue-600/5 p-8 rounded-[2.5rem] border-2 border-blue-100/50 space-y-3 shadow-xl shadow-blue-500/5 transition-all hover:border-blue-300 calendar-container-focus">
                   <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-2 mb-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     8. Horário Agendado (Data e Hora)
