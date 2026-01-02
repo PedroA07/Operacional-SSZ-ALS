@@ -105,6 +105,12 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
       }));
     } else if (field === 'seal') {
       setFormData(prev => ({ ...prev, seal: maskSeal(upValue) }));
+    } else if (field === 'tipo') {
+      setFormData(prev => ({ 
+        ...prev, 
+        tipo: upValue, 
+        padrao: upValue === '40HR' ? 'REEFER' : prev.padrao 
+      }));
     } else {
       setFormData(prev => ({ ...prev, [field]: upValue }));
     }
@@ -148,7 +154,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
-  const darkInputClass = "w-full px-4 py-3.5 rounded-xl border-none bg-[#333333] text-white font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-500";
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -252,24 +257,24 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-200 pb-2">3. Dados do Container</p>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className={labelClass}>Container</label><input className={darkInputClass} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
-                    <div className="space-y-1"><label className={labelClass}>Tara</label><input className={darkInputClass} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Tara</label><input className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={darkInputClass} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
-                    <div className="space-y-1"><label className={labelClass}>Genset (Opcional)</label><input className={darkInputClass} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Genset (Opcional)</label><input className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
                   </div>
 
                   <div className="space-y-1">
                     <label className={labelClass}>Armador</label>
-                    <input className={darkInputClass} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
+                    <input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className={labelClass}>Tipo</label>
-                      <select className={darkInputClass} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
+                      <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
                         <option value="40HC">40HC</option>
                         <option value="40HR">40HR</option>
                         <option value="40DC">40DC</option>
@@ -277,7 +282,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                     </div>
                     <div className="space-y-1">
                       <label className={labelClass}>Padrão</label>
-                      <select className={darkInputClass} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
+                      <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
                         <option value="CARGA GERAL">CARGA GERAL</option>
                         <option value="CARGO PREMIUM">CARGO PREMIUM</option>
                         <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
@@ -287,8 +292,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className={labelClass}>Navio</label><input className={darkInputClass} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
-                    <div className="space-y-1"><label className={labelClass}>Booking</label><input className={darkInputClass} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
                   </div>
                 </div>
 
@@ -297,7 +302,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <label className={labelBlueClass}>4. Dados do Motorista</label>
                   <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setShowDriverResults(true); }} />
                   {showDriverResults && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
                       {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name}</button>)}
                     </div>
                   )}
