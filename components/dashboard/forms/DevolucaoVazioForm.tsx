@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port, PreStacking } from '../../../types';
+import { Driver, Customer, Port } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import DevolucaoVazioTemplate from './DevolucaoVazioTemplate';
@@ -10,13 +10,12 @@ interface DevolucaoVazioFormProps {
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
-  preStacking: PreStacking[];
   onClose: () => void;
 }
 
 const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
 
-const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, customers, ports, preStacking, onClose }) => {
+const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, customers, ports, onClose }) => {
   const [isExporting, setIsExporting] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
   
@@ -61,9 +60,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
   
-  // O Local de Devolução pode estar em Ports ou PreStacking
-  const allLocals = [...ports, ...preStacking];
-  const selectedDestinatario = allLocals.find(l => l.id === formData.destinatarioId);
+  // O Local de Devolução agora busca apenas em Ports (Terminais/Depots)
+  const selectedDestinatario = ports.find(l => l.id === formData.destinatarioId);
 
   const downloadPDF = async () => {
     setIsExporting(true);
@@ -92,7 +90,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
     (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
   );
 
-  const filteredLocals = allLocals.filter(l => 
+  const filteredLocals = ports.filter(l => 
     l.name.toUpperCase().includes(destinatarioSearch) || 
     (l.legalName && l.legalName.toUpperCase().includes(destinatarioSearch))
   );
@@ -119,7 +117,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
           <label className={labelBlueClass}>1. Local da Devolução (Depot / Terminal)</label>
           <input 
             type="text" 
-            placeholder="BUSCAR LOCAL OU DIGITE MANUAL..." 
+            placeholder="BUSCAR DEPOT OU DIGITE MANUAL..." 
             className={inputClasses} 
             value={destinatarioSearch} 
             onFocus={() => setShowDestinatarioResults(true)}

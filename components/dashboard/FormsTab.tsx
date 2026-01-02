@@ -93,7 +93,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
             ) : selectedFormType === 'LIBERACAO_VAZIO' ? (
               <LiberacaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
             ) : selectedFormType === 'DEVOLUCAO_VAZIO' ? (
-              <DevolucaoVazioForm drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} onClose={() => setIsFormModalOpen(false)} />
+              <DevolucaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
             ) : (
               <div className="flex-1 p-10 text-center text-slate-400 font-bold uppercase italic">
                 O formulário {formConfigs[selectedFormType].title} está sendo migrado para o novo padrão modular.
