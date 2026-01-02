@@ -32,104 +32,133 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
         position: 'relative'
       }}
     >
-      {/* CABEÇALHO */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <span style={{ fontSize: '42px', fontWeight: 900, fontStyle: 'italic', color: '#1e40af', lineHeight: '1' }}>ALS</span>
-          <span style={{ fontSize: '12px', fontWeight: 900, color: '#94a3b8', letterSpacing: '3px', marginLeft: '8px' }}>TRANSPORTES</span>
-        </div>
-      </div>
-
-      <div style={{ border: '2px solid #000', padding: '15px', textAlign: 'center', marginBottom: '20px', backgroundColor: '#f8fafc' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 900, textDecoration: 'underline', letterSpacing: '1px' }}>MINUTA DE LIBERAÇÃO DE CNTR VAZIO</h1>
-      </div>
-
-      {/* DEPÓSITO / TERMINAL */}
-      <div style={{ border: '1px solid #000', padding: '15px', textAlign: 'center', marginBottom: '25px', backgroundColor: '#f0fdf4' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 900, textDecoration: 'underline' }}>
-          {selectedDestinatario?.legalName || selectedDestinatario?.name || 'SELECIONE O TERMINAL DE RETIRADA'} - {selectedDestinatario?.city || ''}
-        </h2>
-      </div>
-
-      {/* TABELA PRINCIPAL DE DADOS */}
-      <div style={{ border: borderStyle, marginBottom: '20px' }}>
-        {[
-          { label: 'BOOKING:', value: formData.booking },
-          { label: 'CLIENTE:', value: selectedRemetente?.legalName || selectedRemetente?.name },
-          { label: 'NAVIO:', value: formData.ship },
-          { label: 'ARMADOR:', value: formData.agencia },
-          { label: 'POD:', value: formData.pod || 'SANTOS' },
-          { label: 'EQUIPAMENTO:', value: `01X${formData.tipo} - ${formData.padrao}` },
-          { label: 'OBS:', value: formData.obs || 'VISTORIA SERÁ FEITO PELO MOTORISTA' },
-          { label: 'MOTORISTA:', value: selectedDriver?.name, isHighlight: true }
-        ].map((row, idx) => (
-          <div key={idx} style={{ display: 'flex', borderBottom: idx === 7 ? 'none' : borderStyle }}>
-            <div style={{ 
-              width: '180px', 
-              padding: '10px 15px', 
-              backgroundColor: row.isHighlight ? '#ecf3ff' : '#f8fafc', 
-              borderRight: borderStyle,
-              fontSize: '11px',
-              fontWeight: 900,
-              color: '#1e293b'
-            }}>
-              {row.label}
-            </div>
-            <div style={{ 
-              flex: 1, 
-              padding: '10px 15px', 
-              fontSize: '12px', 
-              fontWeight: 900,
-              textTransform: 'uppercase'
-            }}>
-              {row.value || '---'}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* DADOS DO MOTORISTA (LINHA ÚNICA) */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-        <div style={{ flex: 1, display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '60px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>CPF:</div>
-          <div style={{ flex: 1, padding: '10px', fontSize: '11px', fontWeight: 900 }}>{selectedDriver?.cpf || '---'}</div>
-        </div>
-        <div style={{ flex: 1, display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '60px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>RG:</div>
-          <div style={{ flex: 1, padding: '10px', fontSize: '11px', fontWeight: 900 }}>{selectedDriver?.rg || '---'}</div>
-        </div>
-        <div style={{ flex: 1, display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '60px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>CNH:</div>
-          <div style={{ flex: 1, padding: '10px', fontSize: '11px', fontWeight: 900 }}>{selectedDriver?.cnh || '---'}</div>
-        </div>
-      </div>
-
-      {/* DADOS DO VEÍCULO */}
-      <div style={{ display: 'flex', gap: '200px', marginBottom: '40px', justifyContent: 'center' }}>
-        <div style={{ width: '220px', display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '80px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>CAVALO:</div>
-          <div style={{ flex: 1, padding: '10px', fontSize: '13px', fontWeight: 900, textAlign: 'center', color: '#1e40af' }}>{selectedDriver?.plateHorse || '---'}</div>
-        </div>
-        <div style={{ width: '220px', display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '80px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>CARRETA:</div>
-          <div style={{ flex: 1, padding: '10px', fontSize: '13px', fontWeight: 900, textAlign: 'center' }}>{selectedDriver?.plateTrailer || '---'}</div>
-        </div>
-      </div>
-
-      {/* FOOTER - AUTORIZAÇÃO */}
-      <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <div style={{ fontSize: '9px', lineHeight: '1.6' }}>
-          <p style={{ fontStyle: 'italic', fontWeight: 'bold' }}>Autorizado por:</p>
-          <p style={{ fontWeight: 900, fontSize: '10px' }}>TRANSPORTADORA: <span style={{ fontWeight: 500 }}>LUARA MEL VIEIRA TRANSPORTES LTDA</span></p>
-          <p style={{ fontWeight: 900 }}>CNPJ: <span style={{ fontWeight: 500 }}>13.841.647/0004-30</span></p>
-          <p style={{ fontWeight: 900 }}>ENDEREÇO: <span style={{ fontWeight: 500 }}>AVENIDA ANA COSTA, 59 - SANTOS SP</span></p>
-          <p style={{ fontWeight: 900 }}>TELEFONE: <span style={{ fontWeight: 500 }}>13 99628-0762</span></p>
-        </div>
-        <div style={{ opacity: 0.2 }}>
+      {/* CABEÇALHO RÍGIDO ALS PREMIUM */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '4px solid #1e40af', paddingBottom: '10px', marginBottom: '20px' }}>
+        <div style={{ width: '400px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontSize: '48px', fontWeight: 900, fontStyle: 'italic', color: '#1e40af', lineHeight: '1' }}>ALS</span>
+            <span style={{ fontSize: '14px', fontWeight: 900, color: '#94a3b8', letterSpacing: '4px', marginLeft: '10px' }}>TRANSPORTES</span>
+          </div>
+          <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b', marginTop: '5px' }}>
+            LUARA MEL VIEIRA TRANSPORTES LTDA. | CNPJ: 13.841.647/0004-30
           </div>
         </div>
+        <div style={{ textAlign: 'right', width: '300px' }}>
+          <div style={{ fontSize: '22px', fontWeight: 900, color: '#000000', letterSpacing: '-0.5px' }}>LIBERAÇÃO DE VAZIO</div>
+          <div style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', marginTop: '4px' }}>
+            EMISSÃO: <span style={{ fontSize: '18px', color: '#000000' }}>{new Date().toLocaleDateString('pt-BR')}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* TERMINAL DE RETIRADA - DESTAQUE */}
+      <div style={{ border: '2px solid #1e40af', padding: '15px', backgroundColor: '#eff6ff', marginBottom: '20px', borderRadius: '4px' }}>
+        <p style={{ fontSize: '9px', fontWeight: 900, color: '#1e40af', marginBottom: '5px', letterSpacing: '2px' }}>LOCAL DE RETIRADA (TERMINAL / DEPÓSITO)</p>
+        <p style={{ fontSize: '20px', fontWeight: 900, color: '#000000', textTransform: 'uppercase' }}>
+          {selectedDestinatario?.legalName || selectedDestinatario?.name || formData.manualLocal || 'NÃO INFORMADO'}
+        </p>
+        {selectedDestinatario && (
+           <p style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginTop: '3px' }}>
+             {selectedDestinatario.address} - {selectedDestinatario.city} / {selectedDestinatario.state}
+           </p>
+        )}
+      </div>
+
+      {/* GRID DE DADOS DA OPERAÇÃO */}
+      <div style={{ border: borderStyle, marginBottom: '10px', display: 'flex' }}>
+         <div style={{ flex: 1, borderRight: borderStyle, padding: '12px' }}>
+            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>BOOKING</p>
+            <p style={{ fontSize: '16px', fontWeight: 900, color: '#1e40af' }}>{formData.booking || '---'}</p>
+         </div>
+         <div style={{ flex: 1, padding: '12px' }}>
+            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>ARMADOR</p>
+            <p style={{ fontSize: '16px', fontWeight: 900 }}>{formData.agencia || '---'}</p>
+         </div>
+      </div>
+
+      <div style={{ border: borderStyle, marginBottom: '10px', display: 'flex' }}>
+         <div style={{ flex: 1, borderRight: borderStyle, padding: '12px' }}>
+            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>CLIENTE / EXPORTADOR</p>
+            <p style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase' }}>{selectedRemetente?.name || '---'}</p>
+         </div>
+         <div style={{ flex: 1, padding: '12px' }}>
+            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>NAVIO</p>
+            <p style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase' }}>{formData.ship || '---'}</p>
+         </div>
+      </div>
+
+      <div style={{ border: borderStyle, marginBottom: '20px', display: 'flex', backgroundColor: '#f8fafc' }}>
+         <div style={{ flex: 1, borderRight: borderStyle, padding: '12px' }}>
+            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>EQUIPAMENTO</p>
+            <p style={{ fontSize: '14px', fontWeight: 900 }}>
+              {formData.qtdContainer} X {formData.tipo} - {formData.padrao}
+            </p>
+         </div>
+         <div style={{ flex: 1, padding: '12px' }}>
+            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>POD (PORTO DE DESCARGA)</p>
+            <p style={{ fontSize: '16px', fontWeight: 900, color: '#1e40af' }}>{formData.pod || '---'}</p>
+         </div>
+      </div>
+
+      {/* BLOCO MOTORISTA AJUSTADO (PADRÃO ALS) */}
+      <div style={{ border: borderStyle, padding: '15px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', marginBottom: '10px' }}>
+          <div style={{ flex: '2' }}>
+            <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>MOTORISTA AUTORIZADO</p>
+            <p style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase' }}>{selectedDriver?.name || '---'}</p>
+          </div>
+          <div style={{ flex: '1' }}>
+            <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CPF</p>
+            <p style={{ fontSize: '12px', fontWeight: 'bold' }}>{selectedDriver?.cpf || '---'}</p>
+          </div>
+          <div style={{ flex: '1' }}>
+            <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CNH</p>
+            <p style={{ fontSize: '12px', fontWeight: 'bold' }}>{selectedDriver?.cnh || '---'}</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ width: '238px' }}>
+            <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>PLACA CAVALO</p>
+            <p style={{ fontSize: '28px', fontWeight: 900, color: '#1e40af', lineHeight: '1' }}>{selectedDriver?.plateHorse || '---'}</p>
+          </div>
+          <div style={{ width: '238px' }}>
+            <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>PLACA CARRETA</p>
+            <p style={{ fontSize: '28px', fontWeight: 900, color: '#1e40af', lineHeight: '1' }}>{selectedDriver?.plateTrailer || '---'}</p>
+          </div>
+          <div style={{ flex: 1, textAlign: 'right' }}>
+            <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CONTATO</p>
+            <p style={{ fontSize: '13px', fontWeight: 900 }}>{selectedDriver?.phone || '---'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* OBSERVAÇÕES */}
+      <div style={{ border: borderStyle, padding: '15px', minHeight: '80px', marginBottom: '20px' }}>
+        <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '8px', letterSpacing: '1px' }}>OBSERVAÇÕES OPERACIONAIS</p>
+        <p style={{ fontSize: '11px', fontWeight: 'bold', lineHeight: '1.4', textTransform: 'uppercase' }}>
+          {formData.obs || 'O MOTORISTA DEVERÁ REALIZAR A VISTORIA DAS UNIDADES NO ATO DA RETIRADA.'}
+        </p>
+      </div>
+
+      {/* ESPAÇO PARA CARIMBO E ASSINATURA */}
+      <div style={{ display: 'flex', gap: '20px', flex: 1, marginTop: '20px' }}>
+         <div style={{ flex: 1, border: '1px dashed #cbd5e1', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa' }}>
+            <span style={{ fontSize: '10px', fontWeight: 900, color: '#cbd5e1', textTransform: 'uppercase', fontStyle: 'italic' }}>Carimbo / Visto Depósito</span>
+         </div>
+         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: '10px' }}>
+            <div style={{ borderBottom: '1px solid #000', marginBottom: '10px' }}></div>
+            <p style={{ fontSize: '9px', fontWeight: 900, textAlign: 'center', color: '#64748b' }}>ASSINATURA DO MOTORISTA</p>
+         </div>
+      </div>
+
+      {/* RODAPÉ INSTITUCIONAL */}
+      <div style={{ marginTop: '30px', borderTop: '1px solid #f1f5f9', paddingTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+         <div style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 'bold' }}>
+           AVENIDA ANA COSTA, 59 - SANTOS SP | CONTATO: 13 99628-0762
+         </div>
+         <div style={{ opacity: 0.3 }}>
+           <span style={{ fontSize: '24px', fontWeight: 900, fontStyle: 'italic', color: '#1e40af' }}>ALS</span>
+         </div>
       </div>
     </div>
   );

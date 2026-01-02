@@ -27,6 +27,8 @@ const formConfigs: Record<FormType, { title: string; color: string; description:
   RETIRADA_CHEIO: { title: 'Retirada de Cheio', color: 'bg-indigo-600', description: 'Ordem para movimentação de container importado' },
 };
 
+const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
+
 const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialFormId }) => {
   const [selectedFormType, setSelectedFormType] = useState<FormType | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -63,7 +65,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     nf: '',
     horarioAgendado: '',
     obs: '',
-    pod: 'SANTOS'
+    pod: 'SANTOS',
+    qtdContainer: '01'
   });
 
   useEffect(() => {
@@ -161,7 +164,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
         <div ref={captureRef}>
           {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
           {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
-          {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+          {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData, manualLocal: destinatarioSearch}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
         </div>
       </div>
 
@@ -191,12 +194,35 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
               <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-5 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
                 
-                {/* 1. Remetente (Cliente) */}
+                {/* 1. Local de Retirada (Terminal / Porto) */}
                 <div className="space-y-1 relative">
-                  <label className={labelBlueClass}>1. Remetente (Cliente)</label>
+                  <label className={labelBlueClass}>1. Local de Retirada (Terminal / Porto)</label>
                   <input 
                     type="text" 
-                    placeholder="PESQUISAR CLIENTE, RAZÃO OU CNPJ..." 
+                    placeholder="PESQUISAR OU DIGITAR LOCAL..." 
+                    className={inputClasses} 
+                    value={destinatarioSearch} 
+                    onFocus={() => setShowDestinatarioResults(true)} 
+                    onChange={e => { setDestinatarioSearch(e.target.value.toUpperCase()); setShowDestinatarioResults(true); }} 
+                  />
+                  {showDestinatarioResults && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-blue-500">
+                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch) || (p.legalName && p.legalName.toUpperCase().includes(destinatarioSearch))).map(p => (
+                        <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, destinatarioId: p.id}); setDestinatarioSearch(p.legalName || p.name); setShowDestinatarioResults(false); }}>
+                          <span className="font-black text-slate-800">{p.legalName || p.name}</span>
+                          <span className="ml-2 text-slate-400 font-medium">({p.city})</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Cliente (Remetente) */}
+                <div className="space-y-1 relative">
+                  <label className={labelBlueClass}>2. Cliente (Remetente)</label>
+                  <input 
+                    type="text" 
+                    placeholder="PESQUISAR CLIENTE..." 
                     className={inputClasses} 
                     value={remetenteSearch} 
                     onFocus={() => setShowRemetenteResults(true)} 
@@ -205,65 +231,21 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   {showRemetenteResults && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-blue-500">
                       {filteredRemetentes.map(c => (
-                        <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50 group" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.legalName ? `${c.legalName} (${c.name})` : c.name); setShowRemetenteResults(false); }}>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-black text-slate-800 group-hover:text-blue-600 leading-tight">{c.legalName || c.name}</p>
-                              {c.legalName && c.name !== c.legalName && (
-                                <p className="text-[8px] text-slate-400 font-black mt-0.5 uppercase">FANTASIA: {c.name}</p>
-                              )}
-                              <p className="text-[7px] text-slate-400 font-mono mt-0.5">{c.cnpj}</p>
-                            </div>
-                            <span className="text-[8px] font-black bg-blue-50 text-blue-400 px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">{c.city}</span>
-                          </div>
+                        <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.legalName || c.name); setShowRemetenteResults(false); }}>
+                          <span className="font-black text-slate-800">{c.legalName || c.name}</span>
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                {/* 2. Destinatário (Terminal/Porto) */}
-                <div className="space-y-1 relative">
-                  <label className={labelBlueClass}>2. Destinatário (Terminal / Porto)</label>
-                  <input 
-                    type="text" 
-                    placeholder="BUSCAR TERMINAL..." 
-                    className={inputClasses} 
-                    value={destinatarioSearch} 
-                    onFocus={() => setShowDestinatarioResults(true)} 
-                    onChange={e => { setDestinatarioSearch(e.target.value.toUpperCase()); setShowDestinatarioResults(true); }} 
-                  />
-                  {showDestinatarioResults && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-slate-800">
-                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch) || (p.legalName && p.legalName.toUpperCase().includes(destinatarioSearch)) || p.city.toUpperCase().includes(destinatarioSearch)).map(p => (
-                        <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-[10px] font-bold uppercase border-b border-slate-50 group" onClick={() => { setFormData({...formData, destinatarioId: p.id}); setDestinatarioSearch(p.legalName ? `${p.legalName} (${p.name})` : p.name); setShowDestinatarioResults(false); }}>
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="font-black text-slate-700 group-hover:text-blue-600">{p.legalName || p.name}</span>
-                              {p.legalName && p.name !== p.legalName && (
-                                <p className="text-[7px] text-slate-400 font-black uppercase">FANTASIA: {p.name}</p>
-                              )}
-                            </div>
-                            <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{p.city}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Dados do Container e Operação */}
-                <div className="bg-slate-100/50 p-5 rounded-3xl border border-slate-200 space-y-4">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-200 pb-2">3. Dados do Container e Operação</p>
+                {/* 3. Dados Técnicos da Liberação */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">3. Dados da Operação</p>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
-                    <div className="space-y-1"><label className={labelClass}>Tara</label><input className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
-                    <div className="space-y-1"><label className={labelClass}>Genset (Opcional)</label><input className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
                   </div>
 
                   <div className="space-y-1">
@@ -271,86 +253,71 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                     <input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
                   </div>
 
+                  <div className="space-y-1">
+                    <label className={labelClass}>POD (Porto de Descarga)</label>
+                    <input 
+                      list="pod-suggestions" 
+                      className={inputClasses} 
+                      value={formData.pod} 
+                      onChange={e => handleInputChange('pod', e.target.value)} 
+                      placeholder="SELECIONE OU DIGITE..."
+                    />
+                    <datalist id="pod-suggestions">
+                      {commonPODs.map(pod => <option key={pod} value={pod} />)}
+                    </datalist>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className={labelClass}>Qtd. Equipamento</label>
+                      <select className={inputClasses} value={formData.qtdContainer} onChange={e => setFormData({...formData, qtdContainer: e.target.value})}>
+                        {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'].map(q => <option key={q} value={q}>{q} CONTAINER</option>)}
+                      </select>
+                    </div>
                     <div className="space-y-1">
                       <label className={labelClass}>Tipo</label>
                       <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
                         <option value="40HC">40HC</option>
                         <option value="40HR">40HR</option>
                         <option value="40DC">40DC</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className={labelClass}>Padrão</label>
-                      <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
-                        <option value="CARGA GERAL">CARGA GERAL</option>
-                        <option value="CARGO PREMIUM">CARGO PREMIUM</option>
-                        <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
-                        <option value="REEFER">REEFER</option>
+                        <option value="20DC">20DC</option>
                       </select>
                     </div>
                   </div>
 
-                  {/* Campo de Operação agora após o Padrão */}
                   <div className="space-y-1">
-                    <label className={labelClass}>Tipo de Operação</label>
-                    <select className={inputClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)}>
-                      <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
-                      <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
-                      <option value="COLETA">COLETA</option>
-                      <option value="ENTREGA">ENTREGA</option>
+                    <label className={labelClass}>Padrão</label>
+                    <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
+                      <option value="CARGA GERAL">CARGA GERAL</option>
+                      <option value="CARGO PREMIUM">CARGO PREMIUM</option>
+                      <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
+                      <option value="REEFER">REEFER</option>
                     </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
-                    <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
                   </div>
                 </div>
 
-                {/* 4. Dados do Motorista */}
+                {/* 4. Motorista */}
                 <div className="space-y-1 relative">
-                  <label className={labelBlueClass}>4. Dados do Motorista</label>
-                  <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setShowDriverResults(true); }} />
+                  <label className={labelBlueClass}>4. Motorista</label>
+                  <input type="text" placeholder="PESQUISAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setShowDriverResults(true); }} />
                   {showDriverResults && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
-                      {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name}</button>)}
+                      {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => (
+                        <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>
+                          {d.name} ({d.plateHorse})
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
 
-                {/* 5, 6, 7. Bloco Operacional */}
-                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-200 space-y-4">
-                  <div className="space-y-1">
-                    <label className={labelClass}>5. Nº Ordem de Serviço</label>
-                    <input className={inputClasses} value={formData.os} onChange={e => handleInputChange('os', e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className={labelClass}>6. Autorização de Coleta</label>
-                    <input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className={labelClass}>7. Embarcador</label>
-                    <input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} />
-                  </div>
-                </div>
-
-                {/* 8. Horário Agendado */}
-                <div className="bg-blue-600/5 p-8 rounded-[2.5rem] border-2 border-blue-100/50 space-y-3 shadow-xl shadow-blue-500/5 transition-all hover:border-blue-300 calendar-container-focus">
-                  <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-2 mb-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    8. Horário Agendado (Data e Hora)
-                  </label>
-                  <input 
-                    type="datetime-local" 
-                    className="w-full px-4 py-4 rounded-2xl border-2 border-slate-200 bg-white text-slate-700 font-black focus:border-blue-600 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-md cursor-pointer" 
-                    value={formData.horarioAgendado} 
-                    onChange={e => setFormData({...formData, horarioAgendado: e.target.value})} 
-                  />
+                <div className="space-y-1">
+                  <label className={labelClass}>Observações</label>
+                  <textarea className={`${inputClasses} h-24 resize-none`} value={formData.obs} onChange={e => setFormData({...formData, obs: e.target.value.toUpperCase()})} placeholder="EX: VISTORIA PELO MOTORISTA..." />
                 </div>
 
                 <button disabled={isExporting} onClick={downloadPDF} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
-                  {isExporting ? 'GERANDO...' : 'BAIXAR DOCUMENTO'}
+                  {isExporting ? 'GERANDO...' : 'BAIXAR LIBERAÇÃO (PDF)'}
                 </button>
               </div>
 
@@ -358,7 +325,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
                   {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                   {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
-                  {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+                  {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData, manualLocal: destinatarioSearch}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                 </div>
               </div>
             </div>
