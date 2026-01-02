@@ -6,6 +6,7 @@ import { db } from '../../utils/storage';
 import NewTripModal from './operations/NewTripModal';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import GenericOperationView from './operations/GenericOperationView';
+import OrdemColetaForm from './forms/OrdemColetaForm';
 
 interface OperationsTabProps {
   user: User;
@@ -22,6 +23,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isOCEditModalOpen, setIsOCEditModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
@@ -57,6 +59,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     await db.saveTrip(updatedTrip);
     setIsStatusModalOpen(false);
     loadData();
+  };
+
+  const openOCEditor = (trip: Trip) => {
+    setSelectedTrip(trip);
+    setIsOCEditModalOpen(true);
   };
 
   const columns = [
@@ -95,8 +102,27 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       )
     },
     {
+      key: 'oc_gestao',
+      label: '3. Gestão OC',
+      render: (t: Trip) => (
+        <div className="flex items-center gap-2">
+          {t.ocFormData ? (
+            <button 
+              onClick={() => openOCEditor(t)}
+              className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[8px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1.5"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="3"/></svg>
+              PDF / Editar
+            </button>
+          ) : (
+            <span className="text-[8px] text-slate-300 font-bold uppercase italic tracking-widest">Manual</span>
+          )}
+        </div>
+      )
+    },
+    {
       key: 'location',
-      label: '3. Local Atendimento',
+      label: '4. Local Atendimento',
       render: (t: Trip) => (
         <div className="flex flex-col">
           <span className="font-black text-slate-700 uppercase leading-none">{t.customer?.name}</span>
@@ -106,7 +132,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     },
     {
       key: 'container_data',
-      label: '4. Dados Container',
+      label: '5. Dados Container',
       render: (t: Trip) => (
         <div className="flex flex-col">
           <span className="font-black text-slate-800">{t.container || '---'}</span>
@@ -117,24 +143,14 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         </div>
       )
     },
-    { key: 'cva', label: '5. CVA', render: (t: Trip) => <span className="font-black text-emerald-600">{t.cva || '---'}</span> },
+    { key: 'cva', label: '6. CVA', render: (t: Trip) => <span className="font-black text-emerald-600">{t.cva || '---'}</span> },
     { 
       key: 'driver', 
-      label: '6. Motorista', 
+      label: '7. Motorista', 
       render: (t: Trip) => (
         <div className="flex flex-col">
           <span className="font-black text-slate-800 uppercase leading-none">{t.driver?.name}</span>
           <span className="text-[8px] font-mono text-slate-400 mt-1">{t.driver?.plateHorse} / {t.driver?.plateTrailer}</span>
-        </div>
-      )
-    },
-    { 
-      key: 'ship_booking', 
-      label: '7. Navio / Booking', 
-      render: (t: Trip) => (
-        <div className="flex flex-col">
-          <span className="font-bold text-slate-700 uppercase leading-none">{t.ship || '---'}</span>
-          <span className="text-[9px] font-black text-blue-500 mt-1 uppercase">BK: {t.booking || '---'}</span>
         </div>
       )
     }
@@ -168,7 +184,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
            </div>
         </div>
 
-        {/* Category Access Area */}
         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
            <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Acesso Rápido por Categoria</h3>
            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -233,6 +248,25 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
              <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase">Atualizar Status</button>
              <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase">Cancelar</button>
           </div>
+        </div>
+      )}
+
+      {/* MODAL PARA REEDIÇÃO DE OC */}
+      {isOCEditModalOpen && selectedTrip && selectedTrip.ocFormData && (
+        <div className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
+           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
+              <div className="p-6 bg-blue-600 text-white flex justify-between items-center">
+                <h3 className="font-black text-sm uppercase tracking-widest">Reemissão / Edição de Ordem de Coleta (Sincronizada)</h3>
+                <button onClick={() => setIsOCEditModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              </div>
+              <OrdemColetaForm 
+                drivers={drivers} 
+                customers={customers} 
+                ports={[]} 
+                onClose={() => { setIsOCEditModalOpen(false); loadData(); }} 
+                initialData={selectedTrip.ocFormData} 
+              />
+           </div>
         </div>
       )}
     </div>

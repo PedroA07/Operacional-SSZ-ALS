@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port, Category } from '../../../types';
+import { Driver, Customer, Port, Category, Trip } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
@@ -8,6 +8,7 @@ import OrdemColetaTemplate from './OrdemColetaTemplate';
 import { maskSeal } from '../../../utils/masks';
 import { lookupCarrierByContainer } from '../../../utils/carrierService';
 import { osCategoryService } from '../../../utils/osCategoryService';
+import { tripSyncService } from '../../../utils/tripSyncService';
 import { db } from '../../../utils/storage';
 
 interface OrdemColetaFormProps {
@@ -15,9 +16,10 @@ interface OrdemColetaFormProps {
   customers: Customer[];
   ports: Port[];
   onClose: () => void;
+  initialData?: any; // Para reedição a partir da Operação
 }
 
-const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, ports, onClose }) => {
+const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, ports, onClose, initialData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -32,7 +34,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [detectedCategory, setDetectedCategory] = useState<string | null>(null);
   const [manualCategory, setManualCategory] = useState('');
 
-  const [formData, setFormData] = useState({
+  // Estados para o Modal de Conflito de OS
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
+
+  const [formData, setFormData] = useState(initialData || {
     date: new Date().toISOString().split('T')[0],
     driverId: '',
     remetenteId: '',
@@ -59,6 +65,18 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     const loadCats = async () => {
       const c = await db.getCategories();
       setCategories(c);
+      
+      if (initialData) {
+        const d = drivers.find(drv => drv.id === initialData.driverId);
+        if (d) setDriverSearch(d.name);
+        const cust = customers.find(c => c.id === initialData.remetenteId);
+        if (cust) setRemetenteSearch(cust.legalName || cust.name);
+        const p = ports.find(pt => pt.id === initialData.destinatarioId);
+        if (p) setDestinatarioSearch(p.legalName || p.name);
+        
+        const detected = osCategoryService.detectCategoryFromOS(initialData.os);
+        setDetectedCategory(detected);
+      }
     };
     loadCats();
   }, []);
@@ -114,15 +132,36 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
   const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
 
-  const downloadPDF = async () => {
-    setIsExporting(true);
-    try {
-      // Sincroniza vínculos antes de baixar
-      const finalCategory = detectedCategory || manualCategory;
-      if (finalCategory) {
-        await osCategoryService.syncVinculos(finalCategory, selectedDriver, selectedRemetente);
-      }
+  const startDownloadWorkflow = async () => {
+    if (!formData.os || !selectedDriver || !selectedRemetente) {
+      alert("Preencha OS, Motorista e Cliente para prosseguir.");
+      return;
+    }
 
+    const existing = await tripSyncService.findExistingTrip(formData.os);
+    if (existing) {
+      setExistingTrip(existing);
+      setShowSyncModal(true);
+    } else {
+      await executeSyncAndDownload(null);
+    }
+  };
+
+  const executeSyncAndDownload = async (existingId: string | null) => {
+    setIsExporting(true);
+    setShowSyncModal(false);
+    
+    try {
+      const finalCategory = detectedCategory || manualCategory || 'Geral';
+      
+      // 1. Sincroniza Vínculos
+      await osCategoryService.syncVinculos(finalCategory, selectedDriver, selectedRemetente);
+
+      // 2. Sincroniza com Painel de Operações
+      const tripData = tripSyncService.mapOCtoTrip(formData, selectedDriver!, selectedRemetente!, finalCategory);
+      await tripSyncService.sync(tripData, existingId || undefined);
+
+      // 3. Gera PDF
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));
       const element = captureRef.current;
@@ -134,9 +173,14 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       
       const driverName = selectedDriver?.name || 'MOTORISTA';
       const osNum = formData.os || 'SEM_OS';
-      
       pdf.save(`OC - ${driverName} - ${osNum}.pdf`);
-    } catch (e) { console.error(e); } finally { setIsExporting(false); }
+      
+    } catch (e) { 
+      console.error(e); 
+      alert("Erro ao processar sincronização.");
+    } finally { 
+      setIsExporting(false); 
+    }
   };
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
@@ -166,9 +210,49 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
       </div>
 
+      {/* MODAL DE CONFLITO DE OS */}
+      {showSyncModal && existingTrip && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95">
+              <div className="p-10 bg-amber-500 text-white flex items-center gap-6">
+                 <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
+                 </div>
+                 <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight">OS Já Existente no Painel</h3>
+                    <p className="text-[10px] font-black uppercase opacity-80 mt-1">Deseja atualizar a programação de operações com estes novos dados?</p>
+                 </div>
+              </div>
+              
+              <div className="p-10 grid grid-cols-2 gap-10">
+                 <div className="space-y-4">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Dados Atuais no Painel</p>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+                       <p className="text-[11px] font-black text-slate-800 uppercase">{existingTrip.driver.name}</p>
+                       <p className="text-[9px] font-bold text-slate-400 uppercase">{existingTrip.customer.name}</p>
+                       <p className="text-[10px] font-mono font-bold text-blue-600">PLACA: {existingTrip.driver.plateHorse}</p>
+                    </div>
+                 </div>
+                 <div className="space-y-4">
+                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest border-b border-blue-100 pb-2">Novos Dados desta OC</p>
+                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-2">
+                       <p className="text-[11px] font-black text-blue-800 uppercase">{selectedDriver?.name}</p>
+                       <p className="text-[9px] font-bold text-blue-400 uppercase">{selectedRemetente?.name}</p>
+                       <p className="text-[10px] font-mono font-bold text-emerald-600">PLACA: {selectedDriver?.plateHorse}</p>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="p-10 bg-slate-50 border-t border-slate-100 flex gap-4">
+                 <button onClick={() => setShowSyncModal(false)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-100 transition-all">Cancelar Emissão</button>
+                 <button onClick={() => executeSyncAndDownload(existingTrip.id)} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Substituir e Baixar PDF</button>
+              </div>
+           </div>
+        </div>
+      )}
+
       <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
         
-        {/* Campo OS com inteligência */}
         <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 shadow-sm space-y-4">
            <div className="space-y-1">
               <label className={labelBlueClass}>Identificação da Viagem (OS)</label>
@@ -340,8 +424,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           </div>
         </div>
 
-        <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
-          {isExporting ? 'GERANDO PDF...' : 'BAIXAR ORDEM DE COLETA'}
+        <button disabled={isExporting} onClick={startDownloadWorkflow} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
+          {isExporting ? 'PROCESSANDO...' : 'SINCRONIZAR E BAIXAR OC'}
         </button>
       </div>
 

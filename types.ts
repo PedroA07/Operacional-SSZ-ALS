@@ -84,6 +84,7 @@ export interface Trip {
   balancePayment: PaymentStatus;
   advancePayment: PaymentStatus;
   documents: TripDocument[];
+  ocFormData?: any; // Dados originais do formulário de Ordem de Coleta
 }
 
 export interface DriverOperation {
