@@ -1,12 +1,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port } from '../../../types';
+import { Driver, Customer, Port, Category } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
 import OrdemColetaTemplate from './OrdemColetaTemplate';
 import { maskSeal } from '../../../utils/masks';
 import { lookupCarrierByContainer } from '../../../utils/carrierService';
+import { osCategoryService } from '../../../utils/osCategoryService';
+import { db } from '../../../utils/storage';
 
 interface OrdemColetaFormProps {
   drivers: Driver[];
@@ -18,6 +20,7 @@ interface OrdemColetaFormProps {
 const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, ports, onClose }) => {
   const [isExporting, setIsExporting] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   
   const [remetenteSearch, setRemetenteSearch] = useState('');
   const [showRemetenteResults, setShowRemetenteResults] = useState(false);
@@ -25,6 +28,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [showDestinatarioResults, setShowDestinatarioResults] = useState(false);
   const [driverSearch, setDriverSearch] = useState('');
   const [showDriverResults, setShowDriverResults] = useState(false);
+
+  const [detectedCategory, setDetectedCategory] = useState<string | null>(null);
+  const [manualCategory, setManualCategory] = useState('');
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -48,6 +54,14 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     obs: '',
     displayDate: new Date().toLocaleDateString('pt-BR')
   });
+
+  useEffect(() => {
+    const loadCats = async () => {
+      const c = await db.getCategories();
+      setCategories(c);
+    };
+    loadCats();
+  }, []);
 
   const generateBarcodes = () => {
     const generate = (id: string, value: string) => {
@@ -73,18 +87,21 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     setFormData(prev => {
       let next = { ...prev, [field]: upValue };
 
-      // Se for container, busca armador
+      if (field === 'os') {
+        const detected = osCategoryService.detectCategoryFromOS(upValue);
+        setDetectedCategory(detected);
+        if (detected) setManualCategory('');
+      }
+
       if (field === 'container') {
         const carrier = lookupCarrierByContainer(upValue);
         next.agencia = carrier ? carrier.name : prev.agencia;
       }
 
-      // Se for lacre, aplica máscara
       if (field === 'seal') {
         next.seal = maskSeal(upValue);
       }
 
-      // REGRA: Se tipo for 40HR, muda padrão para REEFER
       if (field === 'tipo' && upValue === '40HR') {
         next.padrao = 'REEFER';
       }
@@ -93,7 +110,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     });
   };
 
-  // Objetos selecionados para o Template
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
   const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
@@ -101,6 +117,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const downloadPDF = async () => {
     setIsExporting(true);
     try {
+      // Sincroniza vínculos antes de baixar
+      const finalCategory = detectedCategory || manualCategory;
+      if (finalCategory) {
+        await osCategoryService.syncVinculos(finalCategory, selectedDriver, selectedRemetente);
+      }
+
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));
       const element = captureRef.current;
@@ -121,7 +143,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
 
-  // Filtros avançados para Cliente e Destinatário
   const filteredCustomers = customers.filter(c => 
     (c.name && c.name.toUpperCase().includes(remetenteSearch)) || 
     (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
@@ -134,7 +155,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
-      {/* OC HIDDEN PREVIEW FOR PDF */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
           <OrdemColetaTemplate 
@@ -146,10 +166,44 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
       </div>
 
-      {/* INPUTS SIDEBAR */}
       <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
         
-        {/* 1. Remetente */}
+        {/* Campo OS com inteligência */}
+        <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 shadow-sm space-y-4">
+           <div className="space-y-1">
+              <label className={labelBlueClass}>Identificação da Viagem (OS)</label>
+              <input 
+                required 
+                placeholder="EX: 123ALC1234567A"
+                className={`${inputClasses} text-lg border-blue-200 focus:border-blue-600`} 
+                value={formData.os} 
+                onChange={e => handleInputChange('os', e.target.value)} 
+              />
+           </div>
+
+           {detectedCategory ? (
+             <div className="flex items-center gap-3 px-4 py-3 bg-emerald-500 text-white rounded-2xl animate-in zoom-in-95">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3"/></svg>
+                <div>
+                   <p className="text-[8px] font-black uppercase leading-none opacity-80">Categoria Identificada</p>
+                   <p className="text-[11px] font-black uppercase tracking-widest">{detectedCategory}</p>
+                </div>
+             </div>
+           ) : formData.os.length > 5 && (
+             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                <label className="text-[8px] font-black text-amber-600 uppercase tracking-widest ml-1">Padrão não reconhecido. Selecione o vínculo:</label>
+                <select 
+                  className={inputClasses} 
+                  value={manualCategory} 
+                  onChange={e => setManualCategory(e.target.value)}
+                >
+                  <option value="">Selecione um Vínculo...</option>
+                  {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+             </div>
+           )}
+        </div>
+
         <div className="relative">
           <label className={labelBlueClass}>1. Remetente (Cliente)</label>
           <input 
@@ -173,16 +227,10 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                       setShowRemetenteResults(false); 
                     }}
                   >
-                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">
-                      {c.legalName || c.name}
-                    </p>
+                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
                     <div className="flex justify-between items-center mt-0.5">
-                      <p className="text-[8px] font-bold text-slate-400 uppercase italic">
-                        {c.legalName && c.name !== c.legalName ? `FANTASIA: ${c.name}` : ''}
-                      </p>
-                      <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">
-                        {c.city} - {c.state}
-                      </p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase italic">{c.legalName && c.name !== c.legalName ? `FANTASIA: ${c.name}` : ''}</p>
+                      <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">{c.city} - {c.state}</p>
                     </div>
                   </button>
                 ))
@@ -193,7 +241,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           )}
         </div>
 
-        {/* 2. Destinatário */}
         <div className="relative">
           <label className={labelBlueClass}>2. Destinatário (Terminal/Porto)</label>
           <input 
@@ -217,16 +264,10 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                       setShowDestinatarioResults(false); 
                     }}
                   >
-                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">
-                      {p.legalName || p.name}
-                    </p>
+                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{p.legalName || p.name}</p>
                     <div className="flex justify-between items-center mt-0.5">
-                      <p className="text-[8px] font-bold text-slate-400 uppercase italic">
-                        {p.legalName && p.name !== p.legalName ? `FANTASIA: ${p.name}` : ''}
-                      </p>
-                      <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">
-                        {p.city} - {p.state}
-                      </p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase italic">{p.legalName && p.name !== p.legalName ? `FANTASIA: ${p.name}` : ''}</p>
+                      <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">{p.city} - {p.state}</p>
                     </div>
                   </button>
                 ))
@@ -237,7 +278,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           )}
         </div>
 
-        {/* 3. Dados do Container */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
           <p className={labelClass}>3. Dados do Equipamento</p>
           <div className="grid grid-cols-2 gap-4">
@@ -272,13 +312,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           <div className="space-y-1"><label className={labelClass}>Tipo Operação</label><input className={inputClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)} /></div>
         </div>
 
-        {/* 4. Logística */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
           <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
         </div>
 
-        {/* 5. Motorista */}
         <div className="relative">
           <label className={labelBlueClass}>5. Motorista</label>
           <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
@@ -291,13 +329,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           )}
         </div>
 
-        {/* 6. Dados Finais */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Nº Ordem de Serviço</label><input className={inputClasses} value={formData.os} onChange={e => handleInputChange('os', e.target.value)} /></div>
             <div className="space-y-1"><label className={labelClass}>Aut. de Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} /></div>
+            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
           </div>
-          <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
           <div className="space-y-1">
             <label className={labelClass}>Horário Agendado</label>
             <input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm" value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
@@ -309,7 +345,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </button>
       </div>
 
-      {/* PREVIEW PANEL */}
       <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
           <OrdemColetaTemplate 
