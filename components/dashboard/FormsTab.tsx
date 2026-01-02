@@ -5,8 +5,8 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
 import OrdemColetaForm from './forms/OrdemColetaForm';
+import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
 import PreStackingTemplate from './forms/PreStackingTemplate';
-import LiberacaoVazioTemplate from './forms/LiberacaoVazioTemplate';
 import DevolucaoVazioTemplate from './forms/DevolucaoVazioTemplate';
 import { maskSeal } from '../../utils/masks';
 import { lookupCarrierByContainer } from '../../utils/carrierService';
@@ -74,11 +74,10 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {/* HIDDEN PREVIEWS FOR OTHER FORMS */}
+      {/* HIDDEN PREVIEWS FOR REMAINING OLD TEMPLATES */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
           {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
-          {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData, manualLocal: destinatarioSearch}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
           {selectedFormType === 'DEVOLUCAO_VAZIO' && <DevolucaoVazioTemplate formData={{...formData, manualLocal: destinatarioSearch}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
         </div>
       </div>
@@ -108,6 +107,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
 
             {selectedFormType === 'ORDEM_COLETA' ? (
               <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
+            ) : selectedFormType === 'LIBERACAO_VAZIO' ? (
+              <LiberacaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
             ) : (
               <div className="flex-1 p-10 text-center text-slate-400 font-bold uppercase italic">
                 O formulário {formConfigs[selectedFormType].title} está sendo migrado para o novo padrão modular.
