@@ -79,7 +79,14 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
       <div style={{ border: borderStyle, marginBottom: '10px', display: 'flex' }}>
          <div style={{ flex: 1, borderRight: borderStyle, padding: '12px' }}>
             <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>CLIENTE / EXPORTADOR</p>
-            <p style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase' }}>{selectedRemetente?.name || '---'}</p>
+            <p style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', lineHeight: '1.2' }}>
+              {selectedRemetente?.legalName || selectedRemetente?.name || '---'}
+            </p>
+            {selectedRemetente?.legalName && selectedRemetente?.name && selectedRemetente.name !== selectedRemetente.legalName && (
+              <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b', marginTop: '2px', textTransform: 'uppercase' }}>
+                FANTASIA: {selectedRemetente.name}
+              </p>
+            )}
          </div>
          <div style={{ flex: 1, padding: '12px' }}>
             <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>NAVIO</p>
