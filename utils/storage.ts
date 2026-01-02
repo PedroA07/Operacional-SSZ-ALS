@@ -20,6 +20,35 @@ export const KEYS = {
   PREFERENCES: 'als_ui_preferences'
 };
 
+const staffMapper = {
+  mapToDb: (s: Staff) => ({
+    id: s.id,
+    name: s.name,
+    username: s.username,
+    role: s.role,
+    position: s.position,
+    registrationdate: s.registrationDate, // Coincide com imagem se for lowercase no banco
+    status: s.status,
+    statussince: s.statusSince,
+    photo: s.photo,
+    emailcorp: s.emailCorp, // Correção: lowercase conforme imagem do banco
+    phonecorp: s.phoneCorp  // Correção: lowercase conforme imagem do banco
+  }),
+  mapFromDb: (s: any): Staff => ({
+    id: s.id,
+    name: s.name,
+    username: s.username,
+    role: s.role,
+    position: s.position,
+    registrationDate: s.registrationdate || s.registrationDate,
+    status: s.status,
+    statusSince: s.statussince || s.statusSince,
+    photo: s.photo,
+    emailCorp: s.emailcorp || s.emailCorp,
+    phoneCorp: s.phonecorp || s.phoneCorp
+  })
+};
+
 const userMapper = {
   mapToDb: (u: User) => ({
     id: u.id,
@@ -38,16 +67,14 @@ const userMapper = {
     is_online_visible: u.isOnlineVisible ?? true
   }),
   mapFromDb: (u: any): User => {
-    const finalLoginDate = u.lastlogin || u.last_login || u.lastLogin || new Date().toISOString();
     const isFirst = u.isfirstlogin ?? u.is_first_login ?? u.isFirstLogin ?? false;
-
     return {
       id: u.id,
       username: u.username,
       password: u.password,
       displayName: u.display_name || u.displayname || u.displayName || u.username,
       role: u.role,
-      lastLogin: finalLoginDate,
+      lastLogin: u.lastlogin || u.last_login || u.lastLogin || new Date().toISOString(),
       photo: u.photo,
       position: u.position,
       staffId: u.staff_id || u.staffid || u.staffId,
@@ -60,80 +87,11 @@ const userMapper = {
   }
 };
 
-const portMapper = {
-  mapToDb: (p: Port) => ({
-    id: p.id,
-    name: p.name,
-    legal_name: p.legalName,
-    city: p.city,
-    state: p.state,
-    cnpj: p.cnpj,
-    address: p.address,
-    neighborhood: p.neighborhood,
-    zipCode: p.zipCode, // CamelCase conforme sua imagem
-    registrationDate: new Date().toISOString()
-  }),
-  mapFromDb: (p: any): Port => ({
-    id: p.id,
-    name: p.name,
-    legalName: p.legal_name,
-    city: p.city,
-    state: p.state,
-    cnpj: p.cnpj,
-    address: p.address,
-    neighborhood: p.neighborhood,
-    zipCode: p.zipCode // CamelCase conforme sua imagem
-  })
-};
-
-const preStackingMapper = {
-  mapToDb: (ps: PreStacking) => ({
-    id: ps.id,
-    name: ps.name,
-    legal_name: ps.legalName,
-    city: ps.city,
-    state: ps.state,
-    cnpj: ps.cnpj,
-    address: ps.address,
-    neighborhood: ps.neighborhood,
-    zipCode: ps.zipCode, // CamelCase conforme sua imagem
-    registrationDate: new Date().toISOString()
-  }),
-  mapFromDb: (ps: any): PreStacking => ({
-    id: ps.id,
-    name: ps.name,
-    legalName: ps.legal_name,
-    city: ps.city,
-    state: ps.state,
-    cnpj: ps.cnpj,
-    address: ps.address,
-    neighborhood: ps.neighborhood,
-    zipCode: ps.zipCode // CamelCase conforme sua imagem
-  })
-};
-
 export const db = {
   _saveLocal: (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data)),
   _getLocal: (key: string) => JSON.parse(localStorage.getItem(key) || '[]'),
 
   isCloudActive: () => !!supabase,
-
-  updatePresence: async (userId: string, isVisible: boolean) => {
-    const now = new Date().toISOString();
-    if (supabase) {
-      await supabase.from('users').update({ 
-        last_seen: now, 
-        is_online_visible: isVisible 
-      }).eq('id', userId);
-    }
-    
-    const users = db._getLocal(KEYS.USERS);
-    const idx = users.findIndex((u: any) => u.id === userId);
-    if (idx >= 0) {
-      users[idx] = { ...users[idx], last_seen: now, is_online_visible: isVisible };
-      db._saveLocal(KEYS.USERS, users);
-    }
-  },
 
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
@@ -162,21 +120,27 @@ export const db = {
   getStaff: async (): Promise<Staff[]> => {
     if (supabase) {
       const { data } = await supabase.from('staff').select('*').order('name');
-      if (data) { db._saveLocal(KEYS.STAFF, data); return data; }
+      if (data) { 
+        const mapped = data.map(s => staffMapper.mapFromDb(s));
+        db._saveLocal(KEYS.STAFF, mapped); 
+        return mapped; 
+      }
     }
     return db._getLocal(KEYS.STAFF);
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
-    if (supabase) await supabase.from('staff').upsert(staff);
+    const payload = staffMapper.mapToDb(staff);
+    if (supabase) await supabase.from('staff').upsert(payload);
+    
     const current = db._getLocal(KEYS.STAFF);
     const idx = current.findIndex((s: Staff) => s.id === staff.id);
     if (idx >= 0) current[idx] = staff; else current.push(staff);
     db._saveLocal(KEYS.STAFF, current);
 
+    // Sincroniza usuário de acesso
     const users = await db.getUsers();
     const existingUser = users.find(u => u.staffId === staff.id);
-    
     const userToSave: User = {
       id: existingUser?.id || `u-${staff.id}`,
       username: staff.username,
@@ -189,18 +153,25 @@ export const db = {
       photo: staff.photo,
       isFirstLogin: existingUser ? existingUser.isFirstLogin : true
     };
-    
-    if (password) {
-      userToSave.password = password;
-      userToSave.isFirstLogin = false;
-    } else if (!existingUser) {
-      userToSave.password = '12345678';
-    } else {
-      userToSave.password = existingUser.password;
-    }
-
+    if (password) { userToSave.password = password; userToSave.isFirstLogin = false; }
+    else if (!existingUser) { userToSave.password = '12345678'; }
+    else { userToSave.password = existingUser.password; }
     await db.saveUser(userToSave);
     return true;
+  },
+
+  deleteStaff: async (id: string) => {
+    if (supabase) await supabase.from('staff').delete().eq('id', id);
+    const current = db._getLocal(KEYS.STAFF).filter((s: Staff) => s.id !== id);
+    db._saveLocal(KEYS.STAFF, current);
+    return true;
+  },
+
+  updatePresence: async (userId: string, isVisible: boolean) => {
+    const now = new Date().toISOString();
+    if (supabase) {
+      await supabase.from('users').update({ last_seen: now, is_online_visible: isVisible }).eq('id', userId);
+    }
   },
 
   getTrips: async (): Promise<Trip[]> => {
@@ -222,11 +193,9 @@ export const db = {
 
   getDrivers: async (): Promise<Driver[]> => {
     if (supabase) {
-      try {
-        const drivers = await driverRepository.getAll(supabase);
-        db._saveLocal(KEYS.DRIVERS, drivers);
-        return drivers;
-      } catch (e) { }
+      const drivers = await driverRepository.getAll(supabase);
+      db._saveLocal(KEYS.DRIVERS, drivers);
+      return drivers;
     }
     return db._getLocal(KEYS.DRIVERS);
   },
@@ -274,21 +243,13 @@ export const db = {
   getPorts: async (): Promise<Port[]> => {
     if (supabase) {
       const { data } = await supabase.from('ports').select('*').order('name');
-      if (data) { 
-        const mapped = data.map(p => portMapper.mapFromDb(p));
-        db._saveLocal(KEYS.PORTS, mapped); 
-        return mapped; 
-      }
+      if (data) { db._saveLocal(KEYS.PORTS, data); return data; }
     }
     return db._getLocal(KEYS.PORTS);
   },
 
   savePort: async (port: Port) => {
-    const payload = portMapper.mapToDb(port);
-    if (supabase) {
-      const { error } = await supabase.from('ports').upsert(payload, { onConflict: 'id' });
-      if (error) throw error;
-    }
+    if (supabase) await supabase.from('ports').upsert(port);
     const current = db._getLocal(KEYS.PORTS);
     const idx = current.findIndex((p: any) => p.id === port.id);
     if (idx >= 0) current[idx] = port; else current.push(port);
@@ -306,21 +267,13 @@ export const db = {
   getPreStacking: async (): Promise<PreStacking[]> => {
     if (supabase) {
       const { data } = await supabase.from('pre_stacking').select('*').order('name');
-      if (data) { 
-        const mapped = data.map(ps => preStackingMapper.mapFromDb(ps));
-        db._saveLocal(KEYS.PRE_STACKING, mapped); 
-        return mapped; 
-      }
+      if (data) { db._saveLocal(KEYS.PRE_STACKING, data); return data; }
     }
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
   savePreStacking: async (ps: PreStacking) => {
-    const payload = preStackingMapper.mapToDb(ps);
-    if (supabase) {
-      const { error } = await supabase.from('pre_stacking').upsert(payload, { onConflict: 'id' });
-      if (error) throw error;
-    }
+    if (supabase) await supabase.from('pre_stacking').upsert(ps);
     const current = db._getLocal(KEYS.PRE_STACKING);
     const idx = current.findIndex((p: any) => p.id === ps.id);
     if (idx >= 0) current[idx] = ps; else current.push(ps);
@@ -353,13 +306,6 @@ export const db = {
     return true;
   },
 
-  deleteStaff: async (id: string) => {
-    if (supabase) await supabase.from('staff').delete().eq('id', id);
-    const current = db._getLocal(KEYS.STAFF).filter((s: Staff) => s.id !== id);
-    db._saveLocal(KEYS.STAFF, current);
-    return true;
-  },
-
   getPreferences: (userId: string) => {
     const allPrefs = JSON.parse(localStorage.getItem(KEYS.PREFERENCES) || '{}');
     return allPrefs[userId] || { visibleColumns: {} };
@@ -374,9 +320,7 @@ export const db = {
 
   exportBackup: async () => {
     const backup: any = {};
-    for (const key of Object.values(KEYS)) {
-      backup[key] = localStorage.getItem(key);
-    }
+    for (const key of Object.values(KEYS)) backup[key] = localStorage.getItem(key);
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -390,12 +334,8 @@ export const db = {
     try {
       const text = await file.text();
       const backup = JSON.parse(text);
-      for (const key of Object.values(KEYS)) {
-        if (backup[key]) localStorage.setItem(key, backup[key]);
-      }
+      for (const key of Object.values(KEYS)) if (backup[key]) localStorage.setItem(key, backup[key]);
       return true;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
 };

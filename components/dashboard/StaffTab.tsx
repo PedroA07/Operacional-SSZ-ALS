@@ -269,7 +269,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                  <div>
                     <h3 className="text-lg font-black text-slate-800 uppercase">Confirmar Exclusão</h3>
                     <p className="text-xs text-slate-400 mt-2">Você está prestes a remover permanentemente:</p>
-                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
                        <p className="text-sm font-black text-slate-700 uppercase">{itemToDelete.name}</p>
                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{itemToDelete.position}</p>
                     </div>
