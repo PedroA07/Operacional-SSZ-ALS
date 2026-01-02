@@ -7,6 +7,7 @@ import JsBarcode from 'jsbarcode';
 import OrdemColetaTemplate from './forms/OrdemColetaTemplate';
 import PreStackingTemplate from './forms/PreStackingTemplate';
 import LiberacaoVazioTemplate from './forms/LiberacaoVazioTemplate';
+import DevolucaoVazioTemplate from './forms/DevolucaoVazioTemplate';
 import { maskSeal } from '../../utils/masks';
 import { lookupCarrierByContainer } from '../../utils/carrierService';
 
@@ -23,7 +24,7 @@ const formConfigs: Record<FormType, { title: string; color: string; description:
   ORDEM_COLETA: { title: 'Ordem de Coleta', color: 'bg-blue-600', description: 'Emissão de OC com campos editáveis e barcodes' },
   PRE_STACKING: { title: 'Pré-Stacking (Minuta Cheio)', color: 'bg-emerald-600', description: 'Minuta para entrega de container cheio no terminal' },
   LIBERACAO_VAZIO: { title: 'Liberação de Vazio', color: 'bg-slate-700', description: 'Documento de autorização de retirada em depósitos' },
-  DEVOLUCAO_VAZIO: { title: 'Devolução de Vazio', color: 'bg-amber-600', description: 'Comprovante de entrega de unidade vazia' },
+  DEVOLUCAO_VAZIO: { title: 'Devolução de Vazio', color: 'bg-amber-600', description: 'Minuta de entrega de unidade vazia (Depot/Santos)' },
   RETIRADA_CHEIO: { title: 'Retirada de Cheio', color: 'bg-indigo-600', description: 'Ordem para movimentação de container importado' },
 };
 
@@ -144,6 +145,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
         fileName = `OC-${driverName} - ${osNum}.pdf`;
       } else if (selectedFormType === 'LIBERACAO_VAZIO') {
         fileName = `LIBERAÇÃO DE VAZIO - ${driverName} - ${locationName}.pdf`;
+      } else if (selectedFormType === 'DEVOLUCAO_VAZIO') {
+        fileName = `DEVOLUÇÃO DE VAZIO - ${driverName} - ${locationName}.pdf`;
       } else {
         fileName = `MINUTA-${driverName} - ${osNum}.pdf`;
       }
@@ -171,6 +174,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
           {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
           {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
           {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData, manualLocal: destinatarioSearch}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+          {selectedFormType === 'DEVOLUCAO_VAZIO' && <DevolucaoVazioTemplate formData={{...formData, manualLocal: destinatarioSearch}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
         </div>
       </div>
 
@@ -200,9 +204,11 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
               <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-5 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
                 
-                {/* 1. Local de Retirada (Terminal / Porto) */}
+                {/* 1. Local de Devolução (Terminal / Depot) */}
                 <div className="space-y-1 relative">
-                  <label className={labelBlueClass}>1. Local de Retirada (Terminal / Porto)</label>
+                  <label className={labelBlueClass}>
+                    {selectedFormType === 'DEVOLUCAO_VAZIO' ? '1. Local de Devolução (Depot / Pre-stacking)' : '1. Local de Retirada (Terminal / Porto)'}
+                  </label>
                   <input 
                     type="text" 
                     placeholder="PESQUISAR OU DIGITAR LOCAL..." 
@@ -223,9 +229,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   )}
                 </div>
 
-                {/* 2. Cliente (Remetente) */}
+                {/* 2. Cliente */}
                 <div className="space-y-1 relative">
-                  <label className={labelBlueClass}>2. Cliente (Remetente)</label>
+                  <label className={labelBlueClass}>2. Cliente (Exportador/Importador)</label>
                   <input 
                     type="text" 
                     placeholder="PESQUISAR CLIENTE..." 
@@ -245,12 +251,12 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   )}
                 </div>
 
-                {/* 3. Dados Técnicos da Liberação */}
+                {/* 3. Dados Técnicos */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">3. Dados da Operação</p>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
+                    <div className="space-y-1"><label className={labelClass}>BL / Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
                     <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
                   </div>
 
@@ -274,12 +280,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className={labelClass}>Qtd. Equipamento</label>
-                      <select className={inputClasses} value={formData.qtdContainer} onChange={e => setFormData({...formData, qtdContainer: e.target.value})}>
-                        {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'].map(q => <option key={q} value={q}>{q} CONTAINER</option>)}
-                      </select>
-                    </div>
+                    <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
                     <div className="space-y-1">
                       <label className={labelClass}>Tipo</label>
                       <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
@@ -289,16 +290,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                         <option value="20DC">20DC</option>
                       </select>
                     </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className={labelClass}>Padrão</label>
-                    <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
-                      <option value="CARGA GERAL">CARGA GERAL</option>
-                      <option value="CARGO PREMIUM">CARGO PREMIUM</option>
-                      <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
-                      <option value="REEFER">REEFER</option>
-                    </select>
                   </div>
                 </div>
 
@@ -317,13 +308,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <label className={labelClass}>Observações</label>
-                  <textarea className={`${inputClasses} h-24 resize-none`} value={formData.obs} onChange={e => setFormData({...formData, obs: e.target.value.toUpperCase()})} placeholder="EX: VISTORIA PELO MOTORISTA..." />
-                </div>
-
                 <button disabled={isExporting} onClick={downloadPDF} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
-                  {isExporting ? 'GERANDO...' : 'BAIXAR LIBERAÇÃO (PDF)'}
+                  {isExporting ? 'GERANDO...' : 'BAIXAR DOCUMENTO (PDF)'}
                 </button>
               </div>
 
@@ -332,6 +318,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   {selectedFormType === 'ORDEM_COLETA' && <OrdemColetaTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                   {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                   {selectedFormType === 'LIBERACAO_VAZIO' && <LiberacaoVazioTemplate formData={{...formData, manualLocal: destinatarioSearch}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
+                  {selectedFormType === 'DEVOLUCAO_VAZIO' && <DevolucaoVazioTemplate formData={{...formData, manualLocal: destinatarioSearch}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
                 </div>
               </div>
             </div>
