@@ -1,11 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port } from '../../types';
+import { Driver, Customer, Port, PreStacking } from '../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
+import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import PreStackingTemplate from './forms/PreStackingTemplate';
 import DevolucaoVazioTemplate from './forms/DevolucaoVazioTemplate';
 import { maskSeal } from '../../utils/masks';
@@ -15,6 +16,7 @@ interface FormsTabProps {
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
+  preStacking: PreStacking[];
   initialFormId?: string | null;
 }
 
@@ -28,7 +30,7 @@ const formConfigs: Record<FormType, { title: string; color: string; description:
   RETIRADA_CHEIO: { title: 'Retirada de Cheio', color: 'bg-indigo-600', description: 'Ordem para movimentação de container importado' },
 };
 
-const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialFormId }) => {
+const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStacking, initialFormId }) => {
   const [selectedFormType, setSelectedFormType] = useState<FormType | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -52,25 +54,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
 
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
-  const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
-
-  const downloadPDF = async () => {
-    setIsExporting(true);
-    try {
-      await new Promise(r => setTimeout(r, 800));
-      const element = captureRef.current;
-      if (!element) return;
-      const canvas = await html2canvas(element, { scale: 2.5, useCORS: true, backgroundColor: "#ffffff" });
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      
-      const driverName = selectedDriver?.name || 'MOTORISTA';
-      const locationName = selectedDestinatario?.legalName || selectedDestinatario?.name || destinatarioSearch || 'NÃO INFORMADO';
-      const fileName = `${formConfigs[selectedFormType!].title} - ${driverName} - ${locationName}.pdf`;
-      pdf.save(fileName);
-    } catch (e) { console.error(e); } finally { setIsExporting(false); }
-  };
+  const selectedDestinatario = [...ports, ...preStacking].find(p => p.id === formData.destinatarioId);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -78,7 +62,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
           {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
-          {selectedFormType === 'DEVOLUCAO_VAZIO' && <DevolucaoVazioTemplate formData={{...formData, manualLocal: destinatarioSearch}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
         </div>
       </div>
 
@@ -109,6 +92,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
               <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
             ) : selectedFormType === 'LIBERACAO_VAZIO' ? (
               <LiberacaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
+            ) : selectedFormType === 'DEVOLUCAO_VAZIO' ? (
+              <DevolucaoVazioForm drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} onClose={() => setIsFormModalOpen(false)} />
             ) : (
               <div className="flex-1 p-10 text-center text-slate-400 font-bold uppercase italic">
                 O formulário {formConfigs[selectedFormType].title} está sendo migrado para o novo padrão modular.
