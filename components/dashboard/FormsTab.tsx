@@ -256,16 +256,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 <div className="bg-slate-100/50 p-5 rounded-3xl border border-slate-200 space-y-4">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-200 pb-2">3. Dados do Container e Operação</p>
                   
-                  <div className="space-y-1">
-                    <label className={labelClass}>Tipo de Operação</label>
-                    <select className={inputClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)}>
-                      <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
-                      <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
-                      <option value="COLETA">COLETA</option>
-                      <option value="ENTREGA">ENTREGA</option>
-                    </select>
-                  </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
                     <div className="space-y-1"><label className={labelClass}>Tara</label><input className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
@@ -299,6 +289,17 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                         <option value="REEFER">REEFER</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Campo de Operação agora após o Padrão */}
+                  <div className="space-y-1">
+                    <label className={labelClass}>Tipo de Operação</label>
+                    <select className={inputClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)}>
+                      <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
+                      <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
+                      <option value="COLETA">COLETA</option>
+                      <option value="ENTREGA">ENTREGA</option>
+                    </select>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
