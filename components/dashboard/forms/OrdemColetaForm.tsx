@@ -69,18 +69,28 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
 
   const handleInputChange = (field: string, value: string) => {
     const upValue = value.toUpperCase();
-    if (field === 'container') {
-      const carrier = lookupCarrierByContainer(upValue);
-      setFormData(prev => ({ 
-        ...prev, 
-        container: upValue, 
-        agencia: carrier ? carrier.name : prev.agencia 
-      }));
-    } else if (field === 'seal') {
-      setFormData(prev => ({ ...prev, seal: maskSeal(upValue) }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: upValue }));
-    }
+    
+    setFormData(prev => {
+      let next = { ...prev, [field]: upValue };
+
+      // Se for container, busca armador
+      if (field === 'container') {
+        const carrier = lookupCarrierByContainer(upValue);
+        next.agencia = carrier ? carrier.name : prev.agencia;
+      }
+
+      // Se for lacre, aplica máscara
+      if (field === 'seal') {
+        next.seal = maskSeal(upValue);
+      }
+
+      // REGRA: Se tipo for 40HR, muda padrão para REEFER
+      if (field === 'tipo' && upValue === '40HR') {
+        next.padrao = 'REEFER';
+      }
+
+      return next;
+    });
   };
 
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
@@ -102,7 +112,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       const driverName = selectedDriver?.name || 'MOTORISTA';
       const osNum = formData.os || 'SEM_OS';
       
-      // NOME DO ARQUIVO CONFORME SOLICITADO
       pdf.save(`OC - ${driverName} - ${osNum}.pdf`);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };

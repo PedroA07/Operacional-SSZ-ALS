@@ -40,7 +40,15 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   });
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value.toUpperCase() }));
+    const val = value.toUpperCase();
+    setFormData(prev => {
+      const next = { ...prev, [field]: val };
+      // REGRA: Se tipo for 40HR, muda padrão para REEFER
+      if (field === 'tipo' && val === '40HR') {
+        next.padrao = 'REEFER';
+      }
+      return next;
+    });
   };
 
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
