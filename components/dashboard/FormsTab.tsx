@@ -137,10 +137,16 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
       
       const driverName = selectedDriver?.name || 'MOTORISTA';
       const osNum = formData.os || 'SEM_OS';
+      const locationName = selectedDestinatario?.legalName || selectedDestinatario?.name || destinatarioSearch || 'NÃO INFORMADO';
       
-      const fileName = selectedFormType === 'ORDEM_COLETA' 
-        ? `OC-${driverName} - ${osNum}.pdf` 
-        : selectedFormType === 'LIBERACAO_VAZIO' ? `LIB-VAZIO-${driverName}.pdf` : `MINUTA-${driverName} - ${osNum}.pdf`;
+      let fileName = '';
+      if (selectedFormType === 'ORDEM_COLETA') {
+        fileName = `OC-${driverName} - ${osNum}.pdf`;
+      } else if (selectedFormType === 'LIBERACAO_VAZIO') {
+        fileName = `LIBERAÇÃO DE VAZIO - ${driverName} - ${locationName}.pdf`;
+      } else {
+        fileName = `MINUTA-${driverName} - ${osNum}.pdf`;
+      }
         
       pdf.save(fileName);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
