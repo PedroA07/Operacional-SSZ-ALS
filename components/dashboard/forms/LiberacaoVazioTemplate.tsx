@@ -6,15 +6,18 @@ interface LiberacaoVazioTemplateProps {
   selectedDriver: any;
   selectedRemetente: any;
   selectedDestinatario: any;
+  manualPortName?: string;
 }
 
 const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({ 
   formData, 
   selectedDriver, 
   selectedRemetente, 
-  selectedDestinatario 
+  selectedDestinatario,
+  manualPortName
 }) => {
-  const borderStyle = "1px solid #1e293b";
+  const borderStyle = "1px solid #334155";
+  const themeColor = "#334155"; // Slate-700 padrão do botão
 
   return (
     <div 
@@ -35,19 +38,19 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
       {/* CABEÇALHO */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <span style={{ fontSize: '42px', fontWeight: 900, fontStyle: 'italic', color: '#1e40af', lineHeight: '1' }}>ALS</span>
+          <span style={{ fontSize: '42px', fontWeight: 900, fontStyle: 'italic', color: themeColor, lineHeight: '1' }}>ALS</span>
           <span style={{ fontSize: '12px', fontWeight: 900, color: '#94a3b8', letterSpacing: '3px', marginLeft: '8px' }}>TRANSPORTES</span>
         </div>
       </div>
 
-      <div style={{ border: '2px solid #000', padding: '15px', textAlign: 'center', marginBottom: '20px', backgroundColor: '#f8fafc' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 900, textDecoration: 'underline', letterSpacing: '1px' }}>MINUTA DE LIBERAÇÃO DE CNTR VAZIO</h1>
+      <div style={{ border: `2px solid ${themeColor}`, padding: '15px', textAlign: 'center', marginBottom: '20px', backgroundColor: '#f8fafc' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 900, textDecoration: 'underline', letterSpacing: '1px', color: themeColor }}>MINUTA DE LIBERAÇÃO DE CNTR VAZIO</h1>
       </div>
 
       {/* DEPÓSITO / TERMINAL */}
-      <div style={{ border: '1px solid #000', padding: '15px', textAlign: 'center', marginBottom: '25px', backgroundColor: '#f0fdf4' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 900, textDecoration: 'underline' }}>
-          {selectedDestinatario?.legalName || selectedDestinatario?.name || 'SELECIONE O TERMINAL DE RETIRADA'} - {selectedDestinatario?.city || ''}
+      <div style={{ border: borderStyle, padding: '15px', textAlign: 'center', marginBottom: '25px', backgroundColor: '#f1f5f9' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 900, textDecoration: 'underline', color: themeColor }}>
+          {selectedDestinatario?.legalName || selectedDestinatario?.name || manualPortName || 'INFORMAR TERMINAL'} {selectedDestinatario?.city ? `- ${selectedDestinatario.city}` : ''}
         </h2>
       </div>
 
@@ -58,8 +61,8 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
           { label: 'CLIENTE:', value: selectedRemetente?.legalName || selectedRemetente?.name },
           { label: 'NAVIO:', value: formData.ship },
           { label: 'ARMADOR:', value: formData.agencia },
-          { label: 'POD:', value: formData.pod || 'SANTOS' },
-          { label: 'EQUIPAMENTO:', value: `01X${formData.tipo} - ${formData.padrao}` },
+          { label: 'POD:', value: formData.pod || '---' },
+          { label: 'EQUIPAMENTO:', value: `${formData.qtd || '01'}X${formData.tipo} - ${formData.padrao}` },
           { label: 'OBS:', value: formData.obs || 'VISTORIA SERÁ FEITO PELO MOTORISTA' },
           { label: 'MOTORISTA:', value: selectedDriver?.name, isHighlight: true }
         ].map((row, idx) => (
@@ -67,11 +70,11 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
             <div style={{ 
               width: '180px', 
               padding: '10px 15px', 
-              backgroundColor: row.isHighlight ? '#ecf3ff' : '#f8fafc', 
+              backgroundColor: row.isHighlight ? '#f1f5f9' : '#f8fafc', 
               borderRight: borderStyle,
               fontSize: '11px',
               fontWeight: 900,
-              color: '#1e293b'
+              color: themeColor
             }}>
               {row.label}
             </div>
@@ -91,15 +94,15 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
       {/* DADOS DO MOTORISTA (LINHA ÚNICA) */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
         <div style={{ flex: 1, display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '60px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>CPF:</div>
+          <div style={{ width: '60px', padding: '10px', backgroundColor: '#f8fafc', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center', color: themeColor }}>CPF:</div>
           <div style={{ flex: 1, padding: '10px', fontSize: '11px', fontWeight: 900 }}>{selectedDriver?.cpf || '---'}</div>
         </div>
         <div style={{ flex: 1, display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '60px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>RG:</div>
+          <div style={{ width: '60px', padding: '10px', backgroundColor: '#f8fafc', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center', color: themeColor }}>RG:</div>
           <div style={{ flex: 1, padding: '10px', fontSize: '11px', fontWeight: 900 }}>{selectedDriver?.rg || '---'}</div>
         </div>
         <div style={{ flex: 1, display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '60px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>CNH:</div>
+          <div style={{ width: '60px', padding: '10px', backgroundColor: '#f8fafc', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center', color: themeColor }}>CNH:</div>
           <div style={{ flex: 1, padding: '10px', fontSize: '11px', fontWeight: 900 }}>{selectedDriver?.cnh || '---'}</div>
         </div>
       </div>
@@ -107,11 +110,11 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
       {/* DADOS DO VEÍCULO */}
       <div style={{ display: 'flex', gap: '200px', marginBottom: '40px', justifyContent: 'center' }}>
         <div style={{ width: '220px', display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '80px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>CAVALO:</div>
-          <div style={{ flex: 1, padding: '10px', fontSize: '13px', fontWeight: 900, textAlign: 'center', color: '#1e40af' }}>{selectedDriver?.plateHorse || '---'}</div>
+          <div style={{ width: '80px', padding: '10px', backgroundColor: '#f8fafc', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center', color: themeColor }}>CAVALO:</div>
+          <div style={{ flex: 1, padding: '10px', fontSize: '13px', fontWeight: 900, textAlign: 'center', color: themeColor }}>{selectedDriver?.plateHorse || '---'}</div>
         </div>
         <div style={{ width: '220px', display: 'flex', border: borderStyle, borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ width: '80px', padding: '10px', backgroundColor: '#f0fdf4', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center' }}>CARRETA:</div>
+          <div style={{ width: '80px', padding: '10px', backgroundColor: '#f8fafc', borderRight: borderStyle, fontSize: '10px', fontWeight: 900, textAlign: 'center', color: themeColor }}>CARRETA:</div>
           <div style={{ flex: 1, padding: '10px', fontSize: '13px', fontWeight: 900, textAlign: 'center' }}>{selectedDriver?.plateTrailer || '---'}</div>
         </div>
       </div>
@@ -127,7 +130,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
         </div>
         <div style={{ opacity: 0.2 }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontSize: '48px', fontWeight: 900, fontStyle: 'italic', color: '#1e40af', lineHeight: '1' }}>ALS</span>
+            <span style={{ fontSize: '48px', fontWeight: 900, fontStyle: 'italic', color: themeColor, lineHeight: '1' }}>ALS</span>
           </div>
         </div>
       </div>
