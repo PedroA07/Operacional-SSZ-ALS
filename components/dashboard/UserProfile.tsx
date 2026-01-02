@@ -24,7 +24,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     };
     loadStaffInfo();
 
-    // REGRA: O timer local usa o lastLogin persistido na sessão (que só muda no login real)
     const updateTimer = () => {
       setSessionTime(timeUtils.calculateDuration(user.lastLogin));
     };
@@ -103,7 +102,16 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                    <span className="text-[8px] font-black text-slate-400 uppercase">Cargo / Função</span>
                    <span className="text-[9px] font-bold text-slate-700 uppercase">{user.position || 'OPERACIONAL'}</span>
                 </div>
+                {/* Novos campos de contato adicionados conforme solicitação */}
+                <div className="flex justify-between items-center border-t border-slate-50 pt-2">
+                   <span className="text-[8px] font-black text-slate-400 uppercase">E-mail Corp.</span>
+                   <span className="text-[9px] font-bold text-blue-600 lowercase">{staffData?.emailCorp || '---'}</span>
+                </div>
                 <div className="flex justify-between items-center">
+                   <span className="text-[8px] font-black text-slate-400 uppercase">Telefone Corp.</span>
+                   <span className="text-[9px] font-bold text-slate-700">{staffData?.phoneCorp || '---'}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-50 pt-2">
                    <span className="text-[8px] font-black text-slate-400 uppercase">Data Admissão</span>
                    <span className="text-[9px] font-bold text-slate-700">{formatDate(staffData?.registrationDate)}</span>
                 </div>

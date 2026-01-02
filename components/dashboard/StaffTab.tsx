@@ -193,8 +193,9 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                  </div>
                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                       <h4 className="font-black text-slate-800 uppercase text-sm leading-tight truncate">{s.name}</h4>
-                       {s.role === 'admin' && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-[6px] font-black uppercase">Admin</span>}
+                       {/* Ajustado: Remoção do truncate para exibir nome completo com quebra */}
+                       <h4 className="font-black text-slate-800 uppercase text-sm leading-tight break-words">{s.name}</h4>
+                       {s.role === 'admin' && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-[6px] font-black uppercase shrink-0">Admin</span>}
                     </div>
                     <p className="text-[10px] text-blue-500 font-bold uppercase mt-1">{s.position}</p>
                  </div>
