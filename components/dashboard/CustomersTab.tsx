@@ -184,7 +184,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                     <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{c.legalName || c.name}</p>
                     {c.legalName && c.name !== c.legalName && <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">FANTASIA: {c.name}</p>}
                   </td>
-                  <td className="px-8 py-4 font-mono font-bold text-slate-500">{maskCNPJ(c.cnpj)}</td>
+                  <td className="px-8 py-4 font-mono font-bold text-slate-500 whitespace-nowrap">{maskCNPJ(c.cnpj)}</td>
                   <td className="px-8 py-4">
                     <div className="flex flex-wrap gap-1">
                        {c.operations && c.operations.length > 0 ? c.operations.map((seg, i) => (
