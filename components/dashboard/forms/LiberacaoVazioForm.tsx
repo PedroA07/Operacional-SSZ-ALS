@@ -20,8 +20,6 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   
   const [remetenteSearch, setRemetenteSearch] = useState('');
   const [showRemetenteResults, setShowRemetenteResults] = useState(false);
-  const [destinatarioSearch, setDestinatarioSearch] = useState('');
-  const [showDestinatarioResults, setShowDestinatarioResults] = useState(false);
   const [driverSearch, setDriverSearch] = useState('');
   const [showDriverResults, setShowDriverResults] = useState(false);
 
@@ -47,7 +45,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
 
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
-  const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
+  const selectedDestinatario = null; // Removida seleção de porto cadastrado
 
   const downloadPDF = async () => {
     setIsExporting(true);
@@ -61,9 +59,8 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       
       const driverName = selectedDriver?.name || 'MOTORISTA';
-      const locationName = selectedDestinatario?.legalName || selectedDestinatario?.name || formData.manualLocal || 'NÃO INFORMADO';
+      const locationName = formData.manualLocal || 'NÃO INFORMADO';
       
-      // NOMENCLATURA CONFORME SOLICITADO
       pdf.save(`LIBERAÇÃO DE VAZIO - ${driverName} - ${locationName}.pdf`);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
@@ -81,7 +78,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
             formData={formData} 
             selectedDriver={selectedDriver} 
             selectedRemetente={selectedRemetente} 
-            selectedDestinatario={selectedDestinatario} 
+            selectedDestinatario={null} 
           />
         </div>
       </div>
@@ -89,35 +86,17 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
       {/* INPUTS SIDEBAR */}
       <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
         
-        {/* 1. Local de Retirada */}
-        <div className="relative">
-          <label className={labelBlueClass}>1. Local de Retirada (Terminal / Porto)</label>
+        {/* 1. Local de Retirada - APENAS INSERÇÃO MANUAL */}
+        <div className="space-y-1">
+          <label className={labelBlueClass}>1. Local de Retirada (Terminais não cadastrados)</label>
           <input 
             type="text" 
-            placeholder="BUSCAR OU DIGITAR LOCAL..." 
+            placeholder="DIGITE O NOME DO TERMINAL / DEPÓSITO..." 
             className={inputClasses} 
-            value={destinatarioSearch} 
-            onFocus={() => setShowDestinatarioResults(true)} 
-            onChange={e => {
-              const val = e.target.value.toUpperCase();
-              setDestinatarioSearch(val);
-              setFormData(prev => ({ ...prev, manualLocal: val, destinatarioId: '' }));
-              setShowDestinatarioResults(true);
-            }} 
+            value={formData.manualLocal} 
+            onChange={e => handleInputChange('manualLocal', e.target.value)} 
           />
-          {showDestinatarioResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
-              {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch)).map(p => (
-                <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { 
-                  setFormData({...formData, destinatarioId: p.id, manualLocal: p.name}); 
-                  setDestinatarioSearch(p.name); 
-                  setShowDestinatarioResults(false); 
-                }}>
-                  {p.name} <span className="text-slate-400 font-bold ml-2">({p.city})</span>
-                </button>
-              ))}
-            </div>
-          )}
+          <p className="text-[8px] font-bold text-slate-400 uppercase italic px-1">Este campo é de preenchimento manual direto.</p>
         </div>
 
         {/* 2. Cliente */}
@@ -207,7 +186,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
           <textarea className={`${inputClasses} h-28 resize-none py-4`} value={formData.obs} onChange={e => handleInputChange('obs', e.target.value)} placeholder="INFORMAÇÕES ADICIONAIS PARA O DEPÓSITO..." />
         </div>
 
-        <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
+        <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
           {isExporting ? 'GERANDO PDF...' : 'BAIXAR LIBERAÇÃO DE VAZIO'}
         </button>
       </div>
@@ -219,7 +198,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
             formData={formData} 
             selectedDriver={selectedDriver} 
             selectedRemetente={selectedRemetente} 
-            selectedDestinatario={selectedDestinatario} 
+            selectedDestinatario={null} 
           />
         </div>
       </div>
