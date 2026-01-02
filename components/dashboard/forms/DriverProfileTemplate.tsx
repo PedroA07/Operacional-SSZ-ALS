@@ -162,19 +162,6 @@ const DriverProfileTemplate: React.FC<DriverProfileTemplateProps> = ({ driver, v
           </div>
         )}
 
-        {/* VÍNCULO DE OPERAÇÕES */}
-        {visibility.operations && (
-          <div style={{ marginBottom: '25px', padding: '15px', border: borderStyle, borderRadius: '12px' }}>
-             <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '10px' }}>VÍNCULO OPERACIONAL DE CLIENTES</p>
-             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {driver.operations.map((op, i) => (
-                  <span key={i} style={{ fontSize: '9px', fontWeight: '900', backgroundColor: '#f1f5f9', color: '#1e293b', padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>{op.client}</span>
-                ))}
-                {driver.operations.length === 0 && <span style={{ fontSize: '9px', color: '#cbd5e1', fontWeight: 'bold' }}>SEM VÍNCULOS ESPECÍFICOS ATIVOS</span>}
-             </div>
-          </div>
-        )}
-
         {/* GRUPO WHATSAPP */}
         {visibility.whatsapp && driver.whatsappGroupLink && (
           <div style={{ marginBottom: '25px', padding: '15px', border: '1px dashed #10b981', borderRadius: '15px', backgroundColor: '#f0fdf4' }}>
@@ -206,28 +193,6 @@ const DriverProfileTemplate: React.FC<DriverProfileTemplateProps> = ({ driver, v
           <p style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 'bold' }}>ESTE DOCUMENTO É PARA USO EXCLUSIVO DA ALS TRANSPORTES E PARCEIROS OPERACIONAIS.</p>
         </div>
       </div>
-
-      {/* PÁGINA 2: ANEXO CNH (SE EXISTIR) */}
-      {driver.cnhPdfUrl && (
-        <div 
-          id={`driver-cnh-attachment-${driver.id}`}
-          style={{ 
-            width: '794px', 
-            height: '1123px', 
-            padding: '50px',
-            backgroundColor: '#ffffff',
-            boxSizing: 'border-box'
-          }}
-        >
-          <div style={{ borderBottom: '2px solid #1e40af', paddingBottom: '10px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <p style={{ fontSize: '12px', fontWeight: 900, color: '#1e40af' }}>ANEXO: DOCUMENTO CNH - {driver.name}</p>
-            <span style={{ fontSize: '32px', fontWeight: 900, fontStyle: 'italic', color: '#1e40af', opacity: 0.1 }}>ALS</span>
-          </div>
-          <div style={{ width: '100%', height: 'calc(100% - 100px)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed #cbd5e1', borderRadius: '20px', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
-             <img src={driver.cnhPdfUrl} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-          </div>
-        </div>
-      )}
     </div>
   );
 };

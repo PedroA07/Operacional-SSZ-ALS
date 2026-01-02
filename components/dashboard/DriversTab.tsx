@@ -26,48 +26,39 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [showPassMap, setShowPassMap] = useState<Record<string, boolean>>({});
   
   const [visibility, setVisibility] = useState({
     driverInfo: true,
     contacts: true,
     equipment: true,
     type: true,
-    beneficiary: false,
-    whatsapp: false,
-    operations: false,
-    portal: false
+    beneficiary: true,
+    whatsapp: true,
+    operations: true,
+    portal: true
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
   
   const initialForm: Partial<Driver> = {
-    photo: '', name: '', cpf: '', rg: '', cnh: '', cnhPdfUrl: '',
+    photo: '', name: '', cpf: '', rg: '', cnh: '',
     phone: '', email: '', 
     plateHorse: '', yearHorse: '', plateTrailer: '', yearTrailer: '',
     driverType: 'Externo', status: 'Ativo',
     beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '',
     beneficiaryCnpj: '', paymentPreference: 'PIX',
     whatsappGroupName: '', whatsappGroupLink: '',
-    operations: [], hasAccess: true,
-    tripsCount: 0
+    operations: [], hasAccess: true
   };
 
   const [form, setForm] = useState<Partial<Driver>>(initialForm);
 
-  const loadData = async () => {
-    try {
-      const u = await db.getUsers();
-      setUsers(u || []);
-    } catch (err) {
-      console.error("Erro ao carregar usuários:", err);
-    }
+  const loadUsers = async () => {
+    const u = await db.getUsers();
+    setUsers(u || []);
   };
 
-  useEffect(() => {
-    loadData();
-  }, [drivers, isModalOpen]);
+  useEffect(() => { loadUsers(); }, [drivers, isModalOpen]);
 
   const handleOpenModal = (d?: Driver) => {
     setForm(d ? { ...d } : initialForm);
@@ -77,22 +68,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
   const handleOpenPreview = (d: Driver) => {
     setSelectedDriver(d);
-    setVisibility({
-      driverInfo: true,
-      contacts: true,
-      equipment: true,
-      type: true,
-      beneficiary: false,
-      whatsapp: false,
-      operations: false,
-      portal: false
-    });
     setIsPreviewModalOpen(true);
-  };
-
-  const confirmDelete = (d: Driver) => {
-    setItemToDelete(d);
-    setIsDeleteModalOpen(true);
   };
 
   const executeDelete = async () => {
@@ -112,63 +88,23 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     }
   };
 
-  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && (file.type === 'application/pdf' || file.type.startsWith('image/'))) {
-      const reader = new FileReader();
-      reader.onloadend = () => setForm(prev => ({ ...prev, cnhPdfUrl: reader.result as string }));
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleLinkChange = (link: string) => {
-    let groupName = form.whatsappGroupName || '';
-    if (link && !form.whatsappGroupName) {
-      const parts = link.split('/');
-      const code = parts[parts.length - 1];
-      if (code) groupName = `GRUPO ${code.substring(0, 8).toUpperCase()}`;
-    }
-    setForm(prev => ({ ...prev, whatsappGroupLink: link, whatsappGroupName: groupName }));
-  };
-
-  const toggleOperation = (category: string, clientName: string) => {
-    const currentOps = [...(form.operations || [])];
-    const index = currentOps.findIndex(op => op.category === category && op.client === clientName);
-    if (index >= 0) currentOps.splice(index, 1);
-    else currentOps.push({ category, client: clientName });
-    setForm(prev => ({ ...prev, operations: currentOps }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
-    
     setIsSaving(true);
     try {
       const drvId = editingId || `drv-${Date.now()}`;
       
-      const finalForm = {
-        ...form,
-        beneficiaryName: form.beneficiaryName || form.name,
-        beneficiaryPhone: form.beneficiaryPhone || form.phone,
-        beneficiaryCnpj: form.beneficiaryCnpj || form.cpf,
-        beneficiaryEmail: form.beneficiaryEmail || form.email,
-        registrationDate: form.registrationDate || new Date().toISOString(),
-        statusLastChangeDate: (!editingId || (editingId && drivers.find(d => d.id === editingId)?.status !== form.status)) 
-          ? new Date().toISOString() 
-          : form.statusLastChangeDate || new Date().toISOString()
-      };
-
-      const { password } = await driverAuthService.syncUserRecord(drvId, finalForm, form.generatedPassword);
+      // Sincroniza usuário e gera senha se for novo
+      const { password } = await driverAuthService.syncUserRecord(drvId, form, form.generatedPassword);
       
       await onSaveDriver({ 
-        ...finalForm, 
+        ...form, 
         id: drvId,
         generatedPassword: password 
       }, editingId);
       
       setIsModalOpen(false);
-      await loadData();
     } catch (err: any) {
       alert(`FALHA AO SALVAR: ${err.message}`);
     } finally {
@@ -177,51 +113,10 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   };
 
   const handleUpdatePassword = async (driverId: string) => {
-    const newPass = prompt("Digite a nova senha para este motorista:");
+    const newPass = prompt("Definir nova senha operacional:");
     if (newPass && newPass.length >= 4) {
       await driverAuthService.updatePassword(driverId, newPass);
-      await loadData();
-      alert("Senha atualizada com sucesso!");
-    }
-  };
-
-  const openPdf = (url?: string) => {
-    if (!url) return;
-    const win = window.open();
-    if (win) {
-      win.document.write(`<iframe src="${url}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-    }
-  };
-
-  const handleDownloadProfile = async () => {
-    if (!selectedDriver) return;
-    setIsExporting(true);
-    try {
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      
-      const dataEl = document.getElementById(`driver-profile-card-${selectedDriver.id}`);
-      if (dataEl) {
-        const canvas1 = await html2canvas(dataEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-        const imgData1 = canvas1.toDataURL('image/jpeg', 0.95);
-        pdf.addImage(imgData1, 'JPEG', 0, 0, 210, 297);
-      }
-
-      if (selectedDriver.cnhPdfUrl) {
-        pdf.addPage();
-        const cnhEl = document.getElementById(`driver-cnh-attachment-${selectedDriver.id}`);
-        if (cnhEl) {
-          const canvas2 = await html2canvas(cnhEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-          const imgData2 = canvas2.toDataURL('image/jpeg', 0.95);
-          pdf.addImage(imgData2, 'JPEG', 0, 0, 210, 297);
-        }
-      }
-
-      pdf.save(`FICHA_CADASTRAL_${selectedDriver.name.replace(/\s+/g, '_')}.pdf`);
-      setIsPreviewModalOpen(false);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsExporting(false);
+      loadUsers();
     }
   };
 
@@ -231,7 +126,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     d.plateHorse.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
+  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1";
 
   return (
     <div className="max-w-full mx-auto space-y-6">
@@ -244,9 +140,11 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
         </div>
-        <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl active:scale-95">Novo Cadastro</button>
+        <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl active:scale-95">Novo Motorista</button>
       </div>
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
@@ -254,115 +152,67 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
-                <th className="px-6 py-5">1. Identificação / Beneficiário</th>
-                <th className="px-6 py-5 text-blue-600">2. Documentos</th>
-                <th className="px-6 py-5">3. Contatos / Grupo</th>
-                <th className="px-6 py-5">4. Equipamento</th>
-                <th className="px-6 py-5">5. Vínculo</th>
-                <th className="px-6 py-5">6. Status / Tipo</th>
-                <th className="px-6 py-5">7. Portal</th>
+                <th className="px-6 py-5">Identificação</th>
+                <th className="px-6 py-5">Equipamento (Placa/Ano)</th>
+                <th className="px-6 py-5">Contatos / WhatsApp</th>
+                <th className="px-6 py-5">Portal (Login / Senha)</th>
+                <th className="px-6 py-5">Status</th>
                 <th className="px-6 py-5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredDrivers.map(d => {
-                const linkedUser = users.find(u => u.driverId === d.id || (u.username === d.cpf.replace(/\D/g, '')));
-                const isPassVisible = showPassMap[d.id];
-                
+                const linkedUser = users.find(u => u.driverId === d.id);
                 return (
-                  <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
+                  <tr key={d.id} className="hover:bg-slate-50/50 align-middle transition-colors">
                     <td className="px-6 py-4">
-                      <div className="flex gap-4">
-                         <div className="w-12 h-12 rounded-full bg-slate-100 border-2 border-white shadow-sm overflow-hidden flex-shrink-0 ring-1 ring-slate-200">
-                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 italic text-[8px]">ALS</div>}
+                      <div className="flex items-center gap-4">
+                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
+                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 italic text-[8px]">ALS</div>}
                          </div>
-                         <div className="min-w-0">
-                            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight whitespace-normal max-w-[200px]">{d.name}</p>
-                            <div className="mt-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
-                               <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest border-b border-blue-50 pb-1 mb-1">Dados de Pagamento</p>
-                               <p className="text-[9px] font-black text-slate-700 uppercase whitespace-normal leading-tight">{d.beneficiaryName || d.name}</p>
-                               <p className="text-[8px] font-mono font-bold text-slate-500">{d.beneficiaryCnpj || d.cpf}</p>
-                               <p className="text-[8px] font-bold text-slate-500">{d.beneficiaryPhone || d.phone}</p>
-                            </div>
+                         <div>
+                            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{d.name}</p>
+                            <p className="text-[9px] text-slate-400 font-bold mt-1">CPF: {d.cpf}</p>
                          </div>
                       </div>
                     </td>
-
                     <td className="px-6 py-4">
-                      <div className="space-y-1">
-                         <div className="flex justify-between items-center bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                            <span className="text-[8px] font-black text-slate-400">CPF:</span>
-                            <span className="text-[9px] font-mono font-bold text-slate-700">{d.cpf}</span>
-                         </div>
-                         <div className="flex justify-between items-center px-2 py-1">
-                            <span className="text-[8px] font-black text-slate-400">RG:</span>
-                            <span className="text-[9px] font-mono font-bold text-slate-600">{d.rg || '---'}</span>
-                         </div>
-                         <button 
-                            onClick={() => d.cnhPdfUrl && openPdf(d.cnhPdfUrl)}
-                            disabled={!d.cnhPdfUrl}
-                            className={`w-full flex items-center justify-center gap-1.5 mt-1 px-2 py-1 rounded-md text-[8px] font-black uppercase border transition-all ${d.cnhPdfUrl ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white' : 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'}`}
-                         >
-                            {d.cnhPdfUrl ? 'Ver CNH (PDF)' : 'Sem PDF'}
-                         </button>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <div className="space-y-2">
-                         <div className="space-y-0.5">
-                            <p className="text-blue-600 font-black text-[10px] leading-none">{d.phone}</p>
-                            <p className="text-slate-400 font-bold text-[8px] lowercase truncate max-w-[130px]">{d.email || 'sem e-mail'}</p>
-                         </div>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4">
-                       <div className="space-y-2">
-                          <div className="bg-slate-900 px-3 py-2 rounded-xl text-white">
-                             <span className="text-[10px] font-black font-mono">{d.plateHorse}</span>
+                       <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                             <span className="bg-slate-900 text-white px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateHorse}</span>
+                             <span className="text-[9px] font-black text-slate-400">{d.yearHorse || '---'}</span>
                           </div>
-                          <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
-                             <span className="text-[10px] font-black font-mono text-slate-700">{d.plateTrailer}</span>
+                          <div className="flex items-center gap-2">
+                             <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateTrailer}</span>
+                             <span className="text-[9px] font-black text-slate-300">{d.yearTrailer || '---'}</span>
                           </div>
                        </div>
                     </td>
-
                     <td className="px-6 py-4">
-                       <div className="flex flex-wrap gap-1 max-w-[120px]">
-                          {(d.operations || []).length > 0 ? d.operations.map((op, idx) => (
-                             <span key={idx} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[7px] font-black uppercase">
-                                {op.client}
-                             </span>
-                          )) : <span className="text-[8px] font-bold text-slate-300 uppercase italic">Sem Vínculo</span>}
+                       <p className="text-blue-600 font-black text-[10px]">{d.phone}</p>
+                       <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase truncate max-w-[120px]">{d.whatsappGroupName || 'Sem Grupo'}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="bg-blue-50 p-2 rounded-xl border border-blue-100 space-y-1">
+                          <div className="flex justify-between text-[8px] font-black uppercase text-blue-400">
+                             <span>Login:</span>
+                             <span className="text-slate-800 font-mono">{d.cpf.replace(/\D/g, '')}</span>
+                          </div>
+                          <div className="flex justify-between text-[8px] font-black uppercase text-blue-400">
+                             <span>Senha:</span>
+                             <span className="text-emerald-600 font-mono font-black">{linkedUser?.password || d.generatedPassword || '---'}</span>
+                          </div>
                        </div>
                     </td>
-
                     <td className="px-6 py-4">
-                      <div className="flex flex-col gap-2">
-                        <span className="px-2 py-0.5 bg-blue-600 text-white rounded text-[8px] font-black uppercase w-fit shadow-sm">
-                           {d.driverType || 'Externo'}
-                        </span>
-                        <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase border w-fit ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                            {d.status}
-                        </span>
-                      </div>
+                       <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                          {d.status}
+                       </span>
                     </td>
-
-                    <td className="px-6 py-4">
-                      <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-1.5 min-w-[140px]">
-                         <div className="flex justify-between items-center text-[8px] font-black text-blue-400 uppercase tracking-tighter">
-                            <span>Login:</span>
-                            <span className="text-slate-700 font-mono font-black">{linkedUser?.username || d.cpf.replace(/\D/g, '')}</span>
-                         </div>
-                         <button onClick={() => handleUpdatePassword(d.id)} className="w-full mt-2 py-1 bg-white text-blue-600 rounded-lg border border-blue-200 text-[7px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">Alterar Senha</button>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
-                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="Ver Ficha"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeWidth="2.5"/><path d="M9 11l3 3L15 11" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => confirmDelete(d)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                    <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
+                      <button onClick={() => handleUpdatePassword(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Definir Senha"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Ficha PDF"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                     </td>
                   </tr>
                 );
@@ -372,7 +222,139 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         </div>
       </div>
 
-      {/* MODAL DE EXCLUSÃO CUSTOMIZADO */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-black text-slate-800 text-lg uppercase">{editingId ? 'Editar Cadastro' : 'Novo Motorista'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
+              
+              {/* SEÇÃO 1: DADOS BÁSICOS */}
+              <div className="grid grid-cols-12 gap-8">
+                 <div className="col-span-3">
+                    <label className={labelClass}>Foto do Motorista</label>
+                    <div onClick={() => fileInputRef.current?.click()} className="aspect-[3/4] rounded-3xl bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden group">
+                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : (
+                         <>
+                           <svg className="w-8 h-8 text-slate-300 mb-2 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2"/></svg>
+                           <span className="text-[8px] font-black text-slate-400 uppercase">Anexar Imagem</span>
+                         </>
+                       )}
+                    </div>
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                 </div>
+
+                 <div className="col-span-9 space-y-5">
+                    <div className="space-y-1">
+                       <label className={labelClass}>Nome Completo</label>
+                       <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-black uppercase text-xl focus:border-blue-500 outline-none" value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                       <div className="space-y-1"><label className={labelClass}>CPF</label><input required className={inputClasses} value={form.cpf} onChange={e => setForm({...form, cpf: maskCPF(e.target.value)})} /></div>
+                       <div className="space-y-1"><label className={labelClass}>RG</label><input className={inputClasses} value={form.rg} onChange={e => setForm({...form, rg: maskRG(e.target.value)})} /></div>
+                       <div className="space-y-1"><label className={labelClass}>Registro CNH</label><input className={inputClasses} value={form.cnh} onChange={e => setForm({...form, cnh: e.target.value.toUpperCase()})} /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-1"><label className={labelClass}>Telefone Celular</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
+                       <div className="space-y-1"><label className={labelClass}>E-mail</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value.toLowerCase()})} /></div>
+                    </div>
+                 </div>
+              </div>
+
+              {/* SEÇÃO 2: EQUIPAMENTO (PLACA + ANO) */}
+              <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white">
+                 <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-6">Informações do Veículo</h4>
+                 <div className="grid grid-cols-2 gap-8">
+                    <div className="grid grid-cols-3 gap-3">
+                       <div className="col-span-2 space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Placa Cavalo</label><input required className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" value={form.plateHorse} onChange={e => setForm({...form, plateHorse: maskPlate(e.target.value)})} /></div>
+                       <div className="space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" maxLength={4} value={form.yearHorse} onChange={e => setForm({...form, yearHorse: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                       <div className="col-span-2 space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Placa Carreta</label><input required className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: maskPlate(e.target.value)})} /></div>
+                       <div className="space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" maxLength={4} value={form.yearTrailer} onChange={e => setForm({...form, yearTrailer: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
+                    </div>
+                 </div>
+              </div>
+
+              {/* SEÇÃO 3: FINANCEIRO (BENEFICIÁRIO) */}
+              <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 space-y-6">
+                 <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Módulo Financeiro (Beneficiário)</h4>
+                    <div className="flex gap-2">
+                       <button type="button" onClick={() => setForm({...form, beneficiaryName: form.name, beneficiaryCnpj: form.cpf, beneficiaryPhone: form.phone})} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Copiar dados do motorista</button>
+                    </div>
+                 </div>
+                 <div className="grid grid-cols-12 gap-5">
+                    <div className="col-span-3 space-y-1">
+                       <label className={labelClass}>Preferência Pagamento</label>
+                       <select className={inputClasses} value={form.paymentPreference} onChange={e => setForm({...form, paymentPreference: e.target.value as any})}>
+                          <option value="PIX">PIX (INSTANTÂNEO)</option>
+                          <option value="TED">TED (TRANSFERÊNCIA)</option>
+                       </select>
+                    </div>
+                    <div className="col-span-6 space-y-1">
+                       <label className={labelClass}>Nome Completo Favorecido</label>
+                       <input className={inputClasses} value={form.beneficiaryName} onChange={e => setForm({...form, beneficiaryName: e.target.value.toUpperCase()})} />
+                    </div>
+                    <div className="col-span-3 space-y-1">
+                       <label className={labelClass}>CPF / CNPJ Beneficiário</label>
+                       <input className={inputClasses} value={form.beneficiaryCnpj} onChange={e => setForm({...form, beneficiaryCnpj: e.target.value})} />
+                    </div>
+                    <div className="col-span-4 space-y-1">
+                       <label className={labelClass}>Telefone para Comprovante</label>
+                       <input className={inputClasses} value={form.beneficiaryPhone} onChange={e => setForm({...form, beneficiaryPhone: maskPhone(e.target.value)})} />
+                    </div>
+                    <div className="col-span-8 space-y-1">
+                       <label className={labelClass}>E-mail / Chave PIX</label>
+                       <input className={`${inputClasses} lowercase`} value={form.beneficiaryEmail} onChange={e => setForm({...form, beneficiaryEmail: e.target.value})} />
+                    </div>
+                 </div>
+              </div>
+
+              {/* SEÇÃO 4: WHATSAPP E OPERACIONAL */}
+              <div className="grid grid-cols-2 gap-8">
+                 <div className="p-8 bg-emerald-50 rounded-[2.5rem] border border-emerald-100 space-y-5">
+                    <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Comunicação WhatsApp</h4>
+                    <div className="space-y-1"><label className={labelClass}>Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm({...form, whatsappGroupName: e.target.value.toUpperCase()})} placeholder="EX: VOLKSWAGEN - ALS" /></div>
+                    <div className="space-y-1"><label className={labelClass}>Link de Convite</label><input className={`${inputClasses} lowercase`} value={form.whatsappGroupLink} onChange={e => setForm({...form, whatsappGroupLink: e.target.value})} placeholder="https://chat.whatsapp.com/..." /></div>
+                 </div>
+                 <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-5">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Configurações de Status</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-1"><label className={labelClass}>Tipo de Vínculo</label><select className={inputClasses} value={form.driverType} onChange={e => setForm({...form, driverType: e.target.value as any})}><option value="Externo">Terceiro / Externo</option><option value="Frota">Frota ALS</option><option value="Motoboy">Motoboy</option></select></div>
+                       <div className="space-y-1"><label className={labelClass}>Status Sistema</label><select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}><option value="Ativo">Ativo / Liberado</option><option value="Inativo">Inativo / Bloqueado</option></select></div>
+                    </div>
+                    <div className="pt-2">
+                       <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50">
+                          {isSaving ? 'Gravando Dados...' : 'Finalizar Cadastro'}
+                       </button>
+                    </div>
+                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PREVIEW PDF */}
+      {isPreviewModalOpen && selectedDriver && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-slate-950/90 backdrop-blur-xl">
+           <div className="bg-white w-full max-w-7xl h-full rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                 <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 italic">Visualização de Ficha Cadastral ALS</h3>
+                 <button onClick={() => setIsPreviewModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-slate-200 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+              </div>
+              <div className="flex-1 overflow-auto bg-slate-200 p-12 flex justify-center">
+                 <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
+                    <DriverProfileTemplate driver={selectedDriver} visibility={visibility} />
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       {isDeleteModalOpen && itemToDelete && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
            <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
@@ -381,112 +363,19 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
                  </div>
                  <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Confirmar Exclusão</h3>
+                    <h3 className="text-lg font-black text-slate-800 uppercase">Confirmar Exclusão</h3>
                     <p className="text-xs text-slate-400 mt-2">Deseja remover permanentemente este motorista?</p>
-                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
                        <p className="text-sm font-black text-slate-700 uppercase">{itemToDelete.name}</p>
                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Placa: {itemToDelete.plateHorse}</p>
                     </div>
                  </div>
                  <div className="grid grid-cols-2 gap-3 pt-4">
-                    <button onClick={() => { setIsDeleteModalOpen(false); setItemToDelete(null); }} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
+                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
                     <button onClick={executeDelete} className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-red-700 transition-all">Sim, Excluir</button>
                  </div>
               </div>
            </div>
-        </div>
-      )}
-
-      {/* MODAL DE PRÉ-VISUALIZAÇÃO */}
-      {isPreviewModalOpen && selectedDriver && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-slate-900/80 backdrop-blur-xl">
-           <div className="bg-slate-50 w-full max-w-7xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex animate-in zoom-in-95">
-              <div className="w-96 bg-white border-r border-slate-200 p-10 flex flex-col">
-                 <div className="flex items-center gap-4 mb-10">
-                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic shadow-lg">ALS</div>
-                    <div><h3 className="text-sm font-black text-slate-800 uppercase">Editor de Ficha</h3><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Opções de Visibilidade</p></div>
-                 </div>
-                 <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2">
-                    {['driverInfo', 'contacts', 'equipment', 'type', 'beneficiary', 'whatsapp', 'operations', 'portal'].map(id => (
-                      <button key={id} onClick={() => setVisibility(prev => ({ ...prev, [id]: !prev[id as keyof typeof visibility] }))} className={`w-full p-4 rounded-3xl border-2 text-left transition-all flex items-center gap-4 ${visibility[id as keyof typeof visibility] ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}>
-                         <span className="text-[10px] font-black uppercase tracking-tight flex-1">{id}</span>
-                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${visibility[id as keyof typeof visibility] ? 'border-blue-600' : 'border-slate-100'}`}>{visibility[id as keyof typeof visibility] && <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>}</div>
-                      </button>
-                    ))}
-                 </div>
-                 <button onClick={handleDownloadProfile} className="w-full mt-6 py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all">Baixar PDF</button>
-                 <button onClick={() => setIsPreviewModalOpen(false)} className="w-full mt-3 py-3 text-slate-400 text-[10px] font-black uppercase hover:text-red-500">Voltar</button>
-              </div>
-              <div className="flex-1 bg-slate-200 p-12 overflow-y-auto flex flex-col items-center custom-scrollbar">
-                 <div className="origin-top transform scale-[0.6] xl:scale-[0.75] shadow-2xl">
-                    <DriverProfileTemplate driver={selectedDriver} visibility={visibility} />
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 h-[95vh] flex flex-col">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-black text-slate-700 text-lg uppercase">{editingId ? 'Editar Motorista' : 'Novo Motorista'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-8 grid grid-cols-12 gap-8 flex-1 overflow-y-auto custom-scrollbar">
-              <div className="col-span-8 space-y-8">
-                <div className="flex gap-8 items-start">
-                  <div className="w-32 aspect-[3/4] rounded-[1.5rem] bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-400 transition-all" onClick={() => fileInputRef.current?.click()}>
-                    {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-slate-400 uppercase text-center p-2">Anexar<br/>Foto</span>}
-                  </div>
-                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
-                  <div className="flex-1 space-y-4">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Completo</label>
-                    <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-black uppercase text-xl focus:border-blue-500 outline-none" value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CPF</label><input required className={inputClasses} value={form.cpf} onChange={e => setForm({...form, cpf: maskCPF(e.target.value)})} /></div>
-                      <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">RG</label><input className={inputClasses} value={form.rg} onChange={e => setForm({...form, rg: maskRG(e.target.value)})} /></div>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">Telefone Principal</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
-                  <div className="space-y-1"><label className="text-[9px] font-black text-blue-500 uppercase ml-1">E-mail Operacional</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
-                </div>
-                <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200 space-y-5">
-                   <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Vínculo de Operações</h4>
-                   <div className="grid grid-cols-2 gap-4">
-                      {availableOps.map(op => (
-                        <div key={op.id} className="p-4 bg-white rounded-2xl border border-slate-100 space-y-3">
-                           <p className="text-[10px] font-black uppercase text-slate-800">{op.category}</p>
-                           <div className="flex flex-wrap gap-2">
-                              {op.clients.map(client => {
-                                const isSelected = (form.operations || []).some(o => o.client === client.name);
-                                return <button key={client.name} type="button" onClick={() => toggleOperation(op.category, client.name)} className={`px-3 py-2 rounded-xl text-[9px] font-bold uppercase border transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}>{client.name}</button>
-                              })}
-                           </div>
-                        </div>
-                      ))}
-                   </div>
-                </div>
-              </div>
-              <div className="col-span-4 space-y-6">
-                <div className="bg-slate-900 p-6 rounded-[2rem] text-white space-y-4">
-                   <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Equipamento</h4>
-                   <div className="grid grid-cols-2 gap-2">
-                     <div className="space-y-1"><label className="text-[8px] font-black uppercase">Placa Cavalo</label><input required className={inputClasses} value={form.plateHorse} onChange={e => setForm({...form, plateHorse: maskPlate(e.target.value)})} /></div>
-                     <div className="space-y-1"><label className="text-[8px] font-black uppercase">Placa Carr.</label><input required className={inputClasses} value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: maskPlate(e.target.value)})} /></div>
-                   </div>
-                </div>
-                <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 space-y-4">
-                   <h4 className="text-[10px] font-black text-blue-600 uppercase">Parâmetros</h4>
-                   <div className="space-y-1"><label className="text-[8px] font-black uppercase">Tipo</label><select className={inputClasses} value={form.driverType} onChange={e => setForm({...form, driverType: e.target.value as any})}><option value="Externo">Externo</option><option value="Frota">Frota ALS</option></select></div>
-                   <div className="space-y-1"><label className="text-[8px] font-black uppercase">Status</label><select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option></select></div>
-                </div>
-                <button type="submit" disabled={isSaving} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[12px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all disabled:bg-slate-400">{isSaving ? 'Salvando...' : 'Finalizar Cadastro'}</button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
     </div>

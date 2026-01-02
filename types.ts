@@ -77,7 +77,7 @@ export interface Trip {
   container: string;
   tara?: string;
   seal?: string;
-  cva?: string; // Novo campo
+  cva?: string; 
   customer: { id: string; name: string; city: string; state?: string };
   driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string };
   status: TripStatus;
@@ -97,24 +97,24 @@ export interface Driver {
   cpf: string;
   rg?: string;
   cnh?: string;
-  cnhPdfUrl?: string; // Novo campo para anexo PDF
+  cnhPdfUrl?: string; 
   photo?: string;
   phone: string;
   email?: string;
   plateHorse: string;
-  yearHorse?: string;
+  yearHorse?: string; // Novo
   plateTrailer: string;
-  yearTrailer?: string;
+  yearTrailer?: string; // Novo
   driverType: 'Frota' | 'Externo' | 'Motoboy';
   status: 'Ativo' | 'Inativo';
   statusLastChangeDate?: string;
-  beneficiaryName?: string;
-  beneficiaryPhone?: string;
-  beneficiaryEmail?: string;
-  beneficiaryCnpj?: string;
-  paymentPreference?: 'PIX' | 'TED';
-  whatsappGroupName?: string;
-  whatsappGroupLink?: string;
+  beneficiaryName?: string; // Novo
+  beneficiaryPhone?: string; // Novo
+  beneficiaryEmail?: string; // Novo
+  beneficiaryCnpj?: string; // Novo
+  paymentPreference?: 'PIX' | 'TED'; // Novo
+  whatsappGroupName?: string; // Novo
+  whatsappGroupLink?: string; // Novo
   registrationDate?: string;
   operations: DriverOperation[];
   tripsCount?: number;
