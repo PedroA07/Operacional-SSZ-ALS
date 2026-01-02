@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface OrdemColetaTemplateProps {
@@ -157,7 +158,6 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
           </div>
           <div style={{ flex: '1', minWidth: '120px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CPF</div>
-            {/* Fix error in file components/dashboard/forms/OrdemColetaTemplate.tsx on line 161: Object literal may only specify known properties, and 'fontMono' does not exist in type 'Properties<string | number, string | number>' */}
             <div style={{ fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace' }}>{selectedDriver?.cpf || '---'}</div>
           </div>
           <div style={{ flex: '0.8', minWidth: '90px' }}>

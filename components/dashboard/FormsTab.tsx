@@ -74,7 +74,6 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
     }
   }, [initialFormId]);
 
-  // Ajusta comportamentos específicos ao trocar o tipo de formulário selecionado
   useEffect(() => {
     if (selectedFormType === 'ORDEM_COLETA') {
       setFormData(prev => ({ ...prev, pod: 'SANTOS', obs: '' }));
@@ -193,26 +192,37 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
               <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-5 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
                 
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Cliente / Solicitante</label>
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Remetente (Razão Social + Fantasia)</label>
                   <input 
                     type="text" 
-                    placeholder="BUSCAR CLIENTE..." 
+                    placeholder="PESQUISAR CLIENTE, RAZÃO OU CNPJ..." 
                     className={inputClasses} 
                     value={remetenteSearch} 
                     onFocus={() => setShowRemetenteResults(true)} 
                     onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); }} 
                   />
                   {showRemetenteResults && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-blue-500">
                       {filteredRemetentes.map(c => (
-                        <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.name); setShowRemetenteResults(false); }}>{c.name}</button>
+                        <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-bold uppercase border-b border-slate-50 group" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.legalName ? `${c.legalName} (${c.name})` : c.name); setShowRemetenteResults(false); }}>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-black text-slate-800 group-hover:text-blue-600 leading-tight">{c.legalName || c.name}</p>
+                              {c.legalName && c.name !== c.legalName && (
+                                <p className="text-[8px] text-slate-400 font-black mt-0.5 uppercase">FANTASIA: {c.name}</p>
+                              )}
+                              <p className="text-[7px] text-slate-400 font-mono mt-0.5">{c.cnpj}</p>
+                            </div>
+                            <span className="text-[8px] font-black bg-blue-50 text-blue-400 px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">{c.city}</span>
+                          </div>
+                        </button>
                       ))}
                     </div>
                   )}
                 </div>
 
                 <div className="space-y-1 relative">
-                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Depósito / Porto (Local Retirada)</label>
+                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Destinatário (Terminal / Porto)</label>
                   <input 
                     type="text" 
                     placeholder={selectedFormType === 'LIBERACAO_VAZIO' ? "BUSCAR OU DIGITAR TERMINAL..." : "BUSCAR TERMINAL..."}
@@ -222,9 +232,19 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                     onChange={e => { setDestinatarioSearch(e.target.value.toUpperCase()); setShowDestinatarioResults(true); }} 
                   />
                   {showDestinatarioResults && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto">
-                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch)).map(p => (
-                        <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-[10px] font-bold uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, destinatarioId: p.id}); setDestinatarioSearch(p.name); setShowDestinatarioResults(false); }}>{p.name}</button>
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-slate-800">
+                      {ports.filter(p => p.name.toUpperCase().includes(destinatarioSearch) || (p.legalName && p.legalName.toUpperCase().includes(destinatarioSearch)) || p.city.toUpperCase().includes(destinatarioSearch)).map(p => (
+                        <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-[10px] font-bold uppercase border-b border-slate-50 group" onClick={() => { setFormData({...formData, destinatarioId: p.id}); setDestinatarioSearch(p.legalName ? `${p.legalName} (${p.name})` : p.name); setShowDestinatarioResults(false); }}>
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="font-black text-slate-700 group-hover:text-blue-600">{p.legalName || p.name}</span>
+                              {p.legalName && p.name !== p.legalName && (
+                                <p className="text-[7px] text-slate-400 font-black uppercase">FANTASIA: {p.name}</p>
+                              )}
+                            </div>
+                            <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{p.city}</span>
+                          </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -247,11 +267,10 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Armador</label>
-                  <input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">2. Armador (Automático)</label>
+                  <input type="text" className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
                 </div>
 
-                {/* Ajustado: Grid dinâmico para não mostrar campos extras na Ordem de Coleta */}
                 <div className={`grid ${selectedFormType === 'LIBERACAO_VAZIO' ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
                   {selectedFormType === 'LIBERACAO_VAZIO' && (
                     <div className="space-y-1">
@@ -295,7 +314,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, initialF
                   <textarea className={`${inputClasses} h-20 resize-none font-bold`} value={formData.obs} onChange={e => handleInputChange('obs', e.target.value)} placeholder={selectedFormType === 'LIBERACAO_VAZIO' ? "VISTORIA SERÁ FEITO PELO MOTORISTA" : ""} />
                 </div>
 
-                <button disabled={isExporting} onClick={downloadPDF} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all">
+                <button disabled={isExporting} onClick={downloadPDF} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
                   {isExporting ? 'GERANDO...' : 'BAIXAR DOCUMENTO'}
                 </button>
               </div>
