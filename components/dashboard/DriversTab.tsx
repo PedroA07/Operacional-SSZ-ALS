@@ -30,9 +30,11 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   
-  const [visibility] = useState({
+  // Estado de visibilidade configurável pelo usuário no preview
+  const [visibility, setVisibility] = useState({
     driverInfo: true,
     contacts: true,
     equipment: true,
@@ -44,6 +46,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cnhInputRef = useRef<HTMLInputElement>(null);
   
   const initialForm: Partial<Driver> = {
     photo: '', name: '', cpf: '', rg: '', cnh: '',
@@ -53,7 +56,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '',
     beneficiaryCnpj: '', paymentPreference: 'PIX',
     whatsappGroupName: '', whatsappGroupLink: '',
-    operations: [], hasAccess: true
+    operations: [], hasAccess: true, cnhPdfUrl: ''
   };
 
   const [form, setForm] = useState<Partial<Driver>>(initialForm);
@@ -93,19 +96,29 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     }
   };
 
+  const handleCnhUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        alert("Por favor, selecione um arquivo PDF.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => setForm(prev => ({ ...prev, cnhPdfUrl: reader.result as string }));
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
     setIsSaving(true);
     try {
       const drvId = editingId || `drv-${Date.now()}`;
-      
-      // Captura o status original para verificar se mudou
       const original = drivers.find(d => d.id === drvId);
       const statusChanged = original && original.status !== form.status;
       const statusDate = statusChanged ? new Date().toISOString() : (form.statusLastChangeDate || new Date().toISOString());
 
-      // Sincroniza usuário e gera senha se for novo
       const { password } = await driverAuthService.syncUserRecord(drvId, form, form.generatedPassword);
       
       await onSaveDriver({ 
@@ -120,6 +133,37 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       alert(`FALHA AO SALVAR: ${err.message}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const downloadDriverPDF = async () => {
+    if (!selectedDriver) return;
+    setIsExporting(true);
+    
+    try {
+      const element = document.getElementById(`driver-profile-card-${selectedDriver.id}`);
+      if (!element) return;
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff"
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+      pdf.save(`Motorista - ${selectedDriver.name}.pdf`);
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      alert("Falha ao gerar o documento PDF.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -147,6 +191,16 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1";
+
+  const VisibilityToggle = ({ id, label }: { id: keyof typeof visibility, label: string }) => (
+    <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-white transition-all group">
+      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${visibility[id] ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
+        {visibility[id] && <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>}
+      </div>
+      <input type="checkbox" className="hidden" checked={visibility[id]} onChange={() => setVisibility(v => ({ ...v, [id]: !v[id] }))} />
+      <span className="text-[10px] font-black uppercase text-slate-500 group-hover:text-slate-800 transition-colors">{label}</span>
+    </label>
+  );
 
   return (
     <div className="max-w-full mx-auto space-y-6">
@@ -205,6 +259,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                           <p className="text-[9px] font-black text-slate-500 uppercase">CPF: <span className="font-mono text-slate-800">{d.cpf}</span></p>
                           <p className="text-[9px] font-black text-slate-500 uppercase">RG: <span className="font-mono text-slate-800">{d.rg || '---'}</span></p>
                           <p className="text-[9px] font-black text-slate-500 uppercase">CNH: <span className="font-mono text-slate-800">{d.cnh || '---'}</span></p>
+                          {d.cnhPdfUrl && <span className="inline-block mt-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[7px] font-black uppercase border border-emerald-100">PDF Anexo</span>}
                        </div>
                     </td>
                     <td className="px-6 py-4">
@@ -279,7 +334,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       {/* MODAL REDEFINIR SENHA */}
       {isPasswordModalOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-           <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
+           <div className="bg-white w-full max-sm:mx-4 max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 text-center space-y-6">
                  <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
@@ -346,6 +401,26 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                        <div className="space-y-1"><label className={labelClass}>Telefone Celular</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
                        <div className="space-y-1"><label className={labelClass}>E-mail</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value.toLowerCase()})} /></div>
                     </div>
+                 </div>
+              </div>
+
+              {/* UPLOAD CNH PDF */}
+              <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 flex items-center justify-between gap-8">
+                 <div className="flex-1">
+                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Anexar Documento CNH</h4>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase">Formato aceito: PDF. Tamanho máximo recomendado: 5MB.</p>
+                 </div>
+                 <div className="shrink-0 flex items-center gap-4">
+                    {form.cnhPdfUrl && (
+                       <div className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-600 rounded-xl border border-emerald-200">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
+                          <span className="text-[8px] font-black uppercase">PDF Carregado</span>
+                       </div>
+                    )}
+                    <button type="button" onClick={() => cnhInputRef.current?.click()} className="px-6 py-3 bg-white border-2 border-blue-200 text-blue-600 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                       {form.cnhPdfUrl ? 'Substituir PDF' : 'Selecionar Arquivo'}
+                    </button>
+                    <input type="file" ref={cnhInputRef} className="hidden" accept="application/pdf" onChange={handleCnhUpload} />
                  </div>
               </div>
 
@@ -419,15 +494,46 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         </div>
       )}
 
-      {/* MODAL PREVIEW PDF */}
+      {/* MODAL PREVIEW PDF COM CONTROLE DE VISIBILIDADE */}
       {isPreviewModalOpen && selectedDriver && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-slate-950/90 backdrop-blur-xl">
-           <div className="bg-white w-full max-w-7xl h-full rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                 <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 italic">Visualização de Ficha Cadastral ALS</h3>
-                 <button onClick={() => setIsPreviewModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-slate-200 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-7xl h-full rounded-[3.5rem] shadow-2xl overflow-hidden flex animate-in zoom-in-95">
+              
+              {/* BARRA LATERAL DE CONFIGURAÇÃO DO PDF */}
+              <div className="w-80 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
+                 <div className="p-8 border-b border-slate-200">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Opções do Documento</h3>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Selecione os dados para exportação</p>
+                 </div>
+                 
+                 <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+                    <VisibilityToggle id="driverInfo" label="Dados Pessoais" />
+                    <VisibilityToggle id="contacts" label="Contatos" />
+                    <VisibilityToggle id="equipment" label="Equipamento" />
+                    <VisibilityToggle id="beneficiary" label="Dados do Beneficiário" />
+                    <VisibilityToggle id="whatsapp" label="Grupo WhatsApp" />
+                    <VisibilityToggle id="portal" label="Credenciais do Portal" />
+                 </div>
+
+                 <div className="p-8 border-t border-slate-200 space-y-3">
+                    <button 
+                       onClick={downloadDriverPDF}
+                       disabled={isExporting}
+                       className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                       {isExporting ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                       ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                       )}
+                       Gerar Ficha PDF
+                    </button>
+                    <button onClick={() => setIsPreviewModalOpen(false)} className="w-full py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all">Fechar</button>
+                 </div>
               </div>
-              <div className="flex-1 overflow-auto bg-slate-200 p-12 flex justify-center">
+
+              {/* ÁREA DO PREVIEW */}
+              <div className="flex-1 overflow-auto bg-slate-200 p-12 flex justify-center custom-scrollbar">
                  <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
                     <DriverProfileTemplate driver={selectedDriver} visibility={visibility} />
                  </div>
