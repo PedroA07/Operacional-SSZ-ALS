@@ -21,6 +21,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
   
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [selectedMapAddress, setSelectedMapAddress] = useState('');
+  const [selectedMapTitle, setSelectedMapTitle] = useState('');
 
   const initialForm: Partial<PreStacking> = {
     name: '',
@@ -116,6 +117,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
   const handleOpenMap = (item: PreStacking) => {
     const fullAddress = `${item.address}, ${item.neighborhood || ''}, ${item.city} - ${item.state}`;
     setSelectedMapAddress(fullAddress);
+    setSelectedMapTitle(item.legalName || item.name);
     setIsMapModalOpen(true);
   };
 
@@ -173,7 +175,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
                     <p className="text-slate-400 font-black text-[10px] mt-1">{p.city} - {p.state}</p>
                   </td>
                   <td className="px-8 py-4 text-right space-x-1">
-                    <button onClick={() => handleOpenMap(p)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg></button>
+                    <button onClick={() => handleOpenMap(p)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors" title="Ver no Mapa"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg></button>
                     <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="4"/></svg></button>
                     {onDeletePreStacking && <button onClick={() => confirmDelete(p)} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Icons.Excluir /></button>}
                   </td>
@@ -184,6 +186,31 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
         </div>
       </div>
 
+      {/* MODAL DE MAPA */}
+      {isMapModalOpen && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-8 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col relative animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                 <div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{selectedMapTitle}</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Localização: {selectedMapAddress}</p>
+                 </div>
+                 <button onClick={() => setIsMapModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+              </div>
+              <div className="flex-1 bg-slate-100 relative">
+                 <iframe 
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    loading="lazy" 
+                    allowFullScreen 
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedMapAddress)}&output=embed`}
+                 ></iframe>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* MODAL DE EXCLUSÃO */}
       {isDeleteModalOpen && itemToDelete && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
@@ -193,7 +220,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
                  </div>
                  <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Excluir Pré-Stacking</h3>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Confirmar Exclusão</h3>
                     <p className="text-xs text-slate-400 mt-2">Deseja remover permanentemente esta unidade?</p>
                     <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
                        <p className="text-sm font-black text-slate-700 uppercase leading-tight">{itemToDelete.legalName || itemToDelete.name}</p>

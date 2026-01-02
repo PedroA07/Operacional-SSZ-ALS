@@ -55,17 +55,23 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
       <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
         <div style={{ width: '352px', height: '120px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px', borderBottom: '1px solid #f1f5f9' }}>REMETENTE (CLIENTE)</div>
-          <div style={{ fontSize: '11px', fontWeight: 'bold', lineHeight: '1.2', marginBottom: '4px', wordBreak: 'break-word' }}>{selectedRemetente?.name || '---'}</div>
-          <div style={{ fontSize: '10px', marginTop: '2px', wordBreak: 'break-word' }}>{selectedRemetente?.address || '---'}</div>
-          <div style={{ fontSize: '10px' }}>{selectedRemetente?.city || '---'} - {selectedRemetente?.state || '--'} | CEP: {selectedRemetente?.zipCode || '---'}</div>
-          <div style={{ fontSize: '10px', fontWeight: 'bold', marginTop: '4px' }}>CNPJ: {selectedRemetente?.cnpj || '---'}</div>
+          <div style={{ fontSize: '10px', fontWeight: 'bold', lineHeight: '1.1', marginBottom: '2px' }}>{selectedRemetente?.legalName || selectedRemetente?.name || '---'}</div>
+          {selectedRemetente?.name && selectedRemetente?.legalName && selectedRemetente.name !== selectedRemetente.legalName && (
+             <div style={{ fontSize: '8px', fontWeight: 900, color: '#1e40af', marginBottom: '4px' }}>FANTASIA: {selectedRemetente.name}</div>
+          )}
+          <div style={{ fontSize: '9px', marginTop: '2px', wordBreak: 'break-word' }}>{selectedRemetente?.address || '---'}</div>
+          <div style={{ fontSize: '9px' }}>{selectedRemetente?.city || '---'} - {selectedRemetente?.state || '--'} | CEP: {selectedRemetente?.zipCode || '---'}</div>
+          <div style={{ fontSize: '9px', fontWeight: 'bold', marginTop: '2px' }}>CNPJ: {selectedRemetente?.cnpj || '---'}</div>
         </div>
         <div style={{ width: '352px', height: '120px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px', borderBottom: '1px solid #f1f5f9' }}>DESTINATÁRIO (TERMINAL)</div>
-          <div style={{ fontSize: '11px', fontWeight: 'bold', lineHeight: '1.2', marginBottom: '4px', wordBreak: 'break-word' }}>{selectedDestinatario?.name || '---'}</div>
-          <div style={{ fontSize: '10px', marginTop: '2px', wordBreak: 'break-word' }}>{selectedDestinatario?.address || '---'}</div>
-          <div style={{ fontSize: '10px' }}>{selectedDestinatario?.city || '---'} - {selectedDestinatario?.state || '--'} | CEP: {selectedDestinatario?.zipCode || '---'}</div>
-          <div style={{ fontSize: '10px', fontWeight: 'bold', marginTop: '4px' }}>CNPJ: {selectedDestinatario?.cnpj || '---'}</div>
+          <div style={{ fontSize: '10px', fontWeight: 'bold', lineHeight: '1.1', marginBottom: '2px' }}>{selectedDestinatario?.legalName || selectedDestinatario?.name || '---'}</div>
+          {selectedDestinatario?.name && selectedDestinatario?.legalName && selectedDestinatario.name !== selectedDestinatario.legalName && (
+             <div style={{ fontSize: '8px', fontWeight: 900, color: '#1e40af', marginBottom: '4px' }}>FANTASIA: {selectedDestinatario.name}</div>
+          )}
+          <div style={{ fontSize: '9px', marginTop: '2px', wordBreak: 'break-word' }}>{selectedDestinatario?.address || '---'}</div>
+          <div style={{ fontSize: '9px' }}>{selectedDestinatario?.city || '---'} - {selectedDestinatario?.state || '--'} | CEP: {selectedDestinatario?.zipCode || '---'}</div>
+          <div style={{ fontSize: '9px', fontWeight: 'bold', marginTop: '2px' }}>CNPJ: {selectedDestinatario?.cnpj || '---'}</div>
         </div>
       </div>
 

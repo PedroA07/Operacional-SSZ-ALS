@@ -22,6 +22,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
   
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [selectedMapAddress, setSelectedMapAddress] = useState('');
+  const [selectedMapTitle, setSelectedMapTitle] = useState('');
   
   const initialForm: Partial<Customer> = {
     name: '',
@@ -118,6 +119,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
   const handleOpenMap = (customer: Customer) => {
     const fullAddress = `${customer.address}, ${customer.neighborhood || ''}, ${customer.city} - ${customer.state}`;
     setSelectedMapAddress(fullAddress);
+    setSelectedMapTitle(customer.legalName || customer.name);
     setIsMapModalOpen(true);
   };
 
@@ -153,7 +155,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
                 <th className="px-8 py-5">Identificação Jurídica</th>
@@ -175,7 +177,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                     <p className="text-slate-400 font-black uppercase text-[10px] mt-1">{c.city} - {c.state}</p>
                   </td>
                   <td className="px-8 py-4 text-right space-x-1 whitespace-nowrap">
-                    <button onClick={() => handleOpenMap(c)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg></button>
+                    <button onClick={() => handleOpenMap(c)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors" title="Visualizar Mapa"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg></button>
                     <button onClick={() => handleOpenModal(c)} className="p-2 text-slate-300 hover:text-blue-500 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                     <button onClick={() => confirmDelete(c)} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Icons.Excluir /></button>
                   </td>
@@ -185,6 +187,35 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
           </table>
         </div>
       </div>
+
+      {/* MODAL DE MAPA */}
+      {isMapModalOpen && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-8 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col relative animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                 <div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{selectedMapTitle}</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Endereço: {selectedMapAddress}</p>
+                 </div>
+                 <button onClick={() => setIsMapModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+              </div>
+              <div className="flex-1 bg-slate-100 relative">
+                 <iframe 
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    loading="lazy" 
+                    allowFullScreen 
+                    src={`https://www.google.com/maps/embed/v1/place?key=SEU_GOOGLE_MAPS_KEY_OU_FALLBACK&q=${encodeURIComponent(selectedMapAddress)}`}
+                    // Nota: Em um ambiente real, deve-se usar uma API Key válida. 
+                    // Como fallback para preview usaremos a URL de busca direta caso a Embed falhe:
+                    onError={(e) => { (e.target as any).src = `https://maps.google.com/maps?q=${encodeURIComponent(selectedMapAddress)}&output=embed`; }}
+                    onLoad={(e) => { if(!(e.target as any).src.includes('key=')) (e.target as any).src = `https://maps.google.com/maps?q=${encodeURIComponent(selectedMapAddress)}&output=embed`; }}
+                 ></iframe>
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* MODAL DE EXCLUSÃO */}
       {isDeleteModalOpen && itemToDelete && (
