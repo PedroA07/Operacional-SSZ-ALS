@@ -20,75 +20,16 @@ export const KEYS = {
   PREFERENCES: 'als_ui_preferences'
 };
 
-const staffMapper = {
-  mapToDb: (s: Staff) => ({
-    id: s.id,
-    name: s.name,
-    username: s.username,
-    role: s.role,
-    position: s.position,
-    registrationdate: s.registrationDate, // Coincide com imagem se for lowercase no banco
-    status: s.status,
-    statussince: s.statusSince,
-    photo: s.photo,
-    emailcorp: s.emailCorp, // Correção: lowercase conforme imagem do banco
-    phonecorp: s.phoneCorp  // Correção: lowercase conforme imagem do banco
-  }),
-  mapFromDb: (s: any): Staff => ({
-    id: s.id,
-    name: s.name,
-    username: s.username,
-    role: s.role,
-    position: s.position,
-    registrationDate: s.registrationdate || s.registrationDate,
-    status: s.status,
-    statusSince: s.statussince || s.statusSince,
-    photo: s.photo,
-    emailCorp: s.emailcorp || s.emailCorp,
-    phoneCorp: s.phonecorp || s.phoneCorp
-  })
-};
-
-const userMapper = {
-  mapToDb: (u: User) => ({
-    id: u.id,
-    username: u.username,
-    password: u.password,
-    display_name: u.displayName,
-    role: u.role,
-    lastlogin: u.lastLogin,
-    photo: u.photo,
-    position: u.position,
-    staff_id: u.staffId,
-    driver_id: u.driverId,
-    status: u.status,
-    isfirstlogin: u.isFirstLogin === true,
-    last_seen: u.lastSeen,
-    is_online_visible: u.isOnlineVisible ?? true
-  }),
-  mapFromDb: (u: any): User => {
-    const isFirst = u.isfirstlogin ?? u.is_first_login ?? u.isFirstLogin ?? false;
-    return {
-      id: u.id,
-      username: u.username,
-      password: u.password,
-      displayName: u.display_name || u.displayname || u.displayName || u.username,
-      role: u.role,
-      lastLogin: u.lastlogin || u.last_login || u.lastLogin || new Date().toISOString(),
-      photo: u.photo,
-      position: u.position,
-      staffId: u.staff_id || u.staffid || u.staffId,
-      driverId: u.driver_id || u.driverid || u.driverId,
-      status: u.status,
-      isFirstLogin: isFirst === true || isFirst === 'true',
-      lastSeen: u.last_seen || u.lastseen || u.lastSeen,
-      isOnlineVisible: u.is_online_visible ?? u.isonlinevisible ?? u.isOnlineVisible ?? true
-    };
-  }
-};
-
 export const db = {
-  _saveLocal: (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data)),
+  _saveLocal: (key: string, data: any) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+      // Se a quota exceder (comum com fotos/PDFs em base64), 
+      // apenas ignoramos o cache local pois o Supabase já salvou.
+      console.warn(`Quota de armazenamento local excedida para ${key}. Dados salvos na nuvem.`);
+    }
+  },
   _getLocal: (key: string) => JSON.parse(localStorage.getItem(key) || '[]'),
 
   isCloudActive: () => !!supabase,
@@ -97,7 +38,22 @@ export const db = {
     if (supabase) {
       const { data } = await supabase.from('users').select('*');
       if (data) {
-        const mapped = data.map(u => userMapper.mapFromDb(u));
+        const mapped = data.map(u => ({
+          id: u.id,
+          username: u.username,
+          password: u.password,
+          displayName: u.display_name || u.username,
+          role: u.role,
+          lastLogin: u.lastlogin || new Date().toISOString(),
+          photo: u.photo,
+          position: u.position,
+          staffId: u.staff_id,
+          driverId: u.driver_id,
+          status: u.status,
+          isFirstLogin: u.isfirstlogin === true,
+          lastSeen: u.last_seen,
+          isOnlineVisible: u.is_online_visible ?? true
+        }));
         db._saveLocal(KEYS.USERS, mapped); 
         return mapped;
       }
@@ -106,88 +62,29 @@ export const db = {
   },
 
   saveUser: async (user: User) => {
-    const payload = userMapper.mapToDb(user);
     if (supabase) {
-      await supabase.from('users').upsert(payload, { onConflict: 'id' });
+      const payload = {
+        id: user.id,
+        username: user.username,
+        password: user.password,
+        display_name: user.displayName,
+        role: user.role,
+        lastlogin: user.lastLogin,
+        photo: user.photo,
+        position: user.position,
+        staff_id: user.staffId,
+        driver_id: user.driverId,
+        status: user.status,
+        isfirstlogin: user.isFirstLogin === true,
+        last_seen: user.lastSeen,
+        is_online_visible: user.isOnlineVisible ?? true
+      };
+      await supabase.from('users').upsert(payload);
     }
     const current = db._getLocal(KEYS.USERS);
     const idx = current.findIndex((u: any) => u.id === user.id);
     if (idx >= 0) current[idx] = user; else current.push(user);
     db._saveLocal(KEYS.USERS, current);
-    return true;
-  },
-
-  getStaff: async (): Promise<Staff[]> => {
-    if (supabase) {
-      const { data } = await supabase.from('staff').select('*').order('name');
-      if (data) { 
-        const mapped = data.map(s => staffMapper.mapFromDb(s));
-        db._saveLocal(KEYS.STAFF, mapped); 
-        return mapped; 
-      }
-    }
-    return db._getLocal(KEYS.STAFF);
-  },
-
-  saveStaff: async (staff: Staff, password?: string) => {
-    const payload = staffMapper.mapToDb(staff);
-    if (supabase) await supabase.from('staff').upsert(payload);
-    
-    const current = db._getLocal(KEYS.STAFF);
-    const idx = current.findIndex((s: Staff) => s.id === staff.id);
-    if (idx >= 0) current[idx] = staff; else current.push(staff);
-    db._saveLocal(KEYS.STAFF, current);
-
-    // Sincroniza usuário de acesso
-    const users = await db.getUsers();
-    const existingUser = users.find(u => u.staffId === staff.id);
-    const userToSave: User = {
-      id: existingUser?.id || `u-${staff.id}`,
-      username: staff.username,
-      displayName: staff.name,
-      role: staff.role,
-      lastLogin: existingUser?.lastLogin || new Date().toISOString(),
-      staffId: staff.id,
-      position: staff.position,
-      status: staff.status,
-      photo: staff.photo,
-      isFirstLogin: existingUser ? existingUser.isFirstLogin : true
-    };
-    if (password) { userToSave.password = password; userToSave.isFirstLogin = false; }
-    else if (!existingUser) { userToSave.password = '12345678'; }
-    else { userToSave.password = existingUser.password; }
-    await db.saveUser(userToSave);
-    return true;
-  },
-
-  deleteStaff: async (id: string) => {
-    if (supabase) await supabase.from('staff').delete().eq('id', id);
-    const current = db._getLocal(KEYS.STAFF).filter((s: Staff) => s.id !== id);
-    db._saveLocal(KEYS.STAFF, current);
-    return true;
-  },
-
-  updatePresence: async (userId: string, isVisible: boolean) => {
-    const now = new Date().toISOString();
-    if (supabase) {
-      await supabase.from('users').update({ last_seen: now, is_online_visible: isVisible }).eq('id', userId);
-    }
-  },
-
-  getTrips: async (): Promise<Trip[]> => {
-    if (supabase) {
-      const { data } = await supabase.from('trips').select('*').order('dateTime', { ascending: false });
-      if (data) { db._saveLocal(KEYS.TRIPS, data); return data; }
-    }
-    return db._getLocal(KEYS.TRIPS);
-  },
-
-  saveTrip: async (trip: Trip) => {
-    if (supabase) await supabase.from('trips').upsert(trip);
-    const current = db._getLocal(KEYS.TRIPS);
-    const idx = current.findIndex((t: Trip) => t.id === trip.id);
-    if (idx >= 0) current[idx] = trip; else current.push(trip);
-    db._saveLocal(KEYS.TRIPS, current);
     return true;
   },
 
@@ -201,7 +98,9 @@ export const db = {
   },
 
   saveDriver: async (driver: Driver) => {
-    if (supabase) await driverRepository.save(supabase, driver);
+    if (supabase) {
+      await driverRepository.save(supabase, driver);
+    }
     const current = db._getLocal(KEYS.DRIVERS);
     const idx = current.findIndex((d: Driver) => d.id === driver.id);
     if (idx >= 0) current[idx] = driver; else current.push(driver);
@@ -288,6 +187,98 @@ export const db = {
     return true;
   },
 
+  getStaff: async (): Promise<Staff[]> => {
+    if (supabase) {
+      const { data } = await supabase.from('staff').select('*').order('name');
+      if (data) {
+        const mapped = data.map(s => ({
+          id: s.id,
+          name: s.name,
+          username: s.username,
+          role: s.role,
+          position: s.position,
+          registrationDate: s.registrationdate || s.registrationDate,
+          status: s.status,
+          statusSince: s.statussince || s.statusSince,
+          photo: s.photo,
+          emailCorp: s.emailcorp || s.emailCorp,
+          phoneCorp: s.phonecorp || s.phoneCorp
+        }));
+        db._saveLocal(KEYS.STAFF, mapped); 
+        return mapped; 
+      }
+    }
+    return db._getLocal(KEYS.STAFF);
+  },
+
+  saveStaff: async (staff: Staff, password?: string) => {
+    if (supabase) {
+      const payload = {
+        id: staff.id,
+        name: staff.name,
+        username: staff.username,
+        role: staff.role,
+        position: staff.position,
+        registrationdate: staff.registrationDate,
+        status: staff.status,
+        statussince: staff.statusSince,
+        photo: staff.photo,
+        emailcorp: staff.emailCorp,
+        phonecorp: staff.phoneCorp
+      };
+      await supabase.from('staff').upsert(payload);
+    }
+    
+    const current = db._getLocal(KEYS.STAFF);
+    const idx = current.findIndex((s: Staff) => s.id === staff.id);
+    if (idx >= 0) current[idx] = staff; else current.push(staff);
+    db._saveLocal(KEYS.STAFF, current);
+
+    const users = await db.getUsers();
+    const existingUser = users.find(u => u.staffId === staff.id);
+    const userToSave: User = {
+      id: existingUser?.id || `u-${staff.id}`,
+      username: staff.username,
+      displayName: staff.name,
+      role: staff.role,
+      lastLogin: existingUser?.lastLogin || new Date().toISOString(),
+      staffId: staff.id,
+      position: staff.position,
+      status: staff.status,
+      photo: staff.photo,
+      isFirstLogin: existingUser ? existingUser.isFirstLogin : true
+    };
+    if (password) { userToSave.password = password; userToSave.isFirstLogin = false; }
+    else if (!existingUser) { userToSave.password = '12345678'; }
+    else { userToSave.password = existingUser.password; }
+    await db.saveUser(userToSave);
+    return true;
+  },
+
+  deleteStaff: async (id: string) => {
+    if (supabase) await supabase.from('staff').delete().eq('id', id);
+    const current = db._getLocal(KEYS.STAFF).filter((s: Staff) => s.id !== id);
+    db._saveLocal(KEYS.STAFF, current);
+    return true;
+  },
+
+  getTrips: async (): Promise<Trip[]> => {
+    if (supabase) {
+      const { data } = await supabase.from('trips').select('*').order('dateTime', { ascending: false });
+      if (data) { db._saveLocal(KEYS.TRIPS, data); return data; }
+    }
+    return db._getLocal(KEYS.TRIPS);
+  },
+
+  saveTrip: async (trip: Trip) => {
+    if (supabase) await supabase.from('trips').upsert(trip);
+    const current = db._getLocal(KEYS.TRIPS);
+    const idx = current.findIndex((t: Trip) => t.id === trip.id);
+    if (idx >= 0) current[idx] = trip; else current.push(trip);
+    db._saveLocal(KEYS.TRIPS, current);
+    return true;
+  },
+
   getCategories: async (): Promise<Category[]> => {
     if (supabase) {
       const { data } = await supabase.from('categories').select('*');
@@ -337,5 +328,12 @@ export const db = {
       for (const key of Object.values(KEYS)) if (backup[key]) localStorage.setItem(key, backup[key]);
       return true;
     } catch { return false; }
+  },
+
+  updatePresence: async (userId: string, isVisible: boolean) => {
+    const now = new Date().toISOString();
+    if (supabase) {
+      await supabase.from('users').update({ last_seen: now, is_online_visible: isVisible }).eq('id', userId);
+    }
   }
 };

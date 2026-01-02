@@ -33,7 +33,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   
-  // Estado de visibilidade configurável pelo usuário no preview
   const [visibility, setVisibility] = useState({
     driverInfo: true,
     contacts: true,
@@ -100,7 +99,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     const file = e.target.files?.[0];
     if (file) {
       if (file.type !== 'application/pdf') {
-        alert("Por favor, selecione um arquivo PDF.");
+        alert("Selecione um arquivo PDF para a CNH.");
         return;
       }
       const reader = new FileReader();
@@ -144,24 +143,13 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       const element = document.getElementById(`driver-profile-card-${selectedDriver.id}`);
       if (!element) return;
 
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff"
-      });
-
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       pdf.save(`Motorista - ${selectedDriver.name}.pdf`);
     } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      alert("Falha ao gerar o documento PDF.");
+      alert("Falha ao gerar o PDF.");
     } finally {
       setIsExporting(false);
     }
@@ -179,7 +167,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       setIsPasswordModalOpen(false);
       loadUsers();
     } else {
-      alert("A senha deve ter no mínimo 4 caracteres.");
+      alert("Senha muito curta.");
     }
   };
 
@@ -189,18 +177,18 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     d.plateHorse.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
-  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1";
-
   const VisibilityToggle = ({ id, label }: { id: keyof typeof visibility, label: string }) => (
     <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-white transition-all group">
       <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${visibility[id] ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
         {visibility[id] && <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>}
       </div>
       <input type="checkbox" className="hidden" checked={visibility[id]} onChange={() => setVisibility(v => ({ ...v, [id]: !v[id] }))} />
-      <span className="text-[10px] font-black uppercase text-slate-500 group-hover:text-slate-800 transition-colors">{label}</span>
+      <span className="text-[10px] font-black uppercase text-slate-500 group-hover:text-slate-800">{label}</span>
     </label>
   );
+
+  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1";
 
   return (
     <div className="max-w-full mx-auto space-y-6">
@@ -222,7 +210,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[1200px]">
+          <table className="w-full text-left text-xs border-collapse min-w-[1300px]">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
                 <th className="px-6 py-5">Identificação / Beneficiário</th>
@@ -239,60 +227,57 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                 const linkedUser = users.find(u => u.driverId === d.id);
                 return (
                   <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
-                    <td className="px-6 py-4 max-w-[200px]">
-                      <div className="flex items-start gap-4">
-                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 mt-1">
-                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 italic text-[8px]">ALS</div>}
+                    <td className="px-6 py-4 max-w-[240px]">
+                      <div className="flex items-start gap-3">
+                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 mt-1">
+                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 text-[8px]">ALS</div>}
                          </div>
                          <div>
                             <p className="font-black text-slate-800 uppercase text-[11px] leading-tight mb-2">{d.name}</p>
-                            <div className="bg-blue-50/50 p-2 rounded-xl border border-blue-100/50">
-                               <p className="text-[7px] font-black text-blue-500 uppercase leading-none mb-1">Beneficiário:</p>
+                            <div className="bg-blue-50/50 p-2 rounded-xl border border-blue-100/50 space-y-0.5">
+                               <p className="text-[7px] font-black text-blue-500 uppercase leading-none">Beneficiário:</p>
                                <p className="text-[10px] font-bold text-slate-600 uppercase truncate">{d.beneficiaryName || d.name}</p>
-                               <p className="text-[8px] font-bold text-slate-400 mt-1">{d.beneficiaryCnpj || d.cpf} | {d.paymentPreference}</p>
+                               <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{d.beneficiaryCnpj || d.cpf} | {d.paymentPreference || 'PIX'}</p>
                             </div>
                          </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                        <div className="space-y-1 mt-1">
-                          <p className="text-[9px] font-black text-slate-500 uppercase">CPF: <span className="font-mono text-slate-800">{d.cpf}</span></p>
-                          <p className="text-[9px] font-black text-slate-500 uppercase">RG: <span className="font-mono text-slate-800">{d.rg || '---'}</span></p>
-                          <p className="text-[9px] font-black text-slate-500 uppercase">CNH: <span className="font-mono text-slate-800">{d.cnh || '---'}</span></p>
-                          {d.cnhPdfUrl && <span className="inline-block mt-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[7px] font-black uppercase border border-emerald-100">PDF Anexo</span>}
+                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CPF: <span className="font-mono text-slate-800 font-bold">{d.cpf}</span></p>
+                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">RG: <span className="font-mono text-slate-800 font-bold">{d.rg || '---'}</span></p>
+                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CNH: <span className="font-mono text-slate-800 font-bold">{d.cnh || '---'}</span></p>
+                          {d.cnhPdfUrl && <span className="inline-block mt-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[7px] font-black uppercase">Anexo PDF OK</span>}
                        </div>
                     </td>
                     <td className="px-6 py-4">
-                       <div className="space-y-3 mt-1">
-                          <div className="flex flex-col">
-                             <span className="text-[7px] font-black text-slate-300 uppercase leading-none mb-1">Cavalo</span>
+                       <div className="mt-1 space-y-3">
+                          <div>
+                             <p className="text-[7px] font-black text-slate-300 uppercase mb-1">Cavalo</p>
                              <div className="flex items-center gap-2">
                                 <span className="bg-slate-900 text-white px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateHorse}</span>
-                                <span className="text-[9px] font-black text-slate-400">{d.yearHorse || '---'}</span>
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{d.yearHorse || '---'}</span>
                              </div>
                           </div>
-                          <div className="flex flex-col">
-                             <span className="text-[7px] font-black text-slate-300 uppercase leading-none mb-1">Carreta</span>
+                          <div>
+                             <p className="text-[7px] font-black text-slate-300 uppercase mb-1">Carreta</p>
                              <div className="flex items-center gap-2">
                                 <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateTrailer}</span>
-                                <span className="text-[9px] font-black text-slate-300">{d.yearTrailer || '---'}</span>
+                                <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter">{d.yearTrailer || '---'}</span>
                              </div>
                           </div>
                        </div>
                     </td>
                     <td className="px-6 py-4">
                        <div className="mt-1 space-y-1">
-                          <p className="text-blue-600 font-black text-[10px]">{d.phone}</p>
-                          <p className="text-[9px] text-slate-400 lowercase truncate max-w-[150px]">{d.email || '---'}</p>
+                          <p className="text-blue-600 font-black text-[11px] leading-none">{d.phone}</p>
+                          <p className="text-[9px] text-slate-400 font-bold lowercase truncate max-w-[150px]">{d.email || '---'}</p>
                           {d.whatsappGroupLink && (
                              <a 
-                               href={d.whatsappGroupLink} 
-                               target="_blank" 
-                               rel="noreferrer"
-                               className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-lg hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20"
+                               href={d.whatsappGroupLink} target="_blank" rel="noreferrer"
+                               className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-lg hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/10"
                              >
-                                <Icons.Whatsapp />
-                                Entrar no Grupo
+                                <Icons.Whatsapp /> Ingressar no Grupo
                              </a>
                           )}
                        </div>
@@ -314,14 +299,14 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                           <span className={`w-fit px-2.5 py-1 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
                              {d.status}
                           </span>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{d.driverType}</p>
+                          <p className="text-[9px] font-black text-slate-400 uppercase">{d.driverType}</p>
                           <p className="text-[8px] text-slate-300 font-bold italic">Desde: {d.statusLastChangeDate ? new Date(d.statusLastChangeDate).toLocaleDateString('pt-BR') : '---'}</p>
                        </div>
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
-                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Ficha Cadastral PDF"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Mudar Senha"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Gerar Ficha PDF"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                     </td>
                   </tr>
                 );
@@ -334,20 +319,19 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
       {/* MODAL REDEFINIR SENHA */}
       {isPasswordModalOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-           <div className="bg-white w-full max-sm:mx-4 max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
+           <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 text-center space-y-6">
                  <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                  </div>
                  <div>
                     <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Redefinir Senha</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Senha de acesso ao portal do motorista</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Acesso ao portal do motorista</p>
                  </div>
                  <div className="space-y-1 text-left">
                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nova Senha Operacional</label>
                     <input 
-                       type="text"
-                       autoFocus
+                       type="text" autoFocus
                        className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-mono font-black text-blue-600 text-center text-lg outline-none focus:border-emerald-500 transition-all"
                        placeholder="••••"
                        value={newPasswordValue}
@@ -363,7 +347,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         </div>
       )}
 
-      {/* MODAL DE CADASTRO/EDIÇÃO */}
+      {/* MODAL CADASTRO / EDIÇÃO */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
           <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
@@ -404,17 +388,17 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                  </div>
               </div>
 
-              {/* UPLOAD CNH PDF */}
-              <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 flex items-center justify-between gap-8">
+              {/* ANEXO CNH PDF */}
+              <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 flex items-center justify-between gap-6">
                  <div className="flex-1">
-                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Anexar Documento CNH</h4>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase">Formato aceito: PDF. Tamanho máximo recomendado: 5MB.</p>
+                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Documento CNH (.PDF)</h4>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase">Anexe a cópia digitalizada do documento para arquivamento no dossiê.</p>
                  </div>
-                 <div className="shrink-0 flex items-center gap-4">
+                 <div className="flex items-center gap-4">
                     {form.cnhPdfUrl && (
                        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-600 rounded-xl border border-emerald-200">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
-                          <span className="text-[8px] font-black uppercase">PDF Carregado</span>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                          <span className="text-[8px] font-black uppercase">Anexo OK</span>
                        </div>
                     )}
                     <button type="button" onClick={() => cnhInputRef.current?.click()} className="px-6 py-3 bg-white border-2 border-blue-200 text-blue-600 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm">
@@ -473,7 +457,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
               <div className="grid grid-cols-2 gap-8">
                  <div className="p-8 bg-emerald-50 rounded-[2.5rem] border border-emerald-100 space-y-5">
                     <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Comunicação WhatsApp</h4>
-                    <div className="space-y-1"><label className={labelClass}>Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm({...form, whatsappGroupName: e.target.value.toUpperCase()})} placeholder="EX: VOLKSWAGEN - ALS" /></div>
+                    <div className="space-y-1"><label className={labelClass}>Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm({...form, whatsappGroupName: e.target.value.toUpperCase()})} placeholder="EX: OPERAÇÃO ALS - SANTOS" /></div>
                     <div className="space-y-1"><label className={labelClass}>Link de Convite</label><input className={`${inputClasses} lowercase`} value={form.whatsappGroupLink} onChange={e => setForm({...form, whatsappGroupLink: e.target.value})} placeholder="https://chat.whatsapp.com/..." /></div>
                  </div>
                  <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-5">
@@ -483,7 +467,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                        <div className="space-y-1"><label className={labelClass}>Status Sistema</label><select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}><option value="Ativo">Ativo / Liberado</option><option value="Inativo">Inativo / Bloqueado</option></select></div>
                     </div>
                     <div className="pt-2">
-                       <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50">
+                       <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50">
                           {isSaving ? 'Gravando Dados...' : 'Finalizar Cadastro'}
                        </button>
                     </div>
@@ -494,16 +478,15 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
         </div>
       )}
 
-      {/* MODAL PREVIEW PDF COM CONTROLE DE VISIBILIDADE */}
+      {/* MODAL PREVIEW PDF */}
       {isPreviewModalOpen && selectedDriver && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-7xl h-full rounded-[3.5rem] shadow-2xl overflow-hidden flex animate-in zoom-in-95">
               
-              {/* BARRA LATERAL DE CONFIGURAÇÃO DO PDF */}
               <div className="w-80 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
                  <div className="p-8 border-b border-slate-200">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Opções do Documento</h3>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Selecione os dados para exportação</p>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Visualizador de Ficha</h3>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Configure os dados visíveis no PDF</p>
                  </div>
                  
                  <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
@@ -521,18 +504,12 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                        disabled={isExporting}
                        className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                       {isExporting ? (
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                       ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                       )}
-                       Gerar Ficha PDF
+                       {isExporting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Baixar Arquivo PDF'}
                     </button>
-                    <button onClick={() => setIsPreviewModalOpen(false)} className="w-full py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all">Fechar</button>
+                    <button onClick={() => setIsPreviewModalOpen(false)} className="w-full py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all">Fechar Preview</button>
                  </div>
               </div>
 
-              {/* ÁREA DO PREVIEW */}
               <div className="flex-1 overflow-auto bg-slate-200 p-12 flex justify-center custom-scrollbar">
                  <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
                     <DriverProfileTemplate driver={selectedDriver} visibility={visibility} />
@@ -550,8 +527,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
                  </div>
                  <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase">Confirmar Exclusão</h3>
-                    <p className="text-xs text-slate-400 mt-2">Deseja remover permanentemente este motorista?</p>
+                    <h3 className="text-lg font-black text-slate-800 uppercase">Excluir Motorista</h3>
+                    <p className="text-xs text-slate-400 mt-2">Deseja remover permanentemente este cadastro?</p>
                     <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
                        <p className="text-sm font-black text-slate-700 uppercase">{itemToDelete.name}</p>
                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Placa: {itemToDelete.plateHorse}</p>
