@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip } from '../types';
 import OverviewTab from './dashboard/OverviewTab';
 import DriversTab from './dashboard/DriversTab';
@@ -15,7 +15,7 @@ import OnlineStatus from './dashboard/OnlineStatus';
 import DatabaseStatus from './dashboard/DatabaseStatus';
 import UserProfile from './dashboard/UserProfile';
 import { DEFAULT_OPERATIONS } from '../constants/operations';
-import { db, supabase } from '../utils/storage';
+import { db } from '../utils/storage';
 import { Icons } from '../constants/icons';
 
 interface DashboardProps {
@@ -36,9 +36,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
 
+  // Estados para Modal de Exclusão de Viagem
+  const [isDeleteTripModalOpen, setIsDeleteTripModalOpen] = useState(false);
+  const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     const [d, c, p, ps, s, t] = await Promise.all([
       db.getDrivers(), 
       db.getCustomers(), 
@@ -53,19 +58,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setPreStacking(ps || []); 
     setStaffList(s || []);
     setTrips(t || []);
+  }, []);
+
+  useEffect(() => { 
+    loadAllData();
+    const syncInterval = setInterval(loadAllData, 30000);
+    return () => clearInterval(syncInterval);
+  }, [loadAllData]);
+
+  const handleDeleteTripRequest = (id: string) => {
+    const trip = trips.find(t => t.id === id);
+    if (trip) {
+      setTripToDelete(trip);
+      setIsDeleteTripModalOpen(true);
+    }
   };
 
-  useEffect(() => { loadAllData(); }, [user]);
-
-  const handleDeleteTrip = async (id: string) => {
-    if (!confirm('Deseja excluir permanentemente esta programação do painel?')) return;
+  const executeDeleteTrip = async () => {
+    if (!tripToDelete) return;
+    setIsDeleting(true);
     try {
-      if (supabase) {
-        await supabase.from('trips').delete().eq('id', id);
-      }
+      await db.deleteTrip(tripToDelete.id);
       await loadAllData();
+      setIsDeleteTripModalOpen(false);
+      setTripToDelete(null);
     } catch (e) {
-      alert('Erro ao excluir viagem.');
+      alert('Erro crítico ao excluir do banco de dados.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -76,28 +96,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     return (
       <div className="w-full">
         <div className="flex items-center group">
-          <button onClick={() => { if (tab) { setActiveTab(tab); if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' }); } }} className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-800/60 text-slate-400'}`}>
+          <button onClick={() => { if (tab) { setActiveTab(tab); if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' }); } }} className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-slate-800/60 text-slate-400'}`}>
             <div className={`${isActive ? 'text-white' : 'text-slate-50 group-hover:text-white'}`}>{icon}</div>
             {sidebarState === 'open' && <span className="truncate">{label}</span>}
           </button>
           {children && sidebarState === 'open' && <button onClick={(e) => { e.stopPropagation(); setExpandedMenus(p => ({ ...p, [label]: !p[label] })); }} className={`p-3 text-slate-500 transition-all ${isExpanded ? 'rotate-180' : ''}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg></button>}
         </div>
-        {children && isExpanded && sidebarState === 'open' && <div className="ml-8 mt-1 space-y-1 border-l border-slate-800/50 pl-4 animate-in slide-in-from-top-2">{children}</div>}
+        {children && isExpanded && sidebarState === 'open' && <div className="ml-8 mt-1 space-y-1 border-l border-slate-800/50 pl-4 animate-in slide-in-from-top-2 duration-300">{children}</div>}
       </div>
     );
   };
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
-      <aside className={`${sidebarState === 'open' ? 'w-80' : sidebarState === 'collapsed' ? 'w-20' : 'w-0'} bg-[#0f172a] text-slate-400 flex flex-col shadow-2xl z-50 transition-all duration-300 relative overflow-hidden`}>
-        <div className="p-5 border-b border-slate-800/50 space-y-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-blue-600 w-9 h-9 min-w-[36px] rounded-xl flex items-center justify-center text-white font-black italic">ALS</div>
-            {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-wider text-xs uppercase whitespace-nowrap">ALS LOGÍSTICA</span>}
+      <aside className={`${sidebarState === 'open' ? 'w-80' : sidebarState === 'collapsed' ? 'w-20' : 'w-0'} bg-[#0f172a] text-slate-400 flex flex-col shadow-[10px_0_50px_rgba(0,0,0,0.3)] z-50 transition-all duration-500 relative overflow-hidden`}>
+        <div className="p-6 border-b border-slate-800/50 space-y-4">
+          <div className="flex items-center gap-4 mb-2">
+            <div className="bg-blue-600 w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center text-white font-black italic shadow-xl shadow-blue-600/10">ALS</div>
+            {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-[0.2em] text-xs uppercase whitespace-nowrap animate-in fade-in slide-in-from-left-4">ALS LOGÍSTICA</span>}
           </div>
           {sidebarState === 'open' && <WeatherWidget />}
         </div>
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">
           <MenuItem tab={DashboardTab.INICIO} label="Início" icon={<Icons.Inicio />} />
           <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
             {availableOps.map(op => <button key={op.id} onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors">• {op.category}</button>)}
@@ -108,29 +128,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" icon={<Icons.Clientes />} />
           <MenuItem tab={DashboardTab.PORTOS} label="Portos" icon={<Icons.Portos />} />
           <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" icon={<Icons.PreStacking />} />
-          <div className="pt-4 pb-2">
-             {sidebarState === 'open' && <p className="px-4 text-[7px] font-black text-slate-600 uppercase mb-2 tracking-[0.2em]">Administração</p>}
+          <div className="pt-6 pb-2">
+             {sidebarState === 'open' && <p className="px-5 text-[8px] font-black text-slate-600 uppercase mb-3 tracking-[0.3em]">Administração</p>}
              <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" icon={<Icons.Equipe />} />
              <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" icon={<Icons.Configuracoes />} adminOnly />
           </div>
         </nav>
-        <div className="p-4 border-t border-slate-800/50 bg-[#0f172a] space-y-3">
+        <div className="p-5 border-t border-slate-800/50 bg-[#0f172a] space-y-4">
            {sidebarState === 'open' && <OnlineStatus staffList={staffList} />}
-           <button onClick={onLogout} className="w-full text-[8px] text-red-500 font-black uppercase hover:bg-red-500/10 py-3 rounded-xl flex items-center justify-center gap-2 border border-red-900/20 active:scale-95 transition-all"><span>Sair do Sistema</span></button>
+           <button onClick={onLogout} className="w-full text-[9px] text-red-500 font-black uppercase hover:bg-red-500/10 py-4 rounded-2xl flex items-center justify-center gap-3 border border-red-900/20 active:scale-95 transition-all duration-300">
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2.5"/></svg>
+             <span>Sair do Sistema</span>
+           </button>
         </div>
       </aside>
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-40">
-           <div className="flex items-center gap-4">
-              <button onClick={() => setSidebarState(s => s === 'open' ? 'collapsed' : 'open')} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
-              <h2 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">{activeTab}</h2>
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-10 shadow-sm z-40">
+           <div className="flex items-center gap-5">
+              <button onClick={() => setSidebarState(s => s === 'open' ? 'collapsed' : 'open')} className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90 border border-transparent hover:border-slate-200">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">{activeTab}</h2>
            </div>
-           <div className="flex items-center gap-4">
+           <div className="flex items-center gap-6">
               <DatabaseStatus />
               <UserProfile user={user} />
            </div>
         </header>
-        <div className="flex-1 overflow-y-auto p-8 bg-[#f8fafc] custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
            {activeTab === DashboardTab.INICIO && <OverviewTab trips={trips} drivers={drivers} />}
            {activeTab === DashboardTab.OPERACOES && (
              <OperationsTab 
@@ -141,12 +166,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                ports={ports}
                activeView={opsView} 
                setActiveView={setOpsView} 
-               onDeleteTrip={handleDeleteTrip}
+               onDeleteTrip={handleDeleteTripRequest}
              />
            )}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver); loadAllData(); }} onDeleteDriver={async id => { await db.deleteDriver(id); loadAllData(); }} availableOps={availableOps} />}
-           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} onDeleteCustomer={async id => { await db.deleteCustomer(id); loadAllData(); }} isAdmin={user.role === 'admin'} />}
+           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); loadAllData(); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); loadAllData(); }} onDeleteStaff={async id => { await db.deleteStaff(id); loadAllData(); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
            {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port); loadAllData(); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(); } }} />}
@@ -154,6 +179,51 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
         </div>
       </main>
+
+      {/* MODAL DE EXCLUSÃO DE VIAGEM CUSTOMIZADO */}
+      {isDeleteTripModalOpen && tripToDelete && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="p-10 text-center space-y-6">
+                 <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner border border-red-100">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
+                 </div>
+                 <div>
+                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Excluir Viagem</h3>
+                    <p className="text-sm text-slate-400 mt-2">Deseja remover permanentemente esta programação de todos os bancos de dados (Nuvem e Local)?</p>
+                    <div className="mt-6 p-5 bg-slate-50 rounded-3xl border border-slate-100 text-left space-y-1">
+                       <p className="text-[9px] font-black text-blue-600 uppercase">Ordem de Serviço:</p>
+                       <p className="text-sm font-black text-slate-700 uppercase">{tripToDelete.os}</p>
+                       <div className="pt-2 flex justify-between">
+                         <span className="text-[8px] font-black text-slate-400 uppercase">Motorista: {tripToDelete.driver.name}</span>
+                         <span className="text-[8px] font-black text-slate-400 uppercase">Placa: {tripToDelete.driver.plateHorse}</span>
+                       </div>
+                    </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-3 pt-4">
+                    <button 
+                      onClick={() => { setIsDeleteTripModalOpen(false); setTripToDelete(null); }}
+                      className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all active:scale-95"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      disabled={isDeleting}
+                      onClick={executeDeleteTrip}
+                      className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <svg className="animate-spin h-3 w-3 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                          Excluindo...
+                        </>
+                      ) : 'Sim, Excluir'}
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
