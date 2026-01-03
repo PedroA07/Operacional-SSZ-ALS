@@ -12,29 +12,25 @@ export const getOperationTableColumns = (
 ) => [
   { 
     key: 'dateTime', 
-    label: '1. Programação', 
+    label: '1. Prog. / Operação', 
     render: (t: Trip) => (
-      <div className="flex flex-col">
-        <span className="font-black text-slate-800">{new Date(t.dateTime).toLocaleDateString('pt-BR')}</span>
-        <span className="text-blue-600 font-bold">{new Date(t.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col">
+          <span className="font-black text-slate-800">{new Date(t.dateTime).toLocaleDateString('pt-BR')}</span>
+          <span className="text-blue-600 font-bold">{new Date(t.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+        <span className={`w-fit px-2 py-0.5 rounded text-[7px] font-black uppercase ${
+          t.type === 'EXPORTAÇÃO' ? 'bg-blue-100 text-blue-700' : 
+          t.type === 'IMPORTAÇÃO' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'
+        }`}>
+          {t.type}
+        </span>
       </div>
     )
   },
   { 
-    key: 'type', 
-    label: '2. Operação', 
-    render: (t: Trip) => (
-      <span className={`px-2 py-1 rounded text-[8px] font-black uppercase ${
-        t.type === 'EXPORTAÇÃO' ? 'bg-blue-100 text-blue-700' : 
-        t.type === 'IMPORTAÇÃO' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'
-      }`}>
-        {t.type}
-      </span>
-    )
-  },
-  { 
     key: 'os_status', 
-    label: '3. OS / Histórico Status', 
+    label: '2. OS / Histórico Status', 
     render: (t: Trip) => (
       <div className="flex flex-col gap-2 min-w-[220px]">
         <div className="flex items-center justify-between group">
@@ -61,7 +57,7 @@ export const getOperationTableColumns = (
   },
   {
     key: 'customer',
-    label: '4. Cliente / Local',
+    label: '3. Cliente / Local',
     render: (t: Trip) => (
       <div className="flex flex-col space-y-0.5 max-w-[200px]">
         <p className="font-black text-slate-800 uppercase text-[10px] leading-tight">
@@ -79,7 +75,7 @@ export const getOperationTableColumns = (
   },
   {
     key: 'cva',
-    label: '5. CVA',
+    label: '4. CVA',
     render: (t: Trip) => (
       <div className="flex items-center justify-center">
         {t.cva ? (
@@ -92,7 +88,7 @@ export const getOperationTableColumns = (
   },
   {
     key: 'equipment',
-    label: '6. Equipamento',
+    label: '5. Equipamento',
     render: (t: Trip) => (
       <div className="flex flex-col space-y-1">
         <div className="flex items-center gap-2">
@@ -111,7 +107,7 @@ export const getOperationTableColumns = (
   },
   { 
     key: 'driver', 
-    label: '7. Motorista', 
+    label: '6. Motorista', 
     render: (t: Trip) => (
       <div className="flex flex-col space-y-0.5">
         <span className="font-black text-slate-800 uppercase text-[10px] truncate max-w-[150px]">{t.driver?.name}</span>
@@ -125,7 +121,7 @@ export const getOperationTableColumns = (
   },
   {
     key: 'destination',
-    label: '8. Destino',
+    label: '7. Destino',
     render: (t: Trip) => (
       <div className="flex flex-col space-y-0.5 max-w-[180px]">
         {t.destination ? (
@@ -144,7 +140,7 @@ export const getOperationTableColumns = (
   },
   {
     key: 'booking_navio',
-    label: '9. Booking / Navio',
+    label: '8. Booking / Navio',
     render: (t: Trip) => (
       <div className="flex flex-col">
         <span className="text-[10px] font-black text-blue-800">{t.booking || '---'}</span>
@@ -154,7 +150,7 @@ export const getOperationTableColumns = (
   },
   {
     key: 'actions',
-    label: '10. Opções',
+    label: '9. Opções',
     render: (t: Trip) => (
       <div className="flex items-center gap-1.5">
         {/* EDITAR DADOS GERAIS */}

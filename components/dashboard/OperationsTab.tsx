@@ -141,11 +141,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
       <SmartOperationTable 
         userId={user.id} 
-        componentId={`ops-table-v7`} 
+        componentId={`ops-table-v8`} 
         columns={columns} 
         data={filteredTrips} 
         title={filterCategory === 'TODAS' ? "Todas as Viagens em Aberto" : `${filterCategory} › ${filterSub}`}
-        defaultVisibleKeys={['dateTime', 'type', 'os_status', 'customer', 'equipment', 'driver', 'actions']}
+        defaultVisibleKeys={['dateTime', 'os_status', 'customer', 'equipment', 'driver', 'booking_navio', 'actions']}
       />
 
       <TripModal 
