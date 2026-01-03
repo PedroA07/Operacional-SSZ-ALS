@@ -16,7 +16,7 @@ interface OrdemColetaFormProps {
   customers: Customer[];
   ports: Port[];
   onClose: () => void;
-  initialData?: any; // Para reedição a partir da Operação
+  initialData?: any; 
 }
 
 const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, ports, onClose, initialData }) => {
@@ -34,7 +34,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [detectedCategory, setDetectedCategory] = useState<string | null>(null);
   const [manualCategory, setManualCategory] = useState('');
 
-  // Estados para o Modal de Conflito de OS
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
 
@@ -154,14 +153,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     try {
       const finalCategory = detectedCategory || manualCategory || 'Geral';
       
-      // 1. Sincroniza Vínculos
       await osCategoryService.syncVinculos(finalCategory, selectedDriver, selectedRemetente);
 
-      // 2. Sincroniza com Painel de Operações
-      const tripData = tripSyncService.mapOCtoTrip(formData, selectedDriver!, selectedRemetente!, finalCategory);
+      const tripData = tripSyncService.mapOCtoTrip(formData, selectedDriver!, selectedRemetente!, finalCategory, selectedDestinatario);
       await tripSyncService.sync(tripData, existingId || undefined);
 
-      // 3. Gera PDF
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));
       const element = captureRef.current;
@@ -210,7 +206,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
       </div>
 
-      {/* MODAL DE CONFLITO DE OS */}
       {showSyncModal && existingTrip && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95">
@@ -326,7 +321,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
 
         <div className="relative">
-          <label className={labelBlueClass}>2. Destinatário (Terminal/Porto)</label>
+          <label className={labelBlueClass}>2. Destinatário (Local Destino)</label>
           <input 
             type="text" 
             placeholder="BUSCAR DESTINO..." 
@@ -393,7 +388,19 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
               </select>
             </div>
           </div>
-          <div className="space-y-1"><label className={labelClass}>Tipo Operação</label><input className={inputClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)} /></div>
+          <div className="space-y-1">
+            <label className={labelClass}>Tipo Operação</label>
+            <select 
+              className={inputClasses} 
+              value={formData.tipoOperacao} 
+              onChange={e => handleInputChange('tipoOperacao', e.target.value)}
+            >
+              <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
+              <option value="CABOTAGEM">CABOTAGEM</option>
+              <option value="ENTREGA">ENTREGA</option>
+              <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

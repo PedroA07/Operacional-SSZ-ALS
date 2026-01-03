@@ -43,6 +43,11 @@ export type TripStatus =
   | 'Agendamento Porto/Depot'
   | 'Viagem concluída';
 
+export interface StatusHistoryEntry {
+  status: TripStatus;
+  dateTime: string;
+}
+
 export interface PaymentStatus {
   status: 'BLOQUEADO' | 'LIBERAR' | 'PAGO' | 'AGUARDANDO_DOCS';
   liberatedAt?: string;
@@ -71,16 +76,18 @@ export interface Trip {
   dateTime: string;
   statusTime?: string;
   isLate: boolean;
-  type: 'EXPORTAÇÃO' | 'IMPORTAÇÃO' | 'COLETA' | 'ENTREGA';
+  type: 'EXPORTAÇÃO' | 'IMPORTAÇÃO' | 'COLETA' | 'ENTREGA' | 'CABOTAGEM';
   category: string;
   subCategory?: string;
   container: string;
   tara?: string;
   seal?: string;
   cva?: string; 
-  customer: { id: string; name: string; city: string; state?: string };
+  customer: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
+  destination?: { id: string; name: string; city: string; state?: string };
   driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string };
   status: TripStatus;
+  statusHistory: StatusHistoryEntry[];
   balancePayment: PaymentStatus;
   advancePayment: PaymentStatus;
   documents: TripDocument[];

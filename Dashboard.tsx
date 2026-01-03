@@ -15,7 +15,7 @@ import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
 import UserProfile from './components/dashboard/UserProfile';
 import { DEFAULT_OPERATIONS } from './constants/operations';
-import { db } from './utils/storage';
+import { db, supabase } from './utils/storage';
 import { Icons } from './constants/icons';
 
 interface DashboardProps {
@@ -60,6 +60,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     const syncInterval = setInterval(loadAllData, 30000);
     return () => clearInterval(syncInterval);
   }, [loadAllData]);
+
+  const handleDeleteTrip = async (id: string) => {
+    if (!confirm('Deseja excluir permanentemente esta programação do painel?')) return;
+    try {
+      if (supabase) {
+        await supabase.from('trips').delete().eq('id', id);
+      }
+      await loadAllData();
+    } catch (e) {
+      alert('Erro ao excluir viagem.');
+    }
+  };
 
   const MenuItem = ({ tab, label, icon, adminOnly, children, forceActive = false }: any) => {
     if (adminOnly && user.role !== 'admin') return null;
@@ -128,7 +140,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </header>
         <div className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
            {activeTab === DashboardTab.INICIO && <OverviewTab trips={trips} drivers={drivers} />}
-           {activeTab === DashboardTab.OPERACOES && <OperationsTab user={user} availableOps={availableOps} drivers={drivers} customers={customers} activeView={opsView} setActiveView={setOpsView} />}
+           {activeTab === DashboardTab.OPERACOES && (
+             <OperationsTab 
+               user={user} 
+               availableOps={availableOps} 
+               drivers={drivers} 
+               customers={customers} 
+               // Added ports prop here
+               ports={ports}
+               activeView={opsView} 
+               setActiveView={setOpsView} 
+               onDeleteTrip={handleDeleteTrip}
+             />
+           )}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver); loadAllData(); }} onDeleteDriver={async id => { await db.deleteDriver(id); loadAllData(); }} availableOps={availableOps} />}
            {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); loadAllData(); } }} isAdmin={user.role === 'admin'} />}

@@ -1,23 +1,26 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, Driver, Customer, Trip, TripStatus, Category, OperationDefinition } from '../../types';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
-import { db } from '../../utils/storage';
+import { db, supabase } from '../../utils/storage';
 import NewTripModal from './operations/NewTripModal';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OrdemColetaForm from './forms/OrdemColetaForm';
+import { maskCPF, maskCNPJ } from '../../utils/masks';
 
 interface OperationsTabProps {
   user: User;
   drivers: Driver[];
   customers: Customer[];
+  ports: Port[];
   availableOps: OperationDefinition[];
   activeView: { type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string };
   setActiveView: (view: any) => void;
+  onDeleteTrip?: (id: string) => void;
 }
 
-const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers, availableOps, activeView, setActiveView }) => {
+const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers, ports, availableOps, activeView, setActiveView, onDeleteTrip }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
@@ -49,21 +52,30 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const openStatusEditor = (trip: Trip, status: TripStatus) => {
     setSelectedTrip(trip);
     setTempStatus(status);
-    setStatusTime(new Date().toISOString().slice(0, 16));
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    setStatusTime(now.toISOString().slice(0, 16));
     setIsStatusModalOpen(true);
   };
 
   const handleUpdateStatus = async () => {
     if (!selectedTrip) return;
-    const updatedTrip = { ...selectedTrip, status: tempStatus, statusTime: new Date(statusTime).toISOString() };
+    
+    const newEntry: StatusHistoryEntry = {
+      status: tempStatus,
+      dateTime: new Date(statusTime).toISOString()
+    };
+
+    const updatedTrip = { 
+      ...selectedTrip, 
+      status: tempStatus, 
+      statusTime: newEntry.dateTime,
+      statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] 
+    };
+    
     await db.saveTrip(updatedTrip);
     setIsStatusModalOpen(false);
     loadData();
-  };
-
-  const openOCEditor = (trip: Trip) => {
-    setSelectedTrip(trip);
-    setIsOCEditModalOpen(true);
   };
 
   const columns = [
@@ -74,22 +86,23 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         <div className="flex flex-col">
           <span className="font-black text-slate-800">{new Date(t.dateTime).toLocaleDateString('pt-BR')}</span>
           <span className="text-blue-600 font-bold">{new Date(t.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span className="text-[8px] font-black uppercase text-slate-400 mt-1">{t.type}</span>
         </div>
       )
     },
     { 
       key: 'os_status', 
-      label: '2. OS / Status', 
+      label: '2. OS / Status (Histórico)', 
       render: (t: Trip) => (
-        <div className="space-y-1">
-          <p className="font-black text-blue-600 text-sm">{t.os}</p>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-1.5 min-w-[200px]">
+          <div className="flex items-center justify-between group/os mb-1">
+            <p className="font-black text-blue-700 text-xs tracking-tighter">OS: {t.os}</p>
             <select 
               value={t.status}
               onChange={(e) => openStatusEditor(t, e.target.value as TripStatus)}
-              className="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-[9px] font-black uppercase outline-none hover:border-blue-400"
+              className="ml-2 px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[8px] font-black uppercase outline-none hover:border-blue-400 cursor-pointer"
             >
-              <option value="Pendente">Pendente</option>
+              <option value="Pendente">Atualizar...</option>
               <option value="Retirada de vazio">Retirada Vazio</option>
               <option value="Retirada de cheio">Retirada Cheio</option>
               <option value="Chegada no cliente">Chegada Cliente</option>
@@ -98,59 +111,98 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
               <option value="Viagem concluída">Concluída</option>
             </select>
           </div>
+          
+          <div className="flex flex-col gap-1">
+             {(t.statusHistory || []).map((step, idx) => (
+               <div key={idx} className={`flex items-center justify-between gap-2 px-2 py-1 rounded-md border text-[7px] font-black uppercase ${idx === 0 ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-100 opacity-60'}`}>
+                  <span className="truncate">{step.status}</span>
+                  <span className="shrink-0 font-mono">
+                    {new Date(step.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})} {new Date(step.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
+                  </span>
+               </div>
+             ))}
+             {(!t.statusHistory || t.statusHistory.length === 0) && (
+               <div className="px-2 py-1 bg-slate-50 text-slate-300 rounded-md border border-slate-100 text-[7px] font-black uppercase italic">Aguardando Início</div>
+             )}
+          </div>
         </div>
       )
     },
     {
-      key: 'oc_gestao',
-      label: '3. Gestão OC',
+      key: 'customer',
+      label: '3. Local Atendimento',
       render: (t: Trip) => (
-        <div className="flex items-center gap-2">
-          {t.ocFormData ? (
-            <button 
-              onClick={() => openOCEditor(t)}
-              className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[8px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center gap-1.5"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="3"/></svg>
-              PDF / Editar
-            </button>
-          ) : (
-            <span className="text-[8px] text-slate-300 font-bold uppercase italic tracking-widest">Manual</span>
+        <div className="flex flex-col space-y-0.5 max-w-[220px]">
+          <span className="font-black text-slate-800 uppercase text-[10px] leading-tight break-words">{t.customer?.legalName || t.customer?.name}</span>
+          {t.customer?.legalName && t.customer.name !== t.customer.legalName && (
+             <span className="text-[8px] font-bold text-slate-500 uppercase">FANTASIA: {t.customer.name}</span>
           )}
+          <span className="text-[8px] font-mono text-slate-400">CNPJ: {maskCNPJ(t.customer?.cnpj || '')}</span>
+          <span className="text-[9px] font-black text-blue-600 mt-1 uppercase italic">{t.customer?.city} - {t.customer?.state}</span>
         </div>
       )
     },
     {
-      key: 'location',
-      label: '4. Local Atendimento',
+      key: 'destination',
+      label: '4. Local Destino',
       render: (t: Trip) => (
-        <div className="flex flex-col">
-          <span className="font-black text-slate-700 uppercase leading-none">{t.customer?.name}</span>
-          <span className="text-[9px] text-slate-400 mt-1">{t.customer?.city} - {t.customer?.state}</span>
+        <div className="flex flex-col space-y-0.5">
+          <span className="font-black text-slate-700 uppercase text-[10px] leading-tight break-words">{t.destination?.name || '---'}</span>
+          <span className="text-[9px] font-black text-emerald-600 uppercase italic">
+            {t.destination?.city ? `${t.destination.city} - ${t.destination.state}` : 'Não Definido'}
+          </span>
         </div>
       )
     },
     {
       key: 'container_data',
-      label: '5. Dados Container',
+      label: '5. Equipamento',
       render: (t: Trip) => (
         <div className="flex flex-col">
-          <span className="font-black text-slate-800">{t.container || '---'}</span>
-          <div className="flex gap-2 text-[8px] font-bold text-slate-400 uppercase">
+          <span className="font-black text-slate-800 text-[11px]">{t.container || '---'}</span>
+          <div className="flex gap-2 text-[8px] font-bold text-slate-400 uppercase mt-0.5">
              <span>T: {t.tara || '---'}</span>
              <span>L: {t.seal || '---'}</span>
+          </div>
+          {t.cva && <span className="text-[8px] font-black text-blue-500 mt-1 uppercase">CVA: {t.cva}</span>}
+        </div>
+      )
+    },
+    { 
+      key: 'driver', 
+      label: '6. Motorista', 
+      render: (t: Trip) => (
+        <div className="flex flex-col">
+          <span className="font-black text-slate-800 uppercase text-[10px] leading-tight break-words">{t.driver?.name}</span>
+          <span className="text-[8px] font-mono font-bold text-slate-500">{maskCPF(t.driver?.cpf || '')}</span>
+          <div className="flex gap-1.5 mt-1">
+             <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded font-mono text-[9px] font-black">{t.driver?.plateHorse}</span>
+             <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono text-[9px] font-black border border-slate-200">{t.driver?.plateTrailer}</span>
           </div>
         </div>
       )
     },
-    { key: 'cva', label: '6. CVA', render: (t: Trip) => <span className="font-black text-emerald-600">{t.cva || '---'}</span> },
-    { 
-      key: 'driver', 
-      label: '7. Motorista', 
+    {
+      key: 'actions',
+      label: 'Opções',
       render: (t: Trip) => (
-        <div className="flex flex-col">
-          <span className="font-black text-slate-800 uppercase leading-none">{t.driver?.name}</span>
-          <span className="text-[8px] font-mono text-slate-400 mt-1">{t.driver?.plateHorse} / {t.driver?.plateTrailer}</span>
+        <div className="flex items-center gap-1">
+           {t.ocFormData && (
+             <button 
+                onClick={() => { setSelectedTrip(t); setIsOCEditModalOpen(true); }}
+                className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Editar Ordem de Coleta"
+             >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeWidth="2.5"/></svg>
+             </button>
+           )}
+           <button 
+              onClick={() => onDeleteTrip?.(t.id)}
+              className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title="Excluir Programação"
+           >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+           </button>
         </div>
       )
     }
@@ -218,7 +270,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         componentId={`ops-table-${filterCategory}-${filterSub}`} 
         columns={columns} 
         data={filteredTrips} 
-        title={filterCategory === 'TODAS' ? "Fila OperacionalALS" : `${filterCategory}${filterSub !== 'TODAS' ? ' › ' + filterSub : ''}`} 
+        title={filterCategory === 'TODAS' ? "Fila Operacional ALS" : `${filterCategory}${filterSub !== 'TODAS' ? ' › ' + filterSub : ''}`} 
       />
 
       <NewTripModal 
@@ -251,18 +303,17 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         </div>
       )}
 
-      {/* MODAL PARA REEDIÇÃO DE OC */}
       {isOCEditModalOpen && selectedTrip && selectedTrip.ocFormData && (
         <div className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
            <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
               <div className="p-6 bg-blue-600 text-white flex justify-between items-center">
-                <h3 className="font-black text-sm uppercase tracking-widest">Reemissão / Edição de Ordem de Coleta (Sincronizada)</h3>
+                <h3 className="font-black text-sm uppercase tracking-widest">Reemissão / Edição de Ordem de Coleta</h3>
                 <button onClick={() => setIsOCEditModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
               </div>
               <OrdemColetaForm 
                 drivers={drivers} 
                 customers={customers} 
-                ports={[]} 
+                ports={ports} 
                 onClose={() => { setIsOCEditModalOpen(false); loadData(); }} 
                 initialData={selectedTrip.ocFormData} 
               />

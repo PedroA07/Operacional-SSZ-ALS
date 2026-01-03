@@ -1,5 +1,5 @@
 
-import { Trip, Driver, Customer } from '../types';
+import { Trip, Driver, Customer, Port, TripStatus } from '../types';
 import { db } from './storage';
 
 export const tripSyncService = {
@@ -14,24 +14,35 @@ export const tripSyncService = {
   /**
    * Converte os dados da Ordem de Coleta para o formato de Viagem Operacional
    */
-  mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string): Partial<Trip> => {
+  mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port): Partial<Trip> => {
+    const now = new Date().toISOString();
+    
     return {
       os: formData.os,
       booking: formData.booking,
       ship: formData.ship,
-      dateTime: formData.horarioAgendado || new Date().toISOString(),
+      dateTime: formData.horarioAgendado || now,
       isLate: false,
-      type: 'EXPORTAÇÃO',
+      type: (formData.tipoOperacao || 'EXPORTAÇÃO').toUpperCase() as any,
       category: category,
       container: formData.container,
       tara: formData.tara,
       seal: formData.seal,
+      cva: formData.autColeta,
       customer: {
         id: customer.id,
         name: customer.name,
+        legalName: customer.legalName,
+        cnpj: customer.cnpj,
         city: customer.city,
         state: customer.state
       },
+      destination: destination ? {
+        id: destination.id,
+        name: destination.name,
+        city: destination.city,
+        state: destination.state
+      } : undefined,
       driver: {
         id: driver.id,
         name: driver.name,
@@ -41,10 +52,11 @@ export const tripSyncService = {
         cpf: driver.cpf
       },
       status: 'Pendente',
+      statusHistory: [{ status: 'Pendente', dateTime: now }],
       advancePayment: { status: 'BLOQUEADO' },
       balancePayment: { status: 'AGUARDANDO_DOCS' },
       documents: [],
-      ocFormData: formData // Salva o estado do formulário para reedição futura
+      ocFormData: formData 
     };
   },
 
