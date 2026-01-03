@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import JsBarcode from 'jsbarcode';
-import { maskCNPJ } from '../../../utils/masks';
+import { maskCNPJ, maskCEP } from '../../../utils/masks';
 
 interface PreStackingTemplateProps {
   formData: any;
@@ -18,7 +18,6 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
 }) => {
   const borderStyle = "1px solid #1e293b";
 
-  // Gera os códigos de barras dentro do template após o render
   useEffect(() => {
     const generate = (id: string, value: string) => {
       const el = document.getElementById(id);
@@ -75,85 +74,75 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
         </div>
       </div>
 
-      {/* BLOCO CLIENTE/TERMINAL */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-        <div style={{ width: '352px', height: '120px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
-          <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px', borderBottom: '1px solid #f1f5f9' }}>REMETENTE (CLIENTE)</div>
-          <div style={{ fontSize: '10px', fontWeight: 'bold', lineHeight: '1.1', marginBottom: '2px' }}>{selectedRemetente?.legalName || selectedRemetente?.name || '---'}</div>
-          {selectedRemetente?.name && selectedRemetente?.legalName && selectedRemetente.name !== selectedRemetente.legalName && (
-             <div style={{ fontSize: '8px', fontWeight: 900, color: '#1e40af', marginBottom: '4px' }}>FANTASIA: {selectedRemetente.name}</div>
-          )}
-          <div style={{ fontSize: '9px', marginTop: '2px' }}>{selectedRemetente?.address || '---'}</div>
-          <div style={{ fontSize: '9px' }}>{selectedRemetente?.city || '---'} - {selectedRemetente?.state || '--'} | CEP: {selectedRemetente?.zipCode || '---'}</div>
-          <div style={{ fontSize: '9px', fontWeight: 'bold', marginTop: '2px' }}>CNPJ: {selectedRemetente?.cnpj || '---'}</div>
-        </div>
-        <div style={{ width: '352px', height: '120px', border: borderStyle, padding: '8px', overflow: 'hidden' }}>
-          <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px', borderBottom: '1px solid #f1f5f9' }}>DESTINATÁRIO (TERMINAL)</div>
-          <div style={{ fontSize: '10px', fontWeight: 'bold', lineHeight: '1.1', marginBottom: '2px' }}>{selectedDestinatario?.legalName || selectedDestinatario?.name || '---'}</div>
-          {selectedDestinatario?.name && selectedDestinatario?.legalName && selectedDestinatario.name !== selectedDestinatario.legalName && (
-             <div style={{ fontSize: '8px', fontWeight: 900, color: '#1e40af', marginBottom: '4px' }}>FANTASIA: {selectedDestinatario.name}</div>
-          )}
-          <div style={{ fontSize: '9px', marginTop: '2px' }}>{selectedDestinatario?.address || '---'}</div>
-          <div style={{ fontSize: '9px' }}>{selectedDestinatario?.city || '---'} - {selectedDestinatario?.state || '--'} | CEP: {selectedDestinatario?.zipCode || '---'}</div>
-          <div style={{ fontSize: '9px', fontWeight: 'bold', marginTop: '2px' }}>CNPJ: {selectedDestinatario?.cnpj ? maskCNPJ(selectedDestinatario.cnpj) : '---'}</div>
+      {/* BLOCO CLIENTE (REMETENTE) */}
+      <div style={{ border: borderStyle, padding: '12px', marginBottom: '10px', backgroundColor: '#f8fafc' }}>
+        <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '6px', borderBottom: '1px solid #e2e8f0' }}>CLIENTE (CONTRATANTE)</div>
+        <div style={{ display: 'flex', gap: '20px' }}>
+           <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '7px', fontWeight: 900, color: '#64748b' }}>RAZÃO SOCIAL</div>
+              <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>{selectedRemetente?.legalName || '---'}</div>
+           </div>
+           <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '7px', fontWeight: 900, color: '#64748b' }}>NOME FANTASIA</div>
+              <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', color: '#1e40af' }}>{selectedRemetente?.name || '---'}</div>
+           </div>
         </div>
       </div>
 
       {/* BLOCO EQUIPAMENTO COM CÓDIGO DE BARRAS */}
-      <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '115px', overflow: 'hidden' }}>
-        <div style={{ width: '400px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '100px', overflow: 'hidden' }}>
+        <div style={{ width: '300px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>CONTAINER</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, lineHeight: '1.2', marginBottom: '2px' }}>{formData.container || '---'}</div>
-          <div style={{ marginTop: 'auto', height: '32px', display: 'flex', alignItems: 'center' }}>
-            <svg id="ps-barcode-container" style={{ width: '300px', height: '22px' }}></svg>
+          <div style={{ fontSize: '22px', fontWeight: 900, lineHeight: '1.1' }}>{formData.container || '---'}</div>
+          <div style={{ marginTop: 'auto', height: '28px', display: 'flex', alignItems: 'center' }}>
+            <svg id="ps-barcode-container" style={{ width: '250px', height: '20px' }}></svg>
           </div>
         </div>
-        <div style={{ width: '157px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+        <div style={{ width: '130px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textAlign: 'left' }}>TARA</div>
-          <div style={{ fontSize: '12px', fontWeight: 900, marginTop: '2px' }}>{formData.tara || '---'}</div>
-          <div style={{ marginTop: 'auto', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg id="ps-barcode-tara" style={{ width: '130px', height: '22px' }}></svg>
+          <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.tara || '---'}</div>
+          <div style={{ marginTop: 'auto', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg id="ps-barcode-tara" style={{ width: '100px', height: '20px' }}></svg>
           </div>
         </div>
-        <div style={{ width: '157px', padding: '10px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+        <div style={{ width: '130px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textAlign: 'left' }}>LACRE</div>
-          <div style={{ fontSize: '12px', fontWeight: 900, marginTop: '2px' }}>{formData.seal || '---'}</div>
-          <div style={{ marginTop: 'auto', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg id="ps-barcode-lacre" style={{ width: '130px', height: '22px' }}></svg>
+          <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.seal || '---'}</div>
+          <div style={{ marginTop: 'auto', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg id="ps-barcode-lacre" style={{ width: '100px', height: '20px' }}></svg>
           </div>
         </div>
-      </div>
-
-      {/* BLOCO OPERACIONAL GRID */}
-      <div style={{ display: 'flex', border: borderStyle, backgroundColor: '#f8fafc', marginBottom: '10px' }}>
-        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle }}>
-          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>TIPO</div>
-          <div style={{ fontSize: '12px', fontWeight: 900 }}>{formData.tipo || '---'}</div>
-        </div>
-        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle }}>
-          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>PADRÃO</div>
-          <div style={{ fontSize: '12px', fontWeight: 900 }}>CARGA CHEIA</div>
-        </div>
-        <div style={{ width: '178px', padding: '8px', borderRight: borderStyle }}>
-          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>OPERAÇÃO</div>
-          <div style={{ fontSize: '12px', fontWeight: 900 }}>EXPORTAÇÃO</div>
-        </div>
-        <div style={{ width: '178px', padding: '8px' }}>
-          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>NOTA FISCAL</div>
-          <div style={{ fontSize: '12px', fontWeight: 900, color: '#1e40af' }}>{formData.nf || '---'}</div>
+        <div style={{ flex: 1, padding: '10px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>TIPO</div>
+          <div style={{ fontSize: '18px', fontWeight: 900 }}>{formData.tipo || '---'}</div>
+          <div style={{ fontSize: '8px', fontWeight: 900, color: '#64748b', marginTop: 'auto' }}>PADRÃO: CHEIO</div>
         </div>
       </div>
 
-      {/* NAVIO / BOOKING */}
+      {/* BLOCO OPERACIONAL GRID 2 */}
       <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px' }}>
-        <div style={{ flex: '1', padding: '8px', borderRight: borderStyle }}>
-          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>NAVIO</div>
-          <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.ship || '---'}</div>
-        </div>
-        <div style={{ flex: '1', padding: '8px' }}>
+        <div style={{ flex: 1, padding: '8px', borderRight: borderStyle }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>BOOKING</div>
           <div style={{ fontSize: '14px', fontWeight: 900, color: '#1e40af' }}>{formData.booking || '---'}</div>
         </div>
+        <div style={{ flex: 1, padding: '8px', borderRight: borderStyle }}>
+          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>AUTORIZAÇÃO DE COLETA</div>
+          <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.autColeta || '---'}</div>
+        </div>
+        <div style={{ flex: 1, padding: '8px', borderRight: borderStyle }}>
+          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>NOTA FISCAL</div>
+          <div style={{ fontSize: '14px', fontWeight: 900, color: '#1e40af' }}>{formData.nf || '---'}</div>
+        </div>
+        <div style={{ flex: 1, padding: '8px' }}>
+          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>Nº ORDEM SERVIÇO (OS)</div>
+          <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.os || '---'}</div>
+        </div>
+      </div>
+
+      {/* NAVIO */}
+      <div style={{ border: borderStyle, padding: '8px', marginBottom: '10px', backgroundColor: '#f8fafc' }}>
+        <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>NAVIO / EMBARCAÇÃO</div>
+        <div style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase' }}>{formData.ship || '---'}</div>
       </div>
 
       {/* BLOCO MOTORISTA DETALHADO */}
@@ -161,52 +150,45 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
         <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px' }}>
           <div style={{ flex: '2', paddingRight: '15px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>MOTORISTA</div>
-            <div style={{ fontSize: '13px', fontWeight: 900, lineHeight: '1.1' }}>{selectedDriver?.name || '---'}</div>
+            <div style={{ fontSize: '14px', fontWeight: 900 }}>{selectedDriver?.name || '---'}</div>
           </div>
           <div style={{ flex: '1' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CPF</div>
-            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{selectedDriver?.cpf || '---'}</div>
-          </div>
-          <div style={{ flex: '1' }}>
-            <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>RG</div>
-            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{selectedDriver?.rg || '---'}</div>
-          </div>
-          <div style={{ flex: '1' }}>
-            <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CNH</div>
-            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{selectedDriver?.cnh || '---'}</div>
+            <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{selectedDriver?.cpf || '---'}</div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-          <div style={{ width: '238px' }}>
+          <div style={{ width: '330px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>PLACA CAVALO</div>
             <div style={{ fontSize: '24px', fontWeight: 900, color: '#1e40af' }}>{selectedDriver?.plateHorse || '---'}</div>
           </div>
-          <div style={{ width: '238px' }}>
+          <div style={{ width: '330px' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>PLACA CARRETA</div>
             <div style={{ fontSize: '24px', fontWeight: 900, color: '#1e40af' }}>{selectedDriver?.plateTrailer || '---'}</div>
-          </div>
-          <div style={{ width: '238px', textAlign: 'right' }}>
-            <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CONTATO</div>
-            <div style={{ fontSize: '12px', fontWeight: 900 }}>{selectedDriver?.phone || '---'}</div>
           </div>
         </div>
       </div>
 
-      {/* BLOCO OS / AUT COLETA */}
+      {/* BLOCO LOCAIS (CARREGAMENTO E ENTREGA) */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-        <div style={{ flex: 1, border: borderStyle }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #f1f5f9' }}>
-            <span style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>Nº ORDEM SERVIÇO</span>
-            <span style={{ fontSize: '12px', fontWeight: 900, color: '#1e40af' }}>{formData.os || '---'}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px' }}>
-            <span style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>AUT. COLETA</span>
-            <span style={{ fontSize: '12px', fontWeight: 900 }}>{formData.autColeta || '---'}</span>
+        <div style={{ flex: 1, border: borderStyle, padding: '10px' }}>
+          <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', borderBottom: '1px solid #f1f5f9', marginBottom: '5px' }}>LOCAL DE CARREGAMENTO</div>
+          <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}>{selectedRemetente?.name || '---'}</div>
+          <div style={{ fontSize: '9px', color: '#475569', marginTop: '2px' }}>{selectedRemetente?.city || '---'} - {selectedRemetente?.state || '--'}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+             <span style={{ fontSize: '8px', fontWeight: 'bold' }}>CNPJ: {selectedRemetente?.cnpj || '---'}</span>
+             <span style={{ fontSize: '8px', fontWeight: 'bold' }}>CEP: {selectedRemetente?.zipCode ? maskCEP(selectedRemetente.zipCode) : '---'}</span>
           </div>
         </div>
-        <div style={{ flex: 1, border: borderStyle, backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 900, color: '#64748b', marginBottom: '5px' }}>AGENDAMENTO DE ENTREGA</div>
-          <div style={{ fontSize: '18px', fontWeight: 900 }}>{formData.displayDate}</div>
+        <div style={{ flex: 1, border: borderStyle, padding: '10px', backgroundColor: '#eff6ff' }}>
+          <div style={{ fontSize: '8px', fontWeight: 900, color: '#1e40af', borderBottom: '1px solid #bfdbfe', marginBottom: '5px' }}>LOCAL DE ENTREGA (PRE-STACKING)</div>
+          <div style={{ fontSize: '10px', fontWeight: 'black', textTransform: 'uppercase' }}>{selectedDestinatario?.legalName || '---'}</div>
+          <div style={{ fontSize: '8px', fontWeight: 'bold', color: '#3b82f6', marginTop: '1px' }}>FANTASIA: {selectedDestinatario?.name || '---'}</div>
+          <div style={{ fontSize: '9px', color: '#475569', marginTop: '2px' }}>{selectedDestinatario?.city || '---'} - {selectedDestinatario?.state || '--'}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+             <span style={{ fontSize: '8px', fontWeight: 'bold' }}>CNPJ: {selectedDestinatario?.cnpj ? maskCNPJ(selectedDestinatario.cnpj) : '---'}</span>
+             <span style={{ fontSize: '8px', fontWeight: 'bold' }}>CEP: {selectedDestinatario?.zipCode ? maskCEP(selectedDestinatario.zipCode) : '---'}</span>
+          </div>
         </div>
       </div>
 
