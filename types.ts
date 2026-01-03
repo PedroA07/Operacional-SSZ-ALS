@@ -1,4 +1,5 @@
 
+
 export enum AppScreen {
   LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD'
@@ -84,7 +85,8 @@ export interface Trip {
   seal?: string;
   cva?: string; 
   customer: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
-  destination?: { id: string; name: string; city: string; state?: string };
+  // Fixed: Added legalName to destination to match customer and fix property access error
+  destination?: { id: string; name: string; legalName?: string; city: string; state?: string };
   driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string };
   status: TripStatus;
   statusHistory: StatusHistoryEntry[];
