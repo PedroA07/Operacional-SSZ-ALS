@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { Driver, OperationDefinition, User, Customer } from '../../../types';
 import SmartOperationTable from './SmartOperationTable';
+import { maskCNPJ } from '../../../utils/masks';
 
 interface GenericOperationViewProps {
   user: User;
@@ -38,8 +39,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       c.operations?.some(op => op.toUpperCase() === categoryName.toUpperCase())
     );
   }, [customers, categoryName]);
-
-  const currentOp = availableOps.find(o => o.category.toUpperCase() === categoryName.toUpperCase());
 
   const driverColumns = [
     { key: 'name', label: 'Motorista', render: (d: any) => (
@@ -102,31 +101,48 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
 
         <div className="lg:col-span-4 space-y-6">
-          {type === 'category' && (
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="font-black text-slate-700 uppercase text-[10px] tracking-widest mb-6 border-b border-slate-100 pb-4">Clientes Vinculados à Categoria</h3>
-              <div className="space-y-3">
-                {linkedCustomers.map((cust, i) => (
-                  <button 
-                    key={cust.id}
-                    onClick={() => onNavigate({ type: 'client', categoryName: categoryName, clientName: cust.name })}
-                    className="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:border-blue-500 hover:bg-white group transition-all text-left flex items-center justify-between"
-                  >
-                    <div>
-                      <p className="text-[10px] font-black text-slate-700 uppercase">{cust.name}</p>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">
-                        {cust.city} - {cust.state}
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+            <h3 className="font-black text-slate-700 uppercase text-[10px] tracking-widest mb-6 border-b border-slate-100 pb-4">
+              {type === 'category' ? 'Clientes Vinculados à Categoria' : 'Navegar para outro Cliente'}
+            </h3>
+            <div className="space-y-4">
+              {linkedCustomers.map((cust) => (
+                <button 
+                  key={cust.id}
+                  onClick={() => onNavigate({ type: 'client', categoryName: categoryName, clientName: cust.name })}
+                  className={`w-full p-5 rounded-[2rem] border transition-all text-left flex items-start gap-4 group ${clientName === cust.name ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-50' : 'bg-slate-50 border-slate-100 hover:border-blue-400 hover:bg-white'}`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black italic text-xs ${clientName === cust.name ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                    {cust.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-black text-slate-800 uppercase leading-tight truncate">
+                      {cust.legalName || cust.name}
+                    </p>
+                    {cust.legalName && cust.name !== cust.legalName && (
+                      <p className="text-[9px] font-bold text-slate-500 uppercase mt-0.5 truncate">
+                        Fantasia: {cust.name}
+                      </p>
+                    )}
+                    <div className="mt-2 pt-2 border-t border-slate-200/50 space-y-1">
+                      <p className="text-[8px] font-black text-blue-600 flex items-center gap-1">
+                         <span className="opacity-50">CNPJ:</span> {maskCNPJ(cust.cnpj)}
+                      </p>
+                      <p className="text-[8px] font-bold text-slate-400 flex items-center gap-1 uppercase">
+                         <span className="opacity-50 tracking-tighter">LOCALIDADE:</span> {cust.city} - {cust.state}
                       </p>
                     </div>
-                    <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
-                  </button>
-                ))}
-                {linkedCustomers.length === 0 && (
-                  <p className="text-[9px] text-slate-400 font-bold uppercase italic text-center py-6">Nenhum cliente vinculado a esta categoria.</p>
-                )}
-              </div>
+                  </div>
+                  <div className="pt-1">
+                    <svg className={`w-4 h-4 transition-colors ${clientName === cust.name ? 'text-blue-600' : 'text-slate-300 group-hover:text-blue-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
+                  </div>
+                </button>
+              ))}
+              {linkedCustomers.length === 0 && (
+                <p className="text-[9px] text-slate-400 font-bold uppercase italic text-center py-6">Nenhum cliente vinculado a esta categoria.</p>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="bg-slate-900 p-8 rounded-3xl text-white relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 p-4 opacity-10">
