@@ -15,10 +15,40 @@ interface PreStackingFormProps {
   initialOS?: string;
 }
 
+// Fix: Moved TerminalCardItem outside and typed as React.FC to allow standard React props like 'key' when mapped in JSX
+interface TerminalCardItemProps {
+  unit: PreStacking;
+  isSelected?: boolean;
+  onClick?: () => void;
+}
+
+const TerminalCardItem: React.FC<TerminalCardItemProps> = ({ unit, isSelected = false, onClick }) => (
+  <div 
+    onClick={onClick}
+    className={`w-full p-4 rounded-2xl border transition-all text-left flex items-center justify-between group cursor-pointer ${isSelected ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-100 shadow-md' : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50'}`}
+  >
+    <div className="flex-1 min-w-0">
+      <p className={`text-[11px] font-black uppercase leading-tight ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
+        {unit.legalName || unit.name}
+      </p>
+      <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5 italic tracking-tighter">
+        FANTASIA: {unit.name || '********'}
+      </p>
+    </div>
+    <div className="text-right shrink-0 ml-4">
+      <p className="text-[9px] font-black text-blue-600 uppercase tracking-tighter">
+        {unit.city} - {unit.state}
+      </p>
+    </div>
+  </div>
+);
+
 const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, ports, onClose, initialOS }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isLoadingTrip, setIsLoadingTrip] = useState(false);
+  const [isTerminalDropdownOpen, setIsTerminalDropdownOpen] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   
   const [osInput, setOsInput] = useState(initialOS || '');
   const [preStackingList, setPreStackingList] = useState<PreStacking[]>([]);
@@ -52,6 +82,14 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     if (initialOS) {
       setTimeout(() => handleOSLookup(initialOS), 500);
     }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsTerminalDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [initialOS]);
 
   const handleOSLookup = async (manualOS?: string) => {
@@ -93,10 +131,10 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     setFormData(prev => ({ ...prev, [field]: value.toUpperCase() }));
   };
 
-  const handleUnitChange = (id: string) => {
-    const unit = preStackingList.find(p => p.id === id);
-    setFormData(prev => ({ ...prev, destinatarioId: id }));
+  const selectTerminal = (unit: PreStacking) => {
+    setFormData(prev => ({ ...prev, destinatarioId: unit.id }));
     setSelectedDestinatario(unit);
+    setIsTerminalDropdownOpen(false);
   };
 
   const downloadPDF = async () => {
@@ -170,39 +208,49 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
               <input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="EX: MAERSK..." />
            </div>
 
-           <div className="space-y-1 relative">
+           {/* SELETOR CUSTOMIZADO (ESTILO IMAGEM REFERÊNCIA) */}
+           <div className="space-y-1 relative" ref={dropdownRef}>
               <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1.5 block">Local de Entrega (Pre-Stacking)</label>
-              <div className="relative group">
-                <select 
-                  className={`${inputClasses} cursor-pointer h-[58px] py-0 appearance-none pr-10`}
-                  value={formData.destinatarioId}
-                  onChange={e => handleUnitChange(e.target.value)}
-                >
-                  <option value="">Selecione o Terminal...</option>
-                  {preStackingList.map(unit => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.name} | {unit.legalName?.substring(0, 20)}... | {unit.city}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
-                </div>
-              </div>
+              
+              <button 
+                type="button"
+                onClick={() => setIsTerminalDropdownOpen(!isTerminalDropdownOpen)}
+                className="w-full text-left focus:outline-none"
+              >
+                {selectedDestinatario ? (
+                  <TerminalCardItem unit={selectedDestinatario} isSelected={true} />
+                ) : (
+                  <div className="w-full px-5 py-5 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 text-slate-400 font-black text-[10px] uppercase flex justify-between items-center hover:border-blue-400 transition-all">
+                    Selecionar Terminal de Entrega...
+                    <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
+                  </div>
+                )}
+              </button>
 
+              {isTerminalDropdownOpen && (
+                <div className="absolute z-[100] w-full mt-2 bg-white rounded-[2rem] shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  <div className="p-3 bg-slate-50 border-b border-slate-100">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Unidades Disponíveis</p>
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-2 space-y-1">
+                    {preStackingList.map(unit => (
+                      <TerminalCardItem 
+                        key={unit.id} 
+                        unit={unit} 
+                        onClick={() => selectTerminal(unit)} 
+                      />
+                    ))}
+                    {preStackingList.length === 0 && (
+                      <div className="p-6 text-center text-slate-300 font-bold uppercase italic text-[9px]">Nenhum terminal cadastrado</div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               {selectedDestinatario && (
-                <div className="mt-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in fade-in slide-in-from-top-2">
-                   <div className="flex justify-between items-start gap-3">
-                      <div className="flex-1">
-                         <p className="text-[10px] font-black text-emerald-900 uppercase leading-tight">{selectedDestinatario.legalName}</p>
-                         <p className="text-[8px] font-bold text-emerald-600 uppercase mt-0.5 italic">Fantasia: {selectedDestinatario.name}</p>
-                      </div>
-                      <span className="px-2 py-0.5 bg-emerald-600 text-white rounded text-[7px] font-black uppercase">Selecionado</span>
-                   </div>
-                   <div className="flex justify-between mt-3 pt-3 border-t border-emerald-200/50">
-                      <span className="text-[8px] font-black text-emerald-700">CNPJ: {maskCNPJ(selectedDestinatario.cnpj)}</span>
-                      <span className="text-[8px] font-black text-emerald-500 uppercase">{selectedDestinatario.city} - {selectedDestinatario.state}</span>
-                   </div>
+                <div className="mt-2 px-2 flex justify-between items-center">
+                   <span className="text-[8px] font-black text-emerald-600 uppercase">CNPJ: {maskCNPJ(selectedDestinatario.cnpj)}</span>
+                   <button onClick={() => { setSelectedDestinatario(null); setFormData(p => ({...p, destinatarioId: ''})); }} className="text-[8px] font-black text-red-400 uppercase hover:underline">Trocar Terminal</button>
                 </div>
               )}
            </div>
