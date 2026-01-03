@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, VWSchedule, VWStatus, Trip } from '../types';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip } from '../types';
 import OverviewTab from './dashboard/OverviewTab';
 import DriversTab from './dashboard/DriversTab';
 import FormsTab from './dashboard/FormsTab';
@@ -14,8 +13,9 @@ import SystemTab from './dashboard/SystemTab';
 import WeatherWidget from './dashboard/WeatherWidget';
 import OnlineStatus from './dashboard/OnlineStatus';
 import DatabaseStatus from './dashboard/DatabaseStatus';
+import UserProfile from './dashboard/UserProfile';
 import { DEFAULT_OPERATIONS } from '../constants/operations';
-import { db } from '../utils/storage';
+import { db, supabase } from '../utils/storage';
 import { Icons } from '../constants/icons';
 
 interface DashboardProps {
@@ -27,8 +27,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ 'Operações': false, 'Administrativo': false });
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [sessionTime, setSessionTime] = useState('00:00:00');
   
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -36,20 +34,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [availableOps, setAvailableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
+  const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const diff = new Date().getTime() - new Date(user.lastLogin).getTime();
-      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-      setSessionTime(`${h}:${m}:${s}`);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [user.lastLogin]);
 
   const loadAllData = async () => {
     const [d, c, p, ps, s, t] = await Promise.all([
@@ -70,6 +57,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => { loadAllData(); }, [user]);
 
+  const handleDeleteTrip = async (id: string) => {
+    if (!confirm('Deseja excluir permanentemente esta programação do painel?')) return;
+    try {
+      if (supabase) {
+        await supabase.from('trips').delete().eq('id', id);
+      }
+      await loadAllData();
+    } catch (e) {
+      alert('Erro ao excluir viagem.');
+    }
+  };
+
   const MenuItem = ({ tab, label, icon, adminOnly, children, forceActive = false }: any) => {
     if (adminOnly && user.role !== 'admin') return null;
     const isActive = forceActive || (tab ? activeTab === tab : false);
@@ -81,7 +80,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <div className={`${isActive ? 'text-white' : 'text-slate-50 group-hover:text-white'}`}>{icon}</div>
             {sidebarState === 'open' && <span className="truncate">{label}</span>}
           </button>
-          {children && sidebarState === 'open' && <button onClick={(e) => { e.stopPropagation(); setExpandedMenus(p => ({ ...p, [label]: !p[label] })); }} className={`p-3 text-slate-500 transition-all ${isExpanded ? 'rotate-180' : ''}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>}
+          {children && sidebarState === 'open' && <button onClick={(e) => { e.stopPropagation(); setExpandedMenus(p => ({ ...p, [label]: !p[label] })); }} className={`p-3 text-slate-500 transition-all ${isExpanded ? 'rotate-180' : ''}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg></button>}
         </div>
         {children && isExpanded && sidebarState === 'open' && <div className="ml-8 mt-1 space-y-1 border-l border-slate-800/50 pl-4 animate-in slide-in-from-top-2">{children}</div>}
       </div>
@@ -94,19 +93,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <div className="p-5 border-b border-slate-800/50 space-y-4">
           <div className="flex items-center gap-3 mb-2">
             <div className="bg-blue-600 w-9 h-9 min-w-[36px] rounded-xl flex items-center justify-center text-white font-black italic">ALS</div>
-            {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-wider text-xs uppercase whitespace-nowrap">ALS TRANSPORTES</span>}
+            {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-wider text-xs uppercase whitespace-nowrap">ALS LOGÍSTICA</span>}
           </div>
           {sidebarState === 'open' && <WeatherWidget />}
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
           <MenuItem tab={DashboardTab.INICIO} label="Início" icon={<Icons.Inicio />} />
-          <MenuItem tab={DashboardTab.ADMINISTRATIVO} label="Administrativo" icon={<Icons.Clientes />} />
           <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
-            {availableOps.map(op => <button key={op.id} onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase text-slate-500 hover:text-white">• {op.category}</button>)}
+            {availableOps.map(op => <button key={op.id} onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors">• {op.category}</button>)}
           </MenuItem>
+          <MenuItem tab={DashboardTab.ADMINISTRATIVO} label="Financeiro" icon={<Icons.Clientes />} />
           <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" icon={<Icons.Motoristas />} />
           <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" icon={<Icons.Formularios />} />
           <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" icon={<Icons.Clientes />} />
+          <MenuItem tab={DashboardTab.PORTOS} label="Portos" icon={<Icons.Portos />} />
+          <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" icon={<Icons.PreStacking />} />
           <div className="pt-4 pb-2">
              {sidebarState === 'open' && <p className="px-4 text-[7px] font-black text-slate-600 uppercase mb-2 tracking-[0.2em]">Administração</p>}
              <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" icon={<Icons.Equipe />} />
@@ -126,19 +127,30 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </div>
            <div className="flex items-center gap-4">
               <DatabaseStatus />
-              <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center font-black text-blue-400 text-xs shadow-md">{user.photo ? <img src={user.photo} className="w-full h-full object-cover rounded-xl" /> : user.displayName[0]}</div>
+              <UserProfile user={user} />
            </div>
         </header>
         <div className="flex-1 overflow-y-auto p-8 bg-[#f8fafc] custom-scrollbar">
            {activeTab === DashboardTab.INICIO && <OverviewTab trips={trips} drivers={drivers} />}
-           {activeTab === DashboardTab.OPERACOES && <OperationsTab user={user} availableOps={availableOps} drivers={drivers} customers={customers} activeView={opsView} setActiveView={setOpsView} />}
+           {activeTab === DashboardTab.OPERACOES && (
+             <OperationsTab 
+               user={user} 
+               availableOps={availableOps} 
+               drivers={drivers} 
+               customers={customers} 
+               ports={ports}
+               activeView={opsView} 
+               setActiveView={setOpsView} 
+               onDeleteTrip={handleDeleteTrip}
+             />
+           )}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver); loadAllData(); }} onDeleteDriver={async id => { await db.deleteDriver(id); loadAllData(); }} availableOps={availableOps} />}
            {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} onDeleteCustomer={async id => { await db.deleteCustomer(id); loadAllData(); }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); loadAllData(); }} onDeleteStaff={async id => { await db.deleteStaff(id); loadAllData(); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
-           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port); loadAllData(); }} />}
-           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking); loadAllData(); }} />}
+           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port); loadAllData(); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(); } }} />}
+           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking); loadAllData(); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(); } }} />}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
         </div>
       </main>
