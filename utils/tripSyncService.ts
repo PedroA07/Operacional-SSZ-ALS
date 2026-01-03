@@ -28,7 +28,7 @@ export const tripSyncService = {
       container: formData.container,
       tara: formData.tara,
       seal: formData.seal,
-      cva: formData.autColeta,
+      // REMOVIDO: cva: formData.autColeta (Soli. do usuário: cva é manual, autColeta é só no PDF)
       customer: {
         id: customer.id,
         name: customer.name,
