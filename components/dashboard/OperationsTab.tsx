@@ -8,6 +8,7 @@ import CategoryManagerModal from './operations/CategoryManagerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
 import OrdemColetaForm from './forms/OrdemColetaForm';
+import PreStackingForm from './forms/PreStackingForm';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
 interface OperationsTabProps {
@@ -27,11 +28,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isOCEditModalOpen, setIsOCEditModalOpen] = useState(false);
+  const [isMinutaModalOpen, setIsMinutaModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   
-  // MODIFICAÇÃO: Inicializando filtros vazios para serem preenchidos com "Todos" via useEffect
   const [filterTypes, setFilterTypes] = useState<string[]>(['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM']);
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
   const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
@@ -46,7 +47,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   useEffect(() => { 
     loadData(); 
-    // Sincroniza os nomes para os filtros de seleção inicial
     setFilterClientNames(customers.map(c => c.name));
     setFilterDriverNames(drivers.map(d => d.name));
   }, [customers, drivers]);
@@ -82,11 +82,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   const handleEditMinuta = (trip: Trip) => {
     setSelectedTrip(trip);
-    setIsTripModalOpen(true); 
+    setIsMinutaModalOpen(true);
   };
 
   const handleDownloadMinuta = (trip: Trip) => {
-    alert(`Gerando Minuta PDF para OS: ${trip.os}`);
+    alert(`Gerando Minuta Direta para OS: ${trip.os}`);
   };
 
   const filteredTrips = useMemo(() => {
@@ -237,6 +237,18 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                 <button onClick={() => setIsOCEditModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
               </div>
               <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCEditModalOpen(false); loadData(); }} initialData={selectedTrip.ocFormData} />
+           </div>
+        </div>
+      )}
+
+      {isMinutaModalOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
+           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
+              <div className="p-6 bg-emerald-600 text-white flex justify-between items-center">
+                <h3 className="font-black text-sm uppercase tracking-widest">Formulário de Minuta Pre-Stacking</h3>
+                <button onClick={() => setIsMinutaModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              </div>
+              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaModalOpen(false); loadData(); }} initialOS={selectedTrip.os} />
            </div>
         </div>
       )}
