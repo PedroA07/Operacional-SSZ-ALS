@@ -20,18 +20,15 @@ export const KEYS = {
   PREFERENCES: 'als_ui_preferences'
 };
 
-/**
- * Mapper para converter objetos do Frontend para o Banco de Dados (Supabase)
- */
 const mapTripToDb = (trip: Trip) => ({
   id: trip.id,
   os: trip.os,
   booking: trip.booking,
   ship: trip.ship,
   date_time: trip.dateTime,
-  // Fixed: Added is_late to mapper
   is_late: trip.isLate,
   type: trip.type,
+  container_type: trip.containerType || null,
   cva: trip.cva,
   genset: (trip as any).genset || null,
   container: trip.container,
@@ -47,7 +44,8 @@ const mapTripToDb = (trip: Trip) => ({
   advance_payment: trip.advancePayment,
   balance_payment: trip.balancePayment,
   documents: trip.documents,
-  oc_form_data: trip.ocFormData
+  oc_form_data: trip.ocFormData,
+  pre_stacking_form_data: trip.preStackingFormData || null
 });
 
 const mapDbToTrip = (d: any): Trip => ({
@@ -56,9 +54,9 @@ const mapDbToTrip = (d: any): Trip => ({
   booking: d.booking,
   ship: d.ship,
   dateTime: d.date_time || d.dateTime,
-  // Fixed: Added isLate to mapper to fulfill Trip interface requirement
   isLate: d.is_late ?? d.isLate ?? false,
   type: d.type,
+  containerType: d.container_type || d.containerType,
   cva: d.cva,
   container: d.container,
   tara: d.tara,
@@ -73,7 +71,8 @@ const mapDbToTrip = (d: any): Trip => ({
   advancePayment: d.advance_payment || d.advancePayment || { status: 'BLOQUEADO' },
   balancePayment: d.balance_payment || d.balancePayment || { status: 'AGUARDANDO_DOCS' },
   documents: d.documents || [],
-  ocFormData: d.oc_form_data || d.ocFormData
+  ocFormData: d.oc_form_data || d.ocFormData,
+  preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData
 });
 
 export const db = {
@@ -101,7 +100,6 @@ export const db = {
 
   isCloudActive: () => !!supabase,
 
-  // --- USUÁRIOS ---
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
       try {
@@ -139,7 +137,6 @@ export const db = {
     return true;
   },
 
-  // --- VIAGENS (TRIPS) ---
   getTrips: async (): Promise<Trip[]> => {
     if (supabase) {
       try {
@@ -178,7 +175,6 @@ export const db = {
     return true;
   },
 
-  // --- MÉTODOS SIMPLIFICADOS PARA OS DEMAIS ---
   getDrivers: async (): Promise<Driver[]> => {
     if (supabase) { try { const d = await driverRepository.getAll(supabase); db._saveLocal(KEYS.DRIVERS, d); return d; } catch (e) {} }
     return db._getLocal(KEYS.DRIVERS);
@@ -245,7 +241,6 @@ export const db = {
     db._saveLocal(KEYS.STAFF, current);
     return true;
   },
-  // Fixed: Added missing deleteStaff method
   deleteStaff: async (id: string) => {
     if (supabase) { try { await supabase.from('staff').delete().eq('id', id); } catch (e) {} }
     const current = db._getLocal(KEYS.STAFF).filter((s: Staff) => s.id !== id);
@@ -276,7 +271,6 @@ export const db = {
     db._saveLocal(KEYS.PRE_STACKING, current);
     return true;
   },
-  // Fixed: Added missing deletePreStacking method
   deletePreStacking: async (id: string) => {
     if (supabase) { try { await supabase.from('pre_stacking').delete().eq('id', id); } catch (e) {} }
     const current = db._getLocal(KEYS.PRE_STACKING).filter((p: PreStacking) => p.id !== id);
@@ -304,7 +298,6 @@ export const db = {
     a.click();
     URL.revokeObjectURL(url);
   },
-  // Fixed: Added missing importBackup method
   importBackup: async (file: File) => {
     try {
       const text = await file.text();

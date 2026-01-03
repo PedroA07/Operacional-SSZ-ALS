@@ -32,7 +32,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [statusTime, setStatusTime] = useState('');
   
   const [filterType, setFilterType] = useState('TODOS');
-  const [filterClientName, setFilterClientName] = useState('TODOS');
+  const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>('TODAS');
   const [filterSub, setFilterSub] = useState<string>('TODAS');
 
@@ -73,20 +73,35 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setIsOCEditModalOpen(true);
   };
 
+  const handleEditMinuta = (trip: Trip) => {
+    // Para simplificar, abriremos o modal de edição principal ou um específico se houvesse,
+    // mas aqui o usuário quer poder configurar os dados da minuta.
+    setSelectedTrip(trip);
+    setIsTripModalOpen(true); 
+  };
+
+  const handleDownloadMinuta = (trip: Trip) => {
+    alert(`Gerando Minuta PDF para OS: ${trip.os}\n(Utilizando template de Pré-Stacking cadastrado)`);
+    // Aqui seria chamada a função do jsPDF com o template de PreStackingTemplate.tsx
+  };
+
   const filteredTrips = useMemo(() => {
     let result = trips;
     if (filterCategory !== 'TODAS') result = result.filter(t => t.category === filterCategory);
     if (filterSub !== 'TODAS') result = result.filter(t => t.customer.name === filterSub || t.subCategory === filterSub);
     if (filterType !== 'TODOS') result = result.filter(t => t.type === filterType);
-    if (filterClientName !== 'TODOS') result = result.filter(t => t.customer.name === filterClientName);
+    if (filterClientNames.length > 0) {
+      result = result.filter(t => filterClientNames.includes(t.customer.name));
+    }
     return result;
-  }, [trips, filterCategory, filterSub, filterType, filterClientName]);
+  }, [trips, filterCategory, filterSub, filterType, filterClientNames]);
 
-  // Obtém colunas e garante que a coluna de 'actions' esteja presente
   const columns = getOperationTableColumns(
     openStatusEditor,
     handleEditTrip,
     handleEditOC,
+    handleEditMinuta,
+    handleDownloadMinuta,
     (id) => onDeleteTrip?.(id)
   );
 
@@ -119,18 +134,18 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       <OperationFilters 
         selectedType={filterType}
         onTypeChange={setFilterType}
-        selectedClient={filterClientName}
-        onClientChange={setFilterClientName}
+        selectedClients={filterClientNames}
+        onClientsChange={setFilterClientNames}
         customers={customers}
       />
 
       <SmartOperationTable 
         userId={user.id} 
-        componentId={`ops-table-v6`} 
+        componentId={`ops-table-v7`} 
         columns={columns} 
         data={filteredTrips} 
         title={filterCategory === 'TODAS' ? "Todas as Viagens em Aberto" : `${filterCategory} › ${filterSub}`}
-        defaultVisibleKeys={['dateTime', 'type', 'os_status', 'customer', 'cva', 'equipment', 'driver', 'destination', 'booking_navio', 'actions']}
+        defaultVisibleKeys={['dateTime', 'type', 'os_status', 'customer', 'equipment', 'driver', 'actions']}
       />
 
       <TripModal 

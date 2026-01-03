@@ -1,5 +1,4 @@
 
-
 export enum AppScreen {
   LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD'
@@ -78,6 +77,7 @@ export interface Trip {
   statusTime?: string;
   isLate: boolean;
   type: 'EXPORTAÇÃO' | 'IMPORTAÇÃO' | 'COLETA' | 'ENTREGA' | 'CABOTAGEM';
+  containerType?: string; // NOVO: 40HC, 40HR, etc
   category: string;
   subCategory?: string;
   container: string;
@@ -85,7 +85,6 @@ export interface Trip {
   seal?: string;
   cva?: string; 
   customer: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
-  // Fixed: Added legalName to destination to match customer and fix property access error
   destination?: { id: string; name: string; legalName?: string; city: string; state?: string };
   driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string };
   status: TripStatus;
@@ -93,7 +92,8 @@ export interface Trip {
   balancePayment: PaymentStatus;
   advancePayment: PaymentStatus;
   documents: TripDocument[];
-  ocFormData?: any; // Dados originais do formulário de Ordem de Coleta
+  ocFormData?: any;
+  preStackingFormData?: any; // NOVO: Dados da minuta de pre-stacking
 }
 
 export interface DriverOperation {
@@ -112,19 +112,19 @@ export interface Driver {
   phone: string;
   email?: string;
   plateHorse: string;
-  yearHorse?: string; // Novo
+  yearHorse?: string;
   plateTrailer: string;
-  yearTrailer?: string; // Novo
+  yearTrailer?: string;
   driverType: 'Frota' | 'Externo' | 'Motoboy';
   status: 'Ativo' | 'Inativo';
   statusLastChangeDate?: string;
-  beneficiaryName?: string; // Novo
-  beneficiaryPhone?: string; // Novo
-  beneficiaryEmail?: string; // Novo
-  beneficiaryCnpj?: string; // Novo
-  paymentPreference?: 'PIX' | 'TED'; // Novo
-  whatsappGroupName?: string; // Novo
-  whatsappGroupLink?: string; // Novo
+  beneficiaryName?: string;
+  beneficiaryPhone?: string;
+  beneficiaryEmail?: string;
+  beneficiaryCnpj?: string;
+  paymentPreference?: 'PIX' | 'TED';
+  whatsappGroupName?: string;
+  whatsappGroupLink?: string;
   registrationDate?: string;
   operations: DriverOperation[];
   tripsCount?: number;
