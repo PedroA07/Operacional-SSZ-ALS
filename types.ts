@@ -37,11 +37,13 @@ export enum DashboardTab {
 export type TripStatus = 
   | 'Pendente' 
   | 'Retirada de vazio'
-  | 'Retirada de cheio'
-  | 'Chegada no cliente'
-  | 'Nota fiscal enviada'
-  | 'Agendamento Porto/Depot'
-  | 'Viagem concluída';
+  | 'Em viagem'
+  | 'Chegou no cliente'
+  | 'Pegou NF'
+  | 'Saiu do cliente'
+  | 'Chegou no destino'
+  | 'Viagem concluída'
+  | 'Viagem cancelada';
 
 export interface StatusHistoryEntry {
   status: TripStatus;
@@ -77,7 +79,7 @@ export interface Trip {
   statusTime?: string;
   isLate: boolean;
   type: 'EXPORTAÇÃO' | 'IMPORTAÇÃO' | 'COLETA' | 'ENTREGA' | 'CABOTAGEM';
-  containerType?: string; // NOVO: 40HC, 40HR, etc
+  containerType?: string; 
   category: string;
   subCategory?: string;
   container: string;
@@ -85,7 +87,7 @@ export interface Trip {
   seal?: string;
   cva?: string; 
   customer: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
-  destination?: { id: string; name: string; legalName?: string; city: string; state?: string };
+  destination?: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
   driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string };
   status: TripStatus;
   statusHistory: StatusHistoryEntry[];
@@ -93,7 +95,7 @@ export interface Trip {
   advancePayment: PaymentStatus;
   documents: TripDocument[];
   ocFormData?: any;
-  preStackingFormData?: any; // NOVO: Dados da minuta de pre-stacking
+  preStackingFormData?: any; 
 }
 
 export interface DriverOperation {
