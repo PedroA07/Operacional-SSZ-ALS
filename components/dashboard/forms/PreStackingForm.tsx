@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port } from '../../../types';
+import { Driver, Customer, Port, PreStacking, Trip } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import PreStackingTemplate from './PreStackingTemplate';
+import { db } from '../../../utils/storage';
 
 interface PreStackingFormProps {
   drivers: Driver[];
@@ -14,14 +15,11 @@ interface PreStackingFormProps {
 
 const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, ports, onClose }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [isLoadingTrip, setIsLoadingTrip] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
   
-  const [remetenteSearch, setRemetenteSearch] = useState('');
-  const [showRemetenteResults, setShowRemetenteResults] = useState(false);
-  const [destinatarioSearch, setDestinatarioSearch] = useState('');
-  const [showDestinatarioResults, setShowDestinatarioResults] = useState(false);
-  const [driverSearch, setDriverSearch] = useState('');
-  const [showDriverResults, setShowDriverResults] = useState(false);
+  const [osInput, setOsInput] = useState('');
+  const [preStackingList, setPreStackingList] = useState<PreStacking[]>([]);
 
   const [formData, setFormData] = useState({
     os: '',
@@ -39,15 +37,70 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     displayDate: new Date().toLocaleDateString('pt-BR')
   });
 
+  const [selectedDriver, setSelectedDriver] = useState<any>(null);
+  const [selectedRemetente, setSelectedRemetente] = useState<any>(null);
+  const [selectedDestinatario, setSelectedDestinatario] = useState<any>(null);
+
+  // Carregar unidades de Pre-Stacking do Banco
+  useEffect(() => {
+    const loadUnits = async () => {
+      const units = await db.getPreStacking();
+      setPreStackingList(units);
+    };
+    loadUnits();
+  }, []);
+
+  // Lógica de Preenchimento Automático por OS
+  const handleOSLookup = async () => {
+    if (!osInput) return;
+    setIsLoadingTrip(true);
+    try {
+      const trips = await db.getTrips();
+      const trip = trips.find(t => t.os.toUpperCase() === osInput.toUpperCase());
+      
+      if (trip) {
+        setFormData(prev => ({
+          ...prev,
+          os: trip.os,
+          container: trip.container,
+          tipo: trip.containerType || '40HC',
+          tara: trip.tara || '',
+          seal: trip.seal || '',
+          booking: trip.booking || '',
+          autColeta: trip.ocFormData?.autColeta || '',
+          ship: trip.ship || '',
+          driverId: trip.driver.id,
+          remetenteId: trip.customer.id
+        }));
+        
+        // Sincronizar objetos completos para o template
+        setSelectedDriver(drivers.find(d => d.id === trip.driver.id));
+        setSelectedRemetente(customers.find(c => c.id === trip.customer.id));
+      } else {
+        alert("Viagem não localizada no sistema para esta OS.");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoadingTrip(false);
+    }
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value.toUpperCase() }));
   };
 
-  const selectedDriver = drivers.find(d => d.id === formData.driverId);
-  const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
-  const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
+  const handleUnitChange = (id: string) => {
+    const unit = preStackingList.find(p => p.id === id);
+    setFormData(prev => ({ ...prev, destinatarioId: id }));
+    setSelectedDestinatario(unit);
+  };
 
   const downloadPDF = async () => {
+    if (!formData.os || !formData.destinatarioId) {
+      alert("Busque uma OS e selecione o Local de Entrega.");
+      return;
+    }
     setIsExporting(true);
     try {
       await new Promise(r => setTimeout(r, 800));
@@ -57,20 +110,16 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      
-      const driverName = selectedDriver?.name || 'MOTORISTA';
-      const osNum = formData.os || 'SEM_OS';
-      pdf.save(`Minuta Pre-Stacking - ${driverName} - ${osNum}.pdf`);
+      pdf.save(`Minuta PreStacking - OS ${formData.os}.pdf`);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
-  const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
-  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
+  const inputClasses = "w-full px-5 py-4 rounded-2xl border border-slate-100 bg-white/80 text-slate-700 font-bold uppercase focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm backdrop-blur-sm";
+  const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
-      {/* HIDDEN PREVIEW FOR CAPTURE */}
+    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-50">
+      {/* TEMPLATE PARA CAPTURA (INVISÍVEL) */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
           <PreStackingTemplate 
@@ -82,113 +131,119 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         </div>
       </div>
 
-      {/* INPUTS SIDEBAR */}
-      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
+      {/* PAINEL DE EDIÇÃO SOFT PREMIUM */}
+      <div className="w-full lg:w-[420px] p-10 overflow-y-auto space-y-8 bg-white/40 backdrop-blur-md border-r border-white shadow-2xl custom-scrollbar z-10">
         
-        <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 shadow-sm space-y-4">
-           <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className={labelBlueClass}>Nº OS</label>
-                <input required className={inputClasses} value={formData.os} onChange={e => handleInputChange('os', e.target.value)} placeholder="00000A" />
-              </div>
-              <div className="space-y-1">
-                <label className={labelBlueClass}>Nota Fiscal</label>
-                <input required className={inputClasses} value={formData.nf} onChange={e => handleInputChange('nf', e.target.value)} placeholder="NF-E" />
+        {/* BUSCA POR OS */}
+        <div className="space-y-4">
+           <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-6 bg-blue-500 rounded-full"></div>
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-tighter">Identificação</h4>
+           </div>
+           <div className="relative group">
+              <label className={labelClass}>Número da OS (Busca Automática)</label>
+              <div className="flex gap-2">
+                <input 
+                  className={`${inputClasses} flex-1`} 
+                  value={osInput} 
+                  onChange={e => setOsInput(e.target.value.toUpperCase())} 
+                  placeholder="EX: 123ALC..."
+                  onKeyDown={e => e.key === 'Enter' && handleOSLookup()}
+                />
+                <button 
+                  onClick={handleOSLookup}
+                  disabled={isLoadingTrip}
+                  className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center hover:bg-blue-600 transition-all shadow-lg active:scale-90"
+                >
+                  {isLoadingTrip ? <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>}
+                </button>
               </div>
            </div>
         </div>
 
-        <div className="relative">
-          <label className={labelBlueClass}>Cliente (Carregamento)</label>
-          <input 
-            type="text" 
-            placeholder="BUSCAR CLIENTE..." 
-            className={inputClasses} 
-            value={remetenteSearch} 
-            onFocus={() => setShowRemetenteResults(true)} 
-            onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} 
-          />
-          {showRemetenteResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
-              {customers.filter(c => (c.legalName || c.name).toUpperCase().includes(remetenteSearch)).map(c => (
-                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.legalName || c.name); setShowRemetenteResults(false); }}>
-                   <p className="text-[10px] font-black uppercase text-slate-800">{c.legalName || c.name}</p>
-                   <p className="text-[8px] font-bold text-slate-400 uppercase italic">CNPJ: {c.cnpj}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* CAMPOS MANUAIS */}
+        <div className="space-y-6 pt-4">
+           <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-6 bg-emerald-400 rounded-full"></div>
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-tighter">Dados de Emissão</h4>
+           </div>
 
-        <div className="relative">
-          <label className={labelBlueClass}>Local de Entrega (Terminal)</label>
-          <input 
-            type="text" 
-            placeholder="BUSCAR TERMINAL..." 
-            className={inputClasses} 
-            value={destinatarioSearch} 
-            onFocus={() => setShowDestinatarioResults(true)} 
-            onChange={e => setDestinatarioSearch(e.target.value.toUpperCase())} 
-          />
-          {showDestinatarioResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
-              {ports.filter(p => (p.legalName || p.name).toUpperCase().includes(destinatarioSearch)).map(p => (
-                <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50" onClick={() => { setFormData({...formData, destinatarioId: p.id}); setDestinatarioSearch(p.legalName || p.name); setShowDestinatarioResults(false); }}>
-                   <p className="text-[10px] font-black uppercase text-slate-800">{p.legalName || p.name}</p>
-                   <p className="text-[8px] font-bold text-slate-400 uppercase italic">{p.city} - {p.state}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+           <div className="space-y-2">
+              <label className={labelClass}>Nota Fiscal (Nº ou Quantidade)</label>
+              <input 
+                className={inputClasses} 
+                value={formData.nf} 
+                onChange={e => handleInputChange('nf', e.target.value)} 
+                placeholder="01 UNIDADE"
+              />
+           </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>Dados do Equipamento</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
-            <div className="space-y-1">
-              <label className={labelClass}>Tipo</label>
-              <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
-                <option value="40HC">40HC</option>
-                <option value="40HR">40HR</option>
-                <option value="40DC">40DC</option>
-                <option value="20DC">20DC</option>
+           <div className="space-y-2">
+              <label className={labelClass}>Nome do Navio</label>
+              <input 
+                className={inputClasses} 
+                value={formData.ship} 
+                onChange={e => handleInputChange('ship', e.target.value)} 
+                placeholder="EX: MAERSK..."
+              />
+           </div>
+
+           <div className="space-y-2">
+              <label className={labelClass}>Local de Entrega (Pré-Stacking)</label>
+              <select 
+                className={`${inputClasses} cursor-pointer`}
+                value={formData.destinatarioId}
+                onChange={e => handleUnitChange(e.target.value)}
+              >
+                <option value="">Selecione o Terminal...</option>
+                {preStackingList.map(unit => (
+                  <option key={unit.id} value={unit.id}>{unit.legalName || unit.name}</option>
+                ))}
               </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Tara</label><input className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
-            <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
-            <div className="space-y-1"><label className={labelClass}>Aut. Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} /></div>
-          </div>
-        </div>
-
-        <div className="space-y-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-           <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
-           <div className="relative">
-              <label className={labelBlueClass}>Motorista</label>
-              <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
-              {showDriverResults && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
-                  {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => (
-                    <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name} ({d.plateHorse})</button>
-                  ))}
-                </div>
-              )}
            </div>
         </div>
 
-        <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 shadow-xl transition-all active:scale-95">
-          {isExporting ? 'GERANDO PDF...' : 'BAIXAR MINUTA PRE-STACKING'}
-        </button>
+        {/* FEEDBACK DE AUTO-FILL */}
+        {formData.driverId && (
+          <div className="p-6 bg-blue-50/50 rounded-3xl border border-blue-100/50 animate-in fade-in slide-in-from-top-4">
+             <p className="text-[9px] font-black text-blue-400 uppercase mb-3 tracking-widest text-center">Dados da Viagem Vinculada</p>
+             <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase">Motorista:</span>
+                  <span className="text-[9px] font-black text-slate-700 uppercase truncate ml-4">{selectedDriver?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase">Container:</span>
+                  <span className="text-[9px] font-black text-slate-700">{formData.container} ({formData.tipo})</span>
+                </div>
+                <div className="flex justify-between border-t border-blue-100 pt-2 mt-2">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase">Cliente:</span>
+                  <span className="text-[9px] font-black text-slate-700 uppercase truncate ml-4">{selectedRemetente?.name}</span>
+                </div>
+             </div>
+          </div>
+        )}
+
+        <div className="pt-6">
+          <button 
+            disabled={isExporting || !formData.os} 
+            onClick={downloadPDF} 
+            className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-600 shadow-2xl transition-all active:scale-95 disabled:opacity-30 disabled:hover:bg-slate-900"
+          >
+            {isExporting ? 'GERANDO DOCUMENTO...' : 'BAIXAR MINUTA DE CHEIO'}
+          </button>
+          <p className="text-center text-[8px] text-slate-400 font-bold uppercase mt-4 opacity-50 tracking-widest">ALS Operacional © 2025</p>
+        </div>
       </div>
 
       {/* PREVIEW PANEL */}
-      <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
-        <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
+      <div className="flex-1 bg-slate-100/50 flex justify-center items-start overflow-auto p-12 custom-scrollbar relative">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+           <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-blue-500/5 blur-[120px] rounded-full"></div>
+           <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-emerald-500/5 blur-[120px] rounded-full"></div>
+        </div>
+        
+        <div className="origin-top transform scale-[0.65] xl:scale-[0.8] transition-all duration-700 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.2)] hover:shadow-[0_80px_120px_-20px_rgba(0,0,0,0.3)] rounded-sm overflow-hidden bg-white">
           <PreStackingTemplate 
             formData={formData} 
             selectedDriver={selectedDriver} 
