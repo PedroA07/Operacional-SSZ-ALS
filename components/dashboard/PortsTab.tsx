@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Port } from '../../types';
 import { maskCEP, maskCNPJ } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
+import ListFilters from './shared/ListFilters';
 
 interface PortsTabProps {
   ports: Port[];
@@ -16,6 +17,7 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
   const [itemToDelete, setItemToDelete] = useState<Port | null>(null);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
   const [isCepLoading, setIsCepLoading] = useState(false);
   const [isCnpjLoading, setIsCnpjLoading] = useState(false);
   
@@ -127,33 +129,44 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
     setIsModalOpen(false);
   };
 
-  const filteredPorts = ports.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.legalName && p.legalName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    p.cnpj.includes(searchQuery)
-  );
+  const filteredPorts = useMemo(() => {
+    let result = ports.filter(p => 
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.legalName && p.legalName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      p.cnpj.includes(searchQuery)
+    );
+
+    result.sort((a, b) => {
+      const nameA = (a.legalName || a.name).toUpperCase();
+      const nameB = (b.legalName || b.name).toUpperCase();
+      if (sortBy === 'name_asc') return nameA.localeCompare(nameB);
+      if (sortBy === 'name_desc') return nameB.localeCompare(nameA);
+      return 0;
+    });
+
+    return result;
+  }, [ports, searchQuery, sortBy]);
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
 
   return (
     <div className="max-w-full mx-auto space-y-6">
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-        <div className="flex-1 max-w-md relative">
-          <input 
-            type="text" 
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
+          <ListFilters 
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
             placeholder="PESQUISAR PORTO / CNPJ / RAZÃO..."
-            className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 text-[10px] font-bold uppercase focus:border-blue-500 outline-none bg-slate-50/50"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5" /></svg>
         </div>
-        <button onClick={() => handleOpenModal()} className="px-6 py-3.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-lg active:scale-95 ml-4">Novo Porto</button>
+        <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl active:scale-95 shrink-0 h-[58px] mt-[-24px]">Novo Porto</button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
                 <th className="px-8 py-5">Identificação</th>

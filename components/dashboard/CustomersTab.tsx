@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Customer } from '../../types';
 import { maskCEP, maskCNPJ } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
+import ListFilters from './shared/ListFilters';
 
 interface CustomersTabProps {
   customers: Customer[];
@@ -19,6 +20,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
   const [itemToDelete, setItemToDelete] = useState<Customer | null>(null);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
   const [isCepLoading, setIsCepLoading] = useState(false);
   const [isCnpjLoading, setIsCnpjLoading] = useState(false);
   
@@ -141,31 +143,42 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     setIsModalOpen(false);
   };
 
-  const filteredCustomers = customers.filter(c => 
-    (c.legalName && c.legalName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.cnpj.includes(searchQuery)
-  );
+  const filteredCustomers = useMemo(() => {
+    let result = customers.filter(c => 
+      (c.legalName && c.legalName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.cnpj.includes(searchQuery)
+    );
+
+    result.sort((a, b) => {
+      const nameA = (a.legalName || a.name).toUpperCase();
+      const nameB = (b.legalName || b.name).toUpperCase();
+      if (sortBy === 'name_asc') return nameA.localeCompare(nameB);
+      if (sortBy === 'name_desc') return nameB.localeCompare(nameA);
+      return 0;
+    });
+
+    return result;
+  }, [customers, searchQuery, sortBy]);
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
 
   return (
     <div className="max-w-full mx-auto space-y-6">
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-        <div className="flex-1 relative">
-          <input 
-            type="text" 
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
+          <ListFilters 
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
             placeholder="PESQUISAR CLIENTE, RAZÃO OU CNPJ..."
-            className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 text-[10px] font-bold uppercase focus:border-blue-500 outline-none bg-slate-50/50"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"><Icons.Busca /></div>
         </div>
-        <button onClick={() => handleOpenModal()} className="px-6 py-3.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-lg active:scale-95">Novo Cliente</button>
+        <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-xl active:scale-95 shrink-0 h-[58px] mt-[-24px]">Novo Cliente</button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">

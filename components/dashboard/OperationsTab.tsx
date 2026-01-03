@@ -82,6 +82,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     return result;
   }, [trips, filterCategory, filterSub, filterType, filterClientName]);
 
+  // Obtém colunas e garante que a coluna de 'actions' esteja presente
   const columns = getOperationTableColumns(
     openStatusEditor,
     handleEditTrip,
@@ -125,10 +126,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
       <SmartOperationTable 
         userId={user.id} 
-        componentId={`ops-table-v5`} 
+        componentId={`ops-table-v6`} 
         columns={columns} 
         data={filteredTrips} 
-        title={filterCategory === 'TODAS' ? "Todas as Viagens em Aberto" : `${filterCategory} › ${filterSub}`} 
+        title={filterCategory === 'TODAS' ? "Todas as Viagens em Aberto" : `${filterCategory} › ${filterSub}`}
+        defaultVisibleKeys={['dateTime', 'type', 'os_status', 'customer', 'cva', 'equipment', 'driver', 'destination', 'booking_navio', 'actions']}
       />
 
       <TripModal 
