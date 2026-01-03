@@ -119,8 +119,12 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
         </div>
       </div>
 
-      {/* BLOCO OPERACIONAL GRID 2 */}
+      {/* BLOCO OPERACIONAL GRID (ALTERADO: NAVIO E BOOKING LADO A LADO) */}
       <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px' }}>
+        <div style={{ flex: 1, padding: '8px', borderRight: borderStyle, backgroundColor: '#f8fafc' }}>
+          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>NAVIO / EMBARCAÇÃO</div>
+          <div style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase' }}>{formData.ship || '---'}</div>
+        </div>
         <div style={{ flex: 1, padding: '8px', borderRight: borderStyle }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>BOOKING</div>
           <div style={{ fontSize: '14px', fontWeight: 900, color: '#1e40af' }}>{formData.booking || '---'}</div>
@@ -129,20 +133,10 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>AUTORIZAÇÃO DE COLETA</div>
           <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.autColeta || '---'}</div>
         </div>
-        <div style={{ flex: 1, padding: '8px', borderRight: borderStyle }}>
+        <div style={{ flex: 1, padding: '8px' }}>
           <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>NOTA FISCAL</div>
           <div style={{ fontSize: '14px', fontWeight: 900, color: '#1e40af' }}>{formData.nf || '---'}</div>
         </div>
-        <div style={{ flex: 1, padding: '8px' }}>
-          <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>Nº ORDEM SERVIÇO (OS)</div>
-          <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.os || '---'}</div>
-        </div>
-      </div>
-
-      {/* NAVIO */}
-      <div style={{ border: borderStyle, padding: '8px', marginBottom: '10px', backgroundColor: '#f8fafc' }}>
-        <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>NAVIO / EMBARCAÇÃO</div>
-        <div style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase' }}>{formData.ship || '---'}</div>
       </div>
 
       {/* BLOCO MOTORISTA DETALHADO */}
@@ -155,6 +149,10 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
           <div style={{ flex: '1' }}>
             <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CPF</div>
             <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{selectedDriver?.cpf || '---'}</div>
+          </div>
+          <div style={{ flex: '1' }}>
+            <div style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>Nº ORDEM SERVIÇO (OS)</div>
+            <div style={{ fontSize: '12px', fontWeight: 900, color: '#1e40af' }}>{formData.os || '---'}</div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -192,13 +190,13 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
         </div>
       </div>
 
-      {/* CONTROLE DE PORTARIA */}
+      {/* CONTROLE DE PORTARIA (ALTERADO: MAIOR ESPAÇAMENTO PARA CARIMBO) */}
       <div style={{ border: borderStyle, padding: '20px', flex: '1', display: 'flex', gap: '40px' }}>
         <div style={{ flex: '1', borderRight: '1px solid #f1f5f9', paddingRight: '20px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '12px', fontWeight: 900, color: '#94a3b8', marginBottom: '15px', letterSpacing: '2px' }}>CONTROLE ENTRADA</div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '15px' }}>DATA: __________________ HORA: _________</div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '20px' }}>ASSINATURA: ___________________________</div>
-          <div style={{ width: '100%', height: '140px', border: '2px dashed #cbd5e1', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginTop: 'auto', backgroundColor: '#fdfdfd' }}>
+          <div style={{ width: '100%', height: '185px', border: '2px dashed #cbd5e1', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginTop: 'auto', backgroundColor: '#fdfdfd' }}>
             <span style={{ width: '100%', fontSize: '11px', fontWeight: 900, color: '#cbd5e1', fontStyle: 'italic', textTransform: 'uppercase' }}>ESPAÇO PARA CARIMBO DE ENTRADA</span>
           </div>
         </div>
@@ -206,7 +204,7 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
           <div style={{ fontSize: '12px', fontWeight: 900, color: '#94a3b8', marginBottom: '15px', letterSpacing: '2px' }}>CONTROLE SAÍDA</div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '15px' }}>DATA: __________________ HORA: _________</div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '20px' }}>ASSINATURA: ___________________________</div>
-          <div style={{ width: '100%', height: '140px', border: '2px dashed #cbd5e1', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginTop: 'auto', backgroundColor: '#fdfdfd' }}>
+          <div style={{ width: '100%', height: '185px', border: '2px dashed #cbd5e1', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginTop: 'auto', backgroundColor: '#fdfdfd' }}>
             <span style={{ width: '100%', fontSize: '11px', fontWeight: 900, color: '#cbd5e1', fontStyle: 'italic', textTransform: 'uppercase' }}>ESPAÇO PARA CARIMBO DE SAÍDA</span>
           </div>
         </div>

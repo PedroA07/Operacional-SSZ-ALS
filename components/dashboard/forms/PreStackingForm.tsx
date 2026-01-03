@@ -43,7 +43,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
   const [selectedRemetente, setSelectedRemetente] = useState<any>(null);
   const [selectedDestinatario, setSelectedDestinatario] = useState<any>(null);
 
-  // Carregar unidades de Pre-Stacking do Banco
   useEffect(() => {
     const loadUnits = async () => {
       const units = await db.getPreStacking();
@@ -55,7 +54,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     }
   }, [initialOS]);
 
-  // Lógica de Preenchimento Automático por OS
   const handleOSLookup = async (manualOS?: string) => {
     const targetOS = manualOS || osInput;
     if (!targetOS) return;
@@ -120,11 +118,10 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
   };
 
   const inputClasses = "w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
-  const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
-      {/* TEMPLATE PARA CAPTURA (INVISÍVEL) */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
           <PreStackingTemplate 
@@ -136,7 +133,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         </div>
       </div>
 
-      {/* PAINEL DE EDIÇÃO (ESTILO ORDEM COLETA) */}
       <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
         
         {/* BUSCA POR OS */}
@@ -176,30 +172,39 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
 
            <div className="space-y-1 relative">
               <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1.5 block">Local de Entrega (Pre-Stacking)</label>
-              <select 
-                className={`${inputClasses} cursor-pointer h-[58px] py-0`}
-                value={formData.destinatarioId}
-                onChange={e => handleUnitChange(e.target.value)}
-              >
-                <option value="">Selecione o Terminal...</option>
-                {preStackingList.map(unit => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.legalName || unit.name} | {unit.name} | {unit.city}
-                  </option>
-                ))}
-              </select>
-              <div className="mt-2 space-y-1 px-1">
-                {selectedDestinatario && (
-                  <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-top-2">
-                     <p className="text-[10px] font-black text-slate-800 uppercase leading-tight">{selectedDestinatario.legalName}</p>
-                     <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Fantasia: {selectedDestinatario.name}</p>
-                     <div className="flex justify-between mt-2 pt-2 border-t border-blue-100">
-                        <span className="text-[8px] font-black text-blue-600">CNPJ: {maskCNPJ(selectedDestinatario.cnpj)}</span>
-                        <span className="text-[8px] font-black text-slate-400 uppercase">{selectedDestinatario.city} - {selectedDestinatario.state}</span>
-                     </div>
-                  </div>
-                )}
+              <div className="relative group">
+                <select 
+                  className={`${inputClasses} cursor-pointer h-[58px] py-0 appearance-none pr-10`}
+                  value={formData.destinatarioId}
+                  onChange={e => handleUnitChange(e.target.value)}
+                >
+                  <option value="">Selecione o Terminal...</option>
+                  {preStackingList.map(unit => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name} | {unit.legalName?.substring(0, 20)}... | {unit.city}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
+                </div>
               </div>
+
+              {selectedDestinatario && (
+                <div className="mt-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in fade-in slide-in-from-top-2">
+                   <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1">
+                         <p className="text-[10px] font-black text-emerald-900 uppercase leading-tight">{selectedDestinatario.legalName}</p>
+                         <p className="text-[8px] font-bold text-emerald-600 uppercase mt-0.5 italic">Fantasia: {selectedDestinatario.name}</p>
+                      </div>
+                      <span className="px-2 py-0.5 bg-emerald-600 text-white rounded text-[7px] font-black uppercase">Selecionado</span>
+                   </div>
+                   <div className="flex justify-between mt-3 pt-3 border-t border-emerald-200/50">
+                      <span className="text-[8px] font-black text-emerald-700">CNPJ: {maskCNPJ(selectedDestinatario.cnpj)}</span>
+                      <span className="text-[8px] font-black text-emerald-500 uppercase">{selectedDestinatario.city} - {selectedDestinatario.state}</span>
+                   </div>
+                </div>
+              )}
            </div>
         </div>
 
@@ -233,7 +238,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         </button>
       </div>
 
-      {/* PREVIEW PANEL */}
       <div className="flex-1 bg-slate-200 flex justify-center items-start overflow-auto p-12 custom-scrollbar relative">
         <div className="origin-top transform scale-[0.7] xl:scale-[0.85] transition-all duration-500 shadow-2xl rounded-sm overflow-hidden bg-white">
           <PreStackingTemplate 
