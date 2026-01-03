@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Driver, OperationDefinition, User, DriverOperation } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
 import { db } from '../../utils/storage';
@@ -8,6 +8,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import DriverProfileTemplate from './forms/DriverProfileTemplate';
 import { Icons } from '../../constants/icons';
+import ListFilters from './shared/ListFilters';
 
 interface DriversTabProps {
   drivers: Driver[];
@@ -29,6 +30,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
+  const [statusFilter, setStatusFilter] = useState('todos');
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
@@ -188,11 +191,26 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     }
   };
 
-  const filteredDrivers = drivers.filter(d => 
-    d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    d.cpf.includes(searchQuery) ||
-    d.plateHorse.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredDrivers = useMemo(() => {
+    let result = drivers.filter(d => 
+      d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.cpf.includes(searchQuery) ||
+      d.plateHorse.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    if (statusFilter !== 'todos') {
+      result = result.filter(d => d.status === statusFilter);
+    }
+
+    result.sort((a, b) => {
+      if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
+      if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
+      if (sortBy === 'recent') return (b.registrationDate || '').localeCompare(a.registrationDate || '');
+      return 0;
+    });
+
+    return result;
+  }, [drivers, searchQuery, sortBy, statusFilter]);
 
   const VisibilityToggle = ({ id, label }: { id: keyof typeof visibility, label: string }) => (
     <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-white transition-all group">
@@ -209,20 +227,19 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
   return (
     <div className="max-w-full mx-auto space-y-6">
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
-        <div className="flex-1 relative max-w-md">
-          <input 
-            type="text" 
-            placeholder="PESQUISAR MOTORISTA, CPF OU PLACA..." 
-            className="w-full pl-12 pr-4 py-4 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black uppercase focus:bg-white focus:border-blue-400 outline-none transition-all"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex-1">
+          <ListFilters 
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            placeholder="BUSCAR MOTORISTA, CPF OU PLACA..."
           />
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          </div>
         </div>
-        <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl active:scale-95">Novo Motorista</button>
+        <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl active:scale-95 shrink-0 h-[58px] mt-[-24px]">Novo Motorista</button>
       </div>
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">

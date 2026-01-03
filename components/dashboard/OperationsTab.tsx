@@ -26,6 +26,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [categories, setCategories] = useState<Category[]>([]);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isOCEditModalOpen, setIsOCEditModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
@@ -61,6 +62,17 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     loadData();
   };
 
+  const handleEditTrip = (trip: Trip) => {
+    setSelectedTrip(trip);
+    setIsTripModalOpen(true);
+  };
+
+  const handleEditOC = (trip: Trip) => {
+    if (!trip.ocFormData) return;
+    setSelectedTrip(trip);
+    setIsOCEditModalOpen(true);
+  };
+
   const filteredTrips = useMemo(() => {
     let result = trips;
     if (filterCategory !== 'TODAS') result = result.filter(t => t.category === filterCategory);
@@ -70,7 +82,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     return result;
   }, [trips, filterCategory, filterSub, filterType, filterClientName]);
 
-  const columns = getOperationTableColumns(openStatusEditor);
+  const columns = getOperationTableColumns(
+    openStatusEditor,
+    handleEditTrip,
+    handleEditOC,
+    (id) => onDeleteTrip?.(id)
+  );
 
   if (activeView.type !== 'list') {
     return <GenericOperationView user={user} type={activeView.type === 'category' ? 'category' : 'client'} categoryName={activeView.categoryName || ''} clientName={activeView.clientName} drivers={drivers} availableOps={availableOps} onNavigate={setActiveView} />;
@@ -108,13 +125,21 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
       <SmartOperationTable 
         userId={user.id} 
-        componentId={`ops-table-v4`} 
+        componentId={`ops-table-v5`} 
         columns={columns} 
         data={filteredTrips} 
         title={filterCategory === 'TODAS' ? "Todas as Viagens em Aberto" : `${filterCategory} › ${filterSub}`} 
       />
 
-      <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} />
+      <TripModal 
+        isOpen={isTripModalOpen} 
+        onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} 
+        onSuccess={loadData} 
+        drivers={drivers} 
+        customers={customers} 
+        categories={categories} 
+        editTrip={selectedTrip} 
+      />
 
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -124,6 +149,18 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
              <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700">Atualizar Status</button>
              <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-2">Cancelar</button>
           </div>
+        </div>
+      )}
+
+      {isOCEditModalOpen && selectedTrip && selectedTrip.ocFormData && (
+        <div className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
+           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
+              <div className="p-6 bg-blue-600 text-white flex justify-between items-center">
+                <h3 className="font-black text-sm uppercase tracking-widest">Editar Ordem de Coleta Original</h3>
+                <button onClick={() => setIsOCEditModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              </div>
+              <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCEditModalOpen(false); loadData(); }} initialData={selectedTrip.ocFormData} />
+           </div>
         </div>
       )}
     </div>
