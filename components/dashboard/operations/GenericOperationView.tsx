@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Driver, OperationDefinition, User } from '../../../types';
+import React, { useMemo } from 'react';
+import { Driver, OperationDefinition, User, Customer } from '../../../types';
 import SmartOperationTable from './SmartOperationTable';
 
 interface GenericOperationViewProps {
@@ -9,6 +9,7 @@ interface GenericOperationViewProps {
   categoryName: string;
   clientName?: string;
   drivers: Driver[];
+  customers: Customer[];
   availableOps: OperationDefinition[];
   onNavigate: (view: { type: 'category' | 'client', id?: string, categoryName: string, clientName?: string }) => void;
 }
@@ -19,6 +20,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   categoryName, 
   clientName, 
   drivers,
+  customers,
   availableOps,
   onNavigate
 }) => {
@@ -30,9 +32,15 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     })
   );
 
+  // REGRA: Buscar todos os clientes da base que possuem esta categoria vinculada
+  const linkedCustomers = useMemo(() => {
+    return customers.filter(c => 
+      c.operations?.some(op => op.toUpperCase() === categoryName.toUpperCase())
+    );
+  }, [customers, categoryName]);
+
   const currentOp = availableOps.find(o => o.category.toUpperCase() === categoryName.toUpperCase());
 
-  // Define columns for the drivers table
   const driverColumns = [
     { key: 'name', label: 'Motorista', render: (d: any) => (
       <div>
@@ -82,7 +90,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Main Column: Personalized Table */}
         <div className="lg:col-span-8 space-y-6">
           <SmartOperationTable 
             userId={user.id}
@@ -94,29 +101,29 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           />
         </div>
 
-        {/* Sidebar della Operazione: Subcategorias / Clientes */}
         <div className="lg:col-span-4 space-y-6">
           {type === 'category' && (
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="font-black text-slate-700 uppercase text-[10px] tracking-widest mb-6 border-b border-slate-100 pb-4">Navegar por Clientes</h3>
+              <h3 className="font-black text-slate-700 uppercase text-[10px] tracking-widest mb-6 border-b border-slate-100 pb-4">Clientes Vinculados à Categoria</h3>
               <div className="space-y-3">
-                {currentOp?.clients.map((client, i) => (
+                {linkedCustomers.map((cust, i) => (
                   <button 
-                    key={i}
-                    onClick={() => client.hasDedicatedPage && onNavigate({ type: 'client', categoryName: categoryName, clientName: client.name })}
-                    className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all ${client.hasDedicatedPage ? 'border-slate-100 bg-slate-50 hover:border-blue-500 hover:bg-white group' : 'border-dashed border-slate-100 opacity-50 cursor-not-allowed'}`}
+                    key={cust.id}
+                    onClick={() => onNavigate({ type: 'client', categoryName: categoryName, clientName: cust.name })}
+                    className="w-full p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:border-blue-500 hover:bg-white group transition-all text-left flex items-center justify-between"
                   >
                     <div>
-                      <p className="text-[10px] font-black text-slate-700 uppercase">{client.name}</p>
+                      <p className="text-[10px] font-black text-slate-700 uppercase">{cust.name}</p>
                       <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">
-                        {client.hasDedicatedPage ? 'Possui Página Dedicada' : 'Apenas Categoria'}
+                        {cust.city} - {cust.state}
                       </p>
                     </div>
-                    {client.hasDedicatedPage && (
-                      <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
-                    )}
+                    <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
                   </button>
                 ))}
+                {linkedCustomers.length === 0 && (
+                  <p className="text-[9px] text-slate-400 font-bold uppercase italic text-center py-6">Nenhum cliente vinculado a esta categoria.</p>
+                )}
               </div>
             </div>
           )}

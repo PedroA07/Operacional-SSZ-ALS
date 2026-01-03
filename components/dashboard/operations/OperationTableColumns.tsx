@@ -19,12 +19,20 @@ export const getOperationTableColumns = (
           <span className="font-black text-slate-800">{new Date(t.dateTime).toLocaleDateString('pt-BR')}</span>
           <span className="text-blue-600 font-bold">{new Date(t.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
-        <span className={`w-fit px-2 py-0.5 rounded text-[7px] font-black uppercase ${
-          t.type === 'EXPORTAÇÃO' ? 'bg-blue-100 text-blue-700' : 
-          t.type === 'IMPORTAÇÃO' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'
-        }`}>
-          {t.type}
-        </span>
+        <div className="space-y-1">
+           <span className={`w-fit px-2 py-0.5 rounded text-[7px] font-black uppercase ${
+             t.type === 'EXPORTAÇÃO' ? 'bg-blue-100 text-blue-700' : 
+             t.type === 'IMPORTAÇÃO' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'
+           }`}>
+             {t.type}
+           </span>
+           <div className="flex items-center gap-1">
+              <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">Vínculo:</span>
+              <span className="text-[8px] font-black text-blue-800 uppercase bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                {t.category} {t.subCategory ? `› ${t.subCategory}` : ''}
+              </span>
+           </div>
+        </div>
       </div>
     )
   },
@@ -191,7 +199,7 @@ export const getOperationTableColumns = (
           onClick={() => onDeleteTrip(t.id)} 
           className="w-full flex items-center gap-2 px-3 py-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
           <span className="text-[8px] font-black uppercase">Remover</span>
         </button>
       </div>

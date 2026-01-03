@@ -31,7 +31,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   
-  const [filterTypes, setFilterTypes] = useState<string[]>([]);
+  // MODIFICAÇÃO: Inicializando filtros vazios para serem preenchidos com "Todos" via useEffect
+  const [filterTypes, setFilterTypes] = useState<string[]>(['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM']);
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
   const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>('TODAS');
@@ -43,13 +44,17 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setCategories(c);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { 
+    loadData(); 
+    // Sincroniza os nomes para os filtros de seleção inicial
+    setFilterClientNames(customers.map(c => c.name));
+    setFilterDriverNames(drivers.map(d => d.name));
+  }, [customers, drivers]);
 
   const openStatusEditor = (trip: Trip, status: TripStatus) => {
     setSelectedTrip(trip);
     setTempStatus(status);
     const now = new Date();
-    // Default to current time for new status updates
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     setStatusTime(now.toISOString().slice(0, 16));
     setIsStatusModalOpen(true);
@@ -106,8 +111,17 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   );
 
   const STATUS_OPTIONS: TripStatus[] = [
-    'Pendente', 'Retirada de vazio', 'Em viagem', 'Chegou no cliente', 
-    'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Viagem concluída', 'Viagem cancelada'
+    'Pendente', 
+    'Retirada de vazio', 
+    'Retirada do cheio', 
+    'Em viagem', 
+    'Chegou no cliente', 
+    'Pegou NF', 
+    'Saiu do cliente', 
+    'Chegou no destino', 
+    'Devolução do cheio',
+    'Viagem concluída', 
+    'Viagem cancelada'
   ];
 
   if (activeView.type !== 'list') {
@@ -118,6 +132,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         categoryName={activeView.categoryName || ''} 
         clientName={activeView.clientName} 
         drivers={drivers} 
+        customers={customers}
         availableOps={availableOps} 
         onNavigate={setActiveView} 
       />
@@ -167,7 +182,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
       <SmartOperationTable 
         userId={user.id} 
-        componentId={`ops-table-v9`} 
+        componentId={`ops-table-v10`} 
         columns={columns} 
         data={filteredTrips} 
         title={filterCategory === 'TODAS' ? "Programação Geral de Operações" : `${filterCategory} › ${filterSub}`}

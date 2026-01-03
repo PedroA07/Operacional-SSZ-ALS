@@ -37,11 +37,13 @@ export enum DashboardTab {
 export type TripStatus = 
   | 'Pendente' 
   | 'Retirada de vazio'
+  | 'Retirada do cheio'
   | 'Em viagem'
   | 'Chegou no cliente'
   | 'Pegou NF'
   | 'Saiu do cliente'
   | 'Chegou no destino'
+  | 'Devolução do cheio'
   | 'Viagem concluída'
   | 'Viagem cancelada';
 
