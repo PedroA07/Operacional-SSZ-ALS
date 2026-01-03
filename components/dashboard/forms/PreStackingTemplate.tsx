@@ -75,7 +75,7 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
 
       {/* CLIENTE */}
       <div style={{ backgroundColor: '#e2e8f0', padding: '4px', border: '1px solid #000', fontWeight: 'bold', fontSize: '10px', marginBottom: '1px' }}>
-        CLIENTE: {selectedRemetente?.name || '---'}
+        CLIENTE: {selectedRemetente?.legalName || selectedRemetente?.name || '---'}
       </div>
 
       {/* TABELA DE CARGA */}
@@ -136,7 +136,7 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
         LOCAL DE CARREGAMENTO
       </div>
       <div style={{ border: '1px solid #000', padding: '8px', marginBottom: '5px', fontSize: '10px', lineHeight: '1.6' }}>
-        <div><span style={labelStyle}>Empresa:</span> {selectedRemetente?.name || '---'}</div>
+        <div><span style={labelStyle}>Empresa:</span> {selectedRemetente?.legalName || selectedRemetente?.name || '---'}</div>
         <div><span style={labelStyle}>Endereço:</span> {selectedRemetente?.address || '---'}</div>
         <div style={{ display: 'flex' }}>
           <div style={{ flex: 1 }}><span style={labelStyle}>Cidade:</span> {selectedRemetente?.city || '---'}</div>
@@ -149,7 +149,7 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
         LOCAL DE ENTREGA
       </div>
       <div style={{ border: '1px solid #000', padding: '8px', marginBottom: '15px', fontSize: '10px', lineHeight: '1.6' }}>
-        <div><span style={labelStyle}>Empresa:</span> {selectedDestinatario?.name || '---'}</div>
+        <div><span style={labelStyle}>Empresa:</span> {selectedDestinatario?.legalName || selectedDestinatario?.name || '---'}</div>
         <div><span style={labelStyle}>Endereço:</span> {selectedDestinatario?.address || '---'}</div>
         <div><span style={labelStyle}>Cidade:</span> {selectedDestinatario?.city || '---'}</div>
       </div>
@@ -163,12 +163,12 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
         <div style={{ flex: 1 }}>
           <div style={{ marginBottom: '10px' }}>Chegada: ____ / ____ / ________</div>
           <div style={{ marginBottom: '10px' }}>Hora: ________ : ________</div>
-          <div>Ass: ____________________________________</div>
+          <div style={{ marginTop: '20px' }}>Ass: ____________________________________</div>
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ marginBottom: '10px' }}>Saída: ____ / ____ / ________</div>
           <div style={{ marginBottom: '10px' }}>Hora: ________ : ________</div>
-          <div>Ass: ____________________________________</div>
+          <div style={{ marginTop: '20px' }}>Ass: ____________________________________</div>
         </div>
       </div>
 

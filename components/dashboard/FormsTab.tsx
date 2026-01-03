@@ -7,6 +7,7 @@ import JsBarcode from 'jsbarcode';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
+import PreStackingForm from './forms/PreStackingForm';
 import PreStackingTemplate from './forms/PreStackingTemplate';
 import DevolucaoVazioTemplate from './forms/DevolucaoVazioTemplate';
 import { maskSeal } from '../../utils/masks';
@@ -33,18 +34,7 @@ const formConfigs: Record<FormType, { title: string; color: string; description:
 const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStacking, initialFormId }) => {
   const [selectedFormType, setSelectedFormType] = useState<FormType | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   
-  const [remetenteSearch, setRemetenteSearch] = useState('');
-  const [destinatarioSearch, setDestinatarioSearch] = useState('');
-  const captureRef = useRef<HTMLDivElement>(null);
-  const [emissionDate] = useState(new Date().toLocaleDateString('pt-BR'));
-
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    driverId: '', remetenteId: '', destinatarioId: '', os: '', container: '', tara: '', seal: '', booking: '', ship: '', agencia: '', pod: 'SANTOS', obs: '', manualLocal: ''
-  });
-
   useEffect(() => {
     if (initialFormId && formConfigs[initialFormId as FormType]) {
       setSelectedFormType(initialFormId as FormType);
@@ -52,19 +42,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
     }
   }, [initialFormId]);
 
-  const selectedDriver = drivers.find(d => d.id === formData.driverId);
-  const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
-  const selectedDestinatario = [...ports, ...preStacking].find(p => p.id === formData.destinatarioId);
-
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {/* HIDDEN PREVIEWS FOR REMAINING OLD TEMPLATES */}
-      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
-        <div ref={captureRef}>
-          {selectedFormType === 'PRE_STACKING' && <PreStackingTemplate formData={{...formData, displayDate: emissionDate}} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario} />}
-        </div>
-      </div>
-
       <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm">
         <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-8 text-center">Central de Emissões Operacionais</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -90,6 +69,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
 
             {selectedFormType === 'ORDEM_COLETA' ? (
               <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
+            ) : selectedFormType === 'PRE_STACKING' ? (
+              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
             ) : selectedFormType === 'LIBERACAO_VAZIO' ? (
               <LiberacaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
             ) : selectedFormType === 'DEVOLUCAO_VAZIO' ? (
