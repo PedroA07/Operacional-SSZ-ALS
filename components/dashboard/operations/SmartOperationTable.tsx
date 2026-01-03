@@ -73,8 +73,8 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   });
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500 relative">
-      <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
+    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm animate-in fade-in duration-500 relative">
+      <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50 rounded-t-[2.5rem]">
         <div className="z-10">
           {title && <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">{title}</h3>}
           <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 tracking-widest">{filteredData.length} registros exibidos</p>
@@ -102,7 +102,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
             </button>
 
             {isColumnPickerOpen && (
-              <div className="absolute top-full right-0 mt-3 w-64 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 z-[100] p-5 animate-in fade-in slide-in-from-top-2">
+              <div className="absolute top-full right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-5 animate-in fade-in slide-in-from-top-2">
                 <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                   <p className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">Exibição</p>
                   <button onClick={() => setVisibleColumns(columns.map(c => c.key))} className="text-[8px] font-black text-blue-600 uppercase hover:underline">Resetar</button>
@@ -129,7 +129,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-b-[2.5rem]">
         <table className="w-full text-left text-[10px] border-collapse min-w-[1000px]">
           <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-400 font-black uppercase tracking-widest">
             <tr>
@@ -146,7 +146,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
                 className={`group transition-all ${onRowClick ? 'cursor-pointer hover:bg-blue-50/40' : 'hover:bg-slate-50/50'}`}
               >
                 {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
-                  <td key={col.key} className="px-6 py-5 whitespace-nowrap text-slate-600">
+                  <td key={col.key} className="px-6 py-5 text-slate-600">
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}

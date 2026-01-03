@@ -59,7 +59,7 @@ export const getOperationTableColumns = (
     key: 'customer',
     label: '3. Cliente / Local',
     render: (t: Trip) => (
-      <div className="flex flex-col space-y-0.5 max-w-[200px]">
+      <div className="flex flex-col space-y-0.5 max-w-[250px] whitespace-normal break-words">
         <p className="font-black text-slate-800 uppercase text-[10px] leading-tight">
           {t.customer?.legalName || 'S.R'}
         </p>
@@ -109,8 +109,8 @@ export const getOperationTableColumns = (
     key: 'driver', 
     label: '6. Motorista', 
     render: (t: Trip) => (
-      <div className="flex flex-col space-y-0.5">
-        <span className="font-black text-slate-800 uppercase text-[10px] truncate max-w-[150px]">{t.driver?.name}</span>
+      <div className="flex flex-col space-y-0.5 max-w-[200px] whitespace-normal break-words">
+        <span className="font-black text-slate-800 uppercase text-[10px] leading-tight">{t.driver?.name}</span>
         <span className="text-[8px] font-bold text-slate-400">CPF: {t.driver?.cpf}</span>
         <div className="mt-1 space-y-0.5">
            <p className="text-[8px] font-black uppercase text-blue-600">Cavalo: <span className="font-mono">{t.driver?.plateHorse}</span></p>
@@ -123,13 +123,13 @@ export const getOperationTableColumns = (
     key: 'destination',
     label: '7. Destino',
     render: (t: Trip) => (
-      <div className="flex flex-col space-y-0.5 max-w-[180px]">
+      <div className="flex flex-col space-y-0.5 max-w-[180px] whitespace-normal break-words">
         {t.destination ? (
           <>
-            <p className="font-black text-slate-700 uppercase text-[10px] leading-tight truncate">
+            <p className="font-black text-slate-700 uppercase text-[10px] leading-tight">
               {t.destination.legalName || t.destination.name}
             </p>
-            <p className="text-[8px] font-bold text-slate-400 uppercase italic truncate">FAN: {t.destination.name}</p>
+            <p className="text-[8px] font-bold text-slate-400 uppercase italic">FAN: {t.destination.name}</p>
             <p className="text-[8px] font-black text-emerald-600 uppercase mt-1">{t.destination.city} - {t.destination.state}</p>
           </>
         ) : (
@@ -142,9 +142,9 @@ export const getOperationTableColumns = (
     key: 'booking_navio',
     label: '8. Booking / Navio',
     render: (t: Trip) => (
-      <div className="flex flex-col">
+      <div className="flex flex-col whitespace-normal break-words max-w-[120px]">
         <span className="text-[10px] font-black text-blue-800">{t.booking || '---'}</span>
-        <span className="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{t.ship || '---'}</span>
+        <span className="text-[9px] font-bold text-slate-400 uppercase leading-tight">{t.ship || '---'}</span>
       </div>
     )
   },
