@@ -148,6 +148,7 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
   }, [ports, searchQuery, sortBy]);
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase ml-1";
 
   return (
     <div className="max-w-full mx-auto space-y-6">
@@ -250,24 +251,39 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 h-[85vh] flex flex-col">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="font-black text-slate-700 text-sm uppercase tracking-widest">{editingId ? 'Editar Porto' : 'Novo Porto'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
             </div>
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNPJ</label><input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" /></div>
+            <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+              <div className="space-y-1"><label className={labelClass}>CNPJ</label><input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1"><label className="text-[9px] font-black text-blue-600 uppercase ml-1">Razão Social</label><input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} /></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Fantasia</label><input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} /></div>
+                <div className="space-y-1"><label className={labelClass}>Razão Social</label><input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} /></div>
+                <div className="space-y-1"><label className={labelClass}>Nome Fantasia</label><input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} /></div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CEP</label><input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm({...form, zipCode: maskCEP(e.target.value)})} /></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm({...form, city: e.target.value.toUpperCase()})} /></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm({...form, state: e.target.value.toUpperCase()})} /></div>
+
+              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Endereço Comercial</label>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Logradouro e Número</label>
+                    <input required type="text" className={inputClasses} value={form.address} onChange={e => setForm({...form, address: e.target.value.toUpperCase()})} placeholder="EX: RUA EXEMPLO, 123" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Bairro</label>
+                    <input required type="text" className={inputClasses} value={form.neighborhood} onChange={e => setForm({...form, neighborhood: e.target.value.toUpperCase()})} placeholder="BAIRRO" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1"><label className={labelClass}>CEP</label><input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm({...form, zipCode: maskCEP(e.target.value)})} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm({...form, city: e.target.value.toUpperCase()})} /></div>
+                    <div className="space-y-1"><label className={labelClass}>UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm({...form, state: e.target.value.toUpperCase()})} /></div>
+                  </div>
+                </div>
               </div>
-              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all">Salvar Porto</button>
+              
+              <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all mt-4">Salvar Porto</button>
             </form>
           </div>
         </div>
