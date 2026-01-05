@@ -4,6 +4,7 @@ import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefi
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db } from '../../utils/storage';
 import TripModal from './operations/TripModal';
+import SchedulingEditModal from './operations/SchedulingEditModal';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
@@ -29,6 +30,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isOCEditModalOpen, setIsOCEditModalOpen] = useState(false);
   const [isMinutaModalOpen, setIsMinutaModalOpen] = useState(false);
+  const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
@@ -77,6 +79,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const handleEditTrip = (trip: Trip) => {
     setSelectedTrip(trip);
     setIsTripModalOpen(true);
+  };
+
+  const handleEditScheduling = (trip: Trip) => {
+    setSelectedTrip(trip);
+    setIsSchedulingModalOpen(true);
   };
 
   const handleEditOC = (trip: Trip) => {
@@ -143,7 +150,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     handleEditMinuta,
     handleViewDoc,
     (id) => onDeleteTrip?.(id),
-    loadData // Callback de atualização injetado nas colunas
+    loadData,
+    handleEditScheduling
   );
 
   const STATUS_OPTIONS: TripStatus[] = [
@@ -236,11 +244,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
       <SmartOperationTable 
         userId={user.id} 
-        componentId={`ops-table-v10`} 
+        componentId={`ops-table-v11`} 
         columns={columns} 
         data={filteredTrips} 
         title={filterCategory === 'TODAS' ? "Programação Geral de Operações" : `${filterCategory} › ${filterSub}`}
-        defaultVisibleKeys={['dateTime', 'os_status', 'customer', 'equipment', 'driver', 'destination', 'actions']}
+        defaultVisibleKeys={['dateTime', 'scheduling_info', 'os_status', 'customer', 'equipment', 'driver', 'actions']}
       />
 
       <TripModal 
@@ -251,6 +259,14 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         customers={customers} 
         categories={categories} 
         editTrip={selectedTrip} 
+      />
+
+      <SchedulingEditModal 
+        isOpen={isSchedulingModalOpen}
+        onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }}
+        trip={selectedTrip}
+        onSuccess={loadData}
+        preStackingUnits={ports}
       />
 
       {isStatusModalOpen && (

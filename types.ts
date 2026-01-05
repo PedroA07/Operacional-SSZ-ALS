@@ -73,6 +73,13 @@ export interface Category {
   parentId?: string;
 }
 
+export interface TripScheduling {
+  dateTime: string;
+  location: string;
+  locationId?: string;
+  obs?: string;
+}
+
 export interface Trip {
   id: string;
   os: string;
@@ -96,14 +103,13 @@ export interface Trip {
   statusHistory: StatusHistoryEntry[];
   balancePayment: PaymentStatus;
   advancePayment: PaymentStatus;
-  // Added missing documents property used in multiple admin and operational components
   documents?: TripDocument[];
-  // Colunas Separadas de Documentos
   osDoc?: TripDocument;
   agendamentoDoc?: TripDocument;
   completoDoc?: TripDocument;
   ocFormData?: any;
-  preStackingFormData?: any; 
+  preStackingFormData?: any;
+  scheduling?: TripScheduling;
 }
 
 export interface Driver {

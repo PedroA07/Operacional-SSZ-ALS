@@ -1,5 +1,5 @@
 
-import { Trip, Driver, Customer, Port } from '../types';
+import { Trip, Driver, Customer, Port, TripScheduling } from '../types';
 import { db } from './storage';
 
 export const tripSyncService = {
@@ -31,6 +31,13 @@ export const tripSyncService = {
   mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port): Partial<Trip> => {
     const now = new Date().toISOString();
     
+    // Se temos um destino (terminado pela Minuta), criamos o objeto de agendamento automático
+    const scheduling: TripScheduling | undefined = destination ? {
+       dateTime: formData.horarioAgendado || now,
+       location: destination.name,
+       locationId: destination.id
+    } : undefined;
+
     return {
       os: formData.os,
       booking: formData.booking,
@@ -72,7 +79,8 @@ export const tripSyncService = {
       advancePayment: { status: 'BLOQUEADO' },
       balancePayment: { status: 'AGUARDANDO_DOCS' },
       documents: [],
-      ocFormData: formData 
+      ocFormData: formData,
+      scheduling: scheduling
     };
   },
 

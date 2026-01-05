@@ -47,7 +47,8 @@ const mapTripToDb = (trip: Trip) => ({
   agendamento_doc: trip.agendamentoDoc || null,
   completo_doc: trip.completoDoc || null,
   oc_form_data: trip.ocFormData,
-  pre_stacking_form_data: trip.preStackingFormData || null
+  pre_stacking_form_data: trip.preStackingFormData || null,
+  scheduling: trip.scheduling || null
 });
 
 const mapDbToTrip = (d: any): Trip => ({
@@ -76,7 +77,8 @@ const mapDbToTrip = (d: any): Trip => ({
   agendamentoDoc: d.agendamento_doc || d.agendamentoDoc,
   completoDoc: d.completo_doc || d.completoDoc,
   ocFormData: d.oc_form_data || d.ocFormData,
-  preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData
+  preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData,
+  scheduling: d.scheduling || undefined
 });
 
 /**
