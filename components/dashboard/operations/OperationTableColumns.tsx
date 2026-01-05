@@ -14,18 +14,22 @@ export const getOperationTableColumns = (
   onEditScheduling: (t: Trip) => void
 ) => {
   
-  const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO', e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'COMPLETO', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     const reader = new FileReader();
     reader.onload = async () => {
-      const prefix = type === 'OS_PDF' ? 'OS' : 'AGD';
+      let prefix = 'DOC';
+      if (type === 'OS_PDF') prefix = 'OS';
+      else if (type === 'AGENDAMENTO') prefix = 'AGD';
+      else if (type === 'COMPLETO') prefix = 'CTE';
+
       const customFileName = `${prefix} - ${trip.driver.name} - ${trip.os}`;
       
       const doc: TripDocument = { 
         id: `${type.toLowerCase()}-${Date.now()}`, 
-        type: type, 
+        type: type as any, 
         url: reader.result as string, 
         fileName: customFileName, 
         uploadDate: new Date().toISOString() 
@@ -34,11 +38,12 @@ export const getOperationTableColumns = (
       const updatedTrip = { ...trip };
       if (type === 'OS_PDF') updatedTrip.osDoc = doc;
       else if (type === 'AGENDAMENTO') updatedTrip.agendamentoDoc = doc;
+      else if (type === 'COMPLETO') updatedTrip.completoDoc = doc;
       
       try {
         await db.saveTrip(updatedTrip);
         onRefreshData();
-        alert(`${type === 'OS_PDF' ? 'OS' : 'Agendamento'} vinculado com sucesso!`);
+        alert(`Documento vinculado com sucesso!`);
       } catch (err) {
         alert("Erro ao salvar no banco de dados.");
       }
@@ -46,12 +51,13 @@ export const getOperationTableColumns = (
     reader.readAsDataURL(file);
   };
 
-  const deleteDocument = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO') => {
-    if (!confirm(`Remover anexo de ${type === 'OS_PDF' ? 'OS' : 'Agendamento'}?`)) return;
+  const deleteDocument = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'COMPLETO') => {
+    if (!confirm(`Remover anexo selecionado?`)) return;
     
     const updatedTrip = { ...trip };
     if (type === 'OS_PDF') updatedTrip.osDoc = undefined;
     else if (type === 'AGENDAMENTO') updatedTrip.agendamentoDoc = undefined;
+    else if (type === 'COMPLETO') updatedTrip.completoDoc = undefined;
     
     try {
       await db.saveTrip(updatedTrip);
@@ -83,13 +89,13 @@ export const getOperationTableColumns = (
     }
   };
 
-  const DocumentBlock = ({ trip, type, label }: { trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO', label: string }) => {
-    const doc = type === 'OS_PDF' ? trip.osDoc : trip.agendamentoDoc;
-    const colorClass = type === 'OS_PDF' ? 'emerald' : 'blue';
+  const DocumentBlock = ({ trip, type, label }: { trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'COMPLETO', label: string }) => {
+    const doc = type === 'OS_PDF' ? trip.osDoc : type === 'AGENDAMENTO' ? trip.agendamentoDoc : trip.completoDoc;
+    const colorClass = type === 'OS_PDF' ? 'emerald' : type === 'AGENDAMENTO' ? 'blue' : 'indigo';
 
     if (doc) {
       return (
-        <div className={`space-y-1 p-2.5 bg-${colorClass}-50 rounded-xl border border-${colorClass}-100 shadow-inner`}>
+        <div className={`space-y-1 p-2 bg-${colorClass}-50 rounded-xl border border-${colorClass}-100 shadow-inner`}>
            <p className={`text-[7px] font-black text-${colorClass}-600 uppercase mb-1 tracking-tighter`}>{label}</p>
            <div className="grid grid-cols-4 gap-1">
               <button onClick={() => onViewDoc(doc.url, doc.fileName)} className={`p-1.5 bg-white text-${colorClass}-600 rounded-lg hover:bg-${colorClass}-600 hover:text-white transition-all shadow-sm border border-${colorClass}-100`} title="Visualizar"><svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
@@ -102,10 +108,10 @@ export const getOperationTableColumns = (
     }
 
     return (
-      <label className={`w-full flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-500 rounded-xl hover:border-${colorClass}-400 hover:bg-${colorClass}-50 transition-all shadow-sm cursor-pointer group`}>
+      <label className={`w-full flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded-xl hover:border-${colorClass}-400 hover:bg-${colorClass}-50 transition-all shadow-sm cursor-pointer group`}>
         <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(trip, type, e)} />
-        <svg className={`w-4 h-4 text-slate-300 group-hover:text-${colorClass}-500 transition-colors`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-        <span className="text-[8px] font-black uppercase tracking-tight">Anexar {label}</span>
+        <svg className={`w-3.5 h-3.5 text-slate-300 group-hover:text-${colorClass}-500 transition-colors`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+        <span className="text-[7.5px] font-black uppercase tracking-tight">Anexar {label}</span>
       </label>
     );
   };
@@ -316,34 +322,35 @@ export const getOperationTableColumns = (
             <span className="text-[8px] font-black uppercase">Editar Viagem</span>
           </button>
 
-          <DocumentBlock trip={t} type="OS_PDF" label="Dossiê OS PDF" />
+          <DocumentBlock trip={t} type="OS_PDF" label="OS PDF" />
+          <DocumentBlock trip={t} type="COMPLETO" label="CTE / COMPL." />
 
           {t.ocFormData && (
             <button 
               onClick={() => onEditOC(t)} 
-              className="w-full flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+              className="w-full flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-              <span className="text-[8px] font-black uppercase">Editar OC</span>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <span className="text-[7.5px] font-black uppercase">Editar OC</span>
             </button>
           )}
 
           <button 
             onClick={() => onEditMinuta(t)} 
-            className="w-full flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+            className="w-full flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-            <span className="text-[8px] font-black uppercase">Minuta PreS.</span>
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+            <span className="text-[7.5px] font-black uppercase">Minuta PreS.</span>
           </button>
 
-          <DocumentBlock trip={t} type="AGENDAMENTO" label="Dossiê Agendamento" />
+          <DocumentBlock trip={t} type="AGENDAMENTO" label="Agendamento" />
 
           <button 
             onClick={() => onDeleteTrip(t.id)} 
-            className="w-full flex items-center gap-2 px-3 py-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm group"
+            className="w-full flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm group"
           >
-            <svg className="w-3.5 h-3.5 text-red-300 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
-            <span className="text-[8px] font-black uppercase">Remover</span>
+            <svg className="w-3 h-3 text-red-300 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+            <span className="text-[7.5px] font-black uppercase">Remover</span>
           </button>
         </div>
       )

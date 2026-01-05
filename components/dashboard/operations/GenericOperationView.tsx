@@ -41,6 +41,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   const [ports, setPorts] = useState<any[]>([]);
+  
+  // Estados do Visualizador de Documentos
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const [docViewConfig, setDocViewConfig] = useState({ url: '', title: '' });
 
   const loadLocalData = async () => {
     const [t, cats, p, ps] = await Promise.all([
@@ -59,7 +63,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   }, [categoryName, clientName]);
 
   const handleOpenNewTrip = () => {
-    // REGRA: Ao criar nova viagem nesta tela, tentamos pré-configurar o contexto
     setSelectedTrip(null);
     setIsTripModalOpen(true);
   };
@@ -99,6 +102,33 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const handleEditMinuta = (trip: Trip) => {
     setSelectedTrip(trip);
     setIsMinutaModalOpen(true);
+  };
+
+  const handleViewDoc = (url: string, title: string) => {
+    setDocViewConfig({ url, title });
+    setIsDocViewerOpen(true);
+  };
+
+  const handlePrintDocInViewer = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head><title>${docViewConfig.title}</title></head>
+          <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;">
+            ${docViewConfig.url.startsWith('data:image') 
+              ? `<img src="${docViewConfig.url}" style="max-width:100%; height:auto;">`
+              : `<embed width="100%" height="100%" src="${docViewConfig.url}" type="application/pdf">`
+            }
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 500);
+    }
   };
 
   // REGRA: Filtrar apenas motoristas vinculados a esta operação específica
@@ -148,7 +178,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
     handleEditOC,
     handleEditMinuta,
-    (url, title) => window.open(url, '_blank'),
+    handleViewDoc,
     async (id) => { if(confirm('Excluir viagem?')) { await db.deleteTrip(id); loadLocalData(); } },
     loadLocalData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); }
@@ -279,6 +309,41 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         onSuccess={loadLocalData}
         preStackingUnits={ports}
       />
+
+      {isDocViewerOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-2xl animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                 <div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Visualizador de Documentos ALS</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Dossiê: {docViewConfig.title}</p>
+                 </div>
+                 <div className="flex gap-4">
+                    <button 
+                      onClick={handlePrintDocInViewer}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all"
+                    >
+                       Imprimir
+                    </button>
+                    <button onClick={() => setIsDocViewerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+                 </div>
+              </div>
+              <div className="flex-1 bg-slate-100 relative overflow-auto flex justify-center items-center p-8">
+                 {docViewConfig.url.startsWith('data:image') ? (
+                    <img src={docViewConfig.url} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" alt="Documento" />
+                 ) : (
+                    <iframe 
+                        width="100%" 
+                        height="100%" 
+                        style={{ border: 0 }} 
+                        src={docViewConfig.url}
+                        title="Document Viewer"
+                    ></iframe>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
 
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
