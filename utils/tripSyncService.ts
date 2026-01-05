@@ -8,6 +8,23 @@ export const tripSyncService = {
     return trips.find(t => t.os.toUpperCase() === os.toUpperCase()) || null;
   },
 
+  /**
+   * Verifica se existem diferenças reais entre a Trip do banco e os dados do formulário
+   */
+  hasChanges: (existing: Trip, currentForm: any, driverId: string, customerId: string): boolean => {
+    // Compara campos críticos
+    const diffs = [
+      existing.driver.id !== driverId,
+      existing.customer.id !== customerId,
+      (existing.container || '').toUpperCase() !== (currentForm.container || '').toUpperCase(),
+      (existing.booking || '').toUpperCase() !== (currentForm.booking || '').toUpperCase(),
+      (existing.ship || '').toUpperCase() !== (currentForm.ship || '').toUpperCase(),
+      (existing.containerType || '').toUpperCase() !== (currentForm.tipo || '').toUpperCase(),
+      (existing.seal || '').toUpperCase() !== (currentForm.seal || '').toUpperCase()
+    ];
+    return diffs.some(d => d === true);
+  },
+
   mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port): Partial<Trip> => {
     const now = new Date().toISOString();
     
@@ -18,7 +35,7 @@ export const tripSyncService = {
       dateTime: formData.horarioAgendado || now,
       isLate: false,
       type: (formData.tipoOperacao || 'EXPORTAÇÃO').toUpperCase() as any,
-      containerType: formData.tipo || '40HC', // MAPEAMENTO DO TIPO (40HC, etc)
+      containerType: formData.tipo || '40HC',
       category: category,
       container: formData.container,
       tara: formData.tara,

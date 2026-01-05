@@ -33,7 +33,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   
-  // Modal de Visualização de OS
   const [isOSViewerOpen, setIsOSViewerOpen] = useState(false);
   const [osViewConfig, setOsViewConfig] = useState({ url: '', title: '' });
 
@@ -94,6 +93,27 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const handleViewOS = (url: string, title: string) => {
     setOsViewConfig({ url, title });
     setIsOSViewerOpen(true);
+  };
+
+  const handlePrintOSInViewer = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${osViewConfig.title}</title>
+          </head>
+          <body style="margin:0;padding:0;">
+            <embed width="100%" height="100%" src="${osViewConfig.url}" type="application/pdf">
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 500);
+    }
   };
 
   const filteredTrips = useMemo(() => {
@@ -285,7 +305,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         </div>
       )}
 
-      {/* MODAL VISUALIZADOR DE OS PDF */}
       {isOSViewerOpen && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-2xl animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col animate-in zoom-in-95">
@@ -296,14 +315,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                  </div>
                  <div className="flex gap-4">
                     <button 
-                      onClick={() => {
-                        const printWindow = window.open('', '_blank');
-                        if (printWindow) {
-                          printWindow.document.write(`<html><body style="margin:0;padding:0;"><embed width="100%" height="100%" src="${osViewConfig.url}" type="application/pdf"></body></html>`);
-                          printWindow.document.close();
-                          setTimeout(() => printWindow.print(), 500);
-                        }
-                      }}
+                      onClick={handlePrintOSInViewer}
                       className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all"
                     >
                        Imprimir Documento

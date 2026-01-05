@@ -149,9 +149,17 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
 
     setPendingAction(mode);
     const existing = await tripSyncService.findExistingTrip(formData.os);
+    
     if (existing) {
-      setExistingTrip(existing);
-      setShowSyncModal(true);
+      // Verifica se houve alteração real
+      const hasChanges = tripSyncService.hasChanges(existing, formData, selectedDriver?.id, selectedRemetente?.id);
+      
+      if (hasChanges) {
+        setExistingTrip(existing);
+        setShowSyncModal(true);
+      } else {
+        await executeWorkflow(existing.id);
+      }
     } else {
       await executeWorkflow(null);
     }
@@ -162,7 +170,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     setShowSyncModal(false);
 
     try {
-      // Sincroniza com o Painel antes de imprimir/baixar
       if (selectedDriver && selectedRemetente) {
          const tripData = tripSyncService.mapOCtoTrip(formData, selectedDriver, selectedRemetente, 'Geral', selectedDestinatario);
          await tripSyncService.sync(tripData, existingId || undefined);
@@ -176,15 +183,18 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       
+      const fileName = `Minuta PreStacking - ${selectedDriver?.name || 'MOTORISTA'} - ${formData.os}.pdf`;
+
       if (pendingAction === 'print') {
         const blob = pdf.output('blob');
         const url = URL.createObjectURL(blob);
         const win = window.open(url, '_blank');
         if (win) {
+          win.document.title = fileName;
           win.onload = () => { win.focus(); win.print(); };
         }
       } else {
-        pdf.save(`Minuta PreStacking - OS ${formData.os}.pdf`);
+        pdf.save(fileName);
       }
     } catch (e) { console.error(e); } finally { setIsExporting(false); setPendingAction(null); }
   };

@@ -18,9 +18,7 @@ export const getOperationTableColumns = (
     
     const reader = new FileReader();
     reader.onload = async () => {
-      // Regra de nomenclatura: OS - (nome do motorista) - N da OS
       const customFileName = `OS - ${trip.driver.name} - ${trip.os}`;
-      
       const doc: TripDocument = { 
         id: `os-pdf-${Date.now()}`, 
         type: 'OS_PDF', 
@@ -28,29 +26,33 @@ export const getOperationTableColumns = (
         fileName: customFileName, 
         uploadDate: new Date().toISOString() 
       };
-
-      // Remove OS anterior se existir e adiciona a nova
       const otherDocs = (trip.documents || []).filter(d => d.type !== 'OS_PDF');
       const updated = { ...trip, documents: [...otherDocs, doc] };
-      
       await db.saveTrip(updated);
       alert("Documento OS vinculado com sucesso!");
     };
     reader.readAsDataURL(file);
   };
 
-  const handlePrintOS = (url: string) => {
+  const handlePrintOS = (url: string, fileName: string) => {
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(`
         <html>
+          <head>
+            <title>${fileName}</title>
+          </head>
           <body style="margin:0;padding:0;">
             <embed width="100%" height="100%" src="${url}" type="application/pdf">
           </body>
         </html>
       `);
       printWindow.document.close();
-      setTimeout(() => printWindow.print(), 500);
+      // Delay necessário para o browser carregar o PDF no iframe antes de disparar o print
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 800);
     }
   };
 
@@ -234,7 +236,7 @@ export const getOperationTableColumns = (
                     <svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                   </button>
                   <button 
-                    onClick={() => handlePrintOS(osDoc.url)}
+                    onClick={() => handlePrintOS(osDoc.url, osDoc.fileName)}
                     className="p-1.5 bg-white text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm border border-blue-100"
                     title="Imprimir OS"
                   >

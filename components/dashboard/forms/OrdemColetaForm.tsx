@@ -140,9 +140,18 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
 
     setPendingAction(mode);
     const existing = await tripSyncService.findExistingTrip(formData.os);
+    
     if (existing) {
-      setExistingTrip(existing);
-      setShowSyncModal(true);
+      // NOVA REGRA: Verifica se houve alteração real
+      const hasChanges = tripSyncService.hasChanges(existing, formData, selectedDriver.id, selectedRemetente.id);
+      
+      if (hasChanges) {
+        setExistingTrip(existing);
+        setShowSyncModal(true);
+      } else {
+        // Se é identico, executa sem perguntar nada
+        await executeWorkflow(existing.id);
+      }
     } else {
       await executeWorkflow(null);
     }
@@ -176,6 +185,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         const url = URL.createObjectURL(blob);
         const win = window.open(url, '_blank');
         if (win) {
+          // Define título para nome do arquivo na impressão
+          win.document.title = fileName;
           win.onload = () => {
              win.focus();
              win.print();
@@ -228,8 +239,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
                  </div>
                  <div>
-                    <h3 className="text-xl font-black uppercase tracking-tight">OS Já Existente no Painel</h3>
-                    <p className="text-[10px] font-black uppercase opacity-80 mt-1">Deseja atualizar a programação de operações com estes novos dados?</p>
+                    <h3 className="text-xl font-black uppercase tracking-tight">Alterações Detectadas</h3>
+                    <p className="text-[10px] font-black uppercase opacity-80 mt-1">Os dados deste formulário são diferentes dos que constam no Painel. Deseja atualizar?</p>
                  </div>
               </div>
               
