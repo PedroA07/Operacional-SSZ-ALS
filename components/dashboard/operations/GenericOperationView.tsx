@@ -58,6 +58,12 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     loadLocalData();
   }, [categoryName, clientName]);
 
+  const handleOpenNewTrip = () => {
+    // REGRA: Ao criar nova viagem nesta tela, tentamos pré-configurar o contexto
+    setSelectedTrip(null);
+    setIsTripModalOpen(true);
+  };
+
   const openStatusEditor = (trip: Trip, status: TripStatus) => {
     setSelectedTrip(trip);
     setTempStatus(status);
@@ -171,13 +177,21 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           </div>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex items-center gap-4">
+           <button 
+             onClick={handleOpenNewTrip}
+             className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 flex items-center gap-3"
+           >
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+             Nova Programação
+           </button>
+           <div className="h-12 w-[1px] bg-slate-200 mx-2"></div>
            <div className="bg-white px-6 py-4 rounded-2xl border border-slate-200 shadow-sm text-center">
-             <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Motoristas Autorizados</p>
+             <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Motoristas</p>
              <p className="text-2xl font-black text-slate-800">{filteredDrivers.length}</p>
            </div>
            <div className="bg-blue-600 px-6 py-4 rounded-2xl shadow-lg shadow-blue-600/20 text-center">
-             <p className="text-[8px] font-black text-blue-100 uppercase mb-1">Total de Viagens</p>
+             <p className="text-[8px] font-black text-blue-100 uppercase mb-1">Viagens</p>
              <p className="text-2xl font-black text-white">{filteredTrips.length}</p>
            </div>
         </div>

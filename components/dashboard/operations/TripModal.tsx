@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Trip, Driver, Customer, Category, Port, PreStacking } from '../../../types';
 import { db } from '../../../utils/storage';
 import { osCategoryService } from '../../../utils/osCategoryService';
+import { lookupCarrierByContainer } from '../../../utils/carrierService';
 
 interface TripModalProps {
   isOpen: boolean;
@@ -12,9 +13,21 @@ interface TripModalProps {
   customers: Customer[];
   categories: Category[];
   editTrip?: Trip | null;
+  initialCategory?: string;
+  initialCustomer?: Customer;
 }
 
-const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drivers, customers, categories, editTrip }) => {
+const TripModal: React.FC<TripModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSuccess, 
+  drivers, 
+  customers, 
+  categories, 
+  editTrip,
+  initialCategory,
+  initialCustomer
+}) => {
   const [ports, setPorts] = useState<(Port | PreStacking)[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState<any>({
@@ -44,13 +57,46 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
       });
     } else {
       setForm({
-        os: '', booking: '', ship: '', dateTime: new Date().toISOString().slice(0, 16), 
-        type: 'EXPORTAÇÃO', status: 'Pendente',
-        category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
-        containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: '', autColeta: ''
+        os: '', 
+        booking: '', 
+        ship: '', 
+        dateTime: new Date().toISOString().slice(0, 16), 
+        type: 'EXPORTAÇÃO', 
+        status: 'Pendente',
+        category: initialCategory || '', 
+        subCategory: initialCustomer?.name || '', 
+        container: '', 
+        tara: '', 
+        seal: '', 
+        cva: '', 
+        containerType: '40HC', 
+        agencia: '', 
+        padrao: 'CARGA GERAL', 
+        embarcador: '', 
+        obs: '', 
+        autColeta: '',
+        customer: initialCustomer ? { 
+          id: initialCustomer.id, 
+          name: initialCustomer.name, 
+          legalName: initialCustomer.legalName, 
+          cnpj: initialCustomer.cnpj, 
+          city: initialCustomer.city, 
+          state: initialCustomer.state 
+        } : undefined
       });
     }
-  }, [editTrip, isOpen]);
+  }, [editTrip, isOpen, initialCategory, initialCustomer]);
+
+  const handleContainerChange = (val: string) => {
+    const container = val.toUpperCase();
+    const carrier = lookupCarrierByContainer(container);
+    
+    setForm(prev => ({
+      ...prev,
+      container,
+      agencia: carrier ? carrier.name : prev.agencia
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +106,6 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
     try {
       const tripId = editTrip?.id || `trip-${Date.now()}`;
       
-      // REGRA SOLICITADA: Vincular motorista ao cliente e categoria automaticamente
       const finalCategory = form.category || 'Geral';
       const driverObj = drivers.find(d => d.id === form.driver?.id);
       const customerObj = customers.find(c => c.id === form.customer?.id);
@@ -188,7 +233,7 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
              <div className="grid grid-cols-12 gap-4">
                 <div className="col-span-4 space-y-1">
                    <label className={labelClass}>Nº Container</label>
-                   <input required className={inputClass} value={form.container} onChange={e => setForm({...form, container: e.target.value.toUpperCase()})} />
+                   <input required className={inputClass} value={form.container} onChange={e => handleContainerChange(e.target.value)} />
                 </div>
                 <div className="col-span-3 space-y-1">
                    <label className={labelClass}>Tipo</label>
