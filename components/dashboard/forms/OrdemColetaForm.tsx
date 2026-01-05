@@ -380,23 +380,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>3. Dados da Operação (Logística)</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="EX: MAERSK..." /></div>
-            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} placeholder="ABC12345" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Aut. Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} /></div>
-            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
-          </div>
-          <div className="space-y-1">
-             <label className={labelClass}>Data e Hora Agendamento</label>
-             <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>4. Dados do Equipamento</p>
+          <p className={labelClass}>3. Dados do Equipamento</p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
             <div className="space-y-1"><label className={labelClass}>Genset</label><input className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
@@ -428,6 +412,18 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           </div>
         </div>
 
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+          <p className={labelClass}>4. Dados da Operação (Logística)</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="EX: MAERSK..." /></div>
+            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} placeholder="ABC12345" /></div>
+          </div>
+          <div className="space-y-1">
+             <label className={labelClass}>Data e Hora Agendamento</label>
+             <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
+          </div>
+        </div>
+
         <div className="relative">
           <label className={labelBlueClass}>5. Motorista</label>
           <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
@@ -438,6 +434,18 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
               ))}
             </div>
           )}
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+          <p className={labelClass}>6. Autorização e Embarcador</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className={labelClass}>Aut. Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} /></div>
+            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
+          </div>
+          <div className="space-y-1">
+             <label className={labelClass}>Observações Adicionais</label>
+             <textarea className={`${inputClasses} h-24 resize-none normal-case`} value={formData.obs} onChange={e => handleInputChange('obs', e.target.value)} placeholder="Instruções..." />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
