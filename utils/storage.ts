@@ -47,6 +47,8 @@ const mapTripToDb = (trip: Trip) => ({
   os_doc: trip.osDoc || null,
   agendamento_doc: trip.agendamentoDoc || null,
   completo_doc: trip.completoDoc || null,
+  cte_doc: trip.cteDoc || null,
+  cva_doc: trip.cvaDoc || null,
   oc_form_data: trip.ocFormData,
   pre_stacking_form_data: trip.preStackingFormData || null,
   scheduling: trip.scheduling || null
@@ -77,74 +79,11 @@ const mapDbToTrip = (d: any): Trip => ({
   osDoc: d.os_doc || d.osDoc,
   agendamentoDoc: d.agendamento_doc || d.agendamentoDoc,
   completoDoc: d.completo_doc || d.completoDoc,
+  cteDoc: d.cte_doc || d.cteDoc,
+  cvaDoc: d.cva_doc || d.cvaDoc,
   ocFormData: d.oc_form_data || d.ocFormData,
   preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData,
   scheduling: d.scheduling || undefined
-});
-
-const mapPreStackingToDb = (ps: PreStacking) => ({
-  id: ps.id,
-  name: ps.name,
-  legal_name: ps.legalName,
-  cnpj: ps.cnpj,
-  zipCode: ps.zipCode,
-  address: ps.address,
-  neighborhood: ps.neighborhood,
-  city: ps.city,
-  state: ps.state,
-  registrationDate: new Date().toISOString()
-});
-
-const mapPortToDb = (p: Port) => ({
-  id: p.id,
-  name: p.name,
-  legal_name: p.legalName,
-  cnpj: p.cnpj,
-  zipCode: p.zipCode,
-  address: p.address,
-  neighborhood: p.neighborhood,
-  city: p.city,
-  state: p.state
-});
-
-const mapDbToPreStacking = (d: any): PreStacking => ({
-  id: d.id,
-  name: d.name,
-  legalName: d.legal_name || d.legalName,
-  cnpj: d.cnpj,
-  zipCode: d.zipCode,
-  address: d.address,
-  neighborhood: d.neighborhood,
-  city: d.city,
-  state: d.state
-});
-
-const mapStaffToDb = (s: Staff) => ({
-  id: s.id,
-  name: s.name,
-  username: s.username,
-  role: s.role,
-  position: s.position,
-  registration_date: s.registrationDate,
-  status: s.status,
-  status_since: s.statusSince,
-  photo: s.photo,
-  emailcorp: s.emailCorp,
-  phonecorp: s.phoneCorp
-});
-
-const mapDbToStaff = (s: any): Staff => ({
-  id: s.id,
-  name: s.name,
-  username: s.username,
-  role: s.role,
-  position: s.position,
-  registrationDate: s.registration_date || s.registrationDate,
-  status: s.status,
-  statusSince: s.status_since || s.statusSince,
-  photo: s.photo,
-  emailCorp: s.emailcorp || s.emailCorp,
-  phoneCorp: s.phonecorp || s.phoneCorp
 });
 
 export const db = {
@@ -248,7 +187,7 @@ export const db = {
         if (!success) throw new Error("Upsert falhou silenciosamente");
       } catch (e) { 
         console.error("Erro crítico ao salvar motorista no Supabase:", e);
-        return false; // Não salva local se falhar na nuvem para manter integridade
+        return false;
       } 
     }
     const current = db._getLocal(KEYS.DRIVERS);
@@ -294,14 +233,15 @@ export const db = {
   },
 
   getPorts: async (): Promise<Port[]> => {
-    if (supabase) { try { const { data, error } = await supabase.from('ports').select('*'); if (data && !error) { const mapped = data.map(mapDbToPreStacking) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { const { data, error } = await supabase.from('ports').select('*'); if (data && !error) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PORTS);
   },
 
   savePort: async (port: Port) => {
     if (supabase) { 
       try { 
-        const payload = mapPortToDb(port);
+        const payload = { ...port, legal_name: port.legalName };
+        delete (payload as any).legalName;
         const { error } = await supabase.from('ports').upsert(payload); 
         if (error) throw error;
       } catch (e) { console.error("Error Port:", e); return false; } 
@@ -321,15 +261,14 @@ export const db = {
   },
 
   getStaff: async (): Promise<Staff[]> => {
-    if (supabase) { try { const { data, error } = await supabase.from('staff').select('*'); if (!error && data) { const mapped = data.map(mapDbToStaff); db._saveLocal(KEYS.STAFF, mapped); return mapped; } } catch (e) {} }
-    const local = db._getLocal(KEYS.STAFF);
-    return local.map(mapDbToStaff);
+    if (supabase) { try { const { data, error } = await supabase.from('staff').select('*'); if (!error && data) { const mapped = data.map(s => ({ ...s, registrationDate: s.registration_date, statusSince: s.status_since, emailCorp: s.emailcorp, phoneCorp: s.phonecorp })); db._saveLocal(KEYS.STAFF, mapped); return mapped; } } catch (e) {} }
+    return db._getLocal(KEYS.STAFF);
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
     if (supabase) { 
       try { 
-        const payload = mapStaffToDb(staff);
+        const payload = { ...staff, registration_date: staff.registrationDate, status_since: staff.statusSince, emailcorp: staff.emailCorp, phonecorp: staff.phoneCorp };
         const { error } = await supabase.from('staff').upsert(payload); 
         if (error) throw error;
       } catch (e) { console.error("Staff Save Error:", e); return false; } 
@@ -363,14 +302,15 @@ export const db = {
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
-    if (supabase) { try { const { data, error } = await supabase.from('pre_stacking').select('*'); if (data && !error) { const mapped = data.map(mapDbToPreStacking); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { const { data, error } = await supabase.from('pre_stacking').select('*'); if (data && !error) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
   savePreStacking: async (ps: PreStacking) => {
     if (supabase) { 
       try { 
-        const payload = mapPreStackingToDb(ps);
+        const payload = { ...ps, legal_name: ps.legalName };
+        delete (payload as any).legalName;
         const { error } = await supabase.from('pre_stacking').upsert(payload); 
         if (error) throw error;
       } catch (e) { console.error("Error PreStacking Cloud:", e); return false; } 

@@ -14,7 +14,7 @@ export const getOperationTableColumns = (
   onEditScheduling: (t: Trip) => void
 ) => {
   
-  const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'COMPLETO', e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -23,7 +23,9 @@ export const getOperationTableColumns = (
       let prefix = 'DOC';
       if (type === 'OS_PDF') prefix = 'OS';
       else if (type === 'AGENDAMENTO') prefix = 'AGD';
-      else if (type === 'COMPLETO') prefix = 'CTE';
+      else if (type === 'CTE') prefix = 'CTE';
+      else if (type === 'CVA') prefix = 'CVA';
+      else if (type === 'COMPLETO') prefix = 'DOSSIE';
 
       const customFileName = `${prefix} - ${trip.driver.name} - ${trip.os}`;
       
@@ -38,6 +40,8 @@ export const getOperationTableColumns = (
       const updatedTrip = { ...trip };
       if (type === 'OS_PDF') updatedTrip.osDoc = doc;
       else if (type === 'AGENDAMENTO') updatedTrip.agendamentoDoc = doc;
+      else if (type === 'CTE') updatedTrip.cteDoc = doc;
+      else if (type === 'CVA') updatedTrip.cvaDoc = doc;
       else if (type === 'COMPLETO') updatedTrip.completoDoc = doc;
       
       try {
@@ -51,12 +55,14 @@ export const getOperationTableColumns = (
     reader.readAsDataURL(file);
   };
 
-  const deleteDocument = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'COMPLETO') => {
+  const deleteDocument = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO') => {
     if (!confirm(`Remover anexo selecionado?`)) return;
     
     const updatedTrip = { ...trip };
     if (type === 'OS_PDF') updatedTrip.osDoc = undefined;
     else if (type === 'AGENDAMENTO') updatedTrip.agendamentoDoc = undefined;
+    else if (type === 'CTE') updatedTrip.cteDoc = undefined;
+    else if (type === 'CVA') updatedTrip.cvaDoc = undefined;
     else if (type === 'COMPLETO') updatedTrip.completoDoc = undefined;
     
     try {
@@ -89,9 +95,20 @@ export const getOperationTableColumns = (
     }
   };
 
-  const DocumentBlock = ({ trip, type, label }: { trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'COMPLETO', label: string }) => {
-    const doc = type === 'OS_PDF' ? trip.osDoc : type === 'AGENDAMENTO' ? trip.agendamentoDoc : trip.completoDoc;
-    const colorClass = type === 'OS_PDF' ? 'emerald' : type === 'AGENDAMENTO' ? 'blue' : 'indigo';
+  const DocumentBlock = ({ trip, type, label, forceVisible = true }: { trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO', label: string, forceVisible?: boolean }) => {
+    if (!forceVisible) return null;
+    
+    const doc = type === 'OS_PDF' ? trip.osDoc 
+                : type === 'AGENDAMENTO' ? trip.agendamentoDoc 
+                : type === 'CTE' ? trip.cteDoc 
+                : type === 'CVA' ? trip.cvaDoc 
+                : trip.completoDoc;
+    
+    const colorClass = type === 'OS_PDF' ? 'emerald' 
+                    : type === 'AGENDAMENTO' ? 'blue' 
+                    : type === 'CTE' ? 'indigo' 
+                    : type === 'CVA' ? 'amber' 
+                    : 'slate';
 
     if (doc) {
       return (
@@ -210,15 +227,18 @@ export const getOperationTableColumns = (
   },
   {
     key: 'cva_info',
-    label: '5. CVA',
+    label: '5. CVA / Dossiê',
     render: (t: Trip) => (
-      <div className="flex items-center">
+      <div className="flex flex-col gap-2 min-w-[120px]">
         {t.cva ? (
-          <span className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-mono font-black uppercase shadow-sm">
-            {t.cva}
-          </span>
+          <div className="space-y-1.5">
+            <span className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-mono font-black uppercase shadow-sm">
+              CVA: {t.cva}
+            </span>
+            <DocumentBlock trip={t} type="CVA" label="Certificado CVA" />
+          </div>
         ) : (
-          <span className="text-[9px] font-bold text-slate-300 uppercase italic">Não Inf.</span>
+          <span className="text-[9px] font-bold text-slate-300 uppercase italic">N/I CVA</span>
         )}
       </div>
     )
@@ -292,17 +312,22 @@ export const getOperationTableColumns = (
       return (
         <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 min-w-[180px] group relative">
            <div className="flex justify-between items-start mb-2">
-              <div className="flex flex-col">
+              <div className="flex flex-col" onClick={() => t.agendamentoDoc && onViewDoc(t.agendamentoDoc.url, t.agendamentoDoc.fileName)}>
                  <span className="text-[9px] font-black text-emerald-700 uppercase leading-none">{schDate.toLocaleDateString('pt-BR')}</span>
                  <span className="text-[11px] font-black text-slate-800 mt-0.5">{schDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
               </div>
-              <button onClick={() => onEditScheduling(t)} className="opacity-0 group-hover:opacity-100 p-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-blue-100 transition-all">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-              </button>
+              <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button onClick={() => onEditScheduling(t)} className="p-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-blue-100">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+              </div>
            </div>
            <div className="border-t border-emerald-100/50 pt-2">
               <p className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter">Terminal:</p>
               <p className="text-[9px] font-bold text-slate-600 uppercase leading-tight truncate">{sch.location}</p>
+           </div>
+           <div className="mt-2">
+             <DocumentBlock trip={t} type="AGENDAMENTO" label="Anexo PDF" />
            </div>
         </div>
       );
@@ -313,7 +338,7 @@ export const getOperationTableColumns = (
     label: '10. Opções',
     render: (t: Trip) => {
       return (
-        <div className="flex flex-col gap-2 min-w-[140px]">
+        <div className="flex flex-col gap-2 min-w-[160px]">
           <button 
             onClick={() => onEditTrip(t)} 
             className="w-full flex items-center gap-2 px-3 py-2 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-sm"
@@ -323,7 +348,8 @@ export const getOperationTableColumns = (
           </button>
 
           <DocumentBlock trip={t} type="OS_PDF" label="OS PDF" />
-          <DocumentBlock trip={t} type="COMPLETO" label="CTE / COMPL." />
+          <DocumentBlock trip={t} type="CTE" label="CT-e (Arquivo)" />
+          <DocumentBlock trip={t} type="COMPLETO" label="Dossiê Completo" />
 
           {t.ocFormData && (
             <button 
@@ -342,8 +368,6 @@ export const getOperationTableColumns = (
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
             <span className="text-[7.5px] font-black uppercase">Minuta PreS.</span>
           </button>
-
-          <DocumentBlock trip={t} type="AGENDAMENTO" label="Agendamento" />
 
           <button 
             onClick={() => onDeleteTrip(t.id)} 

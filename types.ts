@@ -61,7 +61,7 @@ export interface PaymentStatus {
 
 export interface TripDocument {
   id: string;
-  type: 'COMPLETO' | 'NF' | 'OC' | 'MINUTA' | 'OS_PDF' | 'AGENDAMENTO';
+  type: 'CTE' | 'COMPLETO' | 'NF' | 'OC' | 'MINUTA' | 'OS_PDF' | 'AGENDAMENTO' | 'CVA';
   url: string;
   fileName: string;
   uploadDate: string;
@@ -107,6 +107,8 @@ export interface Trip {
   osDoc?: TripDocument;
   agendamentoDoc?: TripDocument;
   completoDoc?: TripDocument;
+  cteDoc?: TripDocument;
+  cvaDoc?: TripDocument;
   ocFormData?: any;
   preStackingFormData?: any;
   scheduling?: TripScheduling;
