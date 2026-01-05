@@ -229,7 +229,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       </div>
 
       {showSyncModal && existingTrip && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95">
               <div className="p-10 bg-amber-500 text-white flex items-center gap-6">
                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
@@ -418,10 +418,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
             <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="EX: MAERSK..." /></div>
             <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} placeholder="ABC12345" /></div>
           </div>
-          <div className="space-y-1">
-             <label className={labelClass}>Data e Hora Agendamento</label>
-             <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
-          </div>
         </div>
 
         <div className="relative">
@@ -443,8 +439,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
             <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
           </div>
           <div className="space-y-1">
-             <label className={labelClass}>Observações Adicionais</label>
-             <textarea className={`${inputClasses} h-24 resize-none normal-case`} value={formData.obs} onChange={e => handleInputChange('obs', e.target.value)} placeholder="Instruções..." />
+             <label className={labelClass}>Data e Hora Agendamento</label>
+             <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
           </div>
         </div>
 
