@@ -43,7 +43,6 @@ const mapTripToDb = (trip: Trip) => ({
   status_history: trip.statusHistory,
   advance_payment: trip.advancePayment,
   balance_payment: trip.balancePayment,
-  // Colunas individuais no Banco
   os_doc: trip.osDoc || null,
   agendamento_doc: trip.agendamentoDoc || null,
   completo_doc: trip.completoDoc || null,
@@ -73,12 +72,43 @@ const mapDbToTrip = (d: any): Trip => ({
   statusHistory: d.status_history || d.statusHistory || [],
   advancePayment: d.advance_payment || d.advancePayment || { status: 'BLOQUEADO' },
   balancePayment: d.balance_payment || d.balancePayment || { status: 'AGUARDANDO_DOCS' },
-  // Mapeamento das colunas individuais
   osDoc: d.os_doc || d.osDoc,
   agendamentoDoc: d.agendamento_doc || d.agendamentoDoc,
   completoDoc: d.completo_doc || d.completoDoc,
   ocFormData: d.oc_form_data || d.ocFormData,
   preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData
+});
+
+/**
+ * MAPEAMENTO DE STAFF (COLABORADORES)
+ * Mapeia emailcorp e phonecorp do banco para emailCorp e phoneCorp no App
+ */
+const mapStaffToDb = (s: Staff) => ({
+  id: s.id,
+  name: s.name,
+  username: s.username,
+  role: s.role,
+  position: s.position,
+  registration_date: s.registrationDate,
+  status: s.status,
+  status_since: s.statusSince,
+  photo: s.photo,
+  emailcorp: s.emailCorp,
+  phonecorp: s.phoneCorp
+});
+
+const mapDbToStaff = (s: any): Staff => ({
+  id: s.id,
+  name: s.name,
+  username: s.username,
+  role: s.role,
+  position: s.position,
+  registrationDate: s.registration_date || s.registrationDate,
+  status: s.status,
+  statusSince: s.status_since || s.statusSince,
+  photo: s.photo,
+  emailCorp: s.emailcorp || s.emailCorp,
+  phoneCorp: s.phonecorp || s.phoneCorp
 });
 
 export const db = {
@@ -236,11 +266,26 @@ export const db = {
     return true;
   },
   getStaff: async (): Promise<Staff[]> => {
-    if (supabase) { try { const { data } = await supabase.from('staff').select('*'); if (data) { db._saveLocal(KEYS.STAFF, data); return data; } } catch (e) {} }
-    return db._getLocal(KEYS.STAFF);
+    if (supabase) { 
+      try { 
+        const { data, error } = await supabase.from('staff').select('*'); 
+        if (!error && data) { 
+          const mapped = data.map(mapDbToStaff);
+          db._saveLocal(KEYS.STAFF, mapped); 
+          return mapped; 
+        } 
+      } catch (e) {} 
+    }
+    const local = db._getLocal(KEYS.STAFF);
+    return local.map(mapDbToStaff);
   },
   saveStaff: async (staff: Staff, password?: string) => {
-    if (supabase) { try { await supabase.from('staff').upsert(staff); } catch (e) {} }
+    if (supabase) { 
+      try { 
+        const payload = mapStaffToDb(staff);
+        await supabase.from('staff').upsert(payload); 
+      } catch (e) {} 
+    }
     const current = db._getLocal(KEYS.STAFF);
     const idx = current.findIndex((s: any) => s.id === staff.id);
     if (idx >= 0) current[idx] = staff; else current.push(staff);

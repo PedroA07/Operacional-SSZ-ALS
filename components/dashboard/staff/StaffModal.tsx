@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Staff, User } from '../../../types';
 import { db } from '../../../utils/storage';
+import { maskPhone } from '../../../utils/masks';
 
 interface StaffModalProps {
   isOpen: boolean;
@@ -218,7 +219,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
                 </div>
                 <div className="space-y-1">
                    <label className={labelClass}>WhatsApp Operacional</label>
-                   <input className={inputClasses} value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: e.target.value})} placeholder="(13) 00000-0000" />
+                   <input className={inputClasses} value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: maskPhone(e.target.value)})} placeholder="(13) 00000-0000" />
                 </div>
              </div>
           </div>
