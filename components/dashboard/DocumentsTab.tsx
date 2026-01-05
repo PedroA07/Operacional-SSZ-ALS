@@ -12,7 +12,8 @@ interface DocumentsTabProps {
 const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip }) => {
   const [activeTab, setActiveTab] = useState<'pendentes' | 'concluidas' | 'canceladas'>('pendentes');
   const [activeCategory, setActiveCategory] = useState<string>('GERAL');
-  const [cancelDate, setCancelDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   const categories = useMemo(() => {
     const cats = new Set(trips.map(t => t.category).filter(Boolean));
@@ -37,21 +38,27 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
     reader.readAsDataURL(file);
   };
 
-  const pendingTrips = useMemo(() => 
-    trips.filter(t => t.status === 'Viagem concluída' && !t.documents?.some(d => d.type === 'COMPLETO')), 
-  [trips]);
+  const pendingTrips = useMemo(() => {
+    let list = trips.filter(t => t.status === 'Viagem concluída' && !t.documents?.some(d => d.type === 'COMPLETO'));
+    if (startDate) list = list.filter(t => t.dateTime >= startDate);
+    if (endDate) list = list.filter(t => t.dateTime <= endDate + 'T23:59:59');
+    return list;
+  }, [trips, startDate, endDate]);
 
   const finishedTrips = useMemo(() => {
     let list = trips.filter(t => t.status === 'Viagem concluída' && t.documents?.some(d => d.type === 'COMPLETO'));
     if (activeCategory !== 'GERAL') list = list.filter(t => t.category === activeCategory);
+    if (startDate) list = list.filter(t => t.dateTime >= startDate);
+    if (endDate) list = list.filter(t => t.dateTime <= endDate + 'T23:59:59');
     return list;
-  }, [trips, activeCategory]);
+  }, [trips, activeCategory, startDate, endDate]);
 
   const canceledTrips = useMemo(() => {
     let list = trips.filter(t => t.status === 'Viagem cancelada');
-    if (cancelDate) list = list.filter(t => t.dateTime.startsWith(cancelDate));
+    if (startDate) list = list.filter(t => t.dateTime >= startDate);
+    if (endDate) list = list.filter(t => t.dateTime <= endDate + 'T23:59:59');
     return list;
-  }, [trips, cancelDate]);
+  }, [trips, startDate, endDate]);
 
   const commonColumns = [
     { key: 'os', label: 'Nº OS', render: (t: Trip) => <span className="font-black text-blue-600">{t.os}</span> },
@@ -64,11 +71,25 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
           <button onClick={() => setActiveTab('pendentes')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'pendentes' ? 'bg-white text-blue-600 shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>Pendentes ({pendingTrips.length})</button>
           <button onClick={() => setActiveTab('concluidas')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'concluidas' ? 'bg-white text-emerald-600 shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>Viagens Concluídas</button>
           <button onClick={() => setActiveTab('canceladas')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'canceladas' ? 'bg-white text-red-600 shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>Canceladas</button>
+        </div>
+
+        <div className="flex gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+           <div className="space-y-1">
+              <label className="text-[7px] font-black text-slate-400 uppercase ml-1">De:</label>
+              <input type="date" className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={startDate} onChange={e => setStartDate(e.target.value)} />
+           </div>
+           <div className="space-y-1">
+              <label className="text-[7px] font-black text-slate-400 uppercase ml-1">Até:</label>
+              <input type="date" className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={endDate} onChange={e => setEndDate(e.target.value)} />
+           </div>
+           {(startDate || endDate) && (
+              <button onClick={() => { setStartDate(''); setEndDate(''); }} className="mt-4 text-[8px] font-black text-blue-600 uppercase hover:underline">Reset</button>
+           )}
         </div>
       </div>
 
@@ -128,13 +149,6 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
 
       {activeTab === 'canceladas' && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-4">
-             <div className="space-y-1">
-                <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Filtrar por Data</label>
-                <input type="date" className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold" value={cancelDate} onChange={e => setCancelDate(e.target.value)} />
-             </div>
-             {cancelDate && <button onClick={() => setCancelDate('')} className="mt-5 text-[8px] font-black text-blue-600 uppercase hover:underline">Limpar Data</button>}
-          </div>
           <SmartOperationTable 
             userId={userId}
             componentId="docs-canceled"

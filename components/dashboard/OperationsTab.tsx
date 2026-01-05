@@ -33,11 +33,17 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   
+  // Modal de Visualização de OS
+  const [isOSViewerOpen, setIsOSViewerOpen] = useState(false);
+  const [osViewConfig, setOsViewConfig] = useState({ url: '', title: '' });
+
   const [filterTypes, setFilterTypes] = useState<string[]>(['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM']);
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
   const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>('TODAS');
   const [filterSub, setFilterSub] = useState<string>('TODAS');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
 
   const loadData = async () => {
     const [t, c] = await Promise.all([db.getTrips(), db.getCategories()]);
@@ -85,8 +91,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setIsMinutaModalOpen(true);
   };
 
-  const handleDownloadMinuta = (trip: Trip) => {
-    alert(`Gerando Minuta Direta para OS: ${trip.os}`);
+  const handleViewOS = (url: string, title: string) => {
+    setOsViewConfig({ url, title });
+    setIsOSViewerOpen(true);
   };
 
   const filteredTrips = useMemo(() => {
@@ -98,15 +105,22 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver.name));
     
+    if (filterStartDate) {
+      result = result.filter(t => t.dateTime >= filterStartDate);
+    }
+    if (filterEndDate) {
+      result = result.filter(t => t.dateTime <= filterEndDate + 'T23:59:59');
+    }
+    
     return result;
-  }, [trips, filterCategory, filterSub, filterTypes, filterClientNames, filterDriverNames]);
+  }, [trips, filterCategory, filterSub, filterTypes, filterClientNames, filterDriverNames, filterStartDate, filterEndDate]);
 
   const columns = getOperationTableColumns(
     openStatusEditor,
     handleEditTrip,
     handleEditOC,
     handleEditMinuta,
-    handleDownloadMinuta,
+    handleViewOS,
     (id) => onDeleteTrip?.(id)
   );
 
@@ -151,20 +165,38 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         </div>
 
         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-           <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Visualizar Categoria Master</h3>
-           <div className="flex flex-wrap gap-3">
-              <button onClick={() => { setFilterCategory('TODAS'); setFilterSub('TODAS'); }} className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase ${filterCategory === 'TODAS' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500'}`}>Visão Geral</button>
-              {categories.filter(c => !c.parentId).map(cat => (
-                <button 
-                  key={cat.id} 
-                  onClick={() => { 
-                    setActiveView({ type: 'category', categoryName: cat.name });
-                  }} 
-                  className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-900 hover:text-white transition-all text-[10px] font-black uppercase"
-                >
-                  {cat.name}
-                </button>
-              ))}
+           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="flex-1">
+                 <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Visualizar Categoria Master</h3>
+                 <div className="flex flex-wrap gap-3">
+                    <button onClick={() => { setFilterCategory('TODAS'); setFilterSub('TODAS'); }} className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase ${filterCategory === 'TODAS' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500'}`}>Visão Geral</button>
+                    {categories.filter(c => !c.parentId).map(cat => (
+                      <button 
+                        key={cat.id} 
+                        onClick={() => { 
+                          setActiveView({ type: 'category', categoryName: cat.name });
+                        }} 
+                        className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-900 hover:text-white transition-all text-[10px] font-black uppercase"
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                 </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                 <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Início Período</label>
+                    <input type="date" className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Fim Período</label>
+                    <input type="date" className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
+                 </div>
+                 {(filterStartDate || filterEndDate) && (
+                   <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }} className="mb-1 text-[8px] font-black text-red-500 uppercase hover:underline">Limpar</button>
+                 )}
+              </div>
            </div>
         </div>
       </div>
@@ -249,6 +281,44 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                 <button onClick={() => setIsMinutaModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
               </div>
               <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaModalOpen(false); loadData(); }} initialOS={selectedTrip.os} />
+           </div>
+        </div>
+      )}
+
+      {/* MODAL VISUALIZADOR DE OS PDF */}
+      {isOSViewerOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-2xl animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col animate-in zoom-in-95">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                 <div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Visualizador de Dossiê OS</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Documento: {osViewConfig.title}</p>
+                 </div>
+                 <div className="flex gap-4">
+                    <button 
+                      onClick={() => {
+                        const printWindow = window.open('', '_blank');
+                        if (printWindow) {
+                          printWindow.document.write(`<html><body style="margin:0;padding:0;"><embed width="100%" height="100%" src="${osViewConfig.url}" type="application/pdf"></body></html>`);
+                          printWindow.document.close();
+                          setTimeout(() => printWindow.print(), 500);
+                        }
+                      }}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all"
+                    >
+                       Imprimir Documento
+                    </button>
+                    <button onClick={() => setIsOSViewerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+                 </div>
+              </div>
+              <div className="flex-1 bg-slate-100 relative">
+                 <iframe 
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    src={osViewConfig.url}
+                 ></iframe>
+              </div>
            </div>
         </div>
       )}

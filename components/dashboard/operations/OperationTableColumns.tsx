@@ -8,27 +8,50 @@ export const getOperationTableColumns = (
   onEditTrip: (t: Trip) => void,
   onEditOC: (t: Trip) => void,
   onEditMinuta: (t: Trip) => void,
-  onDownloadMinuta: (t: Trip) => void,
+  onViewOS: (url: string, title: string) => void,
   onDeleteTrip: (id: string) => void
 ) => {
   
   const handleOSUpload = (trip: Trip, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
     const reader = new FileReader();
     reader.onload = async () => {
+      // Regra de nomenclatura: OS - (nome do motorista) - N da OS
+      const customFileName = `OS - ${trip.driver.name} - ${trip.os}`;
+      
       const doc: TripDocument = { 
         id: `os-pdf-${Date.now()}`, 
         type: 'OS_PDF', 
         url: reader.result as string, 
-        fileName: file.name, 
+        fileName: customFileName, 
         uploadDate: new Date().toISOString() 
       };
-      const updated = { ...trip, documents: [...(trip.documents || []), doc] };
+
+      // Remove OS anterior se existir e adiciona a nova
+      const otherDocs = (trip.documents || []).filter(d => d.type !== 'OS_PDF');
+      const updated = { ...trip, documents: [...otherDocs, doc] };
+      
       await db.saveTrip(updated);
-      alert("PDF da OS anexado com sucesso!");
+      alert("Documento OS vinculado com sucesso!");
     };
     reader.readAsDataURL(file);
+  };
+
+  const handlePrintOS = (url: string) => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <body style="margin:0;padding:0;">
+            <embed width="100%" height="100%" src="${url}" type="application/pdf">
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 500);
+    }
   };
 
   return [
@@ -184,53 +207,83 @@ export const getOperationTableColumns = (
   {
     key: 'actions',
     label: '9. Opções',
-    render: (t: Trip) => (
-      <div className="flex flex-col gap-2 min-w-[120px]">
-        {/* EDITAR DADOS GERAIS */}
-        <button 
-          onClick={() => onEditTrip(t)} 
-          className="w-full flex items-center gap-2 px-3 py-2 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-sm"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-          <span className="text-[8px] font-black uppercase">Editar Viagem</span>
-        </button>
-
-        {/* ANEXAR OS PDF */}
-        <label className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all shadow-sm cursor-pointer border ${t.documents?.some(d => d.type === 'OS_PDF') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-400'}`}>
-          <input type="file" className="hidden" accept=".pdf" onChange={(e) => handleOSUpload(t, e)} />
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-          <span className="text-[8px] font-black uppercase">{t.documents?.some(d => d.type === 'OS_PDF') ? 'OS Anexada' : 'Anexar OS PDF'}</span>
-        </label>
-
-        {/* OC: EDITAR */}
-        {t.ocFormData && (
+    render: (t: Trip) => {
+      const osDoc = t.documents?.find(d => d.type === 'OS_PDF');
+      
+      return (
+        <div className="flex flex-col gap-2 min-w-[140px]">
+          {/* EDITAR DADOS GERAIS */}
           <button 
-            onClick={() => onEditOC(t)} 
-            className="w-full flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+            onClick={() => onEditTrip(t)} 
+            className="w-full flex items-center gap-2 px-3 py-2 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-sm"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            <span className="text-[8px] font-black uppercase">Editar OC</span>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            <span className="text-[8px] font-black uppercase">Editar Viagem</span>
           </button>
-        )}
 
-        {/* MINUTA PRE-STACKING FORM */}
-        <button 
-          onClick={() => onEditMinuta(t)} 
-          className="w-full flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-          <span className="text-[8px] font-black uppercase">Minuta PreS.</span>
-        </button>
+          {/* GESTÃO DE OS PDF */}
+          {osDoc ? (
+            <div className="space-y-1 p-2 bg-emerald-50 rounded-xl border border-emerald-100">
+               <p className="text-[7px] font-black text-emerald-600 uppercase mb-1">Dossiê OS PDF</p>
+               <div className="grid grid-cols-3 gap-1">
+                  <button 
+                    onClick={() => onViewOS(osDoc.url, osDoc.fileName)}
+                    className="p-1.5 bg-white text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+                    title="Visualizar OS"
+                  >
+                    <svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  </button>
+                  <button 
+                    onClick={() => handlePrintOS(osDoc.url)}
+                    className="p-1.5 bg-white text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm border border-blue-100"
+                    title="Imprimir OS"
+                  >
+                    <svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
+                  </button>
+                  <label className="p-1.5 bg-white text-amber-600 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm border border-amber-100 cursor-pointer">
+                    <input type="file" className="hidden" accept=".pdf" onChange={(e) => handleOSUpload(t, e)} />
+                    <svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  </label>
+               </div>
+            </div>
+          ) : (
+            <label className="w-full flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-500 rounded-xl hover:border-blue-400 transition-all shadow-sm cursor-pointer group">
+              <input type="file" className="hidden" accept=".pdf" onChange={(e) => handleOSUpload(t, e)} />
+              <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+              <span className="text-[8px] font-black uppercase">Anexar OS PDF</span>
+            </label>
+          )}
 
-        {/* EXCLUIR */}
-        <button 
-          onClick={() => onDeleteTrip(t.id)} 
-          className="w-full flex items-center gap-2 px-3 py-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
-          <span className="text-[8px] font-black uppercase">Remover</span>
-        </button>
-      </div>
-    )
+          {/* OC: EDITAR */}
+          {t.ocFormData && (
+            <button 
+              onClick={() => onEditOC(t)} 
+              className="w-full flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <span className="text-[8px] font-black uppercase">Editar OC</span>
+            </button>
+          )}
+
+          {/* MINUTA PRE-STACKING FORM */}
+          <button 
+            onClick={() => onEditMinuta(t)} 
+            className="w-full flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+            <span className="text-[8px] font-black uppercase">Minuta PreS.</span>
+          </button>
+
+          {/* EXCLUIR */}
+          <button 
+            onClick={() => onDeleteTrip(t.id)} 
+            className="w-full flex items-center gap-2 px-3 py-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm group"
+          >
+            <svg className="w-3.5 h-3.5 text-red-300 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+            <span className="text-[8px] font-black uppercase">Remover</span>
+          </button>
+        </div>
+      )
+    }
   }
 ]};

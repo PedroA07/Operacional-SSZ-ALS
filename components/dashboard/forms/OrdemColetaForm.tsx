@@ -36,6 +36,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
 
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
+  const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
 
   const [formData, setFormData] = useState(initialData || {
     date: new Date().toISOString().split('T')[0],
@@ -131,30 +132,29 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
   const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
 
-  const startDownloadWorkflow = async () => {
+  const startWorkflow = async (mode: 'download' | 'print') => {
     if (!formData.os || !selectedDriver || !selectedRemetente) {
       alert("Preencha OS, Motorista e Cliente para prosseguir.");
       return;
     }
 
+    setPendingAction(mode);
     const existing = await tripSyncService.findExistingTrip(formData.os);
     if (existing) {
       setExistingTrip(existing);
       setShowSyncModal(true);
     } else {
-      await executeSyncAndDownload(null);
+      await executeWorkflow(null);
     }
   };
 
-  const executeSyncAndDownload = async (existingId: string | null) => {
+  const executeWorkflow = async (existingId: string | null) => {
     setIsExporting(true);
     setShowSyncModal(false);
     
     try {
       const finalCategory = detectedCategory || manualCategory || 'Geral';
-      
       await osCategoryService.syncVinculos(finalCategory, selectedDriver, selectedRemetente);
-
       const tripData = tripSyncService.mapOCtoTrip(formData, selectedDriver!, selectedRemetente!, finalCategory, selectedDestinatario);
       await tripSyncService.sync(tripData, existingId || undefined);
 
@@ -169,13 +169,27 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       
       const driverName = selectedDriver?.name || 'MOTORISTA';
       const osNum = formData.os || 'SEM_OS';
-      pdf.save(`OC - ${driverName} - ${osNum}.pdf`);
+      const fileName = `OC - ${driverName} - ${osNum}.pdf`;
+
+      if (pendingAction === 'print') {
+        const blob = pdf.output('blob');
+        const url = URL.createObjectURL(blob);
+        const win = window.open(url, '_blank');
+        if (win) {
+          win.onload = () => {
+             win.focus();
+             win.print();
+          };
+        }
+      } else {
+        pdf.save(fileName);
+      }
       
     } catch (e) { 
       console.error(e); 
-      alert("Erro ao processar sincronização.");
     } finally { 
       setIsExporting(false); 
+      setPendingAction(null);
     }
   };
 
@@ -240,7 +254,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
 
               <div className="p-10 bg-slate-50 border-t border-slate-100 flex gap-4">
                  <button onClick={() => setShowSyncModal(false)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-100 transition-all">Cancelar Emissão</button>
-                 <button onClick={() => executeSyncAndDownload(existingTrip.id)} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Substituir e Baixar PDF</button>
+                 <button onClick={() => executeWorkflow(existingTrip.id)} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Substituir e {pendingAction === 'print' ? 'Imprimir' : 'Baixar'}</button>
               </div>
            </div>
         </div>
@@ -388,24 +402,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
               </select>
             </div>
           </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Tipo Operação</label>
-            <select 
-              className={inputClasses} 
-              value={formData.tipoOperacao} 
-              onChange={e => handleInputChange('tipoOperacao', e.target.value)}
-            >
-              <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
-              <option value="CABOTAGEM">CABOTAGEM</option>
-              <option value="ENTREGA">ENTREGA</option>
-              <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
-          <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
         </div>
 
         <div className="relative">
@@ -420,20 +416,16 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           )}
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Aut. de Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} /></div>
-            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Horário Agendado</label>
-            <input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm" value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+           <button disabled={isExporting} onClick={() => startWorkflow('print')} className="py-5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
+             Imprimir
+           </button>
+           <button disabled={isExporting} onClick={() => startWorkflow('download')} className="py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-2">
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+             Baixar PDF
+           </button>
         </div>
-
-        <button disabled={isExporting} onClick={startDownloadWorkflow} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
-          {isExporting ? 'PROCESSANDO...' : 'SINCRONIZAR E BAIXAR OC'}
-        </button>
       </div>
 
       <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
