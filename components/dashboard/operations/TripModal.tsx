@@ -31,11 +31,23 @@ const TripModal: React.FC<TripModalProps> = ({
   const [ports, setPorts] = useState<(Port | PreStacking)[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [autoFilledAgencia, setAutoFilledAgencia] = useState(false);
+  
   const [form, setForm] = useState<any>({
     os: '', booking: '', ship: '', dateTime: '', type: 'EXPORTAÇÃO', status: 'Pendente',
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
     containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: '', autColeta: ''
   });
+
+  // Utilitário para converter data ISO (UTC) para string local compatível com input datetime-local
+  const formatISOToLocalInput = (isoString: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '';
+    // Ajusta o fuso horário para o local antes de fazer o slice
+    const offset = date.getTimezoneOffset() * 60000;
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().slice(0, 16);
+  };
 
   useEffect(() => {
     const loadPorts = async () => {
@@ -49,8 +61,10 @@ const TripModal: React.FC<TripModalProps> = ({
     if (editTrip) {
       setForm({
         ...editTrip,
-        dateTime: editTrip.dateTime?.slice(0, 16),
-        agencia: editTrip.ocFormData?.agencia || editTrip.containerType || '',
+        // CORREÇÃO 1: Formata a data corretamente para o input local evitando saltos de horas
+        dateTime: formatISOToLocalInput(editTrip.dateTime),
+        // CORREÇÃO 2: Remove o fallback do containerType para não vir 40HC no Armador
+        agencia: editTrip.ocFormData?.agencia || '',
         padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
         embarcador: editTrip.ocFormData?.embarcador || '',
         autColeta: editTrip.ocFormData?.autColeta || '',
@@ -122,6 +136,7 @@ const TripModal: React.FC<TripModalProps> = ({
       const payload = {
         ...form,
         id: tripId,
+        // Ao salvar, o JavaScript converte a string local de volta para o objeto Date/ISO corretamente
         dateTime: new Date(form.dateTime).toISOString(),
         isLate: editTrip?.isLate || false,
         documents: editTrip?.documents || [],
