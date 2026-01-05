@@ -8,8 +8,8 @@ import SchedulingEditModal from './operations/SchedulingEditModal';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
-import OrdemColetaForm from './forms/OrdemColetaForm';
-import PreStackingForm from './forms/PreStackingForm';
+import OrdemColetaForm from '../forms/OrdemColetaForm';
+import PreStackingForm from '../forms/PreStackingForm';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
 interface OperationsTabProps {
@@ -38,9 +38,22 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [docViewConfig, setDocViewConfig] = useState({ url: '', title: '' });
 
-  const [filterTypes, setFilterTypes] = useState<string[]>(['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM']);
-  const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
-  const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
+  // Estados de Filtro com Inicialização via LocalStorage
+  const [filterTypes, setFilterTypes] = useState<string[]>(() => {
+    const saved = localStorage.getItem('als_filter_types');
+    return saved ? JSON.parse(saved) : ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
+  });
+  
+  const [filterClientNames, setFilterClientNames] = useState<string[]>(() => {
+    const saved = localStorage.getItem('als_filter_clients');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [filterDriverNames, setFilterDriverNames] = useState<string[]>(() => {
+    const saved = localStorage.getItem('als_filter_drivers');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [filterCategory, setFilterCategory] = useState<string>('TODAS');
   const [filterSub, setFilterSub] = useState<string>('TODAS');
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -54,16 +67,41 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   useEffect(() => { 
     loadData(); 
-    setFilterClientNames(customers.map(c => c.name));
-    setFilterDriverNames(drivers.map(d => d.name));
+  }, []);
+
+  // Inicialização padrão caso não haja filtros salvos (Apenas na primeira carga dos dados)
+  useEffect(() => {
+    if (customers.length > 0 && filterClientNames.length === 0 && !localStorage.getItem('als_filter_clients')) {
+      setFilterClientNames(customers.map(c => c.name));
+    }
+    if (drivers.length > 0 && filterDriverNames.length === 0 && !localStorage.getItem('als_filter_drivers')) {
+      setFilterDriverNames(drivers.map(d => d.name));
+    }
   }, [customers, drivers]);
+
+  // Salvar filtros no LocalStorage sempre que mudarem
+  useEffect(() => {
+    localStorage.setItem('als_filter_types', JSON.stringify(filterTypes));
+  }, [filterTypes]);
+
+  useEffect(() => {
+    if (filterClientNames.length > 0) {
+      localStorage.setItem('als_filter_clients', JSON.stringify(filterClientNames));
+    }
+  }, [filterClientNames]);
+
+  useEffect(() => {
+    if (filterDriverNames.length > 0) {
+      localStorage.setItem('als_filter_drivers', JSON.stringify(filterDriverNames));
+    }
+  }, [filterDriverNames]);
 
   const openStatusEditor = (trip: Trip, status: TripStatus) => {
     setSelectedTrip(trip);
     setTempStatus(status);
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    setStatusTime(now.toISOString().slice(0, 16));
+    statusTime && setStatusTime(now.toISOString().slice(0, 16));
     setIsStatusModalOpen(true);
   };
 
@@ -168,6 +206,20 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     'Viagem cancelada'
   ];
 
+  const handleClearAllFilters = () => {
+    const allTypes = ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
+    const allClients = customers.map(c => c.name);
+    const allDrivers = drivers.map(d => d.name);
+    
+    setFilterTypes(allTypes);
+    setFilterClientNames(allClients);
+    setFilterDriverNames(allDrivers);
+    
+    localStorage.setItem('als_filter_types', JSON.stringify(allTypes));
+    localStorage.setItem('als_filter_clients', JSON.stringify(allClients));
+    localStorage.setItem('als_filter_drivers', JSON.stringify(allDrivers));
+  };
+
   if (activeView.type !== 'list') {
     return (
       <GenericOperationView 
@@ -217,10 +269,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
               <div className="flex gap-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
                  <div className="space-y-1">
                     <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Início Período</label>
+                    {/* Fixed Error: Changed setStartDate to setFilterStartDate */}
                     <input type="date" className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
                  </div>
                  <div className="space-y-1">
                     <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Fim Período</label>
+                    {/* Fixed Error: Changed setEndDate to setFilterEndDate */}
                     <input type="date" className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
                  </div>
                  {(filterStartDate || filterEndDate) && (
@@ -241,6 +295,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         customers={customers}
         drivers={drivers}
       />
+
+      <div className="flex justify-end -mt-4 mb-2 px-4">
+        <button onClick={handleClearAllFilters} className="text-[8px] font-black text-slate-400 uppercase hover:text-blue-600 transition-colors tracking-widest bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm">Resetar Preferências de Filtro</button>
+      </div>
 
       <SmartOperationTable 
         userId={user.id} 
