@@ -382,14 +382,17 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
           <p className={labelClass}>3. Dados do Equipamento</p>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
+            <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} placeholder="ABCD1234567" /></div>
             <div className="space-y-1"><label className={labelClass}>Genset</label><input className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={labelClass}>Tara</label><input className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
             <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
           </div>
-          <div className="space-y-1"><label className={labelClass}>Armador</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
+          <div className="space-y-1">
+            <label className={labelClass}>Armador / Agência</label>
+            <input className={`${inputClasses} ${formData.agencia ? 'bg-blue-50 border-blue-200' : ''}`} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className={labelClass}>Tipo</label>

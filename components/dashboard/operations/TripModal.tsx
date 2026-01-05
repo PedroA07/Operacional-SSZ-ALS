@@ -30,6 +30,7 @@ const TripModal: React.FC<TripModalProps> = ({
 }) => {
   const [ports, setPorts] = useState<(Port | PreStacking)[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [autoFilledAgencia, setAutoFilledAgencia] = useState(false);
   const [form, setForm] = useState<any>({
     os: '', booking: '', ship: '', dateTime: '', type: 'EXPORTAÇÃO', status: 'Pendente',
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
@@ -91,6 +92,11 @@ const TripModal: React.FC<TripModalProps> = ({
     const container = val.toUpperCase();
     const carrier = lookupCarrierByContainer(container);
     
+    if (carrier) {
+      setAutoFilledAgencia(true);
+      setTimeout(() => setAutoFilledAgencia(false), 2000);
+    }
+
     setForm(prev => ({
       ...prev,
       container,
@@ -105,7 +111,6 @@ const TripModal: React.FC<TripModalProps> = ({
 
     try {
       const tripId = editTrip?.id || `trip-${Date.now()}`;
-      
       const finalCategory = form.category || 'Geral';
       const driverObj = drivers.find(d => d.id === form.driver?.id);
       const customerObj = customers.find(c => c.id === form.customer?.id);
@@ -143,7 +148,7 @@ const TripModal: React.FC<TripModalProps> = ({
   if (!isOpen) return null;
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
-  const inputClass = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 shadow-sm";
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 shadow-sm";
   const selectClass = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none cursor-pointer shadow-sm";
 
   return (
@@ -233,7 +238,7 @@ const TripModal: React.FC<TripModalProps> = ({
              <div className="grid grid-cols-12 gap-4">
                 <div className="col-span-4 space-y-1">
                    <label className={labelClass}>Nº Container</label>
-                   <input required className={inputClass} value={form.container} onChange={e => handleContainerChange(e.target.value)} />
+                   <input required className={inputClass} value={form.container} onChange={e => handleContainerChange(e.target.value)} placeholder="ABCD1234567" />
                 </div>
                 <div className="col-span-3 space-y-1">
                    <label className={labelClass}>Tipo</label>
@@ -246,7 +251,7 @@ const TripModal: React.FC<TripModalProps> = ({
                 </div>
                 <div className="col-span-3 space-y-1">
                    <label className={labelClass}>Armador / Agência</label>
-                   <input className={inputClass} value={form.agencia} onChange={e => setForm({...form, agencia: e.target.value.toUpperCase()})} />
+                   <input className={`${inputClass} ${autoFilledAgencia ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`} value={form.agencia} onChange={e => setForm({...form, agencia: e.target.value.toUpperCase()})} />
                 </div>
                 <div className="col-span-2 space-y-1">
                    <label className={labelClass}>CVA</label>

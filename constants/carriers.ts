@@ -6,63 +6,74 @@ export interface Carrier {
 }
 
 /**
- * Mapeamento de Armadores e seus respectivos prefixos registrados no BIC (bic-code.org)
+ * Mapeamento exaustivo de Armadores e seus respectivos prefixos BIC (ISO 6346).
+ * Referência atualizada conforme Bureau International des Containers.
  */
 export const CARRIERS: Carrier[] = [
   {
     name: 'MSC',
-    prefixes: ['MEDU', 'MSCU', 'MSCU', 'TCLU', 'TTNU', 'GLDU'],
+    prefixes: ['MEDU', 'MSCU', 'MSCU', 'TCLU', 'TTNU', 'GLDU', 'MCQU'],
     sealPattern: 'MSC'
   },
   {
     name: 'MAERSK',
-    prefixes: ['MAEU', 'MSKU', 'PONU', 'MRKU', 'RKLU'],
+    prefixes: ['MAEU', 'MSKU', 'PONU', 'MRKU', 'RKLU', 'MCPU', 'MSLU'],
     sealPattern: 'MAERSK'
   },
   {
     name: 'HAMBURG SUD',
-    prefixes: ['SUDU', 'HASU', 'SUDU'],
+    prefixes: ['SUDU', 'HASU', 'SUXU'],
     sealPattern: 'MAERSK'
   },
   {
     name: 'CMA CGM',
-    prefixes: ['CMAU', 'APZU', 'CNXU', 'CGMU', 'TOLU'],
+    prefixes: ['CMAU', 'APZU', 'CNXU', 'CGMU', 'TOLU', 'ANXU'],
     sealPattern: 'CMA'
   },
   {
     name: 'HAPAG-LLOYD',
-    prefixes: ['HLCU', 'HAMU', 'UASC', 'CPPU', 'HLBU'],
+    prefixes: ['HLCU', 'HAMU', 'UASC', 'CPPU', 'HLBU', 'AMFU'],
     sealPattern: 'HAPAG'
   },
   {
-    name: 'ONE',
-    prefixes: ['ONEU', 'NYKU', 'MOLU', 'KKFU', 'KLINE'],
+    name: 'ONE (OCEAN NETWORK EXPRESS)',
+    prefixes: ['ONEU', 'NYKU', 'MOLU', 'KKFU', 'KLINE', 'BSLU'],
     sealPattern: 'GENERIC'
   },
   {
     name: 'EVERGREEN',
-    prefixes: ['EGCU', 'EMCU', 'UGMU', 'EISU'],
-    sealPattern: 'GENERIC'
-  },
-  {
-    name: 'ZIM',
-    prefixes: ['ZIMU', 'ZCSU', 'ZUXU'],
+    prefixes: ['EGCU', 'EMCU', 'UGMU', 'EISU', 'GAOU'],
     sealPattern: 'GENERIC'
   },
   {
     name: 'COSCO',
-    prefixes: ['COSU', 'CHLU', 'CCLU', 'FESU'],
+    prefixes: ['COSU', 'CHLU', 'CCLU', 'FESU', 'JKLU'],
     sealPattern: 'GENERIC'
   },
   {
     name: 'ALIANÇA',
-    prefixes: ['ALXU', 'ALNU', 'ALBU'],
+    prefixes: ['ALXU', 'ALNU', 'ALBU', 'HAMU'],
     sealPattern: 'MAERSK'
   },
   {
-    name: 'MERCOSUL',
-    prefixes: ['MNCU', 'MSRU'],
+    name: 'MERCOSUL LINE',
+    prefixes: ['MNCU', 'MSRU', 'MERU'],
     sealPattern: 'MAERSK'
+  },
+  {
+    name: 'ZIM',
+    prefixes: ['ZIMU', 'ZCSU', 'ZUXU', 'ZIAU'],
+    sealPattern: 'GENERIC'
+  },
+  {
+    name: 'HMM (HYUNDAI)',
+    prefixes: ['HDMU', 'HMMU'],
+    sealPattern: 'GENERIC'
+  },
+  {
+    name: 'YANG MING',
+    prefixes: ['YMLU', 'YMMU'],
+    sealPattern: 'GENERIC'
   },
   {
     name: 'WAN HAI',
@@ -70,8 +81,8 @@ export const CARRIERS: Carrier[] = [
     sealPattern: 'GENERIC'
   },
   {
-    name: 'YANG MING',
-    prefixes: ['YMLU', 'YMMU'],
+    name: 'LOG-IN',
+    prefixes: ['LGIU', 'LOGU'],
     sealPattern: 'GENERIC'
   }
 ];
