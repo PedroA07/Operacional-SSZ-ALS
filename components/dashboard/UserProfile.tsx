@@ -92,28 +92,41 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
           </div>
           
           <div className="p-6 space-y-5">
-             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Duração da Sessão</p>
-                <p className="text-2xl font-black text-slate-800 font-mono tracking-tighter">{sessionTime}</p>
+             <div className="bg-slate-900 p-5 rounded-3xl border border-white/5 shadow-inner">
+                <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1.5">Tempo de Conexão Ativa</p>
+                <p className="text-3xl font-black text-white font-mono tracking-tighter leading-none">{sessionTime}</p>
              </div>
              
-             <div className="space-y-3 px-2 pt-2">
-                <div className="flex justify-between items-center">
-                   <span className="text-[8px] font-black text-slate-400 uppercase">Cargo / Função</span>
-                   <span className="text-[9px] font-bold text-slate-700 uppercase">{user.position || 'OPERACIONAL'}</span>
+             <div className="space-y-4 pt-2">
+                <div className="flex items-start gap-4">
+                   <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeWidth="2.5"/></svg>
+                   </div>
+                   <div className="min-w-0">
+                      <p className="text-[8px] font-black text-slate-400 uppercase leading-none">E-mail Corporativo</p>
+                      <p className="text-[11px] font-bold text-slate-700 truncate mt-1 lowercase">{staffData?.emailCorp || '---'}</p>
+                   </div>
                 </div>
-                {/* Novos campos de contato adicionados conforme solicitação */}
-                <div className="flex justify-between items-center border-t border-slate-50 pt-2">
-                   <span className="text-[8px] font-black text-slate-400 uppercase">E-mail Corp.</span>
-                   <span className="text-[9px] font-bold text-blue-600 lowercase">{staffData?.emailCorp || '---'}</span>
+
+                <div className="flex items-start gap-4">
+                   <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" strokeWidth="2.5"/></svg>
+                   </div>
+                   <div className="min-w-0">
+                      <p className="text-[8px] font-black text-slate-400 uppercase leading-none">Telefone ALS</p>
+                      <p className="text-[11px] font-bold text-slate-700 mt-1">{staffData?.phoneCorp || '---'}</p>
+                   </div>
                 </div>
-                <div className="flex justify-between items-center">
-                   <span className="text-[8px] font-black text-slate-400 uppercase">Telefone Corp.</span>
-                   <span className="text-[9px] font-bold text-slate-700">{staffData?.phoneCorp || '---'}</span>
-                </div>
-                <div className="flex justify-between items-center border-t border-slate-50 pt-2">
-                   <span className="text-[8px] font-black text-slate-400 uppercase">Data Admissão</span>
-                   <span className="text-[9px] font-bold text-slate-700">{formatDate(staffData?.registrationDate)}</span>
+
+                <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+                   <div className="flex flex-col">
+                      <span className="text-[8px] font-black text-slate-300 uppercase">Admissão</span>
+                      <span className="text-[10px] font-bold text-slate-500">{formatDate(staffData?.registrationDate)}</span>
+                   </div>
+                   <div className="text-right flex flex-col">
+                      <span className="text-[8px] font-black text-slate-300 uppercase">Cargo</span>
+                      <span className="text-[10px] font-black text-blue-600 uppercase">{user.position || 'OPERAÇÕES'}</span>
+                   </div>
                 </div>
              </div>
           </div>
