@@ -103,7 +103,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     const upValue = value.toUpperCase();
     
     setFormData(prev => {
-      let next = { ...prev, [field]: upValue };
+      let next = { ...prev, [field]: (field === 'horarioAgendado' || field === 'obs') ? value : upValue };
 
       if (field === 'os') {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
@@ -142,14 +142,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     const existing = await tripSyncService.findExistingTrip(formData.os);
     
     if (existing) {
-      // NOVA REGRA: Verifica se houve alteração real
       const hasChanges = tripSyncService.hasChanges(existing, formData, selectedDriver.id, selectedRemetente.id);
       
       if (hasChanges) {
         setExistingTrip(existing);
         setShowSyncModal(true);
       } else {
-        // Se é identico, executa sem perguntar nada
         await executeWorkflow(existing.id);
       }
     } else {
@@ -178,14 +176,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       
       const driverName = selectedDriver?.name || 'MOTORISTA';
       const osNum = formData.os || 'SEM_OS';
-      const fileName = `OC - ${driverName} - ${osNum}.pdf`;
+      const fileName = `OC - ${driverName} - ${osNum}`;
 
       if (pendingAction === 'print') {
         const blob = pdf.output('blob');
         const url = URL.createObjectURL(blob);
         const win = window.open(url, '_blank');
         if (win) {
-          // Define título para nome do arquivo na impressão
           win.document.title = fileName;
           win.onload = () => {
              win.focus();
@@ -193,7 +190,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           };
         }
       } else {
-        pdf.save(fileName);
+        pdf.save(`${fileName}.pdf`);
       }
       
     } catch (e) { 
@@ -204,7 +201,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     }
   };
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
+  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
 
@@ -264,7 +261,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
               </div>
 
               <div className="p-10 bg-slate-50 border-t border-slate-100 flex gap-4">
-                 <button onClick={() => setShowSyncModal(false)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-100 transition-all">Cancelar Emissão</button>
+                 <button onClick={() => setShowSyncModal(false)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-100 transition-all">Cancelar</button>
                  <button onClick={() => executeWorkflow(existingTrip.id)} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Substituir e {pendingAction === 'print' ? 'Imprimir' : 'Baixar'}</button>
               </div>
            </div>
@@ -383,7 +380,23 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>3. Dados do Equipamento</p>
+          <p className={labelClass}>3. Dados da Operação (Logística)</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="EX: MAERSK..." /></div>
+            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} placeholder="ABC12345" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className={labelClass}>Aut. Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} /></div>
+            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
+          </div>
+          <div className="space-y-1">
+             <label className={labelClass}>Data e Hora Agendamento</label>
+             <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+          <p className={labelClass}>4. Dados do Equipamento</p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
             <div className="space-y-1"><label className={labelClass}>Genset</label><input className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>

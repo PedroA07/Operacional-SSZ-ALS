@@ -18,7 +18,7 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
   const [form, setForm] = useState<any>({
     os: '', booking: '', ship: '', dateTime: '', type: 'EXPORTAÇÃO', status: 'Pendente',
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
-    containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: ''
+    containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: '', autColeta: ''
   });
 
   useEffect(() => {
@@ -38,6 +38,7 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
         agencia: editTrip.ocFormData?.agencia || editTrip.containerType || '',
         padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
         embarcador: editTrip.ocFormData?.embarcador || '',
+        autColeta: editTrip.ocFormData?.autColeta || '',
         obs: editTrip.ocFormData?.obs || ''
       });
     } else {
@@ -45,7 +46,7 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
         os: '', booking: '', ship: '', dateTime: new Date().toISOString().slice(0, 16), 
         type: 'EXPORTAÇÃO', status: 'Pendente',
         category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
-        containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: ''
+        containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: '', autColeta: ''
       });
     }
   }, [editTrip, isOpen]);
@@ -148,7 +149,7 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
                <label className={labelClass}>Destino (Porto / Entrega)</label>
                <select required className={selectClass} value={form.destination?.id} onChange={e => {
                  const p = ports.find(pt => pt.id === e.target.value);
-                 if (p) setForm({...form, destination: { id: p.id, name: p.name, legalName: (p as any).legalName, cnpj: (p as any).cnpj, city: p.city, state: p.state }});
+                 if (p) setForm({...form, destination: { id: p.id, name: p.name, legalName: p.legalName, cnpj: p.cnpj, city: p.city, state: p.state }});
                }}>
                  <option value="">Selecione o destino...</option>
                  {ports.map(p => <option key={p.id} value={p.id}>{p.legalName || p.name} ({p.city})</option>)}
@@ -205,8 +206,19 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
              </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-6">
+             <div className="space-y-1">
+                <label className={labelClass}>Aut. Coleta</label>
+                <input className={inputClass} value={form.autColeta} onChange={e => setForm({...form, autColeta: e.target.value.toUpperCase()})} />
+             </div>
+             <div className="space-y-1">
+                <label className={labelClass}>Embarcador</label>
+                <input className={inputClass} value={form.embarcador} onChange={e => setForm({...form, embarcador: e.target.value.toUpperCase()})} />
+             </div>
+          </div>
+
           <div className="space-y-1">
-             <label className={labelClass}>Embarcador / Observações</label>
+             <label className={labelClass}>Observações Adicionais</label>
              <textarea className={`${inputClass} h-24 resize-none normal-case`} value={form.obs} onChange={e => setForm({...form, obs: e.target.value})} placeholder="Instruções de carregamento..." />
           </div>
 

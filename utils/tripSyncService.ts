@@ -20,7 +20,10 @@ export const tripSyncService = {
       (existing.ship || '').toUpperCase() !== (currentForm.ship || '').toUpperCase(),
       (existing.containerType || '').toUpperCase() !== (currentForm.tipo || '').toUpperCase(),
       (existing.seal || '').toUpperCase() !== (currentForm.seal || '').toUpperCase(),
-      (existing.destination?.id || '') !== (currentForm.destinatarioId || '')
+      (existing.destination?.id || '') !== (currentForm.destinatarioId || ''),
+      (existing.ocFormData?.autColeta || '') !== (currentForm.autColeta || ''),
+      (existing.ocFormData?.embarcador || '') !== (currentForm.embarcador || ''),
+      (existing.dateTime || '').slice(0,16) !== (currentForm.horarioAgendado || '').slice(0,16)
     ];
     return diffs.some(d => d === true);
   },
@@ -51,8 +54,8 @@ export const tripSyncService = {
       destination: destination ? {
         id: destination.id,
         name: destination.name,
-        legalName: (destination as any).legalName,
-        cnpj: (destination as any).cnpj,
+        legalName: destination.legalName,
+        cnpj: destination.cnpj,
         city: destination.city,
         state: destination.state
       } : undefined,
