@@ -34,7 +34,6 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
       setForm({
         ...editTrip,
         dateTime: editTrip.dateTime?.slice(0, 16),
-        // Garante campos extras vindos da OC se existirem
         agencia: editTrip.ocFormData?.agencia || editTrip.containerType || '',
         padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
         embarcador: editTrip.ocFormData?.embarcador || '',
@@ -64,7 +63,6 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
       statusHistory: editTrip?.statusHistory || [{ status: 'Pendente', dateTime: new Date().toISOString() }],
       advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },
       balancePayment: editTrip?.balancePayment || { status: 'AGUARDANDO_DOCS' },
-      // Sincroniza dados extras para o ocFormData
       ocFormData: {
         ...form,
         horarioAgendado: new Date(form.dateTime).toISOString()
@@ -95,7 +93,7 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
         <form onSubmit={handleSubmit} className="p-10 space-y-6 overflow-y-auto custom-scrollbar flex-1 bg-[#f8fafc]">
           
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
-             <div className="grid grid-cols-3 gap-6">
+             <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <label className={labelClass}>Tipo de Operação</label>
                   <select required className={selectClass} value={form.type} onChange={e => setForm({...form, type: e.target.value as any})}>
@@ -106,40 +104,35 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
                     <option value="CABOTAGEM">CABOTAGEM</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className={labelClass}>Categoria Master</label>
-                  <select required className={selectClass} value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
-                    <option value="">Selecione...</option>
-                    {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className={labelClass}>Vínculo / Filtro</label>
-                  <select className={selectClass} value={form.subCategory} onChange={e => setForm({...form, subCategory: e.target.value})}>
-                    <option value="">Geral</option>
-                    {categories.filter(c => c.parentId && categories.find(p => p.id === c.parentId)?.name === form.category).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  </select>
-                </div>
-             </div>
-
-             <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className={labelClass}>Nº Ordem de Serviço (OS)</label>
-                  <input required className={inputClass} value={form.os} onChange={e => setForm({...form, os: e.target.value.toUpperCase()})} />
-                </div>
                 <div>
                   <label className={labelClass}>Data/Hora Agenda</label>
                   <input required type="datetime-local" className={inputClass} value={form.dateTime} onChange={e => setForm({...form, dateTime: e.target.value})} />
                 </div>
              </div>
+
+             <div className="space-y-1">
+                <label className={labelClass}>Nº Ordem de Serviço (OS)</label>
+                <input required className={inputClass} value={form.os} onChange={e => setForm({...form, os: e.target.value.toUpperCase()})} />
+             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-               <label className={labelClass}>Cliente (Contratante)</label>
+               <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block">Cliente (Contratante)</label>
                <select required className={selectClass} value={form.customer?.id} onChange={e => {
                  const c = customers.find(cust => cust.id === e.target.value);
-                 if (c) setForm({...form, customer: { id: c.id, name: c.name, legalName: c.legalName, cnpj: c.cnpj, city: c.city, state: c.state }});
+                 if (c) {
+                    // Lógica de Vínculo Automático:
+                    // 1. Pega a primeira operação do cliente se existir (ex: Aliança)
+                    const autoCategory = (c.operations && c.operations.length > 0) ? c.operations[0] : form.category;
+                    
+                    setForm({
+                      ...form, 
+                      customer: { id: c.id, name: c.name, legalName: c.legalName, cnpj: c.cnpj, city: c.city, state: c.state },
+                      category: autoCategory, // Seta Master automática
+                      subCategory: c.name // Seta Vínculo automático com o nome fantasia
+                    });
+                 }
                }}>
                  <option value="">Selecione o cliente...</option>
                  {customers.map(c => <option key={c.id} value={c.id}>{c.legalName || c.name}</option>)}
@@ -155,6 +148,22 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
                  {ports.map(p => <option key={p.id} value={p.id}>{p.legalName || p.name} ({p.city})</option>)}
                </select>
             </div>
+          </div>
+
+          {/* CATEGORIAS AGORA COM POSSIBILIDADE DE AJUSTE MANUAL APÓS O AUTO-PREENCHIMENTO */}
+          <div className="grid grid-cols-2 gap-6 p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200">
+             <div className="space-y-1">
+                <label className={labelClass}>Categoria Master (Classificação)</label>
+                <select required className={selectClass} value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
+                  <option value="">Selecione...</option>
+                  {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+             </div>
+             <div className="space-y-1">
+                <label className={labelClass}>Vínculo / Filtro (Subcategoria)</label>
+                <input className={inputClass} placeholder="Geral" value={form.subCategory} onChange={e => setForm({...form, subCategory: e.target.value.toUpperCase()})} />
+                <p className="text-[7px] text-slate-400 font-bold uppercase mt-1 ml-1">* Preenchido automaticamente com o nome do cliente.</p>
+             </div>
           </div>
 
           <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 space-y-6">
