@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category } from '../types';
+import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType } from '../types';
 import { driverRepository } from './driverRepository';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
@@ -17,74 +17,9 @@ export const KEYS = {
   USERS: 'als_users',
   TRIPS: 'als_trips',
   CATEGORIES: 'als_categories',
-  PREFERENCES: 'als_ui_preferences'
+  PREFERENCES: 'als_ui_preferences',
+  NOTIFICATIONS: 'als_notifications'
 };
-
-// --- MAPPERS ---
-const mapTripToDb = (trip: Trip) => ({
-  id: trip.id,
-  os: trip.os,
-  booking: trip.booking,
-  ship: trip.ship,
-  date_time: trip.dateTime,
-  is_late: trip.isLate,
-  type: trip.type,
-  container_type: trip.containerType || null,
-  cva: trip.cva,
-  genset: (trip as any).genset || null,
-  container: trip.container,
-  tara: trip.tara,
-  seal: trip.seal,
-  category: trip.category,
-  sub_category: trip.subCategory,
-  status: trip.status,
-  customer: trip.customer,
-  destination: trip.destination,
-  driver: trip.driver,
-  status_history: trip.statusHistory,
-  advance_payment: trip.advancePayment,
-  balance_payment: trip.balancePayment,
-  os_doc: trip.osDoc || null,
-  agendamento_doc: trip.agendamentoDoc || null,
-  completo_doc: trip.completoDoc || null,
-  cte_doc: trip.cteDoc || null,
-  cva_doc: trip.cvaDoc || null,
-  oc_form_data: trip.ocFormData,
-  pre_stacking_form_data: trip.preStackingFormData || null,
-  scheduling: trip.scheduling || null
-});
-
-const mapDbToTrip = (d: any): Trip => ({
-  id: d.id,
-  os: d.os,
-  booking: d.booking,
-  ship: d.ship,
-  dateTime: d.date_time || d.dateTime,
-  isLate: d.is_late ?? d.isLate ?? false,
-  type: d.type,
-  containerType: d.container_type || d.containerType,
-  cva: d.cva,
-  container: d.container,
-  tara: d.tara,
-  seal: d.seal,
-  category: d.category,
-  subCategory: d.sub_category || d.subCategory,
-  status: d.status,
-  customer: d.customer,
-  destination: d.destination,
-  driver: d.driver,
-  statusHistory: d.status_history || d.statusHistory || [],
-  advancePayment: d.advance_payment || d.advancePayment || { status: 'BLOQUEADO' },
-  balancePayment: d.balance_payment || d.balancePayment || { status: 'AGUARDANDO_DOCS' },
-  osDoc: d.os_doc || d.osDoc,
-  agendamentoDoc: d.agendamento_doc || d.agendamentoDoc,
-  completoDoc: d.completo_doc || d.completoDoc,
-  cteDoc: d.cte_doc || d.cteDoc,
-  cvaDoc: d.cva_doc || d.cvaDoc,
-  ocFormData: d.oc_form_data || d.ocFormData,
-  preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData,
-  scheduling: d.scheduling || undefined
-});
 
 export const db = {
   _saveLocal: (key: string, data: any) => {
@@ -93,6 +28,60 @@ export const db = {
   _getLocal: (key: string) => {
     try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
   },
+  
+  // NOTIFICAÇÕES
+  getNotifications: async (): Promise<Notification[]> => {
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(50);
+        if (data) {
+          const mapped = data.map(n => ({
+            id: n.id,
+            userId: n.user_id,
+            userName: n.user_name,
+            type: n.type as any,
+            message: n.message,
+            osRef: n.os_ref,
+            timestamp: n.timestamp
+          }));
+          db._saveLocal(KEYS.NOTIFICATIONS, mapped);
+          return mapped;
+        }
+      } catch (e) {}
+    }
+    return db._getLocal(KEYS.NOTIFICATIONS);
+  },
+
+  addNotification: async (user: User, type: NotificationType, message: string, osRef?: string) => {
+    const newNotif = {
+      id: `notif-${Date.now()}`,
+      userId: user.id,
+      userName: user.displayName,
+      type,
+      message,
+      osRef,
+      timestamp: new Date().toISOString()
+    };
+
+    if (supabase) {
+      try {
+        await supabase.from('notifications').insert({
+          user_id: user.id,
+          user_name: user.displayName,
+          type: type,
+          message: message,
+          os_ref: osRef
+        });
+      } catch (e) {}
+    }
+
+    const current = db._getLocal(KEYS.NOTIFICATIONS);
+    db._saveLocal(KEYS.NOTIFICATIONS, [newNotif, ...current].slice(0, 50));
+    
+    // Dispara um evento de sistema para que outros componentes ouçam em tempo real (mesma aba)
+    window.dispatchEvent(new CustomEvent('als_new_notification', { detail: newNotif }));
+  },
+
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try {
@@ -100,7 +89,6 @@ export const db = {
       return !error;
     } catch { return false; }
   },
-  isCloudActive: () => !!supabase,
 
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
@@ -113,7 +101,8 @@ export const db = {
             lastLogin: u.lastlogin || new Date().toISOString(), photo: u.photo,
             position: u.position, staffId: u.staff_id, driverId: u.driver_id,
             status: u.status, isFirstLogin: u.isfirstlogin === true,
-            lastSeen: u.last_seen, isOnlineVisible: u.is_online_visible ?? true
+            lastSeen: u.last_seen, isOnlineVisible: u.is_online_visible ?? true,
+            notificationPrefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true }
           }));
           db._saveLocal(KEYS.USERS, mapped);
           return mapped;
@@ -129,7 +118,8 @@ export const db = {
       display_name: user.displayName, role: user.role, lastlogin: user.lastLogin,
       photo: user.photo, position: user.position, staff_id: user.staffId,
       driver_id: user.driverId, status: user.status, isfirstlogin: user.isFirstLogin === true,
-      last_seen: user.lastSeen, is_online_visible: user.isOnlineVisible ?? true
+      last_seen: user.lastSeen, is_online_visible: user.isOnlineVisible ?? true,
+      notification_prefs: user.notificationPrefs
     };
     if (supabase) { try { await supabase.from('users').upsert(payload); } catch (e) { console.error("Erro User Cloud:", e); } }
     const current = db._getLocal(KEYS.USERS);
@@ -153,7 +143,10 @@ export const db = {
     return db._getLocal(KEYS.TRIPS);
   },
 
-  saveTrip: async (trip: Trip) => {
+  saveTrip: async (trip: Trip, actingUser?: User) => {
+    const isNew = !db._getLocal(KEYS.TRIPS).find((t: any) => t.id === trip.id);
+    const oldTrip = db._getLocal(KEYS.TRIPS).find((t: any) => t.id === trip.id);
+
     if (supabase) {
       try {
         const payload = mapTripToDb(trip);
@@ -161,17 +154,35 @@ export const db = {
         if (error) throw error;
       } catch (e) { console.error("Erro Trip Cloud:", e); return false; }
     }
+    
     const current = db._getLocal(KEYS.TRIPS);
     const idx = current.findIndex((t: Trip) => t.id === trip.id);
     if (idx >= 0) current[idx] = trip; else current.push(trip);
     db._saveLocal(KEYS.TRIPS, current);
+
+    // LOGAR NOTIFICAÇÃO
+    if (actingUser) {
+      if (isNew) {
+        await db.addNotification(actingUser, 'TRIP_CREATED', `Nova programação cadastrada por ${actingUser.displayName}`, trip.os);
+      } else if (oldTrip && oldTrip.status !== trip.status) {
+        await db.addNotification(actingUser, 'STATUS_UPDATED', `OS ${trip.os} alterada para ${trip.status}`, trip.os);
+      } else if (oldTrip && (oldTrip.advancePayment.status !== trip.advancePayment.status || oldTrip.balancePayment.status !== trip.balancePayment.status)) {
+        await db.addNotification(actingUser, 'PAYMENT_LIBERATED', `Financeiro da OS ${trip.os} atualizado`, trip.os);
+      }
+    }
+    
     return true;
   },
 
-  deleteTrip: async (id: string) => {
+  deleteTrip: async (id: string, actingUser?: User) => {
+    const trip = db._getLocal(KEYS.TRIPS).find((t: any) => t.id === id);
     if (supabase) { try { const { error } = await supabase.from('trips').delete().eq('id', id); if (error) throw error; } catch (e) { console.error("Error deleting trip:", e); return false; } }
     const current = db._getLocal(KEYS.TRIPS).filter((t: Trip) => t.id !== id);
     db._saveLocal(KEYS.TRIPS, current);
+
+    if (actingUser && trip) {
+      await db.addNotification(actingUser, 'SYSTEM', `Programação OS ${trip.os} foi excluída do sistema`, trip.os);
+    }
     return true;
   },
 
@@ -292,12 +303,16 @@ export const db = {
     return db._getLocal(KEYS.CATEGORIES);
   },
 
-  saveCategory: async (category: Partial<Category>) => {
+  saveCategory: async (category: Partial<Category>, actingUser?: User) => {
     if (supabase) { try { const { error } = await supabase.from('categories').upsert(category); if (error) throw error; } catch (e) { console.error(e); return false; } }
     const current = db._getLocal(KEYS.CATEGORIES);
     const idx = current.findIndex((c: any) => c.id === category.id);
     if (idx >= 0) current[idx] = category as any; else current.push(category as any);
     db._saveLocal(KEYS.CATEGORIES, current);
+
+    if (actingUser) {
+      await db.addNotification(actingUser, 'CATEGORY_CREATED', `Nova categoria "${category.name}" criada por ${actingUser.displayName}`);
+    }
     return true;
   },
 
@@ -362,3 +377,67 @@ export const db = {
     if (supabase) { try { await supabase.from('users').update({ last_seen: new Date().toISOString(), is_online_visible: isVisible }).eq('id', userId); } catch (e) {} }
   }
 };
+
+const mapTripToDb = (trip: Trip) => ({
+  id: trip.id,
+  os: trip.os,
+  booking: trip.booking,
+  ship: trip.ship,
+  date_time: trip.dateTime,
+  is_late: trip.isLate,
+  type: trip.type,
+  container_type: trip.containerType || null,
+  cva: trip.cva,
+  container: trip.container,
+  tara: trip.tara,
+  seal: trip.seal,
+  category: trip.category,
+  sub_category: trip.subCategory,
+  status: trip.status,
+  customer: trip.customer,
+  destination: trip.destination,
+  driver: trip.driver,
+  status_history: trip.statusHistory,
+  advance_payment: trip.advancePayment,
+  balance_payment: trip.balancePayment,
+  os_doc: trip.osDoc || null,
+  agendamento_doc: trip.agendamentoDoc || null,
+  completo_doc: trip.completoDoc || null,
+  cte_doc: trip.cteDoc || null,
+  cva_doc: trip.cvaDoc || null,
+  oc_form_data: trip.ocFormData,
+  pre_stacking_form_data: trip.preStackingFormData || null,
+  scheduling: trip.scheduling || null
+});
+
+const mapDbToTrip = (d: any): Trip => ({
+  id: d.id,
+  os: d.os,
+  booking: d.booking,
+  ship: d.ship,
+  dateTime: d.date_time || d.dateTime,
+  isLate: d.is_late ?? d.isLate ?? false,
+  type: d.type,
+  containerType: d.container_type || d.containerType,
+  cva: d.cva,
+  container: d.container,
+  tara: d.tara,
+  seal: d.seal,
+  category: d.category,
+  subCategory: d.sub_category || d.subCategory,
+  status: d.status,
+  customer: d.customer,
+  destination: d.destination,
+  driver: d.driver,
+  statusHistory: d.status_history || d.statusHistory || [],
+  advancePayment: d.advance_payment || d.advancePayment || { status: 'BLOQUEADO' },
+  balancePayment: d.balance_payment || d.balancePayment || { status: 'AGUARDANDO_DOCS' },
+  osDoc: d.os_doc || d.osDoc,
+  agendamentoDoc: d.agendamento_doc || d.agendamentoDoc,
+  completoDoc: d.completo_doc || d.completoDoc,
+  cteDoc: d.cte_doc || d.cteDoc,
+  cvaDoc: d.cva_doc || d.cvaDoc,
+  ocFormData: d.oc_form_data || d.ocFormData,
+  preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData,
+  scheduling: d.scheduling || undefined
+});

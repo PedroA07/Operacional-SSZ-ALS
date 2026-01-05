@@ -11,10 +11,12 @@ import OperationsTab from './dashboard/OperationsTab';
 import AdminTab from './dashboard/AdminTab';
 import StaffTab from './dashboard/StaffTab';
 import SystemTab from './dashboard/SystemTab';
+import DocumentsTab from './dashboard/DocumentsTab';
 import WeatherWidget from './dashboard/WeatherWidget';
 import OnlineStatus from './dashboard/OnlineStatus';
 import DatabaseStatus from './dashboard/DatabaseStatus';
 import UserProfile from './dashboard/UserProfile';
+import NotificationCenter from './dashboard/notifications/NotificationCenter';
 import { DEFAULT_OPERATIONS } from '../constants/operations';
 import { db } from '../utils/storage';
 import { Icons } from '../constants/icons';
@@ -79,7 +81,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     if (!tripToDelete) return;
     setIsDeleting(true);
     try {
-      await db.deleteTrip(tripToDelete.id);
+      await db.deleteTrip(tripToDelete.id, user);
       await loadAllData();
       setIsDeleteTripModalOpen(false);
       setTripToDelete(null);
@@ -123,6 +125,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
             {availableOps.map(op => <button key={op.id} onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'category', id: op.id, categoryName: op.category }); }} className="w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors">• {op.category}</button>)}
           </MenuItem>
+          <MenuItem tab={DashboardTab.DOCUMENTOS} label="Documentação" icon={<Icons.Formularios />} />
           <MenuItem tab={DashboardTab.ADMINISTRATIVO} label="Financeiro" icon={<Icons.Clientes />} />
           <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" icon={<Icons.Motoristas />} />
           <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" icon={<Icons.Formularios />} />
@@ -151,8 +154,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </button>
               <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">{activeTab}</h2>
            </div>
-           <div className="flex items-center gap-6">
+           <div className="flex items-center gap-4">
               <DatabaseStatus />
+              <NotificationCenter user={user} />
               <UserProfile user={user} />
            </div>
         </header>
@@ -170,6 +174,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onDeleteTrip={handleDeleteTripRequest}
              />
            )}
+           {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); loadAllData(); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver); loadAllData(); }} onDeleteDriver={async id => { await db.deleteDriver(id); loadAllData(); }} availableOps={availableOps} />}
            {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); loadAllData(); } }} isAdmin={user.role === 'admin'} />}

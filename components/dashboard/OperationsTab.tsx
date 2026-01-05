@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
@@ -26,6 +27,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isOCEditModalOpen, setIsOCEditModalOpen] = useState(false);
   const [isMinutaModalOpen, setIsMinutaModalOpen] = useState(false);
@@ -37,7 +39,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [docViewConfig, setDocViewConfig] = useState({ url: '', title: '' });
 
-  // Estados de Filtro com Inicialização via LocalStorage
+  // Estados de Filtro
   const [filterTypes, setFilterTypes] = useState<string[]>(() => {
     const saved = localStorage.getItem('als_filter_types');
     return saved ? JSON.parse(saved) : ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
@@ -54,7 +56,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   });
 
   const [filterCategory, setFilterCategory] = useState<string>('TODAS');
-  const [filterSub, setFilterSub] = useState<string>('TODAS');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
 
@@ -68,32 +69,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     loadData(); 
   }, []);
 
-  // Inicialização padrão caso não haja filtros salvos (Apenas na primeira carga dos dados)
-  useEffect(() => {
-    if (customers.length > 0 && filterClientNames.length === 0 && !localStorage.getItem('als_filter_clients')) {
-      setFilterClientNames(customers.map(c => c.name));
-    }
-    if (drivers.length > 0 && filterDriverNames.length === 0 && !localStorage.getItem('als_filter_drivers')) {
-      setFilterDriverNames(drivers.map(d => d.name));
-    }
-  }, [customers, drivers]);
-
-  // Salvar filtros no LocalStorage sempre que mudarem
   useEffect(() => {
     localStorage.setItem('als_filter_types', JSON.stringify(filterTypes));
   }, [filterTypes]);
-
-  useEffect(() => {
-    if (filterClientNames.length > 0) {
-      localStorage.setItem('als_filter_clients', JSON.stringify(filterClientNames));
-    }
-  }, [filterClientNames]);
-
-  useEffect(() => {
-    if (filterDriverNames.length > 0) {
-      localStorage.setItem('als_filter_drivers', JSON.stringify(filterDriverNames));
-    }
-  }, [filterDriverNames]);
 
   const openStatusEditor = (trip: Trip, status: TripStatus) => {
     setSelectedTrip(trip);
@@ -108,115 +86,40 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     if (!selectedTrip) return;
     const newEntry: StatusHistoryEntry = { status: tempStatus, dateTime: new Date(statusTime).toISOString() };
     const updatedTrip = { ...selectedTrip, status: tempStatus, statusTime: newEntry.dateTime, statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] };
-    await db.saveTrip(updatedTrip);
+    await db.saveTrip(updatedTrip, user);
     setIsStatusModalOpen(false);
     loadData();
-  };
-
-  const handleEditTrip = (trip: Trip) => {
-    setSelectedTrip(trip);
-    setIsTripModalOpen(true);
-  };
-
-  const handleEditScheduling = (trip: Trip) => {
-    setSelectedTrip(trip);
-    setIsSchedulingModalOpen(true);
-  };
-
-  const handleEditOC = (trip: Trip) => {
-    if (!trip.ocFormData) return;
-    setSelectedTrip(trip);
-    setIsOCEditModalOpen(true);
-  };
-
-  const handleEditMinuta = (trip: Trip) => {
-    setSelectedTrip(trip);
-    setIsMinutaModalOpen(true);
-  };
-
-  const handleViewDoc = (url: string, title: string) => {
-    setDocViewConfig({ url, title });
-    setIsDocViewerOpen(true);
-  };
-
-  const handlePrintDocInViewer = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head><title>${docViewConfig.title}</title></head>
-          <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;">
-            ${docViewConfig.url.startsWith('data:image') 
-              ? `<img src="${docViewConfig.url}" style="max-width:100%; height:auto;">`
-              : `<embed width="100%" height="100%" src="${docViewConfig.url}" type="application/pdf">`
-            }
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-      }, 500);
-    }
   };
 
   const filteredTrips = useMemo(() => {
     let result = trips;
     if (filterCategory !== 'TODAS') result = result.filter(t => t.category === filterCategory);
-    if (filterSub !== 'TODAS') result = result.filter(t => t.customer.name === filterSub || t.subCategory === filterSub);
-    
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type));
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver.name));
-    
-    if (filterStartDate) {
-      result = result.filter(t => t.dateTime >= filterStartDate);
-    }
-    if (filterEndDate) {
-      result = result.filter(t => t.dateTime <= filterEndDate + 'T23:59:59');
-    }
-    
+    if (filterStartDate) result = result.filter(t => t.dateTime >= filterStartDate);
+    if (filterEndDate) result = result.filter(t => t.dateTime <= filterEndDate + 'T23:59:59');
     return result;
-  }, [trips, filterCategory, filterSub, filterTypes, filterClientNames, filterDriverNames, filterStartDate, filterEndDate]);
+  }, [trips, filterCategory, filterTypes, filterClientNames, filterDriverNames, filterStartDate, filterEndDate]);
 
   const columns = getOperationTableColumns(
     openStatusEditor,
-    handleEditTrip,
-    handleEditOC,
-    handleEditMinuta,
-    handleViewDoc,
+    (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
+    (t) => { setSelectedTrip(t); setIsOCEditModalOpen(true); },
+    (t) => { setSelectedTrip(t); setIsMinutaModalOpen(true); },
+    (url, title) => { setDocViewConfig({ url, title }); setIsDocViewerOpen(true); },
     (id) => onDeleteTrip?.(id),
     loadData,
-    handleEditScheduling
+    (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); }
   );
 
-  const STATUS_OPTIONS: TripStatus[] = [
-    'Pendente', 
-    'Retirada de vazio', 
-    'Retirada do cheio', 
-    'Em viagem', 
-    'Chegou no cliente', 
-    'Pegou NF', 
-    'Saiu do cliente', 
-    'Chegou no destino', 
-    'Devolução do cheio',
-    'Viagem concluída', 
-    'Viagem cancelada'
-  ];
-
   const handleClearAllFilters = () => {
-    const allTypes = ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
-    const allClients = customers.map(c => c.name);
-    const allDrivers = drivers.map(d => d.name);
-    
-    setFilterTypes(allTypes);
-    setFilterClientNames(allClients);
-    setFilterDriverNames(allDrivers);
-    
-    localStorage.setItem('als_filter_types', JSON.stringify(allTypes));
-    localStorage.setItem('als_filter_clients', JSON.stringify(allClients));
-    localStorage.setItem('als_filter_drivers', JSON.stringify(allDrivers));
+    setFilterTypes(['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM']);
+    setFilterClientNames([]);
+    setFilterDriverNames([]);
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setFilterCategory('TODAS');
   };
 
   if (activeView.type !== 'list') {
@@ -236,45 +139,91 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-        <OperationFilters 
-          selectedTypes={filterTypes}
-          onTypesChange={setFilterTypes}
-          selectedClients={filterClientNames}
-          onClientsChange={setFilterClientNames}
-          selectedDrivers={filterDriverNames}
-          onDriversChange={setFilterDriverNames}
-          customers={customers}
-          drivers={drivers}
-        />
-        
-        <div className="flex justify-between items-center mb-6">
-          <button onClick={handleClearAllFilters} className="text-[10px] font-black text-blue-600 uppercase hover:underline">Limpar todos os filtros</button>
-          
-          <div className="flex gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
-             <div className="space-y-1">
-                <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Início</label>
-                <input type="date" className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
-             </div>
-             <div className="space-y-1">
-                <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Fim</label>
-                <input type="date" className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
-             </div>
-             {(filterStartDate || filterEndDate) && (
-               <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }} className="mt-4 text-[8px] font-black text-red-500 uppercase hover:underline">Limpar</button>
-             )}
+      {/* CABEÇALHO COM BOTÕES DE AÇÃO RÁPIDA E NAVEGAÇÃO DE CATEGORIAS */}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Painel de Operações ALS</h2>
+            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Gestão Completa de Fila e Rastreabilidade</p>
+          </div>
+          <div className="flex gap-3">
+             <button 
+               onClick={() => setIsCategoryModalOpen(true)}
+               className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-50 hover:text-blue-600 transition-all active:scale-95"
+             >
+               Nova Categoria
+             </button>
+             <button 
+               onClick={() => { setSelectedTrip(null); setIsTripModalOpen(true); }}
+               className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 flex items-center gap-2"
+             >
+               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>
+               Nova Programação
+             </button>
           </div>
         </div>
 
-        <SmartOperationTable 
-          userId={user.id}
-          componentId="ops-main-table"
-          title="Painel Geral de Operações"
-          columns={columns}
-          data={filteredTrips}
-          defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'destination_ship_booking', 'scheduling_info', 'actions']}
-        />
+        {/* NAVEGAÇÃO POR CATEGORIA MASTER */}
+        <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+           <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Acesso Rápido por Categoria</h3>
+           <div className="flex flex-wrap gap-3">
+              <button 
+                onClick={() => setFilterCategory('TODAS')} 
+                className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase ${filterCategory === 'TODAS' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500'}`}
+              >
+                Visão Geral
+              </button>
+              {categories.filter(c => !c.parentId).map(cat => (
+                <button 
+                  key={cat.id} 
+                  onClick={() => setActiveView({ type: 'category', categoryName: cat.name })} 
+                  className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-900 hover:text-white transition-all text-[10px] font-black uppercase flex items-center gap-2 group"
+                >
+                  {cat.name}
+                  <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+                </button>
+              ))}
+           </div>
+        </div>
       </div>
+
+      <OperationFilters 
+        selectedTypes={filterTypes}
+        onTypesChange={setFilterTypes}
+        selectedClients={filterClientNames}
+        onClientsChange={setFilterClientNames}
+        selectedDrivers={filterDriverNames}
+        onDriversChange={setFilterDriverNames}
+        customers={customers}
+        drivers={drivers}
+      />
+      
+      <div className="flex justify-between items-center mb-6">
+        <button onClick={handleClearAllFilters} className="text-[10px] font-black text-blue-600 uppercase hover:underline">Limpar todos os filtros</button>
+        
+        <div className="flex gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
+           <div className="space-y-1">
+              <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Início</label>
+              <input type="date" className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
+           </div>
+           <div className="space-y-1">
+              <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Fim</label>
+              <input type="date" className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
+           </div>
+           {(filterStartDate || filterEndDate) && (
+             <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }} className="mt-4 text-[8px] font-black text-red-500 uppercase hover:underline">Limpar</button>
+           )}
+        </div>
+      </div>
+
+      <SmartOperationTable 
+        userId={user.id}
+        componentId="ops-main-table"
+        title="Painel Geral de Operações"
+        columns={columns}
+        data={filteredTrips}
+        defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'destination_ship_booking', 'scheduling_info', 'actions']}
+      />
 
       <TripModal 
         isOpen={isTripModalOpen} 
@@ -284,6 +233,14 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         customers={customers} 
         categories={categories} 
         editTrip={selectedTrip} 
+      />
+
+      <CategoryManagerModal 
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={categories}
+        onSuccess={loadData}
+        actingUser={user}
       />
 
       <SchedulingEditModal 
@@ -305,7 +262,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                 <div className="space-y-1">
                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Selecione o Novo Status</label>
                    <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                      {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      {['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
                    </select>
                 </div>
                 <div className="space-y-1">
@@ -354,12 +311,14 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Dossiê: {docViewConfig.title}</p>
                  </div>
                  <div className="flex gap-4">
-                    <button 
-                      onClick={handlePrintDocInViewer}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all"
-                    >
-                       Imprimir
-                    </button>
+                    <button onClick={() => {
+                        const win = window.open('', '_blank');
+                        if (win) {
+                          win.document.write(`<html><body style="margin:0;display:flex;justify-content:center;align-items:center;">${docViewConfig.url.startsWith('data:image') ? `<img src="${docViewConfig.url}" style="max-width:100%;">` : `<embed width="100%" height="100%" src="${docViewConfig.url}" type="application/pdf">`}</body></html>`);
+                          win.document.close();
+                          win.print();
+                        }
+                    }} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all">Imprimir</button>
                     <button onClick={() => setIsDocViewerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
                  </div>
               </div>
@@ -367,13 +326,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                  {docViewConfig.url.startsWith('data:image') ? (
                     <img src={docViewConfig.url} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" alt="Documento" />
                  ) : (
-                    <iframe 
-                        width="100%" 
-                        height="100%" 
-                        style={{ border: 0 }} 
-                        src={docViewConfig.url}
-                        title="Document Viewer"
-                    ></iframe>
+                    <iframe width="100%" height="100%" style={{ border: 0 }} src={docViewConfig.url} title="Document Viewer"></iframe>
                  )}
               </div>
            </div>

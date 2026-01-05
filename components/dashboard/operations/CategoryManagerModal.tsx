@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Category } from '../../../types';
+import { Category, User } from '../../../types';
 import { db } from '../../../utils/storage';
 
 interface Props {
@@ -8,16 +8,17 @@ interface Props {
   onClose: () => void;
   categories: Category[];
   onSuccess: () => void;
+  actingUser: User;
 }
 
-const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, onSuccess }) => {
+const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, onSuccess, actingUser }) => {
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState('');
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) return;
-    await db.saveCategory({ name, parentId: parentId || undefined });
+    await db.saveCategory({ id: `cat-${Date.now()}`, name, parentId: parentId || undefined }, actingUser);
     setName('');
     setParentId('');
     onSuccess();

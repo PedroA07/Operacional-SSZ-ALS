@@ -19,6 +19,27 @@ export interface User {
   isFirstLogin?: boolean;
   lastSeen?: string;
   isOnlineVisible?: boolean;
+  notificationPrefs?: NotificationPreference;
+}
+
+export interface NotificationPreference {
+  newTrip: boolean;
+  statusUpdate: boolean;
+  paymentLiberated: boolean;
+  systemChanges: boolean;
+}
+
+export type NotificationType = 'TRIP_CREATED' | 'STATUS_UPDATED' | 'PAYMENT_LIBERATED' | 'CATEGORY_CREATED' | 'SYSTEM';
+
+export interface Notification {
+  id: string;
+  userId: string;
+  userName: string;
+  type: NotificationType;
+  message: string;
+  osRef?: string;
+  timestamp: string;
+  readBy?: string[];
 }
 
 export enum DashboardTab {
@@ -38,14 +59,14 @@ export enum DashboardTab {
 export type TripStatus = 
   | 'Pendente' 
   | 'Retirada de vazio'
-  | 'Retirada do cheio'
-  | 'Em viagem'
-  | 'Chegou no cliente'
-  | 'Pegou NF'
-  | 'Saiu do cliente'
-  | 'Chegou no destino'
+  | 'Retirada do cheio' 
+  | 'Em viagem' 
+  | 'Chegou no cliente' 
+  | 'Pegou NF' 
+  | 'Saiu do cliente' 
+  | 'Chegou no destino' 
   | 'Devolução do cheio'
-  | 'Viagem concluída'
+  | 'Viagem concluída' 
   | 'Viagem cancelada';
 
 export interface StatusHistoryEntry {
@@ -213,6 +234,7 @@ export interface WeatherData {
   };
 }
 
+// Fix: Adding missing VW related types
 export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
 
 export interface VWStatusUpdate {
@@ -236,6 +258,7 @@ export interface VWSchedule {
   statusHistory: VWStatusUpdate[];
 }
 
+// Fix: Adding missing Opentech related types
 export interface OpentechTrip {
   id: string;
   smNumber: string;
@@ -247,6 +270,6 @@ export interface OpentechTrip {
   destination: string;
   startTime: string;
   eta: string;
-  status: string;
-  riskLevel: string;
+  status: 'Em Viagem' | 'Concluída' | 'Alerta' | 'Sinistrada' | 'Iniciada' | 'Alerta Risco';
+  riskLevel: 'Crítico' | 'Alto' | 'Médio' | 'Baixo';
 }
