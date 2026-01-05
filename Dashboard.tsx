@@ -16,6 +16,7 @@ import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
 import DatabaseStatus from './components/dashboard/DatabaseStatus';
 import UserProfile from './components/dashboard/UserProfile';
+import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
 import { DEFAULT_OPERATIONS } from './constants/operations';
 import { db } from './utils/storage';
 import { Icons } from './constants/icons';
@@ -38,7 +39,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
 
-  // Estados para Modal de Exclusão de Viagem
   const [isDeleteTripModalOpen, setIsDeleteTripModalOpen] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -80,12 +80,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     if (!tripToDelete) return;
     setIsDeleting(true);
     try {
-      await db.deleteTrip(tripToDelete.id);
+      await db.deleteTrip(tripToDelete.id, user);
       await loadAllData();
       setIsDeleteTripModalOpen(false);
       setTripToDelete(null);
     } catch (e) {
-      alert('Erro crítico ao excluir do banco de dados.');
+      alert('Erro crítico ao excluir.');
     } finally {
       setIsDeleting(false);
     }
@@ -155,6 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </div>
            <div className="flex items-center gap-6">
               <DatabaseStatus />
+              <NotificationCenter user={user} />
               <UserProfile user={user} />
            </div>
         </header>
@@ -172,62 +173,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onDeleteTrip={handleDeleteTripRequest}
              />
            )}
-           {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t); loadAllData(); }} />}
+           {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); loadAllData(); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
-           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver); loadAllData(); }} onDeleteDriver={async id => { await db.deleteDriver(id); loadAllData(); }} availableOps={availableOps} />}
-           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer); loadAllData(); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); loadAllData(); } }} isAdmin={user.role === 'admin'} />}
+           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); loadAllData(); }} onDeleteDriver={async id => { await db.deleteDriver(id); loadAllData(); }} availableOps={availableOps} />}
+           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); loadAllData(); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); loadAllData(); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); loadAllData(); }} onDeleteStaff={async id => { await db.deleteStaff(id); loadAllData(); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
-           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port); loadAllData(); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(); } }} />}
-           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking); loadAllData(); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(); } }} />}
+           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); loadAllData(); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(); } }} />}
+           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); loadAllData(); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(); } }} />}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
         </div>
       </main>
-
-      {/* MODAL DE EXCLUSÃO DE VIAGEM CUSTOMIZADO */}
-      {isDeleteTripModalOpen && tripToDelete && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="p-10 text-center space-y-6">
-                 <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner border border-red-100">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
-                 </div>
-                 <div>
-                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Excluir Viagem</h3>
-                    <p className="text-sm text-slate-400 mt-2">Deseja remover permanentemente esta programação de todos os bancos de dados (Nuvem e Local)?</p>
-                    <div className="mt-6 p-5 bg-slate-50 rounded-3xl border border-slate-100 text-left space-y-1">
-                       <p className="text-[9px] font-black text-blue-600 uppercase">Ordem de Serviço:</p>
-                       <p className="text-sm font-black text-slate-700 uppercase">{tripToDelete.os}</p>
-                       <div className="pt-2 flex justify-between">
-                         <span className="text-[8px] font-black text-slate-400 uppercase">Motorista: {tripToDelete.driver.name}</span>
-                         <span className="text-[8px] font-black text-slate-400 uppercase">Placa: {tripToDelete.driver.plateHorse}</span>
-                       </div>
-                    </div>
-                 </div>
-                 <div className="grid grid-cols-2 gap-3 pt-4">
-                    <button 
-                      onClick={() => { setIsDeleteTripModalOpen(false); setTripToDelete(null); }}
-                      className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all active:scale-95"
-                    >
-                      Cancelar
-                    </button>
-                    <button 
-                      disabled={isDeleting}
-                      onClick={executeDeleteTrip}
-                      className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {isDeleting ? (
-                        <>
-                          <svg className="animate-spin h-3 w-3 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                          Excluindo...
-                        </>
-                      ) : 'Sim, Excluir'}
-                    </button>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
     </div>
   );
 };

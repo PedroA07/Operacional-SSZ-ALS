@@ -27,9 +27,20 @@ export interface NotificationPreference {
   statusUpdate: boolean;
   paymentLiberated: boolean;
   systemChanges: boolean;
+  newRegistrations: boolean; // Novo: Motoristas, Clientes, etc
 }
 
-export type NotificationType = 'TRIP_CREATED' | 'STATUS_UPDATED' | 'PAYMENT_LIBERATED' | 'CATEGORY_CREATED' | 'SYSTEM';
+export type NotificationType = 
+  | 'TRIP_CREATED' 
+  | 'STATUS_UPDATED' 
+  | 'PAYMENT_LIBERATED' 
+  | 'CATEGORY_CREATED' 
+  | 'DRIVER_CREATED'
+  | 'CUSTOMER_CREATED'
+  | 'PORT_CREATED'
+  | 'PRESTACKING_CREATED'
+  | 'SYSTEM'
+  | 'DELETED';
 
 export interface Notification {
   id: string;
@@ -234,7 +245,6 @@ export interface WeatherData {
   };
 }
 
-// Fix: Adding missing VW related types
 export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
 
 export interface VWStatusUpdate {
@@ -258,7 +268,6 @@ export interface VWSchedule {
   statusHistory: VWStatusUpdate[];
 }
 
-// Fix: Adding missing Opentech related types
 export interface OpentechTrip {
   id: string;
   smNumber: string;
