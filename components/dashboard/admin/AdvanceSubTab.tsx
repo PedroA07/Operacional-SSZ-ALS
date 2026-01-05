@@ -20,7 +20,7 @@ const AdvanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
     if (isChecked) {
       onUpdate({ ...t, advancePayment: { status: 'LIBERAR', liberatedAt: new Date().toISOString() } });
     } else {
-      if (confirm("ATENÇÃO: Deseja ESTORNAR a liberação deste adiantamento e voltar para a fila de bloqueados?")) {
+      if (confirm("Deseja ESTORNAR a liberação deste adiantamento? A OS voltará para a fila de Pendentes.")) {
         onUpdate({ ...t, advancePayment: { status: 'BLOQUEADO', liberatedAt: undefined } });
       }
     }
@@ -78,12 +78,12 @@ const AdvanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
               type="checkbox" 
               checked={isLiberated}
               onChange={(e) => handleToggleLiberation(t, e.target.checked)}
-              disabled={isPaid} // Se já foi pago pelo banco, não permite voltar etapa aqui
-              className={`w-5 h-5 rounded border-slate-300 transition-all cursor-pointer ${isPaid ? 'opacity-50 cursor-not-allowed' : 'text-blue-600 focus:ring-blue-500'}`}
+              disabled={isPaid}
+              className={`w-5 h-5 rounded border-slate-300 transition-all cursor-pointer ${isPaid ? 'opacity-50 cursor-not-allowed text-emerald-600' : 'text-blue-600 focus:ring-blue-500'}`}
             />
             <div className="flex flex-col">
               <span className={`text-[10px] font-black uppercase ${isPaid ? 'text-emerald-600' : isLiberated ? 'text-blue-500' : 'text-slate-400'}`}>
-                {isPaid ? '✓ PAGAMENTO REALIZADO' : isLiberated ? '✓ LIBERADO P/ FINANCEIRO' : 'AGUARDANDO CONFERÊNCIA'}
+                {isPaid ? '✓ PAGO' : isLiberated ? '✓ LIBERADO' : 'AGUARDANDO'}
               </span>
               {t.advancePayment?.liberatedAt && (
                 <span className="text-[7px] font-bold text-slate-300 uppercase">Liberado em: {new Date(t.advancePayment.liberatedAt).toLocaleString('pt-BR')}</span>
@@ -102,15 +102,15 @@ const AdvanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
           <button onClick={() => setShowLiberated(false)} className={`px-5 py-2.5 rounded-lg text-[9px] font-black uppercase transition-all ${!showLiberated ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Pendentes ({pendingTrips.length})</button>
           <button onClick={() => setShowLiberated(true)} className={`px-5 py-2.5 rounded-lg text-[9px] font-black uppercase transition-all ${showLiberated ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Liberados ({liberatedTrips.length})</button>
         </div>
-        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Etapa: Autorização de Pagamento Inicial (70%)</p>
+        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Autorização de Pagamento Inicial (70%)</p>
       </div>
 
       <SmartOperationTable 
         userId={userId} 
-        componentId={`admin-advance-${showLiberated ? 'liberated' : 'pending'}`} 
+        componentId={`admin-advance-${showLiberated ? 'lib' : 'pend'}`} 
         columns={columns} 
         data={showLiberated ? liberatedTrips : pendingTrips} 
-        title={showLiberated ? "Fila de Pagamento (Adiantamentos)" : "Fila de Conferência Operacional"}
+        title={showLiberated ? "Adiantamentos Liberados" : "Fila de Conferência Operacional"}
       />
     </div>
   );

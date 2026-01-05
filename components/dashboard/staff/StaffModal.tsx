@@ -22,7 +22,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
   allUsers 
 }) => {
   const [form, setForm] = useState<Partial<Staff & { password?: string }>>({ 
-    name: '', position: '', username: '', role: 'staff', password: '', emailCorp: '', phoneCorp: '', status: 'Ativo', photo: ''
+    name: '', position: '', username: '', role: 'staff', password: '', emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '', registrationDate: new Date().toISOString().split('T')[0]
   });
   
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,19 +36,19 @@ const StaffModal: React.FC<StaffModalProps> = ({
       setForm({ 
         ...editingStaff, 
         password: linkedUser?.password || '',
-        photo: editingStaff.photo || ''
+        photo: editingStaff.photo || '',
+        registrationDate: editingStaff.registrationDate?.split('T')[0]
       });
       setIsEditingPassword(false);
     } else {
       setForm({ 
         role: 'staff', name: '', position: '', username: '', password: '12345678', 
-        emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '' 
+        emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '', registrationDate: new Date().toISOString().split('T')[0]
       });
       setIsEditingPassword(true);
     }
   }, [editingStaff, isOpen, allUsers]);
 
-  // Inteligência de geração de Username
   useEffect(() => {
     if (form.name && !editingStaff) {
       const cleanName = form.name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -61,12 +61,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
         setUsernameOptions(uniqueOptions);
         if (uniqueOptions.length > 0 && !uniqueOptions.includes(form.username || '')) {
            setForm(prev => ({ ...prev, username: uniqueOptions[0] }));
-        }
-      } else {
-        setUsernameOptions([]);
-        const basicUser = parts[0] || '';
-        if (!allUsers.some(u => u.username === basicUser)) {
-           setForm(prev => ({ ...prev, username: basicUser }));
         }
       }
     }
@@ -96,10 +90,10 @@ const StaffModal: React.FC<StaffModalProps> = ({
         username: (form.username || '').toLowerCase(),
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: form.photo || '',
-        registrationDate: editingStaff?.registrationDate || new Date().toISOString(),
+        registrationDate: form.registrationDate ? new Date(form.registrationDate).toISOString() : new Date().toISOString(),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
-        status: form.status || 'Ativo',
+        status: (form.status as 'Ativo' | 'Inativo') || 'Ativo',
         statusSince: editingStaff?.statusSince || new Date().toISOString()
       };
       
@@ -124,7 +118,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
           <div>
             <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingStaff ? 'Editar Colaborador' : 'Novo Colaborador ALS'}</h3>
-            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Configuração de Acessos e Perfil</p>
+            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Gestão de Perfil e Acessos</p>
           </div>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 rounded-full transition-all shadow-sm">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
@@ -132,22 +126,11 @@ const StaffModal: React.FC<StaffModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-          {/* Foto e Nome */}
           <div className="flex flex-col md:flex-row gap-8">
-            <div className="shrink-0 space-y-2">
-              <label className={labelClass}>Foto de Perfil</label>
-              <div 
-                onClick={() => photoRef.current?.click()}
-                className="w-32 h-32 rounded-[2.5rem] bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden group relative"
-              >
-                {form.photo ? (
-                  <img src={form.photo} className="w-full h-full object-cover" />
-                ) : (
-                  <svg className="w-8 h-8 text-slate-300 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2"/></svg>
-                )}
-                <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 flex items-center justify-center transition-all">
-                  <span className="text-[7px] font-black text-white opacity-0 group-hover:opacity-100 uppercase">Alterar</span>
-                </div>
+            <div className="shrink-0 space-y-2 text-center">
+              <label className={labelClass}>Foto</label>
+              <div onClick={() => photoRef.current?.click()} className="w-24 h-24 rounded-[2rem] bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden relative group mx-auto">
+                {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/></svg>}
               </div>
               <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
             </div>
@@ -155,86 +138,72 @@ const StaffModal: React.FC<StaffModalProps> = ({
             <div className="flex-1 space-y-5">
               <div className="space-y-1">
                 <label className={labelClass}>Nome Completo</label>
-                <input required className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Ex: Claudio Silva" />
+                <input required className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
-                    <label className={labelClass}>Cargo / Função</label>
-                    <input required className={inputClasses} value={form.position} onChange={e => setForm({...form, position: e.target.value})} placeholder="Ex: Operacional" />
+                    <label className={labelClass}>Data de Admissão</label>
+                    <input type="date" required className={inputClasses} value={form.registrationDate} onChange={e => setForm({...form, registrationDate: e.target.value})} />
                  </div>
                  <div className="space-y-1">
-                    <label className={labelClass}>Nível de Acesso</label>
-                    <select className={inputClasses} value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
-                       <option value="staff">OPERACIONAL (PADRÃO)</option>
-                       <option value="admin">ADMINISTRADOR (DIRETORIA)</option>
+                    <label className={labelClass}>Status Colaborador</label>
+                    <select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}>
+                       <option value="Ativo">ATIVO / LIBERADO</option>
+                       <option value="Inativo">INATIVO / BLOQUEADO</option>
                     </select>
                  </div>
               </div>
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-6">
+             <div className="space-y-1">
+                <label className={labelClass}>Cargo / Função</label>
+                <input required className={inputClasses} value={form.position} onChange={e => setForm({...form, position: e.target.value})} />
+             </div>
+             <div className="space-y-1">
+                <label className={labelClass}>Nível de Acesso</label>
+                <select className={inputClasses} value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
+                   <option value="staff">OPERACIONAL (PADRÃO)</option>
+                   <option value="admin">ADMINISTRADOR (DIRETORIA)</option>
+                </select>
+             </div>
+          </div>
+
           <div className="p-8 bg-blue-50/50 rounded-[2.5rem] border border-blue-100 space-y-6">
-             <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b border-blue-100 pb-3">Credenciais de Acesso ao Portal</h4>
-             
+             <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Acesso ao Portal</h4>
              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                   <label className={labelClass}>Nome de Usuário (Login)</label>
+                   <label className={labelClass}>Usuário (Login)</label>
                    <input required className={inputClasses} value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase()})} />
-                   {usernameOptions.length > 0 && !editingStaff && (
-                     <div className="flex flex-wrap gap-2 mt-2">
-                        {usernameOptions.map(opt => (
-                          <button key={opt} type="button" onClick={() => setForm({...form, username: opt})} className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${form.username === opt ? 'bg-blue-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}>
-                            {opt}
-                          </button>
-                        ))}
-                     </div>
-                   )}
                 </div>
-
                 <div className="space-y-1">
                    <div className="flex justify-between items-center pr-1">
-                      <label className={labelClass}>Senha de Acesso</label>
-                      {editingStaff && !isEditingPassword && (
-                        <button type="button" onClick={() => setIsEditingPassword(true)} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Alterar Senha</button>
-                      )}
+                      <label className={labelClass}>Senha</label>
+                      {editingStaff && !isEditingPassword && <button type="button" onClick={() => setIsEditingPassword(true)} className="text-[8px] font-black text-blue-500 uppercase">Alterar</button>}
                    </div>
-                   <input 
-                    type="text"
-                    disabled={!isEditingPassword}
-                    required={isEditingPassword}
-                    className={`${inputClasses} font-mono`} 
-                    value={isEditingPassword ? form.password : '••••••••'} 
-                    onChange={e => setForm({...form, password: e.target.value})} 
-                   />
+                   <input type="text" disabled={!isEditingPassword} required={isEditingPassword} className={`${inputClasses} font-mono`} value={isEditingPassword ? form.password : '••••••••'} onChange={e => setForm({...form, password: e.target.value})} />
                 </div>
              </div>
           </div>
 
           <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-6">
-             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-3">Contatos Corporativos</h4>
+             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contatos ALS</h4>
              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                   <label className={labelClass}>E-mail ALS</label>
-                   <input className={`${inputClasses} lowercase`} value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} placeholder="exemplo@alstransportes.com.br" />
+                   <label className={labelClass}>E-mail Corporativo</label>
+                   <input className={`${inputClasses} lowercase`} value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} />
                 </div>
                 <div className="space-y-1">
-                   <label className={labelClass}>WhatsApp Operacional</label>
-                   <input className={inputClasses} value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: maskPhone(e.target.value)})} placeholder="(13) 00000-0000" />
+                   <label className={labelClass}>WhatsApp</label>
+                   <input className={inputClasses} value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: maskPhone(e.target.value)})} />
                 </div>
              </div>
           </div>
 
-          <div className="pt-4">
-            <button 
-              type="submit" 
-              disabled={isProcessing}
-              className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
-            >
-              {isProcessing ? (
-                <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
-              ) : editingStaff ? 'Salvar Alterações' : 'Concluir Cadastro ALS'}
-            </button>
-          </div>
+          <button type="submit" disabled={isProcessing} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3">
+             {isProcessing ? 'Gravando...' : editingStaff ? 'Salvar Alterações' : 'Cadastrar Colaborador'}
+          </button>
         </form>
       </div>
     </div>

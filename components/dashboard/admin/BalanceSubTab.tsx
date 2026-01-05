@@ -19,22 +19,16 @@ const BalanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
     const reader = new FileReader();
     reader.onload = () => {
       const doc: TripDocument = { id: `doc-${Date.now()}`, type: 'COMPLETO', url: reader.result as string, fileName: file.name, uploadDate: new Date().toISOString() };
-      onUpdate({ ...trip, documents: [...(trip.documents || []), doc] });
+      onUpdate({ ...trip, completoDoc: doc });
     };
     reader.readAsDataURL(file);
   };
 
   const handleToggleLiberation = (t: Trip, isChecked: boolean) => {
     if (isChecked) {
-      const hasFull = t.documents?.some(d => d.type === 'COMPLETO') || t.completoDoc;
-      if (!hasFull) {
-        if (!confirm("O PDF Completo ainda não foi anexado. Deseja liberar o saldo mesmo assim?")) {
-          return;
-        }
-      }
       onUpdate({ ...t, balancePayment: { status: 'LIBERAR', liberatedAt: new Date().toISOString() } });
     } else {
-      if (confirm("ESTORNO DE SALDO: Deseja voltar esta viagem para a fila de conferência de documentos?")) {
+      if (confirm("Deseja ESTORNAR a liberação deste saldo? A OS voltará para a fila de Documentação.")) {
         onUpdate({ ...t, balancePayment: { status: 'AGUARDANDO_DOCS', liberatedAt: undefined } });
       }
     }
@@ -58,10 +52,11 @@ const BalanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
     },
     { 
       key: 'driver_info', 
-      label: '3. Motorista / Plates', 
+      label: '3. Motorista / Placas', 
       render: (t: Trip) => (
         <div className="flex flex-col max-w-[200px]">
           <span className="font-black text-slate-800 uppercase text-[10px] leading-tight truncate">{t.driver?.name}</span>
+          <span className="text-[8px] font-bold text-slate-400">CPF: {maskCPF(t.driver?.cpf || '')}</span>
           <div className="flex gap-1.5 mt-1">
             <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">{t.driver?.plateHorse}</span>
             <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 text-[8px] font-mono font-bold">{t.driver?.plateTrailer}</span>
@@ -70,7 +65,7 @@ const BalanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
       )
     },
     { key: 'docs', label: '4. Documentação', render: (t: Trip) => {
-      const hasFull = (t.documents?.some(d => d.type === 'COMPLETO')) || t.completoDoc;
+      const hasFull = !!t.completoDoc;
       return (
         <div className="flex items-center gap-2">
           <div className={`w-2.5 h-2.5 rounded-full ${hasFull ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 animate-pulse'}`}></div>
@@ -97,11 +92,11 @@ const BalanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
             checked={isLiberated}
             disabled={isPaid}
             onChange={(e) => handleToggleLiberation(t, e.target.checked)}
-            className={`w-5 h-5 rounded border-slate-300 transition-all cursor-pointer ${isPaid ? 'opacity-50 cursor-not-allowed' : 'text-indigo-600 focus:ring-indigo-500'}`}
+            className={`w-5 h-5 rounded border-slate-300 transition-all cursor-pointer ${isPaid ? 'opacity-50 cursor-not-allowed text-emerald-600' : 'text-indigo-600 focus:ring-indigo-500'}`}
           />
           <div className="flex flex-col">
             <span className={`text-[9px] font-black uppercase ${isPaid ? 'text-emerald-600' : isLiberated ? 'text-indigo-600' : 'text-slate-400'}`}>
-              {isPaid ? '✓ SALDO PAGO' : isLiberated ? '✓ LIBERADO' : 'AGUARDANDO DOCS'}
+              {isPaid ? '✓ PAGO' : isLiberated ? '✓ LIBERADO' : 'AGUARDANDO DOCS'}
             </span>
           </div>
         </div>
@@ -116,7 +111,7 @@ const BalanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
           <button onClick={() => setShowLiberated(false)} className={`px-5 py-2.5 rounded-lg text-[9px] font-black uppercase transition-all ${!showLiberated ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Pendentes ({pendingTrips.length})</button>
           <button onClick={() => setShowLiberated(true)} className={`px-5 py-2.5 rounded-lg text-[9px] font-black uppercase transition-all ${showLiberated ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Liberados ({liberatedTrips.length})</button>
         </div>
-        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Etapa Final: Quitação de Saldo (30%)</p>
+        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Quitação de Saldo Final (30%)</p>
       </div>
 
       <SmartOperationTable 
