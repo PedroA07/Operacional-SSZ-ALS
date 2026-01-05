@@ -43,7 +43,7 @@ const TripModal: React.FC<TripModalProps> = ({
     if (!isoString) return '';
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return '';
-    // Ajusta o fuso horário para o local antes de fazer o slice
+    // Ajusta o fuso horário para o local antes de fazer o slice para evitar saltos de horas
     const offset = date.getTimezoneOffset() * 60000;
     const localDate = new Date(date.getTime() - offset);
     return localDate.toISOString().slice(0, 16);
@@ -61,9 +61,9 @@ const TripModal: React.FC<TripModalProps> = ({
     if (editTrip) {
       setForm({
         ...editTrip,
-        // CORREÇÃO 1: Formata a data corretamente para o input local evitando saltos de horas
+        // CORREÇÃO: Formata a data corretamente para o input local evitando saltos de horas
         dateTime: formatISOToLocalInput(editTrip.dateTime),
-        // CORREÇÃO 2: Remove o fallback do containerType para não vir 40HC no Armador
+        // CORREÇÃO: Remove o fallback do containerType para não vir 40HC no Armador
         agencia: editTrip.ocFormData?.agencia || '',
         padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
         embarcador: editTrip.ocFormData?.embarcador || '',
