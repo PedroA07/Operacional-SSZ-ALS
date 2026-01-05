@@ -300,11 +300,25 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CEP</label><input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm({...form, zipCode: maskCEP(e.target.value)})} /></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm({...form, city: e.target.value.toUpperCase()})} /></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm({...form, state: e.target.value.toUpperCase()})} /></div>
+              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Endereço Comercial</label>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Logradouro e Número</label>
+                    <input required type="text" className={inputClasses} value={form.address} onChange={e => setForm({...form, address: e.target.value.toUpperCase()})} placeholder="EX: RUA EXEMPLO, 123" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Bairro</label>
+                    <input required type="text" className={inputClasses} value={form.neighborhood} onChange={e => setForm({...form, neighborhood: e.target.value.toUpperCase()})} placeholder="BAIRRO" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CEP</label><input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm({...form, zipCode: maskCEP(e.target.value)})} /></div>
+                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm({...form, city: e.target.value.toUpperCase()})} /></div>
+                    <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm({...form, state: e.target.value.toUpperCase()})} /></div>
+                  </div>
+                </div>
               </div>
+              
               <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all mt-4">Salvar Cadastro de Cliente</button>
             </form>
           </div>

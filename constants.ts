@@ -1,7 +1,7 @@
 
 export const ADMIN_CREDENTIALS = {
   username: 'operacional_ssz',
-  password: 'financeiro'
+  password: 'operacoes'
 };
 
 export const APP_CONFIG = {
