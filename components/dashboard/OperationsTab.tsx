@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
@@ -101,7 +100,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setTempStatus(status);
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    statusTime && setStatusTime(now.toISOString().slice(0, 16));
+    setStatusTime(now.toISOString().slice(0, 16));
     setIsStatusModalOpen(true);
   };
 
@@ -146,9 +145,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       printWindow.document.write(`
         <html>
           <head><title>${docViewConfig.title}</title></head>
-          <body style="margin:0;padding:0;">
+          <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;">
             ${docViewConfig.url.startsWith('data:image') 
-              ? `<img src="${docViewConfig.url}" style="width:100%; height:auto;">`
+              ? `<img src="${docViewConfig.url}" style="max-width:100%; height:auto;">`
               : `<embed width="100%" height="100%" src="${docViewConfig.url}" type="application/pdf">`
             }
           </body>
@@ -237,77 +236,31 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-           <div>
-              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Painel de Operações ALS</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Gestão Completa de Fila e Rastreabilidade</p>
-           </div>
-           <button onClick={() => { setSelectedTrip(null); setIsTripModalOpen(true); }} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-600 transition-all">Nova Programação</button>
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+        <OperationFilters 
+          selectedTypes={filterTypes}
+          onTypesChange={setFilterTypes}
+          selectedClients={filterClientNames}
+          onClientsChange={setFilterClientNames}
+          selectedDrivers={filterDriverNames}
+          onDriversChange={setFilterDriverNames}
+          customers={customers}
+          drivers={drivers}
+        />
+        
+        <div className="flex justify-between items-center mb-6">
+          <button onClick={handleClearAllFilters} className="text-[10px] font-black text-blue-600 uppercase hover:underline">Limpar todos os filtros</button>
         </div>
 
-        <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-              <div className="flex-1">
-                 <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Visualizar Categoria Master</h3>
-                 <div className="flex flex-wrap gap-3">
-                    <button onClick={() => { setFilterCategory('TODAS'); setFilterSub('TODAS'); }} className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase ${filterCategory === 'TODAS' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500'}`}>Visão Geral</button>
-                    {categories.filter(c => !c.parentId).map(cat => (
-                      <button 
-                        key={cat.id} 
-                        onClick={() => { 
-                          setActiveView({ type: 'category', categoryName: cat.name });
-                        }} 
-                        className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-900 hover:text-white transition-all text-[10px] font-black uppercase"
-                      >
-                        {cat.name}
-                      </button>
-                    ))}
-                 </div>
-              </div>
-
-              <div className="flex gap-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                 <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Início Período</label>
-                    {/* Fixed Error: Changed setStartDate to setFilterStartDate */}
-                    <input type="date" className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
-                 </div>
-                 <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Fim Período</label>
-                    {/* Fixed Error: Changed setEndDate to setFilterEndDate */}
-                    <input type="date" className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
-                 </div>
-                 {(filterStartDate || filterEndDate) && (
-                   <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }} className="mb-1 text-[8px] font-black text-red-500 uppercase hover:underline">Limpar</button>
-                 )}
-              </div>
-           </div>
-        </div>
+        <SmartOperationTable 
+          userId={user.id}
+          componentId="ops-main-table"
+          title="Painel Geral de Operações"
+          columns={columns}
+          data={filteredTrips}
+          defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'destination_ship_booking', 'scheduling_info', 'actions']}
+        />
       </div>
-
-      <OperationFilters 
-        selectedTypes={filterTypes}
-        onTypesChange={setFilterTypes}
-        selectedClients={filterClientNames}
-        onClientsChange={setFilterClientNames}
-        selectedDrivers={filterDriverNames}
-        onDriversChange={setFilterDriverNames}
-        customers={customers}
-        drivers={drivers}
-      />
-
-      <div className="flex justify-end -mt-4 mb-2 px-4">
-        <button onClick={handleClearAllFilters} className="text-[8px] font-black text-slate-400 uppercase hover:text-blue-600 transition-colors tracking-widest bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm">Resetar Preferências de Filtro</button>
-      </div>
-
-      <SmartOperationTable 
-        userId={user.id} 
-        componentId={`ops-table-v14`} 
-        columns={columns} 
-        data={filteredTrips} 
-        title={filterCategory === 'TODAS' ? "Programação Geral de Operações" : `${filterCategory} › ${filterSub}`}
-        defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'cva_info', 'customer', 'destination_ship_booking', 'scheduling_info', 'actions']}
-      />
 
       <TripModal 
         isOpen={isTripModalOpen} 
@@ -334,7 +287,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento Operacional</p>
                 <p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p>
              </div>
-             
              <div className="space-y-4">
                 <div className="space-y-1">
                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Selecione o Novo Status</label>
@@ -342,13 +294,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                       {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                    </select>
                 </div>
-                
                 <div className="space-y-1">
                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora da Ocorrência</label>
                    <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
                 </div>
              </div>
-
              <div className="grid gap-3 pt-4">
                 <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button>
                 <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
@@ -386,7 +336,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
            <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                  <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Visualizador de Documentos</h3>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Visualizador de Documentos ALS</h3>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Dossiê: {docViewConfig.title}</p>
                  </div>
                  <div className="flex gap-4">
@@ -396,7 +346,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                     >
                        Imprimir
                     </button>
-                    <button onClick={() => setIsDocViewerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+                    <button onClick={() => setIsDocViewerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
                  </div>
               </div>
               <div className="flex-1 bg-slate-100 relative overflow-auto flex justify-center items-center p-8">
@@ -419,4 +369,5 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   );
 };
 
+// Fix: Added missing default export to fix module resolution error in Dashboard files
 export default OperationsTab;
