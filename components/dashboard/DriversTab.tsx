@@ -210,7 +210,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
     }
 
     result.sort((a, b) => {
-      if (sortBy === 'name_asc') return a.name.localeCompare(name);
+      if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
       if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
       if (sortBy === 'recent') return (b.registrationDate || '').localeCompare(a.registrationDate || '');
       return 0;
