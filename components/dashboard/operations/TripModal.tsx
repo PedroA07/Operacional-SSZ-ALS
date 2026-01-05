@@ -15,9 +15,10 @@ interface TripModalProps {
 
 const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drivers, customers, categories, editTrip }) => {
   const [ports, setPorts] = useState<(Port | PreStacking)[]>([]);
-  const [form, setForm] = useState<Partial<Trip>>({
+  const [form, setForm] = useState<any>({
     os: '', booking: '', ship: '', dateTime: '', type: 'EXPORTAÇÃO', status: 'Pendente',
-    category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', containerType: '40HC'
+    category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
+    containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: ''
   });
 
   useEffect(() => {
@@ -30,12 +31,21 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
 
   useEffect(() => {
     if (editTrip) {
-      setForm(editTrip);
+      setForm({
+        ...editTrip,
+        dateTime: editTrip.dateTime?.slice(0, 16),
+        // Garante campos extras vindos da OC se existirem
+        agencia: editTrip.ocFormData?.agencia || editTrip.containerType || '',
+        padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
+        embarcador: editTrip.ocFormData?.embarcador || '',
+        obs: editTrip.ocFormData?.obs || ''
+      });
     } else {
       setForm({
         os: '', booking: '', ship: '', dateTime: new Date().toISOString().slice(0, 16), 
         type: 'EXPORTAÇÃO', status: 'Pendente',
-        category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', containerType: '40HC'
+        category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
+        containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: ''
       });
     }
   }, [editTrip, isOpen]);
@@ -47,11 +57,17 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
     const payload = {
       ...form,
       id: tripId,
+      dateTime: new Date(form.dateTime).toISOString(),
       isLate: editTrip?.isLate || false,
       documents: editTrip?.documents || [],
       statusHistory: editTrip?.statusHistory || [{ status: 'Pendente', dateTime: new Date().toISOString() }],
       advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },
-      balancePayment: editTrip?.balancePayment || { status: 'AGUARDANDO_DOCS' }
+      balancePayment: editTrip?.balancePayment || { status: 'AGUARDANDO_DOCS' },
+      // Sincroniza dados extras para o ocFormData
+      ocFormData: {
+        ...form,
+        horarioAgendado: new Date(form.dateTime).toISOString()
+      }
     };
 
     await db.saveTrip(payload as any);
@@ -62,62 +78,64 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
   if (!isOpen) return null;
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
-  const inputClass = "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300";
-  const selectClass = "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none cursor-pointer";
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300 shadow-sm";
+  const selectClass = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none cursor-pointer shadow-sm";
 
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
       <div className="bg-[#f8fafc] w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[95vh] flex flex-col">
         <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-white">
-          <h3 className="font-black text-slate-800 text-sm uppercase tracking-[0.2em]">{editTrip ? 'Editar Programação' : 'Nova Programação'}</h3>
+          <h3 className="font-black text-slate-800 text-sm uppercase tracking-[0.2em]">{editTrip ? 'Editar Programação' : 'Nova Programação ALS'}</h3>
           <button onClick={onClose} className="text-slate-300 hover:text-red-500 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-10 space-y-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
+        <form onSubmit={handleSubmit} className="p-10 space-y-6 overflow-y-auto custom-scrollbar flex-1 bg-[#f8fafc]">
           
-          <div className="grid grid-cols-3 gap-6">
-            <div className="space-y-1">
-              <label className={labelClass}>Tipo de Operação</label>
-              <select required className={selectClass} value={form.type} onChange={e => setForm({...form, type: e.target.value as any})}>
-                <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
-                <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
-                <option value="COLETA">COLETA</option>
-                <option value="ENTREGA">ENTREGA</option>
-                <option value="CABOTAGEM">CABOTAGEM</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className={labelClass}>Categoria Master</label>
-              <select required className={selectClass} value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
-                <option value="">Selecione...</option>
-                {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className={labelClass}>Subcategoria / Filtro</label>
-              <select className={selectClass} value={form.subCategory} onChange={e => setForm({...form, subCategory: e.target.value})}>
-                <option value="">Nenhuma</option>
-                {categories.filter(c => c.parentId && categories.find(p => p.id === c.parentId)?.name === form.category).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-            </div>
+          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+             <div className="grid grid-cols-3 gap-6">
+                <div className="space-y-1">
+                  <label className={labelClass}>Tipo de Operação</label>
+                  <select required className={selectClass} value={form.type} onChange={e => setForm({...form, type: e.target.value as any})}>
+                    <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
+                    <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
+                    <option value="COLETA">COLETA</option>
+                    <option value="ENTREGA">ENTREGA</option>
+                    <option value="CABOTAGEM">CABOTAGEM</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className={labelClass}>Categoria Master</label>
+                  <select required className={selectClass} value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
+                    <option value="">Selecione...</option>
+                    {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className={labelClass}>Vínculo / Filtro</label>
+                  <select className={selectClass} value={form.subCategory} onChange={e => setForm({...form, subCategory: e.target.value})}>
+                    <option value="">Geral</option>
+                    {categories.filter(c => c.parentId && categories.find(p => p.id === c.parentId)?.name === form.category).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
+             </div>
+
+             <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className={labelClass}>Nº Ordem de Serviço (OS)</label>
+                  <input required className={inputClass} value={form.os} onChange={e => setForm({...form, os: e.target.value.toUpperCase()})} />
+                </div>
+                <div>
+                  <label className={labelClass}>Data/Hora Agenda</label>
+                  <input required type="datetime-local" className={inputClass} value={form.dateTime} onChange={e => setForm({...form, dateTime: e.target.value})} />
+                </div>
+             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">
-            <div>
-              <label className={labelClass}>Nº Ordem de Serviço (OS)</label>
-              <input required className={inputClass} value={form.os} onChange={e => setForm({...form, os: e.target.value.toUpperCase()})} />
-            </div>
-            <div>
-              <label className={labelClass}>Data/Hora Agenda</label>
-              <input required type="datetime-local" className={inputClass} value={form.dateTime ? form.dateTime.slice(0, 16) : ''} onChange={e => setForm({...form, dateTime: e.target.value})} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-               <label className={labelClass}>Cliente (Pagador / Remetente)</label>
+               <label className={labelClass}>Cliente (Contratante)</label>
                <select required className={selectClass} value={form.customer?.id} onChange={e => {
                  const c = customers.find(cust => cust.id === e.target.value);
                  if (c) setForm({...form, customer: { id: c.id, name: c.name, legalName: c.legalName, cnpj: c.cnpj, city: c.city, state: c.state }});
@@ -127,10 +145,10 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
                </select>
             </div>
             <div className="space-y-1">
-               <label className={labelClass}>Destino (Terminal / Porto / Entrega)</label>
+               <label className={labelClass}>Destino (Porto / Entrega)</label>
                <select required className={selectClass} value={form.destination?.id} onChange={e => {
                  const p = ports.find(pt => pt.id === e.target.value);
-                 if (p) setForm({...form, destination: { id: p.id, name: p.name, legalName: p.legalName, cnpj: p.cnpj, city: p.city, state: p.state }});
+                 if (p) setForm({...form, destination: { id: p.id, name: p.name, legalName: (p as any).legalName, cnpj: (p as any).cnpj, city: p.city, state: p.state }});
                }}>
                  <option value="">Selecione o destino...</option>
                  {ports.map(p => <option key={p.id} value={p.id}>{p.legalName || p.name} ({p.city})</option>)}
@@ -138,31 +156,35 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
             </div>
           </div>
 
-          <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-6">
-             <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Detalhes do Equipamento</p>
-             <div className="grid grid-cols-4 gap-4">
-                <div className="col-span-2 space-y-1">
-                   <label className={labelClass}>Identif. Container</label>
+          <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 space-y-6">
+             <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Dossiê do Equipamento</p>
+             <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-4 space-y-1">
+                   <label className={labelClass}>Nº Container</label>
                    <input required className={inputClass} value={form.container} onChange={e => setForm({...form, container: e.target.value.toUpperCase()})} />
                 </div>
-                <div className="space-y-1">
-                   <label className={labelClass}>Tipo Container</label>
+                <div className="col-span-3 space-y-1">
+                   <label className={labelClass}>Tipo</label>
                    <select className={selectClass} value={form.containerType} onChange={e => setForm({...form, containerType: e.target.value})}>
                       <option value="40HC">40HC</option>
-                      <option value="40HR">40HR (REEFER)</option>
+                      <option value="40HR">40HR</option>
                       <option value="40DC">40DC</option>
                       <option value="20DC">20DC</option>
-                      <option value="20RF">20RF</option>
                    </select>
                 </div>
-                <div className="space-y-1">
+                <div className="col-span-3 space-y-1">
+                   <label className={labelClass}>Armador / Agência</label>
+                   <input className={inputClass} value={form.agencia} onChange={e => setForm({...form, agencia: e.target.value.toUpperCase()})} />
+                </div>
+                <div className="col-span-2 space-y-1">
                    <label className={labelClass}>CVA</label>
-                   <input className={inputClass} value={form.cva} onChange={e => setForm({...form, cva: e.target.value.toUpperCase()})} />
+                   <input className={`${inputClass} border-blue-200 text-blue-700`} value={form.cva} onChange={e => setForm({...form, cva: e.target.value.toUpperCase()})} />
                 </div>
              </div>
-             <div className="grid grid-cols-2 gap-6">
+             <div className="grid grid-cols-3 gap-6">
                 <div className="space-y-1"><label className={labelClass}>Tara (KG)</label><input className={inputClass} value={form.tara} onChange={e => setForm({...form, tara: e.target.value.toUpperCase()})} /></div>
-                <div className="space-y-1"><label className={labelClass}>Lacre Armador</label><input className={inputClass} value={form.seal} onChange={e => setForm({...form, seal: e.target.value.toUpperCase()})} /></div>
+                <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={inputClass} value={form.seal} onChange={e => setForm({...form, seal: e.target.value.toUpperCase()})} /></div>
+                <div className="space-y-1"><label className={labelClass}>Padrão Unidade</label><input className={inputClass} value={form.padrao} onChange={e => setForm({...form, padrao: e.target.value.toUpperCase()})} /></div>
              </div>
           </div>
 
@@ -183,8 +205,13 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
              </div>
           </div>
 
-          <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-2xl text-[12px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-blue-600 transition-all">
-            {editTrip ? 'Atualizar Dados da Programação' : 'Gravar Nova Programação'}
+          <div className="space-y-1">
+             <label className={labelClass}>Embarcador / Observações</label>
+             <textarea className={`${inputClass} h-24 resize-none normal-case`} value={form.obs} onChange={e => setForm({...form, obs: e.target.value})} placeholder="Instruções de carregamento..." />
+          </div>
+
+          <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-blue-600 transition-all active:scale-[0.98]">
+            {editTrip ? 'Finalizar Atualização de Viagem' : 'Cadastrar Programação no Painel'}
           </button>
         </form>
       </div>

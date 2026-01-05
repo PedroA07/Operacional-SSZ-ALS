@@ -1,5 +1,5 @@
 
-import { Trip, Driver, Customer, Port, TripStatus } from '../types';
+import { Trip, Driver, Customer, Port } from '../types';
 import { db } from './storage';
 
 export const tripSyncService = {
@@ -12,7 +12,6 @@ export const tripSyncService = {
    * Verifica se existem diferenças reais entre a Trip do banco e os dados do formulário
    */
   hasChanges: (existing: Trip, currentForm: any, driverId: string, customerId: string): boolean => {
-    // Compara campos críticos
     const diffs = [
       existing.driver.id !== driverId,
       existing.customer.id !== customerId,
@@ -20,7 +19,8 @@ export const tripSyncService = {
       (existing.booking || '').toUpperCase() !== (currentForm.booking || '').toUpperCase(),
       (existing.ship || '').toUpperCase() !== (currentForm.ship || '').toUpperCase(),
       (existing.containerType || '').toUpperCase() !== (currentForm.tipo || '').toUpperCase(),
-      (existing.seal || '').toUpperCase() !== (currentForm.seal || '').toUpperCase()
+      (existing.seal || '').toUpperCase() !== (currentForm.seal || '').toUpperCase(),
+      (existing.destination?.id || '') !== (currentForm.destinatarioId || '')
     ];
     return diffs.some(d => d === true);
   },
@@ -51,6 +51,8 @@ export const tripSyncService = {
       destination: destination ? {
         id: destination.id,
         name: destination.name,
+        legalName: (destination as any).legalName,
+        cnpj: (destination as any).cnpj,
         city: destination.city,
         state: destination.state
       } : undefined,

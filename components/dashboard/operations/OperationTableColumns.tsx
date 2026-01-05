@@ -48,7 +48,6 @@ export const getOperationTableColumns = (
         </html>
       `);
       printWindow.document.close();
-      // Delay necessário para o browser carregar o PDF no iframe antes de disparar o print
       setTimeout(() => {
         printWindow.focus();
         printWindow.print();
@@ -116,7 +115,7 @@ export const getOperationTableColumns = (
     render: (t: Trip) => (
       <div className="flex flex-col space-y-0.5 max-w-[250px] whitespace-normal break-words">
         <p className="font-black text-slate-800 uppercase text-[10px] leading-tight">
-          {t.customer?.legalName || 'S.R'}
+          {t.customer?.legalName || t.customer?.name}
         </p>
         <p className="text-[9px] font-bold text-slate-400 uppercase italic">
           FAN: {t.customer?.name}
@@ -214,7 +213,6 @@ export const getOperationTableColumns = (
       
       return (
         <div className="flex flex-col gap-2 min-w-[140px]">
-          {/* EDITAR DADOS GERAIS */}
           <button 
             onClick={() => onEditTrip(t)} 
             className="w-full flex items-center gap-2 px-3 py-2 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-sm"
@@ -223,7 +221,6 @@ export const getOperationTableColumns = (
             <span className="text-[8px] font-black uppercase">Editar Viagem</span>
           </button>
 
-          {/* GESTÃO DE OS PDF */}
           {osDoc ? (
             <div className="space-y-1 p-2 bg-emerald-50 rounded-xl border border-emerald-100">
                <p className="text-[7px] font-black text-emerald-600 uppercase mb-1">Dossiê OS PDF</p>
@@ -256,7 +253,6 @@ export const getOperationTableColumns = (
             </label>
           )}
 
-          {/* OC: EDITAR */}
           {t.ocFormData && (
             <button 
               onClick={() => onEditOC(t)} 
@@ -267,7 +263,6 @@ export const getOperationTableColumns = (
             </button>
           )}
 
-          {/* MINUTA PRE-STACKING FORM */}
           <button 
             onClick={() => onEditMinuta(t)} 
             className="w-full flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
@@ -276,7 +271,6 @@ export const getOperationTableColumns = (
             <span className="text-[8px] font-black uppercase">Minuta PreS.</span>
           </button>
 
-          {/* EXCLUIR */}
           <button 
             onClick={() => onDeleteTrip(t.id)} 
             className="w-full flex items-center gap-2 px-3 py-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm group"
