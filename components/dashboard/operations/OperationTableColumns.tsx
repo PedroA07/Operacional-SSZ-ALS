@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { Trip, TripStatus } from '../../../types';
+import { Trip, TripStatus, TripDocument } from '../../../types';
+import { db } from '../../../utils/storage';
 
 export const getOperationTableColumns = (
   openStatusEditor: (t: Trip, s: TripStatus) => void,
@@ -9,7 +10,28 @@ export const getOperationTableColumns = (
   onEditMinuta: (t: Trip) => void,
   onDownloadMinuta: (t: Trip) => void,
   onDeleteTrip: (id: string) => void
-) => [
+) => {
+  
+  const handleOSUpload = (trip: Trip, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const doc: TripDocument = { 
+        id: `os-pdf-${Date.now()}`, 
+        type: 'OS_PDF', 
+        url: reader.result as string, 
+        fileName: file.name, 
+        uploadDate: new Date().toISOString() 
+      };
+      const updated = { ...trip, documents: [...(trip.documents || []), doc] };
+      await db.saveTrip(updated);
+      alert("PDF da OS anexado com sucesso!");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return [
   { 
     key: 'dateTime', 
     label: '1. Prog. / Operação', 
@@ -173,6 +195,13 @@ export const getOperationTableColumns = (
           <span className="text-[8px] font-black uppercase">Editar Viagem</span>
         </button>
 
+        {/* ANEXAR OS PDF */}
+        <label className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all shadow-sm cursor-pointer border ${t.documents?.some(d => d.type === 'OS_PDF') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-400'}`}>
+          <input type="file" className="hidden" accept=".pdf" onChange={(e) => handleOSUpload(t, e)} />
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+          <span className="text-[8px] font-black uppercase">{t.documents?.some(d => d.type === 'OS_PDF') ? 'OS Anexada' : 'Anexar OS PDF'}</span>
+        </label>
+
         {/* OC: EDITAR */}
         {t.ocFormData && (
           <button 
@@ -204,4 +233,4 @@ export const getOperationTableColumns = (
       </div>
     )
   }
-];
+]};

@@ -31,7 +31,8 @@ export enum DashboardTab {
   FORMULARIOS = 'FORMULARIOS',
   COLABORADORES = 'COLABORADORES',
   PORTOS = 'PORTOS',
-  PRE_STACKING = 'PRE_STACKING'
+  PRE_STACKING = 'PRE_STACKING',
+  DOCUMENTOS = 'DOCUMENTOS'
 }
 
 export type TripStatus = 
@@ -60,7 +61,7 @@ export interface PaymentStatus {
 
 export interface TripDocument {
   id: string;
-  type: 'COMPLETO' | 'NF' | 'OC' | 'MINUTA';
+  type: 'COMPLETO' | 'NF' | 'OC' | 'MINUTA' | 'OS_PDF';
   url: string;
   fileName: string;
   uploadDate: string;
