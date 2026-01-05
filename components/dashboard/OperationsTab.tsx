@@ -142,7 +142,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     handleEditOC,
     handleEditMinuta,
     handleViewDoc,
-    (id) => onDeleteTrip?.(id)
+    (id) => onDeleteTrip?.(id),
+    loadData // Callback de atualização injetado nas colunas
   );
 
   const STATUS_OPTIONS: TripStatus[] = [
