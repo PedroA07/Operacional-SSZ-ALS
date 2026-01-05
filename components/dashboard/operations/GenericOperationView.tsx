@@ -244,7 +244,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
             title={`Histórico e Programação: ${type === 'category' ? categoryName : clientName}`}
             columns={tripColumns}
             data={filteredTrips}
-            defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'scheduling_info', 'actions']}
+            defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'destination_ship_booking', 'scheduling_info', 'actions']}
           />
         </div>
 

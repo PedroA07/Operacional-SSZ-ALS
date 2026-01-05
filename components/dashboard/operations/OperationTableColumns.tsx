@@ -262,42 +262,37 @@ export const getOperationTableColumns = (
     )
   },
   {
-    key: 'destination_info',
-    label: '7. Destino',
+    key: 'destination_ship_booking',
+    label: '7. Destino / Navio / Booking',
     render: (t: Trip) => (
-      <div className="flex flex-col space-y-0.5 max-w-[200px] whitespace-normal break-words">
-        <p className="font-black text-slate-700 uppercase text-[10px] leading-tight">
-          {t.destination?.legalName || t.destination?.name || '---'}
-        </p>
-        {t.destination && (
-          <div className="flex flex-col mt-1 border-t border-slate-50 pt-1">
-             <span className="text-[8px] font-bold text-slate-400 uppercase">
-                {t.destination.city} - {t.destination.state}
-             </span>
-          </div>
-        )}
-      </div>
-    )
-  },
-  {
-    key: 'ship_booking',
-    label: '8. Navio / Booking',
-    render: (t: Trip) => (
-      <div className="flex flex-col">
-        <div className="flex flex-col mb-2">
-          <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">Navio:</span>
-          <span className="font-black text-slate-800 text-[10px] uppercase truncate">{t.ship || '---'}</span>
+      <div className="flex flex-col space-y-2 max-w-[220px] whitespace-normal">
+        <div className="flex flex-col space-y-0.5">
+          <p className="font-black text-slate-700 uppercase text-[10px] leading-tight">
+            {t.destination?.legalName || t.destination?.name || '---'}
+          </p>
+          {t.destination && (
+            <span className="text-[8px] font-bold text-slate-400 uppercase">
+              {t.destination.city} - {t.destination.state}
+            </span>
+          )}
         </div>
-        <div className="flex flex-col border-t border-slate-50 pt-1">
-          <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter">Booking:</span>
-          <span className="text-blue-600 font-bold text-[10px] uppercase">{t.booking || '---'}</span>
+        
+        <div className="flex flex-col pt-1.5 border-t border-slate-100 gap-1.5">
+          <div className="flex flex-col">
+            <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter leading-none">Navio:</span>
+            <span className="font-black text-slate-800 text-[9px] uppercase truncate">{t.ship || '---'}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter leading-none">Booking:</span>
+            <span className="text-blue-600 font-bold text-[9px] uppercase truncate">{t.booking || '---'}</span>
+          </div>
         </div>
       </div>
     )
   },
   { 
     key: 'scheduling_info', 
-    label: '9. Agendamento', 
+    label: '8. Agendamento', 
     render: (t: Trip) => {
       const sch = t.scheduling;
       if (!sch) return (
@@ -335,7 +330,7 @@ export const getOperationTableColumns = (
   },
   {
     key: 'actions',
-    label: '10. Opções',
+    label: '9. Opções',
     render: (t: Trip) => {
       return (
         <div className="flex flex-col gap-2 min-w-[160px]">
