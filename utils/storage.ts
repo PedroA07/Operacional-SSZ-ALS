@@ -20,6 +20,7 @@ export const KEYS = {
   PREFERENCES: 'als_ui_preferences'
 };
 
+// --- MAPPERS PARA TRIP ---
 const mapTripToDb = (trip: Trip) => ({
   id: trip.id,
   os: trip.os,
@@ -81,10 +82,45 @@ const mapDbToTrip = (d: any): Trip => ({
   scheduling: d.scheduling || undefined
 });
 
-/**
- * MAPEAMENTO DE STAFF (COLABORADORES)
- * Mapeia emailcorp e phonecorp do banco para emailCorp e phoneCorp no App
- */
+// --- MAPPERS PARA PRE-STACKING E PORTO ---
+const mapPreStackingToDb = (ps: PreStacking) => ({
+  id: ps.id,
+  name: ps.name,
+  legal_name: ps.legalName, // Traduzindo para legal_name do banco
+  cnpj: ps.cnpj,
+  zipCode: ps.zipCode,
+  address: ps.address,
+  neighborhood: ps.neighborhood,
+  city: ps.city,
+  state: ps.state,
+  registrationDate: new Date().toISOString()
+});
+
+const mapPortToDb = (p: Port) => ({
+  id: p.id,
+  name: p.name,
+  legal_name: p.legalName, // Traduzindo para legal_name do banco
+  cnpj: p.cnpj,
+  zipCode: p.zipCode,
+  address: p.address,
+  neighborhood: p.neighborhood,
+  city: p.city,
+  state: p.state
+});
+
+const mapDbToPreStacking = (d: any): PreStacking => ({
+  id: d.id,
+  name: d.name,
+  legalName: d.legal_name || d.legalName,
+  cnpj: d.cnpj,
+  zipCode: d.zipCode,
+  address: d.address,
+  neighborhood: d.neighborhood,
+  city: d.city,
+  state: d.state
+});
+
+// --- MAPPERS PARA STAFF ---
 const mapStaffToDb = (s: Staff) => ({
   id: s.id,
   name: s.name,
@@ -236,7 +272,14 @@ export const db = {
     return db._getLocal(KEYS.CUSTOMERS);
   },
   saveCustomer: async (customer: Customer) => {
-    if (supabase) { try { await supabase.from('customers').upsert(customer); } catch (e) {} }
+    if (supabase) { 
+      try { 
+        // Pequeno ajuste para customers que também usam legalName
+        const payload = { ...customer, legal_name: customer.legalName };
+        delete (payload as any).legalName;
+        await supabase.from('customers').upsert(payload); 
+      } catch (e) {} 
+    }
     const current = db._getLocal(KEYS.CUSTOMERS);
     const idx = current.findIndex((c: any) => c.id === customer.id);
     if (idx >= 0) current[idx] = customer; else current.push(customer);
@@ -250,11 +293,28 @@ export const db = {
     return true;
   },
   getPorts: async (): Promise<Port[]> => {
-    if (supabase) { try { const { data } = await supabase.from('ports').select('*'); if (data) { db._saveLocal(KEYS.PORTS, data); return data; } } catch (e) {} }
+    if (supabase) { 
+      try { 
+        const { data, error } = await supabase.from('ports').select('*'); 
+        if (data && !error) { 
+          const mapped = data.map(mapDbToPreStacking) as Port[];
+          db._saveLocal(KEYS.PORTS, mapped); 
+          return mapped; 
+        } 
+      } catch (e) {} 
+    }
     return db._getLocal(KEYS.PORTS);
   },
   savePort: async (port: Port) => {
-    if (supabase) { try { await supabase.from('ports').upsert(port); } catch (e) {} }
+    if (supabase) { 
+      try { 
+        const payload = mapPortToDb(port);
+        const { error } = await supabase.from('ports').upsert(payload); 
+        if (error) console.error("Erro ao salvar Porto na Nuvem:", error);
+      } catch (e) {
+        console.error("Exceção ao salvar Porto:", e);
+      } 
+    }
     const current = db._getLocal(KEYS.PORTS);
     const idx = current.findIndex((p: any) => p.id === port.id);
     if (idx >= 0) current[idx] = port; else current.push(port);
@@ -313,11 +373,31 @@ export const db = {
     return true;
   },
   getPreStacking: async (): Promise<PreStacking[]> => {
-    if (supabase) { try { const { data } = await supabase.from('pre_stacking').select('*'); if (data) { db._saveLocal(KEYS.PRE_STACKING, data); return data; } } catch (e) {} }
+    if (supabase) { 
+      try { 
+        const { data, error } = await supabase.from('pre_stacking').select('*'); 
+        if (data && !error) { 
+          const mapped = data.map(mapDbToPreStacking);
+          db._saveLocal(KEYS.PRE_STACKING, mapped); 
+          return mapped; 
+        } 
+      } catch (e) {} 
+    }
     return db._getLocal(KEYS.PRE_STACKING);
   },
   savePreStacking: async (ps: PreStacking) => {
-    if (supabase) { try { await supabase.from('pre_stacking').upsert(ps); } catch (e) {} }
+    if (supabase) { 
+      try { 
+        const payload = mapPreStackingToDb(ps);
+        const { error } = await supabase.from('pre_stacking').upsert(payload); 
+        if (error) {
+          console.error("Erro ao salvar PreStacking na Nuvem:", error);
+          throw error;
+        }
+      } catch (e) {
+        console.error("Exceção ao salvar PreStacking:", e);
+      } 
+    }
     const current = db._getLocal(KEYS.PRE_STACKING);
     const idx = current.findIndex((p: any) => p.id === ps.id);
     if (idx >= 0) current[idx] = ps; else current.push(ps);
