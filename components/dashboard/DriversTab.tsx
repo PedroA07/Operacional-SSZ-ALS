@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-// Fixed: Removed DriverOperation which is not exported from types.ts
-import { Driver, OperationDefinition, User } from '../../types';
+import { Driver, OperationDefinition, User, Customer } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
 import { db } from '../../utils/storage';
 import { driverAuthService } from '../../utils/driverAuthService';
@@ -13,12 +12,13 @@ import ListFilters from './shared/ListFilters';
 
 interface DriversTabProps {
   drivers: Driver[];
+  customers: Customer[]; // Adicionado customers para filtrar no modal
   onSaveDriver: (driver: Partial<Driver>, id?: string) => Promise<void>;
   onDeleteDriver: (id: string) => void;
   availableOps: OperationDefinition[];
 }
 
-const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDeleteDriver, availableOps }) => {
+const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDriver, onDeleteDriver, availableOps }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -36,6 +36,10 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+
+  // Estados temporários para o formulário de adição de operação no modal
+  const [tempCategory, setTempCategory] = useState(availableOps[0]?.category || '');
+  const [tempClient, setTempClient] = useState('Geral');
   
   const [visibility, setVisibility] = useState({
     driverInfo: true,
@@ -74,6 +78,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
   const handleOpenModal = (d?: Driver) => {
     setForm(d ? { ...d, operations: d.operations || [] } : initialForm);
     setEditingId(d?.id);
+    setTempCategory(availableOps[0]?.category || '');
+    setTempClient('Geral');
     setIsModalOpen(true);
   };
 
@@ -112,13 +118,13 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     }
   };
 
-  const addOperation = (category: string, client: string) => {
-    if (!category || !client) return;
-    const exists = form.operations?.some(op => op.category === category && op.client === client);
+  const addOperation = () => {
+    if (!tempCategory || !tempClient) return;
+    const exists = form.operations?.some(op => op.category === tempCategory && op.client === tempClient);
     if (exists) return;
     setForm(prev => ({
       ...prev,
-      operations: [...(prev.operations || []), { category, client }]
+      operations: [...(prev.operations || []), { category: tempCategory, client: tempClient }]
     }));
   };
 
@@ -204,7 +210,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
     }
 
     result.sort((a, b) => {
-      if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
+      if (sortBy === 'name_asc') return a.name.localeCompare(name);
       if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
       if (sortBy === 'recent') return (b.registrationDate || '').localeCompare(a.registrationDate || '');
       return 0;
@@ -212,6 +218,14 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
 
     return result;
   }, [drivers, searchQuery, sortBy, statusFilter]);
+
+  // Filtragem dinâmica de clientes baseada na categoria selecionada no modal
+  const filteredCustomersForOps = useMemo(() => {
+    if (!tempCategory) return [];
+    return customers.filter(c => 
+      c.operations?.some(op => op.toUpperCase() === tempCategory.toUpperCase())
+    );
+  }, [customers, tempCategory]);
 
   const VisibilityToggle = ({ id, label }: { id: keyof typeof visibility, label: string }) => (
     <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-white transition-all group">
@@ -438,35 +452,45 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                  </div>
               </div>
 
-              {/* VÍNCULOS OPERACIONAIS EDITOR */}
+              {/* VÍNCULOS OPERACIONAIS EDITOR DINÂMICO */}
               <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-white/5 space-y-6">
                  <div className="flex items-center justify-between">
                     <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Gestão de Vínculos Operacionais</h4>
                  </div>
                  <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-5">
-                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Categoria</label>
-                       <select id="op-cat" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500">
+                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Categoria Master</label>
+                       <select 
+                         value={tempCategory}
+                         onChange={(e) => {
+                            setTempCategory(e.target.value);
+                            setTempClient('Geral'); // Reseta cliente ao mudar categoria
+                         }}
+                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500"
+                       >
                           {availableOps.map(op => <option key={op.id} value={op.category} className="bg-slate-900">{op.category}</option>)}
                        </select>
                     </div>
                     <div className="col-span-5">
-                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Cliente</label>
-                       <select id="op-client" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500">
-                          <option value="Geral" className="bg-slate-900">Geral / Todos</option>
-                          {availableOps.find(o => o.category === (document.getElementById('op-cat') as HTMLSelectElement)?.value)?.clients.map((c, i) => (
-                             <option key={i} value={c.name} className="bg-slate-900">{c.name}</option>
+                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Cliente Vinculado</label>
+                       <select 
+                         value={tempClient}
+                         onChange={(e) => setTempClient(e.target.value)}
+                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500"
+                       >
+                          <option value="Geral" className="bg-slate-900">Geral / Todos da Categoria</option>
+                          {filteredCustomersForOps.map((c) => (
+                             <option key={c.id} value={c.name} className="bg-slate-900">
+                               {c.name} ({c.city})
+                             </option>
                           ))}
                        </select>
+                       <p className="text-[7px] text-slate-500 font-bold uppercase mt-1 ml-1">* Exibindo clientes registrados em "{tempCategory}"</p>
                     </div>
                     <div className="col-span-2 flex items-end">
                        <button 
                          type="button" 
-                         onClick={() => {
-                            const cat = (document.getElementById('op-cat') as HTMLSelectElement).value;
-                            const cli = (document.getElementById('op-client') as HTMLSelectElement).value;
-                            addOperation(cat, cli);
-                         }}
+                         onClick={addOperation}
                          className="w-full py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-500 transition-all shadow-lg"
                        >
                           Adicionar
@@ -500,7 +524,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                     <button type="button" onClick={() => cnhInputRef.current?.click()} className="px-6 py-3 bg-white border-2 border-blue-200 text-blue-600 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm">
                        {form.cnhPdfUrl ? 'Substituir PDF' : 'Selecionar Arquivo'}
                     </button>
-                    <input type="file" ref={cnhInputRef} className="hidden" accept="application/pdf" onChange={handleCnhUpload} />
+                    <input type="file" className="hidden" accept="application/pdf" ref={cnhInputRef} onChange={handleCnhUpload} />
                  </div>
               </div>
 
@@ -513,7 +537,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, onSaveDriver, onDelete
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                        <div className="col-span-2 space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Placa Carreta</label><input required className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: maskPlate(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-slate-200 bg-white font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50" maxLength={4} value={form.yearTrailer} onChange={e => setForm({...form, yearTrailer: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
+                       <div className="space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" maxLength={4} value={form.yearTrailer} onChange={e => setForm({...form, yearTrailer: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
                     </div>
                  </div>
               </div>
