@@ -143,41 +143,8 @@ export const getOperationTableColumns = (
     }
   },
   { 
-    key: 'scheduling_info', 
-    label: '2. Agendamento Terminal', 
-    render: (t: Trip) => {
-      const sch = t.scheduling;
-      if (!sch) return (
-        <button onClick={() => onEditScheduling(t)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all border border-dashed border-slate-300">
-           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
-           <span className="text-[8px] font-black uppercase">Vincular Agend.</span>
-        </button>
-      );
-
-      const schDate = new Date(sch.dateTime);
-
-      return (
-        <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 min-w-[180px] group relative">
-           <div className="flex justify-between items-start mb-2">
-              <div className="flex flex-col">
-                 <span className="text-[9px] font-black text-emerald-700 uppercase leading-none">{schDate.toLocaleDateString('pt-BR')}</span>
-                 <span className="text-[11px] font-black text-slate-800 mt-0.5">{schDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-              </div>
-              <button onClick={() => onEditScheduling(t)} className="opacity-0 group-hover:opacity-100 p-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-blue-100 transition-all">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-              </button>
-           </div>
-           <div className="border-t border-emerald-100/50 pt-2">
-              <p className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter">Local de Entrega:</p>
-              <p className="text-[9px] font-bold text-slate-600 uppercase leading-tight truncate">{sch.location}</p>
-           </div>
-        </div>
-      );
-    }
-  },
-  { 
     key: 'os_status', 
-    label: '3. OS / Histórico Status', 
+    label: '2. OS / Histórico Status', 
     render: (t: Trip) => (
       <div className="flex flex-col gap-2 min-w-[220px]">
         <div className="flex items-center justify-between group">
@@ -202,27 +169,23 @@ export const getOperationTableColumns = (
       </div>
     )
   },
-  {
-    key: 'customer',
-    label: '4. Cliente / Local',
+  { 
+    key: 'driver', 
+    label: '3. Motorista', 
     render: (t: Trip) => (
-      <div className="flex flex-col space-y-0.5 max-w-[250px] whitespace-normal break-words">
-        <p className="font-black text-slate-800 uppercase text-[10px] leading-tight">
-          {t.customer?.legalName || t.customer?.name}
-        </p>
-        <p className="text-[9px] font-bold text-slate-400 uppercase italic">
-          FAN: {t.customer?.name}
-        </p>
-        <div className="flex flex-col mt-1 border-t border-slate-50 pt-1">
-           <span className="text-[8px] font-black text-blue-600">CNPJ: {t.customer?.cnpj || '---'}</span>
-           <span className="text-[8px] font-bold text-slate-500">{t.customer?.city} - {t.customer?.state}</span>
+      <div className="flex flex-col space-y-0.5 max-w-[200px] whitespace-normal break-words">
+        <span className="font-black text-slate-800 uppercase text-[10px] leading-tight">{t.driver?.name}</span>
+        <span className="text-[8px] font-bold text-slate-400">CPF: {t.driver?.cpf}</span>
+        <div className="mt-1 space-y-0.5">
+           <p className="text-[8px] font-black uppercase text-blue-600">Cavalo: <span className="font-mono">{t.driver?.plateHorse}</span></p>
+           <p className="text-[8px] font-black uppercase text-slate-500">Carreta: <span className="font-mono">{t.driver?.plateTrailer}</span></p>
         </div>
       </div>
     )
   },
   {
     key: 'equipment',
-    label: '5. Equipamento',
+    label: '4. Equipamento',
     render: (t: Trip) => (
       <div className="flex flex-col space-y-1">
         <div className="flex items-center gap-2">
@@ -239,23 +202,109 @@ export const getOperationTableColumns = (
       </div>
     )
   },
-  { 
-    key: 'driver', 
-    label: '6. Motorista', 
+  {
+    key: 'cva_info',
+    label: '5. CVA',
     render: (t: Trip) => (
-      <div className="flex flex-col space-y-0.5 max-w-[200px] whitespace-normal break-words">
-        <span className="font-black text-slate-800 uppercase text-[10px] leading-tight">{t.driver?.name}</span>
-        <span className="text-[8px] font-bold text-slate-400">CPF: {t.driver?.cpf}</span>
-        <div className="mt-1 space-y-0.5">
-           <p className="text-[8px] font-black uppercase text-blue-600">Cavalo: <span className="font-mono">{t.driver?.plateHorse}</span></p>
-           <p className="text-[8px] font-black uppercase text-slate-500">Carreta: <span className="font-mono">{t.driver?.plateTrailer}</span></p>
+      <div className="flex items-center">
+        {t.cva ? (
+          <span className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-mono font-black uppercase shadow-sm">
+            {t.cva}
+          </span>
+        ) : (
+          <span className="text-[9px] font-bold text-slate-300 uppercase italic">Não Inf.</span>
+        )}
+      </div>
+    )
+  },
+  {
+    key: 'customer',
+    label: '6. Cliente',
+    render: (t: Trip) => (
+      <div className="flex flex-col space-y-0.5 max-w-[250px] whitespace-normal break-words">
+        <p className="font-black text-slate-800 uppercase text-[10px] leading-tight">
+          {t.customer?.legalName || t.customer?.name}
+        </p>
+        <p className="text-[9px] font-bold text-slate-400 uppercase italic">
+          FAN: {t.customer?.name}
+        </p>
+        <div className="flex flex-col mt-1 border-t border-slate-50 pt-1">
+           <span className="text-[8px] font-black text-blue-600">CNPJ: {t.customer?.cnpj || '---'}</span>
+           <span className="text-[8px] font-bold text-slate-500">{t.customer?.city} - {t.customer?.state}</span>
         </div>
       </div>
     )
   },
   {
+    key: 'destination_info',
+    label: '7. Destino',
+    render: (t: Trip) => (
+      <div className="flex flex-col space-y-0.5 max-w-[200px] whitespace-normal break-words">
+        <p className="font-black text-slate-700 uppercase text-[10px] leading-tight">
+          {t.destination?.legalName || t.destination?.name || '---'}
+        </p>
+        {t.destination && (
+          <div className="flex flex-col mt-1 border-t border-slate-50 pt-1">
+             <span className="text-[8px] font-bold text-slate-400 uppercase">
+                {t.destination.city} - {t.destination.state}
+             </span>
+          </div>
+        )}
+      </div>
+    )
+  },
+  {
+    key: 'ship_booking',
+    label: '8. Navio / Booking',
+    render: (t: Trip) => (
+      <div className="flex flex-col">
+        <div className="flex flex-col mb-2">
+          <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">Navio:</span>
+          <span className="font-black text-slate-800 text-[10px] uppercase truncate">{t.ship || '---'}</span>
+        </div>
+        <div className="flex flex-col border-t border-slate-50 pt-1">
+          <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter">Booking:</span>
+          <span className="text-blue-600 font-bold text-[10px] uppercase">{t.booking || '---'}</span>
+        </div>
+      </div>
+    )
+  },
+  { 
+    key: 'scheduling_info', 
+    label: '9. Agendamento', 
+    render: (t: Trip) => {
+      const sch = t.scheduling;
+      if (!sch) return (
+        <button onClick={() => onEditScheduling(t)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all border border-dashed border-slate-300">
+           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+           <span className="text-[8px] font-black uppercase">Agendar</span>
+        </button>
+      );
+
+      const schDate = new Date(sch.dateTime);
+
+      return (
+        <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 min-w-[180px] group relative">
+           <div className="flex justify-between items-start mb-2">
+              <div className="flex flex-col">
+                 <span className="text-[9px] font-black text-emerald-700 uppercase leading-none">{schDate.toLocaleDateString('pt-BR')}</span>
+                 <span className="text-[11px] font-black text-slate-800 mt-0.5">{schDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+              </div>
+              <button onClick={() => onEditScheduling(t)} className="opacity-0 group-hover:opacity-100 p-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-blue-100 transition-all">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              </button>
+           </div>
+           <div className="border-t border-emerald-100/50 pt-2">
+              <p className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter">Terminal:</p>
+              <p className="text-[9px] font-bold text-slate-600 uppercase leading-tight truncate">{sch.location}</p>
+           </div>
+        </div>
+      );
+    }
+  },
+  {
     key: 'actions',
-    label: '7. Opções',
+    label: '10. Opções',
     render: (t: Trip) => {
       return (
         <div className="flex flex-col gap-2 min-w-[140px]">
