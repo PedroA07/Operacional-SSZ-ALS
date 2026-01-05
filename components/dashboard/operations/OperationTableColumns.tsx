@@ -8,42 +8,54 @@ export const getOperationTableColumns = (
   onEditTrip: (t: Trip) => void,
   onEditOC: (t: Trip) => void,
   onEditMinuta: (t: Trip) => void,
-  onViewOS: (url: string, title: string) => void,
+  onViewDoc: (url: string, title: string) => void,
   onDeleteTrip: (id: string) => void
 ) => {
   
-  const handleOSUpload = (trip: Trip, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     const reader = new FileReader();
     reader.onload = async () => {
-      const customFileName = `OS - ${trip.driver.name} - ${trip.os}`;
+      const prefix = type === 'OS_PDF' ? 'OS' : 'AGD';
+      const customFileName = `${prefix} - ${trip.driver.name} - ${trip.os}`;
+      
       const doc: TripDocument = { 
-        id: `os-pdf-${Date.now()}`, 
-        type: 'OS_PDF', 
+        id: `${type.toLowerCase()}-${Date.now()}`, 
+        type: type, 
         url: reader.result as string, 
         fileName: customFileName, 
         uploadDate: new Date().toISOString() 
       };
-      const otherDocs = (trip.documents || []).filter(d => d.type !== 'OS_PDF');
+
+      // Remove documento anterior do mesmo tipo se existir
+      const otherDocs = (trip.documents || []).filter(d => d.type !== type);
       const updated = { ...trip, documents: [...otherDocs, doc] };
       await db.saveTrip(updated);
-      alert("Documento OS vinculado com sucesso!");
+      alert(`${type === 'OS_PDF' ? 'OS' : 'Agendamento'} vinculado com sucesso!`);
     };
     reader.readAsDataURL(file);
   };
 
-  const handlePrintOS = (url: string, fileName: string) => {
+  const deleteDocument = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO') => {
+    if (!confirm(`Deseja remover permanentemente o anexo de ${type === 'OS_PDF' ? 'OS' : 'Agendamento'}?`)) return;
+    const updatedDocs = (trip.documents || []).filter(d => d.type !== type);
+    const updated = { ...trip, documents: updatedDocs };
+    await db.saveTrip(updated);
+  };
+
+  const handlePrint = (url: string, fileName: string) => {
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(`
         <html>
-          <head>
-            <title>${fileName}</title>
-          </head>
+          <head><title>${fileName}</title></head>
           <body style="margin:0;padding:0;">
-            <embed width="100%" height="100%" src="${url}" type="application/pdf">
+            ${url.startsWith('data:image') 
+              ? `<img src="${url}" style="width:100%; height:auto;">`
+              : `<embed width="100%" height="100%" src="${url}" type="application/pdf">`
+            }
           </body>
         </html>
       `);
@@ -53,6 +65,54 @@ export const getOperationTableColumns = (
         printWindow.print();
       }, 800);
     }
+  };
+
+  const DocumentBlock = ({ trip, type, label }: { trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO', label: string }) => {
+    const doc = trip.documents?.find(d => d.type === type);
+    const colorClass = type === 'OS_PDF' ? 'emerald' : 'blue';
+
+    if (doc) {
+      return (
+        <div className={`space-y-1 p-2 bg-${colorClass}-50 rounded-xl border border-${colorClass}-100`}>
+           <p className={`text-[7px] font-black text-${colorClass}-600 uppercase mb-1`}>{label}</p>
+           <div className="grid grid-cols-4 gap-1">
+              <button 
+                onClick={() => onViewDoc(doc.url, doc.fileName)}
+                className={`p-1.5 bg-white text-${colorClass}-600 rounded-lg hover:bg-${colorClass}-600 hover:text-white transition-all shadow-sm border border-${colorClass}-100`}
+                title="Visualizar"
+              >
+                <svg className="w-3 h-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+              <button 
+                onClick={() => handlePrint(doc.url, doc.fileName)}
+                className="p-1.5 bg-white text-slate-600 rounded-lg hover:bg-slate-600 hover:text-white transition-all shadow-sm border border-slate-100"
+                title="Imprimir"
+              >
+                <svg className="w-3 h-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
+              </button>
+              <label className="p-1.5 bg-white text-amber-600 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm border border-amber-100 cursor-pointer" title="Alterar">
+                <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(trip, type, e)} />
+                <svg className="w-3 h-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </label>
+              <button 
+                onClick={() => deleteDocument(trip, type)}
+                className="p-1.5 bg-white text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm border border-red-100"
+                title="Excluir"
+              >
+                <svg className="w-3 h-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+           </div>
+        </div>
+      );
+    }
+
+    return (
+      <label className={`w-full flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-500 rounded-xl hover:border-${colorClass}-400 transition-all shadow-sm cursor-pointer group`}>
+        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(trip, type, e)} />
+        <svg className={`w-3.5 h-3.5 text-slate-300 group-hover:text-${colorClass}-500 transition-colors`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+        <span className="text-[8px] font-black uppercase">Anexar {label}</span>
+      </label>
+    );
   };
 
   return [
@@ -209,8 +269,6 @@ export const getOperationTableColumns = (
     key: 'actions',
     label: '9. Opções',
     render: (t: Trip) => {
-      const osDoc = t.documents?.find(d => d.type === 'OS_PDF');
-      
       return (
         <div className="flex flex-col gap-2 min-w-[140px]">
           <button 
@@ -221,37 +279,7 @@ export const getOperationTableColumns = (
             <span className="text-[8px] font-black uppercase">Editar Viagem</span>
           </button>
 
-          {osDoc ? (
-            <div className="space-y-1 p-2 bg-emerald-50 rounded-xl border border-emerald-100">
-               <p className="text-[7px] font-black text-emerald-600 uppercase mb-1">Dossiê OS PDF</p>
-               <div className="grid grid-cols-3 gap-1">
-                  <button 
-                    onClick={() => onViewOS(osDoc.url, osDoc.fileName)}
-                    className="p-1.5 bg-white text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-                    title="Visualizar OS"
-                  >
-                    <svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                  </button>
-                  <button 
-                    onClick={() => handlePrintOS(osDoc.url, osDoc.fileName)}
-                    className="p-1.5 bg-white text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm border border-blue-100"
-                    title="Imprimir OS"
-                  >
-                    <svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
-                  </button>
-                  <label className="p-1.5 bg-white text-amber-600 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm border border-amber-100 cursor-pointer">
-                    <input type="file" className="hidden" accept=".pdf" onChange={(e) => handleOSUpload(t, e)} />
-                    <svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                  </label>
-               </div>
-            </div>
-          ) : (
-            <label className="w-full flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-500 rounded-xl hover:border-blue-400 transition-all shadow-sm cursor-pointer group">
-              <input type="file" className="hidden" accept=".pdf" onChange={(e) => handleOSUpload(t, e)} />
-              <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-              <span className="text-[8px] font-black uppercase">Anexar OS PDF</span>
-            </label>
-          )}
+          <DocumentBlock trip={t} type="OS_PDF" label="Dossiê OS PDF" />
 
           {t.ocFormData && (
             <button 
@@ -270,6 +298,8 @@ export const getOperationTableColumns = (
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
             <span className="text-[8px] font-black uppercase">Minuta PreS.</span>
           </button>
+
+          <DocumentBlock trip={t} type="AGENDAMENTO" label="Dossiê Agendamento" />
 
           <button 
             onClick={() => onDeleteTrip(t.id)} 

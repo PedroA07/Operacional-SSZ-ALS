@@ -61,7 +61,7 @@ export interface PaymentStatus {
 
 export interface TripDocument {
   id: string;
-  type: 'COMPLETO' | 'NF' | 'OC' | 'MINUTA' | 'OS_PDF';
+  type: 'COMPLETO' | 'NF' | 'OC' | 'MINUTA' | 'OS_PDF' | 'AGENDAMENTO';
   url: string;
   fileName: string;
   uploadDate: string;

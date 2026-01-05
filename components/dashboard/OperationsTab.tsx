@@ -33,8 +33,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   
-  const [isOSViewerOpen, setIsOSViewerOpen] = useState(false);
-  const [osViewConfig, setOsViewConfig] = useState({ url: '', title: '' });
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const [docViewConfig, setDocViewConfig] = useState({ url: '', title: '' });
 
   const [filterTypes, setFilterTypes] = useState<string[]>(['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM']);
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
@@ -90,21 +90,22 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setIsMinutaModalOpen(true);
   };
 
-  const handleViewOS = (url: string, title: string) => {
-    setOsViewConfig({ url, title });
-    setIsOSViewerOpen(true);
+  const handleViewDoc = (url: string, title: string) => {
+    setDocViewConfig({ url, title });
+    setIsDocViewerOpen(true);
   };
 
-  const handlePrintOSInViewer = () => {
+  const handlePrintDocInViewer = () => {
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(`
         <html>
-          <head>
-            <title>${osViewConfig.title}</title>
-          </head>
+          <head><title>${docViewConfig.title}</title></head>
           <body style="margin:0;padding:0;">
-            <embed width="100%" height="100%" src="${osViewConfig.url}" type="application/pdf">
+            ${docViewConfig.url.startsWith('data:image') 
+              ? `<img src="${docViewConfig.url}" style="width:100%; height:auto;">`
+              : `<embed width="100%" height="100%" src="${docViewConfig.url}" type="application/pdf">`
+            }
           </body>
         </html>
       `);
@@ -140,7 +141,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     handleEditTrip,
     handleEditOC,
     handleEditMinuta,
-    handleViewOS,
+    handleViewDoc,
     (id) => onDeleteTrip?.(id)
   );
 
@@ -305,31 +306,36 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         </div>
       )}
 
-      {isOSViewerOpen && (
+      {isDocViewerOpen && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-2xl animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                  <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Visualizador de Dossiê OS</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Documento: {osViewConfig.title}</p>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Visualizador de Documentos</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Dossiê: {docViewConfig.title}</p>
                  </div>
                  <div className="flex gap-4">
                     <button 
-                      onClick={handlePrintOSInViewer}
+                      onClick={handlePrintDocInViewer}
                       className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all"
                     >
-                       Imprimir Documento
+                       Imprimir
                     </button>
-                    <button onClick={() => setIsOSViewerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+                    <button onClick={() => setIsDocViewerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
                  </div>
               </div>
-              <div className="flex-1 bg-slate-100 relative">
-                 <iframe 
-                    width="100%" 
-                    height="100%" 
-                    style={{ border: 0 }} 
-                    src={osViewConfig.url}
-                 ></iframe>
+              <div className="flex-1 bg-slate-100 relative overflow-auto flex justify-center items-center p-8">
+                 {docViewConfig.url.startsWith('data:image') ? (
+                    <img src={docViewConfig.url} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" alt="Documento" />
+                 ) : (
+                    <iframe 
+                        width="100%" 
+                        height="100%" 
+                        style={{ border: 0 }} 
+                        src={docViewConfig.url}
+                        title="Document Viewer"
+                    ></iframe>
+                 )}
               </div>
            </div>
         </div>
