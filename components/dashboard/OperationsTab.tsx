@@ -7,8 +7,8 @@ import SchedulingEditModal from './operations/SchedulingEditModal';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
-import OrdemColetaForm from '../forms/OrdemColetaForm';
-import PreStackingForm from '../forms/PreStackingForm';
+import OrdemColetaForm from './forms/OrdemColetaForm';
+import PreStackingForm from './forms/PreStackingForm';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
 interface OperationsTabProps {
@@ -250,6 +250,20 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         
         <div className="flex justify-between items-center mb-6">
           <button onClick={handleClearAllFilters} className="text-[10px] font-black text-blue-600 uppercase hover:underline">Limpar todos os filtros</button>
+          
+          <div className="flex gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
+             <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Início</label>
+                <input type="date" className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
+             </div>
+             <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Fim</label>
+                <input type="date" className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
+             </div>
+             {(filterStartDate || filterEndDate) && (
+               <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }} className="mt-4 text-[8px] font-black text-red-500 uppercase hover:underline">Limpar</button>
+             )}
+          </div>
         </div>
 
         <SmartOperationTable 
@@ -369,5 +383,4 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   );
 };
 
-// Fix: Added missing default export to fix module resolution error in Dashboard files
 export default OperationsTab;
