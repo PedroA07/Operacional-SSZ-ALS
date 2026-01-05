@@ -70,7 +70,7 @@ export interface TripDocument {
 export interface Category {
   id: string;
   name: string;
-  parentId?: string; // Para subcategorias
+  parentId?: string;
 }
 
 export interface Trip {
@@ -96,14 +96,14 @@ export interface Trip {
   statusHistory: StatusHistoryEntry[];
   balancePayment: PaymentStatus;
   advancePayment: PaymentStatus;
-  documents: TripDocument[];
+  // Added missing documents property used in multiple admin and operational components
+  documents?: TripDocument[];
+  // Colunas Separadas de Documentos
+  osDoc?: TripDocument;
+  agendamentoDoc?: TripDocument;
+  completoDoc?: TripDocument;
   ocFormData?: any;
   preStackingFormData?: any; 
-}
-
-export interface DriverOperation {
-  category: string;
-  client: string;
 }
 
 export interface Driver {
@@ -131,7 +131,7 @@ export interface Driver {
   whatsappGroupName?: string;
   whatsappGroupLink?: string;
   registrationDate?: string;
-  operations: DriverOperation[];
+  operations: { category: string; client: string }[];
   tripsCount?: number;
   generatedPassword?: string;
   hasAccess?: boolean;

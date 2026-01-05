@@ -43,7 +43,10 @@ const mapTripToDb = (trip: Trip) => ({
   status_history: trip.statusHistory,
   advance_payment: trip.advancePayment,
   balance_payment: trip.balancePayment,
-  documents: trip.documents,
+  // Colunas individuais no Banco
+  os_doc: trip.osDoc || null,
+  agendamento_doc: trip.agendamentoDoc || null,
+  completo_doc: trip.completoDoc || null,
   oc_form_data: trip.ocFormData,
   pre_stacking_form_data: trip.preStackingFormData || null
 });
@@ -70,7 +73,10 @@ const mapDbToTrip = (d: any): Trip => ({
   statusHistory: d.status_history || d.statusHistory || [],
   advancePayment: d.advance_payment || d.advancePayment || { status: 'BLOQUEADO' },
   balancePayment: d.balance_payment || d.balancePayment || { status: 'AGUARDANDO_DOCS' },
-  documents: d.documents || [],
+  // Mapeamento das colunas individuais
+  osDoc: d.os_doc || d.osDoc,
+  agendamentoDoc: d.agendamento_doc || d.agendamentoDoc,
+  completoDoc: d.completo_doc || d.completoDoc,
   ocFormData: d.oc_form_data || d.ocFormData,
   preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData
 });

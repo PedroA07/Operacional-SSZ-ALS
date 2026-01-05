@@ -20,7 +20,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
     return ['GERAL', ...Array.from(cats)];
   }, [trips]);
 
-  const handleFullPDFUpload = (trip: Trip, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFullPDFUpload = async (trip: Trip, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -32,21 +32,21 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
         fileName: file.name, 
         uploadDate: new Date().toISOString() 
       };
-      const updated = { ...trip, documents: [...(trip.documents || []), doc] };
+      const updated = { ...trip, completoDoc: doc };
       await onUpdateTrip(updated);
     };
     reader.readAsDataURL(file);
   };
 
   const pendingTrips = useMemo(() => {
-    let list = trips.filter(t => t.status === 'Viagem concluída' && !t.documents?.some(d => d.type === 'COMPLETO'));
+    let list = trips.filter(t => t.status === 'Viagem concluída' && !t.completoDoc);
     if (startDate) list = list.filter(t => t.dateTime >= startDate);
     if (endDate) list = list.filter(t => t.dateTime <= endDate + 'T23:59:59');
     return list;
   }, [trips, startDate, endDate]);
 
   const finishedTrips = useMemo(() => {
-    let list = trips.filter(t => t.status === 'Viagem concluída' && t.documents?.some(d => d.type === 'COMPLETO'));
+    let list = trips.filter(t => t.status === 'Viagem concluída' && t.completoDoc);
     if (activeCategory !== 'GERAL') list = list.filter(t => t.category === activeCategory);
     if (startDate) list = list.filter(t => t.dateTime >= startDate);
     if (endDate) list = list.filter(t => t.dateTime <= endDate + 'T23:59:59');
@@ -134,7 +134,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
             columns={[
               ...commonColumns,
               { key: 'view', label: 'Documento', render: (t: Trip) => {
-                const doc = t.documents.find(d => d.type === 'COMPLETO');
+                const doc = t.completoDoc;
                 return doc ? (
                   <button onClick={() => window.open(doc.url, '_blank')} className="flex items-center gap-2 text-emerald-600 font-black uppercase text-[8px] hover:underline">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
