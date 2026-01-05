@@ -1,12 +1,13 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Driver, OperationDefinition, User, Customer, Trip } from '../../../types';
+import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, StatusHistoryEntry } from '../../../types';
 import SmartOperationTable from './SmartOperationTable';
-import { maskCNPJ } from '../../../utils/masks';
 import { db } from '../../../utils/storage';
 import { getOperationTableColumns } from './OperationTableColumns';
 import TripModal from './TripModal';
 import SchedulingEditModal from './SchedulingEditModal';
+import OrdemColetaForm from '../forms/OrdemColetaForm';
+import PreStackingForm from '../forms/PreStackingForm';
 
 interface GenericOperationViewProps {
   user: User;
@@ -34,6 +35,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isOCEditModalOpen, setIsOCEditModalOpen] = useState(false);
+  const [isMinutaModalOpen, setIsMinutaModalOpen] = useState(false);
+  const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
+  const [statusTime, setStatusTime] = useState('');
   const [ports, setPorts] = useState<any[]>([]);
 
   const loadLocalData = async () => {
@@ -51,6 +57,43 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   useEffect(() => {
     loadLocalData();
   }, [categoryName, clientName]);
+
+  const openStatusEditor = (trip: Trip, status: TripStatus) => {
+    setSelectedTrip(trip);
+    setTempStatus(status);
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    setStatusTime(now.toISOString().slice(0, 16));
+    setIsStatusModalOpen(true);
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selectedTrip) return;
+    const newEntry: StatusHistoryEntry = { 
+      status: tempStatus, 
+      dateTime: new Date(statusTime).toISOString() 
+    };
+    const updatedTrip = { 
+      ...selectedTrip, 
+      status: tempStatus, 
+      statusTime: newEntry.dateTime, 
+      statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] 
+    };
+    await db.saveTrip(updatedTrip);
+    setIsStatusModalOpen(false);
+    loadLocalData();
+  };
+
+  const handleEditOC = (trip: Trip) => {
+    if (!trip.ocFormData) return;
+    setSelectedTrip(trip);
+    setIsOCEditModalOpen(true);
+  };
+
+  const handleEditMinuta = (trip: Trip) => {
+    setSelectedTrip(trip);
+    setIsMinutaModalOpen(true);
+  };
 
   // REGRA: Filtrar apenas motoristas vinculados a esta operação específica
   const filteredDrivers = drivers.filter(d => 
@@ -94,17 +137,22 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     )}
   ];
 
-  // Reuso das colunas de operação para manter consistência total
   const tripColumns = getOperationTableColumns(
-    () => {}, // openStatusEditor - aqui poderíamos implementar se necessário
+    openStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
-    () => {}, // handleEditOC
-    () => {}, // handleEditMinuta
+    handleEditOC,
+    handleEditMinuta,
     (url, title) => window.open(url, '_blank'),
     async (id) => { if(confirm('Excluir viagem?')) { await db.deleteTrip(id); loadLocalData(); } },
     loadLocalData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); }
   );
+
+  const STATUS_OPTIONS: TripStatus[] = [
+    'Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 
+    'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 
+    'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'
+  ];
 
   return (
     <div className="space-y-8 animate-in slide-in-from-right duration-300">
@@ -137,8 +185,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-9 space-y-8">
-          
-          {/* TABELA DE MOTORISTAS AUTORIZADOS */}
           <SmartOperationTable 
             userId={user.id}
             componentId={`op-drivers-${type}-${categoryName}-${clientName || 'all'}`}
@@ -148,7 +194,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
             defaultVisibleKeys={['name', 'plateHorse', 'status']}
           />
 
-          {/* TABELA DE VIAGENS DA OPERAÇÃO */}
           <SmartOperationTable 
             userId={user.id}
             componentId={`op-trips-${type}-${categoryName}-${clientName || 'all'}`}
@@ -179,7 +224,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                       {cust.name}
                     </p>
                   </div>
-                  <svg className={`w-3 h-3 transition-colors ${clientName === cust.name ? 'text-blue-600' : 'text-slate-300 group-hover:text-blue-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
                 </button>
               ))}
             </div>
@@ -221,6 +265,57 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         onSuccess={loadLocalData}
         preStackingUnits={ports}
       />
+
+      {isStatusModalOpen && (
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6 animate-in zoom-in-95">
+             <div className="text-center border-b border-slate-100 pb-6">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento Operacional</p>
+                <p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p>
+             </div>
+             <div className="space-y-4">
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Selecione o Novo Status</label>
+                   <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
+                      {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                   </select>
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora da Ocorrência</label>
+                   <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
+                </div>
+             </div>
+             <div className="grid gap-3 pt-4">
+                <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button>
+                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isOCEditModalOpen && selectedTrip && selectedTrip.ocFormData && (
+        <div className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
+           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
+              <div className="p-6 bg-blue-600 text-white flex justify-between items-center">
+                <h3 className="font-black text-sm uppercase tracking-widest">Editar Ordem de Coleta Original</h3>
+                <button onClick={() => setIsOCEditModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              </div>
+              <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCEditModalOpen(false); loadLocalData(); }} initialData={selectedTrip.ocFormData} />
+           </div>
+        </div>
+      )}
+
+      {isMinutaModalOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
+           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
+              <div className="p-6 bg-emerald-600 text-white flex justify-between items-center">
+                <h3 className="font-black text-sm uppercase tracking-widest">Formulário de Minuta Pre-Stacking</h3>
+                <button onClick={() => setIsMinutaModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              </div>
+              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaModalOpen(false); loadLocalData(); }} initialOS={selectedTrip.os} />
+           </div>
+        </div>
+      )}
     </div>
   );
 };
