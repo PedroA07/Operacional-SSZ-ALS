@@ -1,5 +1,4 @@
 
-// Fixed: Removed 'db' from '../types' import as it doesn't exist there and is already imported as 'database' from './storage'.
 import { Driver, Customer } from '../types';
 import { db as database } from './storage';
 
@@ -27,23 +26,26 @@ export const osCategoryService = {
   syncVinculos: async (category: string, driver: any, customer: any) => {
     if (!category || category === 'Nenhum') return;
 
+    const normalizedCategory = category.trim().toUpperCase();
+    const normalizedClient = (customer?.name || 'GERAL').trim().toUpperCase();
+
     // 1. Atualizar Motorista (Padrão: {category, client})
     if (driver && driver.id) {
       const currentDrivers = await database.getDrivers();
       const dbDriver = currentDrivers.find(d => d.id === driver.id);
       
       if (dbDriver) {
-        const hasOp = dbDriver.operations.some(op => 
-          op.category.toUpperCase() === category.toUpperCase() && 
-          op.client.toUpperCase() === (customer?.name || 'GERAL').toUpperCase()
+        const hasOp = (dbDriver.operations || []).some(op => 
+          op.category.toUpperCase() === normalizedCategory && 
+          op.client.toUpperCase() === normalizedClient
         );
 
         if (!hasOp) {
           const updatedDriver = {
             ...dbDriver,
             operations: [
-              ...dbDriver.operations, 
-              { category: category, client: customer?.name || 'Geral' }
+              ...(dbDriver.operations || []), 
+              { category: category.trim(), client: (customer?.name || 'Geral').trim() }
             ]
           };
           await database.saveDriver(updatedDriver);
@@ -58,12 +60,12 @@ export const osCategoryService = {
 
       if (dbCust) {
         const currentOps = dbCust.operations || [];
-        const hasOp = currentOps.some(op => op.toUpperCase() === category.toUpperCase());
+        const hasOp = currentOps.some(op => op.toUpperCase() === normalizedCategory);
 
         if (!hasOp) {
           const updatedCust = {
             ...dbCust,
-            operations: [...currentOps, category]
+            operations: [...currentOps, category.trim()]
           };
           await database.saveCustomer(updatedCust);
         }

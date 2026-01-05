@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trip, Driver, Customer, Category, Port, PreStacking } from '../../../types';
 import { db } from '../../../utils/storage';
+import { osCategoryService } from '../../../utils/osCategoryService';
 
 interface TripModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface TripModalProps {
 
 const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drivers, customers, categories, editTrip }) => {
   const [ports, setPorts] = useState<(Port | PreStacking)[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState<any>({
     os: '', booking: '', ship: '', dateTime: '', type: 'EXPORTAÇÃO', status: 'Pendente',
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
@@ -52,26 +54,45 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const tripId = editTrip?.id || `trip-${Date.now()}`;
-    
-    const payload = {
-      ...form,
-      id: tripId,
-      dateTime: new Date(form.dateTime).toISOString(),
-      isLate: editTrip?.isLate || false,
-      documents: editTrip?.documents || [],
-      statusHistory: editTrip?.statusHistory || [{ status: 'Pendente', dateTime: new Date().toISOString() }],
-      advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },
-      balancePayment: editTrip?.balancePayment || { status: 'AGUARDANDO_DOCS' },
-      ocFormData: {
-        ...form,
-        horarioAgendado: new Date(form.dateTime).toISOString()
-      }
-    };
+    if (isSaving) return;
+    setIsSaving(true);
 
-    await db.saveTrip(payload as any);
-    onSuccess();
-    onClose();
+    try {
+      const tripId = editTrip?.id || `trip-${Date.now()}`;
+      
+      // REGRA SOLICITADA: Vincular motorista ao cliente e categoria automaticamente
+      const finalCategory = form.category || 'Geral';
+      const driverObj = drivers.find(d => d.id === form.driver?.id);
+      const customerObj = customers.find(c => c.id === form.customer?.id);
+
+      if (driverObj && customerObj) {
+        await osCategoryService.syncVinculos(finalCategory, driverObj, customerObj);
+      }
+
+      const payload = {
+        ...form,
+        id: tripId,
+        dateTime: new Date(form.dateTime).toISOString(),
+        isLate: editTrip?.isLate || false,
+        documents: editTrip?.documents || [],
+        statusHistory: editTrip?.statusHistory || [{ status: 'Pendente', dateTime: new Date().toISOString() }],
+        advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },
+        balancePayment: editTrip?.balancePayment || { status: 'AGUARDANDO_DOCS' },
+        ocFormData: {
+          ...form,
+          horarioAgendado: new Date(form.dateTime).toISOString()
+        }
+      };
+
+      await db.saveTrip(payload as any);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      console.error("Erro ao salvar viagem:", err);
+      alert("Erro ao processar a programação.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -122,15 +143,12 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
                <select required className={selectClass} value={form.customer?.id} onChange={e => {
                  const c = customers.find(cust => cust.id === e.target.value);
                  if (c) {
-                    // Lógica de Vínculo Automático:
-                    // 1. Pega a primeira operação do cliente se existir (ex: Aliança)
                     const autoCategory = (c.operations && c.operations.length > 0) ? c.operations[0] : form.category;
-                    
                     setForm({
                       ...form, 
                       customer: { id: c.id, name: c.name, legalName: c.legalName, cnpj: c.cnpj, city: c.city, state: c.state },
-                      category: autoCategory, // Seta Master automática
-                      subCategory: c.name // Seta Vínculo automático com o nome fantasia
+                      category: autoCategory,
+                      subCategory: c.name 
                     });
                  }
                }}>
@@ -150,7 +168,6 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
             </div>
           </div>
 
-          {/* CATEGORIAS AGORA COM POSSIBILIDADE DE AJUSTE MANUAL APÓS O AUTO-PREENCHIMENTO */}
           <div className="grid grid-cols-2 gap-6 p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200">
              <div className="space-y-1">
                 <label className={labelClass}>Categoria Master (Classificação)</label>
@@ -162,7 +179,7 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
              <div className="space-y-1">
                 <label className={labelClass}>Vínculo / Filtro (Subcategoria)</label>
                 <input className={inputClass} placeholder="Geral" value={form.subCategory} onChange={e => setForm({...form, subCategory: e.target.value.toUpperCase()})} />
-                <p className="text-[7px] text-slate-400 font-bold uppercase mt-1 ml-1">* Preenchido automaticamente com o nome do cliente.</p>
+                <p className="text-[7px] text-slate-400 font-bold uppercase mt-1 ml-1">* Este vínculo será salvo no cadastro do motorista.</p>
              </div>
           </div>
 
@@ -231,8 +248,13 @@ const TripModal: React.FC<TripModalProps> = ({ isOpen, onClose, onSuccess, drive
              <textarea className={`${inputClass} h-24 resize-none normal-case`} value={form.obs} onChange={e => setForm({...form, obs: e.target.value})} placeholder="Instruções de carregamento..." />
           </div>
 
-          <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-blue-600 transition-all active:scale-[0.98]">
-            {editTrip ? 'Finalizar Atualização de Viagem' : 'Cadastrar Programação no Painel'}
+          <button type="submit" disabled={isSaving} className="w-full py-6 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-blue-600 transition-all active:scale-[0.98] disabled:opacity-50">
+            {isSaving ? (
+              <div className="flex items-center justify-center gap-3">
+                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Processando Vínculos e Viagem...
+              </div>
+            ) : editTrip ? 'Finalizar Atualização de Viagem' : 'Cadastrar Programação no Painel'}
           </button>
         </form>
       </div>
