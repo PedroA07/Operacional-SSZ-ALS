@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Driver } from '../../../types';
-import { maskPhone } from '../../../utils/masks';
+import { maskPhone, maskCPF } from '../../../utils/masks';
 import { driverService } from '../../../utils/driverService';
 
 interface ProfileTabProps {
@@ -14,7 +14,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Estados para edição (somente campos permitidos)
   const [editedPhoto, setEditedPhoto] = useState('');
   const [editedPhone, setEditedPhone] = useState('');
   const [editedEmail, setEditedEmail] = useState('');
@@ -52,88 +51,77 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
       setIsEditing(false);
       setTimeout(() => window.location.reload(), 300); 
     } else {
-      alert("Erro ao atualizar cadastro. Tente novamente.");
+      alert("Falha ao salvar. Tente novamente.");
     }
     setIsSaving(false);
   };
 
-  const InfoCard = ({ label, value, highlight = false, mono = false }: any) => (
+  const DataRow = ({ label, value, highlight = false, mono = false }: any) => (
     <div className="flex flex-col border-b border-white/5 pb-4 last:border-0 last:pb-0">
-      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">{label}</span>
-      <span className={`text-[13px] font-black uppercase ${highlight ? 'text-blue-500' : 'text-slate-100'} ${mono ? 'font-mono' : ''}`}>
+      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{label}</span>
+      <span className={`text-[13px] font-black uppercase ${highlight ? 'text-blue-500' : 'text-slate-100'} ${mono ? 'font-mono tracking-tight' : ''}`}>
         {value || '---'}
       </span>
     </div>
   );
 
-  if (!driver) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-4">Puxando dados da tabela...</p>
-      </div>
-    );
-  }
+  if (!driver) return (
+    <div className="flex flex-col items-center justify-center py-20 text-slate-600 uppercase font-black text-[10px] tracking-widest">
+      Sincronizando perfil...
+    </div>
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
-      {/* HEADER DE PERFIL */}
+      
+      {/* HEADER DE PERFIL COM FOTO EDITÁVEL */}
       <div className="text-center space-y-4">
-        <div className="relative inline-block group">
+        <div className="relative inline-block">
             <div 
               onClick={() => isEditing && fileInputRef.current?.click()}
-              className={`w-32 h-32 rounded-[3rem] bg-slate-900 border border-white/10 mx-auto overflow-hidden shadow-2xl transition-all ${isEditing ? 'ring-4 ring-blue-600 scale-105 cursor-pointer' : ''}`}
+              className={`w-32 h-32 rounded-[3rem] bg-slate-900 border border-white/10 mx-auto overflow-hidden shadow-2xl transition-all ${isEditing ? 'ring-4 ring-blue-600 scale-105 cursor-pointer' : 'ring-4 ring-white/5'}`}
             >
               {(isEditing ? editedPhoto : (driver.photo || user.photo)) ? (
                 <img src={isEditing ? editedPhoto : (driver.photo || user.photo)} className="w-full h-full object-cover" alt="" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-blue-500 font-black text-4xl italic">
+                <div className="w-full h-full flex items-center justify-center text-blue-500 font-black text-5xl italic">
                   {driver.name[0]}
                 </div>
               )}
               {isEditing && (
                 <div className="absolute inset-0 bg-blue-600/40 flex items-center justify-center backdrop-blur-sm">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2.5"/>
-                    <path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/>
-                  </svg>
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2.5"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>
                 </div>
               )}
             </div>
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
-            {!isEditing && (
-              <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-emerald-500 rounded-2xl border-4 border-[#020617] flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-              </div>
-            )}
         </div>
         <div>
-            <h3 className="text-2xl font-black uppercase tracking-tighter text-white">{driver.name}</h3>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">ID Registro: {driver.id}</p>
+            <h3 className="text-2xl font-black uppercase tracking-tighter text-white px-4 leading-tight">{driver.name}</h3>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em] mt-1.5">Motorista Parceiro ALS</p>
         </div>
       </div>
 
-      {/* BLOCO DE DADOS CADASTRAIS (ESTILO OPERAÇÕES) */}
-      <div className="bg-slate-900/50 rounded-[2.5rem] border border-white/5 p-8 space-y-6 shadow-2xl">
+      {/* DADOS CADASTRAIS (PADRÃO OPERACIONAL) */}
+      <div className="bg-slate-900/60 rounded-[2.5rem] border border-white/5 p-8 space-y-6 shadow-2xl">
         <div className="grid grid-cols-2 gap-8">
-           <InfoCard label="CPF" value={driver.cpf} mono />
-           <InfoCard label="RG" value={driver.rg} mono />
+           <DataRow label="CPF" value={driver.cpf} mono />
+           <DataRow label="RG" value={driver.rg} mono />
         </div>
 
-        <InfoCard label="Documento CNH" value={driver.cnh} mono />
+        <DataRow label="Registro CNH" value={driver.cnh} mono />
 
         <div className="grid grid-cols-2 gap-8">
-           <InfoCard label="Placa Cavalo" value={driver.plateHorse} highlight mono />
-           <InfoCard label="Ano Veículo" value={driver.yearHorse} mono />
+           <DataRow label="Placa Cavalo" value={driver.plateHorse} highlight mono />
+           <DataRow label="Ano Modelo" value={driver.yearHorse} mono />
         </div>
 
-        {/* CAMPOS EDITÁVEIS */}
-        <div className="space-y-4 pt-4 border-t border-white/5">
-            <div className="space-y-1">
-                <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest block mb-1">Telefone Celular</span>
+        <div className="pt-2 space-y-4 border-t border-white/5">
+            <div className="space-y-1.5">
+                <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest block mb-1">Celular para Contato</span>
                 {isEditing ? (
                   <input 
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-blue-400 outline-none focus:border-blue-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-blue-400 outline-none focus:border-blue-500 transition-all"
                     value={editedPhone}
                     onChange={e => setEditedPhone(maskPhone(e.target.value))}
                   />
@@ -142,11 +130,11 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
                 )}
             </div>
 
-            <div className="space-y-1">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">E-mail para Contato</span>
+            <div className="space-y-1.5">
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">E-mail Cadastrado</span>
                 {isEditing ? (
                   <input 
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:border-blue-500 lowercase"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:border-blue-500 lowercase transition-all"
                     type="email"
                     value={editedEmail}
                     onChange={e => setEditedEmail(e.target.value)}
@@ -161,22 +149,22 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
       {/* BOTÕES DE AÇÃO */}
       <div className="space-y-4 px-1">
         {isEditing ? (
-          <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setIsEditing(false)} className="py-5 bg-slate-800 text-slate-400 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Cancelar</button>
-              <button disabled={isSaving} onClick={handleSave} className="py-5 bg-blue-600 text-white rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
-                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Confirmar'}
+          <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setIsEditing(false)} className="py-5 bg-slate-800 text-slate-400 rounded-3xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Cancelar</button>
+              <button disabled={isSaving} onClick={handleSave} className="py-5 bg-blue-600 text-white rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Confirmar Alterações'}
               </button>
           </div>
         ) : (
-          <button onClick={() => setIsEditing(true)} className="w-full py-6 bg-white/5 text-white border border-white/10 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all shadow-lg">
-            Editar Meus Dados
+          <button onClick={() => setIsEditing(true)} className="w-full py-6 bg-white/5 text-white border border-white/10 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all shadow-lg">
+            Editar Cadastro
           </button>
         )}
 
-        <div className="pt-6">
+        <div className="pt-8">
           <button 
             onClick={onLogout} 
-            className="w-full py-7 bg-red-500/10 text-red-500 border border-red-500/20 rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.3em] active:bg-red-600 active:text-white transition-all shadow-2xl flex items-center justify-center gap-4 group"
+            className="w-full py-7 bg-red-500/10 text-red-500 border border-red-500/20 rounded-[2.8rem] text-[12px] font-black uppercase tracking-[0.3em] active:bg-red-600 active:text-white transition-all shadow-2xl flex items-center justify-center gap-4 group"
           >
             <svg className="w-6 h-6 group-active:scale-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -185,10 +173,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
           </button>
         </div>
       </div>
-
-      <p className="text-[8px] text-slate-700 font-bold uppercase tracking-[0.5em] text-center mt-4">
-        ALS TRANSPORTES OPERACIONAL V4.0
-      </p>
     </div>
   );
 };
