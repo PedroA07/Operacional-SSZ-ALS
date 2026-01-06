@@ -52,7 +52,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const nextStatus = activeTrip ? getNextStatus(activeTrip.status) : null;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-10">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-20">
       
       {/* SEÇÃO DA VIAGEM EM DESTAQUE */}
       <section className="space-y-4">
@@ -153,7 +153,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       </section>
 
       {/* RODAPÉ TÉCNICO */}
-      <div className="pt-4 pb-8">
+      <div className="pt-4 pb-12">
         <p className="text-[8px] text-slate-800 font-bold uppercase tracking-[0.5em] text-center">
           ALS TRANSPORTES OPERACIONAL V4.0
         </p>

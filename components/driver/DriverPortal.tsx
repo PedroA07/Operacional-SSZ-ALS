@@ -27,14 +27,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         db.getTrips()
       ]);
 
-      // Comparação robusta: converte ambos para string para evitar erros de tipo
       const currentDriver = allDrivers.find(d => String(d.id) === String(user.driverId));
       
-      if (!currentDriver) {
-        console.error("Vínculo não localizado para driverId:", user.driverId);
-      }
-
-      // Filtra viagens vinculadas
       const myTrips = allTrips.filter(t => String(t.driver?.id) === String(user.driverId))
         .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
@@ -69,7 +63,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     );
   }
 
-  // Fallback caso o driverId na sessão não bata com nenhum motorista no banco
   if (!driver && !isLoading) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617] p-10 text-center">
@@ -85,8 +78,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white flex flex-col font-sans select-none pb-24 overflow-hidden">
-      {/* HEADER ESTILO PREMIUM */}
+    <div className="h-screen bg-[#020617] text-white flex flex-col font-sans select-none overflow-hidden">
+      {/* HEADER FIXO */}
       <header className="p-6 pt-12 flex justify-between items-center bg-slate-950/60 border-b border-white/5 shrink-0 backdrop-blur-md">
         <div>
            <div className="flex items-center gap-2 mb-1.5">
@@ -111,16 +104,16 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         </div>
       </header>
 
-      {/* ÁREA PRINCIPAL */}
-      <main className="flex-1 px-5 pt-6 overflow-y-auto custom-scrollbar">
+      {/* ÁREA DE CONTEÚDO ROLÁVEL */}
+      <main className="flex-1 px-5 pt-6 overflow-y-auto custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
         {activeTab === 'inicio' && <HomeTab user={user} trips={trips} onRefresh={loadPortalData} />}
         {activeTab === 'viagens' && <TripsTab trips={trips} />}
         {activeTab === 'docs' && <DocsTab trips={trips} />}
         {activeTab === 'perfil' && <ProfileTab user={user} driver={driver} onLogout={onLogout} />}
       </main>
 
-      {/* NAVEGAÇÃO INFERIOR */}
-      <nav className="fixed bottom-0 left-0 w-full h-20 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around px-6 z-50">
+      {/* NAVEGAÇÃO INFERIOR FIXA */}
+      <nav className="shrink-0 h-20 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around px-6 z-50">
         {[
           { id: 'inicio', label: 'Início', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
           { id: 'viagens', label: 'Histórico', icon: 'M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2' },

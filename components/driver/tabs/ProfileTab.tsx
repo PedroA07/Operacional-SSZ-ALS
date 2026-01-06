@@ -72,7 +72,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-32">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-40">
       
       {/* CABEÇALHO DA FICHA */}
       <div className="text-center space-y-4">
