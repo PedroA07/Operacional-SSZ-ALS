@@ -22,7 +22,6 @@ const App: React.FC = () => {
 
           if (dbUser && dbUser.status !== 'Inativo') {
             setUser(dbUser);
-            // Seta como online ao restaurar sessão
             await db.updatePresence(dbUser.id, 'online');
             sessionStorage.setItem('als_active_session', JSON.stringify(dbUser));
             setCurrentScreen(AppScreen.DASHBOARD);
@@ -39,29 +38,23 @@ const App: React.FC = () => {
     initSession();
   }, []);
 
-  // Monitor de Presença (Online / Ausente / Offline)
+  // Monitor de Presença Real-time (Online / Ausente / Offline)
   useEffect(() => {
     if (!user || currentScreen !== AppScreen.DASHBOARD) return;
 
-    const updateStatus = async (status: PresenceStatus) => {
+    const handlePresence = async (status: PresenceStatus) => {
       await db.updatePresence(user.id, status);
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        updateStatus('away');
-      } else {
-        updateStatus('online');
-      }
+      handlePresence(document.hidden ? 'away' : 'online');
     };
 
-    const handleFocus = () => updateStatus('online');
-    const handleBlur = () => updateStatus('away');
+    const handleFocus = () => handlePresence('online');
+    const handleBlur = () => handlePresence('away');
 
     const handleUnload = () => {
-      // Tentativa de marcar como offline ao fechar aba
-      // beforeunload e unload são restritos em navegadores modernos,
-      // mas o beacon ou uma chamada síncrona curta pode funcionar.
+      // Tenta sinalizar offline ao fechar aba
       db.updatePresence(user.id, 'offline');
     };
 
@@ -70,14 +63,14 @@ const App: React.FC = () => {
     window.addEventListener('blur', handleBlur);
     window.addEventListener('beforeunload', handleUnload);
 
-    // Heartbeat para manter o timer e status ativo no banco
-    const interval = setInterval(() => {
-      const currentStatus: PresenceStatus = document.hidden ? 'away' : 'online';
-      updateStatus(currentStatus);
-    }, 15000);
+    // Heartbeat: mantém o sinal de vida no banco a cada 20s
+    const heartbeat = setInterval(() => {
+      const status: PresenceStatus = document.hidden ? 'away' : 'online';
+      handlePresence(status);
+    }, 20000);
 
     return () => {
-      clearInterval(interval);
+      clearInterval(heartbeat);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('blur', handleBlur);

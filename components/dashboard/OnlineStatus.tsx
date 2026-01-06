@@ -13,12 +13,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const saved = sessionStorage.getItem('als_active_session');
-    if (saved) setCurrentUser(JSON.parse(saved));
-  }, []);
 
   const fetchStatus = useCallback(async () => {
     const u = await db.getUsers();
@@ -27,9 +21,9 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
-    // Atualiza a lista a cada 10 segundos
+    // Sincroniza lista de usuários do banco a cada 10s
     const syncInterval = setInterval(fetchStatus, 10000);
-    // Timer fluido a cada segundo para o cronômetro
+    // Relógio fluido para o cronômetro visual (1s)
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -47,17 +41,15 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   }, [fetchStatus]);
 
   const getStatusInfo = (user: User) => {
-    // 1. Verifica se o usuário tem o campo presence_status do banco
     const status = user.presence_status || 'offline';
     
-    // 2. Heartbeat check: se o lastSeen for muito antigo (> 1 min), considera desconectado independente do status
+    // Fallback de segurança: Se não houve sinal de vida nos últimos 60s, forçar offline visualmente
     if (user.lastSeen) {
       const lastSeenDate = new Date(user.lastSeen);
       const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
       if (diffSeconds > 60) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
     }
 
-    // 3. Mapeamento visual
     switch (status) {
       case 'online': return { key: 'online', color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online' };
       case 'away': return { key: 'away', color: 'bg-amber-500', text: 'text-amber-400', label: 'Ausente' };
@@ -65,8 +57,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     }
   };
 
-  const onlineUsers = users.filter(u => getStatusInfo(u).key !== 'offline');
-  const onlineCount = onlineUsers.length;
+  const activeUsers = users.filter(u => getStatusInfo(u).key !== 'offline');
+  const onlineCount = activeUsers.length;
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -86,7 +78,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
             <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
               {onlineCount} Online agora
             </span>
-            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Presença em Tempo Real</span>
+            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Presença Real</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -96,8 +88,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
         <div className="absolute bottom-full left-0 mb-4 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] overflow-hidden animate-in slide-in-from-bottom-6 zoom-in-95 duration-500 z-[200]">
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
              <div className="flex flex-col">
-               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Sessões Ativas</h4>
-               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Tempo Total de Trabalho</p>
+               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Colaboradores</h4>
+               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Tempo de Trabalho (Sincronizado)</p>
              </div>
              <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
@@ -107,15 +99,15 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
           <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
-              // Encontra o usuário vinculado para pegar o lastLogin real do banco
+              // Busca o registro de usuário vinculado para ter o mesmo lastLogin do perfil
               const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
               const info = u ? getStatusInfo(u) : { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
               
-              // O cronômetro usa o lastLogin do banco, garantindo paridade com o UserProfile
+              // Garante que o cálculo de tempo usa a mesma string lastLogin do banco
               const displayTime = (u && info.key !== 'offline') ? timeUtils.calculateDuration(u.lastLogin) : '00:00:00';
 
               return (
-                <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${info.key === 'offline' ? 'opacity-30 grayscale' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}>
+                <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${info.key === 'offline' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}>
                   <div className="relative shrink-0">
                     <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden flex items-center justify-center border border-white/10">
                       {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="text-xs font-black text-slate-600">{s.name.charAt(0)}</span>}
@@ -138,8 +130,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
               );
             })}
             {onlineCount === 0 && (
-              <div className="p-12 text-center text-slate-600 font-black uppercase text-[9px] italic">
-                Nenhum colaborador online no momento
+              <div className="p-12 text-center">
+                 <p className="text-[9px] font-black text-slate-600 uppercase italic tracking-widest">Nenhuma sessão ativa</p>
               </div>
             )}
           </div>

@@ -9,9 +9,9 @@ export const staffRepository = {
     username: staff.username?.toLowerCase() || '',
     role: staff.role || 'staff',
     position: staff.position?.toUpperCase() || '',
-    registration_date: staff.registrationDate || new Date().toISOString(),
+    registration_date: staff.registrationDate ? new Date(staff.registrationDate).toISOString() : new Date().toISOString(),
     status: staff.status || 'Ativo',
-    status_since: staff.statusSince || new Date().toISOString(),
+    status_since: staff.statusSince ? new Date(staff.statusSince).toISOString() : new Date().toISOString(),
     photo: staff.photo || null,
     lastlogin: staff.lastLogin || null,
     emailcorp: staff.emailCorp?.toLowerCase() || null,
@@ -20,29 +20,35 @@ export const staffRepository = {
 
   mapFromDb: (d: any): Staff => ({
     id: d.id,
-    name: d.name,
-    username: d.username,
-    role: d.role,
-    position: d.position,
-    registrationDate: d.registration_date,
-    status: d.status,
-    statusSince: d.status_since,
-    photo: d.photo,
-    lastLogin: d.lastlogin,
-    emailCorp: d.emailcorp,
-    phoneCorp: d.phonecorp
+    name: d.name || '',
+    username: d.username || '',
+    role: d.role || 'staff',
+    position: d.position || '',
+    registrationDate: d.registration_date || d.registrationDate || new Date().toISOString(),
+    status: d.status || 'Ativo',
+    statusSince: d.status_since || d.statusSince || new Date().toISOString(),
+    photo: d.photo || '',
+    lastLogin: d.lastlogin || d.lastLogin || null,
+    emailCorp: d.emailcorp || d.emailCorp || '',
+    phoneCorp: d.phonecorp || d.phoneCorp || ''
   }),
 
   async save(supabase: SupabaseClient, staff: Staff) {
     const payload = this.mapToDb(staff);
     const { error } = await supabase.from('staff').upsert(payload);
-    if (error) throw error;
+    if (error) {
+      console.error("Erro ao salvar staff:", error);
+      throw error;
+    }
     return true;
   },
 
   async getAll(supabase: SupabaseClient): Promise<Staff[]> {
     const { data, error } = await supabase.from('staff').select('*').order('name');
-    if (error) return [];
+    if (error) {
+      console.error("Erro ao buscar staff:", error);
+      return [];
+    }
     return (data || []).map(d => this.mapFromDb(d));
   },
 
