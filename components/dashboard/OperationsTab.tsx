@@ -86,7 +86,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     if (!selectedTrip) return;
     const newEntry: StatusHistoryEntry = { status: tempStatus, dateTime: new Date(statusTime).toISOString() };
     const updatedTrip = { ...selectedTrip, status: tempStatus, statusTime: newEntry.dateTime, statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] };
-    // Passamos o actingUser para o saveTrip
     await db.saveTrip(updatedTrip, user);
     setIsStatusModalOpen(false);
     loadData();
@@ -112,7 +111,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     (id) => onDeleteTrip?.(id),
     loadData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
-    user // Passamos o actingUser para a fábrica de colunas
+    user
   );
 
   const handleClearAllFilters = () => {
@@ -141,6 +140,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   return (
     <div className="space-y-6">
+      {/* CABEÇALHO COM BOTÕES DE AÇÃO RÁPIDA E NAVEGAÇÃO DE CATEGORIAS */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -164,6 +164,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
           </div>
         </div>
 
+        {/* NAVEGAÇÃO POR CATEGORIA MASTER */}
         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
            <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Acesso Rápido por Categoria</h3>
            <div className="flex flex-wrap gap-3">
@@ -176,11 +177,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
               {categories.filter(c => !c.parentId).map(cat => (
                 <button 
                   key={cat.id} 
-                  onClick={() => setActiveView({ type: 'category', categoryName: cat.name })} 
-                  className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-900 hover:text-white transition-all text-[10px] font-black uppercase flex items-center gap-2 group"
+                  onClick={() => setFilterCategory(cat.name)} 
+                  className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase flex items-center gap-2 ${filterCategory === cat.name ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500'}`}
                 >
                   {cat.name}
-                  <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
                 </button>
               ))}
            </div>
@@ -275,61 +275,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                 <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
              </div>
           </div>
-        </div>
-      )}
-
-      {isOCEditModalOpen && selectedTrip && selectedTrip.ocFormData && (
-        <div className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
-           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
-              <div className="p-6 bg-blue-600 text-white flex justify-between items-center">
-                <h3 className="font-black text-sm uppercase tracking-widest">Editar Ordem de Coleta Original</h3>
-                <button onClick={() => setIsOCEditModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
-              </div>
-              <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCEditModalOpen(false); loadData(); }} initialData={selectedTrip.ocFormData} />
-           </div>
-        </div>
-      )}
-
-      {isMinutaModalOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[450] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
-           <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
-              <div className="p-6 bg-emerald-600 text-white flex justify-between items-center">
-                <h3 className="font-black text-sm uppercase tracking-widest">Formulário de Minuta Pre-Stacking</h3>
-                <button onClick={() => setIsMinutaModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
-              </div>
-              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaModalOpen(false); loadData(); }} initialOS={selectedTrip.os} />
-           </div>
-        </div>
-      )}
-
-      {isDocViewerOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-2xl animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-6xl h-full rounded-[3.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col animate-in zoom-in-95">
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                 <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Visualizador de Documentos ALS</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Dossiê: {docViewConfig.title}</p>
-                 </div>
-                 <div className="flex gap-4">
-                    <button onClick={() => {
-                        const win = window.open('', '_blank');
-                        if (win) {
-                          win.document.write(`<html><body style="margin:0;display:flex;justify-content:center;align-items:center;">${docViewConfig.url.startsWith('data:image') ? `<img src="${docViewConfig.url}" style="max-width:100%;">` : `<embed width="100%" height="100%" src="${docViewConfig.url}" type="application/pdf">`}</body></html>`);
-                          win.document.close();
-                          win.print();
-                        }
-                    }} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all">Imprimir</button>
-                    <button onClick={() => setIsDocViewerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-200 text-slate-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
-                 </div>
-              </div>
-              <div className="flex-1 bg-slate-100 relative overflow-auto flex justify-center items-center p-8">
-                 {docViewConfig.url.startsWith('data:image') ? (
-                    <img src={docViewConfig.url} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" alt="Documento" />
-                 ) : (
-                    <iframe width="100%" height="100%" style={{ border: 0 }} src={docViewConfig.url} title="Document Viewer"></iframe>
-                 )}
-              </div>
-           </div>
         </div>
       )}
     </div>

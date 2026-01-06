@@ -21,16 +21,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   }, []);
 
   const fetchStatus = useCallback(async () => {
-    // Busca os usuários do banco (incluindo o last_login oficial)
     const u = await db.getUsers();
     setUsers(u);
   }, []);
 
   useEffect(() => {
     fetchStatus();
-    // Atualiza os dados do banco a cada 15s
     const syncInterval = setInterval(fetchStatus, 15000);
-    // Atualiza o relógio interno a cada 1s para o cronômetro correr suavemente
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -49,14 +46,12 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
     if (currentUser && user.id === currentUser.id) return 'ONLINE';
-    
     if (!user.lastSeen) return 'OFFLINE';
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
-    
     if (diffSeconds > 180) return 'OFFLINE';
-    if (diffSeconds < 60) return 'ONLINE';
-    return 'AUSENTE';
+    if (diffSeconds > 60) return 'AUSENTE';
+    return 'ONLINE';
   };
 
   const onlineCount = users.filter(u => getStatus(u) === 'ONLINE').length;
@@ -73,7 +68,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
       >
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className={`w-3.5 h-3.5 rounded-full ${onlineCount > 0 ? 'bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.6)]' : 'bg-slate-600'}`}></div>
+            <div className={`w-3 h-3 rounded-full ${onlineCount > 0 ? 'bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.6)]' : 'bg-slate-600'}`}></div>
           </div>
           <div className="flex flex-col items-start text-left">
             <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
@@ -89,51 +84,42 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
         <div className="absolute bottom-full left-0 mb-4 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] overflow-hidden animate-in slide-in-from-bottom-6 zoom-in-95 duration-500 z-[200]">
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
              <div className="flex flex-col">
-               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Monitor de Sessões</h4>
-               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Dados Sincronizados</p>
+               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Sessões Ativas</h4>
+               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Tempo de Conexão Individual</p>
              </div>
              <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
-                <span className="text-[8px] font-black bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl uppercase border border-blue-500/20">Monitorando</span>
+                <span className="text-[8px] font-black bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-xl uppercase border border-blue-500/20">LIVE</span>
              </div>
           </div>
 
-          <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
+          <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
-              // Localiza o usuário correspondente no banco para pegar o lastLogin real
-              const u = users.find(user => 
-                (user.staffId === s.id) || 
-                (s.role === 'admin' && user.username.toLowerCase() === s.username.toLowerCase()) ||
-                (s.username === 'operacional_ssz' && user.id === 'admin-master')
-              );
-              
+              const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
               const status = u ? getStatus(u) : 'OFFLINE';
-              const statusConfigs = {
-                ONLINE: { color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online / Ativo', shadow: 'shadow-emerald-500/40' },
-                AUSENTE: { color: 'bg-amber-500', text: 'text-amber-400', label: 'Ausente / Inativo', shadow: 'shadow-amber-500/40' },
-                OFFLINE: { color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado', shadow: 'shadow-transparent' }
-              };
+              const config = {
+                ONLINE: { color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online' },
+                AUSENTE: { color: 'bg-amber-500', text: 'text-amber-400', label: 'Ausente' },
+                OFFLINE: { color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' }
+              }[status];
 
-              const config = statusConfigs[status];
-              // Usa o utilitário PRÓPRIO baseado na data do banco:
               const displayTime = u ? timeUtils.calculateDuration(u.lastLogin) : '00:00:00';
 
               return (
-                <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${status === 'OFFLINE' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'}`}>
+                <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${status === 'OFFLINE' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}>
                   <div className="relative shrink-0">
-                    <div className={`w-12 h-12 rounded-2xl bg-slate-800 overflow-hidden flex items-center justify-center border transition-all ${status === 'OFFLINE' ? 'border-white/5' : 'border-white/20'}`}>
-                      {s.photo ? <img src={s.photo} className="w-full h-full object-cover" alt="" /> : <span className="text-sm font-black text-slate-600">{s.name.charAt(0)}</span>}
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden flex items-center justify-center border border-white/10">
+                      {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="text-xs font-black text-slate-600">{s.name.charAt(0)}</span>}
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-[3px] border-[#0a0f1e] shadow-lg ${config.color} ${config.shadow} ${status === 'ONLINE' ? 'animate-pulse' : ''}`}></div>
+                    <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-[3px] border-[#0a0f1e] ${config.color}`}></div>
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-black text-slate-100 uppercase truncate tracking-tight">{s.name}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <p className={`text-[8px] font-black uppercase tracking-tighter ${config.text}`}>{config.label}</p>
+                    <p className="text-[10px] font-black text-slate-100 uppercase truncate">{s.name}</p>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className={`text-[7px] font-black uppercase tracking-tighter ${config.text}`}>{config.label}</p>
                       {status !== 'OFFLINE' && (
-                        <div className="flex items-center gap-1.5 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/10">
-                           <svg className="w-2.5 h-2.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3.5"/></svg>
+                        <div className="flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/10">
                            <span className="text-[8px] font-mono font-black text-blue-400">{displayTime}</span>
                         </div>
                       )}

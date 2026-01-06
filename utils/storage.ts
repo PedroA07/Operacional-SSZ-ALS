@@ -81,9 +81,7 @@ export const db = {
           author_id: user.id,
           summary: newNotif.summary
         });
-      } catch (e) {
-        console.error("Erro ao salvar notificação no banco:", e);
-      }
+      } catch (e) {}
     }
 
     const current = db._getLocal(KEYS.NOTIFICATIONS);
@@ -161,19 +159,18 @@ export const db = {
     if (actingUser) {
       const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse };
       
-      // Notificação de Status
-      if (oldTrip && oldTrip.status !== trip.status) {
-        await db.addNotification(actingUser, 'STATUS_UPDATED', `Status Alterado: ${trip.os}`, `Viagem movida para "${trip.status}"`, summary);
-      }
-      
-      // Notificação de Anexos (Dossiê)
-      if (oldTrip) {
-        if (!oldTrip.osDoc && trip.osDoc) await db.addNotification(actingUser, 'SYSTEM', `OS Anexada: ${trip.os}`, `O arquivo PDF da Ordem de Serviço foi vinculado.`, summary);
-        if (!oldTrip.agendamentoDoc && trip.agendamentoDoc) await db.addNotification(actingUser, 'SYSTEM', `Agendamento Vinculado: ${trip.os}`, `O comprovante de agendamento foi anexado.`, summary);
-        if (!oldTrip.completoDoc && trip.completoDoc) await db.addNotification(actingUser, 'SYSTEM', `Dossiê Finalizado: ${trip.os}`, `O documento completo da viagem foi anexado para faturamento.`, summary);
+      if (!oldTrip) {
+        await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada no painel.`, summary);
       } else {
-        // Nova Viagem Criada Manualmente
-        await db.addNotification(actingUser, 'TRIP_CREATED', `Nova OS no Painel: ${trip.os}`, `Uma nova programação foi registrada manualmente.`, summary);
+        if (oldTrip.status !== trip.status) {
+          await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status Atualizado', `Viagem OS ${trip.os} movida para "${trip.status}".`, summary);
+        }
+        if (oldTrip.advancePayment.status !== trip.advancePayment.status && trip.advancePayment.status === 'LIBERAR') {
+          await db.addNotification(actingUser, 'PAYMENT_LIBERATED', 'Adiantamento Liberado', `Pagamento de 70% autorizado para a OS ${trip.os}.`, summary);
+        }
+        if (oldTrip.balancePayment.status !== trip.balancePayment.status && trip.balancePayment.status === 'LIBERAR') {
+          await db.addNotification(actingUser, 'PAYMENT_LIBERATED', 'Saldo Liberado', `Pagamento final de 30% autorizado para a OS ${trip.os}.`, summary);
+        }
       }
     }
     return true;
@@ -187,8 +184,8 @@ export const db = {
     if (idx >= 0) current[idx] = driver; else current.push(driver);
     db._saveLocal(KEYS.DRIVERS, current);
     
-    if (actingUser) {
-      await db.addNotification(actingUser, 'SYSTEM', isNew ? 'Novo Motorista' : 'Cadastro Atualizado', `O motorista ${driver.name} foi ${isNew ? 'cadastrado' : 'atualizado'} no sistema.`, { motorista: driver.name, placa: driver.plateHorse });
+    if (actingUser && isNew) {
+      await db.addNotification(actingUser, 'DRIVER_CREATED', 'Novo Motorista', `O motorista ${driver.name} foi cadastrado na base.`, { motorista: driver.name, placa: driver.plateHorse });
     }
     return true;
   },
@@ -205,13 +202,14 @@ export const db = {
     if (idx >= 0) current[idx] = customer; else current.push(customer);
     db._saveLocal(KEYS.CUSTOMERS, current);
     
-    if (actingUser) {
-      await db.addNotification(actingUser, 'SYSTEM', isNew ? 'Novo Cliente' : 'Cliente Atualizado', `A empresa ${customer.legalName || customer.name} teve seus dados salvos.`, { cliente: customer.name });
+    if (actingUser && isNew) {
+      await db.addNotification(actingUser, 'CUSTOMER_CREATED', 'Novo Cliente', `A empresa ${customer.name} foi adicionada ao sistema.`, { cliente: customer.name });
     }
     return true;
   },
 
   savePort: async (port: Port, actingUser?: User) => {
+    const isNew = !db._getLocal(KEYS.PORTS).some((p: any) => p.id === port.id);
     if (supabase) { 
       const payload = { ...port, legal_name: port.legalName };
       delete (payload as any).legalName;
@@ -221,11 +219,12 @@ export const db = {
     const idx = current.findIndex((p: any) => p.id === port.id);
     if (idx >= 0) current[idx] = port; else current.push(port);
     db._saveLocal(KEYS.PORTS, current);
-    if (actingUser) await db.addNotification(actingUser, 'SYSTEM', 'Porto/Local Salvo', `Localidade ${port.name} atualizada.`, { cliente: port.name });
+    if (actingUser && isNew) await db.addNotification(actingUser, 'PORT_CREATED', 'Novo Porto', `Localidade ${port.name} cadastrada.`);
     return true;
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
+    const isNew = !db._getLocal(KEYS.PRE_STACKING).some((p: any) => p.id === ps.id);
     if (supabase) { 
       const payload = { ...ps, legal_name: ps.legalName };
       delete (payload as any).legalName;
@@ -235,7 +234,7 @@ export const db = {
     const idx = current.findIndex((p: any) => p.id === ps.id);
     if (idx >= 0) current[idx] = ps; else current.push(ps);
     db._saveLocal(KEYS.PRE_STACKING, current);
-    if (actingUser) await db.addNotification(actingUser, 'SYSTEM', 'Unidade Pré-Stacking', `Terminal ${ps.name} atualizado.`, { cliente: ps.name });
+    if (actingUser && isNew) await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `Terminal ${ps.name} cadastrado.`);
     return true;
   },
 
@@ -244,7 +243,7 @@ export const db = {
     if (supabase) { await supabase.from('trips').delete().eq('id', id); }
     db._saveLocal(KEYS.TRIPS, db._getLocal(KEYS.TRIPS).filter((t: any) => t.id !== id));
     if (actingUser && trip) {
-      await db.addNotification(actingUser, 'DELETED', `OS Removida: ${trip.os}`, `A programação da OS ${trip.os} foi excluída permanentemente.`, { os: trip.os });
+      await db.addNotification(actingUser, 'DELETED', 'OS Excluída', `A programação da OS ${trip.os} foi removida permanentemente.`, { os: trip.os });
     }
     return true;
   },
@@ -316,12 +315,12 @@ export const db = {
     const idx = current.findIndex((c: any) => c.id === category.id);
     if (idx >= 0) current[idx] = category as any; else current.push(category as any);
     db._saveLocal(KEYS.CATEGORIES, current);
-    if (actingUser) { await db.addNotification(actingUser, 'SYSTEM', `Nova Categoria`, `Categoria "${category.name}" adicionada ao sistema.`); }
+    if (actingUser) { await db.addNotification(actingUser, 'CATEGORY_CREATED', 'Nova Categoria', `Categoria "${category.name}" adicionada ao sistema.`); }
     return true;
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
-    if (supabase) { try { const { data } = await supabase.from('pre_stacking').select('*'); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { const { data, error } = await supabase.from('pre_stacking').select('*'); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
