@@ -8,8 +8,8 @@ import SchedulingEditModal from './operations/SchedulingEditModal';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
-import OrdemColetaForm from './forms/OrdemColetaForm';
-import PreStackingForm from './forms/PreStackingForm';
+import OrdemColetaForm from '../forms/OrdemColetaForm';
+import PreStackingForm from '../forms/PreStackingForm';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
 interface OperationsTabProps {
@@ -118,7 +118,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setFilterTypes(['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM']);
     setFilterClientNames([]);
     setFilterDriverNames([]);
+    // Fix: Using correct state setter name filterStartDate
     setFilterStartDate('');
+    // Fix: Using correct state setter name filterEndDate
     setFilterEndDate('');
     setFilterCategory('TODAS');
   };
@@ -164,23 +166,24 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
           </div>
         </div>
 
-        {/* NAVEGAÇÃO POR CATEGORIA MASTER */}
+        {/* NAVEGAÇÃO POR CATEGORIA MASTER - ATUALIZADA PARA NAVEGAR EM VEZ DE APENAS FILTRAR */}
         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
            <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Acesso Rápido por Categoria</h3>
            <div className="flex flex-wrap gap-3">
               <button 
                 onClick={() => setFilterCategory('TODAS')} 
-                className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase ${filterCategory === 'TODAS' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500'}`}
+                className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase ${filterCategory === 'TODAS' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'}`}
               >
                 Visão Geral
               </button>
               {categories.filter(c => !c.parentId).map(cat => (
                 <button 
                   key={cat.id} 
-                  onClick={() => setFilterCategory(cat.name)} 
-                  className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase flex items-center gap-2 ${filterCategory === cat.name ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500'}`}
+                  onClick={() => setActiveView({ type: 'category', categoryName: cat.name })} 
+                  className="px-6 py-3 bg-white border border-slate-200 hover:border-blue-600 hover:text-blue-600 rounded-xl transition-all text-[10px] font-black uppercase flex items-center gap-2 group"
                 >
-                  {cat.name}
+                  <span>{cat.name}</span>
+                  <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </button>
               ))}
            </div>
