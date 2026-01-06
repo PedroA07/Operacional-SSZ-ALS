@@ -22,16 +22,19 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
   const loadPortalData = useCallback(async () => {
     try {
-      // Carrega dados brutos como no Portal Administrativo para evitar erros de cache
       const [allDrivers, allTrips] = await Promise.all([
         db.getDrivers(),
         db.getTrips()
       ]);
 
-      // Localiza o motorista logado
+      // Comparação robusta: converte ambos para string para evitar erros de tipo
       const currentDriver = allDrivers.find(d => String(d.id) === String(user.driverId));
       
-      // Filtra viagens vinculadas a este motorista
+      if (!currentDriver) {
+        console.error("Vínculo não localizado para driverId:", user.driverId);
+      }
+
+      // Filtra viagens vinculadas
       const myTrips = allTrips.filter(t => String(t.driver?.id) === String(user.driverId))
         .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
@@ -61,7 +64,22 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Conectando Servidor ALS...</p>
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Sincronizando Banco de Dados...</p>
+      </div>
+    );
+  }
+
+  // Fallback caso o driverId na sessão não bata com nenhum motorista no banco
+  if (!driver && !isLoading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#020617] p-10 text-center">
+        <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6">
+           <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <h2 className="text-white font-black uppercase text-xl">Erro de Vínculo</h2>
+        <p className="text-slate-400 text-sm mt-4 leading-relaxed">Não localizamos seu registro de motorista vinculado a este login. <br/> Por favor, entre em contato com o operacional.</p>
+        <p className="text-slate-600 text-[10px] mt-2 font-mono uppercase">ID: {user.driverId || 'NÃO DEFINIDO'}</p>
+        <button onClick={onLogout} className="mt-10 px-8 py-4 bg-slate-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest">Sair do Sistema</button>
       </div>
     );
   }
@@ -81,7 +99,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
            <div className="flex items-center gap-2 mt-2">
               <span className="text-[8px] font-black text-blue-500 uppercase">Placa: <span className="font-mono text-white">{driver?.plateHorse || '---'}</span></span>
               <span className="text-[8px] font-black text-slate-700">|</span>
-              <span className="text-[8px] font-black text-slate-500 uppercase">ID: {driver?.id?.split('-')[1] || '---'}</span>
+              <span className="text-[8px] font-black text-slate-500 uppercase">Ficha: {driver?.id?.split('-')[1] || '---'}</span>
            </div>
         </div>
         <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-white/5">

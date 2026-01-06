@@ -22,17 +22,20 @@ export const driverAuthService = {
    * Sincroniza o usuário do motorista no banco de dados 'users'
    */
   syncUserRecord: async (driverId: string, driverData: Partial<Driver>, customPassword?: string) => {
+    if (!driverId) throw new Error("ID do motorista é obrigatório para sincronismo.");
+
     const defaults = driverAuthService.generateDefaults(driverData);
     const username = defaults.username;
     const password = customPassword || defaults.password;
 
+    // CRÍTICO: Garantimos que o driverId da tabela 'drivers' seja gravado aqui no 'users'
     const userPayload: User = {
       id: `u-${driverId}`,
       username: username,
       password: password,
       displayName: driverData.name || 'Motorista',
       role: driverData.driverType === 'Motoboy' ? 'motoboy' : 'driver',
-      driverId: driverId, // ESSENCIAL PARA O PORTAL DO MOTORISTA
+      driverId: driverId, 
       lastLogin: new Date().toISOString(),
       position: driverData.driverType || 'Motorista',
       status: driverData.status || 'Ativo',
@@ -49,7 +52,7 @@ export const driverAuthService = {
    */
   updatePassword: async (driverId: string, newPassword: string) => {
     const users = await db.getUsers();
-    const user = users.find(u => u.driverId === driverId);
+    const user = users.find(u => String(u.driverId) === String(driverId));
     if (user) {
       user.password = newPassword;
       await db.saveUser(user);
