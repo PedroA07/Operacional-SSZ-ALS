@@ -67,6 +67,8 @@ export interface Notification {
     porto?: string;
     categoria?: string;
     unidade?: string;
+    // Added 'fotos' property to support scanner notifications and fix type error in ScannerModal
+    fotos?: string;
   };
 }
 
