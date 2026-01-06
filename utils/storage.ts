@@ -100,7 +100,7 @@ export const db = {
             id: u.id, username: u.username, password: u.password,
             displayName: u.display_name || u.username, role: u.role,
             lastLogin: u.lastlogin || new Date().toISOString(), photo: u.photo,
-            position: u.position, staffId: u.staff_id, driverId: u.driver_id,
+            position: u.position, staffId: u.staff_id, driverId: u.driver_id, // driver_id vindo do Supabase
             status: u.status, isFirstLogin: u.isfirstlogin === true,
             lastSeen: u.last_seen, isOnlineVisible: u.is_online_visible ?? true,
             isOnline: u.is_online ?? false,
@@ -120,7 +120,8 @@ export const db = {
       id: user.id, username: user.username, password: user.password,
       display_name: user.displayName, role: user.role, lastlogin: user.lastLogin,
       photo: user.photo, position: user.position, staff_id: user.staffId,
-      driver_id: user.driverId, status: user.status, isfirstlogin: user.isFirstLogin === true,
+      driver_id: user.driverId, // Gravando driver_id no Supabase
+      status: user.status, isfirstlogin: user.isFirstLogin === true,
       last_seen: user.lastSeen, is_online_visible: user.isOnlineVisible ?? true,
       is_online: (user as any).isOnline ?? false,
       presence_status: user.presence_status || 'offline',

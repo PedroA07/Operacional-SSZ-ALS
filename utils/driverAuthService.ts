@@ -29,18 +29,23 @@ export const driverAuthService = {
     const password = customPassword || defaults.password;
 
     // CRÍTICO: Garantimos que o driverId da tabela 'drivers' seja gravado aqui no 'users'
+    // Se o usuário já existir, preservamos os campos dele e atualizamos o vínculo
+    const users = await db.getUsers();
+    const existingUser = users.find(u => u.username === username);
+
     const userPayload: User = {
-      id: `u-${driverId}`,
+      ...(existingUser || {}),
+      id: existingUser?.id || `u-${driverId}`,
       username: username,
       password: password,
       displayName: driverData.name || 'Motorista',
       role: driverData.driverType === 'Motoboy' ? 'motoboy' : 'driver',
-      driverId: driverId, 
-      lastLogin: new Date().toISOString(),
+      driverId: driverId, // Campo crucial para o vínculo
+      lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       position: driverData.driverType || 'Motorista',
       status: driverData.status || 'Ativo',
-      photo: driverData.photo,
-      isFirstLogin: false 
+      photo: driverData.photo || existingUser?.photo,
+      isFirstLogin: existingUser ? (existingUser.isFirstLogin === true) : false 
     };
 
     await db.saveUser(userPayload);
