@@ -27,7 +27,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
-  const [usernameOptions, setUsernameOptions] = useState<string[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -37,6 +36,9 @@ const StaffModal: React.FC<StaffModalProps> = ({
         ...editingStaff, 
         password: linkedUser?.password || '',
         photo: editingStaff.photo || '',
+        // Garante que os campos corporativos não venham undefined
+        emailCorp: editingStaff.emailCorp || '',
+        phoneCorp: editingStaff.phoneCorp || '',
         registrationDate: editingStaff.registrationDate?.split('T')[0]
       });
       setIsEditingPassword(false);
@@ -48,23 +50,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
       setIsEditingPassword(true);
     }
   }, [editingStaff, isOpen, allUsers]);
-
-  useEffect(() => {
-    if (form.name && !editingStaff) {
-      const cleanName = form.name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const parts = cleanName.split(/\s+/);
-      
-      if (parts.length > 1) {
-        const first = parts[0];
-        const options = parts.slice(1).map(surname => `${first}.${surname}`);
-        const uniqueOptions = options.filter(opt => !allUsers.some(u => u.username === opt));
-        setUsernameOptions(uniqueOptions);
-        if (uniqueOptions.length > 0 && !uniqueOptions.includes(form.username || '')) {
-           setForm(prev => ({ ...prev, username: uniqueOptions[0] }));
-        }
-      }
-    }
-  }, [form.name, editingStaff, allUsers]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

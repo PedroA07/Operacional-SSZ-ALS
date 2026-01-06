@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
+import { staffRepository } from './staffRepository';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
@@ -142,6 +143,51 @@ export const db = {
         }).eq('id', userId);
       } catch (e) {}
     }
+  },
+
+  getStaff: async (): Promise<Staff[]> => {
+    if (supabase) { 
+      try { 
+        const s = await staffRepository.getAll(supabase); 
+        db._saveLocal(KEYS.STAFF, s); 
+        return s; 
+      } catch (e) {} 
+    }
+    return db._getLocal(KEYS.STAFF);
+  },
+
+  saveStaff: async (staff: Staff, password?: string) => {
+    if (supabase) { 
+      await staffRepository.save(supabase, staff);
+    }
+    // Sincroniza também com a tabela de usuários se houver alteração de senha ou username
+    const currentUsers = await db.getUsers();
+    const linkedUser = currentUsers.find(u => u.staffId === staff.id);
+    if (linkedUser) {
+      const updatedUser = { 
+        ...linkedUser, 
+        username: staff.username, 
+        displayName: staff.name, 
+        role: staff.role,
+        position: staff.position,
+        status: staff.status,
+        photo: staff.photo
+      };
+      if (password) updatedUser.password = password;
+      await db.saveUser(updatedUser);
+    }
+
+    const current = db._getLocal(KEYS.STAFF);
+    const idx = current.findIndex((s: any) => s.id === staff.id);
+    if (idx >= 0) current[idx] = staff; else current.push(staff);
+    db._saveLocal(KEYS.STAFF, current);
+    return true;
+  },
+
+  deleteStaff: async (id: string) => {
+    if (supabase) { await staffRepository.delete(supabase, id); }
+    db._saveLocal(KEYS.STAFF, db._getLocal(KEYS.STAFF).filter((s: any) => s.id !== id));
+    return true;
   },
 
   getTrips: async (): Promise<Trip[]> => {
@@ -294,29 +340,6 @@ export const db = {
   deletePort: async (id: string) => {
     if (supabase) { await supabase.from('ports').delete().eq('id', id); }
     db._saveLocal(KEYS.PORTS, db._getLocal(KEYS.PORTS).filter((p: any) => p.id !== id));
-    return true;
-  },
-
-  getStaff: async (): Promise<Staff[]> => {
-    if (supabase) { try { const { data } = await supabase.from('staff').select('*'); if (data) { const mapped = data.map(s => ({ ...s, registrationDate: s.registration_date, statusSince: s.status_since, emailCorp: s.emailcorp, phonecorp: s.phonecorp })); db._saveLocal(KEYS.STAFF, mapped); return mapped; } } catch (e) {} }
-    return db._getLocal(KEYS.STAFF);
-  },
-
-  saveStaff: async (staff: Staff, password?: string) => {
-    if (supabase) { 
-      const payload = { ...staff, registration_date: staff.registrationDate, status_since: staff.statusSince, emailcorp: staff.emailCorp, phonecorp: staff.phoneCorp };
-      await supabase.from('staff').upsert(payload); 
-    }
-    const current = db._getLocal(KEYS.STAFF);
-    const idx = current.findIndex((s: any) => s.id === staff.id);
-    if (idx >= 0) current[idx] = staff; else current.push(staff);
-    db._saveLocal(KEYS.STAFF, current);
-    return true;
-  },
-
-  deleteStaff: async (id: string) => {
-    if (supabase) { await supabase.from('staff').delete().eq('id', id); }
-    db._saveLocal(KEYS.STAFF, db._getLocal(KEYS.STAFF).filter((s: any) => s.id !== id));
     return true;
   },
 
