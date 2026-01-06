@@ -31,6 +31,64 @@ export const db = {
     try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
   },
   
+  getUsers: async (): Promise<User[]> => {
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from('users').select('*');
+        if (!error && data) {
+          const mapped = data.map(u => ({
+            id: u.id, 
+            username: u.username, 
+            password: u.password,
+            displayName: u.displayname || u.username, // Ajustado para 'displayname' (minúsculo)
+            role: u.role,
+            lastLogin: u.lastlogin || new Date().toISOString(), // Ajustado para 'lastlogin'
+            photo: u.photo,
+            position: u.position, 
+            staffId: u.staffid, // Ajustado para 'staffid'
+            driverId: u.driverid, // Ajustado para 'driverid'
+            status: u.status, 
+            isFirstLogin: u.isfirstlogin === true, // Ajustado para 'isfirstlogin'
+            lastSeen: u.lastseen, // Ajustado para 'lastseen'
+            isOnlineVisible: u.isonlinevisible ?? true, // Ajustado para 'isonlinevisible'
+            presence_status: u.presence_status || 'offline',
+            notificationPrefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true, newRegistrations: true }
+          }));
+          db._saveLocal(KEYS.USERS, mapped);
+          return mapped;
+        }
+      } catch (e) {}
+    }
+    return db._getLocal(KEYS.USERS);
+  },
+
+  saveUser: async (user: User) => {
+    const payload = {
+      id: user.id, 
+      username: user.username, 
+      password: user.password,
+      displayname: user.displayName, // Mapeando para minúsculo
+      role: user.role, 
+      lastlogin: user.lastLogin, // Mapeando para minúsculo
+      photo: user.photo, 
+      position: user.position, 
+      staffid: user.staffId, // Mapeando para minúsculo
+      driverid: user.driverId, // Mapeando para minúsculo (O que causava o Erro de Vínculo)
+      status: user.status, 
+      isfirstlogin: user.isFirstLogin === true,
+      lastseen: user.lastSeen,
+      isonlinevisible: user.isOnlineVisible ?? true,
+      presence_status: user.presence_status || 'offline',
+      notification_prefs: user.notificationPrefs
+    };
+    if (supabase) { try { await supabase.from('users').upsert(payload); } catch (e) {} }
+    const current = db._getLocal(KEYS.USERS);
+    const idx = current.findIndex((u: any) => u.id === user.id);
+    if (idx >= 0) current[idx] = user; else current.push(user);
+    db._saveLocal(KEYS.USERS, current);
+    return true;
+  },
+
   getNotifications: async (): Promise<Notification[]> => {
     if (supabase) {
       try {
@@ -54,93 +112,30 @@ export const db = {
     return db._getLocal(KEYS.NOTIFICATIONS);
   },
 
-  addNotification: async (
-    user: User, 
-    type: NotificationType, 
-    title: string, 
-    description: string, 
-    summary?: Notification['summary']
-  ) => {
+  addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: Notification['summary']) => {
     const authorName = user.displayName || user.username || 'Sistema';
     const newNotif: Notification = {
       id: `notif-${Date.now()}`,
-      title,
-      description,
-      type,
-      authorName: authorName,
-      authorId: user.id || 'system',
-      timestamp: new Date().toISOString(),
-      summary
+      title, description, type, authorName, authorId: user.id || 'system', timestamp: new Date().toISOString(), summary
     };
-
     if (supabase) {
       try {
         await supabase.from('notifications').insert({
-          title: newNotif.title,
-          description: newNotif.description,
-          type: newNotif.type,
-          author_name: authorName,
-          author_id: user.id,
-          summary: newNotif.summary
+          title: newNotif.title, description: newNotif.description, type: newNotif.type,
+          author_name: authorName, author_id: user.id, summary: newNotif.summary
         });
       } catch (e) {}
     }
-
     const current = db._getLocal(KEYS.NOTIFICATIONS);
     db._saveLocal(KEYS.NOTIFICATIONS, [newNotif, ...current].slice(0, 50));
     window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: newNotif }));
-  },
-
-  getUsers: async (): Promise<User[]> => {
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.from('users').select('*');
-        if (!error && data) {
-          const mapped = data.map(u => ({
-            id: u.id, username: u.username, password: u.password,
-            displayName: u.display_name || u.username, role: u.role,
-            lastLogin: u.lastlogin || new Date().toISOString(), photo: u.photo,
-            position: u.position, staffId: u.staff_id, driverId: u.driver_id, // driver_id vindo do Supabase
-            status: u.status, isFirstLogin: u.isfirstlogin === true,
-            lastSeen: u.last_seen, isOnlineVisible: u.is_online_visible ?? true,
-            isOnline: u.is_online ?? false,
-            presence_status: u.presence_status || 'offline',
-            notificationPrefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true, newRegistrations: true }
-          }));
-          db._saveLocal(KEYS.USERS, mapped);
-          return mapped;
-        }
-      } catch (e) {}
-    }
-    return db._getLocal(KEYS.USERS);
-  },
-
-  saveUser: async (user: User) => {
-    const payload = {
-      id: user.id, username: user.username, password: user.password,
-      display_name: user.displayName, role: user.role, lastlogin: user.lastLogin,
-      photo: user.photo, position: user.position, staff_id: user.staffId,
-      driver_id: user.driverId, // Gravando driver_id no Supabase
-      status: user.status, isfirstlogin: user.isFirstLogin === true,
-      last_seen: user.lastSeen, is_online_visible: user.isOnlineVisible ?? true,
-      is_online: (user as any).isOnline ?? false,
-      presence_status: user.presence_status || 'offline',
-      notification_prefs: user.notificationPrefs
-    };
-    if (supabase) { try { await supabase.from('users').upsert(payload); } catch (e) {} }
-    const current = db._getLocal(KEYS.USERS);
-    const idx = current.findIndex((u: any) => u.id === user.id);
-    if (idx >= 0) current[idx] = user; else current.push(user);
-    db._saveLocal(KEYS.USERS, current);
-    return true;
   },
 
   updatePresence: async (userId: string, status: PresenceStatus) => {
     if (supabase) {
       try {
         await supabase.from('users').update({ 
-          last_seen: new Date().toISOString(), 
-          is_online: status !== 'offline',
+          lastseen: new Date().toISOString(), // Ajustado para minúsculo
           presence_status: status
         }).eq('id', userId);
       } catch (e) {}
@@ -148,36 +143,19 @@ export const db = {
   },
 
   getStaff: async (): Promise<Staff[]> => {
-    if (supabase) { 
-      try { 
-        const s = await staffRepository.getAll(supabase); 
-        db._saveLocal(KEYS.STAFF, s); 
-        return s; 
-      } catch (e) {} 
-    }
+    if (supabase) { try { const s = await staffRepository.getAll(supabase); db._saveLocal(KEYS.STAFF, s); return s; } catch (e) {} }
     return db._getLocal(KEYS.STAFF);
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
-    if (supabase) { 
-      await staffRepository.save(supabase, staff);
-    }
+    if (supabase) { await staffRepository.save(supabase, staff); }
     const currentUsers = await db.getUsers();
     const linkedUser = currentUsers.find(u => u.staffId === staff.id);
     if (linkedUser) {
-      const updatedUser = { 
-        ...linkedUser, 
-        username: staff.username, 
-        displayName: staff.name, 
-        role: staff.role,
-        position: staff.position,
-        status: staff.status,
-        photo: staff.photo
-      };
+      const updatedUser = { ...linkedUser, username: staff.username, displayName: staff.name, role: staff.role, position: staff.position, status: staff.status, photo: staff.photo };
       if (password) updatedUser.password = password;
       await db.saveUser(updatedUser);
     }
-
     const current = db._getLocal(KEYS.STAFF);
     const idx = current.findIndex((s: any) => s.id === staff.id);
     if (idx >= 0) current[idx] = staff; else current.push(staff);
@@ -192,37 +170,21 @@ export const db = {
   },
 
   getTrips: async (): Promise<Trip[]> => {
-    if (supabase) {
-      try {
-        const t = await tripRepository.getAll(supabase);
-        db._saveLocal(KEYS.TRIPS, t);
-        return t;
-      } catch (e) {}
-    }
+    if (supabase) { try { const t = await tripRepository.getAll(supabase); db._saveLocal(KEYS.TRIPS, t); return t; } catch (e) {} }
     return db._getLocal(KEYS.TRIPS);
   },
 
   saveTrip: async (trip: Trip, actingUser?: User) => {
     const oldTrip = db._getLocal(KEYS.TRIPS).find((t: any) => t.id === trip.id);
-
-    if (supabase) {
-      try {
-        await tripRepository.save(supabase, trip);
-      } catch (e) {}
-    }
-    
+    if (supabase) { try { await tripRepository.save(supabase, trip); } catch (e) {} }
     const current = db._getLocal(KEYS.TRIPS);
     const idx = current.findIndex((t: Trip) => t.id === trip.id);
     if (idx >= 0) current[idx] = trip; else current.push(trip);
     db._saveLocal(KEYS.TRIPS, current);
-
     if (actingUser) {
       const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse };
-      if (!oldTrip) {
-        await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada no painel.`, summary);
-      } else if (oldTrip.status !== trip.status) {
-        await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status Atualizado', `Viagem OS ${trip.os} movida para "${trip.status}".`, summary);
-      }
+      if (!oldTrip) await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada.`, summary);
+      else if (oldTrip.status !== trip.status) await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status Atualizado', `OS ${trip.os} para "${trip.status}".`, summary);
     }
     return true;
   },
@@ -231,9 +193,7 @@ export const db = {
     const trip = db._getLocal(KEYS.TRIPS).find((t: any) => t.id === id);
     if (supabase) { await tripRepository.delete(supabase, id); }
     db._saveLocal(KEYS.TRIPS, db._getLocal(KEYS.TRIPS).filter((t: any) => t.id !== id));
-    if (actingUser && trip) {
-      await db.addNotification(actingUser, 'DELETED', 'OS Excluída', `A programação da OS ${trip.os} foi removida permanentemente.`, { os: trip.os });
-    }
+    if (actingUser && trip) await db.addNotification(actingUser, 'DELETED', 'OS Excluída', `OS ${trip.os} removida.`, { os: trip.os });
     return true;
   },
 
@@ -244,10 +204,7 @@ export const db = {
     const idx = current.findIndex((d: any) => d.id === driver.id);
     if (idx >= 0) current[idx] = driver; else current.push(driver);
     db._saveLocal(KEYS.DRIVERS, current);
-    
-    if (actingUser && isNew) {
-      await db.addNotification(actingUser, 'DRIVER_CREATED', 'Novo Motorista', `O motorista ${driver.name} foi cadastrado na base.`, { motorista: driver.name, placa: driver.plateHorse });
-    }
+    if (actingUser && isNew) await db.addNotification(actingUser, 'DRIVER_CREATED', 'Novo Motorista', `${driver.name} cadastrado.`, { motorista: driver.name, placa: driver.plateHorse });
     return true;
   },
 
@@ -273,10 +230,7 @@ export const db = {
     const idx = current.findIndex((c: any) => c.id === customer.id);
     if (idx >= 0) current[idx] = customer; else current.push(customer);
     db._saveLocal(KEYS.CUSTOMERS, current);
-    
-    if (actingUser && isNew) {
-      await db.addNotification(actingUser, 'CUSTOMER_CREATED', 'Novo Cliente', `A empresa ${customer.name} foi adicionada ao sistema.`, { cliente: customer.name });
-    }
+    if (actingUser && isNew) await db.addNotification(actingUser, 'CUSTOMER_CREATED', 'Novo Cliente', `${customer.name} adicionado.`, { cliente: customer.name });
     return true;
   },
 
@@ -328,7 +282,7 @@ export const db = {
     const idx = current.findIndex((c: any) => c.id === category.id);
     if (idx >= 0) current[idx] = category as any; else current.push(category as any);
     db._saveLocal(KEYS.CATEGORIES, current);
-    if (actingUser) { await db.addNotification(actingUser, 'CATEGORY_CREATED', 'Nova Categoria', `Categoria "${category.name}" adicionada ao sistema.`); }
+    if (actingUser) await db.addNotification(actingUser, 'CATEGORY_CREATED', 'Nova Categoria', `Categoria "${category.name}" adicionada.`);
     return true;
   },
 
