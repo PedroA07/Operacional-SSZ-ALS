@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { Trip, User, TripStatus } from '../../../types';
 import { driverService } from '../../../utils/driverService';
+import ScannerModal from '../ScannerModal';
 
 interface HomeTabProps {
   user: User;
@@ -18,6 +19,7 @@ const ALL_STATUSES: TripStatus[] = [
 const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const activeTrip = useMemo(() => {
     return trips.find(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
@@ -63,6 +65,20 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 </div>
               </div>
 
+              {/* BOTAO SCANNER DE NOTAS */}
+              <button 
+                onClick={() => setIsScannerOpen(true)}
+                className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl flex items-center justify-center gap-4 border border-white/10 shadow-xl active:scale-95 transition-all group"
+              >
+                <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center text-white group-active:scale-110 transition-transform">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Anexar Documentos</p>
+                  <p className="text-[8px] font-bold text-blue-200 uppercase mt-1">Notas Fiscais / Canhotos</p>
+                </div>
+              </button>
+
               {/* EXIBIÇÃO CONDICIONAL DO AGENDAMENTO */}
               {activeTrip.scheduling && activeTrip.scheduling.location && (
                 <div className="bg-emerald-500/5 rounded-3xl p-5 border border-emerald-500/10 space-y-2 animate-in zoom-in-95">
@@ -107,7 +123,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                           className={`py-5 px-3 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all border flex items-center justify-center text-center leading-tight ${
                             isCurrent 
                             ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 opacity-50' 
-                            : 'bg-white/5 border-white/5 text-slate-400 active:scale-95 active:bg-blue-600 active:text-white'
+                            : 'bg-white/5 border-white/10 text-slate-400 active:scale-95 active:bg-blue-600 active:text-white'
                           }`}
                         >
                           {status}
@@ -128,6 +144,16 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           </div>
         )}
       </section>
+
+      {isScannerOpen && activeTrip && (
+        <ScannerModal 
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onSuccess={onRefresh}
+          trip={activeTrip}
+          user={user}
+        />
+      )}
 
       <div className="pt-4 pb-8">
         <p className="text-[8px] text-slate-800 font-bold uppercase tracking-[0.5em] text-center">

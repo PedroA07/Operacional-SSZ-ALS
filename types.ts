@@ -47,7 +47,8 @@ export type NotificationType =
   | 'OC_GENERATED'
   | 'LIBERACAO_GENERATED'
   | 'MINUTA_GENERATED'
-  | 'CONTRACT_UPLOADED';
+  | 'CONTRACT_UPLOADED'
+  | 'DRIVER_DOC_UPLOADED';
 
 export interface Notification {
   id: string;
@@ -109,7 +110,7 @@ export interface PaymentStatus {
 
 export interface TripDocument {
   id: string;
-  type: 'CTE' | 'COMPLETO' | 'NF' | 'OC' | 'MINUTA' | 'OS_PDF' | 'AGENDAMENTO' | 'CVA' | 'CONTRATO_FRETE';
+  type: 'CTE' | 'COMPLETO' | 'NF' | 'OC' | 'MINUTA' | 'OS_PDF' | 'AGENDAMENTO' | 'CVA' | 'CONTRATO_FRETE' | 'DRIVER_SCAN';
   url: string;
   fileName: string;
   uploadDate: string;
@@ -126,6 +127,12 @@ export interface TripScheduling {
   location: string;
   locationId?: string;
   obs?: string;
+}
+
+export interface DriverCapturedDoc {
+  id: string;
+  url: string;
+  timestamp: string;
 }
 
 export interface Trip {
@@ -161,6 +168,7 @@ export interface Trip {
   ocFormData?: any;
   preStackingFormData?: any;
   scheduling?: TripScheduling;
+  driver_docs?: DriverCapturedDoc[];
 }
 
 export interface Driver {
@@ -192,7 +200,6 @@ export interface Driver {
   tripsCount?: number;
   generatedPassword?: string;
   hasAccess?: boolean;
-  // Campos de Localização Real-time
   currentLat?: number;
   currentLng?: number;
   lastLocationAt?: string;
@@ -266,7 +273,6 @@ export interface WeatherData {
   };
 }
 
-// Fixed missing types for VW and Opentech
 export interface VWStatusUpdate {
   status: VWStatus;
   dateTime: string;

@@ -29,12 +29,13 @@ export const tripRepository = {
     os_doc: trip.osDoc || null,
     agendamento_doc: trip.agendamentoDoc || null,
     completo_doc: trip.completoDoc || null,
-    freight_contract_doc: trip.freightContractDoc || null, // Mapeamento para DB
+    freight_contract_doc: trip.freightContractDoc || null,
     cte_doc: trip.cteDoc || null,
     cva_doc: trip.cvaDoc || null,
     oc_form_data: trip.ocFormData || null,
     pre_stacking_form_data: trip.preStackingFormData || null,
-    scheduling: trip.scheduling || null
+    scheduling: trip.scheduling || null,
+    driver_docs: trip.driver_docs || []
   }),
 
   mapFromDb: (d: any): Trip => ({
@@ -63,12 +64,13 @@ export const tripRepository = {
     osDoc: d.os_doc || d.osDoc,
     agendamentoDoc: d.agendamento_doc || d.agendamentoDoc,
     completoDoc: d.completo_doc || d.completoDoc,
-    freightContractDoc: d.freight_contract_doc || d.freightContractDoc, // Mapeamento do DB
+    freightContractDoc: d.freight_contract_doc || d.freightContractDoc,
     cteDoc: d.cte_doc || d.cteDoc,
     cvaDoc: d.cva_doc || d.cvaDoc,
     ocFormData: d.oc_form_data || d.ocFormData,
     preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData,
-    scheduling: d.scheduling || undefined
+    scheduling: d.scheduling || undefined,
+    driver_docs: d.driver_docs || []
   }),
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
