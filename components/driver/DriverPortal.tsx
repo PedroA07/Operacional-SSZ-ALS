@@ -56,7 +56,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
+      <div className="h-[100dvh] flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Sincronizando Banco de Dados...</p>
       </div>
@@ -65,7 +65,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
   if (!driver && !isLoading) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#020617] p-10 text-center">
+      <div className="h-[100dvh] flex flex-col items-center justify-center bg-[#020617] p-10 text-center">
         <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6">
            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         </div>
@@ -78,9 +78,9 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   }
 
   return (
-    <div className="h-screen bg-[#020617] text-white flex flex-col font-sans select-none overflow-hidden">
+    <div className="h-[100dvh] bg-[#020617] text-white flex flex-col font-sans select-none overflow-hidden relative">
       {/* HEADER FIXO */}
-      <header className="p-6 pt-12 flex justify-between items-center bg-slate-950/60 border-b border-white/5 shrink-0 backdrop-blur-md">
+      <header className="p-6 pt-12 flex justify-between items-center bg-slate-950/60 border-b border-white/5 shrink-0 backdrop-blur-md z-40">
         <div>
            <div className="flex items-center gap-2 mb-1.5">
              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
@@ -104,8 +104,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         </div>
       </header>
 
-      {/* ÁREA DE CONTEÚDO ROLÁVEL */}
-      <main className="flex-1 px-5 pt-6 overflow-y-auto custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+      {/* ÁREA DE CONTEÚDO ROLÁVEL - flex-1 preenche o espaço entre header e nav */}
+      <main className="flex-1 px-5 pt-6 overflow-y-auto scroll-smooth custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
         {activeTab === 'inicio' && <HomeTab user={user} trips={trips} onRefresh={loadPortalData} />}
         {activeTab === 'viagens' && <TripsTab trips={trips} />}
         {activeTab === 'docs' && <DocsTab trips={trips} />}
@@ -113,7 +113,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       </main>
 
       {/* NAVEGAÇÃO INFERIOR FIXA */}
-      <nav className="shrink-0 h-20 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around px-6 z-50">
+      <nav className="shrink-0 h-22 pb-6 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around px-6 z-50">
         {[
           { id: 'inicio', label: 'Início', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
           { id: 'viagens', label: 'Histórico', icon: 'M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2' },
@@ -123,12 +123,12 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
           <button 
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)} 
-            className={`flex flex-col items-center gap-1 transition-all ${activeTab === tab.id ? 'text-blue-500 scale-110' : 'text-slate-600'}`}
+            className={`flex flex-col items-center gap-1.5 transition-all py-2 px-4 rounded-2xl ${activeTab === tab.id ? 'text-blue-500 scale-110' : 'text-slate-600'}`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d={tab.icon} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            <span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
+            <span className="text-[7.5px] font-black uppercase tracking-widest">{tab.label}</span>
           </button>
         ))}
       </nav>
