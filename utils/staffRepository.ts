@@ -9,6 +9,7 @@ export const staffRepository = {
     username: staff.username?.toLowerCase() || '',
     role: staff.role || 'staff',
     position: staff.position?.toUpperCase() || '',
+    // Garantindo o mapeamento para snake_case esperado pelo banco
     registration_date: staff.registrationDate ? new Date(staff.registrationDate).toISOString() : new Date().toISOString(),
     status: staff.status || 'Ativo',
     status_since: staff.statusSince ? new Date(staff.statusSince).toISOString() : new Date().toISOString(),
@@ -34,21 +35,24 @@ export const staffRepository = {
   }),
 
   async save(supabase: SupabaseClient, staff: Staff) {
-    const payload = this.mapToDb(staff);
-    const { error } = await supabase.from('staff').upsert(payload);
-    if (error) {
-      console.error("Erro ao salvar staff:", error);
+    try {
+      const payload = this.mapToDb(staff);
+      const { error } = await supabase.from('staff').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (error: any) {
+      console.error("Erro no repositório Staff:", error);
+      // Se o erro for de coluna faltante, pode ser cache do Supabase
+      if (error.message?.includes('registration_date')) {
+        throw new Error("A coluna 'registration_date' não foi encontrada. Verifique se executou o SQL de migração no Supabase.");
+      }
       throw error;
     }
-    return true;
   },
 
   async getAll(supabase: SupabaseClient): Promise<Staff[]> {
     const { data, error } = await supabase.from('staff').select('*').order('name');
-    if (error) {
-      console.error("Erro ao buscar staff:", error);
-      return [];
-    }
+    if (error) return [];
     return (data || []).map(d => this.mapFromDb(d));
   },
 
