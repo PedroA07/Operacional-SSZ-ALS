@@ -8,8 +8,6 @@ import SchedulingEditModal from './operations/SchedulingEditModal';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
-import OrdemColetaForm from './forms/OrdemColetaForm';
-import PreStackingForm from './forms/PreStackingForm';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
 interface OperationsTabProps {
@@ -29,17 +27,16 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [isOCEditModalOpen, setIsOCEditModalOpen] = useState(false);
-  const [isMinutaModalOpen, setIsMinutaModalOpen] = useState(false);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [trackedDriver, setTrackedDriver] = useState<Driver | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [docViewConfig, setDocViewConfig] = useState({ url: '', title: '' });
 
-  // Estados de Filtro - Normalizados
   const [filterTypes, setFilterTypes] = useState<string[]>(() => {
     const saved = localStorage.getItem('als_filter_types');
     return saved ? JSON.parse(saved) : ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
@@ -57,13 +54,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setCategories(c || []);
   };
 
-  useEffect(() => { 
-    loadData(); 
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('als_filter_types', JSON.stringify(filterTypes));
-  }, [filterTypes]);
+  useEffect(() => { loadData(); }, []);
 
   const openStatusEditor = (trip: Trip, status: TripStatus) => {
     setSelectedTrip(trip);
@@ -83,119 +74,103 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     loadData();
   };
 
+  const handleLocateDriver = async (driverId: string) => {
+    const allDrivers = await db.getDrivers();
+    const found = allDrivers.find(d => d.id === driverId);
+    if (found) {
+      setTrackedDriver(found);
+      setIsLocationModalOpen(true);
+    } else {
+      alert("Motorista não localizado no banco de dados.");
+    }
+  };
+
   const filteredTrips = useMemo(() => {
     let result = [...trips];
-    
-    // Normalização para comparação segura
-    if (filterCategory && filterCategory !== 'TODAS') {
-      result = result.filter(t => t.category?.toUpperCase() === filterCategory.toUpperCase());
-    }
-    
-    if (filterTypes.length > 0) {
-      result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
-    }
-    
-    if (filterClientNames.length > 0) {
-      result = result.filter(t => filterClientNames.includes(t.customer?.name));
-    }
-    
-    if (filterDriverNames.length > 0) {
-      result = result.filter(t => filterDriverNames.includes(t.driver?.name));
-    }
-    
-    if (filterStartDate) {
-      result = result.filter(t => t.dateTime >= filterStartDate);
-    }
-    
-    if (filterEndDate) {
-      result = result.filter(t => t.dateTime <= filterEndDate + 'T23:59:59');
-    }
-    
+    if (filterCategory && filterCategory !== 'TODAS') result = result.filter(t => t.category?.toUpperCase() === filterCategory.toUpperCase());
+    if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
+    if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
+    if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
+    if (filterStartDate) result = result.filter(t => t.dateTime >= filterStartDate);
+    if (filterEndDate) result = result.filter(t => t.dateTime <= filterEndDate + 'T23:59:59');
     return result;
   }, [trips, filterCategory, filterTypes, filterClientNames, filterDriverNames, filterStartDate, filterEndDate]);
 
   const columns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
-    (t) => { setSelectedTrip(t); setIsOCEditModalOpen(true); },
-    (t) => { setSelectedTrip(t); setIsMinutaModalOpen(true); },
+    (t) => { setSelectedTrip(t); }, // Edit OC
+    (t) => { setSelectedTrip(t); }, // Edit Minuta
     (url, title) => { setDocViewConfig({ url, title }); setIsDocViewerOpen(true); },
     async (id) => { if(onDeleteTrip) onDeleteTrip(id); },
     loadData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
-    user
+    user,
+    handleLocateDriver
   );
-
-  const handleClearAllFilters = () => {
-    setFilterTypes(['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM']);
-    setFilterClientNames([]);
-    setFilterDriverNames([]);
-    setFilterStartDate('');
-    setFilterEndDate('');
-    setFilterCategory('TODAS');
-  };
 
   if (activeView.type !== 'list') {
     return (
       <GenericOperationView 
-        user={user} 
-        type={activeView.type === 'category' ? 'category' : 'client'} 
-        categoryName={activeView.categoryName || ''} 
-        clientName={activeView.clientName} 
-        drivers={drivers} 
-        customers={customers}
-        availableOps={availableOps} 
-        onNavigate={setActiveView} 
+        user={user} type={activeView.type === 'category' ? 'category' : 'client'} 
+        categoryName={activeView.categoryName || ''} clientName={activeView.clientName} 
+        drivers={drivers} customers={customers} availableOps={availableOps} onNavigate={setActiveView}
+        onLocateDriver={handleLocateDriver}
       />
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* CABEÇALHO */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Painel de Operações ALS</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Gestão de Viagens em Tempo Real</p>
-          </div>
-          <div className="flex gap-3">
-             <button onClick={() => setIsCategoryModalOpen(true)} className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all">Nova Categoria</button>
-             <button onClick={() => { setSelectedTrip(null); setIsTripModalOpen(true); }} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center gap-2">
-               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>
-               Nova Programação
-             </button>
-          </div>
-        </div>
-
-        <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-           <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Abrir Visão por Categoria</h3>
-           <div className="flex flex-wrap gap-3">
-              <button onClick={() => setFilterCategory('TODAS')} className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase ${filterCategory === 'TODAS' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500'}`}>Lista Geral</button>
-              {categories.filter(c => !c.parentId).map(cat => (
-                <button key={cat.id} onClick={() => setActiveView({ type: 'category', categoryName: cat.name })} className="px-6 py-3 bg-white border border-slate-200 hover:border-blue-600 hover:text-blue-600 rounded-xl transition-all text-[10px] font-black uppercase flex items-center gap-2 group">
-                  <span>{cat.name}</span>
-                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </button>
-              ))}
-           </div>
+          <div><h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Painel de Operações ALS</h2><p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Gestão de Viagens em Tempo Real</p></div>
+          <div className="flex gap-3"><button onClick={() => setIsCategoryModalOpen(true)} className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all">Nova Categoria</button><button onClick={() => { setSelectedTrip(null); setIsTripModalOpen(true); }} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center gap-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>Nova Programação</button></div>
         </div>
       </div>
 
       <OperationFilters selectedTypes={filterTypes} onTypesChange={setFilterTypes} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} />
       
-      <div className="flex justify-between items-center mb-6">
-        <button onClick={handleClearAllFilters} className="text-[10px] font-black text-blue-600 uppercase hover:underline">Limpar filtros da lista</button>
-        <div className="flex gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
-           <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase ml-1">Início</label><input type="date" className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} /></div>
-           <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase ml-1">Fim</label><input type="date" className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} /></div>
-        </div>
-      </div>
-
       <SmartOperationTable userId={user.id} componentId="ops-main-table" title="Monitoramento Operacional Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'destination_ship_booking', 'scheduling_info', 'actions']} />
 
+      {/* MODAL DE RASTREAMENTO SATELITAL */}
+      {isLocationModalOpen && trackedDriver && (
+        <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-transparent animate-in fade-in duration-300">
+           <div className="bg-white/95 backdrop-blur-2xl w-full max-w-5xl h-[85vh] rounded-[3.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.2)] border border-white/20 overflow-hidden flex flex-col animate-in zoom-in-95">
+              <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                 <div className="flex items-center gap-6">
+                    <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg">
+                       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>
+                    </div>
+                    <div>
+                       <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Rastreamento Satelital (Dispositivo)</p>
+                       <h3 className="text-lg font-black uppercase truncate">{trackedDriver.name}</h3>
+                       <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Placa: {trackedDriver.plateHorse} | Atualizado em: {trackedDriver.lastLocationAt ? new Date(trackedDriver.lastLocationAt).toLocaleTimeString('pt-BR') : 'Sem sinal'}</p>
+                    </div>
+                 </div>
+                 <button onClick={() => setIsLocationModalOpen(false)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg>
+                 </button>
+              </div>
+              <div className="flex-1 bg-slate-100 relative">
+                 {trackedDriver.currentLat && trackedDriver.currentLng ? (
+                   <iframe 
+                      width="100%" height="100%" style={{ border: 0 }} 
+                      src={`https://maps.google.com/maps?q=${trackedDriver.currentLat},${trackedDriver.currentLng}&z=15&output=embed`}
+                   ></iframe>
+                 ) : (
+                   <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
+                      <div className="w-20 h-20 bg-slate-200 text-slate-400 rounded-full flex items-center justify-center mb-6"><svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2.5"/></svg></div>
+                      <h4 className="text-lg font-black text-slate-800 uppercase">Sem sinal de GPS</h4>
+                      <p className="text-slate-500 text-sm mt-2 max-w-md">O dispositivo do motorista ainda não registrou coordenadas geográficas. Certifique-se que o motorista autorizou a localização no Portal ALS.</p>
+                   </div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
       <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} />
-      <CategoryManagerModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} categories={categories} onSuccess={loadData} actingUser={user} />
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadData} preStackingUnits={ports} />
 
       {isStatusModalOpen && (

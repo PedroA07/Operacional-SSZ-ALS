@@ -1,54 +1,176 @@
 
-import React from 'react';
-import { Trip } from '../../../types';
+import React, { useState, useMemo } from 'react';
+import { Trip, TripDocument } from '../../../types';
 
 interface TripsTabProps {
   trips: Trip[];
 }
 
 const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'todas' | 'ativas' | 'concluidas'>('todas');
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+
+  const filteredTrips = useMemo(() => {
+    return trips.filter(t => {
+      const matchSearch = t.os.toLowerCase().includes(search.toLowerCase()) || 
+                          t.customer.name.toLowerCase().includes(search.toLowerCase()) ||
+                          (t.container || '').toLowerCase().includes(search.toLowerCase());
+      
+      const isFinished = t.status === 'Viagem concluída' || t.status === 'Viagem cancelada';
+      if (filter === 'ativas') return matchSearch && !isFinished;
+      if (filter === 'concluidas') return matchSearch && isFinished;
+      return matchSearch;
+    });
+  }, [trips, search, filter]);
+
+  const openDoc = (url: string) => {
+    window.open(url, '_blank');
+  };
+
+  const DetailRow = ({ label, value, blue = false, mono = false }: any) => (
+    <div className="flex flex-col py-3 border-b border-white/5 last:border-0">
+      <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">{label}</span>
+      <span className={`text-[12px] font-bold uppercase ${blue ? 'text-blue-400' : 'text-slate-100'} ${mono ? 'font-mono' : ''}`}>
+        {value || 'NÃO INFORMADO'}
+      </span>
+    </div>
+  );
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-       <div className="flex justify-between items-center px-1">
-          <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Minhas Programações</h2>
-          <p className="text-[8px] font-bold text-blue-400 uppercase tracking-widest">Atualizado</p>
-       </div>
-       
-       <div className="space-y-4">
-          {trips.length > 0 ? trips.map((t, idx) => {
-            const isFinished = t.status === 'Viagem concluída';
-            const isRecent = idx === 0 && !isFinished;
-            
-            return (
-              <div key={t.id} className={`p-6 rounded-[2.2rem] border transition-all ${isFinished ? 'bg-slate-900/20 border-white/5 opacity-60' : isRecent ? 'bg-blue-600/10 border-blue-500/50 ring-2 ring-blue-500/10' : 'bg-slate-900 border-white/10 shadow-lg'}`}>
-                <div className="flex justify-between items-start mb-4">
-                   <div>
-                     <div className="flex items-center gap-2">
-                       <p className="text-lg font-black text-white uppercase">OS {t.os}</p>
-                       {isRecent && <span className="px-1.5 py-0.5 bg-blue-600 text-[6px] font-black text-white uppercase rounded">Recente</span>}
-                     </div>
-                     <p className="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[200px]">{t.customer.name}</p>
-                   </div>
-                   <span className={`px-2.5 py-1 rounded-lg text-[7px] font-black uppercase ${isFinished ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                     {t.status}
-                   </span>
-                </div>
-                <div className="flex justify-between border-t border-white/5 pt-4">
-                   <div className="flex flex-col">
-                      <span className="text-[7px] font-black text-slate-600 uppercase">Programada</span>
-                      <span className="text-[10px] font-bold text-slate-300">{new Date(t.dateTime).toLocaleDateString('pt-BR')}</span>
-                   </div>
-                   <div className="flex flex-col text-right">
-                      <span className="text-[7px] font-black text-slate-600 uppercase">Equipamento</span>
-                      <span className="text-[10px] font-mono font-bold text-blue-400">{t.container || '---'}</span>
-                   </div>
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      {/* HEADER E BUSCA */}
+      <div className="space-y-4 px-1">
+        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Programações ALS</h2>
+        
+        <div className="relative">
+          <input 
+            type="text" 
+            placeholder="BUSCAR OS, CLIENTE OU CONTAINER..." 
+            className="w-full pl-11 pr-5 py-4 bg-slate-900/80 border border-white/10 rounded-2xl text-[11px] font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>
+        </div>
+
+        <div className="flex gap-2">
+          {['todas', 'ativas', 'concluidas'].map((f) => (
+            <button 
+              key={f}
+              onClick={() => setFilter(f as any)}
+              className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all ${filter === f ? 'bg-blue-600 border-blue-500 text-white shadow-lg' : 'bg-white/5 border-white/10 text-slate-500'}`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* LISTA DE VIAGENS */}
+      <div className="space-y-3">
+        {filteredTrips.length > 0 ? filteredTrips.map((t) => {
+          const isFinished = t.status === 'Viagem concluída' || t.status === 'Viagem cancelada';
+          return (
+            <button 
+              key={t.id}
+              onClick={() => setSelectedTrip(t)}
+              className={`w-full p-5 rounded-[2rem] border text-left flex items-center justify-between transition-all group ${isFinished ? 'bg-slate-900/30 border-white/5 grayscale opacity-60' : 'bg-slate-900 border-white/10 shadow-xl active:scale-95 active:border-blue-600'}`}
+            >
+              <div className="min-w-0">
+                <p className="text-lg font-black text-white uppercase leading-none mb-2">OS {t.os}</p>
+                <p className="text-[9px] font-bold text-slate-500 uppercase truncate max-w-[200px]">{t.customer.name}</p>
+                <div className="flex gap-2 mt-3">
+                  <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${isFinished ? 'bg-slate-800 text-slate-400' : 'bg-blue-600 text-white'}`}>{t.status}</span>
+                  <span className="px-2 py-0.5 bg-white/5 border border-white/5 rounded text-[7px] font-mono text-slate-400 uppercase tracking-tighter">{t.container || 'A DEFINIR'}</span>
                 </div>
               </div>
-            );
-          }) : (
-            <div className="py-20 text-center text-slate-600 font-black uppercase text-[10px] italic">Você não possui viagens registradas.</div>
-          )}
-       </div>
+              <svg className="w-5 h-5 text-slate-800 group-active:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+            </button>
+          );
+        }) : (
+          <div className="py-20 text-center">
+            <p className="text-[10px] font-black text-slate-700 uppercase italic">Nenhuma viagem localizada</p>
+          </div>
+        )}
+      </div>
+
+      {/* DETALHE DA VIAGEM SELECIONADA (DOSSIÊ) */}
+      {selectedTrip && (
+        <div className="fixed inset-0 z-[1000] bg-[#020617] flex flex-col animate-in slide-in-from-bottom-full duration-500">
+           <header className="p-6 pt-12 flex justify-between items-center bg-slate-950 border-b border-white/5 shrink-0">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Dossiê da OS</p>
+                <h3 className="text-xl font-black text-white uppercase mt-1">Nº {selectedTrip.os}</h3>
+              </div>
+              <button onClick={() => setSelectedTrip(null)} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white active:bg-red-600 transition-colors">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg>
+              </button>
+           </header>
+
+           <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+              <section className="bg-slate-900 rounded-[2.5rem] p-8 border border-white/5 shadow-2xl space-y-2">
+                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/5">
+                    <span className="text-[11px] font-black uppercase text-blue-400">Informações Operacionais</span>
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${selectedTrip.status.includes('concluída') ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-600 text-white'}`}>{selectedTrip.status}</span>
+                 </div>
+                 <DetailRow label="Cliente / Destino" value={`${selectedTrip.customer.name} › ${selectedTrip.destination?.name || '---'}`} blue />
+                 <DetailRow label="Modalidade" value={selectedTrip.type} />
+                 <DetailRow label="Container" value={selectedTrip.container} mono />
+                 <div className="grid grid-cols-2 gap-4">
+                    <DetailRow label="Tara" value={selectedTrip.tara} mono />
+                    <DetailRow label="Lacre" value={selectedTrip.seal} mono />
+                 </div>
+                 <DetailRow label="Ship / Booking" value={`${selectedTrip.ship || '---'} / ${selectedTrip.booking || '---'}`} />
+                 <DetailRow label="Data Programada" value={new Date(selectedTrip.dateTime).toLocaleString('pt-BR')} />
+                 {selectedTrip.scheduling && (
+                   <div className="mt-4 p-5 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl">
+                      <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-2">Agendamento no Local</p>
+                      <p className="text-sm font-black text-white uppercase">{selectedTrip.scheduling.location}</p>
+                      <p className="text-xs font-bold text-slate-300 mt-1">{new Date(selectedTrip.scheduling.dateTime).toLocaleString('pt-BR')}</p>
+                   </div>
+                 )}
+              </section>
+
+              {/* DOCUMENTOS ANEXADOS */}
+              <section className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Documentos Digitais</h4>
+                <div className="grid gap-3">
+                   {[
+                     { label: 'Ordem de Coleta', doc: selectedTrip.osDoc },
+                     { label: 'Comprovante Agendamento', doc: selectedTrip.agendamentoDoc },
+                     { label: 'CT-e / Completo', doc: selectedTrip.completoDoc || selectedTrip.cteDoc },
+                     { label: 'Certificado CVA', doc: selectedTrip.cvaDoc },
+                     { label: 'Contrato de Frete', doc: selectedTrip.freightContractDoc }
+                   ].map((item, idx) => item.doc && (
+                     <button 
+                       key={idx}
+                       onClick={() => openDoc(item.doc!.url)}
+                       className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl flex items-center justify-between active:bg-blue-600 active:border-blue-500 transition-all shadow-xl group"
+                     >
+                        <div className="flex items-center gap-4">
+                           <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 group-active:text-white">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg>
+                           </div>
+                           <span className="text-[11px] font-black uppercase text-white tracking-tighter">{item.label}</span>
+                        </div>
+                        <svg className="w-4 h-4 text-slate-700 group-active:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+                     </button>
+                   ))}
+                   {![selectedTrip.osDoc, selectedTrip.agendamentoDoc, selectedTrip.completoDoc, selectedTrip.cteDoc, selectedTrip.cvaDoc, selectedTrip.freightContractDoc].some(Boolean) && (
+                     <div className="p-10 text-center bg-slate-900/50 rounded-3xl border border-dashed border-white/5">
+                        <p className="text-[9px] font-bold text-slate-600 uppercase">Nenhum documento anexado a esta viagem.</p>
+                     </div>
+                   )}
+                </div>
+              </section>
+           </div>
+           
+           <div className="p-6 bg-slate-950 border-t border-white/5">
+              <button onClick={() => setSelectedTrip(null)} className="w-full py-5 bg-slate-900 text-slate-400 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all">Voltar para a Lista</button>
+           </div>
+        </div>
+      )}
     </div>
   );
 };

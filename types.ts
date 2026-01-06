@@ -22,7 +22,7 @@ export interface User {
   lastSeen?: string;
   isOnlineVisible?: boolean;
   notificationPrefs?: NotificationPreference;
-  presence_status?: PresenceStatus; // Novo campo
+  presence_status?: PresenceStatus;
 }
 
 export interface NotificationPreference {
@@ -152,7 +152,7 @@ export interface Trip {
   osDoc?: TripDocument;
   agendamentoDoc?: TripDocument;
   completoDoc?: TripDocument;
-  freightContractDoc?: TripDocument; // Novo campo específico
+  freightContractDoc?: TripDocument;
   cteDoc?: TripDocument;
   cvaDoc?: TripDocument;
   ocFormData?: any;
@@ -189,6 +189,10 @@ export interface Driver {
   tripsCount?: number;
   generatedPassword?: string;
   hasAccess?: boolean;
+  // Campos de Localização Real-time
+  currentLat?: number;
+  currentLng?: number;
+  lastLocationAt?: string;
 }
 
 export interface Customer { 
@@ -259,12 +263,13 @@ export interface WeatherData {
   };
 }
 
-export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
-
+// Fixed missing types for VW and Opentech
 export interface VWStatusUpdate {
   status: VWStatus;
   dateTime: string;
 }
+
+export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
 
 export interface VWSchedule {
   id: string;
@@ -293,6 +298,6 @@ export interface OpentechTrip {
   destination: string;
   startTime: string;
   eta: string;
-  status: 'Em Viagem' | 'Concluída' | 'Alerta' | 'Sinistrada' | 'Iniciada' | 'Alerta Risco';
+  status: string;
   riskLevel: 'Crítico' | 'Alto' | 'Médio' | 'Baixo';
 }

@@ -3,11 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Driver } from '../types';
 
 export const driverRepository = {
-  /**
-   * Converte o objeto Driver (CamelCase) para o formato do Banco (snake_case)
-   */
   mapToDb: (driver: Driver) => {
-    // Limpeza profunda do array de operações para garantir que o Supabase receba JSON puro
     const cleanOperations = Array.isArray(driver.operations) 
       ? driver.operations.map(op => ({ category: op.category, client: op.client }))
       : [];
@@ -39,13 +35,13 @@ export const driverRepository = {
       registration_date: driver.registrationDate || new Date().toISOString(),
       operations: cleanOperations,
       trips_count: driver.tripsCount || 0,
-      generated_password: driver.generatedPassword || null
+      generated_password: driver.generatedPassword || null,
+      current_lat: driver.currentLat || null,
+      current_lng: driver.currentLng || null,
+      last_location_at: driver.lastLocationAt || null
     };
   },
 
-  /**
-   * Converte os dados do Banco (snake_case) de volta para o objeto Driver (CamelCase)
-   */
   mapFromDb: (d: any): Driver => ({
     id: d.id,
     photo: d.photo,
@@ -73,7 +69,10 @@ export const driverRepository = {
     registrationDate: d.registration_date,
     operations: Array.isArray(d.operations) ? d.operations : [],
     tripsCount: d.trips_count || 0,
-    generatedPassword: d.generated_password
+    generatedPassword: d.generated_password,
+    currentLat: d.current_lat,
+    currentLng: d.current_lng,
+    lastLocationAt: d.last_location_at
   }),
 
   async save(supabase: SupabaseClient, driver: Driver) {
@@ -95,12 +94,10 @@ export const driverRepository = {
     return (data || []).map(d => this.mapFromDb(d));
   },
 
+  // Added delete method for driver records
   async delete(supabase: SupabaseClient, id: string) {
     const { error } = await supabase.from('drivers').delete().eq('id', id);
-    if (error) {
-      console.error("ERRO DELETE DRIVER:", error);
-      return false;
-    }
+    if (error) throw error;
     return true;
   }
 };
