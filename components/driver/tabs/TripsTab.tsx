@@ -10,6 +10,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'todas' | 'ativas' | 'concluidas'>('todas');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string, label: string } | null>(null);
 
   const filteredTrips = useMemo(() => {
     return trips.filter(t => {
@@ -24,8 +25,8 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
     });
   }, [trips, search, filter]);
 
-  const openDoc = (url: string) => {
-    window.open(url, '_blank');
+  const handlePreviewDoc = (url: string, label: string) => {
+    setPreviewDoc({ url, label });
   };
 
   const DetailRow = ({ label, value, blue = false, mono = false }: any) => (
@@ -47,7 +48,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
           <input 
             type="text" 
             placeholder="BUSCAR OS, CLIENTE OU CONTAINER..." 
-            className="w-full pl-11 pr-5 py-4 bg-slate-900/80 border border-white/10 rounded-2xl text-[11px] font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600"
+            className="w-full pl-11 pr-5 py-4 bg-slate-900/80 border border-white/10 rounded-2xl text-[11px] font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600 shadow-xl"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -108,7 +109,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
               </button>
            </header>
 
-           <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+           <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-32">
               <section className="bg-slate-900 rounded-[2.5rem] p-8 border border-white/5 shadow-2xl space-y-2">
                  <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/5">
                     <span className="text-[11px] font-black uppercase text-blue-400">Informações Operacionais</span>
@@ -145,7 +146,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
                    ].map((item, idx) => item.doc && (
                      <button 
                        key={idx}
-                       onClick={() => openDoc(item.doc!.url)}
+                       onClick={() => handlePreviewDoc(item.doc!.url, item.label)}
                        className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl flex items-center justify-between active:bg-blue-600 active:border-blue-500 transition-all shadow-xl group"
                      >
                         <div className="flex items-center gap-4">
@@ -154,7 +155,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
                            </div>
                            <span className="text-[11px] font-black uppercase text-white tracking-tighter">{item.label}</span>
                         </div>
-                        <svg className="w-4 h-4 text-slate-700 group-active:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+                        <svg className="w-4 h-4 text-slate-700 group-active:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2"/></svg>
                      </button>
                    ))}
                    {![selectedTrip.osDoc, selectedTrip.agendamentoDoc, selectedTrip.completoDoc, selectedTrip.cteDoc, selectedTrip.cvaDoc, selectedTrip.freightContractDoc].some(Boolean) && (
@@ -166,8 +167,36 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
               </section>
            </div>
            
-           <div className="p-6 bg-slate-950 border-t border-white/5">
+           <div className="p-6 bg-slate-950 border-t border-white/5 fixed bottom-0 left-0 w-full z-[1010]">
               <button onClick={() => setSelectedTrip(null)} className="w-full py-5 bg-slate-900 text-slate-400 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all">Voltar para a Lista</button>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL DE VISUALIZAÇÃO DE DOCUMENTO (DRIVER PORTAL) */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-[2000] bg-[#020617] flex flex-col animate-in fade-in duration-300">
+           <header className="p-6 pt-12 flex justify-between items-center bg-slate-950 border-b border-white/5 shrink-0">
+              <div>
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Visualizador Digital</p>
+                <h3 className="text-sm font-black text-white uppercase mt-1">{previewDoc.label}</h3>
+              </div>
+              <button onClick={() => setPreviewDoc(null)} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white active:bg-red-600 transition-colors">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg>
+              </button>
+           </header>
+           <div className="flex-1 bg-white overflow-hidden relative">
+              {previewDoc.url.startsWith('data:image') ? (
+                <div className="w-full h-full flex items-center justify-center p-4 overflow-auto bg-slate-200">
+                   <img src={previewDoc.url} className="max-w-full shadow-2xl rounded-lg" alt="Documento" />
+                </div>
+              ) : (
+                <iframe src={previewDoc.url} className="w-full h-full border-none" title="Preview Doc"></iframe>
+              )}
+           </div>
+           <div className="p-6 bg-slate-950 border-t border-white/5 flex gap-3">
+              <button onClick={() => window.open(previewDoc.url, '_blank')} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest active:bg-blue-700 transition-all">Abrir Externo</button>
+              <button onClick={() => setPreviewDoc(null)} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all">Fechar</button>
            </div>
         </div>
       )}

@@ -31,6 +31,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   const [ports, setPorts] = useState<any[]>([]);
+  const [isDriversCollapsed, setIsDriversCollapsed] = useState(false);
   
   const [activeMainTab, setActiveMainTab] = useState<'overview' | 'clients'>('overview');
   const [activeStatusTab, setActiveStatusTab] = useState<'ativas' | 'concluida' | 'cancelada'>('ativas');
@@ -136,8 +137,28 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
             <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-2 w-fit">
                {[{ id: 'ativas', label: 'Em Aberto / Ativas', color: 'blue' }, { id: 'concluida', label: 'Concluídas', color: 'emerald' }, { id: 'cancelada', label: 'Canceladas', color: 'red' }].map(tab => (<button key={tab.id} onClick={() => setActiveStatusTab(tab.id as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${activeStatusTab === tab.id ? `bg-${tab.color}-600 text-white shadow-lg` : `bg-slate-50 text-slate-400 hover:bg-slate-100`}`}>{tab.label}</button>))}
             </div>
+            
             <div className="grid grid-cols-1 gap-8">
-              {activeStatusTab === 'ativas' && filteredDrivers.length > 0 && (<SmartOperationTable userId={user.id} componentId={`op-drivers-${type}-${categoryName}`} title="Motoristas Ativos nesta Categoria" columns={driverColumns} data={filteredDrivers} defaultVisibleKeys={['name', 'plateHorse', 'status']} />)}
+              {activeStatusTab === 'ativas' && filteredDrivers.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between px-2">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Motoristas Vinculados</h4>
+                    <button 
+                      onClick={() => setIsDriversCollapsed(!isDriversCollapsed)}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all"
+                    >
+                      <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isDriversCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
+                      <span className="text-[8px] font-black uppercase">{isDriversCollapsed ? 'Mostrar Lista' : 'Encolher Lista'}</span>
+                    </button>
+                  </div>
+                  {!isDriversCollapsed && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                      <SmartOperationTable userId={user.id} componentId={`op-drivers-${type}-${categoryName}`} title="" columns={driverColumns} data={filteredDrivers} defaultVisibleKeys={['name', 'plateHorse', 'status']} />
+                    </div>
+                  )}
+                </div>
+              )}
+              
               <SmartOperationTable userId={user.id} componentId={`op-trips-${type}-${categoryName}-${activeStatusTab}`} title={`Fila de Viagens: ${activeStatusTab === 'ativas' ? 'Pendentes & Em Execução' : activeStatusTab.toUpperCase()}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'destination_ship_booking', 'scheduling_info', 'actions']} />
             </div>
         </div>
