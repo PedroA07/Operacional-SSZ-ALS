@@ -19,7 +19,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionTime, setSessionTime] = useState('00:00:00');
-  const [gpsStatus, setGpsStatus] = useState<'OFF' | 'BUSCANDO' | 'ATIVO'>('OFF');
   
   const gpsWatchRef = useRef<number | null>(null);
 
@@ -56,43 +55,31 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     };
   }, [loadPortalData, user.lastLogin]);
 
-  // MOTOR DE GEOLOCALIZAÇÃO REAL-TIME (REFEITO)
+  // MOTOR DE GEOLOCALIZAÇÃO REAL-TIME (FUNCIONANDO EM SEGUNDO PLANO)
   useEffect(() => {
     if (!user.driverId) return;
 
     const startGpsTracking = () => {
-      if (!navigator.geolocation) {
-        console.error("Geolocalização não suportada.");
-        return;
-      }
+      if (!navigator.geolocation) return;
 
-      setGpsStatus('BUSCANDO');
-
-      // Limpa qualquer monitoramento anterior
       if (gpsWatchRef.current !== null) {
         navigator.geolocation.clearWatch(gpsWatchRef.current);
       }
 
       gpsWatchRef.current = navigator.geolocation.watchPosition(
         async (position) => {
-          const { latitude, longitude, accuracy } = position.coords;
-          setGpsStatus('ATIVO');
-          
+          const { latitude, longitude } = position.coords;
           try {
             await db.updateDriverLocation(user.driverId!, latitude, longitude);
-            console.debug(`GPS Ativo: Accuracy ${accuracy}m`);
-          } catch (e) {
-            console.error("Erro ao reportar GPS ao servidor.");
-          }
+          } catch (e) {}
         },
         (error) => {
-          console.warn("Erro de GPS:", error.message);
-          setGpsStatus('OFF');
+          console.warn("GPS ALS Silencioso: Erro de sinal.");
         },
         { 
           enableHighAccuracy: true, 
           timeout: 15000, 
-          maximumAge: 0 // Força posição nova a cada leitura
+          maximumAge: 0 
         }
       );
     };
@@ -129,10 +116,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
            <div className="flex items-center gap-2 mt-2">
               <span className="text-[8px] font-black text-blue-500 uppercase">Placa: <span className="font-mono text-white">{driver?.plateHorse || '---'}</span></span>
               <span className="text-[8px] font-black text-slate-700">|</span>
-              <div className="flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${gpsStatus === 'ATIVO' ? 'bg-emerald-500 animate-ping' : gpsStatus === 'BUSCANDO' ? 'bg-amber-500' : 'bg-red-500'}`}></div>
-                <span className={`text-[8px] font-black uppercase tracking-widest ${gpsStatus === 'ATIVO' ? 'text-emerald-400' : 'text-slate-500'}`}>GPS {gpsStatus}</span>
-              </div>
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">SISTEMA ATIVO</span>
            </div>
         </div>
         <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-white/5">

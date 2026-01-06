@@ -25,7 +25,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
     });
   }, [trips, search, filter]);
 
-  // Função para converter Base64 em Blob URL para visualização estável
   const openDocViewer = (doc: TripDocument | undefined, label: string) => {
     if (!doc?.url) return;
 
@@ -33,7 +32,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
       const isImage = doc.url.startsWith('data:image');
       let finalUrl = doc.url;
 
-      // Se for PDF ou imagem em Base64, convertemos para Blob para o Iframe aceitar melhor
       if (doc.url.startsWith('data:')) {
         const parts = doc.url.split(';base64,');
         const contentType = parts[0].split(':')[1];
@@ -54,7 +52,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
     }
   };
 
-  // Limpeza de Blob URLs para evitar vazamento de memória
   useEffect(() => {
     return () => {
       if (previewDoc?.blobUrl.startsWith('blob:')) {
@@ -161,25 +158,42 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
       )}
 
       {previewDoc && (
-        <div className="fixed inset-0 z-[2000] bg-[#020617] flex flex-col animate-in fade-in duration-300">
-           <header className="p-6 pt-12 flex justify-between items-center bg-slate-950 border-b border-white/5 shrink-0">
+        <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-in fade-in duration-300">
+           <header className="p-6 pt-12 flex justify-between items-center bg-slate-950/80 backdrop-blur-md border-b border-white/5 shrink-0 z-50">
               <div>
                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Visualizador Digital</p>
                 <h3 className="text-sm font-black text-white uppercase mt-1">{previewDoc.label}</h3>
               </div>
-              <button onClick={() => setPreviewDoc(null)} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white active:bg-red-600 transition-colors"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg></button>
+              <button onClick={() => setPreviewDoc(null)} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white active:bg-red-600 transition-colors">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg>
+              </button>
            </header>
-           <div className="flex-1 bg-white overflow-hidden relative">
+           <div className="flex-1 bg-white relative">
               {previewDoc.isImage ? (
-                <div className="w-full h-full flex items-center justify-center p-4 bg-slate-200 overflow-auto"><img src={previewDoc.blobUrl} className="max-w-full shadow-2xl rounded-lg" alt="Doc" /></div>
+                <div className="w-full h-full flex items-center justify-center p-4 bg-slate-900 overflow-auto">
+                   <img src={previewDoc.blobUrl} className="max-w-full max-h-full shadow-2xl" alt="Documento" />
+                </div>
               ) : (
-                <iframe src={`${previewDoc.blobUrl}#toolbar=0`} className="w-full h-full border-none" title="Doc Preview"></iframe>
+                <div className="w-full h-full bg-slate-100 flex flex-col">
+                  {/* Container for PDF visualization to avoid direct download prompt on some mobile browsers */}
+                  <object 
+                    data={`${previewDoc.blobUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`} 
+                    type="application/pdf" 
+                    className="w-full h-full border-none"
+                  >
+                    <iframe 
+                      src={`${previewDoc.blobUrl}#toolbar=0`} 
+                      className="w-full h-full border-none" 
+                      title="PDF Viewer"
+                    />
+                  </object>
+                </div>
               )}
            </div>
-           <div className="p-6 bg-slate-950 border-t border-white/5 flex gap-3">
-              <button onClick={() => window.open(previewDoc.blobUrl, '_blank')} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest active:bg-blue-700 transition-all">Abrir Original</button>
-              <button onClick={() => setPreviewDoc(null)} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all">Fechar</button>
-           </div>
+           <footer className="p-6 bg-slate-950 border-t border-white/5 flex gap-3 shrink-0">
+              <button onClick={() => window.open(previewDoc.blobUrl, '_blank')} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest active:bg-blue-700 transition-all">Download / Abrir Original</button>
+              <button onClick={() => setPreviewDoc(null)} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all">Fechar Visualizador</button>
+           </footer>
         </div>
       )}
     </div>
