@@ -22,7 +22,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Função para parar a câmera de forma limpa
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -34,9 +33,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     setIsCameraReady(false);
   }, []);
 
-  // Inicialização ultra-protegida contra re-renders
   const startCamera = useCallback(async () => {
-    // Se já tiver um stream ou o vídeo já estiver com fonte, não faz nada
     if (streamRef.current || (videoRef.current && videoRef.current.srcObject)) return;
     
     try {
@@ -53,7 +50,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         streamRef.current = stream;
         videoRef.current.srcObject = stream;
         
-        // Garante que o play só ocorra após carregar
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play().catch((e: any) => console.error("Auto-play error:", e));
           setIsCameraReady(true);
@@ -64,15 +60,13 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       alert("Erro ao acessar câmera. Verifique as permissões do navegador.");
       onClose();
     }
-  }, [onClose]); // onClose aqui é estável devido ao useCallback no pai
+  }, [onClose]);
 
-  // Ciclo de vida isolado: Só depende do 'isOpen'
   useEffect(() => {
     if (isOpen) {
       startCamera();
     }
     return () => {
-      // Quando o modal desmonta, matamos o hardware
       stopCamera();
     };
   }, [isOpen, startCamera, stopCamera]);
@@ -127,25 +121,32 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
 
     setIsSaving(true);
     try {
+      // Cria a cópia atualizada da viagem com as novas fotos
       const updatedTrip: Trip = {
         ...trip,
         driver_docs: [...(trip.driver_docs || []), ...finalDocs]
       };
       
-      await db.saveTrip(updatedTrip);
+      // Salva no banco de dados passando o usuário para garantir o sync e as notificações
+      const saved = await db.saveTrip(updatedTrip, user);
       
-      await db.addNotification(
-        user,
-        'DRIVER_DOC_UPLOADED',
-        `Scanner OS ${trip.os}`,
-        `${user.displayName} enviou ${finalDocs.length} foto(s).`,
-        { os: trip.os, motorista: user.displayName, fotos: String(finalDocs.length) }
-      );
+      if (saved) {
+        await db.addNotification(
+          user,
+          'DRIVER_DOC_UPLOADED',
+          `Scanner OS ${trip.os}`,
+          `${user.displayName} enviou ${finalDocs.length} foto(s).`,
+          { os: trip.os, motorista: user.displayName, fotos: String(finalDocs.length) }
+        );
 
-      await onSuccess();
-      onClose();
+        await onSuccess();
+        onClose();
+      } else {
+        throw new Error("Falha na persistência dos dados.");
+      }
     } catch (err) {
-      alert("Erro ao salvar.");
+      console.error("Erro ao salvar documentos:", err);
+      alert("Erro ao salvar as fotos. Verifique sua internet.");
     } finally {
       setIsSaving(false);
     }
@@ -170,7 +171,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       </header>
 
       <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
-        {/* VÍDEO SEMPRE MONTADO - USAMOS CSS PARA ESCONDER */}
         <video 
           ref={videoRef} 
           autoPlay 
