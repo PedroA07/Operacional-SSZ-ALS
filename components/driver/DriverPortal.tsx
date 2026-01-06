@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Trip, Driver } from '../../types';
 import { timeUtils } from '../../utils/timeUtils';
 import { db } from '../../utils/storage';
@@ -19,6 +19,9 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionTime, setSessionTime] = useState('00:00:00');
+  const [gpsStatus, setGpsStatus] = useState<'OFF' | 'BUSCANDO' | 'ATIVO'>('OFF');
+  
+  const gpsWatchRef = useRef<number | null>(null);
 
   const loadPortalData = useCallback(async () => {
     try {
@@ -28,7 +31,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       ]);
 
       const currentDriver = allDrivers.find(d => String(d.id) === String(user.driverId));
-      
       const myTrips = allTrips.filter(t => String(t.driver?.id) === String(user.driverId))
         .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
@@ -54,55 +56,61 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     };
   }, [loadPortalData, user.lastLogin]);
 
-  // MONITOR DE GEOLOCALIZAÇÃO REAL-TIME DO DISPOSITIVO
+  // MOTOR DE GEOLOCALIZAÇÃO REAL-TIME (REFEITO)
   useEffect(() => {
     if (!user.driverId) return;
 
-    let watchId: number | null = null;
-
-    const startTracking = () => {
-      // Rastreamos apenas se houver uma viagem em andamento (não concluída/cancelada)
-      const hasActiveTrip = trips.some(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
-      
-      if (hasActiveTrip && navigator.geolocation) {
-        watchId = navigator.geolocation.watchPosition(
-          async (pos) => {
-            const { latitude, longitude } = pos.coords;
-            // Atualiza o banco de dados com a posição atual do motorista
-            await db.updateDriverLocation(user.driverId!, latitude, longitude);
-            console.debug("Localização GPS atualizada:", latitude, longitude);
-          },
-          (err) => console.warn("GPS ALS: Sem sinal ou permissão negada."),
-          { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
-        );
+    const startGpsTracking = () => {
+      if (!navigator.geolocation) {
+        console.error("Geolocalização não suportada.");
+        return;
       }
+
+      setGpsStatus('BUSCANDO');
+
+      // Limpa qualquer monitoramento anterior
+      if (gpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchRef.current);
+      }
+
+      gpsWatchRef.current = navigator.geolocation.watchPosition(
+        async (position) => {
+          const { latitude, longitude, accuracy } = position.coords;
+          setGpsStatus('ATIVO');
+          
+          try {
+            await db.updateDriverLocation(user.driverId!, latitude, longitude);
+            console.debug(`GPS Ativo: Accuracy ${accuracy}m`);
+          } catch (e) {
+            console.error("Erro ao reportar GPS ao servidor.");
+          }
+        },
+        (error) => {
+          console.warn("Erro de GPS:", error.message);
+          setGpsStatus('OFF');
+        },
+        { 
+          enableHighAccuracy: true, 
+          timeout: 15000, 
+          maximumAge: 0 // Força posição nova a cada leitura
+        }
+      );
     };
 
-    startTracking();
+    startGpsTracking();
 
     return () => {
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (gpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchRef.current);
+      }
     };
-  }, [user.driverId, trips]);
+  }, [user.driverId]);
 
   if (isLoading) {
     return (
       <div className="h-[100dvh] flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Conectando Servidor ALS...</p>
-      </div>
-    );
-  }
-
-  if (!driver && !isLoading) {
-    return (
-      <div className="h-[100dvh] flex flex-col items-center justify-center bg-[#020617] p-10 text-center">
-        <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6">
-           <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        </div>
-        <h2 className="text-white font-black uppercase text-xl">Vínculo não localizado</h2>
-        <p className="text-slate-400 text-sm mt-4 leading-relaxed">Não localizamos seu registro de motorista vinculado a este login. <br/> Por favor, entre em contato com o operacional.</p>
-        <button onClick={onLogout} className="mt-10 px-8 py-4 bg-slate-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest">Sair do Sistema</button>
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Carregando Painel...</p>
       </div>
     );
   }
@@ -121,19 +129,18 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
            <div className="flex items-center gap-2 mt-2">
               <span className="text-[8px] font-black text-blue-500 uppercase">Placa: <span className="font-mono text-white">{driver?.plateHorse || '---'}</span></span>
               <span className="text-[8px] font-black text-slate-700">|</span>
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">SINAL GPS ATIVO</span>
+              <div className="flex items-center gap-1.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${gpsStatus === 'ATIVO' ? 'bg-emerald-500 animate-ping' : gpsStatus === 'BUSCANDO' ? 'bg-amber-500' : 'bg-red-500'}`}></div>
+                <span className={`text-[8px] font-black uppercase tracking-widest ${gpsStatus === 'ATIVO' ? 'text-emerald-400' : 'text-slate-500'}`}>GPS {gpsStatus}</span>
+              </div>
            </div>
         </div>
         <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-white/5">
-          {driver?.photo || user.photo ? (
-            <img src={driver?.photo || user.photo} className="w-full h-full object-cover" alt="" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center font-black text-blue-400 italic text-xs">ALS</div>
-          )}
+          {driver?.photo ? <img src={driver.photo} className="w-full h-full object-cover" /> : <div className="text-xs font-black text-blue-400 italic">ALS</div>}
         </div>
       </header>
 
-      <main className="flex-1 px-5 pt-6 overflow-y-auto scroll-smooth custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <main className="flex-1 px-5 pt-6 overflow-y-auto custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
         {activeTab === 'inicio' && <HomeTab user={user} trips={trips} onRefresh={loadPortalData} />}
         {activeTab === 'viagens' && <TripsTab trips={trips} />}
         {activeTab === 'docs' && <DocsTab trips={trips} />}
@@ -142,20 +149,14 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
       <nav className="shrink-0 h-22 pb-6 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around px-6 z-50">
         {[
-          { id: 'inicio', label: 'Início', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-          { id: 'viagens', label: 'Progs', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-          { id: 'docs', label: 'Dossiê', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-          { id: 'perfil', label: 'Ficha', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' }
+          { id: 'inicio', label: 'Home', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+          { id: 'viagens', label: 'Minhas Viagens', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+          { id: 'docs', label: 'Contratos', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+          { id: 'perfil', label: 'Minha Ficha', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' }
         ].map(tab => (
-          <button 
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)} 
-            className={`flex flex-col items-center gap-1.5 transition-all py-2 px-4 rounded-2xl ${activeTab === tab.id ? 'text-blue-500 scale-110' : 'text-slate-600'}`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d={tab.icon} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span className="text-[7.5px] font-black uppercase tracking-widest">{tab.label}</span>
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex flex-col items-center gap-1.5 transition-all py-2 px-4 rounded-2xl ${activeTab === tab.id ? 'text-blue-500 scale-110' : 'text-slate-600'}`}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d={tab.icon} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
           </button>
         ))}
       </nav>
