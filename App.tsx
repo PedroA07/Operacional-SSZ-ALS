@@ -17,15 +17,13 @@ const App: React.FC = () => {
       if (saved) {
         try {
           const sessionData: User = JSON.parse(saved);
-          
-          // BUSCA NO BANCO: Forçamos a leitura do Banco de Dados oficial.
-          // Isso garante que se o usuário der F5, o 'lastlogin' lido venha do Supabase.
           const allUsers = await db.getUsers();
           const dbUser = allUsers.find(u => u.id === sessionData.id);
 
           if (dbUser && dbUser.status !== 'Inativo') {
             setUser(dbUser);
-            // Atualiza o cache local com os dados frescos do banco
+            // Seta como online ao restaurar sessão
+            await db.updatePresence(dbUser.id, true);
             sessionStorage.setItem('als_active_session', JSON.stringify(dbUser));
             setCurrentScreen(AppScreen.DASHBOARD);
           } else {
@@ -45,31 +43,41 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user || currentScreen !== AppScreen.DASHBOARD) return;
 
-    const updatePresence = async () => {
-      const isVisible = document.visibilityState === 'visible';
-      await db.updatePresence(user.id, isVisible);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        db.updatePresence(user.id, true);
+      }
+    }, 15000);
+    
+    // Função para "zerar" a presença ao fechar o site ou aba
+    const handleUnload = () => {
+      // Usamos o navigator.sendBeacon se possível para chamadas de fechamento de aba
+      // Mas como updatePresence é assíncrona, fazemos o melhor esforço
+      db.updatePresence(user.id, false);
     };
 
-    updatePresence();
-    const interval = setInterval(updatePresence, 15000);
-    
-    const handleVisibility = () => updatePresence();
-    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('unload', handleUnload);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('unload', handleUnload);
     };
   }, [user?.id, currentScreen]);
 
   const handleLoginSuccess = async (userData: User) => {
-    // Ao logar, o authService já garantiu que o 'lastlogin' é AGORA e salvou no banco.
     setUser(userData);
+    await db.updatePresence(userData.id, true);
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (user) {
+      // Marca como offline antes de sair para zerar os timers dos outros usuários imediatamente
+      await db.updatePresence(user.id, false);
+    }
     setUser(null);
     sessionStorage.removeItem('als_active_session');
     setCurrentScreen(AppScreen.LOGIN);

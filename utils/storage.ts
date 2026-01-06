@@ -101,6 +101,7 @@ export const db = {
             position: u.position, staffId: u.staff_id, driverId: u.driver_id,
             status: u.status, isFirstLogin: u.isfirstlogin === true,
             lastSeen: u.last_seen, isOnlineVisible: u.is_online_visible ?? true,
+            isOnline: u.is_online ?? false, // Mapeamento do novo campo
             notificationPrefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true, newRegistrations: true }
           }));
           db._saveLocal(KEYS.USERS, mapped);
@@ -118,6 +119,7 @@ export const db = {
       photo: user.photo, position: user.position, staff_id: user.staffId,
       driver_id: user.driverId, status: user.status, isfirstlogin: user.isFirstLogin === true,
       last_seen: user.lastSeen, is_online_visible: user.isOnlineVisible ?? true,
+      is_online: (user as any).isOnline ?? false,
       notification_prefs: user.notificationPrefs
     };
     if (supabase) { try { await supabase.from('users').upsert(payload); } catch (e) {} }
@@ -126,6 +128,17 @@ export const db = {
     if (idx >= 0) current[idx] = user; else current.push(user);
     db._saveLocal(KEYS.USERS, current);
     return true;
+  },
+
+  updatePresence: async (userId: string, isOnline: boolean) => {
+    if (supabase) {
+      try {
+        await supabase.from('users').update({ 
+          last_seen: new Date().toISOString(), 
+          is_online: isOnline 
+        }).eq('id', userId);
+      } catch (e) {}
+    }
   },
 
   getTrips: async (): Promise<Trip[]> => {
@@ -282,7 +295,7 @@ export const db = {
   },
 
   getStaff: async (): Promise<Staff[]> => {
-    if (supabase) { try { const { data } = await supabase.from('staff').select('*'); if (data) { const mapped = data.map(s => ({ ...s, registrationDate: s.registration_date, statusSince: s.status_since, emailCorp: s.emailcorp, phoneCorp: s.phonecorp })); db._saveLocal(KEYS.STAFF, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { const { data } = await supabase.from('staff').select('*'); if (data) { const mapped = data.map(s => ({ ...s, registrationDate: s.registration_date, statusSince: s.status_since, emailCorp: s.emailcorp, phonecorp: s.phonecorp })); db._saveLocal(KEYS.STAFF, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.STAFF);
   },
 
@@ -354,9 +367,6 @@ export const db = {
       return true;
     } catch (e) { return false; }
   },
-  updatePresence: async (userId: string, isVisible: boolean) => {
-    if (supabase) { try { await supabase.from('users').update({ last_seen: new Date().toISOString(), is_online_visible: isVisible }).eq('id', userId); } catch (e) {} }
-  },
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try { const { error } = await supabase.from('users').select('count', { count: 'exact', head: true }).limit(1); return !error; } catch { return false; }
@@ -369,6 +379,7 @@ const mapTripToDb = (trip: Trip) => ({
   category: trip.category, sub_category: trip.subCategory, status: trip.status, customer: trip.customer, destination: trip.destination,
   driver: trip.driver, status_history: trip.statusHistory, advance_payment: trip.advancePayment, balance_payment: trip.balancePayment,
   os_doc: trip.osDoc || null, agendamento_doc: trip.agendamentoDoc || null, completo_doc: trip.completoDoc || null, cte_doc: trip.cteDoc || null,
+  /* Fixed property name from cva_doc to cvaDoc on trip object */
   cva_doc: trip.cvaDoc || null, oc_form_data: trip.ocFormData, pre_stacking_form_data: trip.preStackingFormData || null, scheduling: trip.scheduling || null
 });
 
