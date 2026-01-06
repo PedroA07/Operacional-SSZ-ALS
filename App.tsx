@@ -13,10 +13,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initSession = async () => {
-      const saved = sessionStorage.getItem('als_active_session');
-
-      if (saved) {
-        try {
+      try {
+        const saved = sessionStorage.getItem('als_active_session');
+        if (saved) {
           const sessionData: User = JSON.parse(saved);
           const allUsers = await db.getUsers();
           const dbUser = allUsers.find(u => u.id === sessionData.id);
@@ -29,11 +28,13 @@ const App: React.FC = () => {
           } else {
             sessionStorage.removeItem('als_active_session');
           }
-        } catch (e) {
-          sessionStorage.removeItem('als_active_session');
         }
+      } catch (e) {
+        console.error("Erro na inicialização da sessão:", e);
+        sessionStorage.removeItem('als_active_session');
+      } finally {
+        setIsInitializing(false);
       }
-      setIsInitializing(false);
     };
 
     initSession();
@@ -44,7 +45,9 @@ const App: React.FC = () => {
     if (!user || currentScreen !== AppScreen.DASHBOARD) return;
 
     const handlePresence = async (status: PresenceStatus) => {
-      await db.updatePresence(user.id, status);
+      try {
+        await db.updatePresence(user.id, status);
+      } catch (e) {}
     };
 
     const handleVisibilityChange = () => {
@@ -80,7 +83,9 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     if (user) {
-      await db.updatePresence(user.id, 'offline');
+      try {
+        await db.updatePresence(user.id, 'offline');
+      } catch (e) {}
     }
     setUser(null);
     sessionStorage.removeItem('als_active_session');
@@ -89,22 +94,20 @@ const App: React.FC = () => {
 
   if (isInitializing) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#020617]">
+      <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
         <div className="text-blue-600 font-black italic text-4xl animate-pulse tracking-tighter">ALS...</div>
+        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.4em] mt-4">Sincronizando Módulos</p>
       </div>
     );
   }
 
-  // ROTEAMENTO BASEADO NO CARGO (ROLE)
   const renderMainContent = () => {
     if (!user) return null;
     
-    // Se for motorista ou motoboy, carrega o portal mobile
     if (user.role === 'driver' || user.role === 'motoboy') {
       return <DriverPortal user={user} onLogout={handleLogout} />;
     }
     
-    // Caso contrário (admin/staff), carrega o dashboard administrativo
     return <Dashboard user={user} onLogout={handleLogout} />;
   };
 

@@ -5,8 +5,16 @@ import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
 
-const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+// Proteção contra erro de acesso a variáveis de ambiente
+let SUPABASE_URL = '';
+let SUPABASE_KEY = '';
+
+try {
+  SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+  SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+} catch (e) {
+  console.warn("Ambiente não suporta import.meta.env");
+}
 
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
@@ -28,7 +36,10 @@ export const db = {
     try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) { console.warn(`Quota local excedida`); }
   },
   _getLocal: (key: string) => {
-    try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+    try { 
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : []; 
+    } catch { return []; }
   },
   
   getUsers: async (): Promise<User[]> => {
@@ -40,17 +51,17 @@ export const db = {
             id: u.id, 
             username: u.username, 
             password: u.password,
-            displayName: u.displayname || u.username, // Ajustado para 'displayname' (minúsculo)
+            displayName: u.displayname || u.username,
             role: u.role,
-            lastLogin: u.lastlogin || new Date().toISOString(), // Ajustado para 'lastlogin'
+            lastLogin: u.lastlogin || new Date().toISOString(),
             photo: u.photo,
             position: u.position, 
-            staffId: u.staffid, // Ajustado para 'staffid'
-            driverId: u.driverid, // Ajustado para 'driverid'
+            staffId: u.staffid,
+            driverId: u.driverid,
             status: u.status, 
-            isFirstLogin: u.isfirstlogin === true, // Ajustado para 'isfirstlogin'
-            lastSeen: u.lastseen, // Ajustado para 'lastseen'
-            isOnlineVisible: u.isonlinevisible ?? true, // Ajustado para 'isonlinevisible'
+            isFirstLogin: u.isfirstlogin === true,
+            lastSeen: u.lastseen,
+            isOnlineVisible: u.isonlinevisible ?? true,
             presence_status: u.presence_status || 'offline',
             notificationPrefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true, newRegistrations: true }
           }));
@@ -67,13 +78,13 @@ export const db = {
       id: user.id, 
       username: user.username, 
       password: user.password,
-      displayname: user.displayName, // Mapeando para minúsculo
+      displayname: user.displayName,
       role: user.role, 
-      lastlogin: user.lastLogin, // Mapeando para minúsculo
+      lastlogin: user.lastLogin,
       photo: user.photo, 
       position: user.position, 
-      staffid: user.staffId, // Mapeando para minúsculo
-      driverid: user.driverId, // Mapeando para minúsculo (O que causava o Erro de Vínculo)
+      staffid: user.staffId,
+      driverid: user.driverId,
       status: user.status, 
       isfirstlogin: user.isFirstLogin === true,
       lastseen: user.lastSeen,
@@ -135,7 +146,7 @@ export const db = {
     if (supabase) {
       try {
         await supabase.from('users').update({ 
-          lastseen: new Date().toISOString(), // Ajustado para minúsculo
+          lastseen: new Date().toISOString(),
           presence_status: status
         }).eq('id', userId);
       } catch (e) {}
@@ -338,6 +349,9 @@ export const db = {
   },
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
-    try { const { error } = await supabase.from('users').select('count', { count: 'exact', head: true }).limit(1); return !error; } catch { return false; }
+    try { 
+      const { error } = await supabase.from('users').select('count', { count: 'exact', head: true }).limit(1); 
+      return !error; 
+    } catch { return false; }
   }
 };
