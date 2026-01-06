@@ -140,6 +140,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   return (
     <div className="space-y-6">
+      {/* CABEÇALHO COM ACESSO RÁPIDO ÀS CATEGORIAS */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -164,13 +165,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         </div>
 
         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-           <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Acesso Rápido por Categoria</h3>
+           <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Abrir Visão por Categoria</h3>
            <div className="flex flex-wrap gap-3">
               <button 
                 onClick={() => setFilterCategory('TODAS')} 
                 className={`px-6 py-3 rounded-xl border transition-all text-[10px] font-black uppercase ${filterCategory === 'TODAS' ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'}`}
               >
-                Visão Geral
+                Lista Geral
               </button>
               {categories.filter(c => !c.parentId).map(cat => (
                 <button 
@@ -179,7 +180,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                   className="px-6 py-3 bg-white border border-slate-200 hover:border-blue-600 hover:text-blue-600 rounded-xl transition-all text-[10px] font-black uppercase flex items-center gap-2 group"
                 >
                   <span>{cat.name}</span>
-                  <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </button>
               ))}
            </div>
@@ -198,7 +199,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       />
       
       <div className="flex justify-between items-center mb-6">
-        <button onClick={handleClearAllFilters} className="text-[10px] font-black text-blue-600 uppercase hover:underline">Limpar todos os filtros</button>
+        <button onClick={handleClearAllFilters} className="text-[10px] font-black text-blue-600 uppercase hover:underline">Limpar filtros da lista</button>
         
         <div className="flex gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
            <div className="space-y-1">
@@ -209,16 +210,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
               <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Fim</label>
               <input type="date" className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
            </div>
-           {(filterStartDate || filterEndDate) && (
-             <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }} className="mt-4 text-[8px] font-black text-red-500 uppercase hover:underline">Limpar</button>
-           )}
         </div>
       </div>
 
       <SmartOperationTable 
         userId={user.id}
         componentId="ops-main-table"
-        title="Painel Geral de Operações"
+        title="Monitoramento Operacional em Tempo Real"
         columns={columns}
         data={filteredTrips}
         defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'destination_ship_booking', 'scheduling_info', 'actions']}
