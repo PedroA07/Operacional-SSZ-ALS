@@ -14,18 +14,9 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Estados para edição expandida
   const [editForm, setEditForm] = useState({
-    photo: '',
-    phone: '',
-    email: '',
-    cpf: '',
-    rg: '',
-    cnh: '',
-    plateHorse: '',
-    plateTrailer: '',
-    yearHorse: '',
-    yearTrailer: ''
+    photo: '', phone: '', email: '', cpf: '', rg: '', cnh: '',
+    plateHorse: '', plateTrailer: '', yearHorse: '', yearTrailer: ''
   });
 
   useEffect(() => {
@@ -59,14 +50,12 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
   const handleSave = async () => {
     if (!driver) return;
     setIsSaving(true);
-    
     const success = await driverService.updateProfile(driver.id, editForm);
-
     if (success) {
       setIsEditing(false);
       setTimeout(() => window.location.reload(), 300); 
     } else {
-      alert("Falha ao atualizar dados.");
+      alert("Falha ao salvar dados. Tente novamente.");
     }
     setIsSaving(false);
   };
@@ -89,114 +78,58 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
     </div>
   );
 
-  if (!driver) return (
-    <div className="flex flex-col items-center justify-center py-20 text-slate-600 font-black text-[10px] uppercase">
-      Puxando ficha cadastral...
-    </div>
-  );
+  if (!driver) return <div className="py-20 text-center text-[10px] font-black text-slate-500 uppercase">Sincronizando ficha...</div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-40">
       
-      {/* CABEÇALHO DA FICHA */}
       <div className="text-center space-y-4">
         <div className="relative inline-block">
             <div 
               onClick={() => isEditing && fileInputRef.current?.click()}
-              className={`w-32 h-32 rounded-[2.8rem] bg-slate-900 border border-white/10 mx-auto overflow-hidden shadow-2xl transition-all ${isEditing ? 'ring-4 ring-blue-600 scale-105 cursor-pointer' : 'ring-4 ring-white/5'}`}
+              className={`w-32 h-32 rounded-[2.8rem] bg-slate-900 border border-white/10 mx-auto overflow-hidden shadow-2xl transition-all ${isEditing ? 'ring-4 ring-blue-600 scale-105' : 'ring-4 ring-white/5'}`}
             >
               {(isEditing ? editForm.photo : (driver.photo || user.photo)) ? (
                 <img src={isEditing ? editForm.photo : (driver.photo || user.photo)} className="w-full h-full object-cover" alt="" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-blue-500 font-black text-4xl italic">
-                  {driver.name[0]}
-                </div>
-              )}
-              {isEditing && (
-                <div className="absolute inset-0 bg-blue-600/40 flex items-center justify-center backdrop-blur-sm">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2.5"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>
-                </div>
+                <div className="w-full h-full flex items-center justify-center text-blue-500 font-black text-4xl italic">{driver.name[0]}</div>
               )}
             </div>
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
         </div>
         <div>
             <h3 className="text-2xl font-black uppercase tracking-tighter text-white px-6 leading-tight">{driver.name}</h3>
-            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.4em] mt-2">Motorista Oficial ALS</p>
+            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.4em] mt-2">Dossiê Operacional ALS</p>
         </div>
       </div>
 
-      {/* DADOS CADASTRAIS */}
       <div className="bg-slate-900/60 rounded-[2.5rem] border border-white/5 p-8 space-y-6 shadow-2xl backdrop-blur-sm">
         <div className="grid grid-cols-2 gap-8">
-           <DataField 
-             label="CPF" 
-             value={isEditing ? editForm.cpf : driver.cpf} 
-             mono 
-             editing={isEditing} 
-             mask={maskCPF}
-             onChange={(v:string) => setEditForm({...editForm, cpf: v})}
-           />
-           <DataField 
-             label="RG" 
-             value={isEditing ? editForm.rg : driver.rg} 
-             mono 
-             editing={isEditing} 
-             mask={maskRG}
-             onChange={(v:string) => setEditForm({...editForm, rg: v})}
-           />
+           <DataField label="CPF" value={isEditing ? editForm.cpf : driver.cpf} mono editing={isEditing} mask={maskCPF} onChange={(v:string) => setEditForm({...editForm, cpf: v})} />
+           <DataField label="RG" value={isEditing ? editForm.rg : driver.rg} mono editing={isEditing} mask={maskRG} onChange={(v:string) => setEditForm({...editForm, rg: v})} />
         </div>
 
-        <DataField 
-          label="Documento CNH" 
-          value={isEditing ? editForm.cnh : driver.cnh} 
-          mono 
-          editing={isEditing} 
-          onChange={(v:string) => setEditForm({...editForm, cnh: v})}
-        />
+        <DataField label="Documento CNH" value={isEditing ? editForm.cnh : driver.cnh} mono editing={isEditing} onChange={(v:string) => setEditForm({...editForm, cnh: v})} />
 
+        {/* FOCO NAS PLACAS CONFORME SOLICITADO */}
         <div className="grid grid-cols-2 gap-8">
-           <DataField 
-             label="Placa Cavalo" 
-             value={isEditing ? editForm.plateHorse : driver.plateHorse} 
-             highlight mono 
-             editing={isEditing}
-             mask={maskPlate}
-             onChange={(v:string) => setEditForm({...editForm, plateHorse: v})}
-           />
-           <DataField 
-             label="Placa Carreta" 
-             value={isEditing ? editForm.plateTrailer : driver.plateTrailer} 
-             highlight mono 
-             editing={isEditing}
-             mask={maskPlate}
-             onChange={(v:string) => setEditForm({...editForm, plateTrailer: v})}
-           />
+           <DataField label="Placa Cavalo" value={isEditing ? editForm.plateHorse : driver.plateHorse} highlight mono editing={isEditing} mask={maskPlate} onChange={(v:string) => setEditForm({...editForm, plateHorse: v})} />
+           <DataField label="Placa Carreta" value={isEditing ? editForm.plateTrailer : driver.plateTrailer} highlight mono editing={isEditing} mask={maskPlate} onChange={(v:string) => setEditForm({...editForm, plateTrailer: v})} />
         </div>
 
         <div className="pt-2 space-y-4 border-t border-white/5">
             <div className="space-y-1">
-                <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest block mb-1">Telefone Celular</span>
+                <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest block mb-1">Celular</span>
                 {isEditing ? (
-                  <input 
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-blue-400 outline-none focus:border-blue-500 transition-all"
-                    value={editForm.phone}
-                    onChange={e => setEditForm({...editForm, phone: maskPhone(e.target.value)})}
-                  />
+                  <input className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-blue-400 outline-none" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: maskPhone(e.target.value)})} />
                 ) : (
                   <span className="text-[15px] font-black text-white font-mono">{driver.phone || '---'}</span>
                 )}
             </div>
-
             <div className="space-y-1">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block mb-1">E-mail Cadastrado</span>
+                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block mb-1">E-mail</span>
                 {isEditing ? (
-                  <input 
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:border-blue-500 lowercase transition-all"
-                    type="email"
-                    value={editForm.email}
-                    onChange={e => setEditForm({...editForm, email: e.target.value})}
-                  />
+                  <input className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none lowercase" type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} />
                 ) : (
                   <span className="text-xs font-bold text-slate-400 lowercase block truncate">{driver.email || '---'}</span>
                 )}
@@ -204,30 +137,22 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
         </div>
       </div>
 
-      {/* BOTÕES DE AÇÃO */}
       <div className="space-y-4 px-1">
         {isEditing ? (
           <div className="grid grid-cols-2 gap-4">
               <button onClick={() => setIsEditing(false)} className="py-5 bg-slate-800 text-slate-400 rounded-3xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Cancelar</button>
-              <button disabled={isSaving} onClick={handleSave} className="py-5 bg-blue-600 text-white rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
-                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Confirmar'}
+              <button disabled={isSaving} onClick={handleSave} className="py-5 bg-blue-600 text-white rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 flex items-center justify-center">
+                {isSaving ? 'Salvando...' : 'Confirmar'}
               </button>
           </div>
         ) : (
           <button onClick={() => setIsEditing(true)} className="w-full py-6 bg-white/5 text-white border border-white/10 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all shadow-lg">
-            Editar Meu Cadastro
+            Editar Todos os Dados
           </button>
         )}
-
         <div className="pt-10">
-          <button 
-            onClick={onLogout} 
-            className="w-full py-7 bg-red-600 text-white rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.2em] active:bg-red-700 active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 group"
-          >
-            <svg className="w-6 h-6 group-active:scale-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Encerrar Sessão ALS
+          <button onClick={onLogout} className="w-full py-7 bg-red-600 text-white rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.2em] active:bg-red-700 active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4">
+            Encerrar Sessão
           </button>
         </div>
       </div>

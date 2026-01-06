@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { Trip, TripDocument } from '../../../types';
+import { Trip } from '../../../types';
 
 interface DocsTabProps {
   trips: Trip[];
@@ -11,18 +11,18 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips }) => {
   const [selectedDoc, setSelectedDoc] = useState<{url: string, title: string} | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Filtramos apenas as viagens que possuem o campo freightContractDoc preenchido
-  const contractDocuments = useMemo(() => {
+  // Filtramos APENAS documentos do tipo Contrato de Frete (coluna específica da viagem)
+  const freightContracts = useMemo(() => {
     return trips
       .filter(t => t.freightContractDoc)
       .map(t => ({
-        tripOs: t.os,
-        customerName: t.customer.name,
+        os: t.os,
+        customer: t.customer.name,
         doc: t.freightContractDoc!
       }))
       .filter(item => 
-        item.tripOs.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+        item.os.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.customer.toLowerCase().includes(searchQuery.toLowerCase())
       );
   }, [trips, searchQuery]);
 
@@ -34,17 +34,17 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips }) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
        <div className="text-center py-6">
-          <h3 className="text-lg font-black uppercase">Contratos de Frete</h3>
-          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Acesso exclusivo aos seus contratos assinados</p>
+          <h3 className="text-lg font-black uppercase text-white">Contratos de Frete</h3>
+          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Sua via assinada digitalmente</p>
        </div>
 
-       {/* BARRA DE BUSCA */}
+       {/* BARRA DE PESQUISA */}
        <div className="px-1">
           <div className="relative">
             <input 
               type="text" 
               placeholder="BUSCAR POR OS OU CLIENTE..." 
-              className="w-full pl-12 pr-6 py-4 bg-slate-900 border border-white/10 rounded-2xl text-white font-bold text-[10px] uppercase outline-none focus:border-blue-500 transition-all placeholder:text-slate-600"
+              className="w-full pl-12 pr-6 py-5 bg-slate-900 border border-white/10 rounded-2xl text-white font-bold text-[10px] uppercase outline-none focus:border-blue-500 transition-all shadow-2xl"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
@@ -55,10 +55,10 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips }) => {
        </div>
        
        <div className="space-y-3">
-          {contractDocuments.length > 0 ? contractDocuments.map((item, idx) => (
+          {freightContracts.length > 0 ? freightContracts.map((item, idx) => (
             <button 
               key={`${item.doc.id}-${idx}`}
-              onClick={() => openDoc(item.doc.url, `Contrato: ${item.tripOs}`)}
+              onClick={() => openDoc(item.doc.url, `Contrato: OS ${item.os}`)}
               className="w-full p-5 bg-slate-900 border border-white/5 rounded-[1.8rem] flex items-center justify-between active:bg-blue-600 transition-all group shadow-xl"
             >
                <div className="flex items-center gap-4 min-w-0">
@@ -66,8 +66,8 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips }) => {
                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg>
                   </div>
                   <div className="text-left min-w-0">
-                    <p className="text-[11px] font-black text-white uppercase truncate">Contrato de Frete - OS {item.tripOs}</p>
-                    <p className="text-[8px] text-slate-500 font-bold uppercase group-active:text-blue-100 mt-0.5">{item.customerName}</p>
+                    <p className="text-[11px] font-black text-white uppercase truncate">Contrato de Frete - OS {item.os}</p>
+                    <p className="text-[8px] text-slate-500 font-bold uppercase group-active:text-blue-100 mt-0.5">{item.customer}</p>
                   </div>
                </div>
                <div className="flex flex-col items-end gap-1">
@@ -77,7 +77,7 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips }) => {
             </button>
           )) : (
             <div className="py-24 bg-slate-900/20 rounded-[2.5rem] border-2 border-dashed border-white/5 text-center px-10">
-               <p className="text-[10px] font-black text-slate-600 uppercase italic leading-relaxed">Nenhum contrato de frete<br/>localizado para esta busca.</p>
+               <p className="text-[10px] font-black text-slate-600 uppercase italic leading-relaxed">Nenhum contrato localizado.<br/>Verifique a OS ou solicite o anexo.</p>
             </div>
           )}
        </div>
@@ -86,7 +86,7 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips }) => {
         <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col animate-in fade-in duration-300">
            <div className="h-20 bg-slate-900 flex items-center justify-between px-6 shrink-0 border-b border-white/5">
               <div className="min-w-0">
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Documento Digitalizado</p>
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Documento Digital</p>
                 <p className="text-xs font-bold text-white uppercase truncate mt-1">{selectedDoc.title}</p>
               </div>
               <button 

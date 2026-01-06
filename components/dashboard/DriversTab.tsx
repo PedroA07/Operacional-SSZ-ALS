@@ -12,7 +12,7 @@ import ListFilters from './shared/ListFilters';
 
 interface DriversTabProps {
   drivers: Driver[];
-  customers: Customer[]; // Adicionado customers para filtrar no modal
+  customers: Customer[];
   onSaveDriver: (driver: Partial<Driver>, id?: string) => Promise<void>;
   onDeleteDriver: (id: string) => void;
   availableOps: OperationDefinition[];
@@ -37,7 +37,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
 
-  // Estados temporários para o formulário de adição de operação no modal
   const [tempCategory, setTempCategory] = useState(availableOps[0]?.category || '');
   const [tempClient, setTempClient] = useState('Geral');
   
@@ -174,7 +173,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      pdf.save(`Motorista - ${selectedDriver.name}.pdf`);
+      pdf.save(`Ficha - ${selectedDriver.name}.pdf`);
     } catch (error) {
       alert("Falha ao gerar o PDF.");
     } finally {
@@ -219,7 +218,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
     return result;
   }, [drivers, searchQuery, sortBy, statusFilter]);
 
-  // Filtragem dinâmica de clientes baseada na categoria selecionada no modal
   const filteredCustomersForOps = useMemo(() => {
     if (!tempCategory) return [];
     return customers.filter(c => 
@@ -228,7 +226,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   }, [customers, tempCategory]);
 
   const VisibilityToggle = ({ id, label }: { id: keyof typeof visibility, label: string }) => (
-    <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-white transition-all group">
+    <label className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-50 transition-all group">
       <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${visibility[id] ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
         {visibility[id] && <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>}
       </div>
@@ -297,12 +295,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CPF: <span className="font-mono text-slate-800 font-bold">{d.cpf}</span></p>
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">RG: <span className="font-mono text-slate-800 font-bold">{d.rg || '---'}</span></p>
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CNH: <span className="font-mono text-slate-800 font-bold">{d.cnh || '---'}</span></p>
-                          {d.cnhPdfUrl && (
-                             <button onClick={() => window.open(d.cnhPdfUrl, '_blank')} className="inline-flex items-center gap-2 mt-2 px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-[7px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="3"/></svg>
-                                Visualizar PDF CNH
-                             </button>
-                          )}
                        </div>
                     </td>
                     <td className="px-6 py-4 max-w-[200px]">
@@ -336,14 +328,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                        <div className="mt-1 space-y-1">
                           <p className="text-blue-600 font-black text-[11px] leading-none">{d.phone}</p>
                           <p className="text-[9px] text-slate-400 font-bold lowercase truncate max-w-[150px]">{d.email || '---'}</p>
-                          {d.whatsappGroupLink && (
-                             <a 
-                               href={d.whatsappGroupLink} target="_blank" rel="noreferrer"
-                               className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500 text-white text-[8px] font-black uppercase rounded-lg hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/10"
-                             >
-                                <Icons.Whatsapp /> Ingressar no Grupo
-                             </a>
-                          )}
                        </div>
                     </td>
                     <td className="px-6 py-4">
@@ -364,12 +348,11 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                              {d.status}
                           </span>
                           <p className="text-[9px] font-black text-slate-400 uppercase">{d.driverType}</p>
-                          <p className="text-[8px] text-slate-300 font-bold italic">Desde: {d.statusLastChangeDate ? new Date(d.statusLastChangeDate).toLocaleDateString('pt-BR') : '---'}</p>
                        </div>
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
                       <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha do Portal"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Ficha Cadastral ALS"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Dossiê do Motorista"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
                       <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar Cadastro"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                     </td>
                   </tr>
@@ -452,7 +435,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                  </div>
               </div>
 
-              {/* VÍNCULOS OPERACIONAIS EDITOR DINÂMICO */}
+              {/* VÍNCULOS OPERACIONAIS */}
               <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-white/5 space-y-6">
                  <div className="flex items-center justify-between">
                     <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Gestão de Vínculos Operacionais</h4>
@@ -464,7 +447,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                          value={tempCategory}
                          onChange={(e) => {
                             setTempCategory(e.target.value);
-                            setTempClient('Geral'); // Reseta cliente ao mudar categoria
+                            setTempClient('Geral');
                          }}
                          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500"
                        >
@@ -485,7 +468,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                              </option>
                           ))}
                        </select>
-                       <p className="text-[7px] text-slate-500 font-bold uppercase mt-1 ml-1">* Exibindo clientes registrados em "{tempCategory}"</p>
                     </div>
                     <div className="col-span-2 flex items-end">
                        <button 
@@ -504,7 +486,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                           <button type="button" onClick={() => removeOperation(i)} className="text-slate-500 hover:text-red-400"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
                        </div>
                     ))}
-                    {(!form.operations || form.operations.length === 0) && <p className="text-[9px] text-slate-600 font-bold uppercase italic tracking-widest w-full text-center py-4">Nenhum vínculo operacional definido</p>}
                  </div>
               </div>
 
@@ -598,40 +579,56 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
         </div>
       )}
 
-      {/* MODAL PREVIEW PDF */}
+      {/* MODAL DE VISUALIZAÇÃO DE DOSSIÊ (VIEW PROFILE) */}
       {isPreviewModalOpen && selectedDriver && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-7xl h-full rounded-[3.5rem] shadow-2xl overflow-hidden flex animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-2xl animate-in fade-in duration-300">
+           <div className="bg-slate-100 w-full max-w-[1400px] h-full rounded-[4rem] shadow-2xl overflow-hidden flex animate-in zoom-in-95 border border-white/10">
               
-              <div className="w-80 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
-                 <div className="p-8 border-b border-slate-200">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Visualizador de Ficha</h3>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Configure os dados visíveis no PDF</p>
+              {/* Painel Lateral de Controle e Info Rápida */}
+              <div className="w-96 bg-white border-r border-slate-200 flex flex-col shrink-0">
+                 <div className="p-10 border-b border-slate-100">
+                    <div className="w-20 h-20 bg-blue-600 text-white rounded-3xl flex items-center justify-center font-black italic text-2xl shadow-xl mb-6 shadow-blue-600/20">ALS</div>
+                    <h3 className="text-xl font-black uppercase tracking-tighter text-slate-800">Dossiê Digital</h3>
+                    <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest leading-tight">Configurações de Visualização e Exportação PDF</p>
                  </div>
                  
-                 <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
-                    <VisibilityToggle id="driverInfo" label="Dados Pessoais" />
-                    <VisibilityToggle id="contacts" label="Contatos" />
-                    <VisibilityToggle id="equipment" label="Equipamento" />
-                    <VisibilityToggle id="beneficiary" label="Dados do Beneficiário" />
-                    <VisibilityToggle id="whatsapp" label="Grupo WhatsApp" />
-                    <VisibilityToggle id="portal" label="Credenciais do Portal" />
+                 <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                    <div className="space-y-3">
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Filtros do Documento</p>
+                       <VisibilityToggle id="driverInfo" label="Dados Pessoais" />
+                       <VisibilityToggle id="contacts" label="Contatos e Endereço" />
+                       <VisibilityToggle id="equipment" label="Dados do Conjunto" />
+                       <VisibilityToggle id="beneficiary" label="Dados Financeiros" />
+                       <VisibilityToggle id="whatsapp" label="Comunicação Interna" />
+                       <VisibilityToggle id="portal" label="Acesso ao Motorista" />
+                    </div>
+
+                    <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100 space-y-3">
+                       <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Informação Técnica</p>
+                       <p className="text-[10px] text-blue-900/70 leading-relaxed">Este dossiê é gerado em tempo real. Qualquer alteração no cadastro refletirá imediatamente nesta ficha.</p>
+                    </div>
                  </div>
 
-                 <div className="p-8 border-t border-slate-200 space-y-3">
+                 <div className="p-10 border-t border-slate-100 space-y-4 bg-slate-50/50">
                     <button 
                        onClick={downloadDriverPDF}
                        disabled={isExporting}
-                       className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                       className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
                     >
-                       {isExporting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Baixar Arquivo PDF'}
+                       {isExporting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : (
+                         <>
+                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                           Gerar Documento PDF
+                         </>
+                       )}
                     </button>
-                    <button onClick={() => setIsPreviewModalOpen(false)} className="w-full py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all">Fechar Preview</button>
+                    <button onClick={() => setIsPreviewModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all active:scale-95">Fechar Visualização</button>
                  </div>
               </div>
 
-              <div className="flex-1 overflow-auto bg-slate-200 p-12 flex justify-center custom-scrollbar">
-                 <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
+              {/* Área do Documento (Ficha) */}
+              <div className="flex-1 overflow-auto bg-slate-200/50 p-12 flex justify-center custom-scrollbar">
+                 <div className="origin-top transform scale-90 xl:scale-100 shadow-[0_40px_100px_rgba(0,0,0,0.1)] rounded-sm overflow-hidden bg-white">
                     <DriverProfileTemplate driver={selectedDriver} visibility={visibility} />
                  </div>
               </div>

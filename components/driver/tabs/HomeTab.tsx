@@ -19,7 +19,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
-  // Viagem Ativa: Primeira que não está concluída ou cancelada
   const activeTrip = useMemo(() => {
     return trips.find(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
   }, [trips]);
@@ -27,7 +26,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const handleUpdateStatus = async (trip: Trip, nextStatus: TripStatus) => {
     if (isUpdating) return;
     if (trip.status === nextStatus) return;
-    if (!confirm(`CONFIRMAR ETAPA: ${nextStatus.toUpperCase()}?`)) return;
+    if (!confirm(`CONFIRMAR ESTA POSIÇÃO: ${nextStatus.toUpperCase()}?`)) return;
 
     setIsUpdating(true);
     const success = await driverService.updateTripStatus(trip, nextStatus, user);
@@ -35,7 +34,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       setShowPicker(false);
       await onRefresh();
     } else {
-      alert("Erro ao conectar. Verifique seu sinal.");
+      alert("Erro ao conectar. Verifique seu sinal de internet.");
     }
     setIsUpdating(false);
   };
@@ -43,12 +42,11 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-24">
       
-      {/* SEÇÃO DA VIAGEM EM DESTAQUE */}
       <section className="space-y-4">
         <div className="flex justify-between items-center px-1">
-          <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Programação Ativa</h2>
+          <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Minha Programação</h2>
           {activeTrip && (
-            <span className="px-2 py-0.5 bg-blue-500 text-white rounded text-[7px] font-black uppercase shadow-[0_0_8px_rgba(59,130,246,0.5)]">Em Andamento</span>
+            <span className="px-2 py-0.5 bg-blue-500 text-white rounded text-[7px] font-black uppercase shadow-[0_0_8px_rgba(59,130,246,0.5)]">Ativa</span>
           )}
         </div>
 
@@ -62,20 +60,19 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-mono font-black text-white">{activeTrip.container || 'A DEFINIR'}</p>
-                  <p className="text-[8px] font-bold text-slate-500 uppercase mt-1">Ref: {activeTrip.booking || '---'}</p>
                 </div>
               </div>
 
-              {/* BLOCO DE AGENDAMENTO CONDICIONAL */}
-              {activeTrip.scheduling && (
+              {/* EXIBIÇÃO CONDICIONAL DO AGENDAMENTO */}
+              {activeTrip.scheduling && activeTrip.scheduling.location && (
                 <div className="bg-emerald-500/5 rounded-3xl p-5 border border-emerald-500/10 space-y-2 animate-in zoom-in-95">
                   <div className="flex justify-between items-center">
-                    <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Agendamento Terminal</p>
+                    <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Agendamento no Local</p>
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
                   </div>
                   <div className="flex flex-col gap-1">
                     <p className="text-sm font-black text-white uppercase truncate">{activeTrip.scheduling.location}</p>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 mt-1">
                        <span className="text-[11px] font-bold text-slate-300">{new Date(activeTrip.scheduling.dateTime).toLocaleDateString('pt-BR')}</span>
                        <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
                        <span className="text-[13px] font-black text-emerald-400">{new Date(activeTrip.scheduling.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
@@ -84,18 +81,17 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 </div>
               )}
 
-              {/* POSIÇÃO ATUAL E BOTÃO DE ALTERAR */}
               <div className="space-y-4">
                 <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between">
                   <div>
-                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sua Posição</p>
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Posição Atual</p>
                     <p className="text-lg font-black uppercase text-blue-400 mt-1">{activeTrip.status}</p>
                   </div>
                   <button 
                     onClick={() => setShowPicker(!showPicker)}
-                    className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border ${showPicker ? 'bg-blue-600 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-slate-300'}`}
+                    className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase transition-all border ${showPicker ? 'bg-blue-600 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-slate-300 shadow-xl'}`}
                   >
-                    {showPicker ? 'Fechar' : 'Atualizar'}
+                    {showPicker ? 'Fechar' : 'Alterar'}
                   </button>
                 </div>
                 
@@ -108,9 +104,9 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                           key={status}
                           disabled={isUpdating || isCurrent}
                           onClick={() => handleUpdateStatus(activeTrip, status)}
-                          className={`py-6 px-4 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all border flex items-center justify-center text-center ${
+                          className={`py-5 px-3 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all border flex items-center justify-center text-center leading-tight ${
                             isCurrent 
-                            ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 opacity-50 cursor-default' 
+                            ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 opacity-50' 
                             : 'bg-white/5 border-white/5 text-slate-400 active:scale-95 active:bg-blue-600 active:text-white'
                           }`}
                         >
@@ -125,17 +121,17 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           </div>
         ) : (
           <div className="py-24 bg-slate-900/30 rounded-[2.5rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center text-center px-8">
-             <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-6 text-slate-600 shadow-inner">
+             <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-6 text-slate-600">
                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" strokeWidth="2.5"/></svg>
              </div>
-             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Nenhuma programação vinculada ao seu cadastro no momento.</p>
+             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Nenhuma programação ativa vinculada ao seu cadastro.</p>
           </div>
         )}
       </section>
 
       <div className="pt-4 pb-8">
         <p className="text-[8px] text-slate-800 font-bold uppercase tracking-[0.5em] text-center">
-          ALS TRANSPORTES OPERACIONAL V4.0
+          ALS TRANSPORTES OPERACIONAL V4.1
         </p>
       </div>
     </div>
