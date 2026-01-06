@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port, Category, Trip } from '../../../types';
+import { Driver, Customer, Port, Category, Trip, User } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
@@ -23,6 +23,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [isExporting, setIsExporting] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   const [remetenteSearch, setRemetenteSearch] = useState('');
   const [showRemetenteResults, setShowRemetenteResults] = useState(false);
@@ -62,6 +63,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   });
 
   useEffect(() => {
+    const saved = sessionStorage.getItem('als_active_session');
+    if (saved) setCurrentUser(JSON.parse(saved));
+
     const loadCats = async () => {
       const c = await db.getCategories();
       setCategories(c);
@@ -165,6 +169,17 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       const tripData = tripSyncService.mapOCtoTrip(formData, selectedDriver!, selectedRemetente!, finalCategory, selectedDestinatario);
       await tripSyncService.sync(tripData, existingId || undefined);
 
+      // Dispara Notificação de Geração de OC
+      if (currentUser) {
+        await db.addNotification(
+          currentUser, 
+          'OC_GENERATED', 
+          `OC Emitida: ${formData.os}`, 
+          `Ordem de Coleta para o motorista ${selectedDriver?.name} gerada com sucesso.`,
+          { os: formData.os, motorista: selectedDriver?.name, placa: selectedDriver?.plateHorse, cliente: selectedRemetente?.name }
+        );
+      }
+
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));
       const element = captureRef.current;
@@ -201,6 +216,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     }
   };
 
+  // ... Resto do componente permanece igual ...
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";

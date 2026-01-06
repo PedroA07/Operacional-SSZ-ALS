@@ -27,30 +27,34 @@ export interface NotificationPreference {
   statusUpdate: boolean;
   paymentLiberated: boolean;
   systemChanges: boolean;
-  newRegistrations: boolean; // Novo: Motoristas, Clientes, etc
+  newRegistrations: boolean;
 }
 
 export type NotificationType = 
-  | 'TRIP_CREATED' 
+  | 'OC_GENERATED' 
+  | 'MINUTA_GENERATED' 
+  | 'LIBERACAO_GENERATED' 
   | 'STATUS_UPDATED' 
+  | 'TRIP_CREATED' 
   | 'PAYMENT_LIBERATED' 
-  | 'CATEGORY_CREATED' 
-  | 'DRIVER_CREATED'
-  | 'CUSTOMER_CREATED'
-  | 'PORT_CREATED'
-  | 'PRESTACKING_CREATED'
-  | 'SYSTEM'
+  | 'SYSTEM' 
   | 'DELETED';
 
 export interface Notification {
   id: string;
-  userId: string;
-  userName: string;
+  title: string;
+  description: string;
   type: NotificationType;
-  message: string;
-  osRef?: string;
+  authorName: string;
+  authorId: string;
   timestamp: string;
-  readBy?: string[];
+  summary?: {
+    os?: string;
+    placa?: string;
+    motorista?: string;
+    cliente?: string;
+    valor?: string;
+  };
 }
 
 export enum DashboardTab {
