@@ -25,8 +25,10 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
     });
   }, [trips, search, filter]);
 
-  const handlePreviewDoc = (url: string, label: string) => {
-    setPreviewDoc({ url, label });
+  const openDocViewer = (doc: TripDocument | undefined, label: string) => {
+    if (doc?.url) {
+      setPreviewDoc({ url: doc.url, label });
+    }
   };
 
   const DetailRow = ({ label, value, blue = false, mono = false }: any) => (
@@ -42,7 +44,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       {/* HEADER E BUSCA */}
       <div className="space-y-4 px-1">
-        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Programações ALS</h2>
+        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Minhas Viagens</h2>
         
         <div className="relative">
           <input 
@@ -90,13 +92,11 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
             </button>
           );
         }) : (
-          <div className="py-20 text-center">
-            <p className="text-[10px] font-black text-slate-700 uppercase italic">Nenhuma viagem localizada</p>
-          </div>
+          <div className="py-20 text-center text-slate-600 font-black uppercase text-[10px] italic">Nenhuma viagem encontrada</div>
         )}
       </div>
 
-      {/* DETALHE DA VIAGEM SELECIONADA (DOSSIÊ) */}
+      {/* DETALHE DA VIAGEM SELECIONADA */}
       {selectedTrip && (
         <div className="fixed inset-0 z-[1000] bg-[#020617] flex flex-col animate-in slide-in-from-bottom-full duration-500">
            <header className="p-6 pt-12 flex justify-between items-center bg-slate-950 border-b border-white/5 shrink-0">
@@ -111,17 +111,8 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
 
            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-32">
               <section className="bg-slate-900 rounded-[2.5rem] p-8 border border-white/5 shadow-2xl space-y-2">
-                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/5">
-                    <span className="text-[11px] font-black uppercase text-blue-400">Informações Operacionais</span>
-                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${selectedTrip.status.includes('concluída') ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-600 text-white'}`}>{selectedTrip.status}</span>
-                 </div>
-                 <DetailRow label="Cliente / Destino" value={`${selectedTrip.customer.name} › ${selectedTrip.destination?.name || '---'}`} blue />
-                 <DetailRow label="Modalidade" value={selectedTrip.type} />
+                 <DetailRow label="Cliente / Localidade" value={`${selectedTrip.customer.name} › ${selectedTrip.customer.city}`} blue />
                  <DetailRow label="Container" value={selectedTrip.container} mono />
-                 <div className="grid grid-cols-2 gap-4">
-                    <DetailRow label="Tara" value={selectedTrip.tara} mono />
-                    <DetailRow label="Lacre" value={selectedTrip.seal} mono />
-                 </div>
                  <DetailRow label="Ship / Booking" value={`${selectedTrip.ship || '---'} / ${selectedTrip.booking || '---'}`} />
                  <DetailRow label="Data Programada" value={new Date(selectedTrip.dateTime).toLocaleString('pt-BR')} />
                  {selectedTrip.scheduling && (
@@ -133,7 +124,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
                  )}
               </section>
 
-              {/* DOCUMENTOS ANEXADOS */}
+              {/* DOCUMENTOS ANEXADOS - AGORA ABREM NO MODAL INTERNO */}
               <section className="space-y-4">
                 <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Documentos Digitais</h4>
                 <div className="grid gap-3">
@@ -146,8 +137,8 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
                    ].map((item, idx) => item.doc && (
                      <button 
                        key={idx}
-                       onClick={() => handlePreviewDoc(item.doc!.url, item.label)}
-                       className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl flex items-center justify-between active:bg-blue-600 active:border-blue-500 transition-all shadow-xl group"
+                       onClick={() => openDocViewer(item.doc, item.label)}
+                       className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl flex items-center justify-between active:bg-blue-600 transition-all shadow-xl group"
                      >
                         <div className="flex items-center gap-4">
                            <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 group-active:text-white">
@@ -173,7 +164,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
         </div>
       )}
 
-      {/* MODAL DE VISUALIZAÇÃO DE DOCUMENTO (DRIVER PORTAL) */}
+      {/* MODAL DE VISUALIZAÇÃO DE DOCUMENTO INTERNO (PORTAL DO MOTORISTA) */}
       {previewDoc && (
         <div className="fixed inset-0 z-[2000] bg-[#020617] flex flex-col animate-in fade-in duration-300">
            <header className="p-6 pt-12 flex justify-between items-center bg-slate-950 border-b border-white/5 shrink-0">
@@ -187,11 +178,11 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
            </header>
            <div className="flex-1 bg-white overflow-hidden relative">
               {previewDoc.url.startsWith('data:image') ? (
-                <div className="w-full h-full flex items-center justify-center p-4 overflow-auto bg-slate-200">
-                   <img src={previewDoc.url} className="max-w-full shadow-2xl rounded-lg" alt="Documento" />
+                <div className="w-full h-full flex items-center justify-center p-4 bg-slate-200 overflow-auto">
+                   <img src={previewDoc.url} className="max-w-full shadow-2xl rounded-lg" alt="Doc" />
                 </div>
               ) : (
-                <iframe src={previewDoc.url} className="w-full h-full border-none" title="Preview Doc"></iframe>
+                <iframe src={previewDoc.url} className="w-full h-full border-none" title="Doc Preview"></iframe>
               )}
            </div>
            <div className="p-6 bg-slate-950 border-t border-white/5 flex gap-3">

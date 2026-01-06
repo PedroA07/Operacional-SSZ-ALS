@@ -54,23 +54,26 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     };
   }, [loadPortalData, user.lastLogin]);
 
-  // MONITOR DE GEOLOCALIZAÇÃO REAL-TIME
+  // MONITOR DE GEOLOCALIZAÇÃO REAL-TIME DO DISPOSITIVO
   useEffect(() => {
     if (!user.driverId) return;
 
     let watchId: number | null = null;
 
     const startTracking = () => {
-      const activeTrip = trips.find(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
+      // Rastreamos apenas se houver uma viagem em andamento (não concluída/cancelada)
+      const hasActiveTrip = trips.some(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
       
-      if (activeTrip && navigator.geolocation) {
+      if (hasActiveTrip && navigator.geolocation) {
         watchId = navigator.geolocation.watchPosition(
           async (pos) => {
             const { latitude, longitude } = pos.coords;
+            // Atualiza o banco de dados com a posição atual do motorista
             await db.updateDriverLocation(user.driverId!, latitude, longitude);
+            console.debug("Localização GPS atualizada:", latitude, longitude);
           },
-          (err) => console.warn("GPS desativado ou sem sinal."),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+          (err) => console.warn("GPS ALS: Sem sinal ou permissão negada."),
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
         );
       }
     };
@@ -80,13 +83,13 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     return () => {
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
-  }, [user.driverId, trips.length]);
+  }, [user.driverId, trips]);
 
   if (isLoading) {
     return (
       <div className="h-[100dvh] flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Sincronizando Banco de Dados...</p>
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Conectando Servidor ALS...</p>
       </div>
     );
   }
@@ -97,7 +100,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6">
            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         </div>
-        <h2 className="text-white font-black uppercase text-xl">Erro de Vínculo</h2>
+        <h2 className="text-white font-black uppercase text-xl">Vínculo não localizado</h2>
         <p className="text-slate-400 text-sm mt-4 leading-relaxed">Não localizamos seu registro de motorista vinculado a este login. <br/> Por favor, entre em contato com o operacional.</p>
         <button onClick={onLogout} className="mt-10 px-8 py-4 bg-slate-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest">Sair do Sistema</button>
       </div>
@@ -118,7 +121,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
            <div className="flex items-center gap-2 mt-2">
               <span className="text-[8px] font-black text-blue-500 uppercase">Placa: <span className="font-mono text-white">{driver?.plateHorse || '---'}</span></span>
               <span className="text-[8px] font-black text-slate-700">|</span>
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">ALS v4.2</span>
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">SINAL GPS ATIVO</span>
            </div>
         </div>
         <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-white/5">

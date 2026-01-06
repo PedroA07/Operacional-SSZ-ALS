@@ -36,9 +36,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<'overview' | 'clients'>('overview');
   const [activeStatusTab, setActiveStatusTab] = useState<'ativas' | 'concluida' | 'cancelada'>('ativas');
 
-  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
-  const [docViewConfig, setDocViewConfig] = useState({ url: '', title: '' });
-
   const loadLocalData = async () => {
     const [t, cats, p, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPorts(), db.getPreStacking()]);
     setAllTrips(t);
@@ -108,8 +105,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
-    (t) => {}, (t) => {}, // OC / Minuta Edit
-    (url, title) => { setDocViewConfig({ url, title }); setIsDocViewerOpen(true); },
+    (t) => {}, (t) => {},
+    (url, title) => { window.open(url, '_blank'); },
     async (id) => { if(confirm('Excluir viagem?')) { await db.deleteTrip(id, user); loadLocalData(); } },
     loadLocalData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
@@ -145,7 +142,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Motoristas Vinculados</h4>
                     <button 
                       onClick={() => setIsDriversCollapsed(!isDriversCollapsed)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-200"
                     >
                       <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isDriversCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
                       <span className="text-[8px] font-black uppercase">{isDriversCollapsed ? 'Mostrar Lista' : 'Encolher Lista'}</span>
@@ -159,7 +156,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                 </div>
               )}
               
-              <SmartOperationTable userId={user.id} componentId={`op-trips-${type}-${categoryName}-${activeStatusTab}`} title={`Fila de Viagens: ${activeStatusTab === 'ativas' ? 'Pendentes & Em Execução' : activeStatusTab.toUpperCase()}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'destination_ship_booking', 'scheduling_info', 'actions']} />
+              <SmartOperationTable userId={user.id} componentId={`op-trips-${type}-${categoryName}-${activeStatusTab}`} title={`Fila de Viagens: ${activeStatusTab === 'ativas' ? 'Pendentes & Em Execução' : activeStatusTab.toUpperCase()}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
             </div>
         </div>
       ) : (
@@ -170,19 +167,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
       <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadLocalData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} initialCustomer={type === 'client' ? customers.find(c => c.name === clientName) : undefined} />
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadLocalData} preStackingUnits={ports} />
-
-      {isStatusModalOpen && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6 animate-in zoom-in-95">
-             <div className="text-center border-b border-slate-100 pb-6"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento Operacional</p><p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p></div>
-             <div className="space-y-4">
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Selecione o Novo Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
-                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora da Ocorrência</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
-             </div>
-             <div className="grid gap-3 pt-4"><button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button><button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button></div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
