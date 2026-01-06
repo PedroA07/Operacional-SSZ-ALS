@@ -32,12 +32,12 @@ export const driverAuthService = {
       password: password,
       displayName: driverData.name || 'Motorista',
       role: driverData.driverType === 'Motoboy' ? 'motoboy' : 'driver',
-      driverId: driverId,
+      driverId: driverId, // ESSENCIAL PARA O PORTAL DO MOTORISTA
       lastLogin: new Date().toISOString(),
       position: driverData.driverType || 'Motorista',
       status: driverData.status || 'Ativo',
       photo: driverData.photo,
-      isFirstLogin: false // Motoristas não precisam trocar no primeiro login por padrão do fluxo solicitado
+      isFirstLogin: false 
     };
 
     await db.saveUser(userPayload);

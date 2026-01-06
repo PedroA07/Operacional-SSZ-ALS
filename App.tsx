@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { AppScreen, User, PresenceStatus } from './types';
 import LoginForm from './components/LoginForm';
 import Dashboard from './Dashboard';
+import DriverPortal from './components/driver/DriverPortal';
 import { db } from './utils/storage';
 
 const App: React.FC = () => {
@@ -38,7 +39,7 @@ const App: React.FC = () => {
     initSession();
   }, []);
 
-  // Monitor de Presença Real-time (Online / Ausente / Offline)
+  // Monitor de Presença Real-time
   useEffect(() => {
     if (!user || currentScreen !== AppScreen.DASHBOARD) return;
 
@@ -53,17 +54,10 @@ const App: React.FC = () => {
     const handleFocus = () => handlePresence('online');
     const handleBlur = () => handlePresence('away');
 
-    const handleUnload = () => {
-      // Tenta sinalizar offline ao fechar aba
-      db.updatePresence(user.id, 'offline');
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
     window.addEventListener('blur', handleBlur);
-    window.addEventListener('beforeunload', handleUnload);
 
-    // Heartbeat: mantém o sinal de vida no banco a cada 20s
     const heartbeat = setInterval(() => {
       const status: PresenceStatus = document.hidden ? 'away' : 'online';
       handlePresence(status);
@@ -74,7 +68,6 @@ const App: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('beforeunload', handleUnload);
     };
   }, [user?.id, currentScreen]);
 
@@ -102,12 +95,25 @@ const App: React.FC = () => {
     );
   }
 
+  // ROTEAMENTO BASEADO NO CARGO (ROLE)
+  const renderMainContent = () => {
+    if (!user) return null;
+    
+    // Se for motorista ou motoboy, carrega o portal mobile
+    if (user.role === 'driver' || user.role === 'motoboy') {
+      return <DriverPortal user={user} onLogout={handleLogout} />;
+    }
+    
+    // Caso contrário (admin/staff), carrega o dashboard administrativo
+    return <Dashboard user={user} onLogout={handleLogout} />;
+  };
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[#f8fafc]">
       {currentScreen === AppScreen.LOGIN ? (
         <LoginForm onLoginSuccess={handleLoginSuccess} />
       ) : (
-        user && <Dashboard user={user} onLogout={handleLogout} />
+        renderMainContent()
       )}
     </div>
   );
