@@ -63,6 +63,9 @@ export interface Notification {
     motorista?: string;
     cliente?: string;
     valor?: string;
+    porto?: string;
+    categoria?: string;
+    unidade?: string;
   };
 }
 
