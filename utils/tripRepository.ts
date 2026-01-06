@@ -52,9 +52,10 @@ export const tripRepository = {
     tara: d.tara,
     seal: d.seal,
     cva: d.cva,
-    customer: d.customer,
-    destination: d.destination,
-    driver: d.driver,
+    // Garante que customer e driver sejam objetos, mesmo que o Supabase os retorne como string (raro) ou null
+    customer: typeof d.customer === 'string' ? JSON.parse(d.customer) : (d.customer || {}),
+    destination: typeof d.destination === 'string' ? JSON.parse(d.destination) : d.destination,
+    driver: typeof d.driver === 'string' ? JSON.parse(d.driver) : (d.driver || {}),
     status: d.status,
     statusHistory: d.status_history || d.statusHistory || [],
     advancePayment: d.advance_payment || d.advancePayment || { status: 'BLOQUEADO' },

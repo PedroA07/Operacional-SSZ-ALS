@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Trip, Driver } from '../../types';
 import { db } from '../../utils/storage';
 import { timeUtils } from '../../utils/timeUtils';
@@ -27,13 +27,20 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         db.getDrivers()
       ]);
 
+      console.log("Debug Portal - user.driverId:", user.driverId);
+      
+      // Filtro robusto: Verifica o ID do motorista no snapshot da viagem
       const myTrips = allTrips
-        .filter(t => t.driver.id === user.driverId)
+        .filter(t => {
+           const tripDriverId = t.driver?.id;
+           return tripDriverId && user.driverId && String(tripDriverId) === String(user.driverId);
+        })
         .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
       
+      console.log("Debug Portal - Viagens filtradas:", myTrips.length);
       setTrips(myTrips);
 
-      const myData = allDrivers.find(d => d.id === user.driverId);
+      const myData = allDrivers.find(d => String(d.id) === String(user.driverId));
       if (myData) setDriver(myData);
     } catch (e) {
       console.error("Erro ao carregar portal:", e);
