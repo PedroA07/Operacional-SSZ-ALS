@@ -8,8 +8,8 @@ import SchedulingEditModal from './operations/SchedulingEditModal';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
-import OrdemColetaForm from '../forms/OrdemColetaForm';
-import PreStackingForm from '../forms/PreStackingForm';
+import OrdemColetaForm from './forms/OrdemColetaForm';
+import PreStackingForm from './forms/PreStackingForm';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
 interface OperationsTabProps {
@@ -118,9 +118,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setFilterTypes(['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM']);
     setFilterClientNames([]);
     setFilterDriverNames([]);
-    // Fix: Using correct state setter name filterStartDate
     setFilterStartDate('');
-    // Fix: Using correct state setter name filterEndDate
     setFilterEndDate('');
     setFilterCategory('TODAS');
   };
@@ -142,7 +140,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   return (
     <div className="space-y-6">
-      {/* CABEÇALHO COM BOTÕES DE AÇÃO RÁPIDA E NAVEGAÇÃO DE CATEGORIAS */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -166,7 +163,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
           </div>
         </div>
 
-        {/* NAVEGAÇÃO POR CATEGORIA MASTER - ATUALIZADA PARA NAVEGAR EM VEZ DE APENAS FILTRAR */}
         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
            <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Acesso Rápido por Categoria</h3>
            <div className="flex flex-wrap gap-3">

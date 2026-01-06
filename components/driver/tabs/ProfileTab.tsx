@@ -14,7 +14,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Sincronizamos os estados editáveis com o objeto 'driver' (Vindo direto do DB)
   const [editedPhoto, setEditedPhoto] = useState('');
   const [editedPhone, setEditedPhone] = useState('');
   const [editedEmail, setEditedEmail] = useState('');
@@ -50,7 +49,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
 
     if (success) {
       setIsEditing(false);
-      // Recarregamento para garantir consistência visual em todos os módulos
       setTimeout(() => window.location.reload(), 300); 
     } else {
       alert("Erro ao salvar alterações. Tente novamente.");
@@ -59,8 +57,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-16 px-1 flex flex-col">
-      {/* HEADER DO PERFIL - Puxando do cadastro direto do banco */}
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20 px-1 flex flex-col">
+      {/* HEADER DO PERFIL */}
       <div className="text-center space-y-4 pt-4">
          <div className="relative inline-block group">
             <div 
@@ -84,14 +82,12 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
                )}
             </div>
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
-            
             {!isEditing && (
               <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-emerald-500 rounded-2xl border-4 border-[#020617] flex items-center justify-center">
                  <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
               </div>
             )}
          </div>
-         
          <div>
             <h3 className="text-2xl font-black uppercase tracking-tight leading-tight px-4 truncate">{driver?.name || user.displayName}</h3>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
@@ -100,16 +96,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
          </div>
       </div>
 
-      {/* BLOCO DE DADOS CADASTRADOS (TABLE DRIVERS) */}
+      {/* BLOCO DE DADOS */}
       <div className="bg-slate-900/50 rounded-[2.5rem] border border-white/5 p-8 space-y-6 shadow-xl">
          <div className="flex justify-between border-b border-white/5 pb-5">
             <span className="text-[10px] font-black text-slate-500 uppercase">CPF OFICIAL</span>
             <span className="text-[11px] font-bold text-white font-mono">{driver?.cpf || '---'}</span>
          </div>
-
-         {/* TELEFONE DO DB */}
          <div className="flex flex-col border-b border-white/5 pb-5 gap-2">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contato Cadastrado</span>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contato</span>
             {isEditing ? (
               <input 
                 className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-blue-400 outline-none focus:border-blue-500"
@@ -120,10 +114,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
               <span className="text-[11px] font-black text-blue-500 font-mono uppercase">{driver?.phone || '---'}</span>
             )}
          </div>
-
-         {/* EMAIL DO DB */}
          <div className="flex flex-col border-b border-white/5 pb-5 gap-2">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">E-mail para Recibos</span>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">E-mail</span>
             {isEditing ? (
               <input 
                 className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-blue-500 lowercase"
@@ -135,54 +127,41 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
               <span className="text-[11px] font-black text-slate-400 font-mono lowercase truncate">{driver?.email || '---'}</span>
             )}
          </div>
-
          <div className="flex justify-between">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Acesso Portal</span>
-            <span className="text-[11px] font-black text-emerald-500 uppercase tracking-tighter">✓ Autenticado via CPF</span>
+            <span className="text-[11px] font-black text-emerald-500 uppercase tracking-tighter">✓ Autenticado</span>
          </div>
       </div>
 
-      {/* BOTÕES DE AÇÃO - Reposicionados para garantir visibilidade */}
-      <div className="space-y-4 px-2 pt-4">
+      {/* BOTÕES DE AÇÃO */}
+      <div className="space-y-4 px-2 mt-auto">
          {isEditing ? (
            <div className="grid grid-cols-2 gap-3">
-              <button 
-                onClick={() => setIsEditing(false)}
-                className="py-5 bg-slate-800 text-slate-400 rounded-3xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
-              >
-                Cancelar
-              </button>
-              <button 
-                disabled={isSaving}
-                onClick={handleSave}
-                className="py-5 bg-blue-600 text-white rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
+              <button onClick={() => setIsEditing(false)} className="py-5 bg-slate-800 text-slate-400 rounded-3xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Cancelar</button>
+              <button disabled={isSaving} onClick={handleSave} className="py-5 bg-blue-600 text-white rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
                 {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Confirmar'}
               </button>
            </div>
          ) : (
-           <button 
-            onClick={() => setIsEditing(true)}
-            className="w-full py-5 bg-white/5 text-white border border-white/10 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all"
-           >
+           <button onClick={() => setIsEditing(true)} className="w-full py-5 bg-white/5 text-white border border-white/10 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all">
              Gerenciar Cadastro
            </button>
          )}
 
-         <div className="pt-4 border-t border-white/5">
+         <div className="pt-4">
             <button 
               onClick={onLogout} 
-              className="w-full py-6 bg-red-500/10 text-red-500 border border-red-500/20 rounded-[2rem] text-[11px] font-black uppercase tracking-[0.2em] active:bg-red-600 active:text-white transition-all shadow-[0_15px_40px_rgba(239,68,68,0.2)] flex items-center justify-center gap-4 group"
+              className="w-full py-6 bg-red-500/20 text-red-500 border border-red-500/30 rounded-[2rem] text-[11px] font-black uppercase tracking-[0.2em] active:bg-red-600 active:text-white transition-all shadow-lg flex items-center justify-center gap-4"
             >
-              <svg className="w-5 h-5 group-active:scale-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Encerrar Sessão ALS
+              Encerrar Sessão
             </button>
          </div>
       </div>
       
-      <p className="text-[8px] text-slate-600 font-bold uppercase tracking-[0.4em] text-center pb-8">
+      <p className="text-[8px] text-slate-600 font-bold uppercase tracking-[0.4em] text-center pb-12 mt-4">
         ALS TRANSPORTES OPERACIONAL V4.0
       </p>
     </div>
