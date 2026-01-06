@@ -121,13 +121,19 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
 
     setIsSaving(true);
     try {
-      // Cria a cópia atualizada da viagem com as novas fotos
+      // 1. Busca a versão mais recente da viagem no banco para evitar conflito de dados
+      const allTrips = await db.getTrips();
+      const latestTrip = allTrips.find(t => t.id === trip.id);
+      
+      if (!latestTrip) throw new Error("Viagem não localizada no banco de dados.");
+
+      // 2. Concatena os documentos existentes com os novos documentos capturados
       const updatedTrip: Trip = {
-        ...trip,
-        driver_docs: [...(trip.driver_docs || []), ...finalDocs]
+        ...latestTrip,
+        driver_docs: [...(latestTrip.driver_docs || []), ...finalDocs]
       };
       
-      // Salva no banco de dados passando o usuário para garantir o sync e as notificações
+      // 3. Salva no banco de dados
       const saved = await db.saveTrip(updatedTrip, user);
       
       if (saved) {
@@ -144,9 +150,9 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       } else {
         throw new Error("Falha na persistência dos dados.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao salvar documentos:", err);
-      alert("Erro ao salvar as fotos. Verifique sua internet.");
+      alert(`Erro ao salvar as fotos: ${err.message || 'Verifique sua conexão'}`);
     } finally {
       setIsSaving(false);
     }

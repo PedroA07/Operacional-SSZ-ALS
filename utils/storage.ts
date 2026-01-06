@@ -156,7 +156,6 @@ export const db = {
     return true;
   },
 
-  // Fixed missing deleteStaff
   deleteStaff: async (id: string) => {
     if (supabase) { try { await staffRepository.delete(supabase, id); } catch (e) {} }
     const current = db._getLocal(KEYS.STAFF);
@@ -171,11 +170,17 @@ export const db = {
 
   saveTrip: async (trip: Trip, actingUser?: User) => {
     const oldTrip = db._getLocal(KEYS.TRIPS).find((t: any) => t.id === trip.id);
-    if (supabase) { try { await tripRepository.save(supabase, trip); } catch (e) {} }
+    
+    // CRÍTICO: Não engolimos mais o erro do Supabase
+    if (supabase) {
+       await tripRepository.save(supabase, trip);
+    }
+    
     const current = db._getLocal(KEYS.TRIPS);
     const idx = current.findIndex((t: Trip) => t.id === trip.id);
     if (idx >= 0) current[idx] = trip; else current.push(trip);
     db._saveLocal(KEYS.TRIPS, current);
+    
     if (actingUser) {
       const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse };
       if (!oldTrip) await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada.`, summary);
@@ -184,7 +189,6 @@ export const db = {
     return true;
   },
 
-  // Added missing deleteTrip method
   deleteTrip: async (id: string, actingUser?: User) => {
     const current = db._getLocal(KEYS.TRIPS);
     const trip = current.find((t: Trip) => t.id === id);
@@ -207,7 +211,6 @@ export const db = {
     return true;
   },
 
-  // Added missing deleteDriver method
   deleteDriver: async (id: string) => {
     if (supabase) {
       try { await driverRepository.delete(supabase, id); } catch (e) {}
@@ -245,7 +248,6 @@ export const db = {
     return db._getLocal(KEYS.CUSTOMERS);
   },
 
-  // Added missing saveCustomer method
   saveCustomer: async (customer: Customer, actingUser?: User) => {
     const isNew = !db._getLocal(KEYS.CUSTOMERS).some((c: any) => c.id === customer.id);
     if (supabase) { try { await supabase.from('customers').upsert(customer); } catch (e) {} }
@@ -257,7 +259,6 @@ export const db = {
     return true;
   },
 
-  // Added missing deleteCustomer method
   deleteCustomer: async (id: string) => {
     if (supabase) { try { await supabase.from('customers').delete().eq('id', id); } catch (e) {} }
     const current = db._getLocal(KEYS.CUSTOMERS);
@@ -270,7 +271,6 @@ export const db = {
     return db._getLocal(KEYS.PORTS);
   },
 
-  // Added missing savePort method
   savePort: async (port: Port, actingUser?: User) => {
     const isNew = !db._getLocal(KEYS.PORTS).some((p: any) => p.id === port.id);
     const payload = { ...port, legal_name: port.legalName };
@@ -283,7 +283,6 @@ export const db = {
     return true;
   },
 
-  // Added missing deletePort method
   deletePort: async (id: string) => {
     if (supabase) { try { await supabase.from('ports').delete().eq('id', id); } catch (e) {} }
     const current = db._getLocal(KEYS.PORTS);
@@ -296,7 +295,6 @@ export const db = {
     return db._getLocal(KEYS.CATEGORIES);
   },
 
-  // Added missing saveCategory method
   saveCategory: async (category: Category, actingUser?: User) => {
     if (supabase) { try { await supabase.from('categories').upsert(category); } catch (e) {} }
     const current = db._getLocal(KEYS.CATEGORIES);
@@ -312,20 +310,18 @@ export const db = {
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
-  // Added missing savePreStacking method
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
     const isNew = !db._getLocal(KEYS.PRE_STACKING).some((p: any) => p.id === ps.id);
     const payload = { ...ps, legal_name: ps.legalName };
     if (supabase) { try { await supabase.from('pre_stacking').upsert(payload); } catch (e) {} }
     const current = db._getLocal(KEYS.PRE_STACKING);
     const idx = current.findIndex((p: any) => p.id === ps.id);
-    if (idx >= 0) current[idx] = ps; else current.push(ps);
+    if (idx >= 0) current[idx] = ps; else current.push(idx);
     db._saveLocal(KEYS.PRE_STACKING, current);
     if (actingUser && isNew) await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `${ps.name} cadastrado.`, { unidade: ps.name });
     return true;
   },
 
-  // Added missing deletePreStacking method
   deletePreStacking: async (id: string) => {
     if (supabase) { try { await supabase.from('pre_stacking').delete().eq('id', id); } catch (e) {} }
     const current = db._getLocal(KEYS.PRE_STACKING);
@@ -351,7 +347,6 @@ export const db = {
     } catch { return false; }
   },
 
-  // Added missing backup methods
   exportBackup: async () => {
     const data = {
       drivers: await db.getDrivers(),
