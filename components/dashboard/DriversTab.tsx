@@ -21,6 +21,7 @@ interface DriversTabProps {
 const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDriver, onDeleteDriver, availableOps }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [isCnhModalOpen, setIsCnhModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   
@@ -30,6 +31,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+  const [currentCnhUrl, setCurrentCnhUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name_asc');
   const [statusFilter, setStatusFilter] = useState('todos');
@@ -85,6 +87,11 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   const handleOpenPreview = (d: Driver) => {
     setSelectedDriver(d);
     setIsPreviewModalOpen(true);
+  };
+
+  const handleViewCnh = (url: string) => {
+    setCurrentCnhUrl(url);
+    setIsCnhModalOpen(true);
   };
 
   const executeDelete = async () => {
@@ -294,7 +301,18 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                        <div className="space-y-1 mt-1">
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CPF: <span className="font-mono text-slate-800 font-bold">{d.cpf}</span></p>
                           <p className="text-[9px] font-black text-slate-500 uppercase leading-none">RG: <span className="font-mono text-slate-800 font-bold">{d.rg || '---'}</span></p>
-                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CNH: <span className="font-mono text-slate-800 font-bold">{d.cnh || '---'}</span></p>
+                          <div className="flex items-center justify-between gap-4">
+                             <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CNH: <span className="font-mono text-slate-800 font-bold">{d.cnh || '---'}</span></p>
+                             {d.cnhPdfUrl && (
+                               <button 
+                                 onClick={() => handleViewCnh(d.cnhPdfUrl!)} 
+                                 className="flex items-center gap-1.5 px-2 py-1 bg-red-50 text-red-600 rounded-lg border border-red-100 hover:bg-red-600 hover:text-white transition-all group/pdf shadow-sm"
+                               >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeWidth="2.5"/></svg>
+                                  <span className="text-[7px] font-black uppercase">Ver PDF</span>
+                               </button>
+                             )}
+                          </div>
                        </div>
                     </td>
                     <td className="px-6 py-4 max-w-[200px]">
@@ -352,7 +370,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
                       <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha do Portal"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Dossiê do Motorista"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Dossiê Digital"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
                       <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar Cadastro"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                     </td>
                   </tr>
@@ -362,6 +380,39 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
           </table>
         </div>
       </div>
+
+      {/* MODAL VISUALIZAÇÃO CNH PDF */}
+      {isCnhModalOpen && currentCnhUrl && (
+        <div className="fixed inset-0 z-[1000] bg-slate-950/90 backdrop-blur-xl flex flex-col animate-in fade-in duration-300">
+           <div className="h-20 bg-slate-900 flex items-center justify-between px-8 shrink-0 border-b border-white/5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-red-500 uppercase tracking-widest leading-none">Documento Original Digitalizado</p>
+                <p className="text-sm font-bold text-white uppercase truncate mt-1">Habilitação do Motorista (CNH)</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => window.open(currentCnhUrl, '_blank')}
+                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all active:scale-95"
+                >
+                  Abrir em Nova Guia
+                </button>
+                <button 
+                  onClick={() => setIsCnhModalOpen(false)}
+                  className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors"
+                >
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+                </button>
+              </div>
+           </div>
+           <div className="flex-1 bg-slate-800 p-6 flex items-center justify-center overflow-hidden">
+              <iframe 
+                src={`${currentCnhUrl}#toolbar=0&navpanes=0&scrollbar=1`} 
+                className="w-full max-w-5xl h-full rounded-[2rem] shadow-2xl border-none bg-white" 
+                title="CNH PDF Viewer" 
+              />
+           </div>
+        </div>
+      )}
 
       {/* MODAL REDEFINIR SENHA */}
       {isPasswordModalOpen && (
@@ -589,7 +640,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                  <div className="p-10 border-b border-slate-100">
                     <div className="w-20 h-20 bg-blue-600 text-white rounded-3xl flex items-center justify-center font-black italic text-2xl shadow-xl mb-6 shadow-blue-600/20">ALS</div>
                     <h3 className="text-xl font-black uppercase tracking-tighter text-slate-800">Dossiê Digital</h3>
-                    <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest leading-tight">Configurações de Visualização e Exportação PDF</p>
+                    <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest depth-tight">Ficha de Conferência Unificada</p>
                  </div>
                  
                  <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
