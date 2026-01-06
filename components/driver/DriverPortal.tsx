@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Trip, Driver } from '../../types';
-import { db } from '../../utils/storage';
 import { timeUtils } from '../../utils/timeUtils';
+import { driverService } from '../../utils/driverService';
 import HomeTab from './tabs/HomeTab';
 import TripsTab from './tabs/TripsTab';
 import DocsTab from './tabs/DocsTab';
@@ -20,38 +20,33 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [sessionTime, setSessionTime] = useState('00:00:00');
 
-  const loadData = useCallback(async () => {
+  const loadPortalData = useCallback(async () => {
+    if (!user.driverId) {
+      console.error("Usuário logado não possui vínculo com ID de motorista.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const [allTrips, allDrivers] = await Promise.all([
-        db.getTrips(),
-        db.getDrivers()
+      const [myTrips, myProfile] = await Promise.all([
+        driverService.getMyTrips(user.driverId),
+        driverService.getMyProfile(user.driverId)
       ]);
 
-      console.log("Debug Portal - user.driverId:", user.driverId);
-      
-      // Filtro robusto: Verifica o ID do motorista no snapshot da viagem
-      const myTrips = allTrips
-        .filter(t => {
-           const tripDriverId = t.driver?.id;
-           return tripDriverId && user.driverId && String(tripDriverId) === String(user.driverId);
-        })
-        .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
-      
-      console.log("Debug Portal - Viagens filtradas:", myTrips.length);
       setTrips(myTrips);
-
-      const myData = allDrivers.find(d => String(d.id) === String(user.driverId));
-      if (myData) setDriver(myData);
+      setDriver(myProfile);
     } catch (e) {
-      console.error("Erro ao carregar portal:", e);
+      console.error("Falha na sincronização do portal:", e);
     } finally {
       setIsLoading(false);
     }
   }, [user.driverId]);
 
   useEffect(() => {
-    loadData();
-    const syncInterval = setInterval(loadData, 30000);
+    loadPortalData();
+    // Refresh automático a cada 60 segundos para novas viagens
+    const syncInterval = setInterval(loadPortalData, 60000);
+    
     const clockInterval = setInterval(() => {
       setSessionTime(timeUtils.calculateDuration(user.lastLogin));
     }, 1000);
@@ -60,16 +55,26 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       clearInterval(syncInterval);
       clearInterval(clockInterval);
     };
-  }, [loadData, user.lastLogin]);
+  }, [loadPortalData, user.lastLogin]);
 
   if (isLoading) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617] text-white">
         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 animate-pulse">Sincronizando Frota ALS...</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 animate-pulse">Sincronizando Escala ALS...</p>
       </div>
     );
   }
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'inicio': return <HomeTab user={user} trips={trips} onRefresh={loadPortalData} />;
+      case 'viagens': return <TripsTab trips={trips} />;
+      case 'docs': return <DocsTab trips={trips} />;
+      case 'perfil': return <ProfileTab user={user} driver={driver} onLogout={onLogout} />;
+      default: return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col font-sans select-none pb-28">
@@ -80,7 +85,9 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{sessionTime}</p>
            </div>
-           <h1 className="text-xl font-black uppercase tracking-tight leading-none text-white">Olá, {user.displayName.split(' ')[0]}</h1>
+           <h1 className="text-xl font-black uppercase tracking-tight leading-none text-white truncate max-w-[200px]">
+             Olá, {user.displayName.split(' ')[0]}
+           </h1>
            <div className="flex items-center gap-3 mt-2">
               <div className="flex flex-col">
                 <span className="text-[7px] font-black text-blue-500 uppercase tracking-tighter">Cavalo</span>
@@ -100,10 +107,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
       {/* CONTEÚDO DINÂMICO */}
       <main className="flex-1 px-5 pt-8 overflow-y-auto custom-scrollbar">
-        {activeTab === 'inicio' && <HomeTab user={user} trips={trips} onRefresh={loadData} />}
-        {activeTab === 'viagens' && <TripsTab trips={trips} />}
-        {activeTab === 'docs' && <DocsTab trips={trips} />}
-        {activeTab === 'perfil' && <ProfileTab user={user} driver={driver} onLogout={onLogout} />}
+        {renderTabContent()}
       </main>
 
       {/* NAVEGAÇÃO INFERIOR */}
