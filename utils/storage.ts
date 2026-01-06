@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType } from '../types';
+import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
@@ -101,7 +101,8 @@ export const db = {
             position: u.position, staffId: u.staff_id, driverId: u.driver_id,
             status: u.status, isFirstLogin: u.isfirstlogin === true,
             lastSeen: u.last_seen, isOnlineVisible: u.is_online_visible ?? true,
-            isOnline: u.is_online ?? false, // Mapeamento do novo campo
+            isOnline: u.is_online ?? false,
+            presence_status: u.presence_status || 'offline',
             notificationPrefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true, newRegistrations: true }
           }));
           db._saveLocal(KEYS.USERS, mapped);
@@ -120,6 +121,7 @@ export const db = {
       driver_id: user.driverId, status: user.status, isfirstlogin: user.isFirstLogin === true,
       last_seen: user.lastSeen, is_online_visible: user.isOnlineVisible ?? true,
       is_online: (user as any).isOnline ?? false,
+      presence_status: user.presence_status || 'offline',
       notification_prefs: user.notificationPrefs
     };
     if (supabase) { try { await supabase.from('users').upsert(payload); } catch (e) {} }
@@ -130,12 +132,13 @@ export const db = {
     return true;
   },
 
-  updatePresence: async (userId: string, isOnline: boolean) => {
+  updatePresence: async (userId: string, status: PresenceStatus) => {
     if (supabase) {
       try {
         await supabase.from('users').update({ 
           last_seen: new Date().toISOString(), 
-          is_online: isOnline 
+          is_online: status !== 'offline',
+          presence_status: status
         }).eq('id', userId);
       } catch (e) {}
     }
@@ -379,7 +382,6 @@ const mapTripToDb = (trip: Trip) => ({
   category: trip.category, sub_category: trip.subCategory, status: trip.status, customer: trip.customer, destination: trip.destination,
   driver: trip.driver, status_history: trip.statusHistory, advance_payment: trip.advancePayment, balance_payment: trip.balancePayment,
   os_doc: trip.osDoc || null, agendamento_doc: trip.agendamentoDoc || null, completo_doc: trip.completoDoc || null, cte_doc: trip.cteDoc || null,
-  /* Fixed property name from cva_doc to cvaDoc on trip object */
   cva_doc: trip.cvaDoc || null, oc_form_data: trip.ocFormData, pre_stacking_form_data: trip.preStackingFormData || null, scheduling: trip.scheduling || null
 });
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppScreen, User } from './types';
+import { AppScreen, User, PresenceStatus } from './types';
 import LoginForm from './components/LoginForm';
 import Dashboard from './Dashboard';
 import { db } from './utils/storage';
@@ -23,7 +23,7 @@ const App: React.FC = () => {
           if (dbUser && dbUser.status !== 'Inativo') {
             setUser(dbUser);
             // Seta como online ao restaurar sessão
-            await db.updatePresence(dbUser.id, true);
+            await db.updatePresence(dbUser.id, 'online');
             sessionStorage.setItem('als_active_session', JSON.stringify(dbUser));
             setCurrentScreen(AppScreen.DASHBOARD);
           } else {
@@ -39,44 +39,62 @@ const App: React.FC = () => {
     initSession();
   }, []);
 
-  // Monitor de Status Online (Presença Real-time)
+  // Monitor de Presença (Online / Ausente / Offline)
   useEffect(() => {
     if (!user || currentScreen !== AppScreen.DASHBOARD) return;
 
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        db.updatePresence(user.id, true);
-      }
-    }, 15000);
-    
-    // Função para "zerar" a presença ao fechar o site ou aba
-    const handleUnload = () => {
-      // Usamos o navigator.sendBeacon se possível para chamadas de fechamento de aba
-      // Mas como updatePresence é assíncrona, fazemos o melhor esforço
-      db.updatePresence(user.id, false);
+    const updateStatus = async (status: PresenceStatus) => {
+      await db.updatePresence(user.id, status);
     };
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        updateStatus('away');
+      } else {
+        updateStatus('online');
+      }
+    };
+
+    const handleFocus = () => updateStatus('online');
+    const handleBlur = () => updateStatus('away');
+
+    const handleUnload = () => {
+      // Tentativa de marcar como offline ao fechar aba
+      // beforeunload e unload são restritos em navegadores modernos,
+      // mas o beacon ou uma chamada síncrona curta pode funcionar.
+      db.updatePresence(user.id, 'offline');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
     window.addEventListener('beforeunload', handleUnload);
-    window.addEventListener('unload', handleUnload);
+
+    // Heartbeat para manter o timer e status ativo no banco
+    const interval = setInterval(() => {
+      const currentStatus: PresenceStatus = document.hidden ? 'away' : 'online';
+      updateStatus(currentStatus);
+    }, 15000);
 
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
       window.removeEventListener('beforeunload', handleUnload);
-      window.removeEventListener('unload', handleUnload);
     };
   }, [user?.id, currentScreen]);
 
   const handleLoginSuccess = async (userData: User) => {
     setUser(userData);
-    await db.updatePresence(userData.id, true);
+    await db.updatePresence(userData.id, 'online');
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);
   };
 
   const handleLogout = async () => {
     if (user) {
-      // Marca como offline antes de sair para zerar os timers dos outros usuários imediatamente
-      await db.updatePresence(user.id, false);
+      await db.updatePresence(user.id, 'offline');
     }
     setUser(null);
     sessionStorage.removeItem('als_active_session');

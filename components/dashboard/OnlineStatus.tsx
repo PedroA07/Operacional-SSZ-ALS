@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Staff } from '../../types';
+import { User, Staff, PresenceStatus } from '../../types';
 import { db } from '../../utils/storage';
 import { timeUtils } from '../../utils/timeUtils';
 
@@ -27,9 +27,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
-    // Sincroniza a lista de usuários para pegar trocas de status
     const syncInterval = setInterval(fetchStatus, 8000);
-    // Relógio fluido
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,27 +44,24 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     };
   }, [fetchStatus]);
 
-  const getStatus = (user: User): 'ONLINE' | 'AUSENTE' | 'OFFLINE' => {
-    // 1. Prioridade para o campo is_online do banco
-    if (!(user as any).isOnline) return 'OFFLINE';
+  const getStatusInfo = (user: User) => {
+    const status = user.presence_status || 'offline';
+    
+    // Verificação de segurança: se o lastSeen for muito velho (> 45s), forçar offline
+    if (user.lastSeen) {
+      const lastSeenDate = new Date(user.lastSeen);
+      const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
+      if (diffSeconds > 45) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
+    }
 
-    // 2. Se is_online for true, mas o lastSeen for muito velho, o usuário provavelmente crashou
-    if (!user.lastSeen) return 'OFFLINE';
-    
-    const lastSeenDate = new Date(user.lastSeen);
-    const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
-    
-    if (diffSeconds > 60) return 'OFFLINE'; // Heartbeat falhou por mais de 1 min
-    if (diffSeconds > 25) return 'AUSENTE';
-    return 'ONLINE';
+    switch (status) {
+      case 'online': return { key: 'online', color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online' };
+      case 'away': return { key: 'away', color: 'bg-amber-500', text: 'text-amber-400', label: 'Ausente' };
+      default: return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
+    }
   };
 
-  const onlineUsersList = staffList.filter(s => {
-    const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
-    return u && getStatus(u) !== 'OFFLINE';
-  });
-
-  const onlineCount = onlineUsersList.length;
+  const onlineCount = users.filter(u => getStatusInfo(u).key !== 'offline').length;
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -84,9 +79,9 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
           </div>
           <div className="flex flex-col items-start text-left">
             <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${isOpen ? 'text-blue-400' : 'text-slate-100'}`}>
-              {onlineCount} Online agora
+              {onlineCount} Ativos agora
             </span>
-            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Sessões Ativas</span>
+            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Monitoramento de Turno</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform duration-500 ${isOpen ? 'rotate-180 text-blue-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -97,7 +92,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
           <div className="p-6 bg-[#0f172a] border-b border-white/5 flex justify-between items-center">
              <div className="flex flex-col">
                <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Colaboradores</h4>
-               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Tempo de Trabalho Hoje</p>
+               <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">Tempo de Conexão Individual</p>
              </div>
              <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
@@ -108,34 +103,28 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
           <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-[#0a0f1e]">
             {staffList.map(s => {
               const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
-              const status = u ? getStatus(u) : 'OFFLINE';
+              const info = u ? getStatusInfo(u) : { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Offline' };
               
-              if (status === 'OFFLINE') return null;
-
-              const config = {
-                ONLINE: { color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online' },
-                AUSENTE: { color: 'bg-amber-500', text: 'text-amber-400', label: 'Ausente' },
-                OFFLINE: { color: 'bg-slate-700', text: 'text-slate-500', label: 'Offline' }
-              }[status];
-
-              const displayTime = u ? timeUtils.calculateDuration(u.lastLogin) : '00:00:00';
+              const displayTime = (u && info.key !== 'offline') ? timeUtils.calculateDuration(u.lastLogin) : '00:00:00';
 
               return (
-                <div key={s.id} className="p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border bg-white/5 border-white/5 hover:bg-white/10">
+                <div key={s.id} className={`p-4 flex items-center gap-4 rounded-[1.8rem] transition-all duration-500 border ${info.key === 'offline' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}>
                   <div className="relative shrink-0">
-                    <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden flex items-center justify-center border border-white/10">
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden flex items-center justify-center border border-white/10 shadow-lg">
                       {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="text-xs font-black text-slate-600">{s.name.charAt(0)}</span>}
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-[3px] border-[#0a0f1e] ${config.color}`}></div>
+                    <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-[3px] border-[#0a0f1e] ${info.color}`}></div>
                   </div>
                   
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-black text-slate-100 uppercase truncate">{s.name}</p>
                     <div className="flex items-center justify-between mt-0.5">
-                      <p className={`text-[7px] font-black uppercase tracking-tighter ${config.text}`}>{config.label}</p>
-                      <div className="flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/10">
-                         <span className="text-[8px] font-mono font-black text-blue-400">{displayTime}</span>
-                      </div>
+                      <p className={`text-[7px] font-black uppercase tracking-tighter ${info.text}`}>{info.label}</p>
+                      {info.key !== 'offline' && (
+                        <div className="flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/10">
+                           <span className="text-[8px] font-mono font-black text-blue-400">{displayTime}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
