@@ -86,6 +86,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     if (!selectedTrip) return;
     const newEntry: StatusHistoryEntry = { status: tempStatus, dateTime: new Date(statusTime).toISOString() };
     const updatedTrip = { ...selectedTrip, status: tempStatus, statusTime: newEntry.dateTime, statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] };
+    // Passamos o actingUser para o saveTrip
     await db.saveTrip(updatedTrip, user);
     setIsStatusModalOpen(false);
     loadData();
@@ -110,7 +111,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     (url, title) => { setDocViewConfig({ url, title }); setIsDocViewerOpen(true); },
     (id) => onDeleteTrip?.(id),
     loadData,
-    (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); }
+    (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
+    user // Passamos o actingUser para a fábrica de colunas
   );
 
   const handleClearAllFilters = () => {
@@ -139,7 +141,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   return (
     <div className="space-y-6">
-      {/* CABEÇALHO COM BOTÕES DE AÇÃO RÁPIDA E NAVEGAÇÃO DE CATEGORIAS */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -163,7 +164,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
           </div>
         </div>
 
-        {/* NAVEGAÇÃO POR CATEGORIA MASTER */}
         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
            <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-2">Acesso Rápido por Categoria</h3>
            <div className="flex flex-wrap gap-3">

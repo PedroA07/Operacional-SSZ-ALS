@@ -59,13 +59,14 @@ export const db = {
     description: string, 
     summary?: Notification['summary']
   ) => {
+    const authorName = user.displayName || user.username || 'Sistema';
     const newNotif: Notification = {
       id: `notif-${Date.now()}`,
       title,
       description,
       type,
-      authorName: user.displayName,
-      authorId: user.id,
+      authorName: authorName,
+      authorId: user.id || 'system',
       timestamp: new Date().toISOString(),
       summary
     };
@@ -76,8 +77,8 @@ export const db = {
           title: newNotif.title,
           description: newNotif.description,
           type: newNotif.type,
-          author_name: newNotif.authorName,
-          author_id: newNotif.authorId,
+          author_name: authorName,
+          author_id: user.id,
           summary: newNotif.summary
         });
       } catch (e) {
@@ -85,15 +86,11 @@ export const db = {
       }
     }
 
-    // Salva local e emite evento para os componentes de UI (Toast e Sino)
     const current = db._getLocal(KEYS.NOTIFICATIONS);
     db._saveLocal(KEYS.NOTIFICATIONS, [newNotif, ...current].slice(0, 50));
-    
-    // Dispara evento global para o NotificationToast.tsx e NotificationCenter.tsx
     window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: newNotif }));
   },
 
-  // ... (Resto do arquivo permanece igual ao storage.ts original)
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
       try {
@@ -161,28 +158,43 @@ export const db = {
     if (idx >= 0) current[idx] = trip; else current.push(trip);
     db._saveLocal(KEYS.TRIPS, current);
 
-    if (actingUser && oldTrip && oldTrip.status !== trip.status) {
-      await db.addNotification(
-        actingUser, 
-        'STATUS_UPDATED', 
-        `Status Alterado: OS ${trip.os}`, 
-        `Viagem teve seu status alterado para "${trip.status}"`,
-        { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse }
-      );
+    if (actingUser) {
+      const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse };
+      
+      // Notificação de Status
+      if (oldTrip && oldTrip.status !== trip.status) {
+        await db.addNotification(actingUser, 'STATUS_UPDATED', `Status Alterado: ${trip.os}`, `Viagem movida para "${trip.status}"`, summary);
+      }
+      
+      // Notificação de Anexos (Dossiê)
+      if (oldTrip) {
+        if (!oldTrip.osDoc && trip.osDoc) await db.addNotification(actingUser, 'SYSTEM', `OS Anexada: ${trip.os}`, `O arquivo PDF da Ordem de Serviço foi vinculado.`, summary);
+        if (!oldTrip.agendamentoDoc && trip.agendamentoDoc) await db.addNotification(actingUser, 'SYSTEM', `Agendamento Vinculado: ${trip.os}`, `O comprovante de agendamento foi anexado.`, summary);
+        if (!oldTrip.completoDoc && trip.completoDoc) await db.addNotification(actingUser, 'SYSTEM', `Dossiê Finalizado: ${trip.os}`, `O documento completo da viagem foi anexado para faturamento.`, summary);
+      } else {
+        // Nova Viagem Criada Manualmente
+        await db.addNotification(actingUser, 'TRIP_CREATED', `Nova OS no Painel: ${trip.os}`, `Uma nova programação foi registrada manualmente.`, summary);
+      }
     }
     return true;
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
+    const isNew = !db._getLocal(KEYS.DRIVERS).some((d: any) => d.id === driver.id);
     if (supabase) { await driverRepository.save(supabase, driver); }
     const current = db._getLocal(KEYS.DRIVERS);
     const idx = current.findIndex((d: any) => d.id === driver.id);
     if (idx >= 0) current[idx] = driver; else current.push(driver);
     db._saveLocal(KEYS.DRIVERS, current);
+    
+    if (actingUser) {
+      await db.addNotification(actingUser, 'SYSTEM', isNew ? 'Novo Motorista' : 'Cadastro Atualizado', `O motorista ${driver.name} foi ${isNew ? 'cadastrado' : 'atualizado'} no sistema.`, { motorista: driver.name, placa: driver.plateHorse });
+    }
     return true;
   },
 
   saveCustomer: async (customer: Customer, actingUser?: User) => {
+    const isNew = !db._getLocal(KEYS.CUSTOMERS).some((c: any) => c.id === customer.id);
     if (supabase) { 
       const payload = { ...customer, legal_name: customer.legalName };
       delete (payload as any).legalName;
@@ -192,6 +204,10 @@ export const db = {
     const idx = current.findIndex((c: any) => c.id === customer.id);
     if (idx >= 0) current[idx] = customer; else current.push(customer);
     db._saveLocal(KEYS.CUSTOMERS, current);
+    
+    if (actingUser) {
+      await db.addNotification(actingUser, 'SYSTEM', isNew ? 'Novo Cliente' : 'Cliente Atualizado', `A empresa ${customer.legalName || customer.name} teve seus dados salvos.`, { cliente: customer.name });
+    }
     return true;
   },
 
@@ -205,6 +221,7 @@ export const db = {
     const idx = current.findIndex((p: any) => p.id === port.id);
     if (idx >= 0) current[idx] = port; else current.push(port);
     db._saveLocal(KEYS.PORTS, current);
+    if (actingUser) await db.addNotification(actingUser, 'SYSTEM', 'Porto/Local Salvo', `Localidade ${port.name} atualizada.`, { cliente: port.name });
     return true;
   },
 
@@ -218,6 +235,7 @@ export const db = {
     const idx = current.findIndex((p: any) => p.id === ps.id);
     if (idx >= 0) current[idx] = ps; else current.push(ps);
     db._saveLocal(KEYS.PRE_STACKING, current);
+    if (actingUser) await db.addNotification(actingUser, 'SYSTEM', 'Unidade Pré-Stacking', `Terminal ${ps.name} atualizado.`, { cliente: ps.name });
     return true;
   },
 

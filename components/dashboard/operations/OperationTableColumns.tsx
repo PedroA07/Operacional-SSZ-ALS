@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Trip, TripStatus, TripDocument } from '../../../types';
+import { Trip, TripStatus, TripDocument, User } from '../../../types';
 import { db } from '../../../utils/storage';
 
 export const getOperationTableColumns = (
@@ -11,7 +11,8 @@ export const getOperationTableColumns = (
   onViewDoc: (url: string, title: string) => void,
   onDeleteTrip: (id: string) => void,
   onRefreshData: () => void,
-  onEditScheduling: (t: Trip) => void
+  onEditScheduling: (t: Trip) => void,
+  actingUser: User // Novo parâmetro obrigatório
 ) => {
   
   const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,7 +46,8 @@ export const getOperationTableColumns = (
       else if (type === 'COMPLETO') updatedTrip.completoDoc = doc;
       
       try {
-        await db.saveTrip(updatedTrip);
+        // Agora passamos o actingUser para o saveTrip para disparar a notificação com autor
+        await db.saveTrip(updatedTrip, actingUser);
         onRefreshData();
         alert(`Documento vinculado com sucesso!`);
       } catch (err) {
@@ -66,7 +68,7 @@ export const getOperationTableColumns = (
     else if (type === 'COMPLETO') updatedTrip.completoDoc = undefined;
     
     try {
-      await db.saveTrip(updatedTrip);
+      await db.saveTrip(updatedTrip, actingUser);
       onRefreshData();
     } catch (err) {
       alert("Erro ao excluir do banco de dados.");
