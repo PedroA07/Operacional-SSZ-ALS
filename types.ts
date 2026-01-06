@@ -67,7 +67,6 @@ export interface Notification {
     porto?: string;
     categoria?: string;
     unidade?: string;
-    // Added 'fotos' property to support scanner notifications and fix type error in ScannerModal
     fotos?: string;
   };
 }
@@ -135,6 +134,7 @@ export interface DriverCapturedDoc {
   id: string;
   url: string;
   timestamp: string;
+  extractedKey?: string; // Novo: Chave de acesso extraída por IA
 }
 
 export interface Trip {
@@ -167,6 +167,8 @@ export interface Trip {
   freightContractDoc?: TripDocument;
   cteDoc?: TripDocument;
   cvaDoc?: TripDocument;
+  nfDoc?: TripDocument; // Novo: Documento PDF da NF
+  nfKey?: string; // Novo: Chave de acesso oficial vinculada à Trip
   ocFormData?: any;
   preStackingFormData?: any;
   scheduling?: TripScheduling;

@@ -6,6 +6,8 @@ import { db } from '../../../utils/storage';
 import { getOperationTableColumns } from './OperationTableColumns';
 import TripModal from './TripModal';
 import SchedulingEditModal from './SchedulingEditModal';
+// Added import for DriverDocsViewerModal to handle driver documents
+import DriverDocsViewerModal from './DriverDocsViewerModal';
 
 interface GenericOperationViewProps {
   user: User;
@@ -28,6 +30,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  // Added state to control the visibility of the driver documents viewer
+  const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   const [ports, setPorts] = useState<any[]>([]);
@@ -67,6 +71,12 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     loadLocalData();
   };
 
+  // Handler to open the driver documents viewer modal
+  const handleViewDriverDocs = (trip: Trip) => {
+    setSelectedTrip(trip);
+    setIsDriverDocsModalOpen(true);
+  };
+
   const filteredDrivers = drivers.filter(d => 
     d.operations.some(op => {
       const matchCat = op.category.toUpperCase() === categoryName.toUpperCase();
@@ -102,6 +112,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     { key: 'status', label: 'Status', render: (d: any) => (<span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>{d.status}</span>)}
   ];
 
+  // Added 11th argument handleViewDriverDocs to fix the "Expected 11 arguments, but got 10" error
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
@@ -111,7 +122,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     loadLocalData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
-    onLocateDriver
+    onLocateDriver,
+    handleViewDriverDocs
   );
 
   return (
@@ -167,6 +179,17 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
       <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadLocalData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} initialCustomer={type === 'client' ? customers.find(c => c.name === clientName) : undefined} />
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadLocalData} preStackingUnits={ports} />
+      
+      {/* DriverDocsViewerModal for viewing docs sent by drivers via their portal */}
+      {isDriverDocsModalOpen && selectedTrip && (
+        <DriverDocsViewerModal 
+          isOpen={isDriverDocsModalOpen}
+          onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }}
+          trip={selectedTrip}
+          user={user}
+          onSuccess={loadLocalData}
+        />
+      )}
     </div>
   );
 };

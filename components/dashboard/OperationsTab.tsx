@@ -5,6 +5,7 @@ import SmartOperationTable from './operations/SmartOperationTable';
 import { db } from '../../utils/storage';
 import TripModal from './operations/TripModal';
 import SchedulingEditModal from './operations/SchedulingEditModal';
+import DriverDocsViewerModal from './operations/DriverDocsViewerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
@@ -27,6 +28,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [trackedDriver, setTrackedDriver] = useState<Driver | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
@@ -76,8 +78,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       setTrackedDriver(found);
       setIsLocationModalOpen(true);
     } else {
-      alert("Motorista não localizado para rastreamento.");
+      alert("Motorista não localizado.");
     }
+  };
+
+  const handleViewDriverDocs = (trip: Trip) => {
+    setSelectedTrip(trip);
+    setIsDriverDocsModalOpen(true);
   };
 
   const filteredTrips = useMemo(() => {
@@ -101,7 +108,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     loadData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
-    handleLocateDriver
+    handleLocateDriver,
+    handleViewDriverDocs
   );
 
   if (activeView.type !== 'list') {
@@ -129,7 +137,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
           </button>
         </div>
 
-        {/* CARDS DE CATEGORIAS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
            {availableOps.map(op => (
              <button 
@@ -151,7 +158,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       
       <SmartOperationTable userId={user.id} componentId="ops-main-table" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
 
-      {/* VISUALIZADOR DE LOCALIZAÇÃO DO MOTORISTA */}
       {isLocationModalOpen && trackedDriver && (
         <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-5xl h-[85vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
@@ -163,7 +169,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                     <div>
                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Localização em Tempo Real</p>
                        <h3 className="text-lg font-black uppercase">{trackedDriver.name}</h3>
-                       <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Placa: {trackedDriver.plateHorse} | Visto em: {trackedDriver.lastLocationAt ? new Date(trackedDriver.lastLocationAt).toLocaleTimeString('pt-BR') : '---'}</p>
                     </div>
                  </div>
                  <button onClick={() => setIsLocationModalOpen(false)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
@@ -178,9 +183,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                    ></iframe>
                  ) : (
                    <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
-                      <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mb-6 text-slate-400"><svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2.5"/></svg></div>
                       <h4 className="text-xl font-black text-slate-800 uppercase">Sem Sinal de GPS</h4>
-                      <p className="text-slate-400 text-sm mt-3 max-w-md">O motorista ainda não autorizou ou não enviou coordenadas válidas pelo dispositivo móvel.</p>
                    </div>
                  )}
               </div>
@@ -190,6 +193,16 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
       <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} />
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadData} preStackingUnits={ports} />
+      
+      {isDriverDocsModalOpen && selectedTrip && (
+        <DriverDocsViewerModal 
+          isOpen={isDriverDocsModalOpen}
+          onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }}
+          trip={selectedTrip}
+          user={user}
+          onSuccess={loadData}
+        />
+      )}
 
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
