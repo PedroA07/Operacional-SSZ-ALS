@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
+import { tripRepository } from './tripRepository';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
@@ -160,7 +161,6 @@ export const db = {
     if (supabase) { 
       await staffRepository.save(supabase, staff);
     }
-    // Sincroniza também com a tabela de usuários se houver alteração de senha ou username
     const currentUsers = await db.getUsers();
     const linkedUser = currentUsers.find(u => u.staffId === staff.id);
     if (linkedUser) {
@@ -193,12 +193,9 @@ export const db = {
   getTrips: async (): Promise<Trip[]> => {
     if (supabase) {
       try {
-        const { data, error } = await supabase.from('trips').select('*').order('date_time', { ascending: false });
-        if (!error && data) {
-          const mapped = data.map(mapDbToTrip);
-          db._saveLocal(KEYS.TRIPS, mapped);
-          return mapped;
-        }
+        const t = await tripRepository.getAll(supabase);
+        db._saveLocal(KEYS.TRIPS, t);
+        return t;
       } catch (e) {}
     }
     return db._getLocal(KEYS.TRIPS);
@@ -209,7 +206,7 @@ export const db = {
 
     if (supabase) {
       try {
-        await supabase.from('trips').upsert(mapTripToDb(trip));
+        await tripRepository.save(supabase, trip);
       } catch (e) {}
     }
     
@@ -220,20 +217,21 @@ export const db = {
 
     if (actingUser) {
       const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse };
-      
       if (!oldTrip) {
         await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada no painel.`, summary);
-      } else {
-        if (oldTrip.status !== trip.status) {
-          await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status Atualizado', `Viagem OS ${trip.os} movida para "${trip.status}".`, summary);
-        }
-        if (oldTrip.advancePayment.status !== trip.advancePayment.status && trip.advancePayment.status === 'LIBERAR') {
-          await db.addNotification(actingUser, 'PAYMENT_LIBERATED', 'Adiantamento Liberado', `Pagamento de 70% autorizado para a OS ${trip.os}.`, summary);
-        }
-        if (oldTrip.balancePayment.status !== trip.balancePayment.status && trip.balancePayment.status === 'LIBERAR') {
-          await db.addNotification(actingUser, 'PAYMENT_LIBERATED', 'Saldo Liberado', `Pagamento final de 30% autorizado para a OS ${trip.os}.`, summary);
-        }
+      } else if (oldTrip.status !== trip.status) {
+        await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status Atualizado', `Viagem OS ${trip.os} movida para "${trip.status}".`, summary);
       }
+    }
+    return true;
+  },
+
+  deleteTrip: async (id: string, actingUser?: User) => {
+    const trip = db._getLocal(KEYS.TRIPS).find((t: any) => t.id === id);
+    if (supabase) { await tripRepository.delete(supabase, id); }
+    db._saveLocal(KEYS.TRIPS, db._getLocal(KEYS.TRIPS).filter((t: any) => t.id !== id));
+    if (actingUser && trip) {
+      await db.addNotification(actingUser, 'DELETED', 'OS Excluída', `A programação da OS ${trip.os} foi removida permanentemente.`, { os: trip.os });
     }
     return true;
   },
@@ -249,6 +247,17 @@ export const db = {
     if (actingUser && isNew) {
       await db.addNotification(actingUser, 'DRIVER_CREATED', 'Novo Motorista', `O motorista ${driver.name} foi cadastrado na base.`, { motorista: driver.name, placa: driver.plateHorse });
     }
+    return true;
+  },
+
+  getDrivers: async (): Promise<Driver[]> => {
+    if (supabase) { try { const d = await driverRepository.getAll(supabase); db._saveLocal(KEYS.DRIVERS, d); return d; } catch (e) {} }
+    return db._getLocal(KEYS.DRIVERS);
+  },
+
+  deleteDriver: async (id: string) => {
+    if (supabase) { try { await driverRepository.delete(supabase, id); } catch (e) {} }
+    db._saveLocal(KEYS.DRIVERS, db._getLocal(KEYS.DRIVERS).filter((d: any) => d.id !== id));
     return true;
   },
 
@@ -270,57 +279,6 @@ export const db = {
     return true;
   },
 
-  savePort: async (port: Port, actingUser?: User) => {
-    const isNew = !db._getLocal(KEYS.PORTS).some((p: any) => p.id === port.id);
-    if (supabase) { 
-      const payload = { ...port, legal_name: port.legalName };
-      delete (payload as any).legalName;
-      await supabase.from('ports').upsert(payload);
-    }
-    const current = db._getLocal(KEYS.PORTS);
-    const idx = current.findIndex((p: any) => p.id === port.id);
-    if (idx >= 0) current[idx] = port; else current.push(port);
-    db._saveLocal(KEYS.PORTS, current);
-    if (actingUser && isNew) await db.addNotification(actingUser, 'PORT_CREATED', 'Novo Porto', `Localidade ${port.name} cadastrada.`);
-    return true;
-  },
-
-  savePreStacking: async (ps: PreStacking, actingUser?: User) => {
-    const isNew = !db._getLocal(KEYS.PRE_STACKING).some((p: any) => p.id === ps.id);
-    if (supabase) { 
-      const payload = { ...ps, legal_name: ps.legalName };
-      delete (payload as any).legalName;
-      await supabase.from('pre_stacking').upsert(payload);
-    }
-    const current = db._getLocal(KEYS.PRE_STACKING);
-    const idx = current.findIndex((p: any) => p.id === ps.id);
-    if (idx >= 0) current[idx] = ps; else current.push(ps);
-    db._saveLocal(KEYS.PRE_STACKING, current);
-    if (actingUser && isNew) await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `Terminal ${ps.name} cadastrado.`);
-    return true;
-  },
-
-  deleteTrip: async (id: string, actingUser?: User) => {
-    const trip = db._getLocal(KEYS.TRIPS).find((t: any) => t.id === id);
-    if (supabase) { await supabase.from('trips').delete().eq('id', id); }
-    db._saveLocal(KEYS.TRIPS, db._getLocal(KEYS.TRIPS).filter((t: any) => t.id !== id));
-    if (actingUser && trip) {
-      await db.addNotification(actingUser, 'DELETED', 'OS Excluída', `A programação da OS ${trip.os} foi removida permanentemente.`, { os: trip.os });
-    }
-    return true;
-  },
-
-  getDrivers: async (): Promise<Driver[]> => {
-    if (supabase) { try { const d = await driverRepository.getAll(supabase); db._saveLocal(KEYS.DRIVERS, d); return d; } catch (e) {} }
-    return db._getLocal(KEYS.DRIVERS);
-  },
-
-  deleteDriver: async (id: string) => {
-    if (supabase) { try { await driverRepository.delete(supabase, id); } catch (e) {} }
-    db._saveLocal(KEYS.DRIVERS, db._getLocal(KEYS.DRIVERS).filter((d: any) => d.id !== id));
-    return true;
-  },
-
   getCustomers: async (): Promise<Customer[]> => {
     if (supabase) { try { const { data } = await supabase.from('customers').select('*'); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } } catch (e) {} }
     return db._getLocal(KEYS.CUSTOMERS);
@@ -335,6 +293,21 @@ export const db = {
   getPorts: async (): Promise<Port[]> => {
     if (supabase) { try { const { data } = await supabase.from('ports').select('*'); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PORTS);
+  },
+
+  savePort: async (port: Port, actingUser?: User) => {
+    const isNew = !db._getLocal(KEYS.PORTS).some((p: any) => p.id === port.id);
+    if (supabase) { 
+      const payload = { ...port, legal_name: port.legalName };
+      delete (payload as any).legalName;
+      await supabase.from('ports').upsert(payload);
+    }
+    const current = db._getLocal(KEYS.PORTS);
+    const idx = current.findIndex((p: any) => p.id === port.id);
+    if (idx >= 0) current[idx] = port; else current.push(port);
+    db._saveLocal(KEYS.PORTS, current);
+    if (actingUser && isNew) await db.addNotification(actingUser, 'PORT_CREATED', 'Novo Porto', `Localidade ${port.name} cadastrada.`);
+    return true;
   },
 
   deletePort: async (id: string) => {
@@ -361,6 +334,21 @@ export const db = {
   getPreStacking: async (): Promise<PreStacking[]> => {
     if (supabase) { try { const { data, error } = await supabase.from('pre_stacking').select('*'); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PRE_STACKING);
+  },
+
+  savePreStacking: async (ps: PreStacking, actingUser?: User) => {
+    const isNew = !db._getLocal(KEYS.PRE_STACKING).some((p: any) => p.id === ps.id);
+    if (supabase) { 
+      const payload = { ...ps, legal_name: ps.legalName };
+      delete (payload as any).legalName;
+      await supabase.from('pre_stacking').upsert(payload);
+    }
+    const current = db._getLocal(KEYS.PRE_STACKING);
+    const idx = current.findIndex((p: any) => p.id === ps.id);
+    if (idx >= 0) current[idx] = ps; else current.push(ps);
+    db._saveLocal(KEYS.PRE_STACKING, current);
+    if (actingUser && isNew) await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `Terminal ${ps.name} cadastrado.`);
+    return true;
   },
 
   deletePreStacking: async (id: string) => {
@@ -398,23 +386,3 @@ export const db = {
     try { const { error } = await supabase.from('users').select('count', { count: 'exact', head: true }).limit(1); return !error; } catch { return false; }
   }
 };
-
-const mapTripToDb = (trip: Trip) => ({
-  id: trip.id, os: trip.os, booking: trip.booking, ship: trip.ship, date_time: trip.dateTime, is_late: trip.isLate,
-  type: trip.type, container_type: trip.containerType || null, cva: trip.cva, container: trip.container, tara: trip.tara, seal: trip.seal,
-  category: trip.category, sub_category: trip.subCategory, status: trip.status, customer: trip.customer, destination: trip.destination,
-  driver: trip.driver, status_history: trip.statusHistory, advance_payment: trip.advancePayment, balance_payment: trip.balancePayment,
-  os_doc: trip.osDoc || null, agendamento_doc: trip.agendamentoDoc || null, completo_doc: trip.completoDoc || null, cte_doc: trip.cteDoc || null,
-  cva_doc: trip.cvaDoc || null, oc_form_data: trip.ocFormData, pre_stacking_form_data: trip.preStackingFormData || null, scheduling: trip.scheduling || null
-});
-
-const mapDbToTrip = (d: any): Trip => ({
-  id: d.id, os: d.os, booking: d.booking, ship: d.ship, dateTime: d.date_time || d.dateTime, isLate: d.is_late ?? d.isLate ?? false,
-  type: d.type, containerType: d.container_type || d.containerType, cva: d.cva, container: d.container, tara: d.tara, seal: d.seal,
-  category: d.category, subCategory: d.sub_category || d.subCategory, status: d.status, customer: d.customer, destination: d.destination,
-  driver: d.driver, statusHistory: d.status_history || d.statusHistory || [], advancePayment: d.advance_payment || d.advancePayment || { status: 'BLOQUEADO' },
-  balancePayment: d.balance_payment || d.balancePayment || { status: 'AGUARDANDO_DOCS' }, osDoc: d.os_doc || d.osDoc,
-  agendamentoDoc: d.agendamento_doc || d.agendamentoDoc, completoDoc: d.completo_doc || d.completoDoc, cteDoc: d.cte_doc || d.cteDoc,
-  cvaDoc: d.cva_doc || d.cvaDoc, ocFormData: d.oc_form_data || d.ocFormData, preStackingFormData: d.pre_stacking_form_data || d.preStackingFormData,
-  scheduling: d.scheduling || undefined
-});
