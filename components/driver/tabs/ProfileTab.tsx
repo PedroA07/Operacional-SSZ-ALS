@@ -72,7 +72,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-32">
       
       {/* CABEÇALHO DA FICHA */}
       <div className="text-center space-y-4">
@@ -161,10 +161,10 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
           </button>
         )}
 
-        <div className="pt-8">
+        <div className="pt-10">
           <button 
             onClick={onLogout} 
-            className="w-full py-7 bg-red-500/10 text-red-500 border border-red-500/20 rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.2em] active:bg-red-600 active:text-white transition-all shadow-2xl flex items-center justify-center gap-4 group"
+            className="w-full py-7 bg-red-600 text-white rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.2em] active:bg-red-700 active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 group"
           >
             <svg className="w-6 h-6 group-active:scale-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
