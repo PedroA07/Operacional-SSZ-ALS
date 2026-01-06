@@ -51,40 +51,40 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
       setIsEditing(false);
       setTimeout(() => window.location.reload(), 300); 
     } else {
-      alert("Falha ao salvar. Tente novamente.");
+      alert("Falha ao atualizar dados.");
     }
     setIsSaving(false);
   };
 
-  const DataRow = ({ label, value, highlight = false, mono = false }: any) => (
+  const DataField = ({ label, value, highlight = false, mono = false }: any) => (
     <div className="flex flex-col border-b border-white/5 pb-4 last:border-0 last:pb-0">
-      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{label}</span>
-      <span className={`text-[13px] font-black uppercase ${highlight ? 'text-blue-500' : 'text-slate-100'} ${mono ? 'font-mono tracking-tight' : ''}`}>
+      <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{label}</span>
+      <span className={`text-[13px] font-black uppercase ${highlight ? 'text-blue-500' : 'text-slate-100'} ${mono ? 'font-mono' : ''}`}>
         {value || '---'}
       </span>
     </div>
   );
 
   if (!driver) return (
-    <div className="flex flex-col items-center justify-center py-20 text-slate-600 uppercase font-black text-[10px] tracking-widest">
-      Sincronizando perfil...
+    <div className="flex flex-col items-center justify-center py-20 text-slate-600 font-black text-[10px] uppercase">
+      Puxando ficha cadastral...
     </div>
   );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
       
-      {/* HEADER DE PERFIL COM FOTO EDITÁVEL */}
+      {/* CABEÇALHO DA FICHA */}
       <div className="text-center space-y-4">
         <div className="relative inline-block">
             <div 
               onClick={() => isEditing && fileInputRef.current?.click()}
-              className={`w-32 h-32 rounded-[3rem] bg-slate-900 border border-white/10 mx-auto overflow-hidden shadow-2xl transition-all ${isEditing ? 'ring-4 ring-blue-600 scale-105 cursor-pointer' : 'ring-4 ring-white/5'}`}
+              className={`w-32 h-32 rounded-[2.8rem] bg-slate-900 border border-white/10 mx-auto overflow-hidden shadow-2xl transition-all ${isEditing ? 'ring-4 ring-blue-600 scale-105 cursor-pointer' : 'ring-4 ring-white/5'}`}
             >
               {(isEditing ? editedPhoto : (driver.photo || user.photo)) ? (
                 <img src={isEditing ? editedPhoto : (driver.photo || user.photo)} className="w-full h-full object-cover" alt="" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-blue-500 font-black text-5xl italic">
+                <div className="w-full h-full flex items-center justify-center text-blue-500 font-black text-4xl italic">
                   {driver.name[0]}
                 </div>
               )}
@@ -97,28 +97,28 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
         </div>
         <div>
-            <h3 className="text-2xl font-black uppercase tracking-tighter text-white px-4 leading-tight">{driver.name}</h3>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em] mt-1.5">Motorista Parceiro ALS</p>
+            <h3 className="text-2xl font-black uppercase tracking-tighter text-white px-6 leading-tight">{driver.name}</h3>
+            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.4em] mt-2">Motorista Oficial ALS</p>
         </div>
       </div>
 
-      {/* DADOS CADASTRAIS (PADRÃO OPERACIONAL) */}
-      <div className="bg-slate-900/60 rounded-[2.5rem] border border-white/5 p-8 space-y-6 shadow-2xl">
+      {/* DADOS CADASTRAIS (ESTILO RH/CADASTRO) */}
+      <div className="bg-slate-900/60 rounded-[2.5rem] border border-white/5 p-8 space-y-6 shadow-2xl backdrop-blur-sm">
         <div className="grid grid-cols-2 gap-8">
-           <DataRow label="CPF" value={driver.cpf} mono />
-           <DataRow label="RG" value={driver.rg} mono />
+           <DataField label="CPF" value={driver.cpf} mono />
+           <DataField label="RG" value={driver.rg} mono />
         </div>
 
-        <DataRow label="Registro CNH" value={driver.cnh} mono />
+        <DataField label="Documento CNH" value={driver.cnh} mono />
 
         <div className="grid grid-cols-2 gap-8">
-           <DataRow label="Placa Cavalo" value={driver.plateHorse} highlight mono />
-           <DataRow label="Ano Modelo" value={driver.yearHorse} mono />
+           <DataField label="Cavalo" value={driver.plateHorse} highlight mono />
+           <DataField label="Ano Modelo" value={driver.yearHorse} mono />
         </div>
 
         <div className="pt-2 space-y-4 border-t border-white/5">
-            <div className="space-y-1.5">
-                <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest block mb-1">Celular para Contato</span>
+            <div className="space-y-1">
+                <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest block mb-1">Telefone Celular</span>
                 {isEditing ? (
                   <input 
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-blue-400 outline-none focus:border-blue-500 transition-all"
@@ -126,12 +126,12 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
                     onChange={e => setEditedPhone(maskPhone(e.target.value))}
                   />
                 ) : (
-                  <span className="text-[16px] font-black text-white font-mono tracking-tight">{driver.phone || '---'}</span>
+                  <span className="text-[15px] font-black text-white font-mono">{driver.phone || '---'}</span>
                 )}
             </div>
 
-            <div className="space-y-1.5">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">E-mail Cadastrado</span>
+            <div className="space-y-1">
+                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block mb-1">E-mail Cadastrado</span>
                 {isEditing ? (
                   <input 
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:border-blue-500 lowercase transition-all"
@@ -152,19 +152,19 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
           <div className="grid grid-cols-2 gap-4">
               <button onClick={() => setIsEditing(false)} className="py-5 bg-slate-800 text-slate-400 rounded-3xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Cancelar</button>
               <button disabled={isSaving} onClick={handleSave} className="py-5 bg-blue-600 text-white rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
-                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Confirmar Alterações'}
+                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Confirmar'}
               </button>
           </div>
         ) : (
-          <button onClick={() => setIsEditing(true)} className="w-full py-6 bg-white/5 text-white border border-white/10 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all shadow-lg">
-            Editar Cadastro
+          <button onClick={() => setIsEditing(true)} className="w-full py-6 bg-white/5 text-white border border-white/10 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all shadow-lg">
+            Editar Meus Contatos
           </button>
         )}
 
         <div className="pt-8">
           <button 
             onClick={onLogout} 
-            className="w-full py-7 bg-red-500/10 text-red-500 border border-red-500/20 rounded-[2.8rem] text-[12px] font-black uppercase tracking-[0.3em] active:bg-red-600 active:text-white transition-all shadow-2xl flex items-center justify-center gap-4 group"
+            className="w-full py-7 bg-red-500/10 text-red-500 border border-red-500/20 rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.2em] active:bg-red-600 active:text-white transition-all shadow-2xl flex items-center justify-center gap-4 group"
           >
             <svg className="w-6 h-6 group-active:scale-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
