@@ -4,13 +4,14 @@ import { Trip, User } from '../../types';
 import { db } from '../../utils/storage';
 import AdvanceSubTab from './admin/AdvanceSubTab';
 import BalanceSubTab from './admin/BalanceSubTab';
+import FreightContractsSubTab from './admin/FreightContractsSubTab';
 
 interface AdminTabProps {
   user: User;
 }
 
 const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'advance' | 'balance'>('advance');
+  const [activeSubTab, setActiveSubTab] = useState<'advance' | 'balance' | 'contracts'>('advance');
   const [trips, setTrips] = useState<Trip[]>([]);
 
   const loadData = async () => {
@@ -21,14 +22,14 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
   useEffect(() => { loadData(); }, []);
 
   const handleUpdate = async (updated: Trip) => {
-    await db.saveTrip(updated);
+    await db.saveTrip(updated, user);
     loadData();
   };
 
   const stats = {
     pendingAdvances: trips.filter(t => t.advancePayment?.status !== 'PAGO' && t.advancePayment?.status !== 'LIBERAR').length,
     pendingBalances: trips.filter(t => t.advancePayment?.status === 'LIBERAR' || t.advancePayment?.status === 'PAGO').filter(t => t.balancePayment?.status !== 'PAGO' && t.balancePayment?.status !== 'LIBERAR').length,
-    blockedBalances: trips.filter(t => (t.advancePayment?.status === 'LIBERAR' || t.advancePayment?.status === 'PAGO') && !t.documents?.some(d => d.type === 'COMPLETO')).length
+    pendingContracts: trips.filter(t => t.status === 'Viagem concluída' && (t.balancePayment?.status === 'LIBERAR' || t.balancePayment?.status === 'PAGO') && !t.freightContractDoc).length
   };
 
   return (
@@ -37,7 +38,7 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="space-y-6">
             <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Painel Administrativo</h2>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3">
               <button 
                 onClick={() => setActiveSubTab('advance')}
                 className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'advance' ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
@@ -49,6 +50,12 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
                 className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'balance' ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
               >
                 Saldos Finais (30%)
+              </button>
+              <button 
+                onClick={() => setActiveSubTab('contracts')}
+                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'contracts' ? 'bg-blue-600 text-white shadow-xl' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+              >
+                Contratos de Frete
               </button>
             </div>
           </div>
@@ -62,20 +69,23 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
                <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Fila Saldo</p>
                <p className="text-3xl font-black text-indigo-700">{stats.pendingBalances}</p>
             </div>
-            <div className="bg-red-50 p-6 rounded-3xl border border-red-100 text-center">
-               <p className="text-[8px] font-black text-red-400 uppercase tracking-widest mb-1">Docs Pendentes</p>
-               <p className="text-3xl font-black text-red-700">{stats.blockedBalances}</p>
+            <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
+               <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-1">Contratos Pend.</p>
+               <p className="text-3xl font-black text-emerald-700">{stats.pendingContracts}</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="bg-white p-10 rounded-[3.5rem] border border-slate-200 shadow-sm min-h-[400px]">
-        {activeSubTab === 'advance' ? (
+        {activeSubTab === 'advance' && (
           <AdvanceSubTab userId={user.id} trips={trips} onUpdate={handleUpdate} />
-        ) : (
-          // Só mostra na aba de saldos viagens que já liberaram o adiantamento
+        )}
+        {activeSubTab === 'balance' && (
           <BalanceSubTab userId={user.id} trips={trips.filter(t => t.advancePayment?.status === 'LIBERAR' || t.advancePayment?.status === 'PAGO')} onUpdate={handleUpdate} />
+        )}
+        {activeSubTab === 'contracts' && (
+          <FreightContractsSubTab userId={user.id} trips={trips} onUpdate={handleUpdate} />
         )}
       </div>
     </div>

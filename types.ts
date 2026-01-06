@@ -46,7 +46,8 @@ export type NotificationType =
   | 'DELETED'
   | 'OC_GENERATED'
   | 'LIBERACAO_GENERATED'
-  | 'MINUTA_GENERATED';
+  | 'MINUTA_GENERATED'
+  | 'CONTRACT_UPLOADED';
 
 export interface Notification {
   id: string;
@@ -105,7 +106,7 @@ export interface PaymentStatus {
 
 export interface TripDocument {
   id: string;
-  type: 'CTE' | 'COMPLETO' | 'NF' | 'OC' | 'MINUTA' | 'OS_PDF' | 'AGENDAMENTO' | 'CVA';
+  type: 'CTE' | 'COMPLETO' | 'NF' | 'OC' | 'MINUTA' | 'OS_PDF' | 'AGENDAMENTO' | 'CVA' | 'CONTRATO_FRETE';
   url: string;
   fileName: string;
   uploadDate: string;
@@ -151,6 +152,7 @@ export interface Trip {
   osDoc?: TripDocument;
   agendamentoDoc?: TripDocument;
   completoDoc?: TripDocument;
+  freightContractDoc?: TripDocument; // Novo campo específico
   cteDoc?: TripDocument;
   cvaDoc?: TripDocument;
   ocFormData?: any;

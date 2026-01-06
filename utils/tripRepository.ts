@@ -29,6 +29,7 @@ export const tripRepository = {
     os_doc: trip.osDoc || null,
     agendamento_doc: trip.agendamentoDoc || null,
     completo_doc: trip.completoDoc || null,
+    freight_contract_doc: trip.freightContractDoc || null, // Mapeamento para DB
     cte_doc: trip.cteDoc || null,
     cva_doc: trip.cvaDoc || null,
     oc_form_data: trip.ocFormData || null,
@@ -52,7 +53,6 @@ export const tripRepository = {
     tara: d.tara,
     seal: d.seal,
     cva: d.cva,
-    // Garante que customer e driver sejam objetos, mesmo que o Supabase os retorne como string (raro) ou null
     customer: typeof d.customer === 'string' ? JSON.parse(d.customer) : (d.customer || {}),
     destination: typeof d.destination === 'string' ? JSON.parse(d.destination) : d.destination,
     driver: typeof d.driver === 'string' ? JSON.parse(d.driver) : (d.driver || {}),
@@ -63,6 +63,7 @@ export const tripRepository = {
     osDoc: d.os_doc || d.osDoc,
     agendamentoDoc: d.agendamento_doc || d.agendamentoDoc,
     completoDoc: d.completo_doc || d.completoDoc,
+    freightContractDoc: d.freight_contract_doc || d.freightContractDoc, // Mapeamento do DB
     cteDoc: d.cte_doc || d.cteDoc,
     cvaDoc: d.cva_doc || d.cvaDoc,
     ocFormData: d.oc_form_data || d.ocFormData,
