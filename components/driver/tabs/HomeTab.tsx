@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Trip, User, TripStatus } from '../../../types';
 import { driverService } from '../../../utils/driverService';
 import ScannerModal from '../ScannerModal';
@@ -41,6 +41,13 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     setIsUpdating(false);
   };
 
+  // Funções estabilizadas para o ScannerModal não piscar
+  const handleOpenScanner = useCallback(() => setIsScannerOpen(true), []);
+  const handleCloseScanner = useCallback(() => setIsScannerOpen(false), []);
+  const handleScannerSuccess = useCallback(async () => {
+    await onRefresh();
+  }, [onRefresh]);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-24">
       
@@ -67,7 +74,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
               {/* BOTAO SCANNER DE NOTAS */}
               <button 
-                onClick={() => setIsScannerOpen(true)}
+                onClick={handleOpenScanner}
                 className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl flex items-center justify-center gap-4 border border-white/10 shadow-xl active:scale-95 transition-all group"
               >
                 <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center text-white group-active:scale-110 transition-transform">
@@ -148,8 +155,8 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       {isScannerOpen && activeTrip && (
         <ScannerModal 
           isOpen={isScannerOpen}
-          onClose={() => setIsScannerOpen(false)}
-          onSuccess={onRefresh}
+          onClose={handleCloseScanner}
+          onSuccess={handleScannerSuccess}
           trip={activeTrip}
           user={user}
         />
