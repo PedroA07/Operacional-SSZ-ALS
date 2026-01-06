@@ -53,7 +53,7 @@ export const driverService = {
   /**
    * Atualiza os dados de contato e foto do motorista
    */
-  async updateProfile(driverId: string, data: { photo?: string; phone?: string; email?: string }): Promise<boolean> {
+  async updateProfile(driverId: string, data: Partial<Driver>): Promise<boolean> {
     try {
       const allDrivers = await db.getDrivers();
       const currentDriver = allDrivers.find(d => d.id === driverId);
@@ -62,21 +62,21 @@ export const driverService = {
 
       const updatedDriver = {
         ...currentDriver,
-        photo: data.photo || currentDriver.photo,
-        phone: data.phone || currentDriver.phone,
-        email: data.email || currentDriver.email
+        ...data,
+        name: currentDriver.name, // Mantém o nome inalterado por segurança de vínculo
       };
 
       // Salva usando o gerenciador central que lida com Sync
       await db.saveDriver(updatedDriver);
 
-      // Sincroniza foto no registro de usuário para o cabeçalho
+      // Sincroniza foto e campos básicos no registro de usuário para o cabeçalho
       const allUsers = await db.getUsers();
       const linkedUser = allUsers.find(u => u.driverId === driverId);
       if (linkedUser) {
         await db.saveUser({
           ...linkedUser,
-          photo: data.photo || linkedUser.photo
+          photo: data.photo || linkedUser.photo,
+          displayName: currentDriver.name // Garante que o nome exibido esteja certo
         });
       }
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Driver } from '../../../types';
-import { maskPhone, maskCPF } from '../../../utils/masks';
+import { maskPhone, maskCPF, maskRG, maskPlate } from '../../../utils/masks';
 import { driverService } from '../../../utils/driverService';
 
 interface ProfileTabProps {
@@ -14,15 +14,34 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  const [editedPhoto, setEditedPhoto] = useState('');
-  const [editedPhone, setEditedPhone] = useState('');
-  const [editedEmail, setEditedEmail] = useState('');
+  // Estados para edição expandida
+  const [editForm, setEditForm] = useState({
+    photo: '',
+    phone: '',
+    email: '',
+    cpf: '',
+    rg: '',
+    cnh: '',
+    plateHorse: '',
+    plateTrailer: '',
+    yearHorse: '',
+    yearTrailer: ''
+  });
 
   useEffect(() => {
     if (driver) {
-      setEditedPhoto(driver.photo || '');
-      setEditedPhone(driver.phone || '');
-      setEditedEmail(driver.email || '');
+      setEditForm({
+        photo: driver.photo || '',
+        phone: driver.phone || '',
+        email: driver.email || '',
+        cpf: driver.cpf || '',
+        rg: driver.rg || '',
+        cnh: driver.cnh || '',
+        plateHorse: driver.plateHorse || '',
+        plateTrailer: driver.plateTrailer || '',
+        yearHorse: driver.yearHorse || '',
+        yearTrailer: driver.yearTrailer || ''
+      });
     }
   }, [driver]);
   
@@ -32,7 +51,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setEditedPhoto(reader.result as string);
+      reader.onloadend = () => setEditForm(prev => ({ ...prev, photo: reader.result as string }));
       reader.readAsDataURL(file);
     }
   };
@@ -41,11 +60,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
     if (!driver) return;
     setIsSaving(true);
     
-    const success = await driverService.updateProfile(driver.id, {
-      photo: editedPhoto,
-      phone: editedPhone,
-      email: editedEmail
-    });
+    const success = await driverService.updateProfile(driver.id, editForm);
 
     if (success) {
       setIsEditing(false);
@@ -56,12 +71,21 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
     setIsSaving(false);
   };
 
-  const DataField = ({ label, value, highlight = false, mono = false }: any) => (
+  const DataField = ({ label, value, highlight = false, mono = false, editing = false, onChange = () => {}, type = "text", mask = (v:string) => v }: any) => (
     <div className="flex flex-col border-b border-white/5 pb-4 last:border-0 last:pb-0">
       <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{label}</span>
-      <span className={`text-[13px] font-black uppercase ${highlight ? 'text-blue-500' : 'text-slate-100'} ${mono ? 'font-mono' : ''}`}>
-        {value || '---'}
-      </span>
+      {editing ? (
+        <input 
+          type={type}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold text-blue-400 outline-none focus:border-blue-500 transition-all uppercase"
+          value={value}
+          onChange={e => onChange(mask(e.target.value))}
+        />
+      ) : (
+        <span className={`text-[13px] font-black uppercase ${highlight ? 'text-blue-500' : 'text-slate-100'} ${mono ? 'font-mono' : ''}`}>
+          {value || '---'}
+        </span>
+      )}
     </div>
   );
 
@@ -81,8 +105,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
               onClick={() => isEditing && fileInputRef.current?.click()}
               className={`w-32 h-32 rounded-[2.8rem] bg-slate-900 border border-white/10 mx-auto overflow-hidden shadow-2xl transition-all ${isEditing ? 'ring-4 ring-blue-600 scale-105 cursor-pointer' : 'ring-4 ring-white/5'}`}
             >
-              {(isEditing ? editedPhoto : (driver.photo || user.photo)) ? (
-                <img src={isEditing ? editedPhoto : (driver.photo || user.photo)} className="w-full h-full object-cover" alt="" />
+              {(isEditing ? editForm.photo : (driver.photo || user.photo)) ? (
+                <img src={isEditing ? editForm.photo : (driver.photo || user.photo)} className="w-full h-full object-cover" alt="" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-blue-500 font-black text-4xl italic">
                   {driver.name[0]}
@@ -102,18 +126,52 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
         </div>
       </div>
 
-      {/* DADOS CADASTRAIS (ESTILO RH/CADASTRO) */}
+      {/* DADOS CADASTRAIS */}
       <div className="bg-slate-900/60 rounded-[2.5rem] border border-white/5 p-8 space-y-6 shadow-2xl backdrop-blur-sm">
         <div className="grid grid-cols-2 gap-8">
-           <DataField label="CPF" value={driver.cpf} mono />
-           <DataField label="RG" value={driver.rg} mono />
+           <DataField 
+             label="CPF" 
+             value={isEditing ? editForm.cpf : driver.cpf} 
+             mono 
+             editing={isEditing} 
+             mask={maskCPF}
+             onChange={(v:string) => setEditForm({...editForm, cpf: v})}
+           />
+           <DataField 
+             label="RG" 
+             value={isEditing ? editForm.rg : driver.rg} 
+             mono 
+             editing={isEditing} 
+             mask={maskRG}
+             onChange={(v:string) => setEditForm({...editForm, rg: v})}
+           />
         </div>
 
-        <DataField label="Documento CNH" value={driver.cnh} mono />
+        <DataField 
+          label="Documento CNH" 
+          value={isEditing ? editForm.cnh : driver.cnh} 
+          mono 
+          editing={isEditing} 
+          onChange={(v:string) => setEditForm({...editForm, cnh: v})}
+        />
 
         <div className="grid grid-cols-2 gap-8">
-           <DataField label="Cavalo" value={driver.plateHorse} highlight mono />
-           <DataField label="Ano Modelo" value={driver.yearHorse} mono />
+           <DataField 
+             label="Placa Cavalo" 
+             value={isEditing ? editForm.plateHorse : driver.plateHorse} 
+             highlight mono 
+             editing={isEditing}
+             mask={maskPlate}
+             onChange={(v:string) => setEditForm({...editForm, plateHorse: v})}
+           />
+           <DataField 
+             label="Placa Carreta" 
+             value={isEditing ? editForm.plateTrailer : driver.plateTrailer} 
+             highlight mono 
+             editing={isEditing}
+             mask={maskPlate}
+             onChange={(v:string) => setEditForm({...editForm, plateTrailer: v})}
+           />
         </div>
 
         <div className="pt-2 space-y-4 border-t border-white/5">
@@ -122,8 +180,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
                 {isEditing ? (
                   <input 
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-blue-400 outline-none focus:border-blue-500 transition-all"
-                    value={editedPhone}
-                    onChange={e => setEditedPhone(maskPhone(e.target.value))}
+                    value={editForm.phone}
+                    onChange={e => setEditForm({...editForm, phone: maskPhone(e.target.value)})}
                   />
                 ) : (
                   <span className="text-[15px] font-black text-white font-mono">{driver.phone || '---'}</span>
@@ -136,8 +194,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
                   <input 
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold text-white outline-none focus:border-blue-500 lowercase transition-all"
                     type="email"
-                    value={editedEmail}
-                    onChange={e => setEditedEmail(e.target.value)}
+                    value={editForm.email}
+                    onChange={e => setEditForm({...editForm, email: e.target.value})}
                   />
                 ) : (
                   <span className="text-xs font-bold text-slate-400 lowercase block truncate">{driver.email || '---'}</span>
@@ -157,7 +215,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
           </div>
         ) : (
           <button onClick={() => setIsEditing(true)} className="w-full py-6 bg-white/5 text-white border border-white/10 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all shadow-lg">
-            Editar Meus Contatos
+            Editar Meu Cadastro
           </button>
         )}
 

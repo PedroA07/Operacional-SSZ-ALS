@@ -17,6 +17,7 @@ const ALL_STATUSES: TripStatus[] = [
 
 const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
 
   // Viagem Ativa: Primeira que não está concluída ou cancelada
   const activeTrip = useMemo(() => {
@@ -31,6 +32,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     setIsUpdating(true);
     const success = await driverService.updateTripStatus(trip, nextStatus, user);
     if (success) {
+      setShowPicker(false);
       await onRefresh();
     } else {
       alert("Erro ao conectar. Verifique seu sinal.");
@@ -64,13 +66,13 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 </div>
               </div>
 
-              {/* BLOCO DE AGENDAMENTO */}
-              <div className="bg-emerald-500/5 rounded-3xl p-5 border border-emerald-500/10 space-y-2">
-                <div className="flex justify-between items-center">
-                  <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Agendamento Terminal</p>
-                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                </div>
-                {activeTrip.scheduling ? (
+              {/* BLOCO DE AGENDAMENTO CONDICIONAL */}
+              {activeTrip.scheduling && (
+                <div className="bg-emerald-500/5 rounded-3xl p-5 border border-emerald-500/10 space-y-2 animate-in zoom-in-95">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Agendamento Terminal</p>
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                  </div>
                   <div className="flex flex-col gap-1">
                     <p className="text-sm font-black text-white uppercase truncate">{activeTrip.scheduling.location}</p>
                     <div className="flex items-center gap-3">
@@ -79,46 +81,45 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                        <span className="text-[13px] font-black text-emerald-400">{new Date(activeTrip.scheduling.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-[10px] font-bold text-slate-600 uppercase italic">Aguardando definição do operacional...</p>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* SELEÇÃO DE ETAPA ATUAL */}
+              {/* POSIÇÃO ATUAL E BOTÃO DE ALTERAR */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 px-1">
-                  <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
-                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Atualize sua posição agora:</p>
+                <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between">
+                  <div>
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sua Posição</p>
+                    <p className="text-lg font-black uppercase text-blue-400 mt-1">{activeTrip.status}</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowPicker(!showPicker)}
+                    className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border ${showPicker ? 'bg-blue-600 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-slate-300'}`}
+                  >
+                    {showPicker ? 'Fechar' : 'Atualizar'}
+                  </button>
                 </div>
                 
-                <div className="grid grid-cols-1 gap-2.5">
-                  {ALL_STATUSES.map((status) => {
-                    const isCurrent = activeTrip.status === status;
-                    return (
-                      <button 
-                        key={status}
-                        disabled={isUpdating}
-                        onClick={() => handleUpdateStatus(activeTrip, status)}
-                        className={`w-full py-4.5 px-6 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-between border ${
-                          isCurrent 
-                          ? 'bg-blue-600 border-blue-500 text-white shadow-lg ring-4 ring-blue-600/20' 
-                          : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 active:scale-95'
-                        }`}
-                      >
-                        <span>{status}</span>
-                        {isCurrent && (
-                          <div className="flex items-center gap-2">
-                             <span className="text-[8px] opacity-70">ATUAL</span>
-                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-                          </div>
-                        )}
-                        {!isCurrent && isUpdating && (
-                          <div className="w-3 h-3 border-2 border-slate-600 border-t-slate-400 rounded-full animate-spin"></div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                {showPicker && (
+                  <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 duration-300">
+                    {ALL_STATUSES.map((status) => {
+                      const isCurrent = activeTrip.status === status;
+                      return (
+                        <button 
+                          key={status}
+                          disabled={isUpdating || isCurrent}
+                          onClick={() => handleUpdateStatus(activeTrip, status)}
+                          className={`py-6 px-4 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all border flex items-center justify-center text-center ${
+                            isCurrent 
+                            ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 opacity-50 cursor-default' 
+                            : 'bg-white/5 border-white/5 text-slate-400 active:scale-95 active:bg-blue-600 active:text-white'
+                          }`}
+                        >
+                          {status}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -132,7 +133,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
         )}
       </section>
 
-      {/* RODAPÉ TÉCNICO */}
       <div className="pt-4 pb-8">
         <p className="text-[8px] text-slate-800 font-bold uppercase tracking-[0.5em] text-center">
           ALS TRANSPORTES OPERACIONAL V4.0
