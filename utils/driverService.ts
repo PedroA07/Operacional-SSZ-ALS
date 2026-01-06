@@ -51,6 +51,42 @@ export const driverService = {
   },
 
   /**
+   * Atualiza os dados de contato e foto do motorista
+   */
+  async updateProfile(driverId: string, data: { photo?: string; phone?: string; email?: string }): Promise<boolean> {
+    if (!supabase) return false;
+    
+    try {
+      // 1. Atualiza a tabela de motoristas
+      const { error: driverError } = await supabase
+        .from('drivers')
+        .update({
+          photo: data.photo,
+          phone: data.phone,
+          email: data.email
+        })
+        .eq('id', driverId);
+
+      if (driverError) throw driverError;
+
+      // 2. Atualiza a tabela de usuários para sincronizar a foto no cabeçalho do portal
+      const { error: userError } = await supabase
+        .from('users')
+        .update({
+          photo: data.photo
+        })
+        .eq('driver_id', driverId);
+
+      if (userError) throw userError;
+
+      return true;
+    } catch (e) {
+      console.error("Erro ao atualizar perfil:", e);
+      return false;
+    }
+  },
+
+  /**
    * Atualiza o status de uma viagem em tempo real
    */
   async updateTripStatus(trip: Trip, nextStatus: any, actingUser: any): Promise<boolean> {
@@ -69,7 +105,6 @@ export const driverService = {
 
     try {
       await tripRepository.save(supabase, updatedTrip);
-      // Opcional: Adicionar notificação para a central
       return true;
     } catch (e) {
       console.error("Erro ao atualizar status da viagem:", e);
