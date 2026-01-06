@@ -383,8 +383,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
 
       {/* MODAL VISUALIZAÇÃO CNH PDF */}
       {isCnhModalOpen && currentCnhUrl && (
-        <div className="fixed inset-0 z-[1000] bg-slate-950/90 backdrop-blur-xl flex flex-col animate-in fade-in duration-300">
-           <div className="h-20 bg-slate-900 flex items-center justify-between px-8 shrink-0 border-b border-white/5">
+        <div className="fixed inset-0 z-[1000] bg-transparent flex flex-col animate-in fade-in duration-300">
+           <div className="h-20 bg-slate-900/95 flex items-center justify-between px-8 shrink-0 border-b border-white/5 shadow-2xl">
               <div className="min-w-0">
                 <p className="text-[10px] font-black text-red-500 uppercase tracking-widest leading-none">Documento Original Digitalizado</p>
                 <p className="text-sm font-bold text-white uppercase truncate mt-1">Habilitação do Motorista (CNH)</p>
@@ -404,7 +404,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                 </button>
               </div>
            </div>
-           <div className="flex-1 bg-slate-800 p-6 flex items-center justify-center overflow-hidden">
+           <div className="flex-1 bg-slate-800/40 p-6 flex items-center justify-center overflow-hidden">
               <iframe 
                 src={`${currentCnhUrl}#toolbar=0&navpanes=0&scrollbar=1`} 
                 className="w-full max-w-5xl h-full rounded-[2rem] shadow-2xl border-none bg-white" 
@@ -416,7 +416,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
 
       {/* MODAL REDEFINIR SENHA */}
       {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-transparent">
            <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 text-center space-y-6">
                  <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
@@ -447,7 +447,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
 
       {/* MODAL CADASTRO / EDIÇÃO */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-transparent">
           <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="font-black text-slate-800 text-lg uppercase">{editingId ? 'Editar Cadastro' : 'Novo Motorista'}</h3>
@@ -632,7 +632,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
 
       {/* MODAL DE VISUALIZAÇÃO DE DOSSIÊ (VIEW PROFILE) */}
       {isPreviewModalOpen && selectedDriver && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-2xl animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-transparent animate-in fade-in duration-300">
            <div className="bg-slate-100 w-full max-w-[1400px] h-full rounded-[4rem] shadow-2xl overflow-hidden flex animate-in zoom-in-95 border border-white/10">
               
               {/* Painel Lateral de Controle e Info Rápida */}
@@ -677,18 +677,48 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                  </div>
               </div>
 
-              {/* Área do Documento (Ficha) */}
-              <div className="flex-1 overflow-auto bg-slate-200/50 p-12 flex justify-center custom-scrollbar">
-                 <div className="origin-top transform scale-90 xl:scale-100 shadow-[0_40px_100px_rgba(0,0,0,0.1)] rounded-sm overflow-hidden bg-white">
+              {/* Área do Documento (Ficha e CNH) */}
+              <div className="flex-1 overflow-auto bg-slate-200/50 p-12 flex flex-col items-center gap-12 custom-scrollbar">
+                 <div className="origin-top transform scale-90 xl:scale-100 shadow-[0_40px_100px_rgba(0,0,0,0.1)] rounded-sm overflow-hidden bg-white shrink-0">
                     <DriverProfileTemplate driver={selectedDriver} visibility={visibility} />
                  </div>
+
+                 {/* ANEXO CNH PDF INTEGRADO NO DOSSIÊ */}
+                 {selectedDriver.cnhPdfUrl && (
+                   <div className="w-full max-w-[794px] h-[1123px] bg-white shadow-2xl rounded-xl overflow-hidden flex flex-col shrink-0 animate-in slide-in-from-bottom-10 duration-700">
+                      <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
+                         <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
+                               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeWidth="2.5"/></svg>
+                            </div>
+                            <div>
+                               <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Anexo Vinculado</p>
+                               <h4 className="text-sm font-black uppercase">Documento CNH Digitalizado</h4>
+                            </div>
+                         </div>
+                         <button 
+                           onClick={() => window.open(selectedDriver.cnhPdfUrl, '_blank')}
+                           className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-[9px] font-black uppercase transition-all"
+                         >
+                           Imprimir CNH
+                         </button>
+                      </div>
+                      <div className="flex-1 bg-slate-100 relative">
+                         <iframe 
+                           src={`${selectedDriver.cnhPdfUrl}#toolbar=0&navpanes=0`} 
+                           className="w-full h-full border-none"
+                           title="Dossie CNH Attachment"
+                         />
+                      </div>
+                   </div>
+                 )}
               </div>
            </div>
         </div>
       )}
 
       {isDeleteModalOpen && itemToDelete && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-transparent">
            <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 text-center space-y-6">
                  <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner">

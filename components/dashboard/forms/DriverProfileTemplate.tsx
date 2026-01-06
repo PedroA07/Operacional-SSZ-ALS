@@ -88,9 +88,9 @@ const DriverProfileTemplate: React.FC<DriverProfileTemplateProps> = ({ driver, v
                      <p style={{ fontSize: '13px', fontWeight: 'bold' }}>{driver.cnh || '---'}</p>
                   </div>
                   {driver.cnhPdfUrl && (
-                     <div style={{ backgroundColor: '#ecfdf5', padding: '4px 10px', borderRadius: '6px', border: '1px solid #10b981', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <div style={{ width: '6px', height: '6px', backgroundColor: '#10b981', borderRadius: '50%' }}></div>
-                        <span style={{ fontSize: '8px', fontWeight: 900, color: '#047857' }}>PDF DA CNH ANEXADO AO SISTEMA</span>
+                     <div style={{ backgroundColor: '#ecfdf5', padding: '6px 12px', borderRadius: '8px', border: '1.5px solid #10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
+                        <span style={{ fontSize: '9px', fontWeight: 900, color: '#047857', letterSpacing: '0.5px' }}>CNH ANEXADA NO DOSSIÊ DIGITAL</span>
                      </div>
                   )}
                </div>
