@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
@@ -8,7 +9,9 @@ let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
 
 try {
+  // @ts-ignore
   SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+  // @ts-ignore
   SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 } catch (e) {
   console.warn("Ambiente não suporta import.meta.env");
@@ -29,12 +32,16 @@ export const KEYS = {
   NOTIFICATIONS: 'als_notifications'
 };
 
-// Utilitário para forçar um timeout em chamadas de rede
-const withTimeout = (promise: Promise<any>, ms: number = 3500) => {
+/**
+ * Utilitário para forçar um timeout em chamadas de rede.
+ * Aumentado para 10 segundos (10000ms) para evitar erros de 'Connection terminated' 
+ * quando o banco de dados está em modo de economia ou processando queries pesadas.
+ */
+const withTimeout = <T>(promise: Promise<T> | any, ms: number = 10000): Promise<T> => {
   return Promise.race([
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_REDE')), ms))
-  ]);
+  ]) as Promise<T>;
 };
 
 export const db = {
@@ -51,7 +58,9 @@ export const db = {
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
       try {
-        const { data, error } = await withTimeout(supabase.from('users').select('*'));
+        // Correção do erro TS2345: garantindo que a query seja tratada como Promise
+        // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
+        const { data, error } = await withTimeout<any>(supabase.from('users').select('*'));
         if (!error && data) {
           const mapped = data.map(u => ({
             id: u.id, 
@@ -99,7 +108,8 @@ export const db = {
   getNotifications: async (): Promise<Notification[]> => {
     if (supabase) {
       try {
-        const { data, error } = await withTimeout(supabase
+        // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
+        const { data, error } = await withTimeout<any>(supabase
           .from('notifications')
           .select('id, user_id, user_name, type, origin, message, os_ref, timestamp, summary')
           .order('timestamp', { ascending: false })
@@ -163,7 +173,6 @@ export const db = {
   updatePresence: async (userId: string, status: PresenceStatus) => {
     if (supabase) {
       try {
-        // Sem timeout aqui para não travar a main thread
         await supabase.from('users').update({ 
           lastseen: new Date().toISOString(),
           presence_status: status
@@ -173,7 +182,8 @@ export const db = {
   },
 
   getStaff: async (): Promise<Staff[]> => {
-    if (supabase) { try { const s = await withTimeout(staffRepository.getAll(supabase)); db._saveLocal(KEYS.STAFF, s); return s; } catch (e) {} }
+    // Fix: added Staff[] generic to withTimeout to match staffRepository.getAll return type
+    if (supabase) { try { const s = await withTimeout<Staff[]>(staffRepository.getAll(supabase)); db._saveLocal(KEYS.STAFF, s); return s; } catch (e) {} }
     return db._getLocal(KEYS.STAFF);
   },
 
@@ -201,7 +211,8 @@ export const db = {
   },
 
   getTrips: async (): Promise<Trip[]> => {
-    if (supabase) { try { const t = await withTimeout(tripRepository.getAll(supabase), 5000); db._saveLocal(KEYS.TRIPS, t); return t; } catch (e) {} }
+    // Fix: added Trip[] generic to withTimeout to match tripRepository.getAll return type
+    if (supabase) { try { const t = await withTimeout<Trip[]>(tripRepository.getAll(supabase), 15000); db._saveLocal(KEYS.TRIPS, t); return t; } catch (e) {} }
     return db._getLocal(KEYS.TRIPS);
   },
 
@@ -240,7 +251,6 @@ export const db = {
     return true;
   },
 
-  // Fix: Added deleteDriver method to handle driver deletion
   deleteDriver: async (id: string) => {
     if (supabase) { try { await withTimeout(driverRepository.delete(supabase, id)); } catch (e) {} }
     const current = db._getLocal(KEYS.DRIVERS);
@@ -249,11 +259,11 @@ export const db = {
   },
 
   getDrivers: async (): Promise<Driver[]> => {
-    if (supabase) { try { const d = await withTimeout(driverRepository.getAll(supabase)); db._saveLocal(KEYS.DRIVERS, d); return d; } catch (e) {} }
+    // Fix: added Driver[] generic to withTimeout to match driverRepository.getAll return type
+    if (supabase) { try { const d = await withTimeout<Driver[]>(driverRepository.getAll(supabase)); db._saveLocal(KEYS.DRIVERS, d); return d; } catch (e) {} }
     return db._getLocal(KEYS.DRIVERS);
   },
 
-  // Fix: Added updateDriverLocation to persist GPS coordinates from the driver portal
   updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
     const now = new Date().toISOString();
     if (supabase) {
@@ -274,7 +284,8 @@ export const db = {
   },
 
   getCustomers: async (): Promise<Customer[]> => {
-    if (supabase) { try { const { data } = await withTimeout(supabase.from('customers').select('*')); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } } catch (e) {} }
+    // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
+    if (supabase) { try { const { data } = await withTimeout<any>(supabase.from('customers').select('*')); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } } catch (e) {} }
     return db._getLocal(KEYS.CUSTOMERS);
   },
 
@@ -287,7 +298,6 @@ export const db = {
     return true;
   },
 
-  // Fix: Added deleteCustomer to handle customer record removal
   deleteCustomer: async (id: string) => {
     if (supabase) { try { await withTimeout(supabase.from('customers').delete().eq('id', id)); } catch (e) {} }
     const current = db._getLocal(KEYS.CUSTOMERS);
@@ -296,7 +306,8 @@ export const db = {
   },
 
   getPorts: async (): Promise<Port[]> => {
-    if (supabase) { try { const { data } = await withTimeout(supabase.from('ports').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
+    // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
+    if (supabase) { try { const { data } = await withTimeout<any>(supabase.from('ports').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PORTS);
   },
 
@@ -310,7 +321,6 @@ export const db = {
     return true;
   },
 
-  // Fix: Added deletePort to handle port/terminal record removal
   deletePort: async (id: string) => {
     if (supabase) { try { await withTimeout(supabase.from('ports').delete().eq('id', id)); } catch (e) {} }
     const current = db._getLocal(KEYS.PORTS);
@@ -319,11 +329,11 @@ export const db = {
   },
 
   getCategories: async (): Promise<Category[]> => {
-    if (supabase) { try { const { data } = await withTimeout(supabase.from('categories').select('*')); if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; } } catch (e) {} }
+    // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
+    if (supabase) { try { const { data } = await withTimeout<any>(supabase.from('categories').select('*')); if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; } } catch (e) {} }
     return db._getLocal(KEYS.CATEGORIES);
   },
 
-  // Fix: Added saveCategory to allow dynamic category creation
   saveCategory: async (category: Category, actingUser?: User) => {
     if (supabase) { try { await withTimeout(supabase.from('categories').upsert(category)); } catch (e) {} }
     const current = db._getLocal(KEYS.CATEGORIES);
@@ -337,7 +347,8 @@ export const db = {
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
-    if (supabase) { try { const { data } = await withTimeout(supabase.from('pre_stacking').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
+    // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
+    if (supabase) { try { const { data } = await withTimeout<any>(supabase.from('pre_stacking').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
@@ -351,7 +362,6 @@ export const db = {
     return true;
   },
 
-  // Fix: Added deletePreStacking to handle pre-stacking unit record removal
   deletePreStacking: async (id: string) => {
     if (supabase) { try { await withTimeout(supabase.from('pre_stacking').delete().eq('id', id)); } catch (e) {} }
     const current = db._getLocal(KEYS.PRE_STACKING);
@@ -372,7 +382,8 @@ export const db = {
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try { 
-      const { error } = await withTimeout(supabase.from('users').select('count', { count: 'exact', head: true }).limit(1), 2000); 
+      // Fix: added generic type 'any' to withTimeout for proper inference of Supabase query response
+      const { error } = await withTimeout<any>(supabase.from('users').select('count', { count: 'exact', head: true }).limit(1), 5000); 
       return !error; 
     } catch { return false; }
   },
