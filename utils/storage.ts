@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
@@ -32,10 +31,6 @@ export const KEYS = {
   NOTIFICATIONS: 'als_notifications'
 };
 
-/**
- * Utilitário de Timeout robusto.
- * Tempo aumentado para 30s para suportar uploads de PDFs e fotos via Supabase Storage em redes instáveis.
- */
 const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 30000): Promise<T> => {
   return Promise.race([
     Promise.resolve(promise),
@@ -75,7 +70,7 @@ export const db = {
             lastSeen: u.lastseen,
             isOnlineVisible: u.isonlinevisible ?? true,
             presence_status: u.presence_status || 'offline',
-            notification_prefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true, newRegistrations: true }
+            notificationPrefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true, newRegistrations: true }
           }));
           db._saveLocal(KEYS.USERS, mapped);
           return mapped;
@@ -113,7 +108,7 @@ export const db = {
           
         if (!error && data) {
           const mapped: Notification[] = data.map(n => ({
-            id: n.id, 
+            id: String(n.id), 
             title: n.type.replace(/_/g, ' '), 
             description: n.message, 
             type: n.type as NotificationType,
@@ -174,6 +169,26 @@ export const db = {
           presence_status: status
         }).eq('id', userId);
       } catch (e) {}
+    }
+  },
+
+  // Fix: Added updateDriverLocation method to update GPS coordinates in both Supabase and Local Storage to satisfy DriverPortal requirement
+  updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
+    const now = new Date().toISOString();
+    if (supabase) {
+      try {
+        await supabase.from('drivers').update({ 
+          current_lat: lat,
+          current_lng: lng,
+          last_location_at: now
+        }).eq('id', driverId);
+      } catch (e) {}
+    }
+    const current = db._getLocal(KEYS.DRIVERS);
+    const idx = current.findIndex((d: any) => d.id === driverId);
+    if (idx >= 0) {
+      current[idx] = { ...current[idx], currentLat: lat, currentLng: lng, lastLocationAt: now };
+      db._saveLocal(KEYS.DRIVERS, current);
     }
   },
 
@@ -257,32 +272,23 @@ export const db = {
     return db._getLocal(KEYS.DRIVERS);
   },
 
-  updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
-    const now = new Date().toISOString();
-    if (supabase) {
-      try {
-        await supabase.from('drivers').update({
-          current_lat: lat,
-          current_lng: lng,
-          last_location_at: now
-        }).eq('id', driverId);
-      } catch (e) {}
-    }
-    const current = db._getLocal(KEYS.DRIVERS);
-    const idx = current.findIndex((d: any) => d.id === driverId);
-    if (idx >= 0) {
-      current[idx] = { ...current[idx], currentLat: lat, currentLng: lng, lastLocationAt: now };
-      db._saveLocal(KEYS.DRIVERS, current);
-    }
-  },
-
   getCustomers: async (): Promise<Customer[]> => {
-    if (supabase) { try { const { data } = await withTimeout(supabase.from('customers').select('*')); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } } catch (e) {} }
+    if (supabase) { 
+      try { 
+        const { data } = await withTimeout(supabase.from('customers').select('*')); 
+        if (data) { 
+          const mapped = data.map(c => ({ ...c, legalName: c.legal_name, zipCode: c.zip_code })) as Customer[];
+          db._saveLocal(KEYS.CUSTOMERS, mapped); 
+          return mapped; 
+        } 
+      } catch (e) {} 
+    }
     return db._getLocal(KEYS.CUSTOMERS);
   },
 
   saveCustomer: async (customer: Customer, actingUser?: User) => {
-    if (supabase) { try { await withTimeout(supabase.from('customers').upsert(customer)); } catch (e) {} }
+    const payload = { ...customer, legal_name: customer.legalName, zip_code: customer.zipCode };
+    if (supabase) { try { await withTimeout(supabase.from('customers').upsert(payload)); } catch (e) {} }
     const current = db._getLocal(KEYS.CUSTOMERS);
     const idx = current.findIndex((c: any) => c.id === customer.id);
     if (idx >= 0) current[idx] = customer; else current.push(customer);
@@ -298,12 +304,12 @@ export const db = {
   },
 
   getPorts: async (): Promise<Port[]> => {
-    if (supabase) { try { const { data } = await withTimeout(supabase.from('ports').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('ports').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name, zipCode: d.zip_code })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PORTS);
   },
 
   savePort: async (port: Port, actingUser?: User) => {
-    const payload = { ...port, legal_name: port.legalName };
+    const payload = { ...port, legal_name: port.legalName, zip_code: port.zipCode };
     if (supabase) { try { await withTimeout(supabase.from('ports').upsert(payload)); } catch (e) {} }
     const current = db._getLocal(KEYS.PORTS);
     const idx = current.findIndex((p: any) => p.id === port.id);
@@ -320,12 +326,13 @@ export const db = {
   },
 
   getCategories: async (): Promise<Category[]> => {
-    if (supabase) { try { const { data } = await withTimeout(supabase.from('categories').select('*')); if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; } } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('categories').select('*')); if (data) { const mapped = data.map(c => ({ ...c, parentId: c.parent_id })) as Category[]; db._saveLocal(KEYS.CATEGORIES, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.CATEGORIES);
   },
 
   saveCategory: async (category: Category, actingUser?: User) => {
-    if (supabase) { try { await withTimeout(supabase.from('categories').upsert(category)); } catch (e) {} }
+    const payload = { ...category, parent_id: category.parentId };
+    if (supabase) { try { await withTimeout(supabase.from('categories').upsert(payload)); } catch (e) {} }
     const current = db._getLocal(KEYS.CATEGORIES);
     const idx = current.findIndex((c: any) => c.id === category.id);
     if (idx >= 0) current[idx] = category; else current.push(category);
@@ -334,12 +341,12 @@ export const db = {
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
-    if (supabase) { try { const { data } = await withTimeout(supabase.from('pre_stacking').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('pre_stacking').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name, zipCode: d.zip_code })) as PreStacking[]; db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
-    const payload = { ...ps, legal_name: ps.legalName };
+    const payload = { ...ps, legal_name: ps.legalName, zip_code: ps.zipCode };
     if (supabase) { try { await withTimeout(supabase.from('pre_stacking').upsert(payload)); } catch (e) {} }
     const current = db._getLocal(KEYS.PRE_STACKING);
     const idx = current.findIndex((p: any) => p.id === ps.id);
@@ -373,7 +380,6 @@ export const db = {
     } catch { return false; }
   },
 
-  // Added importBackup method to db object
   importBackup: async (file: File): Promise<boolean> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -381,7 +387,6 @@ export const db = {
         try {
           const content = e.target?.result as string;
           const data = JSON.parse(content);
-          
           if (data.drivers) db._saveLocal(KEYS.DRIVERS, data.drivers);
           if (data.customers) db._saveLocal(KEYS.CUSTOMERS, data.customers);
           if (data.ports) db._saveLocal(KEYS.PORTS, data.ports);
@@ -390,12 +395,8 @@ export const db = {
           if (data.trips) db._saveLocal(KEYS.TRIPS, data.trips);
           if (data.categories) db._saveLocal(KEYS.CATEGORIES, data.categories);
           if (data.users) db._saveLocal(KEYS.USERS, data.users);
-          
           resolve(true);
-        } catch (err) {
-          console.error("Erro na importação:", err);
-          resolve(false);
-        }
+        } catch (err) { resolve(false); }
       };
       reader.onerror = () => resolve(false);
       reader.readAsText(file);
