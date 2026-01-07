@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { User, Staff, PresenceStatus } from '../../types';
 import { db } from '../../utils/storage';
@@ -15,13 +14,16 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
 
   const fetchStatus = useCallback(async () => {
-    const u = await db.getUsers();
-    setUsers(u);
+    try {
+      const u = await db.getUsers();
+      setUsers(u);
+    } catch (e) {}
   }, []);
 
   useEffect(() => {
     fetchStatus();
-    const syncInterval = setInterval(fetchStatus, 10000);
+    // Aumentado para 60s
+    const syncInterval = setInterval(fetchStatus, 60000);
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -44,7 +46,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     if (user.lastSeen) {
       const lastSeenDate = new Date(user.lastSeen);
       const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
-      if (diffSeconds > 60) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
+      if (diffSeconds > 120) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
     }
 
     switch (status) {
@@ -94,7 +96,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
       {isOpen && (
         <div className="absolute bottom-full left-0 mb-4 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] overflow-hidden animate-in slide-in-from-bottom-6 zoom-in-95 duration-500 z-[200]">
-          {/* TOPO COM RESUMO DE STATUS */}
           <div className="p-6 bg-[#0f172a] border-b border-white/5">
              <div className="flex justify-between items-center mb-6">
                 <div>

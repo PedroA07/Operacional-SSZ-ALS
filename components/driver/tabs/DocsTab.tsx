@@ -37,11 +37,11 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips, driver }) => {
     const driverCpf = driver.cpf.replace(/\D/g, '');
     const beneficiaryCnpj = driver.beneficiaryCnpj ? driver.beneficiaryCnpj.replace(/\D/g, '') : driverCpf;
 
-    // Se o beneficiário é o próprio motorista, acesso livre
+    // Se o beneficiário é o próprio motorista (CPF == Documento Benf), acesso livre
     if (driverCpf === beneficiaryCnpj) {
       openDoc(url, title);
     } else {
-      // Solicita chave (4 últimos dígitos do CPF do beneficiário)
+      // Solicita chave (4 últimos dígitos do CPF/CNPJ do beneficiário)
       setPendingDoc({ url, title });
       setInputKey('');
       setKeyError(false);
@@ -61,7 +61,7 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips, driver }) => {
       setPendingDoc(null);
     } else {
       setKeyError(true);
-      setTimeout(() => setKeyError(false), 2000);
+      setTimeout(() => setKeyError(false), 1500);
     }
   };
 

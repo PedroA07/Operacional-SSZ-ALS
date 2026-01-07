@@ -131,7 +131,6 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
             <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>PLACA CARRETA</p>
             <p style={{ fontSize: '28px', fontWeight: 900, color: '#1e40af', lineHeight: '1' }}>{selectedDriver?.plateTrailer || '---'}</p>
           </div>
-          {/* FIX: added colon to flex property to fix syntax error around line 143 */}
           <div style={{ flex: 1, textAlign: 'right' }}>
             <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CONTATO</p>
             <p style={{ fontSize: '13px', fontWeight: 900 }}>{selectedDriver?.phone || '---'}</p>

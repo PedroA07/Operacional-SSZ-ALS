@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
@@ -73,13 +72,20 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   }, [filterTypes, filterClientNames, filterDriverNames, user.id]);
 
   const loadData = async () => {
-    const [t, c, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPreStacking()]);
-    setTrips(t || []);
-    setCategories(c || []);
-    setPreStacking(ps || []);
+    try {
+      const [t, c, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPreStacking()]);
+      setTrips(t || []);
+      setCategories(c || []);
+      setPreStacking(ps || []);
+    } catch (e) {}
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { 
+    loadData();
+    // Reduzido para 60s
+    const interval = setInterval(loadData, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleUpdateStatus = async () => {
     if (!selectedTrip) return;
@@ -109,7 +115,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
     
-    // Filtro de Data
     if (startDate) result = result.filter(t => t.dateTime >= startDate);
     if (endDate) result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
 
@@ -160,7 +165,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
            />
         </div>
         
-        <SmartOperationTable userId={user.id} componentId="ops-global" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'cva', 'customer', 'actions']} />
+        <SmartOperationTable userId={user.id} componentId="ops-global" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
       </div>
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
@@ -200,9 +205,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
              <div className="text-center border-b border-slate-100 pb-6 shrink-0">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento</p>
                 <p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p>
-                {isVWCrageaTrip && (
-                  <span className="inline-block mt-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[8px] font-black uppercase border border-blue-100">Operação VW/Cragea</span>
-                )}
              </div>
 
              <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-1">

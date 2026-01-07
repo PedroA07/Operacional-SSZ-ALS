@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
@@ -17,8 +16,6 @@ import OnlineStatus from './components/dashboard/OnlineStatus';
 import DatabaseStatus from './components/dashboard/DatabaseStatus';
 import UserProfile from './components/dashboard/UserProfile';
 import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
-import NotificationToast from './components/dashboard/notifications/NotificationToast';
-import Logo from './components/shared/Logo';
 import { DEFAULT_OPERATIONS } from './constants/operations';
 import { db } from './utils/storage';
 import { Icons } from './constants/icons';
@@ -64,13 +61,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       setStaffList(s || []);
       setTrips(t || []);
     } catch (e) {
-      console.warn("Erro ao carregar dados do Dashboard");
+      console.warn("Erro de conexão durante sincronização em segundo plano.");
     }
   }, []);
 
   useEffect(() => { 
     loadAllData();
-    const syncInterval = setInterval(loadAllData, 30000);
+    // Aumentado para 60s para respeitar limites do Supabase Free Tier
+    const syncInterval = setInterval(loadAllData, 60000);
     return () => clearInterval(syncInterval);
   }, [loadAllData]);
 
@@ -91,7 +89,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       setIsDeleteTripModalOpen(false);
       setTripToDelete(null);
     } catch (e) {
-      alert('Erro crítico ao excluir.');
+      alert('Erro ao excluir. Verifique sua conexão.');
     } finally {
       setIsDeleting(false);
     }
@@ -104,12 +102,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     return (
       <div className="w-full">
         <div className="flex items-center group">
-          <button onClick={() => { 
-            if (tab) { 
-              setActiveTab(tab); 
-              if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' }); 
-            } 
-          }} className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-slate-800/60 text-slate-400'}`}>
+          <button onClick={() => { if (tab) { setActiveTab(tab); if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' }); } }} className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-slate-800/60 text-slate-400'}`}>
             <div className={`${isActive ? 'text-white' : 'text-slate-50 group-hover:text-white'}`}>{icon}</div>
             {sidebarState === 'open' && <span className="truncate">{label}</span>}
           </button>
@@ -122,17 +115,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
-      <NotificationToast />
-
       <aside className={`${sidebarState === 'open' ? 'w-80' : sidebarState === 'collapsed' ? 'w-20' : 'w-0'} bg-[#0f172a] text-slate-400 flex flex-col shadow-[10px_0_50px_rgba(0,0,0,0.3)] z-50 transition-all duration-500 relative overflow-hidden`}>
         <div className="p-6 border-b border-slate-800/50 space-y-4">
           <div className="flex items-center gap-4 mb-2">
-            <Logo 
-              size={sidebarState === 'open' ? 'md' : 'sm'} 
-              variant="white" 
-              showText={sidebarState === 'open'}
-              className={`${sidebarState === 'collapsed' ? 'justify-center w-full' : ''}`}
-            />
+            <div className="bg-blue-600 w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center text-white font-black italic shadow-xl shadow-blue-600/10">ALS</div>
+            {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-[0.2em] text-xs uppercase whitespace-nowrap animate-in fade-in slide-in-from-left-4">ALS LOGÍSTICA</span>}
           </div>
           {sidebarState === 'open' && <WeatherWidget />}
         </div>
@@ -170,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </button>
               <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">{activeTab}</h2>
            </div>
-           <div className="flex items-center gap-6">
+           <div className="flex items-center gap-4">
               <DatabaseStatus />
               <NotificationCenter user={user} />
               <UserProfile user={user} />

@@ -58,7 +58,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadPortalData();
-    const syncInterval = setInterval(loadPortalData, 15000);
+    // Aumentado para 60s
+    const syncInterval = setInterval(loadPortalData, 60000);
     const clockInterval = setInterval(() => {
       setSessionTime(timeUtils.calculateDuration(user.lastLogin));
     }, 1000);

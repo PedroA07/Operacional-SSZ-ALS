@@ -279,8 +279,9 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
             <tbody className="divide-y divide-slate-100">
               {filteredDrivers.map(d => {
                 const linkedUser = users.find(u => u.driverId === d.id);
-                const isThirdBeneficiary = d.beneficiaryCnpj && d.beneficiaryCnpj.replace(/\D/g,'') !== d.cpf.replace(/\D/g,'');
-                const beneficiaryKey = isThirdBeneficiary ? d.beneficiaryCnpj.replace(/\D/g,'').slice(-4) : null;
+                // Lógica de Chave do Beneficiário
+                const isThirdParty = d.beneficiaryCnpj && d.beneficiaryCnpj.replace(/\D/g, '') !== d.cpf.replace(/\D/g, '');
+                const beneficiaryKey = isThirdParty ? d.beneficiaryCnpj.replace(/\D/g, '').slice(-4) : null;
 
                 return (
                   <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
@@ -361,9 +362,9 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                              <span className="text-emerald-600 font-mono font-black text-[10px]">{linkedUser?.password || d.generatedPassword || '---'}</span>
                           </div>
                           {beneficiaryKey && (
-                            <div className="flex justify-between items-center gap-4 pt-1 border-t border-blue-100/50">
-                               <span className="text-[8px] font-black uppercase text-blue-600">Chave Benf:</span>
-                               <span className="text-blue-700 font-mono font-black text-[10px]">{beneficiaryKey}</span>
+                            <div className="flex justify-between items-center gap-2 pt-1 border-t border-blue-100/50">
+                               <span className="text-[7px] font-black uppercase text-blue-500 whitespace-nowrap">Chave Benf:</span>
+                               <span className="text-blue-700 font-mono font-black text-[9px]">{beneficiaryKey}</span>
                             </div>
                           )}
                        </div>
@@ -726,7 +727,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
       )}
 
       {isDeleteModalOpen && itemToDelete && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-transparent">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
               <div className="p-8 text-center space-y-6">
                  <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
