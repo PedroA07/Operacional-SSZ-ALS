@@ -131,7 +131,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         customers={customers} drivers={drivers} 
       />
       
-      <SmartOperationTable userId={user.id} componentId="ops-global" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+      <SmartOperationTable userId={user.id} componentId="ops-global" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'cva', 'customer', 'actions']} />
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
 
