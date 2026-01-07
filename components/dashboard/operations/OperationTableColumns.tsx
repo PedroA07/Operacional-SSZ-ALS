@@ -1,7 +1,124 @@
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Trip, TripStatus, TripDocument, User, Driver, NotificationType } from '../../../types';
 import { db } from '../../../utils/storage';
+
+const ActionMenu: React.FC<{
+  trip: Trip;
+  onEditTrip: (t: Trip) => void;
+  onEditOC: (t: Trip) => void;
+  onEditMinuta: (t: Trip) => void;
+  onDeleteTrip: (id: string) => void;
+  onViewDriverDocs: (t: Trip) => void;
+  handleFileUpload: (trip: Trip, type: any, e: any) => void;
+  deleteDocument: (trip: Trip, type: any) => void;
+  onViewDoc: (url: string, title: string) => void;
+  handlePrint: (url: string, fileName: string) => void;
+}> = ({ trip, onEditTrip, onEditOC, onEditMinuta, onDeleteTrip, onViewDriverDocs, handleFileUpload, deleteDocument, onViewDoc, handlePrint }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const DocItem = ({ type, label, iconColor }: { type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO', label: string, iconColor: string }) => {
+    const doc = type === 'OS_PDF' ? trip.osDoc : type === 'AGENDAMENTO' ? trip.agendamentoDoc : type === 'CTE' ? trip.cteDoc : type === 'CVA' ? trip.cvaDoc : trip.completoDoc;
+    
+    if (doc) {
+      return (
+        <div className="flex items-center justify-between py-2 px-3 hover:bg-slate-50 rounded-xl transition-colors group">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className={`w-2 h-2 rounded-full ${iconColor} shrink-0`}></div>
+            <span className="text-[10px] font-black text-slate-700 uppercase truncate">{label}</span>
+          </div>
+          <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
+             <button onClick={() => onViewDoc(doc.url, doc.fileName)} className="p-1.5 hover:text-blue-600 transition-colors" title="Ver"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+             <button onClick={() => handlePrint(doc.url, doc.fileName)} className="p-1.5 hover:text-slate-900 transition-colors" title="Imp"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg></button>
+             <button onClick={() => deleteDocument(trip, type)} className="p-1.5 hover:text-red-500 transition-colors" title="Del"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <label className="flex items-center gap-2 py-2 px-3 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer group">
+        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(trip, type, e)} />
+        <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+        <span className="text-[9px] font-black text-slate-400 group-hover:text-blue-600 uppercase tracking-tight">Anexar {label}</span>
+      </label>
+    );
+  };
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <div className="flex items-center gap-1.5">
+         <button 
+           onClick={() => onViewDriverDocs(trip)}
+           className="px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2"
+           title="Fotos do Motorista"
+         >
+           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+           {trip.driver_docs && trip.driver_docs.length > 0 && <span className="text-[9px] font-black">{trip.driver_docs.length}</span>}
+         </button>
+
+         <button 
+           onClick={() => setIsOpen(!isOpen)}
+           className={`p-2 rounded-xl border-2 transition-all ${isOpen ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'}`}
+         >
+           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+         </button>
+      </div>
+
+      {isOpen && (
+        <div className="absolute right-0 bottom-full mb-2 w-72 bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-2 z-[500] animate-in slide-in-from-bottom-2 zoom-in-95">
+          <div className="p-4 space-y-4">
+             {/* SEÇÃO GESTÃO */}
+             <div className="space-y-1">
+                <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest px-2 mb-2">Gestão da Viagem</p>
+                <button onClick={() => { onEditTrip(trip); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-900 hover:text-white rounded-xl transition-all group">
+                   <svg className="w-4 h-4 text-slate-400 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                   <span className="text-[10px] font-black uppercase">Editar Programação</span>
+                </button>
+                {trip.ocFormData && (
+                  <button onClick={() => { onEditOC(trip); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-600 hover:text-white rounded-xl transition-all group">
+                    <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span className="text-[10px] font-black uppercase">Editar Ordem Coleta</span>
+                  </button>
+                )}
+                <button onClick={() => { onEditMinuta(trip); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-emerald-600 hover:text-white rounded-xl transition-all group">
+                   <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                   <span className="text-[10px] font-black uppercase">Minuta Pre-Stacking</span>
+                </button>
+             </div>
+
+             {/* SEÇÃO ARQUIVOS */}
+             <div className="space-y-1 pt-3 border-t border-slate-50">
+                <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest px-2 mb-2">Documentos e Anexos</p>
+                <DocItem type="OS_PDF" label="OS Original PDF" iconColor="bg-emerald-500" />
+                <DocItem type="CTE" label="Arquivo do CT-e" iconColor="bg-indigo-500" />
+                <DocItem type="COMPLETO" label="Dossiê Completo" iconColor="bg-blue-500" />
+             </div>
+
+             <button 
+               onClick={() => { onDeleteTrip(trip.id); setIsOpen(false); }}
+               className="w-full flex items-center gap-3 px-3 py-3 mt-2 text-red-500 hover:bg-red-50 rounded-xl transition-all group"
+             >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+                <span className="text-[10px] font-black uppercase">Excluir Viagem</span>
+             </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const getOperationTableColumns = (
   openStatusEditor: (t: Trip, s: TripStatus) => void,
@@ -24,7 +141,6 @@ export const getOperationTableColumns = (
     const reader = new FileReader();
     reader.onload = async () => {
       let prefix = 'DOC';
-      let notifType: NotificationType = 'DOC_ATTACHED';
       let docLabel = 'Documento';
 
       if (type === 'OS_PDF') { prefix = 'OS'; docLabel = 'OS Digital'; }
@@ -34,14 +150,7 @@ export const getOperationTableColumns = (
       else if (type === 'COMPLETO') { prefix = 'DOSSIE'; docLabel = 'Dossiê Completo'; }
 
       const customFileName = `${prefix} - ${trip.driver.name} - ${trip.os}`;
-      
-      const doc: TripDocument = { 
-        id: `${type.toLowerCase()}-${Date.now()}`, 
-        type: type as any, 
-        url: reader.result as string, 
-        fileName: customFileName, 
-        uploadDate: new Date().toISOString() 
-      };
+      const doc: TripDocument = { id: `${type.toLowerCase()}-${Date.now()}`, type: type as any, url: reader.result as string, fileName: customFileName, uploadDate: new Date().toISOString() };
 
       const updatedTrip = { ...trip };
       if (type === 'OS_PDF') updatedTrip.osDoc = doc;
@@ -52,20 +161,9 @@ export const getOperationTableColumns = (
       
       try {
         await db.saveTrip(updatedTrip, actingUser);
-        
-        // Dispara notificação específica de anexo de documento
-        await db.addNotification(
-          actingUser, 
-          'DOC_ATTACHED', 
-          `Documento Anexado: ${docLabel}`, 
-          `${actingUser.displayName} anexou ${docLabel} na OS ${trip.os}.`,
-          { os: trip.os, motorista: trip.driver.name, docType: docLabel }
-        );
-
+        await db.addNotification(actingUser, 'DOC_ATTACHED', `Documento Anexado: ${docLabel}`, `${actingUser.displayName} anexou ${docLabel} na OS ${trip.os}.`, { os: trip.os, motorista: trip.driver.name, docType: docLabel });
         onRefreshData();
-      } catch (err) {
-        alert("Erro ao salvar no banco.");
-      }
+      } catch (err) { alert("Erro ao salvar no banco."); }
     };
     reader.readAsDataURL(file);
   };
@@ -81,9 +179,7 @@ export const getOperationTableColumns = (
     try {
       await db.saveTrip(updatedTrip, actingUser);
       onRefreshData();
-    } catch (err) {
-      alert("Erro ao excluir do banco.");
-    }
+    } catch (err) { alert("Erro ao excluir do banco."); }
   };
 
   const handlePrint = (url: string, fileName: string) => {
@@ -95,30 +191,24 @@ export const getOperationTableColumns = (
     }
   };
 
-  const DocumentBlock = ({ trip, type, label, forceVisible = true }: { trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO', label: string, forceVisible?: boolean }) => {
-    if (!forceVisible) return null;
-    const doc = type === 'OS_PDF' ? trip.osDoc : type === 'AGENDAMENTO' ? trip.agendamentoDoc : type === 'CTE' ? trip.cteDoc : type === 'CVA' ? trip.cvaDoc : trip.completoDoc;
-    const colorClass = type === 'OS_PDF' ? 'emerald' : type === 'AGENDAMENTO' ? 'blue' : type === 'CTE' ? 'indigo' : type === 'CVA' ? 'amber' : 'slate';
+  const DocumentBlockForTable = ({ trip, type, label }: { trip: Trip, type: 'AGENDAMENTO', label: string }) => {
+    const doc = trip.agendamentoDoc;
+    const colorClass = 'blue';
 
     if (doc) {
       return (
-        <div className={`space-y-1 p-2 bg-${colorClass}-50 rounded-xl border border-${colorClass}-100 shadow-inner`}>
-           <p className={`text-[7px] font-black text-${colorClass}-600 uppercase mb-1 tracking-tighter`}>{label}</p>
-           <div className="grid grid-cols-4 gap-1">
-              <button onClick={() => onViewDoc(doc.url, doc.fileName)} className={`p-1.5 bg-white text-${colorClass}-600 rounded-lg hover:bg-${colorClass}-600 hover:text-white transition-all shadow-sm border border-${colorClass}-100`} title="Ver"><svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
-              <button onClick={() => handlePrint(doc.url, doc.fileName)} className="p-1.5 bg-white text-slate-600 rounded-lg hover:bg-slate-600 hover:text-white transition-all shadow-sm border border-slate-100" title="Imp"><svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg></button>
-              <label className="p-1.5 bg-white text-amber-600 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm border border-amber-100 cursor-pointer" title="Subst"><input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(trip, type, e)} /><svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></label>
-              <button onClick={() => deleteDocument(trip, type)} className="p-1.5 bg-white text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm border border-red-100" title="Del"><svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
-           </div>
+        <div className="flex items-center gap-1.5 p-1.5 bg-blue-50 rounded-xl border border-blue-100 mt-2">
+           <button onClick={() => onViewDoc(doc.url, doc.fileName)} className="p-1 text-blue-600 hover:bg-white rounded-lg transition-all" title="Ver"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+           <span className="text-[7.5px] font-black text-blue-600 uppercase">Ver PDF</span>
         </div>
       );
     }
 
     return (
-      <label className={`w-full flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded-xl hover:border-${colorClass}-400 hover:bg-${colorClass}-50 transition-all shadow-sm cursor-pointer group`}>
+      <label className="flex items-center gap-2 px-2 py-1 bg-white border border-slate-100 text-slate-400 rounded-lg hover:border-blue-300 transition-all cursor-pointer mt-2 group">
         <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(trip, type, e)} />
-        <svg className={`w-3.5 h-3.5 text-slate-300 group-hover:text-${colorClass}-500 transition-colors`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-        <span className="text-[7.5px] font-black uppercase tracking-tight">Anexar {label}</span>
+        <svg className="w-2.5 h-2.5 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+        <span className="text-[7px] font-black uppercase">Anexar</span>
       </label>
     );
   };
@@ -176,7 +266,7 @@ export const getOperationTableColumns = (
            <button 
              onClick={() => onLocateDriver(t.driver.id)}
              className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm border border-blue-100"
-             title="Localizar Motorista em tempo real"
+             title="Localizar Motorista"
            >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="3"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/></svg>
            </button>
@@ -202,12 +292,23 @@ export const getOperationTableColumns = (
   },
   { key: 'customer', label: '6. Cliente', render: (t: Trip) => (<div className="flex flex-col space-y-0.5 max-w-[250px] whitespace-normal"><p className="font-black text-slate-800 uppercase text-[10px] leading-tight">{t.customer?.legalName || t.customer?.name}</p><p className="text-[9px] font-bold text-slate-400 uppercase italic">FAN: {t.customer?.name}</p><div className="flex flex-col mt-1 border-t border-slate-50 pt-1"><span className="text-[8px] font-black text-blue-600">CNPJ: {t.customer?.cnpj || '---'}</span><span className="text-[8px] font-bold text-slate-500">{t.customer?.city} - {t.customer?.state}</span></div></div>)},
   { key: 'destination_ship_booking', label: '7. Destino / Navio / Booking', render: (t: Trip) => (<div className="flex flex-col space-y-2 max-w-[220px] whitespace-normal"><div className="flex flex-col space-y-0.5"><p className="font-black text-slate-700 uppercase text-[10px] leading-tight">{t.destination?.legalName || t.destination?.name || '---'}</p>{t.destination && (<span className="text-[8px] font-bold text-slate-400 uppercase">{t.destination.city} - {t.destination.state}</span>)}</div><div className="flex flex-col pt-1.5 border-t border-slate-100 gap-1.5"><div className="flex flex-col"><span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter leading-none">Navio:</span><span className="font-black text-slate-800 text-[9px] uppercase truncate">{t.ship || '---'}</span></div><div className="flex flex-col"><span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter leading-none">Booking:</span><span className="text-blue-600 font-bold text-[9px] uppercase truncate">{t.booking || '---'}</span></div></div></div>)},
-  { key: 'scheduling_info', label: '8. Agendamento', render: (t: Trip) => { const sch = t.scheduling; if (!sch) return (<button onClick={() => onEditScheduling(t)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all border border-dashed border-slate-300"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg><span className="text-[8px] font-black uppercase">Agendar</span></button>); const schDate = new Date(sch.dateTime); return (<div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 min-w-[180px] group relative"><div className="flex justify-between items-start mb-2"><div className="flex flex-col" onClick={() => t.agendamentoDoc && onViewDoc(t.agendamentoDoc.url, t.agendamentoDoc.fileName)}><span className="text-[9px] font-black text-emerald-700 uppercase leading-none">{schDate.toLocaleDateString('pt-BR')}</span><span className="text-[11px] font-black text-slate-800 mt-0.5">{schDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span></div><div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all"><button onClick={() => onEditScheduling(t)} className="p-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-blue-100"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button></div></div><div className="border-t border-emerald-100/50 pt-2"><p className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter">Terminal:</p><p className="text-[9px] font-bold text-slate-600 uppercase leading-tight truncate">{sch.location}</p></div><div className="mt-2"><DocumentBlock trip={t} type="AGENDAMENTO" label="Anexo PDF" /></div></div>); } },
-  { key: 'actions', label: '9. Opções', render: (t: Trip) => (<div className="flex flex-col gap-2 min-w-[160px]">
-    <button onClick={() => onViewDriverDocs(t)} className="w-full flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm">
-      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-      <span className="text-[8px] font-black uppercase">Fotos Motorista</span>
-      {t.driver_docs && t.driver_docs.length > 0 && <span className="ml-auto bg-white/20 px-1.5 rounded-full text-[7px]">{t.driver_docs.length}</span>}
-    </button>
-    <button onClick={() => onEditTrip(t)} className="w-full flex items-center gap-2 px-3 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition-all shadow-sm"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg><span className="text-[8px] font-black uppercase">Editar Viagem</span></button><DocumentBlock trip={t} type="OS_PDF" label="OS PDF" /><DocumentBlock trip={t} type="CTE" label="CT-e (Arquivo)" /><DocumentBlock trip={t} type="COMPLETO" label="Dossiê Completo" />{t.ocFormData && (<button onClick={() => onEditOC(t)} className="w-full flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><span className="text-[7.5px] font-black uppercase">Editar OC</span></button>)}<button onClick={() => onEditMinuta(t)} className="w-full flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg><span className="text-[7.5px] font-black uppercase">Minuta PreS.</span></button><button onClick={() => onDeleteTrip(t.id)} className="w-full flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm group"><svg className="w-3.5 h-3.5 text-red-300 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg><span className="text-[7.5px] font-black uppercase">Remover</span></button></div>) }
+  { key: 'scheduling_info', label: '8. Agendamento', render: (t: Trip) => { const sch = t.scheduling; if (!sch) return (<button onClick={() => onEditScheduling(t)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all border border-dashed border-slate-300"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg><span className="text-[8px] font-black uppercase">Agendar</span></button>); const schDate = new Date(sch.dateTime); return (<div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 min-w-[180px] group relative"><div className="flex justify-between items-start mb-2"><div className="flex flex-col" onClick={() => t.agendamentoDoc && onViewDoc(t.agendamentoDoc.url, t.agendamentoDoc.fileName)}><span className="text-[9px] font-black text-emerald-700 uppercase leading-none">{schDate.toLocaleDateString('pt-BR')}</span><span className="text-[11px] font-black text-slate-800 mt-0.5">{schDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span></div><div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all"><button onClick={() => onEditScheduling(t)} className="p-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-blue-100"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button></div></div><div className="border-t border-emerald-100/50 pt-2"><p className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter">Terminal:</p><p className="text-[9px] font-bold text-slate-600 uppercase leading-tight truncate">{sch.location}</p></div><DocumentBlockForTable trip={t} type="AGENDAMENTO" label="PDF" /></div>); } },
+  { 
+    key: 'actions', 
+    label: '9. Opções', 
+    render: (t: Trip) => (
+      <ActionMenu 
+        trip={t}
+        onEditTrip={onEditTrip}
+        onEditOC={onEditOC}
+        onEditMinuta={onEditMinuta}
+        onDeleteTrip={onDeleteTrip}
+        onViewDriverDocs={onViewDriverDocs}
+        handleFileUpload={handleFileUpload}
+        deleteDocument={deleteDocument}
+        onViewDoc={onViewDoc}
+        handlePrint={handlePrint}
+      />
+    ) 
+  }
 ]};
