@@ -92,35 +92,73 @@ export const db = {
   getNotifications: async (): Promise<Notification[]> => {
     if (supabase) {
       try {
-        const { data } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(50);
-        if (data) {
-          const mapped = data.map(n => ({
-            id: n.id, title: n.title, description: n.description, type: n.type as any,
-            authorName: n.author_name, authorId: n.author_id, timestamp: n.timestamp, summary: n.summary
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('id, user_id, user_name, type, message, os_ref, timestamp, summary')
+          .order('timestamp', { ascending: false })
+          .limit(50);
+          
+        if (!error && data) {
+          const mapped: Notification[] = data.map(n => ({
+            id: n.id, 
+            title: n.type.replace(/_/g, ' '), 
+            description: n.message, 
+            type: n.type as NotificationType,
+            authorName: n.user_name || 'Sistema', 
+            authorId: n.user_id || 'system', 
+            timestamp: n.timestamp, 
+            summary: { ...n.summary, os: n.os_ref }
           }));
           db._saveLocal(KEYS.NOTIFICATIONS, mapped);
           return mapped;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Erro ao buscar notificações do Supabase:", e);
+      }
     }
     return db._getLocal(KEYS.NOTIFICATIONS);
   },
 
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: Notification['summary']) => {
     const authorName = user.displayName || user.username || 'Sistema';
-    const newNotif: Notification = {
-      id: `notif-${Date.now()}`, title, description, type, authorName, authorId: user.id || 'system', timestamp: new Date().toISOString(), summary
-    };
+    const timestamp = new Date().toISOString();
+    const osRef = summary?.os || '';
+    
+    // 1. Persistência no Supabase com nomes de colunas exatos
     if (supabase) {
       try {
-        await supabase.from('notifications').insert({
-          title: newNotif.title, description: newNotif.description, type: newNotif.type,
-          author_name: authorName, author_id: user.id, summary: newNotif.summary
+        const { error } = await supabase.from('notifications').insert({
+          user_id: user.id || 'system',
+          user_name: authorName,
+          type: type,
+          message: description,
+          os_ref: osRef,
+          timestamp: timestamp,
+          summary: summary || {}
         });
-      } catch (e) {}
+        if (error) console.error("Erro Supabase Insert:", error);
+      } catch (e) {
+        console.error("Exceção ao inserir notificação:", e);
+      }
     }
+
+    // 2. Objeto para interface
+    const newNotif: Notification = {
+      id: `notif-${Date.now()}`,
+      title,
+      description,
+      type,
+      authorName,
+      authorId: user.id || 'system',
+      timestamp,
+      summary
+    };
+
+    // 3. Atualiza cache local
     const current = db._getLocal(KEYS.NOTIFICATIONS);
     db._saveLocal(KEYS.NOTIFICATIONS, [newNotif, ...current].slice(0, 50));
+    
+    // 4. DISPARO DO EVENTO GLOBAL PARA O POPUP (TOAST)
     window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: newNotif }));
   },
 
@@ -169,7 +207,8 @@ export const db = {
   },
 
   saveTrip: async (trip: Trip, actingUser?: User) => {
-    const oldTrip = db._getLocal(KEYS.TRIPS).find((t: any) => t.id === trip.id);
+    const currentTrips = db._getLocal(KEYS.TRIPS);
+    const oldTrip = currentTrips.find((t: any) => t.id === trip.id);
     
     if (supabase) {
        await tripRepository.save(supabase, trip);
@@ -182,8 +221,11 @@ export const db = {
     
     if (actingUser) {
       const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse };
-      if (!oldTrip) await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada.`, summary);
-      else if (oldTrip.status !== trip.status) await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status Atualizado', `OS ${trip.os} para "${trip.status}".`, summary);
+      if (!oldTrip) {
+        await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada com sucesso.`, summary);
+      } else if (oldTrip.status !== trip.status) {
+        await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status Atualizado', `A OS ${trip.os} mudou para "${trip.status}".`, summary);
+      }
     }
     return true;
   },
@@ -194,7 +236,7 @@ export const db = {
     if (supabase) { try { await tripRepository.delete(supabase, id); } catch (e) {} }
     db._saveLocal(KEYS.TRIPS, current.filter((t: Trip) => t.id !== id));
     if (actingUser && trip) {
-      await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `OS ${trip.os} excluída.`, { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse });
+      await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `A OS ${trip.os} foi removida do sistema por ${actingUser.displayName}.`, { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse });
     }
     return true;
   },
@@ -206,7 +248,9 @@ export const db = {
     const idx = current.findIndex((d: any) => d.id === driver.id);
     if (idx >= 0) current[idx] = driver; else current.push(driver);
     db._saveLocal(KEYS.DRIVERS, current);
-    if (actingUser && isNew) await db.addNotification(actingUser, 'DRIVER_CREATED', 'Novo Motorista', `${driver.name} cadastrado.`, { motorista: driver.name, placa: driver.plateHorse });
+    if (actingUser && isNew) {
+      await db.addNotification(actingUser, 'DRIVER_CREATED', 'Novo Motorista', `${driver.name} foi cadastrado no sistema.`, { motorista: driver.name, placa: driver.plateHorse });
+    }
     return true;
   },
 
@@ -254,7 +298,9 @@ export const db = {
     const idx = current.findIndex((c: any) => c.id === customer.id);
     if (idx >= 0) current[idx] = customer; else current.push(customer);
     db._saveLocal(KEYS.CUSTOMERS, current);
-    if (actingUser && isNew) await db.addNotification(actingUser, 'CUSTOMER_CREATED', 'Novo Cliente', `${customer.name} cadastrado.`, { cliente: customer.name });
+    if (actingUser && isNew) {
+      await db.addNotification(actingUser, 'CUSTOMER_CREATED', 'Novo Cliente', `${customer.name} foi adicionado à base.`, { cliente: customer.name });
+    }
     return true;
   },
 
@@ -278,7 +324,9 @@ export const db = {
     const idx = current.findIndex((p: any) => p.id === port.id);
     if (idx >= 0) current[idx] = port; else current.push(port);
     db._saveLocal(KEYS.PORTS, current);
-    if (actingUser && isNew) await db.addNotification(actingUser, 'PORT_CREATED', 'Novo Porto', `${port.name} cadastrado.`, { porto: port.name });
+    if (actingUser && isNew) {
+      await db.addNotification(actingUser, 'PORT_CREATED', 'Novo Porto', `${port.name} foi cadastrado.`, { porto: port.name });
+    }
     return true;
   },
 
@@ -300,7 +348,9 @@ export const db = {
     const idx = current.findIndex((c: any) => c.id === category.id);
     if (idx >= 0) current[idx] = category; else current.push(category);
     db._saveLocal(KEYS.CATEGORIES, current);
-    if (actingUser) await db.addNotification(actingUser, 'CATEGORY_CREATED', 'Nova Categoria', `${category.name} cadastrada.`, { categoria: category.name });
+    if (actingUser) {
+      await db.addNotification(actingUser, 'CATEGORY_CREATED', 'Nova Categoria', `${category.name} cadastrada com sucesso.`, { categoria: category.name });
+    }
     return true;
   },
 
@@ -317,7 +367,9 @@ export const db = {
     const idx = current.findIndex((p: any) => p.id === ps.id);
     if (idx >= 0) current[idx] = ps; else current.push(ps);
     db._saveLocal(KEYS.PRE_STACKING, current);
-    if (actingUser && isNew) await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `${ps.name} cadastrado.`, { unidade: ps.name });
+    if (actingUser && isNew) {
+      await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `${ps.name} cadastrado na base.`, { unidade: ps.name });
+    }
     return true;
   },
 
