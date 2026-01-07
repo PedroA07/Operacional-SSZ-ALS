@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Driver, OperationDefinition, User, Customer } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
@@ -280,6 +279,9 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
             <tbody className="divide-y divide-slate-100">
               {filteredDrivers.map(d => {
                 const linkedUser = users.find(u => u.driverId === d.id);
+                const isThirdBeneficiary = d.beneficiaryCnpj && d.beneficiaryCnpj.replace(/\D/g,'') !== d.cpf.replace(/\D/g,'');
+                const beneficiaryKey = isThirdBeneficiary ? d.beneficiaryCnpj.replace(/\D/g,'').slice(-4) : null;
+
                 return (
                   <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
                     <td className="px-6 py-4 max-w-[240px]">
@@ -358,6 +360,12 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                              <span className="text-[8px] font-black uppercase text-blue-400">Senha:</span>
                              <span className="text-emerald-600 font-mono font-black text-[10px]">{linkedUser?.password || d.generatedPassword || '---'}</span>
                           </div>
+                          {beneficiaryKey && (
+                            <div className="flex justify-between items-center gap-4 pt-1 border-t border-blue-100/50">
+                               <span className="text-[8px] font-black uppercase text-blue-600">Chave Benf:</span>
+                               <span className="text-blue-700 font-mono font-black text-[10px]">{beneficiaryKey}</span>
+                            </div>
+                          )}
                        </div>
                     </td>
                     <td className="px-6 py-4">

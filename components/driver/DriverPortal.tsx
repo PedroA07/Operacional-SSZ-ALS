@@ -118,7 +118,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       <main className="flex-1 px-5 pt-6 overflow-y-auto custom-scrollbar">
         {activeTab === 'inicio' && <HomeTab user={user} trips={trips} onRefresh={loadPortalData} />}
         {activeTab === 'viagens' && <TripsTab trips={trips} />}
-        {activeTab === 'docs' && <DocsTab trips={trips} />}
+        {activeTab === 'docs' && <DocsTab trips={trips} driver={driver} />}
         {activeTab === 'perfil' && <ProfileTab user={user} driver={driver} onLogout={onLogout} />}
         {activeTab === 'download' && <DownloadAppTab />}
       </main>
