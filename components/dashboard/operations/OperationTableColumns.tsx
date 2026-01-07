@@ -77,7 +77,7 @@ const ActionMenu: React.FC<{
       </div>
 
       {isOpen && (
-        <div className="absolute right-0 bottom-full mb-2 w-72 bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-2 z-[500] animate-in slide-in-from-bottom-2 zoom-in-95">
+        <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-[2rem] shadow-[0_25px_60px_rgba(0,0,0,0.3)] border border-slate-200 p-2 z-[999] animate-in fade-in slide-in-from-top-2 zoom-in-95 origin-top-right">
           <div className="p-4 space-y-4">
              {/* SEÇÃO GESTÃO */}
              <div className="space-y-1">

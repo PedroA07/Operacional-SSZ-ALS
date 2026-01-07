@@ -161,6 +161,8 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
             )}
           </tbody>
         </table>
+        {/* ESPAÇADOR PARA DROPDOWNS DAS ÚLTIMAS LINHAS */}
+        <div className="h-60 pointer-events-none"></div>
       </div>
     </div>
   );
