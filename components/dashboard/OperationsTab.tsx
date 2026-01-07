@@ -40,7 +40,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   
-  // FILTROS COM PERSISTÊNCIA CORRIGIDA
   const [filterTypes, setFilterTypes] = useState<string[]>(() => {
     const saved = localStorage.getItem(`als_opt_types_${user.id}`);
     return saved ? JSON.parse(saved) : ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
@@ -56,7 +55,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Salvar sempre que mudar
   useEffect(() => {
     localStorage.setItem(`als_opt_types_${user.id}`, JSON.stringify(filterTypes));
     localStorage.setItem(`als_opt_clients_${user.id}`, JSON.stringify(filterClientNames));
@@ -98,7 +96,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     loadData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
-    (driverId) => { /* logic for location if needed */ },
+    (driverId) => { /* logic for location */ },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); }
   );
 
@@ -125,6 +123,15 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       <SmartOperationTable userId={user.id} componentId="ops-global" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
+
+      {/* RENDERIZAÇÃO DOS MODAIS DE EDIÇÃO */}
+      <SchedulingEditModal 
+        isOpen={isSchedulingModalOpen} 
+        onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} 
+        trip={selectedTrip} 
+        onSuccess={loadData} 
+        preStackingUnits={[...ports, ...customers as any]} 
+      />
 
       {isOCFormOpen && selectedTrip && (
         <div className="fixed inset-0 z-[800] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4">

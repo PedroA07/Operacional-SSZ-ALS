@@ -23,8 +23,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
       
       const lastCheckStr = localStorage.getItem(`als_notif_last_check_${user.id}`);
       const lastCheck = lastCheckStr ? new Date(lastCheckStr).getTime() : 0;
-      
-      // Conta não lidas apenas da aba ativa ou geral? Geral é melhor para o badge
       const count = data.filter(n => new Date(n.timestamp).getTime() > lastCheck).length;
       setUnreadCount(count);
     } catch (e) {
@@ -61,7 +59,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
     }
   };
 
-  // Filtros solicitados por você
   const filteredNotifications = notifications.filter(n => {
     if (activeTab === 'OPERACIONAL') {
       // Filtro Operacional: Viagens, OCs, Docs, Cadastros, Edições
@@ -70,7 +67,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
         'LIBERACAO_GENERATED', 'MINUTA_GENERATED', 'DOC_ATTACHED', 
         'CONTRACT_UPLOADED', 'DRIVER_CREATED', 'DRIVER_UPDATED', 
         'CUSTOMER_CREATED', 'CUSTOMER_UPDATED', 'PORT_CREATED', 
-        'PORT_UPDATED', 'PRESTACKING_CREATED', 'PRESTACKING_UPDATED'
+        'PORT_UPDATED', 'PRESTACKING_CREATED', 'PRESTACKING_UPDATED',
+        'CATEGORY_CREATED', 'DELETED', 'SYSTEM'
       ].includes(n.type);
     } else {
       // Filtro Motorista: Perfil, Status, Fotos
@@ -110,7 +108,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
                 {isLoading && <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>}
               </div>
 
-              {/* TABS DE FILTRO */}
               <div className="flex bg-slate-200/50 p-1.5 rounded-2xl gap-1">
                  <button 
                    onClick={() => setActiveTab('OPERACIONAL')}

@@ -6,7 +6,6 @@ import { db } from '../../../utils/storage';
 import { getOperationTableColumns } from './OperationTableColumns';
 import TripModal from './TripModal';
 import SchedulingEditModal from './SchedulingEditModal';
-// Added import for DriverDocsViewerModal to handle driver documents
 import DriverDocsViewerModal from './DriverDocsViewerModal';
 
 interface GenericOperationViewProps {
@@ -30,7 +29,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  // Added state to control the visibility of the driver documents viewer
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
@@ -71,7 +69,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     loadLocalData();
   };
 
-  // Handler to open the driver documents viewer modal
   const handleViewDriverDocs = (trip: Trip) => {
     setSelectedTrip(trip);
     setIsDriverDocsModalOpen(true);
@@ -112,7 +109,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     { key: 'status', label: 'Status', render: (d: any) => (<span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>{d.status}</span>)}
   ];
 
-  // Added 11th argument handleViewDriverDocs to fix the "Expected 11 arguments, but got 10" error
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
@@ -156,7 +152,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                       onClick={() => setIsDriversCollapsed(!isDriversCollapsed)}
                       className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-200"
                     >
-                      <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isDriversCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
+                      <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isDriversCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       <span className="text-[8px] font-black uppercase">{isDriversCollapsed ? 'Mostrar Lista' : 'Encolher Lista'}</span>
                     </button>
                   </div>
@@ -178,9 +174,16 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       )}
 
       <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadLocalData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} initialCustomer={type === 'client' ? customers.find(c => c.name === clientName) : undefined} />
-      <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadLocalData} preStackingUnits={ports} />
       
-      {/* DriverDocsViewerModal for viewing docs sent by drivers via their portal */}
+      {/* CORREÇÃO: ADICIONADO COMPONENTE DE AGENDAMENTO */}
+      <SchedulingEditModal 
+        isOpen={isSchedulingModalOpen} 
+        onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} 
+        trip={selectedTrip} 
+        onSuccess={loadLocalData} 
+        preStackingUnits={ports} 
+      />
+      
       {isDriverDocsModalOpen && selectedTrip && (
         <DriverDocsViewerModal 
           isOpen={isDriverDocsModalOpen}
