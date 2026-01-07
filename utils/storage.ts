@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, PresenceStatus } from '../types';
+import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
@@ -62,7 +62,7 @@ export const db = {
             lastSeen: u.lastseen,
             isOnlineVisible: u.isonlinevisible ?? true,
             presence_status: u.presence_status || 'offline',
-            notificationPrefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true, newRegistrations: true }
+            notification_prefs: u.notification_prefs || { newTrip: true, statusUpdate: true, paymentLiberated: true, systemChanges: true, newRegistrations: true }
           }));
           db._saveLocal(KEYS.USERS, mapped);
           return mapped;
@@ -94,9 +94,9 @@ export const db = {
       try {
         const { data, error } = await supabase
           .from('notifications')
-          .select('id, user_id, user_name, type, message, os_ref, timestamp, summary')
+          .select('id, user_id, user_name, type, origin, message, os_ref, timestamp, summary')
           .order('timestamp', { ascending: false })
-          .limit(50);
+          .limit(100);
           
         if (!error && data) {
           const mapped: Notification[] = data.map(n => ({
@@ -104,6 +104,7 @@ export const db = {
             title: n.type.replace(/_/g, ' '), 
             description: n.message, 
             type: n.type as NotificationType,
+            origin: (n.origin as NotificationOrigin) || 'OPERACIONAL',
             authorName: n.user_name || 'Sistema', 
             authorId: n.user_id || 'system', 
             timestamp: n.timestamp, 
@@ -124,41 +125,44 @@ export const db = {
     const timestamp = new Date().toISOString();
     const osRef = summary?.os || '';
     
-    // 1. Persistência no Supabase com nomes de colunas exatos
+    // Define a origem baseada no papel do usuário ou tipo de notificação
+    let origin: NotificationOrigin = 'OPERACIONAL';
+    if (user.role === 'driver' || user.role === 'motoboy' || ['STATUS_UPDATED', 'DRIVER_DOC_UPLOADED', 'DRIVER_PROFILE_UPDATED'].includes(type)) {
+      origin = 'MOTORISTA';
+    }
+    
     if (supabase) {
       try {
-        const { error } = await supabase.from('notifications').insert({
+        await supabase.from('notifications').insert({
           user_id: user.id || 'system',
           user_name: authorName,
           type: type,
+          origin: origin,
           message: description,
           os_ref: osRef,
           timestamp: timestamp,
           summary: summary || {}
         });
-        if (error) console.error("Erro Supabase Insert:", error);
       } catch (e) {
         console.error("Exceção ao inserir notificação:", e);
       }
     }
 
-    // 2. Objeto para interface
     const newNotif: Notification = {
       id: `notif-${Date.now()}`,
       title,
       description,
       type,
+      origin,
       authorName,
       authorId: user.id || 'system',
       timestamp,
       summary
     };
 
-    // 3. Atualiza cache local
     const current = db._getLocal(KEYS.NOTIFICATIONS);
-    db._saveLocal(KEYS.NOTIFICATIONS, [newNotif, ...current].slice(0, 50));
+    db._saveLocal(KEYS.NOTIFICATIONS, [newNotif, ...current].slice(0, 100));
     
-    // 4. DISPARO DO EVENTO GLOBAL PARA O POPUP (TOAST)
     window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: newNotif }));
   },
 
@@ -220,11 +224,15 @@ export const db = {
     db._saveLocal(KEYS.TRIPS, current);
     
     if (actingUser) {
-      const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse };
+      const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse, cliente: trip.customer.name };
       if (!oldTrip) {
         await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada com sucesso.`, summary);
-      } else if (oldTrip.status !== trip.status) {
-        await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status Atualizado', `A OS ${trip.os} mudou para "${trip.status}".`, summary);
+      } else {
+        if (oldTrip.status !== trip.status) {
+           await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status de Viagem', `A OS ${trip.os} foi alterada para "${trip.status}".`, summary);
+        } else {
+           await db.addNotification(actingUser, 'TRIP_UPDATED', 'Dados da Viagem Alterados', `A Ordem de Serviço ${trip.os} foi editada por ${actingUser.displayName}.`, summary);
+        }
       }
     }
     return true;
@@ -242,14 +250,23 @@ export const db = {
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
-    const isNew = !db._getLocal(KEYS.DRIVERS).some((d: any) => d.id === driver.id);
+    const currentDrivers = db._getLocal(KEYS.DRIVERS);
+    const oldDriver = currentDrivers.find((d: any) => d.id === driver.id);
+    
     if (supabase) { await driverRepository.save(supabase, driver); }
+    
     const current = db._getLocal(KEYS.DRIVERS);
     const idx = current.findIndex((d: any) => d.id === driver.id);
     if (idx >= 0) current[idx] = driver; else current.push(driver);
     db._saveLocal(KEYS.DRIVERS, current);
-    if (actingUser && isNew) {
-      await db.addNotification(actingUser, 'DRIVER_CREATED', 'Novo Motorista', `${driver.name} foi cadastrado no sistema.`, { motorista: driver.name, placa: driver.plateHorse });
+    
+    if (actingUser) {
+      const summary = { motorista: driver.name, placa: driver.plateHorse };
+      if (!oldDriver) {
+        await db.addNotification(actingUser, 'DRIVER_CREATED', 'Novo Motorista', `${driver.name} foi cadastrado no sistema.`, summary);
+      } else {
+        await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Atualizado', `Os dados do motorista ${driver.name} foram alterados.`, summary);
+      }
     }
     return true;
   },
@@ -292,14 +309,23 @@ export const db = {
   },
 
   saveCustomer: async (customer: Customer, actingUser?: User) => {
-    const isNew = !db._getLocal(KEYS.CUSTOMERS).some((c: any) => c.id === customer.id);
+    const currentCusts = db._getLocal(KEYS.CUSTOMERS);
+    const oldCust = currentCusts.find((c: any) => c.id === customer.id);
+    
     if (supabase) { try { await supabase.from('customers').upsert(customer); } catch (e) {} }
+    
     const current = db._getLocal(KEYS.CUSTOMERS);
     const idx = current.findIndex((c: any) => c.id === customer.id);
     if (idx >= 0) current[idx] = customer; else current.push(customer);
     db._saveLocal(KEYS.CUSTOMERS, current);
-    if (actingUser && isNew) {
-      await db.addNotification(actingUser, 'CUSTOMER_CREATED', 'Novo Cliente', `${customer.name} foi adicionado à base.`, { cliente: customer.name });
+    
+    if (actingUser) {
+      const summary = { cliente: customer.name };
+      if (!oldCust) {
+        await db.addNotification(actingUser, 'CUSTOMER_CREATED', 'Novo Cliente', `${customer.name} foi adicionado à base.`, summary);
+      } else {
+        await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cliente Editado', `O cadastro do cliente ${customer.name} foi atualizado.`, summary);
+      }
     }
     return true;
   },
@@ -317,15 +343,24 @@ export const db = {
   },
 
   savePort: async (port: Port, actingUser?: User) => {
-    const isNew = !db._getLocal(KEYS.PORTS).some((p: any) => p.id === port.id);
+    const currentPorts = db._getLocal(KEYS.PORTS);
+    const oldPort = currentPorts.find((p: any) => p.id === port.id);
     const payload = { ...port, legal_name: port.legalName };
+    
     if (supabase) { try { await supabase.from('ports').upsert(payload); } catch (e) {} }
+    
     const current = db._getLocal(KEYS.PORTS);
     const idx = current.findIndex((p: any) => p.id === port.id);
     if (idx >= 0) current[idx] = port; else current.push(port);
     db._saveLocal(KEYS.PORTS, current);
-    if (actingUser && isNew) {
-      await db.addNotification(actingUser, 'PORT_CREATED', 'Novo Porto', `${port.name} foi cadastrado.`, { porto: port.name });
+    
+    if (actingUser) {
+      const summary = { porto: port.name };
+      if (!oldPort) {
+        await db.addNotification(actingUser, 'PORT_CREATED', 'Novo Porto', `${port.name} foi cadastrado.`, summary);
+      } else {
+        await db.addNotification(actingUser, 'PORT_UPDATED', 'Porto Editado', `Os dados do terminal ${port.name} foram atualizados.`, summary);
+      }
     }
     return true;
   },
@@ -360,15 +395,24 @@ export const db = {
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
-    const isNew = !db._getLocal(KEYS.PRE_STACKING).some((p: any) => p.id === ps.id);
+    const currentUnits = db._getLocal(KEYS.PRE_STACKING);
+    const oldUnit = currentUnits.find((p: any) => p.id === ps.id);
     const payload = { ...ps, legal_name: ps.legalName };
+    
     if (supabase) { try { await supabase.from('pre_stacking').upsert(payload); } catch (e) {} }
+    
     const current = db._getLocal(KEYS.PRE_STACKING);
     const idx = current.findIndex((p: any) => p.id === ps.id);
     if (idx >= 0) current[idx] = ps; else current.push(ps);
     db._saveLocal(KEYS.PRE_STACKING, current);
-    if (actingUser && isNew) {
-      await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `${ps.name} cadastrado na base.`, { unidade: ps.name });
+    
+    if (actingUser) {
+      const summary = { unidade: ps.name };
+      if (!oldUnit) {
+        await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `${ps.name} cadastrado na base.`, summary);
+      } else {
+        await db.addNotification(actingUser, 'PRESTACKING_UPDATED', 'Unidade Atualizada', `Os dados do pré-stacking ${ps.name} foram alterados.`, summary);
+      }
     }
     return true;
   },

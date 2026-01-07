@@ -33,28 +33,39 @@ export interface NotificationPreference {
   newRegistrations: boolean;
 }
 
+export type NotificationOrigin = 'OPERACIONAL' | 'MOTORISTA';
+
 export type NotificationType = 
   | 'TRIP_CREATED' 
+  | 'TRIP_UPDATED'
   | 'STATUS_UPDATED' 
   | 'PAYMENT_LIBERATED' 
   | 'DRIVER_CREATED'
+  | 'DRIVER_UPDATED'
   | 'CUSTOMER_CREATED'
+  | 'CUSTOMER_UPDATED'
   | 'PORT_CREATED'
+  | 'PORT_UPDATED'
   | 'PRESTACKING_CREATED'
+  | 'PRESTACKING_UPDATED'
   | 'CATEGORY_CREATED'
   | 'SYSTEM' 
   | 'DELETED'
   | 'OC_GENERATED'
+  | 'OC_EDITED'
   | 'LIBERACAO_GENERATED'
   | 'MINUTA_GENERATED'
+  | 'DOC_ATTACHED'
   | 'CONTRACT_UPLOADED'
-  | 'DRIVER_DOC_UPLOADED';
+  | 'DRIVER_DOC_UPLOADED'
+  | 'DRIVER_PROFILE_UPDATED';
 
 export interface Notification {
   id: string;
   title: string;
   description: string;
   type: NotificationType;
+  origin: NotificationOrigin;
   authorName: string;
   authorId: string;
   timestamp: string;
@@ -68,6 +79,7 @@ export interface Notification {
     categoria?: string;
     unidade?: string;
     fotos?: string;
+    docType?: string;
   };
 }
 
@@ -134,7 +146,7 @@ export interface DriverCapturedDoc {
   id: string;
   url: string;
   timestamp: string;
-  extractedKey?: string; // Novo: Chave de acesso extraída por IA
+  extractedKey?: string; 
 }
 
 export interface Trip {
@@ -167,8 +179,8 @@ export interface Trip {
   freightContractDoc?: TripDocument;
   cteDoc?: TripDocument;
   cvaDoc?: TripDocument;
-  nfDoc?: TripDocument; // Novo: Documento PDF da NF
-  nfKey?: string; // Novo: Chave de acesso oficial vinculada à Trip
+  nfDoc?: TripDocument; 
+  nfKey?: string; 
   ocFormData?: any;
   preStackingFormData?: any;
   scheduling?: TripScheduling;

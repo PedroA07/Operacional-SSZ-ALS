@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Trip, TripStatus, TripDocument, User, Driver } from '../../../types';
+import { Trip, TripStatus, TripDocument, User, Driver, NotificationType } from '../../../types';
 import { db } from '../../../utils/storage';
 
 export const getOperationTableColumns = (
@@ -14,7 +14,7 @@ export const getOperationTableColumns = (
   onEditScheduling: (t: Trip) => void,
   actingUser: User,
   onLocateDriver: (driverId: string) => void,
-  onViewDriverDocs: (t: Trip) => void // Novo callback
+  onViewDriverDocs: (t: Trip) => void 
 ) => {
   
   const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,11 +24,14 @@ export const getOperationTableColumns = (
     const reader = new FileReader();
     reader.onload = async () => {
       let prefix = 'DOC';
-      if (type === 'OS_PDF') prefix = 'OS';
-      else if (type === 'AGENDAMENTO') prefix = 'AGD';
-      else if (type === 'CTE') prefix = 'CTE';
-      else if (type === 'CVA') prefix = 'CVA';
-      else if (type === 'COMPLETO') prefix = 'DOSSIE';
+      let notifType: NotificationType = 'DOC_ATTACHED';
+      let docLabel = 'Documento';
+
+      if (type === 'OS_PDF') { prefix = 'OS'; docLabel = 'OS Digital'; }
+      else if (type === 'AGENDAMENTO') { prefix = 'AGD'; docLabel = 'Agendamento'; }
+      else if (type === 'CTE') { prefix = 'CTE'; docLabel = 'CT-e'; }
+      else if (type === 'CVA') { prefix = 'CVA'; docLabel = 'Certificado CVA'; }
+      else if (type === 'COMPLETO') { prefix = 'DOSSIE'; docLabel = 'Dossiê Completo'; }
 
       const customFileName = `${prefix} - ${trip.driver.name} - ${trip.os}`;
       
@@ -49,6 +52,16 @@ export const getOperationTableColumns = (
       
       try {
         await db.saveTrip(updatedTrip, actingUser);
+        
+        // Dispara notificação específica de anexo de documento
+        await db.addNotification(
+          actingUser, 
+          'DOC_ATTACHED', 
+          `Documento Anexado: ${docLabel}`, 
+          `${actingUser.displayName} anexou ${docLabel} na OS ${trip.os}.`,
+          { os: trip.os, motorista: trip.driver.name, docType: docLabel }
+        );
+
         onRefreshData();
       } catch (err) {
         alert("Erro ao salvar no banco.");
@@ -191,7 +204,6 @@ export const getOperationTableColumns = (
   { key: 'destination_ship_booking', label: '7. Destino / Navio / Booking', render: (t: Trip) => (<div className="flex flex-col space-y-2 max-w-[220px] whitespace-normal"><div className="flex flex-col space-y-0.5"><p className="font-black text-slate-700 uppercase text-[10px] leading-tight">{t.destination?.legalName || t.destination?.name || '---'}</p>{t.destination && (<span className="text-[8px] font-bold text-slate-400 uppercase">{t.destination.city} - {t.destination.state}</span>)}</div><div className="flex flex-col pt-1.5 border-t border-slate-100 gap-1.5"><div className="flex flex-col"><span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter leading-none">Navio:</span><span className="font-black text-slate-800 text-[9px] uppercase truncate">{t.ship || '---'}</span></div><div className="flex flex-col"><span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter leading-none">Booking:</span><span className="text-blue-600 font-bold text-[9px] uppercase truncate">{t.booking || '---'}</span></div></div></div>)},
   { key: 'scheduling_info', label: '8. Agendamento', render: (t: Trip) => { const sch = t.scheduling; if (!sch) return (<button onClick={() => onEditScheduling(t)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all border border-dashed border-slate-300"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg><span className="text-[8px] font-black uppercase">Agendar</span></button>); const schDate = new Date(sch.dateTime); return (<div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 min-w-[180px] group relative"><div className="flex justify-between items-start mb-2"><div className="flex flex-col" onClick={() => t.agendamentoDoc && onViewDoc(t.agendamentoDoc.url, t.agendamentoDoc.fileName)}><span className="text-[9px] font-black text-emerald-700 uppercase leading-none">{schDate.toLocaleDateString('pt-BR')}</span><span className="text-[11px] font-black text-slate-800 mt-0.5">{schDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span></div><div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all"><button onClick={() => onEditScheduling(t)} className="p-1.5 bg-white text-blue-600 rounded-lg shadow-sm border border-blue-100"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button></div></div><div className="border-t border-emerald-100/50 pt-2"><p className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter">Terminal:</p><p className="text-[9px] font-bold text-slate-600 uppercase leading-tight truncate">{sch.location}</p></div><div className="mt-2"><DocumentBlock trip={t} type="AGENDAMENTO" label="Anexo PDF" /></div></div>); } },
   { key: 'actions', label: '9. Opções', render: (t: Trip) => (<div className="flex flex-col gap-2 min-w-[160px]">
-    {/* Botão de Ver Fotos do Motorista */}
     <button onClick={() => onViewDriverDocs(t)} className="w-full flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm">
       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       <span className="text-[8px] font-black uppercase">Fotos Motorista</span>

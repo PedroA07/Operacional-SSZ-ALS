@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User, Driver } from '../../../types';
 import { maskPhone, maskCPF, maskRG, maskPlate } from '../../../utils/masks';
 import { driverService } from '../../../utils/driverService';
+import { db } from '../../../utils/storage';
 
 interface ProfileTabProps {
   user: User;
@@ -52,6 +53,15 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
     setIsSaving(true);
     const success = await driverService.updateProfile(driver.id, editForm);
     if (success) {
+      // Dispara notificação de alteração de perfil vinda do motorista
+      await db.addNotification(
+        user,
+        'DRIVER_PROFILE_UPDATED',
+        'Dados Cadastrais Alterados',
+        `${driver.name} atualizou seus dados cadastrais através do portal.`,
+        { motorista: driver.name, placa: editForm.plateHorse }
+      );
+
       setIsEditing(false);
       setTimeout(() => window.location.reload(), 300); 
     } else {
@@ -111,7 +121,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, driver, onLogout }) => {
 
         <DataField label="Documento CNH" value={isEditing ? editForm.cnh : driver.cnh} mono editing={isEditing} onChange={(v:string) => setEditForm({...editForm, cnh: v})} />
 
-        {/* FOCO NAS PLACAS CONFORME SOLICITADO */}
         <div className="grid grid-cols-2 gap-8">
            <DataField label="Placa Cavalo" value={isEditing ? editForm.plateHorse : driver.plateHorse} highlight mono editing={isEditing} mask={maskPlate} onChange={(v:string) => setEditForm({...editForm, plateHorse: v})} />
            <DataField label="Placa Carreta" value={isEditing ? editForm.plateTrailer : driver.plateTrailer} highlight mono editing={isEditing} mask={maskPlate} onChange={(v:string) => setEditForm({...editForm, plateTrailer: v})} />
