@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Trip, DriverCapturedDoc, TripDocument, User } from '../../../types';
 import { db } from '../../../utils/storage';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 interface DriverDocsViewerModalProps {
   isOpen: boolean;
@@ -33,21 +32,22 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     setIsProcessing(doc.id);
 
     try {
+      // Fix: Follow @google/genai guidelines for initialization
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const base64Data = doc.url.split(',')[1];
       
-      const response = await ai.models.generateContent({
+      // Fix: Follow @google/genai guidelines for generateContent request parameters
+      const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [
-          {
-            parts: [
-              { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
-              { text: "Extraia a CHAVE DE ACESSO de 44 dígitos desta Nota Fiscal (NF-e). Retorne APENAS os números, sem espaços ou caracteres especiais. Se não encontrar uma chave de 44 dígitos, retorne 'NAO_LOCALIZADO'." }
-            ]
-          }
-        ]
+        contents: {
+          parts: [
+            { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
+            { text: "Extraia a CHAVE DE ACESSO de 44 dígitos desta Nota Fiscal (NF-e). Retorne APENAS os números, sem espaços ou caracteres especiais. Se não encontrar uma chave de 44 dígitos, retorne 'NAO_LOCALIZADO'." }
+          ]
+        }
       });
 
+      // Fix: access .text property directly as per guidelines
       const extracted = response.text?.trim() || 'NAO_LOCALIZADO';
       const cleanKey = extracted.replace(/\D/g, '');
 
@@ -143,7 +143,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
           <div className="w-full md:w-80 bg-slate-50 border-r border-slate-200 overflow-y-auto custom-scrollbar p-6 space-y-4">
              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Capturas Recebidas ({docs.length})</p>
              {docs.length === 0 ? (
-               <div className="py-20 text-center text-slate-300 font-bold uppercase italic text-[10px]">Aguardando envio do motorista</div>
+               <div className="py-24 text-center text-slate-300 font-bold uppercase italic text-[10px]">Aguardando envio do motorista</div>
              ) : docs.map(doc => (
                <button 
                  key={doc.id}

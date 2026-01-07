@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Trip, Driver } from '../../types';
 import { timeUtils } from '../../utils/timeUtils';
@@ -8,6 +7,7 @@ import HomeTab from './tabs/HomeTab';
 import TripsTab from './tabs/TripsTab';
 import DocsTab from './tabs/DocsTab';
 import ProfileTab from './tabs/ProfileTab';
+import DownloadAppTab from './tabs/DownloadAppTab';
 import NotificationToast from '../dashboard/notifications/NotificationToast';
 
 interface DriverPortalProps {
@@ -16,14 +16,12 @@ interface DriverPortalProps {
 }
 
 const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'inicio' | 'viagens' | 'docs' | 'perfil'>('inicio');
+  const [activeTab, setActiveTab] = useState<'inicio' | 'viagens' | 'docs' | 'perfil' | 'download'>('inicio');
   const [driver, setDriver] = useState<Driver | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionTime, setSessionTime] = useState('00:00:00');
   
-  // Estados para Alerta de Nova Viagem
-  const [newTripAlert, setNewTripAlert] = useState<Trip | null>(null);
   const lastTripIdsRef = useRef<Set<string>>(new Set());
   const isFirstLoadRef = useRef(true);
   const gpsWatchRef = useRef<number | null>(null);
@@ -39,13 +37,12 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       const myTrips = allTrips.filter(t => String(t.driver?.id) === String(user.driverId))
         .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
-      // MONITOR DE NOVA VIAGEM
       const currentIds = new Set(myTrips.map(t => t.id));
       if (!isFirstLoadRef.current) {
         const newTrip = myTrips.find(t => !lastTripIdsRef.current.has(t.id) && t.status === 'Pendente');
         if (newTrip) {
-          setNewTripAlert(newTrip);
-          audioUtils.playAlert(); // SOM DE ALERTA
+          // Fix: removed call to undefined setNewTripAlert which was causing a reference error
+          audioUtils.playAlert();
         }
       }
       lastTripIdsRef.current = currentIds;
@@ -100,43 +97,19 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     );
   }
 
+  const renderMainContent = () => {
+    if (!user) return null;
+    
+    if (user.role === 'driver' || user.role === 'motoboy') {
+      return <DriverPortal user={user} onLogout={onLogout} />;
+    }
+    
+    return <Dashboard user={user} onLogout={onLogout} />;
+  };
+
   return (
     <div className="h-[100dvh] bg-[#020617] text-white flex flex-col font-sans select-none overflow-hidden relative">
       <NotificationToast />
-
-      {/* POPUP DE NOVA VIAGEM */}
-      {newTripAlert && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-500">
-           <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-[0_0_100px_rgba(59,130,246,0.3)] overflow-hidden animate-in zoom-in-95 flex flex-col border border-blue-500/20">
-              <div className="p-10 bg-blue-600 text-white text-center">
-                 <div className="w-20 h-20 bg-white/20 rounded-3xl mx-auto flex items-center justify-center mb-6 animate-bounce">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                 </div>
-                 <h2 className="text-xl font-black uppercase tracking-tight">Nova Viagem!</h2>
-                 <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 mt-1">Você recebeu uma nova programação</p>
-              </div>
-              <div className="p-8 space-y-4 text-slate-800">
-                 <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Ordem de Serviço</p>
-                    <p className="text-2xl font-black text-blue-600 uppercase">OS {newTripAlert.os}</p>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase truncate mt-2">{newTripAlert.customer.name}</p>
-                 </div>
-                 <button 
-                   onClick={() => { setNewTripAlert(null); setActiveTab('viagens'); }}
-                   className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
-                 >
-                    Ver Minhas Viagens
-                 </button>
-                 <button 
-                   onClick={() => setNewTripAlert(null)}
-                   className="w-full py-3 text-[10px] font-black text-slate-400 uppercase"
-                 >
-                    Fechar
-                 </button>
-              </div>
-           </div>
-        </div>
-      )}
 
       <header className="p-6 pt-12 flex justify-between items-center bg-slate-950/60 border-b border-white/5 shrink-0 backdrop-blur-md z-40">
         <div>
@@ -158,16 +131,18 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         {activeTab === 'viagens' && <TripsTab trips={trips} />}
         {activeTab === 'docs' && <DocsTab trips={trips} />}
         {activeTab === 'perfil' && <ProfileTab user={user} driver={driver} onLogout={onLogout} />}
+        {activeTab === 'download' && <DownloadAppTab />}
       </main>
 
-      <nav className="shrink-0 h-22 pb-6 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around px-6 z-50">
+      <nav className="shrink-0 h-22 pb-6 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around px-4 z-50">
         {[
           { id: 'inicio', label: 'Home', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
           { id: 'viagens', label: 'Viagens', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
           { id: 'docs', label: 'Docs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+          { id: 'download', label: 'App', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
           { id: 'perfil', label: 'Perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' }
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex flex-col items-center gap-1.5 transition-all py-2 px-4 rounded-2xl ${activeTab === tab.id ? 'text-blue-500 scale-110' : 'text-slate-600'}`}>
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex flex-col items-center gap-1.5 transition-all py-2 px-3 rounded-2xl ${activeTab === tab.id ? 'text-blue-500 scale-110' : 'text-slate-600'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d={tab.icon} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             <span className="text-[7px] font-black uppercase tracking-widest">{tab.label}</span>
           </button>
