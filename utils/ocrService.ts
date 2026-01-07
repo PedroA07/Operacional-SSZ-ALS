@@ -1,5 +1,4 @@
-
-// @ts-expect-error
+// @ts-ignore
 import Tesseract from 'tesseract.js';
 
 export const ocrService = {
