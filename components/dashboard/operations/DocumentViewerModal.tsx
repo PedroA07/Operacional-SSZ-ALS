@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface DocumentViewerModalProps {
@@ -56,45 +55,55 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ isOpen, onClo
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-slate-950/90 backdrop-blur-md flex flex-col animate-in fade-in duration-300">
-      <header className="h-20 bg-slate-900 border-b border-white/10 flex items-center justify-between px-8 shrink-0 shadow-2xl">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg font-black italic">ALS</div>
-          <div>
-            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none">Visualizador Digital</p>
-            <h3 className="text-sm font-bold text-white uppercase mt-1 truncate max-w-md">{title}</h3>
+    <div className="fixed inset-0 z-[3000] bg-slate-950 flex flex-col animate-in fade-in duration-300">
+      <header className="h-20 bg-slate-900 border-b border-white/10 flex items-center justify-between px-4 sm:px-8 shrink-0 shadow-2xl safe-top">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg font-black italic shrink-0">ALS</div>
+          <div className="min-w-0">
+            <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none">Documento Digital</p>
+            <h3 className="text-[11px] sm:text-sm font-bold text-white uppercase mt-1 truncate">{title}</h3>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button 
             onClick={handlePrint}
-            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 shadow-lg active:scale-95"
+            className="p-2 sm:px-6 sm:py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase transition-all flex items-center gap-2 shadow-lg active:scale-95"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4" /></svg>
-            Imprimir
+            <span className="hidden sm:inline">Imprimir</span>
           </button>
+          
           <button 
-            onClick={() => { const link = document.createElement('a'); link.href = url; link.download = title.replace(/\s+/g, '_'); link.click(); }}
-            className="px-6 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 border border-white/10"
+            onClick={onClose} 
+            className="flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-red-700 transition-all active:scale-95 shadow-xl"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-            Download
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span>Fechar</span>
           </button>
-          <button onClick={onClose} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
         </div>
       </header>
-      <div className="flex-1 overflow-hidden p-6 flex items-center justify-center bg-slate-900/50">
-        <div className="w-full h-full max-w-6xl bg-white rounded-[2rem] shadow-2xl overflow-hidden relative flex items-center justify-center">
+      
+      <div className="flex-1 overflow-hidden p-2 sm:p-6 flex items-center justify-center bg-slate-900/50">
+        <div className="w-full h-full max-w-6xl bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl overflow-hidden relative flex items-center justify-center">
           {isImage ? (
-            <div className="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
+            <div className="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-2">
               <img src={url} className="max-w-full max-h-full object-contain shadow-lg" alt={title} />
             </div>
           ) : (
-            <iframe src={`${url}#toolbar=0&navpanes=0&scrollbar=1`} className="w-full h-full border-none" title={title} />
+            <iframe 
+              src={`${url}#toolbar=0&navpanes=0&scrollbar=1`} 
+              className="w-full h-full border-none" 
+              title={title} 
+              style={{ width: '100%', height: '100%' }}
+            />
           )}
         </div>
       </div>
+
+      <style>{`
+        .safe-top { padding-top: env(safe-area-inset-top); }
+      `}</style>
     </div>
   );
 };

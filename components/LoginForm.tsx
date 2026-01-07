@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { authService } from '../utils/authService';
 import { User } from '../types';
+import Logo from './shared/Logo';
 
 interface LoginFormProps {
   onLoginSuccess: (user: User) => void;
@@ -13,7 +14,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Estados para o fluxo de primeiro acesso
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -58,11 +58,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    if (newPassword === '12345678') {
-      setError('Você não pode usar a senha padrão como sua nova senha.');
-      return;
-    }
-
     if (pendingUser) {
       setIsLoading(true);
       try {
@@ -82,15 +77,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[3rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
         
         <div className="relative bg-slate-950/80 backdrop-blur-2xl p-10 space-y-8 rounded-[3rem] shadow-2xl border border-white/10 animate-in fade-in zoom-in-95 duration-700">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-24 h-24 mb-6 rounded-3xl bg-blue-600 text-white shadow-2xl shadow-blue-500/20 rotate-3">
-              <span className="text-4xl font-black italic tracking-tighter">ALS</span>
-            </div>
+          <div className="flex flex-col items-center text-center space-y-4">
+            <Logo size="xl" variant="white" className="mb-4" />
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter">
               {isChangingPassword ? 'Nova Senha' : 'Acesso Restrito'}
             </h2>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.4em]">
-              {isChangingPassword ? 'Primeiro acesso detectado' : 'Portal Operacional'}
+              {isChangingPassword ? 'Primeiro acesso detectado' : 'Portal Administrativo'}
             </p>
           </div>
 
@@ -171,12 +164,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                   onChange={(e) => setConfirmPassword(e.target.value)} 
                 />
               </div>
-
-              {error && (
-                <div className="p-4 text-[10px] font-black uppercase text-red-400 bg-red-500/10 rounded-2xl border border-red-500/20 text-center">
-                  {error}
-                </div>
-              )}
 
               <button 
                 type="submit" 

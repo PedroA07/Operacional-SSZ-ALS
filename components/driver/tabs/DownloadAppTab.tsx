@@ -1,11 +1,28 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 
 const DownloadAppTab: React.FC = () => {
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const handleDownloadAPK = () => {
-    // Aqui seria o link para o arquivo .apk hospedado
-    alert("Iniciando download do instalador ALS_Operacional.apk...");
-    // window.location.href = '/downloads/als-driver-latest.apk'; 
+    setIsDownloading(true);
+    
+    // Simulação de link de download. 
+    // Em produção, substitua pela URL real do seu arquivo .apk
+    const apkUrl = "https://github.com/als-transportes/mobile/releases/download/v4.1.1/ALS_Operacional.apk";
+    
+    // Criamos um elemento temporário para forçar o download
+    const link = document.createElement('a');
+    link.href = apkUrl;
+    link.setAttribute('download', 'ALS_Operacional.apk');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => {
+      setIsDownloading(false);
+      alert("Se o download não iniciou automaticamente, verifique se o seu navegador não bloqueou a janela pop-up.");
+    }, 2000);
   };
 
   return (
@@ -16,8 +33,8 @@ const DownloadAppTab: React.FC = () => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
           </svg>
         </div>
-        <h2 className="text-xl font-black uppercase text-white">ALS no seu Celular</h2>
-        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Escolha como prefere usar o portal</p>
+        <h2 className="text-xl font-black uppercase text-white">Portal ALS no Celular</h2>
+        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Sincronização mobile para motoristas</p>
       </div>
 
       {/* OPÇÃO 1: INSTALAÇÃO DIRETA (APK) */}
@@ -28,54 +45,56 @@ const DownloadAppTab: React.FC = () => {
           </svg>
         </div>
         <div>
-          <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[8px] font-black uppercase tracking-widest border border-emerald-500/20">Recomendado Android</span>
-          <h3 className="text-lg font-black text-white uppercase mt-3">Baixar Instalador</h3>
-          <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Versão leve que funciona offline para consulta de documentos e fotos.</p>
+          <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[8px] font-black uppercase tracking-widest border border-emerald-500/20">Android Nativo</span>
+          <h3 className="text-lg font-black text-white uppercase mt-3">Baixar Instalador APK</h3>
+          <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Versão para Android que permite o uso de câmera e GPS de forma mais estável.</p>
         </div>
         <button 
           onClick={handleDownloadAPK}
-          className="w-full py-5 bg-white text-slate-900 rounded-3xl text-[11px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+          disabled={isDownloading}
+          className="w-full py-5 bg-blue-600 text-white rounded-3xl text-[11px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
         >
-          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Download Grátis (.APK)
+          {isDownloading ? (
+             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          )}
+          {isDownloading ? 'Iniciando...' : 'Download Agora (.APK)'}
         </button>
       </section>
 
       {/* OPÇÃO 2: PWA (WEB APP) */}
       <section className="bg-slate-900/40 border border-white/5 rounded-[2.5rem] p-8 space-y-6">
-        <h3 className="text-sm font-black text-slate-300 uppercase tracking-widest">Transformar Site em App</h3>
+        <div className="flex items-center justify-between">
+           <h3 className="text-sm font-black text-slate-300 uppercase tracking-widest">Acesso Rápido (Sem Baixar)</h3>
+           <div className="px-2 py-0.5 bg-blue-500/10 rounded text-blue-400 font-black text-[7px] border border-blue-500/20 uppercase">iPhone & Android</div>
+        </div>
         
         <div className="space-y-4">
           <div className="flex gap-4">
             <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-black text-xs shrink-0 italic">1</div>
             <div>
-              <p className="text-[11px] font-bold text-slate-200 uppercase">Clique nas Opções do Navegador</p>
-              <p className="text-[9px] text-slate-500">Geralmente são 3 pontinhos (Android) ou o ícone de compartilhar (iPhone).</p>
+              <p className="text-[11px] font-bold text-slate-200 uppercase">Abra o menu do navegador</p>
+              <p className="text-[9px] text-slate-500">Nos 3 pontinhos (Chrome) ou Compartilhar (Safari).</p>
             </div>
           </div>
           <div className="flex gap-4">
             <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-black text-xs shrink-0 italic">2</div>
             <div>
-              <p className="text-[11px] font-bold text-slate-200 uppercase">"Instalar Aplicativo"</p>
-              <p className="text-[9px] text-slate-500">Ou selecione "Adicionar à Tela de Início".</p>
+              <p className="text-[11px] font-bold text-slate-200 uppercase">Instalar Aplicativo</p>
+              <p className="text-[9px] text-slate-500">Ou "Adicionar à Tela de Início".</p>
             </div>
           </div>
         </div>
 
         <div className="pt-4 border-t border-white/5">
            <p className="text-[8px] text-slate-500 font-bold text-center uppercase leading-relaxed">
-             Isso criará um ícone na sua área de trabalho <br/> igual a um aplicativo normal.
+             Isso criará um ícone na sua área de trabalho <br/> que funciona como um app normal.
            </p>
         </div>
       </section>
-
-      <div className="bg-blue-600/5 p-6 rounded-3xl border border-blue-500/10">
-        <p className="text-[9px] text-blue-400 font-bold text-center uppercase tracking-widest italic">
-          O uso do aplicativo economiza sua bateria <br/> e seu plano de dados.
-        </p>
-      </div>
     </div>
   );
 };

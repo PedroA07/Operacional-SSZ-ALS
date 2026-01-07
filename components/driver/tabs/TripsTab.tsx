@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import { Trip } from '../../../types';
 import html2canvas from 'html2canvas';
@@ -55,20 +54,30 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
       <div className="px-1 py-4"><h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Minhas Viagens</h2></div>
 
       <div className="space-y-3">
-        {filteredTrips.map((t) => (
-          <button key={t.id} onClick={() => setSelectedTrip(t)} className="w-full p-6 rounded-[2rem] bg-slate-900 border border-white/10 text-left flex flex-col gap-2 shadow-xl active:scale-95 transition-all">
-             <div className="flex justify-between items-start">
-                <p className="text-xl font-black text-blue-500 leading-none">OS {t.os}</p>
-                <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${t.status === 'Viagem concluída' ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'}`}>{t.status}</span>
-             </div>
-             <p className="text-[10px] font-bold text-slate-400 uppercase truncate">{t.customer.name}</p>
-          </button>
-        ))}
+        {filteredTrips.map((t) => {
+          const tripDate = new Date(t.dateTime);
+          return (
+            <button key={t.id} onClick={() => setSelectedTrip(t)} className="w-full p-6 rounded-[2rem] bg-slate-900 border border-white/10 text-left flex flex-col gap-2 shadow-xl active:scale-95 transition-all">
+               <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xl font-black text-blue-500 leading-none">OS {t.os}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                       <span className="text-[9px] font-black text-white">{tripDate.toLocaleDateString('pt-BR')}</span>
+                       <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+                       <span className="text-[9px] font-black text-blue-400">{tripDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${t.status === 'Viagem concluída' ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'}`}>{t.status}</span>
+               </div>
+               <p className="text-[10px] font-bold text-slate-400 uppercase truncate mt-1">{t.customer.name}</p>
+            </button>
+          );
+        })}
       </div>
 
       {selectedTrip && (
         <div className="fixed inset-0 z-[1000] bg-[#020617] flex flex-col animate-in slide-in-from-bottom-full duration-500">
-           <header className="p-8 pt-14 flex justify-between items-center bg-slate-950 border-b border-white/5">
+           <header className="p-6 pt-12 flex justify-between items-center bg-slate-950 border-b border-white/5 shrink-0">
               <div><p className="text-[9px] font-black text-blue-500 uppercase tracking-widest leading-none">Dossiê da OS</p><h3 className="text-xl font-black text-white uppercase mt-1">Nº {selectedTrip.os}</h3></div>
               <button onClick={() => setSelectedTrip(null)} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white active:bg-red-600 transition-all"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg></button>
            </header>
@@ -96,7 +105,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
                  {selectedTrip.preStackingFormData && (
                    <button onClick={() => generatePDF(minutaRef, `Minuta - OS ${selectedTrip.os}`)} className="w-full p-6 bg-emerald-600/10 border border-emerald-500/30 rounded-3xl flex items-center justify-between active:scale-95 transition-all shadow-lg">
                       <div className="flex items-center gap-4 text-left">
-                        <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 a2 2 0 110-4m0 4v2m0-6V4" strokeWidth="2.5"/></svg></div>
+                        <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" strokeWidth="2.5"/></svg></div>
                         <div><span className="text-[11px] font-black text-white uppercase block">Minuta Pre-Stacking</span><span className="text-[8px] text-emerald-400 font-bold uppercase">Comprovante Cheio</span></div>
                       </div>
                       <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
@@ -112,7 +121,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
               </section>
            </div>
            
-           <div className="p-6 bg-slate-950 border-t border-white/5"><button onClick={() => setSelectedTrip(null)} className="w-full py-5 bg-slate-900 text-slate-500 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-950 transition-all">Voltar para Lista</button></div>
+           <div className="p-6 bg-slate-950 border-t border-white/5 shrink-0"><button onClick={() => setSelectedTrip(null)} className="w-full py-5 bg-slate-900 text-slate-500 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-950 transition-all">Voltar para Lista</button></div>
         </div>
       )}
 
