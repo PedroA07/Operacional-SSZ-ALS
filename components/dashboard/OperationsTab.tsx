@@ -49,6 +49,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
 
   // Estados de Filtro
+  const [activeStatusTab, setActiveStatusTab] = useState<'ativas' | 'concluida' | 'cancelada'>('ativas');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [filterTypes, setFilterTypes] = useState<string[]>(() => {
@@ -83,7 +84,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   useEffect(() => { 
     loadData();
-    // INTERVALO PRO: 15 segundos para monitoramento instantâneo
     const interval = setInterval(loadData, 15000);
     return () => clearInterval(interval);
   }, []);
@@ -112,6 +112,23 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   const filteredTrips = useMemo(() => {
     let result = [...trips];
+
+    // Filtro por Status da Viagem
+    if (activeStatusTab === 'ativas') {
+      const activeStatuses: TripStatus[] = [
+        'Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 
+        'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 
+        'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 
+        'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'
+      ];
+      result = result.filter(t => activeStatuses.includes(t.status));
+    } else if (activeStatusTab === 'concluida') {
+      result = result.filter(t => t.status === 'Viagem concluída');
+    } else if (activeStatusTab === 'cancelada') {
+      result = result.filter(t => t.status === 'Viagem cancelada');
+    }
+
+    // Outros Filtros
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
@@ -120,7 +137,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     if (endDate) result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
 
     return result;
-  }, [trips, filterTypes, filterClientNames, filterDriverNames, startDate, endDate]);
+  }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate]);
 
   const columns = getOperationTableColumns(
     (t, s) => { setSelectedTrip(t); setTempStatus(s); setStatusTime(new Date().toISOString().slice(0, 16)); setIsStatusModalOpen(true); },
@@ -151,22 +168,50 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     <div className="space-y-8">
       <CategoryNavigation availableOps={availableOps} customers={customers} onNavigate={setActiveView} />
 
-      <div className="pt-8 border-t border-slate-200">
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-           <OperationFilters 
-             selectedTypes={filterTypes} onTypesChange={setFilterTypes} 
-             selectedClients={filterClientNames} onClientsChange={setFilterClientNames} 
-             selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} 
-             customers={customers} drivers={drivers} 
-           />
+      <div className="pt-8 border-t border-slate-200 space-y-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+           <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1 w-full lg:w-auto">
+             {[
+               { id: 'ativas', label: 'Viagens Ativas', color: 'blue' },
+               { id: 'concluida', label: 'Concluídas', color: 'emerald' },
+               { id: 'cancelada', label: 'Canceladas', color: 'red' }
+             ].map(tab => (
+               <button 
+                 key={tab.id} 
+                 onClick={() => setActiveStatusTab(tab.id as any)}
+                 className={`flex-1 lg:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${
+                   activeStatusTab === tab.id 
+                   ? `bg-${tab.color}-600 text-white shadow-lg` 
+                   : 'bg-transparent text-slate-400 hover:bg-slate-50'
+                 }`}
+               >
+                 {tab.label}
+               </button>
+             ))}
+           </div>
+
            <DateRangeFilter 
              startDate={startDate} onStartDateChange={setStartDate}
              endDate={endDate} onEndDateChange={setEndDate}
              onClear={() => { setStartDate(''); setEndDate(''); }}
            />
         </div>
+
+        <OperationFilters 
+          selectedTypes={filterTypes} onTypesChange={setFilterTypes} 
+          selectedClients={filterClientNames} onClientsChange={setFilterClientNames} 
+          selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} 
+          customers={customers} drivers={drivers} 
+        />
         
-        <SmartOperationTable userId={user.id} componentId="ops-global" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+        <SmartOperationTable 
+          userId={user.id} 
+          componentId="ops-global" 
+          title={`Monitoramento Global: ${activeStatusTab === 'ativas' ? 'Fila Ativa' : activeStatusTab === 'concluida' ? 'Concluídas' : 'Canceladas'}`} 
+          columns={columns} 
+          data={filteredTrips} 
+          defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
+        />
       </div>
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
