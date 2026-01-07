@@ -1,10 +1,12 @@
+
 import React, { useState, useMemo, useRef } from 'react';
-import { Trip } from '../../../types';
+import { Trip, DriverCapturedDoc } from '../../../types';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import DocumentViewerModal from '../../dashboard/operations/DocumentViewerModal';
 import OrdemColetaTemplate from '../../dashboard/forms/OrdemColetaTemplate';
 import PreStackingTemplate from '../../dashboard/forms/PreStackingTemplate';
+import ImageViewer from '../../shared/ImageViewer';
 
 interface TripsTabProps {
   trips: Trip[];
@@ -15,6 +17,9 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [previewData, setPreviewData] = useState({ url: '', title: '' });
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Estados para visualizar fotos capturadas
+  const [activePhoto, setActivePhoto] = useState<DriverCapturedDoc | null>(null);
 
   const ocRef = useRef<HTMLDivElement>(null);
   const minutaRef = useRef<HTMLDivElement>(null);
@@ -89,6 +94,30 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
                  <div className="flex flex-col"><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Navio / Booking</span><span className="text-xs font-bold text-slate-300 uppercase">{selectedTrip.ship || '---'} | {selectedTrip.booking || '---'}</span></div>
               </section>
 
+              {/* SEÇÃO DE FOTOS ENVIADAS PELO MOTORISTA */}
+              {selectedTrip.driver_docs && selectedTrip.driver_docs.length > 0 && (
+                <section className="space-y-3">
+                   <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Minhas Capturas (Fotos)</p>
+                   <div className="grid grid-cols-2 gap-3">
+                      {selectedTrip.driver_docs.map((doc) => (
+                        <button 
+                          key={doc.id}
+                          onClick={() => setActivePhoto(doc)}
+                          className="aspect-[3/4] bg-slate-900 rounded-3xl border border-white/10 overflow-hidden relative shadow-lg active:scale-95 transition-all"
+                        >
+                           <img src={doc.url} className="w-full h-full object-cover" alt="Scan" />
+                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+                              <p className="text-[7px] font-black text-white/70 uppercase">{new Date(doc.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
+                           </div>
+                           <div className="absolute top-3 right-3 w-6 h-6 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
+                           </div>
+                        </button>
+                      ))}
+                   </div>
+                </section>
+              )}
+
               <section className="space-y-3">
                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Documentos Liberados</p>
                  
@@ -125,9 +154,42 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
         </div>
       )}
 
+      {/* MODAL DE VISUALIZAÇÃO DE FOTO DO MOTORISTA */}
+      {activePhoto && (
+        <div className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col animate-in fade-in duration-300">
+           <header className="h-20 bg-slate-900 border-b border-white/10 flex items-center justify-between px-6 shrink-0 safe-top">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Minha Captura</p>
+                <p className="text-xs font-bold text-white uppercase truncate mt-1">Enviada em {new Date(activePhoto.timestamp).toLocaleString('pt-BR')}</p>
+              </div>
+              <button 
+                onClick={() => setActivePhoto(null)} 
+                className="w-12 h-12 bg-red-600 text-white rounded-2xl flex items-center justify-center active:bg-red-700 transition-all shadow-xl"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+           </header>
+           
+           <div className="flex-1 overflow-hidden p-4">
+              <ImageViewer url={activePhoto.url} />
+           </div>
+
+           <div className="p-6 bg-slate-900 border-t border-white/5 safe-bottom">
+              <p className="text-[8px] text-slate-500 font-bold uppercase text-center leading-relaxed">
+                 Use os controles de Zoom e Rotação para conferir a legibilidade dos dados.
+              </p>
+           </div>
+        </div>
+      )}
+
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewData.url} title={previewData.title} />
       
       {isGenerating && <div className="fixed inset-0 z-[2000] bg-black/80 flex flex-col items-center justify-center space-y-4"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div><p className="text-[10px] font-black text-white uppercase tracking-widest">Processando Documento...</p></div>}
+
+      <style>{`
+        .safe-top { padding-top: env(safe-area-inset-top); }
+        .safe-bottom { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+      `}</style>
     </div>
   );
 };
