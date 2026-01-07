@@ -1,10 +1,10 @@
 
 export const ADMIN_CREDENTIALS = {
   username: 'operacional_ssz',
-  password: 'operacional'
+  password: 'operacoes'
 };
 
 export const APP_CONFIG = {
   companyName: 'ALS Transportes',
-  version: '4.1.0'
+  version: '4.1.1'
 };

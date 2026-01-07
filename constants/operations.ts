@@ -6,7 +6,7 @@ export const DEFAULT_OPERATIONS: OperationDefinition[] = [
     id: 'op-alianca',
     category: 'Aliança',
     clients: [
-      { name: 'Volkswagen', hasDedicatedPage: true }
+      { name: 'Volkswagen', hasDedicatedPage: false }
     ]
   },
   {
@@ -20,7 +20,7 @@ export const DEFAULT_OPERATIONS: OperationDefinition[] = [
     id: 'op-industria',
     category: 'Industria',
     clients: [
-      { name: 'Diageo', hasDedicatedPage: true }
+      { name: 'Diageo', hasDedicatedPage: false }
     ]
   },
   {

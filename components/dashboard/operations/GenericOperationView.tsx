@@ -8,6 +8,7 @@ import TripModal from './TripModal';
 import SchedulingEditModal from './SchedulingEditModal';
 import DriverDocsViewerModal from './DriverDocsViewerModal';
 import DriverLocationModal from './DriverLocationModal';
+import DocumentViewerModal from './DocumentViewerModal';
 import VWStatusSelector from './VWStatusSelector';
 import ViewFilters from './ViewFilters';
 
@@ -34,6 +35,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
+  
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
@@ -88,6 +92,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     setIsDriverDocsModalOpen(true);
   };
 
+  const handleOpenDocModal = (url: string, title: string) => {
+    setPreviewDocData({ url, title });
+    setIsDocViewerOpen(true);
+  };
+
   const isVWCrageaTrip = useMemo(() => {
     if (!selectedTrip) return false;
     const isVW = selectedTrip.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
@@ -114,7 +123,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       return matchCategory && matchClient;
     });
 
-    // 1. Filtro por Aba de Status
     if (activeStatusTab === 'ativas') {
       const activeStatuses = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
       result = result.filter(t => activeStatuses.includes(t.status));
@@ -124,7 +132,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       result = result.filter(t => t.status === 'Viagem cancelada');
     }
 
-    // 2. Filtro de Busca Textual
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(t => 
@@ -137,13 +144,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       );
     }
 
-    // 3. Filtro de Range de Datas
-    if (startDate) {
-      result = result.filter(t => t.dateTime >= startDate);
-    }
-    if (endDate) {
-      result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
-    }
+    if (startDate) result = result.filter(t => t.dateTime >= startDate);
+    if (endDate) result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
 
     return result;
   }, [allTrips, categoryName, clientName, type, activeStatusTab, searchQuery, startDate, endDate]);
@@ -159,7 +161,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
     (t) => {},
     (t) => {},
-    (url, title) => { window.open(url, '_blank'); },
+    handleOpenDocModal,
     async (id) => { if(confirm('Excluir viagem?')) { await db.deleteTrip(id, user); loadLocalData(); } },
     loadLocalData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
@@ -191,7 +193,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                 </div>
             </div>
 
-            {/* FILTROS REUTILIZÁVEIS */}
             <ViewFilters 
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -238,11 +239,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
              <div className="text-center border-b border-slate-100 pb-6 shrink-0">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento</p>
                 <p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p>
-                {isVWCrageaTrip && (
-                  <span className="inline-block mt-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[8px] font-black uppercase border border-blue-100">Operação VW/Cragea</span>
-                )}
              </div>
-
              <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-1">
                 {isVWCrageaTrip ? (
                    <VWStatusSelector currentStatus={tempStatus} onSelect={setTempStatus} />
@@ -259,7 +256,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                    <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
                 </div>
              </div>
-
              <div className="grid gap-3 pt-4 border-t border-slate-100 shrink-0">
                 <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button>
                 <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
@@ -272,6 +268,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadLocalData} preStackingUnits={preStackingUnits} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
       {isDriverDocsModalOpen && selectedTrip && (<DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={loadLocalData} />)}
+      <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
     </div>
   );
 };

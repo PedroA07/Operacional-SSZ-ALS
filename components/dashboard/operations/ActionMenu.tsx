@@ -51,9 +51,27 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
             <span className="text-[10px] font-black text-slate-700 uppercase truncate">{label}</span>
           </div>
           <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
-             <button onClick={() => onViewDoc(doc.url, doc.fileName)} className="p-1.5 hover:text-blue-600 transition-colors" title="Ver"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
-             <button onClick={() => handlePrint(doc.url, doc.fileName)} className="p-1.5 hover:text-slate-900 transition-colors" title="Imp"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg></button>
-             <button onClick={() => deleteDocument(trip, type)} className="p-1.5 hover:text-red-500 transition-colors" title="Del"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+             <button 
+               onClick={(e) => { e.stopPropagation(); onViewDoc(doc.url, doc.fileName); }} 
+               className="p-1.5 hover:text-blue-600 transition-colors" 
+               title="Visualizar Documento"
+             >
+               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="3" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+             </button>
+             <button 
+               onClick={(e) => { e.stopPropagation(); handlePrint(doc.url, doc.fileName); }} 
+               className="p-1.5 hover:text-slate-900 transition-colors" 
+               title="Imprimir"
+             >
+               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
+             </button>
+             <button 
+               onClick={(e) => { e.stopPropagation(); deleteDocument(trip, type); }} 
+               className="p-1.5 hover:text-red-500 transition-colors" 
+               title="Excluir"
+             >
+               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+             </button>
           </div>
         </div>
       );
@@ -74,7 +92,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
          <button 
            onClick={() => onViewDriverDocs(trip)}
            className="px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2"
-           title="Fotos do Motorista"
+           title="Fotos enviadas pelo Motorista"
          >
            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
            {trip.driver_docs && trip.driver_docs.length > 0 && <span className="text-[9px] font-black">{trip.driver_docs.length}</span>}
@@ -99,7 +117,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
                 </button>
                 <button onClick={() => { onEditOC(trip); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-600 hover:text-white rounded-xl transition-all group">
                   <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                  <span className="text-[10px] font-black uppercase">Editar Ordem Coleta</span>
+                   <span className="text-[10px] font-black uppercase">Editar Ordem Coleta</span>
                 </button>
                 <button onClick={() => { onEditMinuta(trip); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-emerald-600 hover:text-white rounded-xl transition-all group">
                    <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
