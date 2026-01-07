@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
@@ -44,29 +45,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
-  // Carregamento SERIALIZADO: Pede um por um com delay para não estourar limite do Supabase
+  /**
+   * CARREGAMENTO OTIMIZADO (PRO): 
+   * Executa todas as consultas ao banco em paralelo para velocidade máxima.
+   */
   const loadAllData = useCallback(async () => {
     try {
-      const d = await db.getDrivers(); setDrivers(d || []);
-      await new Promise(r => setTimeout(r, 150));
-      const c = await db.getCustomers(); setCustomers(c || []);
-      await new Promise(r => setTimeout(r, 150));
-      const p = await db.getPorts(); setPorts(p || []);
-      await new Promise(r => setTimeout(r, 150));
-      const ps = await db.getPreStacking(); setPreStacking(ps || []);
-      await new Promise(r => setTimeout(r, 150));
-      const s = await db.getStaff(); setStaffList(s || []);
-      await new Promise(r => setTimeout(r, 150));
-      const t = await db.getTrips(); setTrips(t || []);
+      const [d, c, p, ps, s, t] = await Promise.all([
+        db.getDrivers(),
+        db.getCustomers(),
+        db.getPorts(),
+        db.getPreStacking(),
+        db.getStaff(),
+        db.getTrips()
+      ]);
+
+      setDrivers(d || []);
+      setCustomers(c || []);
+      setPorts(p || []);
+      setPreStacking(ps || []);
+      setStaffList(s || []);
+      setTrips(t || []);
     } catch (e) {
-      console.warn("Alguns dados foram carregados apenas da memória local.");
+      console.error("Erro na sincronização Pro:", e);
     }
   }, []);
 
   useEffect(() => { 
     loadAllData();
-    // Intervalo de 90s para extrema economia de recursos
-    const syncInterval = setInterval(loadAllData, 90000);
+    // Intervalo reduzido para 20s (Supabase Pro aguenta altas taxas de requisição)
+    const syncInterval = setInterval(loadAllData, 20000);
     return () => clearInterval(syncInterval);
   }, [loadAllData]);
 

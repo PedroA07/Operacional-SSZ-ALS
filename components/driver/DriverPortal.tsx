@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Trip, Driver } from '../../types';
 import { timeUtils } from '../../utils/timeUtils';
@@ -58,8 +59,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadPortalData();
-    // Aumentado para 60s
-    const syncInterval = setInterval(loadPortalData, 60000);
+    // INTERVALO PRO MOTORISTA: 30 segundos
+    const syncInterval = setInterval(loadPortalData, 30000);
     const clockInterval = setInterval(() => {
       setSessionTime(timeUtils.calculateDuration(user.lastLogin));
     }, 1000);

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { User, Staff, PresenceStatus } from '../../types';
 import { db } from '../../utils/storage';
@@ -22,8 +23,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
-    // Heartbeat de 2 minutos (120000ms) para máxima economia de recursos do Supabase
-    const syncInterval = setInterval(fetchStatus, 120000);
+    // HEARTBEAT PRO: 30 segundos para atualização quase imediata da equipe online
+    const syncInterval = setInterval(fetchStatus, 30000);
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,8 +47,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     if (user.lastSeen) {
       const lastSeenDate = new Date(user.lastSeen);
       const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
-      // Considera offline após 5 minutos sem sinal (contornando a economia de energia do navegador)
-      if (diffSeconds > 300) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
+      // Offline após 3 minutos no modo Pro
+      if (diffSeconds > 180) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
     }
 
     switch (status) {

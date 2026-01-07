@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
@@ -82,8 +83,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   useEffect(() => { 
     loadData();
-    // Reduzido para 60s
-    const interval = setInterval(loadData, 60000);
+    // INTERVALO PRO: 15 segundos para monitoramento instantâneo
+    const interval = setInterval(loadData, 15000);
     return () => clearInterval(interval);
   }, []);
 
