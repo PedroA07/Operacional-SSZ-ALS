@@ -6,7 +6,7 @@ export const ADMIN_CREDENTIALS = {
 
 export const APP_CONFIG = {
   companyName: 'ALS Transportes',
-  version: '5.2.0',
-  // Use a URL do seu Worker como fallback de visualização caso não tenha configurado domínio próprio ainda
+  version: '5.3.0',
+  // URL do Worker Cloudflare R2
   r2PublicUrl: 'https://square-cell-541cals-uploader.pedro-andrade-pereira.workers.dev', 
 };

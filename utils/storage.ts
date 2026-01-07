@@ -34,14 +34,15 @@ export const KEYS = {
 
 /**
  * Utilitário para forçar um timeout em chamadas de rede.
- * Aumentado para 10 segundos (10000ms) para evitar erros de 'Connection terminated' 
- * quando o banco de dados está em modo de economia ou processando queries pesadas.
+ * Atualizado para converter builders do Supabase em Promises reais via Promise.resolve.
+ * ms aumentado para 15000 para evitar o erro 'Connection terminated' em redes lentas.
  */
-const withTimeout = <T>(promise: Promise<T> | any, ms: number = 10000): Promise<T> => {
+// Fix: Use default generic T = any and cast return to any to prevent inference falling back to {} and causing property errors on Supabase calls
+const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 15000): Promise<T> => {
   return Promise.race([
-    promise,
+    Promise.resolve(promise),
     new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_REDE')), ms))
-  ]) as Promise<T>;
+  ]) as any;
 };
 
 export const db = {
@@ -58,9 +59,8 @@ export const db = {
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
       try {
-        // Correção do erro TS2345: garantindo que a query seja tratada como Promise
-        // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
-        const { data, error } = await withTimeout<any>(supabase.from('users').select('*'));
+        // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
+        const { data, error } = await withTimeout(supabase.from('users').select('*'));
         if (!error && data) {
           const mapped = data.map(u => ({
             id: u.id, 
@@ -108,8 +108,8 @@ export const db = {
   getNotifications: async (): Promise<Notification[]> => {
     if (supabase) {
       try {
-        // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
-        const { data, error } = await withTimeout<any>(supabase
+        // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
+        const { data, error } = await withTimeout(supabase
           .from('notifications')
           .select('id, user_id, user_name, type, origin, message, os_ref, timestamp, summary')
           .order('timestamp', { ascending: false })
@@ -182,8 +182,12 @@ export const db = {
   },
 
   getStaff: async (): Promise<Staff[]> => {
-    // Fix: added Staff[] generic to withTimeout to match staffRepository.getAll return type
-    if (supabase) { try { const s = await withTimeout<Staff[]>(staffRepository.getAll(supabase)); db._saveLocal(KEYS.STAFF, s); return s; } catch (e) {} }
+    if (supabase) { try { 
+      // Fix: correctly inferred as Staff[] through generic T handled by withTimeout any cast
+      const s = await withTimeout(staffRepository.getAll(supabase)); 
+      db._saveLocal(KEYS.STAFF, s); 
+      return s; 
+    } catch (e) {} }
     return db._getLocal(KEYS.STAFF);
   },
 
@@ -211,8 +215,12 @@ export const db = {
   },
 
   getTrips: async (): Promise<Trip[]> => {
-    // Fix: added Trip[] generic to withTimeout to match tripRepository.getAll return type
-    if (supabase) { try { const t = await withTimeout<Trip[]>(tripRepository.getAll(supabase), 15000); db._saveLocal(KEYS.TRIPS, t); return t; } catch (e) {} }
+    if (supabase) { try { 
+      // Fix: correctly inferred as Trip[] through generic T handled by withTimeout any cast
+      const t = await withTimeout(tripRepository.getAll(supabase), 20000); 
+      db._saveLocal(KEYS.TRIPS, t); 
+      return t; 
+    } catch (e) {} }
     return db._getLocal(KEYS.TRIPS);
   },
 
@@ -259,8 +267,12 @@ export const db = {
   },
 
   getDrivers: async (): Promise<Driver[]> => {
-    // Fix: added Driver[] generic to withTimeout to match driverRepository.getAll return type
-    if (supabase) { try { const d = await withTimeout<Driver[]>(driverRepository.getAll(supabase)); db._saveLocal(KEYS.DRIVERS, d); return d; } catch (e) {} }
+    if (supabase) { try { 
+      // Fix: correctly inferred as Driver[] through generic T handled by withTimeout any cast
+      const d = await withTimeout(driverRepository.getAll(supabase)); 
+      db._saveLocal(KEYS.DRIVERS, d); 
+      return d; 
+    } catch (e) {} }
     return db._getLocal(KEYS.DRIVERS);
   },
 
@@ -284,8 +296,10 @@ export const db = {
   },
 
   getCustomers: async (): Promise<Customer[]> => {
-    // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
-    if (supabase) { try { const { data } = await withTimeout<any>(supabase.from('customers').select('*')); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } } catch (e) {} }
+    if (supabase) { try { 
+      // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
+      const { data } = await withTimeout(supabase.from('customers').select('*')); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } 
+    } catch (e) {} }
     return db._getLocal(KEYS.CUSTOMERS);
   },
 
@@ -306,8 +320,10 @@ export const db = {
   },
 
   getPorts: async (): Promise<Port[]> => {
-    // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
-    if (supabase) { try { const { data } = await withTimeout<any>(supabase.from('ports').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { 
+      // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
+      const { data } = await withTimeout(supabase.from('ports').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } 
+    } catch (e) {} }
     return db._getLocal(KEYS.PORTS);
   },
 
@@ -329,8 +345,10 @@ export const db = {
   },
 
   getCategories: async (): Promise<Category[]> => {
-    // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
-    if (supabase) { try { const { data } = await withTimeout<any>(supabase.from('categories').select('*')); if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; } } catch (e) {} }
+    if (supabase) { try { 
+      // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
+      const { data } = await withTimeout(supabase.from('categories').select('*')); if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; } 
+    } catch (e) {} }
     return db._getLocal(KEYS.CATEGORIES);
   },
 
@@ -347,8 +365,10 @@ export const db = {
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
-    // Fix: added generic type 'any' to withTimeout for proper inference of Supabase response
-    if (supabase) { try { const { data } = await withTimeout<any>(supabase.from('pre_stacking').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { 
+      // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
+      const { data } = await withTimeout(supabase.from('pre_stacking').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } 
+    } catch (e) {} }
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
@@ -382,8 +402,8 @@ export const db = {
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try { 
-      // Fix: added generic type 'any' to withTimeout for proper inference of Supabase query response
-      const { error } = await withTimeout<any>(supabase.from('users').select('count', { count: 'exact', head: true }).limit(1), 5000); 
+      // Fix: result type correctly inferred as any instead of {}
+      const { error } = await withTimeout(supabase.from('users').select('count', { count: 'exact', head: true }).limit(1), 5000); 
       return !error; 
     } catch { return false; }
   },
