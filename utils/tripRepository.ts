@@ -13,7 +13,7 @@ export const tripRepository = {
       booking: trip.booking,
       ship: trip.ship,
       date_time: trip.dateTime,
-      status_time: trip.statusTime || null,
+      status_time: trip.statusTime || trip.statusHistory?.[0]?.dateTime || new Date().toISOString(),
       is_late: trip.isLate,
       type: trip.type,
       container_type: trip.containerType || null,
@@ -41,7 +41,7 @@ export const tripRepository = {
       oc_form_data: trip.ocFormData || null,
       pre_stacking_form_data: trip.preStackingFormData || null,
       scheduling: trip.scheduling || null,
-      driver_docs: driverDocs // Enviado como array/objeto (JSONB)
+      driver_docs: driverDocs 
     };
   },
 
@@ -56,7 +56,7 @@ export const tripRepository = {
           return fallback;
         }
       }
-      return val; // Já é objeto/array
+      return val; 
     };
 
     return {
@@ -93,7 +93,7 @@ export const tripRepository = {
       ocFormData: safeParse(d.oc_form_data || d.ocFormData, null),
       preStackingFormData: safeParse(d.pre_stacking_form_data || d.preStackingFormData, null),
       scheduling: safeParse(d.scheduling, undefined),
-      driver_docs: safeParse(d.driver_docs, []) // Garante que as fotos Base64 voltem como array de objetos
+      driver_docs: safeParse(d.driver_docs, []) 
     };
   },
 

@@ -171,7 +171,6 @@ export const db = {
   saveTrip: async (trip: Trip, actingUser?: User) => {
     const oldTrip = db._getLocal(KEYS.TRIPS).find((t: any) => t.id === trip.id);
     
-    // CRÍTICO: Não engolimos mais o erro do Supabase
     if (supabase) {
        await tripRepository.save(supabase, trip);
     }
@@ -316,7 +315,7 @@ export const db = {
     if (supabase) { try { await supabase.from('pre_stacking').upsert(payload); } catch (e) {} }
     const current = db._getLocal(KEYS.PRE_STACKING);
     const idx = current.findIndex((p: any) => p.id === ps.id);
-    if (idx >= 0) current[idx] = ps; else current.push(idx);
+    if (idx >= 0) current[idx] = ps; else current.push(ps);
     db._saveLocal(KEYS.PRE_STACKING, current);
     if (actingUser && isNew) await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `${ps.name} cadastrado.`, { unidade: ps.name });
     return true;
