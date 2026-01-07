@@ -32,11 +32,9 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     setIsProcessing(doc.id);
 
     try {
-      // Fix: Follow @google/genai guidelines for initialization
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const base64Data = doc.url.split(',')[1];
       
-      // Fix: Follow @google/genai guidelines for generateContent request parameters
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
@@ -47,7 +45,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
         }
       });
 
-      // Fix: access .text property directly as per guidelines
       const extracted = response.text?.trim() || 'NAO_LOCALIZADO';
       const cleanKey = extracted.replace(/\D/g, '');
 
@@ -175,7 +172,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                  <div className="flex-1 bg-black/40 rounded-[2.5rem] overflow-hidden relative flex items-center justify-center border border-white/5 shadow-2xl group">
                     <img src={selectedDoc.url} className="max-w-full max-h-full object-contain" alt="Full View" />
                     
-                    {/* Botão de Download flutuante na imagem */}
                     <button 
                       onClick={() => downloadImage(selectedDoc.url, selectedDoc.id)}
                       className="absolute top-6 right-6 p-4 bg-white/10 hover:bg-blue-600 text-white rounded-2xl backdrop-blur-md border border-white/10 shadow-2xl transition-all opacity-0 group-hover:opacity-100 active:scale-90"
@@ -184,7 +180,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                     </button>
 
-                    {/* OVERLAY DE PROCESSAMENTO */}
                     {isProcessing === selectedDoc.id && (
                       <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-white space-y-4 z-20">
                          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -194,9 +189,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                     )}
                  </div>
 
-                 {/* BARRA DE FERRAMENTAS INFERIOR REDESENHADA */}
                  <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    {/* Input Manual e OCR */}
                     <div className="lg:col-span-8 bg-slate-900/60 p-6 rounded-[2rem] border border-white/5 space-y-4 shadow-xl">
                        <div className="flex items-center justify-between">
                           <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Identificador da Nota Fiscal (44 Dígitos)</p>
@@ -229,7 +222,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                        </div>
                     </div>
 
-                    {/* Ações de Vínculo */}
                     <div className="lg:col-span-4 flex flex-col gap-3 justify-center">
                        {manualKey.length === 44 && (
                          <>

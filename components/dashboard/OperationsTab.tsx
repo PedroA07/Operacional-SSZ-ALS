@@ -10,6 +10,7 @@ import DocumentViewerModal from './operations/DocumentViewerModal';
 import DriverLocationModal from './operations/DriverLocationModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
+import DateRangeFilter from './operations/DateRangeFilter';
 import CategoryNavigation from './operations/CategoryNavigation';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import PreStackingForm from './forms/PreStackingForm';
@@ -46,7 +47,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
-  
+
+  // Estados de Filtro
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [filterTypes, setFilterTypes] = useState<string[]>(() => {
     const saved = localStorage.getItem(`als_opt_types_${user.id}`);
     return saved ? JSON.parse(saved) : ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
@@ -104,8 +108,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
+    
+    // Filtro de Data
+    if (startDate) result = result.filter(t => t.dateTime >= startDate);
+    if (endDate) result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
+
     return result;
-  }, [trips, filterTypes, filterClientNames, filterDriverNames]);
+  }, [trips, filterTypes, filterClientNames, filterDriverNames, startDate, endDate]);
 
   const columns = getOperationTableColumns(
     (t, s) => { setSelectedTrip(t); setTempStatus(s); setStatusTime(new Date().toISOString().slice(0, 16)); setIsStatusModalOpen(true); },
@@ -137,12 +146,19 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       <CategoryNavigation availableOps={availableOps} customers={customers} onNavigate={setActiveView} />
 
       <div className="pt-8 border-t border-slate-200">
-        <OperationFilters 
-          selectedTypes={filterTypes} onTypesChange={setFilterTypes} 
-          selectedClients={filterClientNames} onClientsChange={setFilterClientNames} 
-          selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} 
-          customers={customers} drivers={drivers} 
-        />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+           <OperationFilters 
+             selectedTypes={filterTypes} onTypesChange={setFilterTypes} 
+             selectedClients={filterClientNames} onClientsChange={setFilterClientNames} 
+             selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} 
+             customers={customers} drivers={drivers} 
+           />
+           <DateRangeFilter 
+             startDate={startDate} onStartDateChange={setStartDate}
+             endDate={endDate} onEndDateChange={setEndDate}
+             onClear={() => { setStartDate(''); setEndDate(''); }}
+           />
+        </div>
         
         <SmartOperationTable userId={user.id} componentId="ops-global" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'cva', 'customer', 'actions']} />
       </div>

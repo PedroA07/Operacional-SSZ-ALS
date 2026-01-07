@@ -41,7 +41,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       if (!isFirstLoadRef.current) {
         const newTrip = myTrips.find(t => !lastTripIdsRef.current.has(t.id) && t.status === 'Pendente');
         if (newTrip) {
-          // Fix: removed call to undefined setNewTripAlert which was causing a reference error
           audioUtils.playAlert();
         }
       }
@@ -96,16 +95,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       </div>
     );
   }
-
-  const renderMainContent = () => {
-    if (!user) return null;
-    
-    if (user.role === 'driver' || user.role === 'motoboy') {
-      return <DriverPortal user={user} onLogout={onLogout} />;
-    }
-    
-    return <Dashboard user={user} onLogout={onLogout} />;
-  };
 
   return (
     <div className="h-[100dvh] bg-[#020617] text-white flex flex-col font-sans select-none overflow-hidden relative">
