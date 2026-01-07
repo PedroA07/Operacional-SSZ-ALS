@@ -8,6 +8,7 @@ import TripModal from './TripModal';
 import SchedulingEditModal from './SchedulingEditModal';
 import DriverDocsViewerModal from './DriverDocsViewerModal';
 import DriverLocationModal from './DriverLocationModal';
+import VWStatusSelector from './VWStatusSelector';
 
 interface GenericOperationViewProps {
   user: User;
@@ -83,6 +84,14 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     setIsDriverDocsModalOpen(true);
   };
 
+  const isVWCrageaTrip = useMemo(() => {
+    if (!selectedTrip) return false;
+    const isVW = selectedTrip.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
+    const isCragea = selectedTrip.destination?.name?.toUpperCase().includes('CRAGEA') || 
+                     selectedTrip.scheduling?.location?.toUpperCase().includes('CRAGEA');
+    return isVW && isCragea;
+  }, [selectedTrip]);
+
   const filteredDrivers = drivers.filter(d => 
     d.operations.some(op => {
       const matchCat = op.category.toUpperCase() === categoryName.toUpperCase();
@@ -102,7 +111,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     });
 
     if (activeStatusTab === 'ativas') {
-      const activeStatuses = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio'];
+      const activeStatuses = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
       result = result.filter(t => activeStatuses.includes(t.status));
     } else if (activeStatusTab === 'concluida') {
       result = result.filter(t => t.status === 'Viagem concluída');
@@ -183,27 +192,36 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
       )}
 
-      {/* MODAL DE STATUS (CORREÇÃO DO BUG) */}
+      {/* MODAL DE STATUS (UNIFICADO) */}
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6 animate-in zoom-in-95">
-             <div className="text-center border-b border-slate-100 pb-6">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+             <div className="text-center border-b border-slate-100 pb-6 shrink-0">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento</p>
                 <p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p>
+                {isVWCrageaTrip && (
+                  <span className="inline-block mt-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[8px] font-black uppercase border border-blue-100">Operação VW/Cragea</span>
+                )}
              </div>
-             <div className="space-y-4">
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Novo Status</label>
-                   <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                      {['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                   </select>
-                </div>
+
+             <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-1">
+                {isVWCrageaTrip ? (
+                   <VWStatusSelector currentStatus={tempStatus} onSelect={setTempStatus} />
+                ) : (
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Novo Status</label>
+                    <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
+                        {['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="space-y-1">
                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora do Evento</label>
                    <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
                 </div>
              </div>
-             <div className="grid gap-3 pt-4">
+
+             <div className="grid gap-3 pt-4 border-t border-slate-100 shrink-0">
                 <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button>
                 <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
              </div>

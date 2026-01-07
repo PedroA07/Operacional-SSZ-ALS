@@ -108,7 +108,13 @@ export type TripStatus =
   | 'Chegou no destino' 
   | 'Devolução do cheio'
   | 'Viagem concluída' 
-  | 'Viagem cancelada';
+  | 'Viagem cancelada'
+  | 'Chegou no Cragea'
+  | 'Aguardando carregar'
+  | 'Saiu do Cragea'
+  | 'Chegou na Volkswagen'
+  | 'Saiu da Volkswagen'
+  | 'Container sobre rodas';
 
 export interface StatusHistoryEntry {
   status: TripStatus;
