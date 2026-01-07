@@ -16,12 +16,12 @@ export const authService = {
         username: ADMIN_CREDENTIALS.username,
         displayName: 'Operacional Master',
         role: 'admin',
-        lastLogin: now, // Define o início do timer AGORA
+        lastLogin: now,
         isFirstLogin: false,
-        position: 'Diretoria'
+        position: 'Diretoria Executiva'
       };
       
-      // Salva no Banco de Dados
+      // Persiste no banco local para manter a sessão em caso de instabilidade de rede
       await db.saveUser(adminUser);
 
       return {
@@ -36,27 +36,25 @@ export const authService = {
       let foundUser = users.find(u => u.username.toLowerCase() === inputUser);
 
       if (!foundUser) {
-        return { success: false, error: 'Usuário não localizado.' };
+        return { success: false, error: 'Usuário não localizado no sistema.' };
       }
 
       if (foundUser.password !== password) {
-        return { success: false, error: 'Senha incorreta.' };
+        return { success: false, error: 'Senha de acesso inválida.' };
       }
 
-      // Prepara o usuário com o novo horário de login (zera o timer)
       const updatedLoginUser: User = {
         ...foundUser,
         lastLogin: now
       };
       
-      // Persiste no banco de dados global
       await db.saveUser(updatedLoginUser); 
 
       const forceChange = passwordRule.shouldForceChange(updatedLoginUser);
 
       return { success: true, user: updatedLoginUser, forceChange };
     } catch (err) {
-      return { success: false, error: 'Erro de conexão com a base de dados.' };
+      return { success: false, error: 'Erro de conexão com o servidor Supabase.' };
     }
   },
 
@@ -66,7 +64,7 @@ export const authService = {
       ...user,
       password: newPassword,
       isFirstLogin: false,
-      lastLogin: now // Também inicia o timer ao trocar a senha
+      lastLogin: now
     };
     
     await db.saveUser(updatedUser);
