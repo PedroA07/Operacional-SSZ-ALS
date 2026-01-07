@@ -97,7 +97,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
          <div style={{ flex: 1, borderRight: borderStyle, padding: '12px' }}>
             <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>EQUIPAMENTO</p>
             <p style={{ fontSize: '14px', fontWeight: 900 }}>
-              {formData.qtdContainer} X {formData.tipo} - {formData.padrao} ({formData.grade})
+              {formData.qtdContainer} X {formData.tipo} - {formData.padrao}
             </p>
          </div>
          <div style={{ flex: 1, padding: '12px' }}>
@@ -131,6 +131,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
             <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>PLACA CARRETA</p>
             <p style={{ fontSize: '28px', fontWeight: 900, color: '#1e40af', lineHeight: '1' }}>{selectedDriver?.plateTrailer || '---'}</p>
           </div>
+          {/* FIX: added colon to flex property to fix syntax error around line 143 */}
           <div style={{ flex: 1, textAlign: 'right' }}>
             <p style={{ fontSize: '7px', fontWeight: 900, color: '#94a3b8' }}>CONTATO</p>
             <p style={{ fontSize: '13px', fontWeight: 900 }}>{selectedDriver?.phone || '---'}</p>

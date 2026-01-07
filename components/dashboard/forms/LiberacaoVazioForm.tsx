@@ -52,7 +52,6 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
     qtdContainer: '01',
     tipo: '40HC',
     padrao: 'CARGA GERAL',
-    grade: 'A (FOOD GRADE)',
     obs: '',
     manualLocal: ''
   });
@@ -145,7 +144,6 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
           )}
         </div>
 
-        {/* SEÇÃO EQUIPAMENTO */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
            <p className={labelClass}>3. Dados do Equipamento</p>
            <div className="grid grid-cols-2 gap-4">
@@ -163,25 +161,15 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
                  </select>
               </div>
            </div>
-           <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                 <label className={labelClass}>Padrão</label>
-                 <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
-                    <option value="CARGA GERAL">CARGA GERAL</option>
-                    <option value="CARGO PREMIUM">CARGO PREMIUM</option>
-                    <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
-                    <option value="REEFER">REEFER</option>
-                    <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
-                 </select>
-              </div>
-              <div className="space-y-1">
-                 <label className={labelClass}>Grade / Qualidade</label>
-                 <select className={inputClasses} value={formData.grade} onChange={e => handleInputChange('grade', e.target.value)}>
-                    <option value="A (FOOD GRADE)">A (FOOD)</option>
-                    <option value="B (PADRÃO)">B (PADRÃO)</option>
-                    <option value="C (INDUSTRIAL)">C (IND.)</option>
-                 </select>
-              </div>
+           <div className="space-y-1">
+              <label className={labelClass}>Padrão</label>
+              <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
+                 <option value="CARGA GERAL">CARGA GERAL</option>
+                 <option value="CARGO PREMIUM">CARGO PREMIUM</option>
+                 <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
+                 <option value="REEFER">REEFER</option>
+                 <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
+              </select>
            </div>
         </div>
 
@@ -193,7 +181,6 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
           </div>
           <div className="space-y-1"><label className={labelClass}>Armador</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
           
-          {/* SELETOR DE POD SOFT PREMIUM */}
           <div className="space-y-1 relative" ref={podRef}>
             <label className={labelClass}>Porto de Descarga (POD)</label>
             <div className="relative">
@@ -249,6 +236,18 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
               ))}
             </div>
           )}
+        </div>
+
+        {/* NOVA SEÇÃO: OBSERVAÇÕES OPERACIONAIS */}
+        <div className="space-y-1">
+          <label className={labelBlueClass}>6. Observações Adicionais</label>
+          <textarea 
+            placeholder="INSTRUÇÕES PARA O MOTORISTA OU DEPÓSITO..." 
+            className={`${inputClasses} h-28 resize-none py-4 lowercase leading-relaxed`} 
+            value={formData.obs} 
+            onChange={e => handleInputChange('obs', e.target.value)} 
+          />
+          <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 ml-1">* Este texto aparecerá no rodapé da liberação.</p>
         </div>
 
         <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
