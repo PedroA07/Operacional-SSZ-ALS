@@ -94,7 +94,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
 
   const filteredCustomers = customers.filter(c => 
-    c.name.toUpperCase().includes(remetenteSearch) || 
+    (c.name && c.name.toUpperCase().includes(remetenteSearch)) || 
     (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
   );
 

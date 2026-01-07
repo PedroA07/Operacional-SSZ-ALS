@@ -1,4 +1,5 @@
 
+// @ts-ignore
 import Tesseract from 'tesseract.js';
 
 export const ocrService = {
@@ -13,7 +14,7 @@ export const ocrService = {
         imageSource,
         'por+eng', // Português e Inglês para termos técnicos de transporte
         {
-          logger: m => {
+          logger: (m: any) => {
             if (m.status === 'recognizing text' && onProgress) {
               onProgress(m.progress);
             }
