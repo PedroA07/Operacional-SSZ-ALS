@@ -50,7 +50,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
   useEffect(() => {
     loadLocalData();
-    const interval = setInterval(loadLocalData, 10000);
+    const interval = setInterval(loadLocalData, 15000);
     return () => clearInterval(interval);
   }, [categoryName, clientName]);
 
@@ -58,6 +58,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     setSelectedTrip(trip);
     setTempStatus(status);
     const now = new Date();
+    // Ajuste para input datetime-local
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     setStatusTime(now.toISOString().slice(0, 16));
     setIsStatusModalOpen(true);
@@ -120,7 +121,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
-    (t) => {}, (t) => {},
+    (t) => {}, // Funções de OC/Minuta podem ser adicionadas conforme necessidade específica da view
+    (t) => {},
     (url, title) => { window.open(url, '_blank'); },
     async (id) => { if(confirm('Excluir viagem?')) { await db.deleteTrip(id, user); loadLocalData(); } },
     loadLocalData,
@@ -172,7 +174,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                 </div>
               )}
               
-              <SmartOperationTable userId={user.id} componentId={`op-trips-${type}-${categoryName}-${activeStatusTab}`} title={`Fila de Viagens: ${activeStatusTab === 'ativas' ? 'Pendentes & Em Execução' : activeStatusTab.toUpperCase()}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'cva', 'customer', 'actions']} />
+              <SmartOperationTable userId={user.id} componentId={`op-trips-${type}-${categoryName}-${activeStatusTab}`} title={`Fila de Viagens: ${activeStatusTab === 'ativas' ? 'Pendentes & Em Execução' : activeStatusTab.toUpperCase()}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
             </div>
         </div>
       ) : (
@@ -181,31 +183,38 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
       )}
 
-      <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadLocalData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} initialCustomer={type === 'client' ? customers.find(c => c.name === clientName) : undefined} />
-      
-      <SchedulingEditModal 
-        isOpen={isSchedulingModalOpen} 
-        onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} 
-        trip={selectedTrip} 
-        onSuccess={loadLocalData} 
-        preStackingUnits={preStackingUnits} 
-      />
-
-      <DriverLocationModal 
-        isOpen={isLocationModalOpen} 
-        onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} 
-        driverId={locationDriverId} 
-      />
-      
-      {isDriverDocsModalOpen && selectedTrip && (
-        <DriverDocsViewerModal 
-          isOpen={isDriverDocsModalOpen}
-          onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }}
-          trip={selectedTrip}
-          user={user}
-          onSuccess={loadLocalData}
-        />
+      {/* MODAL DE STATUS (CORREÇÃO DO BUG) */}
+      {isStatusModalOpen && (
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6 animate-in zoom-in-95">
+             <div className="text-center border-b border-slate-100 pb-6">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento</p>
+                <p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p>
+             </div>
+             <div className="space-y-4">
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Novo Status</label>
+                   <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
+                      {['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                   </select>
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora do Evento</label>
+                   <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
+                </div>
+             </div>
+             <div className="grid gap-3 pt-4">
+                <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button>
+                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
+             </div>
+          </div>
+        </div>
       )}
+
+      <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadLocalData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} initialCustomer={type === 'client' ? customers.find(c => c.name === clientName) : undefined} />
+      <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadLocalData} preStackingUnits={preStackingUnits} />
+      <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
+      {isDriverDocsModalOpen && selectedTrip && (<DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={loadLocalData} />)}
     </div>
   );
 };

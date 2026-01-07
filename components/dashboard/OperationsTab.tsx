@@ -10,6 +10,7 @@ import DocumentViewerModal from './operations/DocumentViewerModal';
 import DriverLocationModal from './operations/DriverLocationModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
+import CategoryNavigation from './operations/CategoryNavigation';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import PreStackingForm from './forms/PreStackingForm';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
@@ -123,31 +124,24 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   }
 
   return (
-    <div className="space-y-6">
-      <OperationFilters 
-        selectedTypes={filterTypes} onTypesChange={setFilterTypes} 
-        selectedClients={filterClientNames} onClientsChange={setFilterClientNames} 
-        selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} 
-        customers={customers} drivers={drivers} 
-      />
-      
-      <SmartOperationTable userId={user.id} componentId="ops-global" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'cva', 'customer', 'actions']} />
+    <div className="space-y-8">
+      {/* Grade de Navegação Rápida */}
+      <CategoryNavigation availableOps={availableOps} customers={customers} onNavigate={setActiveView} />
+
+      <div className="pt-8 border-t border-slate-200">
+        <OperationFilters 
+          selectedTypes={filterTypes} onTypesChange={setFilterTypes} 
+          selectedClients={filterClientNames} onClientsChange={setFilterClientNames} 
+          selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} 
+          customers={customers} drivers={drivers} 
+        />
+        
+        <SmartOperationTable userId={user.id} componentId="ops-global" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'cva', 'customer', 'actions']} />
+      </div>
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
-
-      <DriverLocationModal 
-        isOpen={isLocationModalOpen} 
-        onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} 
-        driverId={locationDriverId} 
-      />
-
-      <SchedulingEditModal 
-        isOpen={isSchedulingModalOpen} 
-        onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} 
-        trip={selectedTrip} 
-        onSuccess={loadData} 
-        preStackingUnits={[...ports, ...preStacking]} 
-      />
+      <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
+      <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadData} preStackingUnits={[...ports, ...preStacking]} />
 
       {isOCFormOpen && selectedTrip && (
         <div className="fixed inset-0 z-[800] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4">
