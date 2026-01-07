@@ -57,7 +57,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       }
     } catch (err) {
       console.error("Erro Câmera:", err);
-      alert("Erro ao acessar câmera. Verifique as permissões do navegador.");
+      alert("Erro ao acessar câmera. Verifique as permissões.");
       onClose();
     }
   }, [onClose]);
@@ -83,6 +83,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
+      // Captura em qualidade alta para manter legibilidade das NFs
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       setCurrentImage(dataUrl);
       setStep('preview');
@@ -92,7 +93,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const handleAddMore = () => {
     if (currentImage) {
       const newDoc: DriverCapturedDoc = {
-        id: `scan-${Date.now()}`,
+        id: `scan-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         url: currentImage,
         timestamp: new Date().toISOString()
       };
@@ -105,54 +106,55 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const handleFinish = async () => {
     if (isSaving) return;
     
-    const finalDocs = [...capturedImages];
+    // Prepara a lista final com as capturadas anteriormente e a atual se houver
+    const finalNewDocs: DriverCapturedDoc[] = [...capturedImages];
     if (currentImage) {
-      finalDocs.push({
+      finalNewDocs.push({
         id: `scan-${Date.now()}`,
         url: currentImage,
         timestamp: new Date().toISOString()
       });
     }
 
-    if (finalDocs.length === 0) {
+    if (finalNewDocs.length === 0) {
       onClose();
       return;
     }
 
     setIsSaving(true);
     try {
-      // 1. Busca a versão mais recente da viagem no banco para evitar conflito de dados
+      // 1. Busca a viagem atualizada para garantir que não sobrescrevemos outros dados
       const allTrips = await db.getTrips();
       const latestTrip = allTrips.find(t => t.id === trip.id);
       
-      if (!latestTrip) throw new Error("Viagem não localizada no banco de dados.");
+      if (!latestTrip) throw new Error("Viagem não localizada.");
 
-      // 2. Concatena os documentos existentes com os novos documentos capturados
+      // 2. Mescla os documentos antigos com os novos capturados
+      const currentDocs = Array.isArray(latestTrip.driver_docs) ? latestTrip.driver_docs : [];
       const updatedTrip: Trip = {
         ...latestTrip,
-        driver_docs: [...(latestTrip.driver_docs || []), ...finalDocs]
+        driver_docs: [...currentDocs, ...finalNewDocs]
       };
       
-      // 3. Salva no banco de dados
+      // 3. Salva a viagem (o actingUser 'user' passado aqui garante o autor na notificação)
       const saved = await db.saveTrip(updatedTrip, user);
       
       if (saved) {
+        // Disparo explícito de notificação caso o saveTrip automático não o faça
         await db.addNotification(
           user,
           'DRIVER_DOC_UPLOADED',
-          `Scanner OS ${trip.os}`,
-          `${user.displayName} enviou ${finalDocs.length} foto(s).`,
-          { os: trip.os, motorista: user.displayName, fotos: String(finalDocs.length) }
+          `Novas Fotos: OS ${trip.os}`,
+          `${user.displayName} enviou ${finalNewDocs.length} foto(s) de documentos.`,
+          { os: trip.os, motorista: user.displayName, fotos: String(finalNewDocs.length) }
         );
 
         await onSuccess();
         onClose();
-      } else {
-        throw new Error("Falha na persistência dos dados.");
       }
     } catch (err: any) {
       console.error("Erro ao salvar documentos:", err);
-      alert(`Erro ao salvar as fotos: ${err.message || 'Verifique sua conexão'}`);
+      alert(`Erro: ${err.message || 'Falha ao enviar fotos.'}`);
     } finally {
       setIsSaving(false);
     }
@@ -162,28 +164,18 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
 
   return (
     <div className="fixed inset-0 z-[2000] bg-black flex flex-col h-[100dvh] overflow-hidden">
-      
-      <header className="px-6 py-4 bg-slate-950/95 backdrop-blur-md border-b border-white/10 flex justify-between items-center shrink-0 z-50">
+      <header className="px-6 py-4 bg-slate-950/95 border-b border-white/10 flex justify-between items-center shrink-0 z-50">
         <div>
           <p className="text-[9px] font-black text-blue-500 uppercase tracking-[0.2em] leading-none">Scanner Digital ALS</p>
           <h3 className="text-xs font-black text-white uppercase mt-1">OS {trip.os}</h3>
         </div>
-        <button 
-          onClick={onClose} 
-          className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-white active:bg-red-600 transition-all"
-        >
+        <button onClick={onClose} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-white active:bg-red-600 transition-all">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
         </button>
       </header>
 
       <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
-        <video 
-          ref={videoRef} 
-          autoPlay 
-          playsInline 
-          muted
-          className={`w-full h-full object-cover transition-opacity duration-300 ${step === 'preview' ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}
-        />
+        <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover transition-opacity duration-300 ${step === 'preview' ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`} />
 
         {step === 'camera' && (
           <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none z-10">
@@ -210,11 +202,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
                  {capturedImages.length} Pág. na Pilha
                </div>
              )}
-             <button 
-               onClick={capturePhoto}
-               disabled={!isCameraReady}
-               className={`w-20 h-20 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center active:scale-75 transition-all shadow-[0_0_40px_rgba(59,130,246,0.6)] ${!isCameraReady ? 'opacity-30 grayscale' : ''}`}
-             >
+             <button onClick={capturePhoto} disabled={!isCameraReady} className={`w-20 h-20 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center active:scale-75 transition-all shadow-[0_0_40px_rgba(59,130,246,0.6)] ${!isCameraReady ? 'opacity-30 grayscale' : ''}`}>
                <div className="w-14 h-14 bg-white border-2 border-slate-200 rounded-full shadow-inner"></div>
              </button>
           </div>
@@ -227,51 +215,25 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         {step === 'preview' ? (
           <div className="flex flex-col gap-3">
              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => setStep('camera')}
-                  className="py-4 bg-slate-900 text-slate-300 rounded-2xl text-[10px] font-black uppercase border border-white/5 active:bg-white active:text-black transition-all"
-                >
-                  Refazer
-                </button>
-                <button 
-                  onClick={handleAddMore}
-                  className="py-4 bg-blue-600/10 text-blue-400 border border-blue-500/20 rounded-2xl text-[10px] font-black uppercase active:bg-blue-600 active:text-white transition-all"
-                >
-                  + Página
-                </button>
+                <button onClick={() => setStep('camera')} className="py-4 bg-slate-900 text-slate-300 rounded-2xl text-[10px] font-black uppercase border border-white/5">Refazer</button>
+                <button onClick={handleAddMore} className="py-4 bg-blue-600/10 text-blue-400 border border-blue-500/20 rounded-2xl text-[10px] font-black uppercase">+ Página</button>
              </div>
-             <button 
-               disabled={isSaving}
-               onClick={handleFinish}
-               className="w-full py-5 bg-emerald-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl active:bg-emerald-700 transition-all flex items-center justify-center gap-3"
-             >
-               {isSaving ? 'Enviando...' : 'Finalizar e Enviar'}
+             <button disabled={isSaving} onClick={handleFinish} className="w-full py-5 bg-emerald-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl active:bg-emerald-700 transition-all flex items-center justify-center gap-3">
+               {isSaving ? 'Salvando...' : 'Finalizar e Enviar'}
              </button>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-4">
-             <button 
-               onClick={onClose}
-               className="flex-1 py-4 bg-slate-900 text-slate-500 rounded-2xl text-[10px] font-black uppercase active:text-white transition-all"
-             >
-               Cancelar
-             </button>
+             <button onClick={onClose} className="flex-1 py-4 bg-slate-900 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Cancelar</button>
              {capturedImages.length > 0 && (
-                <button 
-                  onClick={handleFinish}
-                  className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all"
-                >
-                  Enviar {capturedImages.length} Foto(s)
-                </button>
+                <button onClick={handleFinish} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all">Enviar {capturedImages.length} Foto(s)</button>
              )}
           </div>
         )}
       </footer>
 
       <style>{`
-        .safe-bottom {
-          padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
-        }
+        .safe-bottom { padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
       `}</style>
     </div>
   );

@@ -3,50 +3,60 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Trip } from '../types';
 
 export const tripRepository = {
-  mapToDb: (trip: Trip) => ({
-    id: trip.id,
-    os: trip.os,
-    booking: trip.booking,
-    ship: trip.ship,
-    date_time: trip.dateTime,
-    status_time: trip.statusTime || null,
-    is_late: trip.isLate,
-    type: trip.type,
-    container_type: trip.containerType || null,
-    category: trip.category,
-    sub_category: trip.subCategory || null,
-    container: trip.container,
-    tara: trip.tara || null,
-    seal: trip.seal || null,
-    cva: trip.cva || null,
-    customer: trip.customer,
-    destination: trip.destination || null,
-    driver: trip.driver,
-    status: trip.status,
-    status_history: trip.statusHistory || [],
-    advance_payment: trip.advancePayment,
-    balance_payment: trip.balancePayment,
-    os_doc: trip.osDoc || null,
-    agendamento_doc: trip.agendamentoDoc || null,
-    completo_doc: trip.completoDoc || null,
-    // Fix: Corrected property name from freight_contract_doc to freightContractDoc to match the Trip interface
-    freight_contract_doc: trip.freightContractDoc || null,
-    cte_doc: trip.cteDoc || null,
-    cva_doc: trip.cvaDoc || null,
-    oc_form_data: trip.ocFormData || null,
-    pre_stacking_form_data: trip.preStackingFormData || null,
-    scheduling: trip.scheduling || null,
-    driver_docs: trip.driver_docs || []
-  }),
+  mapToDb: (trip: Trip) => {
+    // Garantimos que driver_docs seja um array limpo para o Supabase (JSONB)
+    const driverDocs = Array.isArray(trip.driver_docs) ? trip.driver_docs : [];
+
+    return {
+      id: trip.id,
+      os: trip.os,
+      booking: trip.booking,
+      ship: trip.ship,
+      date_time: trip.dateTime,
+      status_time: trip.statusTime || null,
+      is_late: trip.isLate,
+      type: trip.type,
+      container_type: trip.containerType || null,
+      category: trip.category,
+      sub_category: trip.subCategory || null,
+      container: trip.container,
+      tara: trip.tara || null,
+      seal: trip.seal || null,
+      cva: trip.cva || null,
+      customer: trip.customer,
+      destination: trip.destination || null,
+      driver: trip.driver,
+      status: trip.status,
+      status_history: trip.statusHistory || [],
+      advance_payment: trip.advancePayment,
+      balance_payment: trip.balancePayment,
+      os_doc: trip.osDoc || null,
+      agendamento_doc: trip.agendamentoDoc || null,
+      completo_doc: trip.completoDoc || null,
+      freight_contract_doc: trip.freightContractDoc || null,
+      cte_doc: trip.cteDoc || null,
+      cva_doc: trip.cvaDoc || null,
+      nf_doc: trip.nfDoc || null,
+      nf_key: trip.nfKey || null,
+      oc_form_data: trip.ocFormData || null,
+      pre_stacking_form_data: trip.preStackingFormData || null,
+      scheduling: trip.scheduling || null,
+      driver_docs: driverDocs // Enviado como array/objeto (JSONB)
+    };
+  },
 
   mapFromDb: (d: any): Trip => {
-    // Helper para parsear JSON de forma segura caso venha como string
     const safeParse = (val: any, fallback: any) => {
       if (!val) return fallback;
       if (typeof val === 'string') {
-        try { return JSON.parse(val); } catch (e) { return fallback; }
+        try {
+          return JSON.parse(val);
+        } catch (e) {
+          console.error("Erro ao parsear campo JSON:", e);
+          return fallback;
+        }
       }
-      return val;
+      return val; // Já é objeto/array
     };
 
     return {
@@ -78,10 +88,12 @@ export const tripRepository = {
       freightContractDoc: d.freight_contract_doc || d.freightContractDoc,
       cteDoc: d.cte_doc || d.cteDoc,
       cvaDoc: d.cva_doc || d.cvaDoc,
+      nfDoc: d.nf_doc || d.nfDoc,
+      nfKey: d.nf_key || d.nfKey,
       ocFormData: safeParse(d.oc_form_data || d.ocFormData, null),
       preStackingFormData: safeParse(d.pre_stacking_form_data || d.preStackingFormData, null),
       scheduling: safeParse(d.scheduling, undefined),
-      driver_docs: safeParse(d.driver_docs, [])
+      driver_docs: safeParse(d.driver_docs, []) // Garante que as fotos Base64 voltem como array de objetos
     };
   },
 
