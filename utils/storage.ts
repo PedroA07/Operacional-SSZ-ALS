@@ -33,15 +33,13 @@ export const KEYS = {
 };
 
 /**
- * Utilitário para forçar um timeout em chamadas de rede.
- * Atualizado para converter builders do Supabase em Promises reais via Promise.resolve.
- * ms aumentado para 15000 para evitar o erro 'Connection terminated' em redes lentas.
+ * Utilitário de Timeout robusto.
+ * Tempo aumentado para 30s para suportar uploads de PDFs e fotos via Supabase Storage em redes instáveis.
  */
-// Fix: Use default generic T = any and cast return to any to prevent inference falling back to {} and causing property errors on Supabase calls
-const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 15000): Promise<T> => {
+const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 30000): Promise<T> => {
   return Promise.race([
     Promise.resolve(promise),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_REDE')), ms))
+    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_CONEXAO_SUPABASE')), ms))
   ]) as any;
 };
 
@@ -59,7 +57,6 @@ export const db = {
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
       try {
-        // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
         const { data, error } = await withTimeout(supabase.from('users').select('*'));
         if (!error && data) {
           const mapped = data.map(u => ({
@@ -83,7 +80,7 @@ export const db = {
           db._saveLocal(KEYS.USERS, mapped);
           return mapped;
         }
-      } catch (e) { console.warn("Supabase Users Indisponível - Usando Local"); }
+      } catch (e) { console.warn("Supabase Users Indisponível"); }
     }
     return db._getLocal(KEYS.USERS);
   },
@@ -108,10 +105,9 @@ export const db = {
   getNotifications: async (): Promise<Notification[]> => {
     if (supabase) {
       try {
-        // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
         const { data, error } = await withTimeout(supabase
           .from('notifications')
-          .select('id, user_id, user_name, type, origin, message, os_ref, timestamp, summary')
+          .select('*')
           .order('timestamp', { ascending: false })
           .limit(50));
           
@@ -182,12 +178,7 @@ export const db = {
   },
 
   getStaff: async (): Promise<Staff[]> => {
-    if (supabase) { try { 
-      // Fix: correctly inferred as Staff[] through generic T handled by withTimeout any cast
-      const s = await withTimeout(staffRepository.getAll(supabase)); 
-      db._saveLocal(KEYS.STAFF, s); 
-      return s; 
-    } catch (e) {} }
+    if (supabase) { try { const s = await withTimeout(staffRepository.getAll(supabase)); db._saveLocal(KEYS.STAFF, s); return s; } catch (e) {} }
     return db._getLocal(KEYS.STAFF);
   },
 
@@ -215,12 +206,7 @@ export const db = {
   },
 
   getTrips: async (): Promise<Trip[]> => {
-    if (supabase) { try { 
-      // Fix: correctly inferred as Trip[] through generic T handled by withTimeout any cast
-      const t = await withTimeout(tripRepository.getAll(supabase), 20000); 
-      db._saveLocal(KEYS.TRIPS, t); 
-      return t; 
-    } catch (e) {} }
+    if (supabase) { try { const t = await withTimeout(tripRepository.getAll(supabase)); db._saveLocal(KEYS.TRIPS, t); return t; } catch (e) {} }
     return db._getLocal(KEYS.TRIPS);
   },
 
@@ -267,12 +253,7 @@ export const db = {
   },
 
   getDrivers: async (): Promise<Driver[]> => {
-    if (supabase) { try { 
-      // Fix: correctly inferred as Driver[] through generic T handled by withTimeout any cast
-      const d = await withTimeout(driverRepository.getAll(supabase)); 
-      db._saveLocal(KEYS.DRIVERS, d); 
-      return d; 
-    } catch (e) {} }
+    if (supabase) { try { const d = await withTimeout(driverRepository.getAll(supabase)); db._saveLocal(KEYS.DRIVERS, d); return d; } catch (e) {} }
     return db._getLocal(KEYS.DRIVERS);
   },
 
@@ -296,10 +277,7 @@ export const db = {
   },
 
   getCustomers: async (): Promise<Customer[]> => {
-    if (supabase) { try { 
-      // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
-      const { data } = await withTimeout(supabase.from('customers').select('*')); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } 
-    } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('customers').select('*')); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } } catch (e) {} }
     return db._getLocal(KEYS.CUSTOMERS);
   },
 
@@ -320,10 +298,7 @@ export const db = {
   },
 
   getPorts: async (): Promise<Port[]> => {
-    if (supabase) { try { 
-      // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
-      const { data } = await withTimeout(supabase.from('ports').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } 
-    } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('ports').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PORTS);
   },
 
@@ -345,10 +320,7 @@ export const db = {
   },
 
   getCategories: async (): Promise<Category[]> => {
-    if (supabase) { try { 
-      // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
-      const { data } = await withTimeout(supabase.from('categories').select('*')); if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; } 
-    } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('categories').select('*')); if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; } } catch (e) {} }
     return db._getLocal(KEYS.CATEGORIES);
   },
 
@@ -358,17 +330,11 @@ export const db = {
     const idx = current.findIndex((c: any) => c.id === category.id);
     if (idx >= 0) current[idx] = category; else current.push(category);
     db._saveLocal(KEYS.CATEGORIES, current);
-    if (actingUser) {
-        await db.addNotification(actingUser, 'CATEGORY_CREATED', 'Nova Categoria', `Categoria ${category.name} cadastrada.`, { categoria: category.name });
-    }
     return true;
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
-    if (supabase) { try { 
-      // Fix: result type correctly inferred as any or PostgrestResponse instead of {}
-      const { data } = await withTimeout(supabase.from('pre_stacking').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } 
-    } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('pre_stacking').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
@@ -402,10 +368,38 @@ export const db = {
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try { 
-      // Fix: result type correctly inferred as any instead of {}
       const { error } = await withTimeout(supabase.from('users').select('count', { count: 'exact', head: true }).limit(1), 5000); 
       return !error; 
     } catch { return false; }
+  },
+
+  // Added importBackup method to db object
+  importBackup: async (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const content = e.target?.result as string;
+          const data = JSON.parse(content);
+          
+          if (data.drivers) db._saveLocal(KEYS.DRIVERS, data.drivers);
+          if (data.customers) db._saveLocal(KEYS.CUSTOMERS, data.customers);
+          if (data.ports) db._saveLocal(KEYS.PORTS, data.ports);
+          if (data.preStacking) db._saveLocal(KEYS.PRE_STACKING, data.preStacking);
+          if (data.staff) db._saveLocal(KEYS.STAFF, data.staff);
+          if (data.trips) db._saveLocal(KEYS.TRIPS, data.trips);
+          if (data.categories) db._saveLocal(KEYS.CATEGORIES, data.categories);
+          if (data.users) db._saveLocal(KEYS.USERS, data.users);
+          
+          resolve(true);
+        } catch (err) {
+          console.error("Erro na importação:", err);
+          resolve(false);
+        }
+      };
+      reader.onerror = () => resolve(false);
+      reader.readAsText(file);
+    });
   },
 
   exportBackup: async () => {
@@ -426,23 +420,5 @@ export const db = {
     a.download = `ALS_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  },
-
-  importBackup: async (file: File) => {
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (data.drivers) db._saveLocal(KEYS.DRIVERS, data.drivers);
-      if (data.customers) db._saveLocal(KEYS.CUSTOMERS, data.customers);
-      if (data.ports) db._saveLocal(KEYS.PORTS, data.ports);
-      if (data.preStacking) db._saveLocal(KEYS.PRE_STACKING, data.preStacking);
-      if (data.staff) db._saveLocal(KEYS.STAFF, data.staff);
-      if (data.trips) db._saveLocal(KEYS.TRIPS, data.trips);
-      if (data.categories) db._saveLocal(KEYS.CATEGORIES, data.categories);
-      if (data.users) db._saveLocal(KEYS.USERS, data.users);
-      return true;
-    } catch (e) {
-      return false;
-    }
   }
 };

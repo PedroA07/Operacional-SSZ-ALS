@@ -6,7 +6,6 @@ export const ADMIN_CREDENTIALS = {
 
 export const APP_CONFIG = {
   companyName: 'ALS Transportes',
-  version: '5.3.0',
-  // URL do Worker Cloudflare R2
-  r2PublicUrl: 'https://square-cell-541cals-uploader.pedro-andrade-pereira.workers.dev', 
+  version: '5.4.0',
+  // O sistema agora utiliza o Supabase Storage nativo
 };
