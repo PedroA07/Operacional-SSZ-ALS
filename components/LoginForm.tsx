@@ -45,7 +45,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           <div className="flex flex-col items-center text-center mb-10">
             <Logo size="xl" variant="white" className="mb-6" />
             <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Portal de Operações</h2>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.4em] mt-2">Acesso Restrito Santos-SSZ</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.4em] mt-2">Acesso Restrito ALS Logística</p>
           </div>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
@@ -107,15 +107,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           <div className="mt-12 flex flex-col items-center gap-4">
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Servidor R2 Ativo</span>
-              </div>
-              <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Supabase DB Sync</span>
+                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Supabase Cloud Active Sync</span>
               </div>
             </div>
-            <p className="text-[7px] text-slate-600 font-bold uppercase tracking-[0.5em]">© 2025 ALS LOGÍSTICA • TECNOLOGIA SSZ</p>
+            <p className="text-[7px] text-slate-600 font-bold uppercase tracking-[0.5em]">© 2025 ALS LOGÍSTICA • TECNOLOGIA ALS</p>
           </div>
         </div>
       </div>
