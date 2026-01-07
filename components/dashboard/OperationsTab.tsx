@@ -6,8 +6,11 @@ import { db } from '../../utils/storage';
 import TripModal from './operations/TripModal';
 import SchedulingEditModal from './operations/SchedulingEditModal';
 import DriverDocsViewerModal from './operations/DriverDocsViewerModal';
+import DocumentViewerModal from './operations/DocumentViewerModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
+import OrdemColetaForm from './forms/OrdemColetaForm';
+import PreStackingForm from './forms/PreStackingForm';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
 interface OperationsTabProps {
@@ -29,7 +32,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const [isOCFormOpen, setIsOCFormOpen] = useState(false);
+  const [isMinutaFormOpen, setIsMinutaFormOpen] = useState(false);
+  
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
   const [trackedDriver, setTrackedDriver] = useState<Driver | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
@@ -87,6 +95,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setIsDriverDocsModalOpen(true);
   };
 
+  const handleViewDoc = (url: string, title: string) => {
+    setPreviewDocData({ url, title });
+    setIsDocViewerOpen(true);
+  };
+
   const filteredTrips = useMemo(() => {
     let result = [...trips];
     if (filterCategory && filterCategory !== 'TODAS') result = result.filter(t => t.category?.toUpperCase() === filterCategory.toUpperCase());
@@ -101,9 +114,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const columns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
-    (t) => { setSelectedTrip(t); }, 
-    (t) => { setSelectedTrip(t); }, 
-    (url, title) => { window.open(url, '_blank'); },
+    (t) => { setSelectedTrip(t); setIsOCFormOpen(true); }, 
+    (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); }, 
+    handleViewDoc,
     async (id) => { if(onDeleteTrip) onDeleteTrip(id); },
     loadData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
@@ -158,6 +171,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       
       <SmartOperationTable userId={user.id} componentId="ops-main-table" title="Monitoramento Global" columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
 
+      {/* MODAL LOCALIZAÇÃO */}
       {isLocationModalOpen && trackedDriver && (
         <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-5xl h-[85vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
@@ -187,6 +201,58 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                    </div>
                  )}
               </div>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL VISUALIZAÇÃO DOCS */}
+      <DocumentViewerModal 
+        isOpen={isDocViewerOpen} 
+        onClose={() => setIsDocViewerOpen(false)} 
+        url={previewDocData.url} 
+        title={previewDocData.title} 
+      />
+
+      {/* FORMULÁRIO EDIÇÃO OC (MODAL) */}
+      {isOCFormOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[800] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-hidden animate-in zoom-in-95">
+           <div className="bg-white w-full max-w-[1700px] h-[95vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden">
+              <header className="px-8 py-5 bg-blue-600 text-white flex justify-between items-center shrink-0">
+                 <h3 className="font-black text-xs uppercase tracking-widest">Edição de Ordem de Coleta › OS {selectedTrip.os}</h3>
+                 <button onClick={() => setIsOCFormOpen(false)} className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              </header>
+              <OrdemColetaForm 
+                drivers={drivers} customers={customers} ports={ports} 
+                onClose={() => { setIsOCFormOpen(false); loadData(); }} 
+                initialData={{
+                  ...selectedTrip.ocFormData,
+                  os: selectedTrip.os,
+                  driverId: selectedTrip.driver.id,
+                  remetenteId: selectedTrip.customer.id,
+                  destinatarioId: selectedTrip.destination?.id || '',
+                  container: selectedTrip.container,
+                  booking: selectedTrip.booking,
+                  ship: selectedTrip.ship,
+                  tipo: selectedTrip.containerType || '40HC'
+                }} 
+              />
+           </div>
+        </div>
+      )}
+
+      {/* FORMULÁRIO EDIÇÃO MINUTA (MODAL) */}
+      {isMinutaFormOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[800] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-hidden animate-in zoom-in-95">
+           <div className="bg-white w-full max-w-[1700px] h-[95vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden">
+              <header className="px-8 py-5 bg-emerald-600 text-white flex justify-between items-center shrink-0">
+                 <h3 className="font-black text-xs uppercase tracking-widest">Edição de Minuta Pre-Stacking › OS {selectedTrip.os}</h3>
+                 <button onClick={() => setIsMinutaFormOpen(false)} className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              </header>
+              <PreStackingForm 
+                drivers={drivers} customers={customers} ports={ports} 
+                onClose={() => { setIsMinutaFormOpen(false); loadData(); }} 
+                initialOS={selectedTrip.os} 
+              />
            </div>
         </div>
       )}
