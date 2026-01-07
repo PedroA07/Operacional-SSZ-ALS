@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Driver, Customer, Port, User } from '../../../types';
 import { jsPDF } from 'jspdf';
@@ -90,7 +89,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
-  const inputClasses = "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm";
+  const inputClasses = "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
 
@@ -132,22 +131,53 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
           )}
         </div>
 
+        {/* SEÇÃO EQUIPAMENTO */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>3. Dados da Operação</p>
+           <p className={labelClass}>3. Dados do Equipamento</p>
+           <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                 <label className={labelClass}>Quantidade</label>
+                 <input className={inputClasses} value={formData.qtdContainer} onChange={e => handleInputChange('qtdContainer', e.target.value)} placeholder="01" />
+              </div>
+              <div className="space-y-1">
+                 <label className={labelClass}>Tipo</label>
+                 <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
+                    <option value="40HC">40HC</option>
+                    <option value="40HR">40HR</option>
+                    <option value="40DC">40DC</option>
+                    <option value="20DC">20DC</option>
+                 </select>
+              </div>
+           </div>
+           <div className="space-y-1">
+              <label className={labelClass}>Padrão do Container</label>
+              <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
+                 <option value="CARGA GERAL">CARGA GERAL</option>
+                 <option value="CARGO PREMIUM">CARGO PREMIUM</option>
+                 <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
+                 <option value="REEFER">REEFER</option>
+                 <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
+                 <option value="FLAT RACK">FLAT RACK</option>
+              </select>
+           </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+          <p className={labelClass}>4. Dados da Operação</p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
             <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
           </div>
           <div className="space-y-1"><label className={labelClass}>Armador</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
           <div className="space-y-1">
-            <label className={labelClass}>POD</label>
+            <label className={labelClass}>POD (Porto Descarga)</label>
             <input list="pod-suggestions" className={inputClasses} value={formData.pod} onChange={e => handleInputChange('pod', e.target.value)} />
             <datalist id="pod-suggestions">{commonPODs.map(p => <option key={p} value={p} />)}</datalist>
           </div>
         </div>
 
         <div className="relative">
-          <label className={labelBlueClass}>4. Motorista Autorizado</label>
+          <label className={labelBlueClass}>5. Motorista Autorizado</label>
           <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
           {showDriverResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">

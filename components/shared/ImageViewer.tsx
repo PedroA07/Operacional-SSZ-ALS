@@ -15,8 +15,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   
-  // Estados para OCR
+  // Estados para OCR Local
   const [isExtracting, setIsExtracting] = useState(false);
+  const [extractProgress, setExtractProgress] = useState(0);
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
   
@@ -41,17 +42,20 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     setRotation(0);
     setPosition({ x: 0, y: 0 });
     setExtractedText(null);
+    setExtractProgress(0);
   };
 
   const handleExtractText = async () => {
     if (isExtracting) return;
     setIsExtracting(true);
     setExtractedText(null);
+    setExtractProgress(0);
+    
     try {
-      const text = await ocrService.extractAllText(url);
+      const text = await ocrService.extractAllText(url, (p) => setExtractProgress(p));
       setExtractedText(text);
     } catch (err) {
-      alert("Falha ao processar imagem para leitura de texto.");
+      alert("Falha no processador de texto local.");
     } finally {
       setIsExtracting(false);
     }
@@ -129,42 +133,53 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
           />
         </div>
 
-        {/* LOADING OCR */}
+        {/* LOADING OCR LOCAL */}
         {isExtracting && (
-          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4 animate-in fade-in">
-             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-             <p className="text-[10px] font-black text-white uppercase tracking-[0.3em]">IA Analisando Documento...</p>
+          <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex flex-col items-center justify-center space-y-6 animate-in fade-in">
+             <div className="relative w-24 h-24 flex items-center justify-center">
+                <svg className="w-full h-full -rotate-90">
+                   <circle cx="48" cy="48" r="44" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-white/10" />
+                   <circle cx="48" cy="48" r="44" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={276} strokeDashoffset={276 - (276 * extractProgress)} className="text-blue-500 transition-all duration-300" />
+                </svg>
+                <span className="absolute text-[10px] font-black text-white">{Math.round(extractProgress * 100)}%</span>
+             </div>
+             <div className="text-center">
+                <p className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Scanner Local Ativo</p>
+                <p className="text-[8px] text-slate-400 font-bold uppercase mt-2">Processando caracteres sem IA externa...</p>
+             </div>
           </div>
         )}
 
-        {/* RESULTADO OCR OVERLAY */}
+        {/* RESULTADO OCR OVERLAY (ESTILO FERRAMENTA DE CAPTURA) */}
         {extractedText && (
-          <div className="absolute inset-x-6 top-6 bottom-24 z-[60] bg-slate-900/95 border border-white/10 rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-top-4 duration-500">
-             <div className="p-5 border-b border-white/5 flex justify-between items-center bg-slate-950/50">
+          <div className="absolute inset-x-6 top-6 bottom-24 z-[60] bg-white/95 backdrop-blur-xl border border-blue-200 rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-top-4 duration-500">
+             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-3">
                    <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                    </div>
-                   <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Texto Identificado</p>
+                   <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Ações de Texto (Local)</p>
                 </div>
-                <button onClick={() => setExtractedText(null)} className="p-2 text-slate-500 hover:text-white transition-colors">
+                <button onClick={() => setExtractedText(null)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all">
                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
                 </button>
              </div>
              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <pre className="text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed">
-                   {extractedText}
-                </pre>
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                  <pre className="text-xs font-mono text-slate-700 whitespace-pre-wrap leading-relaxed select-all">
+                     {extractedText}
+                  </pre>
+                </div>
              </div>
-             <div className="p-6 border-t border-white/5 flex justify-center">
+             <div className="p-6 border-t border-slate-100 flex justify-center bg-white">
                 <button 
                   onClick={handleCopyText}
-                  className={`px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 shadow-xl ${copyFeedback ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-500 active:scale-95'}`}
+                  className={`px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 shadow-xl ${copyFeedback ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-500 active:scale-95'}`}
                 >
                   {copyFeedback ? (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
-                      Copiado!
+                      Copiado para Área de Transferência
                     </>
                   ) : (
                     <>
@@ -219,7 +234,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
           onClick={handleExtractText}
           disabled={isExtracting}
           className={`p-3 rounded-xl transition-all ${extractedText ? 'bg-blue-600 text-white' : 'text-white hover:bg-white/10'}`}
-          title="Extrair Texto (IA)"
+          title="Ações de Texto (Local)"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         </button>

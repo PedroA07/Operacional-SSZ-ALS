@@ -1,37 +1,30 @@
 
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import Tesseract from 'tesseract.js';
 
 export const ocrService = {
   /**
-   * Extrai todo o texto contido em uma imagem usando o modelo Gemini.
+   * Extrai texto localmente usando Tesseract.js (Sem uso de APIs de IA externas)
+   * @param imageSource URL da imagem ou base64
+   * @param onProgress Callback opcional para monitorar o progresso (0 a 1)
    */
-  extractAllText: async (base64Image: string): Promise<string> => {
+  extractAllText: async (imageSource: string, onProgress?: (p: number) => void): Promise<string> => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      // Remove o prefixo data:image/... se existir
-      const base64Data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
-
-      const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: {
-          parts: [
-            { 
-              inlineData: { 
-                mimeType: 'image/jpeg', 
-                data: base64Data 
-              } 
-            },
-            { 
-              text: "Leia esta imagem e extraia TODO o texto contido nela de forma organizada. Mantenha a estrutura de parágrafos se possível. Retorne apenas o texto encontrado, sem comentários adicionais." 
+      const result = await Tesseract.recognize(
+        imageSource,
+        'por+eng', // Português e Inglês para termos técnicos de transporte
+        {
+          logger: m => {
+            if (m.status === 'recognizing text' && onProgress) {
+              onProgress(m.progress);
             }
-          ]
+          }
         }
-      });
+      );
 
-      return response.text || '';
+      return result.data.text || '';
     } catch (error) {
-      console.error("Erro no OCR Gemini:", error);
-      throw new Error("Não foi possível extrair o texto da imagem.");
+      console.error("Erro no OCR Local:", error);
+      throw new Error("Falha ao ler o documento localmente.");
     }
   }
 };
