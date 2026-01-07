@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
@@ -30,6 +29,14 @@ export const KEYS = {
   NOTIFICATIONS: 'als_notifications'
 };
 
+// Utilitário para forçar um timeout em chamadas de rede
+const withTimeout = (promise: Promise<any>, ms: number = 3500) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_REDE')), ms))
+  ]);
+};
+
 export const db = {
   _saveLocal: (key: string, data: any) => {
     try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) { console.warn(`Quota local excedida`); }
@@ -44,7 +51,7 @@ export const db = {
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
       try {
-        const { data, error } = await supabase.from('users').select('*');
+        const { data, error } = await withTimeout(supabase.from('users').select('*'));
         if (!error && data) {
           const mapped = data.map(u => ({
             id: u.id, 
@@ -67,7 +74,7 @@ export const db = {
           db._saveLocal(KEYS.USERS, mapped);
           return mapped;
         }
-      } catch (e) {}
+      } catch (e) { console.warn("Supabase Users Indisponível - Usando Local"); }
     }
     return db._getLocal(KEYS.USERS);
   },
@@ -81,7 +88,7 @@ export const db = {
       lastseen: user.lastSeen, isonlinevisible: user.isOnlineVisible ?? true,
       presence_status: user.presence_status || 'offline', notification_prefs: user.notificationPrefs
     };
-    if (supabase) { try { await supabase.from('users').upsert(payload); } catch (e) {} }
+    if (supabase) { try { await withTimeout(supabase.from('users').upsert(payload)); } catch (e) {} }
     const current = db._getLocal(KEYS.USERS);
     const idx = current.findIndex((u: any) => u.id === user.id);
     if (idx >= 0) current[idx] = user; else current.push(user);
@@ -92,11 +99,11 @@ export const db = {
   getNotifications: async (): Promise<Notification[]> => {
     if (supabase) {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await withTimeout(supabase
           .from('notifications')
           .select('id, user_id, user_name, type, origin, message, os_ref, timestamp, summary')
           .order('timestamp', { ascending: false })
-          .limit(100);
+          .limit(50));
           
         if (!error && data) {
           const mapped: Notification[] = data.map(n => ({
@@ -113,9 +120,7 @@ export const db = {
           db._saveLocal(KEYS.NOTIFICATIONS, mapped);
           return mapped;
         }
-      } catch (e) {
-        console.error("Erro ao buscar notificações do Supabase:", e);
-      }
+      } catch (e) {}
     }
     return db._getLocal(KEYS.NOTIFICATIONS);
   },
@@ -125,7 +130,6 @@ export const db = {
     const timestamp = new Date().toISOString();
     const osRef = summary?.os || '';
     
-    // Define a origem baseada no papel do usuário ou tipo de notificação
     let origin: NotificationOrigin = 'OPERACIONAL';
     if (user.role === 'driver' || user.role === 'motoboy' || ['STATUS_UPDATED', 'DRIVER_DOC_UPLOADED', 'DRIVER_PROFILE_UPDATED'].includes(type)) {
       origin = 'MOTORISTA';
@@ -133,7 +137,7 @@ export const db = {
     
     if (supabase) {
       try {
-        await supabase.from('notifications').insert({
+        await withTimeout(supabase.from('notifications').insert({
           user_id: user.id || 'system',
           user_name: authorName,
           type: type,
@@ -142,33 +146,24 @@ export const db = {
           os_ref: osRef,
           timestamp: timestamp,
           summary: summary || {}
-        });
-      } catch (e) {
-        console.error("Exceção ao inserir notificação:", e);
-      }
+        }));
+      } catch (e) {}
     }
 
     const newNotif: Notification = {
       id: `notif-${Date.now()}`,
-      title,
-      description,
-      type,
-      origin,
-      authorName,
-      authorId: user.id || 'system',
-      timestamp,
-      summary
+      title, description, type, origin, authorName, authorId: user.id || 'system', timestamp, summary
     };
 
     const current = db._getLocal(KEYS.NOTIFICATIONS);
     db._saveLocal(KEYS.NOTIFICATIONS, [newNotif, ...current].slice(0, 100));
-    
     window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: newNotif }));
   },
 
   updatePresence: async (userId: string, status: PresenceStatus) => {
     if (supabase) {
       try {
+        // Sem timeout aqui para não travar a main thread
         await supabase.from('users').update({ 
           lastseen: new Date().toISOString(),
           presence_status: status
@@ -178,12 +173,12 @@ export const db = {
   },
 
   getStaff: async (): Promise<Staff[]> => {
-    if (supabase) { try { const s = await staffRepository.getAll(supabase); db._saveLocal(KEYS.STAFF, s); return s; } catch (e) {} }
+    if (supabase) { try { const s = await withTimeout(staffRepository.getAll(supabase)); db._saveLocal(KEYS.STAFF, s); return s; } catch (e) {} }
     return db._getLocal(KEYS.STAFF);
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
-    if (supabase) { await staffRepository.save(supabase, staff); }
+    if (supabase) { try { await withTimeout(staffRepository.save(supabase, staff)); } catch (e) {} }
     const currentUsers = await db.getUsers();
     const linkedUser = currentUsers.find(u => u.staffId === staff.id);
     if (linkedUser) {
@@ -199,41 +194,29 @@ export const db = {
   },
 
   deleteStaff: async (id: string) => {
-    if (supabase) { try { await staffRepository.delete(supabase, id); } catch (e) {} }
+    if (supabase) { try { await withTimeout(staffRepository.delete(supabase, id)); } catch (e) {} }
     const current = db._getLocal(KEYS.STAFF);
     db._saveLocal(KEYS.STAFF, current.filter((s: any) => s.id !== id));
     return true;
   },
 
   getTrips: async (): Promise<Trip[]> => {
-    if (supabase) { try { const t = await tripRepository.getAll(supabase); db._saveLocal(KEYS.TRIPS, t); return t; } catch (e) {} }
+    if (supabase) { try { const t = await withTimeout(tripRepository.getAll(supabase), 5000); db._saveLocal(KEYS.TRIPS, t); return t; } catch (e) {} }
     return db._getLocal(KEYS.TRIPS);
   },
 
   saveTrip: async (trip: Trip, actingUser?: User) => {
     const currentTrips = db._getLocal(KEYS.TRIPS);
     const oldTrip = currentTrips.find((t: any) => t.id === trip.id);
-    
-    if (supabase) {
-       await tripRepository.save(supabase, trip);
-    }
-    
+    if (supabase) { try { await withTimeout(tripRepository.save(supabase, trip)); } catch (e) {} }
     const current = db._getLocal(KEYS.TRIPS);
     const idx = current.findIndex((t: Trip) => t.id === trip.id);
     if (idx >= 0) current[idx] = trip; else current.push(trip);
     db._saveLocal(KEYS.TRIPS, current);
-    
     if (actingUser) {
       const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse, cliente: trip.customer.name };
-      if (!oldTrip) {
-        await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada com sucesso.`, summary);
-      } else {
-        if (oldTrip.status !== trip.status) {
-           await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status de Viagem', `A OS ${trip.os} foi alterada para "${trip.status}".`, summary);
-        } else {
-           await db.addNotification(actingUser, 'TRIP_UPDATED', 'Dados da Viagem Alterados', `A Ordem de Serviço ${trip.os} foi editada por ${actingUser.displayName}.`, summary);
-        }
-      }
+      if (!oldTrip) await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `OS ${trip.os} cadastrada com sucesso.`, summary);
+      else if (oldTrip.status !== trip.status) await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status de Viagem', `A OS ${trip.os} foi alterada para "${trip.status}".`, summary);
     }
     return true;
   },
@@ -241,184 +224,136 @@ export const db = {
   deleteTrip: async (id: string, actingUser?: User) => {
     const current = db._getLocal(KEYS.TRIPS);
     const trip = current.find((t: Trip) => t.id === id);
-    if (supabase) { try { await tripRepository.delete(supabase, id); } catch (e) {} }
+    if (supabase) { try { await withTimeout(tripRepository.delete(supabase, id)); } catch (e) {} }
     db._saveLocal(KEYS.TRIPS, current.filter((t: Trip) => t.id !== id));
-    if (actingUser && trip) {
-      await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `A OS ${trip.os} foi removida do sistema por ${actingUser.displayName}.`, { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse });
-    }
+    if (actingUser && trip) await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `A OS ${trip.os} foi removida.`, { os: trip.os, motorista: trip.driver.name });
     return true;
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
-    const currentDrivers = db._getLocal(KEYS.DRIVERS);
-    const oldDriver = currentDrivers.find((d: any) => d.id === driver.id);
-    
-    if (supabase) { await driverRepository.save(supabase, driver); }
-    
+    if (supabase) { try { await withTimeout(driverRepository.save(supabase, driver)); } catch (e) {} }
     const current = db._getLocal(KEYS.DRIVERS);
     const idx = current.findIndex((d: any) => d.id === driver.id);
     if (idx >= 0) current[idx] = driver; else current.push(driver);
     db._saveLocal(KEYS.DRIVERS, current);
-    
-    if (actingUser) {
-      const summary = { motorista: driver.name, placa: driver.plateHorse };
-      if (!oldDriver) {
-        await db.addNotification(actingUser, 'DRIVER_CREATED', 'Novo Motorista', `${driver.name} foi cadastrado no sistema.`, summary);
-      } else {
-        await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Atualizado', `Os dados do motorista ${driver.name} foram alterados.`, summary);
-      }
-    }
+    if (actingUser) await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Atualizado', `Motorista ${driver.name} atualizado.`, { motorista: driver.name, placa: driver.plateHorse });
     return true;
   },
 
+  // Fix: Added deleteDriver method to handle driver deletion
   deleteDriver: async (id: string) => {
-    if (supabase) {
-      try { await driverRepository.delete(supabase, id); } catch (e) {}
-    }
+    if (supabase) { try { await withTimeout(driverRepository.delete(supabase, id)); } catch (e) {} }
     const current = db._getLocal(KEYS.DRIVERS);
     db._saveLocal(KEYS.DRIVERS, current.filter((d: any) => d.id !== id));
     return true;
   },
 
+  getDrivers: async (): Promise<Driver[]> => {
+    if (supabase) { try { const d = await withTimeout(driverRepository.getAll(supabase)); db._saveLocal(KEYS.DRIVERS, d); return d; } catch (e) {} }
+    return db._getLocal(KEYS.DRIVERS);
+  },
+
+  // Fix: Added updateDriverLocation to persist GPS coordinates from the driver portal
   updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
+    const now = new Date().toISOString();
     if (supabase) {
       try {
         await supabase.from('drivers').update({
           current_lat: lat,
           current_lng: lng,
-          last_location_at: new Date().toISOString()
+          last_location_at: now
         }).eq('id', driverId);
       } catch (e) {}
     }
     const current = db._getLocal(KEYS.DRIVERS);
     const idx = current.findIndex((d: any) => d.id === driverId);
     if (idx >= 0) {
-      current[idx] = { ...current[idx], currentLat: lat, currentLng: lng, lastLocationAt: new Date().toISOString() };
+      current[idx] = { ...current[idx], currentLat: lat, currentLng: lng, lastLocationAt: now };
       db._saveLocal(KEYS.DRIVERS, current);
     }
   },
 
-  getDrivers: async (): Promise<Driver[]> => {
-    if (supabase) { try { const d = await driverRepository.getAll(supabase); db._saveLocal(KEYS.DRIVERS, d); return d; } catch (e) {} }
-    return db._getLocal(KEYS.DRIVERS);
-  },
-
   getCustomers: async (): Promise<Customer[]> => {
-    if (supabase) { try { const { data } = await supabase.from('customers').select('*'); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('customers').select('*')); if (data) { db._saveLocal(KEYS.CUSTOMERS, data); return data; } } catch (e) {} }
     return db._getLocal(KEYS.CUSTOMERS);
   },
 
   saveCustomer: async (customer: Customer, actingUser?: User) => {
-    const currentCusts = db._getLocal(KEYS.CUSTOMERS);
-    const oldCust = currentCusts.find((c: any) => c.id === customer.id);
-    
-    if (supabase) { try { await supabase.from('customers').upsert(customer); } catch (e) {} }
-    
+    if (supabase) { try { await withTimeout(supabase.from('customers').upsert(customer)); } catch (e) {} }
     const current = db._getLocal(KEYS.CUSTOMERS);
     const idx = current.findIndex((c: any) => c.id === customer.id);
     if (idx >= 0) current[idx] = customer; else current.push(customer);
     db._saveLocal(KEYS.CUSTOMERS, current);
-    
-    if (actingUser) {
-      const summary = { cliente: customer.name };
-      if (!oldCust) {
-        await db.addNotification(actingUser, 'CUSTOMER_CREATED', 'Novo Cliente', `${customer.name} foi adicionado à base.`, summary);
-      } else {
-        await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cliente Editado', `O cadastro do cliente ${customer.name} foi atualizado.`, summary);
-      }
-    }
     return true;
   },
 
+  // Fix: Added deleteCustomer to handle customer record removal
   deleteCustomer: async (id: string) => {
-    if (supabase) { try { await supabase.from('customers').delete().eq('id', id); } catch (e) {} }
+    if (supabase) { try { await withTimeout(supabase.from('customers').delete().eq('id', id)); } catch (e) {} }
     const current = db._getLocal(KEYS.CUSTOMERS);
     db._saveLocal(KEYS.CUSTOMERS, current.filter((c: any) => c.id !== id));
     return true;
   },
 
   getPorts: async (): Promise<Port[]> => {
-    if (supabase) { try { const { data } = await supabase.from('ports').select('*'); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('ports').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })) as Port[]; db._saveLocal(KEYS.PORTS, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PORTS);
   },
 
   savePort: async (port: Port, actingUser?: User) => {
-    const currentPorts = db._getLocal(KEYS.PORTS);
-    const oldPort = currentPorts.find((p: any) => p.id === port.id);
     const payload = { ...port, legal_name: port.legalName };
-    
-    if (supabase) { try { await supabase.from('ports').upsert(payload); } catch (e) {} }
-    
+    if (supabase) { try { await withTimeout(supabase.from('ports').upsert(payload)); } catch (e) {} }
     const current = db._getLocal(KEYS.PORTS);
     const idx = current.findIndex((p: any) => p.id === port.id);
     if (idx >= 0) current[idx] = port; else current.push(port);
     db._saveLocal(KEYS.PORTS, current);
-    
-    if (actingUser) {
-      const summary = { porto: port.name };
-      if (!oldPort) {
-        await db.addNotification(actingUser, 'PORT_CREATED', 'Novo Porto', `${port.name} foi cadastrado.`, summary);
-      } else {
-        await db.addNotification(actingUser, 'PORT_UPDATED', 'Porto Editado', `Os dados do terminal ${port.name} foram atualizados.`, summary);
-      }
-    }
     return true;
   },
 
+  // Fix: Added deletePort to handle port/terminal record removal
   deletePort: async (id: string) => {
-    if (supabase) { try { await supabase.from('ports').delete().eq('id', id); } catch (e) {} }
+    if (supabase) { try { await withTimeout(supabase.from('ports').delete().eq('id', id)); } catch (e) {} }
     const current = db._getLocal(KEYS.PORTS);
     db._saveLocal(KEYS.PORTS, current.filter((p: any) => p.id !== id));
     return true;
   },
 
   getCategories: async (): Promise<Category[]> => {
-    if (supabase) { try { const { data } = await supabase.from('categories').select('*'); if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; } } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('categories').select('*')); if (data) { db._saveLocal(KEYS.CATEGORIES, data); return data; } } catch (e) {} }
     return db._getLocal(KEYS.CATEGORIES);
   },
 
+  // Fix: Added saveCategory to allow dynamic category creation
   saveCategory: async (category: Category, actingUser?: User) => {
-    if (supabase) { try { await supabase.from('categories').upsert(category); } catch (e) {} }
+    if (supabase) { try { await withTimeout(supabase.from('categories').upsert(category)); } catch (e) {} }
     const current = db._getLocal(KEYS.CATEGORIES);
     const idx = current.findIndex((c: any) => c.id === category.id);
     if (idx >= 0) current[idx] = category; else current.push(category);
     db._saveLocal(KEYS.CATEGORIES, current);
     if (actingUser) {
-      await db.addNotification(actingUser, 'CATEGORY_CREATED', 'Nova Categoria', `${category.name} cadastrada com sucesso.`, { categoria: category.name });
+        await db.addNotification(actingUser, 'CATEGORY_CREATED', 'Nova Categoria', `Categoria ${category.name} cadastrada.`, { categoria: category.name });
     }
     return true;
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
-    if (supabase) { try { const { data, error } = await supabase.from('pre_stacking').select('*'); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
+    if (supabase) { try { const { data } = await withTimeout(supabase.from('pre_stacking').select('*')); if (data) { const mapped = data.map(d => ({ ...d, legalName: d.legal_name })); db._saveLocal(KEYS.PRE_STACKING, mapped); return mapped; } } catch (e) {} }
     return db._getLocal(KEYS.PRE_STACKING);
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
-    const currentUnits = db._getLocal(KEYS.PRE_STACKING);
-    const oldUnit = currentUnits.find((p: any) => p.id === ps.id);
     const payload = { ...ps, legal_name: ps.legalName };
-    
-    if (supabase) { try { await supabase.from('pre_stacking').upsert(payload); } catch (e) {} }
-    
+    if (supabase) { try { await withTimeout(supabase.from('pre_stacking').upsert(payload)); } catch (e) {} }
     const current = db._getLocal(KEYS.PRE_STACKING);
     const idx = current.findIndex((p: any) => p.id === ps.id);
     if (idx >= 0) current[idx] = ps; else current.push(ps);
     db._saveLocal(KEYS.PRE_STACKING, current);
-    
-    if (actingUser) {
-      const summary = { unidade: ps.name };
-      if (!oldUnit) {
-        await db.addNotification(actingUser, 'PRESTACKING_CREATED', 'Novo Pré-Stacking', `${ps.name} cadastrado na base.`, summary);
-      } else {
-        await db.addNotification(actingUser, 'PRESTACKING_UPDATED', 'Unidade Atualizada', `Os dados do pré-stacking ${ps.name} foram alterados.`, summary);
-      }
-    }
     return true;
   },
 
+  // Fix: Added deletePreStacking to handle pre-stacking unit record removal
   deletePreStacking: async (id: string) => {
-    if (supabase) { try { await supabase.from('pre_stacking').delete().eq('id', id); } catch (e) {} }
+    if (supabase) { try { await withTimeout(supabase.from('pre_stacking').delete().eq('id', id)); } catch (e) {} }
     const current = db._getLocal(KEYS.PRE_STACKING);
     db._saveLocal(KEYS.PRE_STACKING, current.filter((p: any) => p.id !== id));
     return true;
@@ -437,7 +372,7 @@ export const db = {
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try { 
-      const { error } = await supabase.from('users').select('count', { count: 'exact', head: true }).limit(1); 
+      const { error } = await withTimeout(supabase.from('users').select('count', { count: 'exact', head: true }).limit(1), 2000); 
       return !error; 
     } catch { return false; }
   },

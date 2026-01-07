@@ -44,31 +44,29 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
+  // Carregamento SERIALIZADO: Pede um por um com delay para não estourar limite do Supabase
   const loadAllData = useCallback(async () => {
     try {
-      const [d, c, p, ps, s, t] = await Promise.all([
-        db.getDrivers(), 
-        db.getCustomers(), 
-        db.getPorts(), 
-        db.getPreStacking(), 
-        db.getStaff(),
-        db.getTrips()
-      ]);
-      setDrivers(d || []); 
-      setCustomers(c || []); 
-      setPorts(p || []); 
-      setPreStacking(ps || []); 
-      setStaffList(s || []);
-      setTrips(t || []);
+      const d = await db.getDrivers(); setDrivers(d || []);
+      await new Promise(r => setTimeout(r, 150));
+      const c = await db.getCustomers(); setCustomers(c || []);
+      await new Promise(r => setTimeout(r, 150));
+      const p = await db.getPorts(); setPorts(p || []);
+      await new Promise(r => setTimeout(r, 150));
+      const ps = await db.getPreStacking(); setPreStacking(ps || []);
+      await new Promise(r => setTimeout(r, 150));
+      const s = await db.getStaff(); setStaffList(s || []);
+      await new Promise(r => setTimeout(r, 150));
+      const t = await db.getTrips(); setTrips(t || []);
     } catch (e) {
-      console.warn("Erro de conexão durante sincronização em segundo plano.");
+      console.warn("Alguns dados foram carregados apenas da memória local.");
     }
   }, []);
 
   useEffect(() => { 
     loadAllData();
-    // Aumentado para 60s para respeitar limites do Supabase Free Tier
-    const syncInterval = setInterval(loadAllData, 60000);
+    // Intervalo de 90s para extrema economia de recursos
+    const syncInterval = setInterval(loadAllData, 90000);
     return () => clearInterval(syncInterval);
   }, [loadAllData]);
 

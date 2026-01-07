@@ -22,8 +22,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
 
   useEffect(() => {
     fetchStatus();
-    // Aumentado para 60s
-    const syncInterval = setInterval(fetchStatus, 60000);
+    // Heartbeat de 2 minutos (120000ms) para máxima economia de recursos do Supabase
+    const syncInterval = setInterval(fetchStatus, 120000);
     const clockInterval = setInterval(() => setCurrentTime(Date.now()), 1000);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,7 +46,8 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     if (user.lastSeen) {
       const lastSeenDate = new Date(user.lastSeen);
       const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
-      if (diffSeconds > 120) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
+      // Considera offline após 5 minutos sem sinal (contornando a economia de energia do navegador)
+      if (diffSeconds > 300) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
     }
 
     switch (status) {
