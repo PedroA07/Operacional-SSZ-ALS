@@ -98,6 +98,7 @@ export const db = {
   },
 
   getNotifications: async (): Promise<Notification[]> => {
+    const localNotifs = db._getLocal(KEYS.NOTIFICATIONS);
     if (supabase) {
       try {
         const { data, error } = await withTimeout(supabase
@@ -118,12 +119,25 @@ export const db = {
             timestamp: n.timestamp, 
             summary: { ...n.summary, os: n.os_ref }
           }));
+
+          // Detecção de novas notificações para disparar Toast
+          const existingIds = new Set(localNotifs.map((n: any) => n.id));
+          const newNotifs = mapped.filter(n => !existingIds.has(n.id));
+          
+          if (newNotifs.length > 0) {
+            // Dispara evento para cada nova notificação encontrada na nuvem
+            // Começa da mais antiga para a mais recente para ordem correta
+            newNotifs.reverse().forEach(notif => {
+              window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: notif }));
+            });
+          }
+
           db._saveLocal(KEYS.NOTIFICATIONS, mapped);
           return mapped;
         }
       } catch (e) {}
     }
-    return db._getLocal(KEYS.NOTIFICATIONS);
+    return localNotifs;
   },
 
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: Notification['summary']) => {
@@ -151,8 +165,10 @@ export const db = {
       } catch (e) {}
     }
 
+    // Nota: O getNotifications sincronizará este item na próxima batida, 
+    // mas adicionamos localmente para feedback imediato
     const newNotif: Notification = {
-      id: `notif-${Date.now()}`,
+      id: `local-${Date.now()}`,
       title, description, type, origin, authorName, authorId: user.id || 'system', timestamp, summary
     };
 
@@ -172,7 +188,6 @@ export const db = {
     }
   },
 
-  // Fix: Added updateDriverLocation method to update GPS coordinates in both Supabase and Local Storage to satisfy DriverPortal requirement
   updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
     const now = new Date().toISOString();
     if (supabase) {

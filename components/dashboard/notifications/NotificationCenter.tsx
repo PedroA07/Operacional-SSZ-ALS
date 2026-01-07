@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, Notification, NotificationOrigin } from '../../../types';
 import { db } from '../../../utils/storage';
@@ -15,8 +14,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const loadNotifications = useCallback(async () => {
-    setIsLoading(true);
+  const loadNotifications = useCallback(async (isAutoRefresh = false) => {
+    if (!isAutoRefresh) setIsLoading(true);
     try {
       const data = await db.getNotifications();
       setNotifications(data);
@@ -28,13 +27,17 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
     } catch (e) {
       console.error("Erro ao carregar notificações:", e);
     } finally {
-      setIsLoading(false);
+      if (!isAutoRefresh) setIsLoading(false);
     }
   }, [user.id]);
 
   useEffect(() => {
     loadNotifications();
-    const handleNewNotif = () => loadNotifications();
+    
+    // Heartbeat de notificações: 15 segundos
+    const interval = setInterval(() => loadNotifications(true), 15000);
+
+    const handleNewNotif = () => loadNotifications(true);
     window.addEventListener('als_new_notification_event', handleNewNotif);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -45,6 +48,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
+      clearInterval(interval);
       window.removeEventListener('als_new_notification_event', handleNewNotif);
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -61,7 +65,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
 
   const filteredNotifications = notifications.filter(n => {
     if (activeTab === 'OPERACIONAL') {
-      // Filtro Operacional: Viagens, OCs, Docs, Cadastros, Edições
       return n.origin === 'OPERACIONAL' && [
         'TRIP_CREATED', 'TRIP_UPDATED', 'OC_GENERATED', 'OC_EDITED', 
         'LIBERACAO_GENERATED', 'MINUTA_GENERATED', 'DOC_ATTACHED', 
@@ -71,7 +74,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
         'CATEGORY_CREATED', 'DELETED', 'SYSTEM'
       ].includes(n.type);
     } else {
-      // Filtro Motorista: Perfil, Status, Fotos
       return n.origin === 'MOTORISTA' && [
         'DRIVER_PROFILE_UPDATED', 'STATUS_UPDATED', 'DRIVER_DOC_UPLOADED'
       ].includes(n.type);
