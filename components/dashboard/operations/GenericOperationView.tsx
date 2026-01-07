@@ -1,12 +1,13 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, StatusHistoryEntry } from '../../../types';
+import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, StatusHistoryEntry, PreStacking, Port } from '../../../types';
 import SmartOperationTable from './SmartOperationTable';
 import { db } from '../../../utils/storage';
 import { getOperationTableColumns } from './OperationTableColumns';
 import TripModal from './TripModal';
 import SchedulingEditModal from './SchedulingEditModal';
 import DriverDocsViewerModal from './DriverDocsViewerModal';
+import DriverLocationModal from './DriverLocationModal';
 
 interface GenericOperationViewProps {
   user: User;
@@ -30,9 +31,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
-  const [ports, setPorts] = useState<any[]>([]);
+  const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isDriversCollapsed, setIsDriversCollapsed] = useState(false);
   
   const [activeMainTab, setActiveMainTab] = useState<'overview' | 'clients'>('overview');
@@ -42,7 +45,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     const [t, cats, p, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPorts(), db.getPreStacking()]);
     setAllTrips(t);
     setCategories(cats);
-    setPorts([...p, ...ps]);
+    setPreStackingUnits([...p, ...ps]);
   };
 
   useEffect(() => {
@@ -67,6 +70,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     await db.saveTrip(updatedTrip, user);
     setIsStatusModalOpen(false);
     loadLocalData();
+  };
+
+  const handleLocateDriverInternal = (driverId: string) => {
+    setLocationDriverId(driverId);
+    setIsLocationModalOpen(true);
   };
 
   const handleViewDriverDocs = (trip: Trip) => {
@@ -118,7 +126,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     loadLocalData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
-    onLocateDriver,
+    handleLocateDriverInternal,
     handleViewDriverDocs
   );
 
@@ -175,13 +183,18 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
       <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadLocalData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} initialCustomer={type === 'client' ? customers.find(c => c.name === clientName) : undefined} />
       
-      {/* CORREÇÃO: ADICIONADO COMPONENTE DE AGENDAMENTO */}
       <SchedulingEditModal 
         isOpen={isSchedulingModalOpen} 
         onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} 
         trip={selectedTrip} 
         onSuccess={loadLocalData} 
-        preStackingUnits={ports} 
+        preStackingUnits={preStackingUnits} 
+      />
+
+      <DriverLocationModal 
+        isOpen={isLocationModalOpen} 
+        onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} 
+        driverId={locationDriverId} 
       />
       
       {isDriverDocsModalOpen && selectedTrip && (

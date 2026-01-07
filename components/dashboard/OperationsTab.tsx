@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry } from '../../types';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db } from '../../utils/storage';
 import TripModal from './operations/TripModal';
 import SchedulingEditModal from './operations/SchedulingEditModal';
 import DriverDocsViewerModal from './operations/DriverDocsViewerModal';
 import DocumentViewerModal from './operations/DocumentViewerModal';
+import DriverLocationModal from './operations/DriverLocationModal';
 import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
 import OrdemColetaForm from './forms/OrdemColetaForm';
@@ -27,6 +28,8 @@ interface OperationsTabProps {
 const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers, ports, availableOps, activeView, setActiveView, onDeleteTrip }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
+  
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
@@ -34,11 +37,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [isOCFormOpen, setIsOCFormOpen] = useState(false);
   const [isMinutaFormOpen, setIsMinutaFormOpen] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
+  const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   
   const [filterTypes, setFilterTypes] = useState<string[]>(() => {
     const saved = localStorage.getItem(`als_opt_types_${user.id}`);
@@ -62,9 +67,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   }, [filterTypes, filterClientNames, filterDriverNames, user.id]);
 
   const loadData = async () => {
-    const [t, c] = await Promise.all([db.getTrips(), db.getCategories()]);
+    const [t, c, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPreStacking()]);
     setTrips(t || []);
     setCategories(c || []);
+    setPreStacking(ps || []);
   };
 
   useEffect(() => { loadData(); }, []);
@@ -76,6 +82,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     await db.saveTrip(updatedTrip, user);
     setIsStatusModalOpen(false);
     loadData();
+  };
+
+  const handleLocateDriver = (driverId: string) => {
+    setLocationDriverId(driverId);
+    setIsLocationModalOpen(true);
   };
 
   const filteredTrips = useMemo(() => {
@@ -96,7 +107,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     loadData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
-    (driverId) => { /* logic for location */ },
+    handleLocateDriver,
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); }
   );
 
@@ -106,7 +117,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         user={user} type={activeView.type === 'category' ? 'category' : 'client'} 
         categoryName={activeView.categoryName || ''} clientName={activeView.clientName} 
         drivers={drivers} customers={customers} availableOps={availableOps} onNavigate={setActiveView}
-        onLocateDriver={() => {}}
+        onLocateDriver={handleLocateDriver}
       />
     );
   }
@@ -124,13 +135,18 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
 
-      {/* RENDERIZAÇÃO DOS MODAIS DE EDIÇÃO */}
+      <DriverLocationModal 
+        isOpen={isLocationModalOpen} 
+        onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} 
+        driverId={locationDriverId} 
+      />
+
       <SchedulingEditModal 
         isOpen={isSchedulingModalOpen} 
         onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} 
         trip={selectedTrip} 
         onSuccess={loadData} 
-        preStackingUnits={[...ports, ...customers as any]} 
+        preStackingUnits={[...ports, ...preStacking]} 
       />
 
       {isOCFormOpen && selectedTrip && (
