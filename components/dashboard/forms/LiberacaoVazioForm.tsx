@@ -18,15 +18,26 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
+  const podRef = useRef<HTMLDivElement>(null);
   
   const [remetenteSearch, setRemetenteSearch] = useState('');
   const [showRemetenteResults, setShowRemetenteResults] = useState(false);
   const [driverSearch, setDriverSearch] = useState('');
   const [showDriverResults, setShowDriverResults] = useState(false);
+  const [podSearch, setPodSearch] = useState('');
+  const [showPodResults, setShowPodResults] = useState(false);
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) setCurrentUser(JSON.parse(saved));
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (podRef.current && !podRef.current.contains(e.target as Node)) {
+        setShowPodResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const [formData, setFormData] = useState({
@@ -41,6 +52,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
     qtdContainer: '01',
     tipo: '40HC',
     padrao: 'CARGA GERAL',
+    grade: 'A (FOOD GRADE)',
     obs: '',
     manualLocal: ''
   });
@@ -98,6 +110,8 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
     (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
   );
 
+  const filteredPODs = commonPODs.filter(p => p.toUpperCase().includes(podSearch.toUpperCase()));
+
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
@@ -121,7 +135,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
           <label className={labelBlueClass}>2. Cliente (Exportador)</label>
           <input type="text" placeholder="BUSCAR..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} />
           {showRemetenteResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
+            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500 animate-in fade-in slide-in-from-top-2 duration-200">
               {filteredCustomers.map(c => (
                 <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.legalName || c.name); setShowRemetenteResults(false); }}>
                   <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
@@ -149,16 +163,25 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
                  </select>
               </div>
            </div>
-           <div className="space-y-1">
-              <label className={labelClass}>Padrão do Container</label>
-              <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
-                 <option value="CARGA GERAL">CARGA GERAL</option>
-                 <option value="CARGO PREMIUM">CARGO PREMIUM</option>
-                 <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
-                 <option value="REEFER">REEFER</option>
-                 <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
-                 <option value="FLAT RACK">FLAT RACK</option>
-              </select>
+           <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                 <label className={labelClass}>Padrão</label>
+                 <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
+                    <option value="CARGA GERAL">CARGA GERAL</option>
+                    <option value="CARGO PREMIUM">CARGO PREMIUM</option>
+                    <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
+                    <option value="REEFER">REEFER</option>
+                    <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
+                 </select>
+              </div>
+              <div className="space-y-1">
+                 <label className={labelClass}>Grade / Qualidade</label>
+                 <select className={inputClasses} value={formData.grade} onChange={e => handleInputChange('grade', e.target.value)}>
+                    <option value="A (FOOD GRADE)">A (FOOD)</option>
+                    <option value="B (PADRÃO)">B (PADRÃO)</option>
+                    <option value="C (INDUSTRIAL)">C (IND.)</option>
+                 </select>
+              </div>
            </div>
         </div>
 
@@ -169,10 +192,50 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
             <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
           </div>
           <div className="space-y-1"><label className={labelClass}>Armador</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
-          <div className="space-y-1">
-            <label className={labelClass}>POD (Porto Descarga)</label>
-            <input list="pod-suggestions" className={inputClasses} value={formData.pod} onChange={e => handleInputChange('pod', e.target.value)} />
-            <datalist id="pod-suggestions">{commonPODs.map(p => <option key={p} value={p} />)}</datalist>
+          
+          {/* SELETOR DE POD SOFT PREMIUM */}
+          <div className="space-y-1 relative" ref={podRef}>
+            <label className={labelClass}>Porto de Descarga (POD)</label>
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="BUSCAR OU DIGITAR POD..." 
+                className={`${inputClasses} pr-10`} 
+                value={podSearch || formData.pod} 
+                onFocus={() => setShowPodResults(true)}
+                onChange={e => {
+                  const val = e.target.value.toUpperCase();
+                  setPodSearch(val);
+                  handleInputChange('pod', val);
+                }} 
+              />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
+              </div>
+            </div>
+            
+            {showPodResults && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-h-52 overflow-y-auto border-t-4 border-blue-500 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="p-2 space-y-0.5">
+                  {filteredPODs.length > 0 ? filteredPODs.map(p => (
+                    <button 
+                      key={p} 
+                      className={`w-full text-left px-4 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-between group ${formData.pod === p ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-600'}`}
+                      onClick={() => {
+                        handleInputChange('pod', p);
+                        setPodSearch(p);
+                        setShowPodResults(false);
+                      }}
+                    >
+                      <span>{p}</span>
+                      {formData.pod === p && <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>}
+                    </button>
+                  )) : (
+                    <div className="p-4 text-center text-[9px] font-bold text-slate-300 uppercase italic">Porto não listado (entrada manual)</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

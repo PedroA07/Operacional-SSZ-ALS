@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface LiberacaoVazioTemplateProps {
@@ -98,7 +97,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
          <div style={{ flex: 1, borderRight: borderStyle, padding: '12px' }}>
             <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>EQUIPAMENTO</p>
             <p style={{ fontSize: '14px', fontWeight: 900 }}>
-              {formData.qtdContainer} X {formData.tipo} - {formData.padrao}
+              {formData.qtdContainer} X {formData.tipo} - {formData.padrao} ({formData.grade})
             </p>
          </div>
          <div style={{ flex: 1, padding: '12px' }}>
