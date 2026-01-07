@@ -62,6 +62,7 @@
         input[type="datetime-local"] {
           color-scheme: light; /* Force consistency */
           position: relative;
+          min-width: 240px; /* Garante que o campo não encolha demais */
         }
         
         input[type="datetime-local"]::-webkit-calendar-picker-indicator {
@@ -72,6 +73,7 @@
           border-radius: 12px;
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
           filter: drop-shadow(0 4px 6px -1px rgb(0 0 0 / 0.1));
+          margin-left: 10px;
         }
         
         input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {

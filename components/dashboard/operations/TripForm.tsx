@@ -96,6 +96,7 @@ const TripForm: React.FC<TripFormProps> = ({
   };
 
   const inputClass = "w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm placeholder:text-slate-300";
+  const dateInputClass = "w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-white text-slate-700 font-bold focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
 
   return (
@@ -104,8 +105,8 @@ const TripForm: React.FC<TripFormProps> = ({
       {/* SEÇÃO 1: CABEÇALHO DA OPERAÇÃO */}
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Identificação Master</h4>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="md:col-span-2 space-y-1">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-5 space-y-1">
             <label className={labelClass}>Número da OS</label>
             <input 
               required 
@@ -115,7 +116,7 @@ const TripForm: React.FC<TripFormProps> = ({
               onChange={e => setFormData({...formData, os: e.target.value.toUpperCase()})} 
             />
           </div>
-          <div className="space-y-1">
+          <div className="md:col-span-3 space-y-1">
             <label className={labelClass}>Modalidade</label>
             <select className={inputClass} value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
               <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
@@ -125,9 +126,15 @@ const TripForm: React.FC<TripFormProps> = ({
               <option value="CABOTAGEM">CABOTAGEM</option>
             </select>
           </div>
-          <div className="space-y-1">
+          <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Data/Hora Programada</label>
-            <input required type="datetime-local" className={inputClass} value={formData.dateTime} onChange={e => setFormData({...formData, dateTime: e.target.value})} />
+            <input 
+              required 
+              type="datetime-local" 
+              className={dateInputClass} 
+              value={formData.dateTime} 
+              onChange={e => setFormData({...formData, dateTime: e.target.value})} 
+            />
           </div>
         </div>
 
