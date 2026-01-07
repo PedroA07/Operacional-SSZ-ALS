@@ -9,6 +9,7 @@ import SchedulingEditModal from './SchedulingEditModal';
 import DriverDocsViewerModal from './DriverDocsViewerModal';
 import DriverLocationModal from './DriverLocationModal';
 import VWStatusSelector from './VWStatusSelector';
+import ViewFilters from './ViewFilters';
 
 interface GenericOperationViewProps {
   user: User;
@@ -39,8 +40,12 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isDriversCollapsed, setIsDriversCollapsed] = useState(false);
   
+  // Estados de Filtro
   const [activeMainTab, setActiveMainTab] = useState<'overview' | 'clients'>('overview');
   const [activeStatusTab, setActiveStatusTab] = useState<'ativas' | 'concluida' | 'cancelada'>('ativas');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const loadLocalData = async () => {
     const [t, cats, p, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPorts(), db.getPreStacking()]);
@@ -59,7 +64,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     setSelectedTrip(trip);
     setTempStatus(status);
     const now = new Date();
-    // Ajuste para input datetime-local
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     setStatusTime(now.toISOString().slice(0, 16));
     setIsStatusModalOpen(true);
@@ -110,6 +114,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       return matchCategory && matchClient;
     });
 
+    // 1. Filtro por Aba de Status
     if (activeStatusTab === 'ativas') {
       const activeStatuses = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
       result = result.filter(t => activeStatuses.includes(t.status));
@@ -118,8 +123,30 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     } else if (activeStatusTab === 'cancelada') {
       result = result.filter(t => t.status === 'Viagem cancelada');
     }
+
+    // 2. Filtro de Busca Textual
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(t => 
+        t.os.toLowerCase().includes(q) || 
+        t.container?.toLowerCase().includes(q) || 
+        t.driver.name.toLowerCase().includes(q) ||
+        t.customer.name.toLowerCase().includes(q) ||
+        t.ship?.toLowerCase().includes(q) ||
+        t.booking?.toLowerCase().includes(q)
+      );
+    }
+
+    // 3. Filtro de Range de Datas
+    if (startDate) {
+      result = result.filter(t => t.dateTime >= startDate);
+    }
+    if (endDate) {
+      result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
+    }
+
     return result;
-  }, [allTrips, categoryName, clientName, type, activeStatusTab]);
+  }, [allTrips, categoryName, clientName, type, activeStatusTab, searchQuery, startDate, endDate]);
 
   const driverColumns = [
     { key: 'name', label: 'Motorista', render: (d: any) => (<div><p className="font-bold text-slate-800 uppercase text-[11px]">{d.name}</p><p className="text-[8px] text-slate-400 font-bold mt-0.5">{d.driverType}</p></div>)},
@@ -130,7 +157,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
-    (t) => {}, // Funções de OC/Minuta podem ser adicionadas conforme necessidade específica da view
+    (t) => {},
     (t) => {},
     (url, title) => { window.open(url, '_blank'); },
     async (id) => { if(confirm('Excluir viagem?')) { await db.deleteTrip(id, user); loadLocalData(); } },
@@ -158,12 +185,25 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
       {activeMainTab === 'overview' || type === 'client' ? (
         <div className="space-y-8">
-            <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-2 w-fit">
-               {[{ id: 'ativas', label: 'Em Aberto / Ativas', color: 'blue' }, { id: 'concluida', label: 'Concluídas', color: 'emerald' }, { id: 'cancelada', label: 'Canceladas', color: 'red' }].map(tab => (<button key={tab.id} onClick={() => setActiveStatusTab(tab.id as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${activeStatusTab === tab.id ? `bg-${tab.color}-600 text-white shadow-lg` : `bg-slate-50 text-slate-400 hover:bg-slate-100`}`}>{tab.label}</button>))}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-2 w-fit shrink-0">
+                  {[{ id: 'ativas', label: 'Em Aberto / Ativas', color: 'blue' }, { id: 'concluida', label: 'Concluídas', color: 'emerald' }, { id: 'cancelada', label: 'Canceladas', color: 'red' }].map(tab => (<button key={tab.id} onClick={() => setActiveStatusTab(tab.id as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${activeStatusTab === tab.id ? `bg-${tab.color}-600 text-white shadow-lg` : `bg-slate-50 text-slate-400 hover:bg-slate-100`}`}>{tab.label}</button>))}
+                </div>
             </div>
+
+            {/* FILTROS REUTILIZÁVEIS */}
+            <ViewFilters 
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              startDate={startDate}
+              onStartDateChange={setStartDate}
+              endDate={endDate}
+              onEndDateChange={setEndDate}
+              onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); }}
+            />
             
             <div className="grid grid-cols-1 gap-8">
-              {activeStatusTab === 'ativas' && filteredDrivers.length > 0 && (
+              {activeStatusTab === 'ativas' && filteredDrivers.length > 0 && !searchQuery && !startDate && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between px-2">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Motoristas Vinculados</h4>
@@ -192,7 +232,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
       )}
 
-      {/* MODAL DE STATUS (UNIFICADO) */}
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
