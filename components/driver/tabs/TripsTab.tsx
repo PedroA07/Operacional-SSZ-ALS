@@ -1,201 +1,124 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Trip, TripDocument } from '../../../types';
+import React, { useState, useMemo, useRef } from 'react';
+import { Trip } from '../../../types';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import DocumentViewerModal from '../../dashboard/operations/DocumentViewerModal';
+import OrdemColetaTemplate from '../../dashboard/forms/OrdemColetaTemplate';
+import PreStackingTemplate from '../../dashboard/forms/PreStackingTemplate';
 
 interface TripsTabProps {
   trips: Trip[];
 }
 
 const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'todas' | 'ativas' | 'concluidas'>('todas');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
-  const [previewDoc, setPreviewDoc] = useState<{ blobUrl: string, label: string, isImage: boolean } | null>(null);
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const [previewData, setPreviewData] = useState({ url: '', title: '' });
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const filteredTrips = useMemo(() => {
-    return trips.filter(t => {
-      const matchSearch = t.os.toLowerCase().includes(search.toLowerCase()) || 
-                          t.customer.name.toLowerCase().includes(search.toLowerCase()) ||
-                          (t.container || '').toLowerCase().includes(search.toLowerCase());
-      
-      const isFinished = t.status === 'Viagem concluída' || t.status === 'Viagem cancelada';
-      if (filter === 'ativas') return matchSearch && !isFinished;
-      if (filter === 'concluidas') return matchSearch && isFinished;
-      return matchSearch;
-    });
-  }, [trips, search, filter]);
+  const ocRef = useRef<HTMLDivElement>(null);
+  const minutaRef = useRef<HTMLDivElement>(null);
 
-  const openDocViewer = (doc: TripDocument | undefined, label: string) => {
-    if (!doc?.url) return;
-
+  const generatePDF = async (ref: React.RefObject<HTMLDivElement>, title: string) => {
+    if (!ref.current || isGenerating) return;
+    setIsGenerating(true);
     try {
-      const isImage = doc.url.startsWith('data:image');
-      let finalUrl = doc.url;
-
-      if (doc.url.startsWith('data:')) {
-        const parts = doc.url.split(';base64,');
-        const contentType = parts[0].split(':')[1];
-        const raw = window.atob(parts[1]);
-        const rawLength = raw.length;
-        const uInt8Array = new Uint8Array(rawLength);
-        for (let i = 0; i < rawLength; ++i) {
-          uInt8Array[i] = raw.charCodeAt(i);
-        }
-        const blob = new Blob([uInt8Array], { type: contentType });
-        finalUrl = URL.createObjectURL(blob);
-      }
-
-      setPreviewDoc({ blobUrl: finalUrl, label, isImage });
+      const canvas = await html2canvas(ref.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+      const blob = pdf.output('blob');
+      const url = URL.createObjectURL(blob);
+      setPreviewData({ url, title: title.toUpperCase() });
+      setIsDocViewerOpen(true);
     } catch (e) {
-      console.error("Erro ao processar documento:", e);
-      alert("Não foi possível carregar o documento.");
+      alert("Falha ao processar documento digital.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  useEffect(() => {
-    return () => {
-      if (previewDoc?.blobUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previewDoc.blobUrl);
-      }
-    };
-  }, [previewDoc]);
-
-  const DetailRow = ({ label, value, blue = false, mono = false }: any) => (
-    <div className="flex flex-col py-3 border-b border-white/5 last:border-0">
-      <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">{label}</span>
-      <span className={`text-[12px] font-bold uppercase ${blue ? 'text-blue-400' : 'text-slate-100'} ${mono ? 'font-mono' : ''}`}>
-        {value || 'NÃO INFORMADO'}
-      </span>
-    </div>
-  );
+  const filteredTrips = useMemo(() => {
+    return trips.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+  }, [trips]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-      <div className="space-y-4 px-1">
-        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Minhas Viagens</h2>
-        <div className="relative">
-          <input 
-            type="text" 
-            placeholder="BUSCAR OS, CLIENTE OU CONTAINER..." 
-            className="w-full pl-11 pr-5 py-4 bg-slate-900/80 border border-white/10 rounded-2xl text-[11px] font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600 shadow-xl"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>
-        </div>
-        <div className="flex gap-2">
-          {['todas', 'ativas', 'concluidas'].map((f) => (
-            <button key={f} onClick={() => setFilter(f as any)} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all ${filter === f ? 'bg-blue-600 border-blue-500 text-white shadow-lg' : 'bg-white/5 border-white/10 text-slate-50'}`}>{f}</button>
-          ))}
-        </div>
+    <div className="space-y-4 animate-in fade-in duration-500 pb-24">
+      
+      {/* TEMPLATES OCULTOS PARA GERAÇÃO */}
+      <div style={{ position: 'fixed', left: '-9999px', top: '-9999px' }}>
+         {selectedTrip?.ocFormData && <div ref={ocRef}><OrdemColetaTemplate formData={selectedTrip.ocFormData} selectedDriver={selectedTrip.driver} selectedRemetente={selectedTrip.customer} selectedDestinatario={selectedTrip.destination} /></div>}
+         {selectedTrip?.preStackingFormData && <div ref={minutaRef}><PreStackingTemplate formData={selectedTrip.preStackingFormData} selectedDriver={selectedTrip.driver} selectedRemetente={selectedTrip.customer} selectedDestinatario={selectedTrip.destination} /></div>}
       </div>
 
+      <div className="px-1 py-4"><h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Minhas Viagens</h2></div>
+
       <div className="space-y-3">
-        {filteredTrips.map((t) => {
-          const isFinished = t.status === 'Viagem concluída' || t.status === 'Viagem cancelada';
-          return (
-            <button key={t.id} onClick={() => setSelectedTrip(t)} className={`w-full p-5 rounded-[2rem] border text-left flex items-center justify-between transition-all group ${isFinished ? 'bg-slate-900/30 border-white/5 grayscale opacity-60' : 'bg-slate-900 border-white/10 shadow-xl active:scale-95'}`}>
-              <div className="min-w-0">
-                <p className="text-lg font-black text-white uppercase leading-none mb-2">OS {t.os}</p>
-                <p className="text-[9px] font-bold text-slate-500 uppercase truncate max-w-[200px]">{t.customer.name}</p>
-                <div className="flex gap-2 mt-3">
-                  <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${isFinished ? 'bg-slate-800 text-slate-400' : 'bg-blue-600 text-white'}`}>{t.status}</span>
-                  <span className="px-2 py-0.5 bg-white/5 border border-white/5 rounded text-[7px] font-mono text-slate-400 uppercase">{t.container || 'A DEFINIR'}</span>
-                </div>
-              </div>
-              <svg className="w-5 h-5 text-slate-800 group-active:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
-            </button>
-          );
-        })}
+        {filteredTrips.map((t) => (
+          <button key={t.id} onClick={() => setSelectedTrip(t)} className="w-full p-6 rounded-[2rem] bg-slate-900 border border-white/10 text-left flex flex-col gap-2 shadow-xl active:scale-95 transition-all">
+             <div className="flex justify-between items-start">
+                <p className="text-xl font-black text-blue-500 leading-none">OS {t.os}</p>
+                <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${t.status === 'Viagem concluída' ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'}`}>{t.status}</span>
+             </div>
+             <p className="text-[10px] font-bold text-slate-400 uppercase truncate">{t.customer.name}</p>
+          </button>
+        ))}
       </div>
 
       {selectedTrip && (
         <div className="fixed inset-0 z-[1000] bg-[#020617] flex flex-col animate-in slide-in-from-bottom-full duration-500">
-           <header className="p-6 pt-12 flex justify-between items-center bg-slate-950 border-b border-white/5 shrink-0">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Dossiê da OS</p>
-                <h3 className="text-xl font-black text-white uppercase mt-1">Nº {selectedTrip.os}</h3>
-              </div>
-              <button onClick={() => setSelectedTrip(null)} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white active:bg-red-600 transition-colors"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg></button>
+           <header className="p-8 pt-14 flex justify-between items-center bg-slate-950 border-b border-white/5">
+              <div><p className="text-[9px] font-black text-blue-500 uppercase tracking-widest leading-none">Dossiê da OS</p><h3 className="text-xl font-black text-white uppercase mt-1">Nº {selectedTrip.os}</h3></div>
+              <button onClick={() => setSelectedTrip(null)} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white active:bg-red-600 transition-all"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg></button>
            </header>
-
-           <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-32">
-              <section className="bg-slate-900 rounded-[2.5rem] p-8 border border-white/5 shadow-2xl space-y-2">
-                 <DetailRow label="Cliente / Localidade" value={`${selectedTrip.customer.name} › ${selectedTrip.customer.city}`} blue />
-                 <DetailRow label="Container" value={selectedTrip.container} mono />
-                 <DetailRow label="Ship / Booking" value={`${selectedTrip.ship || '---'} / ${selectedTrip.booking || '---'}`} />
-                 <DetailRow label="Data Programada" value={new Date(selectedTrip.dateTime).toLocaleString('pt-BR')} />
+           
+           <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
+              <section className="bg-slate-900 p-7 rounded-[2.5rem] border border-white/5 space-y-4 shadow-2xl">
+                 <div className="flex flex-col"><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Contratante</span><span className="text-sm font-bold text-white uppercase">{selectedTrip.customer.name}</span></div>
+                 <div className="flex flex-col"><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Equipamento</span><span className="text-sm font-mono font-black text-blue-400">{selectedTrip.container || 'A DEFINIR'}</span></div>
+                 <div className="flex flex-col"><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Navio / Booking</span><span className="text-xs font-bold text-slate-300 uppercase">{selectedTrip.ship || '---'} | {selectedTrip.booking || '---'}</span></div>
               </section>
 
-              <section className="space-y-4">
-                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Documentos Disponíveis</h4>
-                <div className="grid gap-3">
-                   {[
-                     { label: 'Ordem de Coleta', doc: selectedTrip.osDoc },
-                     { label: 'Agendamento Terminal', doc: selectedTrip.agendamentoDoc },
-                     { label: 'CT-e / Completo', doc: selectedTrip.completoDoc || selectedTrip.cteDoc },
-                     { label: 'Certificado CVA', doc: selectedTrip.cvaDoc },
-                     { label: 'Contrato de Frete', doc: selectedTrip.freightContractDoc }
-                   ].map((item, idx) => item.doc && (
-                     <button key={idx} onClick={() => openDocViewer(item.doc, item.label)} className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl flex items-center justify-between active:bg-blue-600 transition-all shadow-xl group">
-                        <div className="flex items-center gap-4">
-                           <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 group-active:text-white">
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg>
-                           </div>
-                           <span className="text-[11px] font-black uppercase text-white tracking-tighter">{item.label}</span>
-                        </div>
-                        <svg className="w-4 h-4 text-slate-700 group-active:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3.5"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2"/></svg>
-                     </button>
-                   ))}
-                </div>
+              <section className="space-y-3">
+                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Documentos Liberados</p>
+                 
+                 {selectedTrip.ocFormData && (
+                   <button onClick={() => generatePDF(ocRef, `OC - OS ${selectedTrip.os}`)} className="w-full p-6 bg-blue-600/10 border border-blue-500/30 rounded-3xl flex items-center justify-between active:scale-95 transition-all shadow-lg">
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></div>
+                        <div><span className="text-[11px] font-black text-white uppercase block">Ordem de Coleta</span><span className="text-[8px] text-blue-400 font-bold uppercase">Digital p/ Impressão</span></div>
+                      </div>
+                      <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+                   </button>
+                 )}
+
+                 {selectedTrip.preStackingFormData && (
+                   <button onClick={() => generatePDF(minutaRef, `Minuta - OS ${selectedTrip.os}`)} className="w-full p-6 bg-emerald-600/10 border border-emerald-500/30 rounded-3xl flex items-center justify-between active:scale-95 transition-all shadow-lg">
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 a2 2 0 110-4m0 4v2m0-6V4" strokeWidth="2.5"/></svg></div>
+                        <div><span className="text-[11px] font-black text-white uppercase block">Minuta Pre-Stacking</span><span className="text-[8px] text-emerald-400 font-bold uppercase">Comprovante Cheio</span></div>
+                      </div>
+                      <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+                   </button>
+                 )}
+
+                 {selectedTrip.osDoc && (
+                   <button onClick={() => { setPreviewData({ url: selectedTrip.osDoc!.url, title: 'OS Original' }); setIsDocViewerOpen(true); }} className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl flex items-center justify-between active:bg-blue-600 transition-all">
+                      <div className="flex items-center gap-4"><span className="text-[11px] font-black uppercase text-white">Anexo OS PDF</span></div>
+                      <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2"/></svg>
+                   </button>
+                 )}
               </section>
            </div>
            
-           <div className="p-6 bg-slate-950 border-t border-white/5 fixed bottom-0 left-0 w-full z-[1010]">
-              <button onClick={() => setSelectedTrip(null)} className="w-full py-5 bg-slate-900 text-slate-400 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all">Voltar</button>
-           </div>
+           <div className="p-6 bg-slate-950 border-t border-white/5"><button onClick={() => setSelectedTrip(null)} className="w-full py-5 bg-slate-900 text-slate-500 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-950 transition-all">Voltar para Lista</button></div>
         </div>
       )}
 
-      {previewDoc && (
-        <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-in fade-in duration-300">
-           <header className="p-6 pt-12 flex justify-between items-center bg-slate-950/80 backdrop-blur-md border-b border-white/5 shrink-0 z-50">
-              <div>
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Visualizador Digital</p>
-                <h3 className="text-sm font-black text-white uppercase mt-1">{previewDoc.label}</h3>
-              </div>
-              <button onClick={() => setPreviewDoc(null)} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white active:bg-red-600 transition-colors">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg>
-              </button>
-           </header>
-           <div className="flex-1 bg-white relative">
-              {previewDoc.isImage ? (
-                <div className="w-full h-full flex items-center justify-center p-4 bg-slate-900 overflow-auto">
-                   <img src={previewDoc.blobUrl} className="max-w-full max-h-full shadow-2xl" alt="Documento" />
-                </div>
-              ) : (
-                <div className="w-full h-full bg-slate-100 flex flex-col">
-                  {/* Container for PDF visualization to avoid direct download prompt on some mobile browsers */}
-                  <object 
-                    data={`${previewDoc.blobUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`} 
-                    type="application/pdf" 
-                    className="w-full h-full border-none"
-                  >
-                    <iframe 
-                      src={`${previewDoc.blobUrl}#toolbar=0`} 
-                      className="w-full h-full border-none" 
-                      title="PDF Viewer"
-                    />
-                  </object>
-                </div>
-              )}
-           </div>
-           <footer className="p-6 bg-slate-950 border-t border-white/5 flex gap-3 shrink-0">
-              <button onClick={() => window.open(previewDoc.blobUrl, '_blank')} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest active:bg-blue-700 transition-all">Download / Abrir Original</button>
-              <button onClick={() => setPreviewDoc(null)} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-900 transition-all">Fechar Visualizador</button>
-           </footer>
-        </div>
-      )}
+      <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewData.url} title={previewData.title} />
+      
+      {isGenerating && <div className="fixed inset-0 z-[2000] bg-black/80 flex flex-col items-center justify-center space-y-4"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div><p className="text-[10px] font-black text-white uppercase tracking-widest">Processando Documento...</p></div>}
     </div>
   );
 };
