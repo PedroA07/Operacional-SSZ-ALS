@@ -10,10 +10,21 @@ interface HomeTabProps {
   onRefresh: () => Promise<void>;
 }
 
-const ALL_STATUSES: TripStatus[] = [
+const DEFAULT_STATUSES: TripStatus[] = [
   'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 
   'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 
   'Chegou no destino', 'Devolução do cheio', 'Viagem concluída'
+];
+
+const VW_CRAGEA_STATUSES: { label: string; value: TripStatus }[] = [
+  { label: 'Retirou o Cheio', value: 'Retirada do cheio' },
+  { label: 'Chegou no Cragea', value: 'Chegou no Cragea' },
+  { label: 'Aguardando Carregar', value: 'Aguardando carregar' },
+  { label: 'Saiu do Cragea', value: 'Saiu do Cragea' },
+  { label: 'Chegou na Volkswagen', value: 'Chegou na Volkswagen' },
+  { label: 'Saiu da Volkswagen', value: 'Saiu da Volkswagen' },
+  { label: 'Container sobre Rodas', value: 'Container sobre rodas' },
+  { label: 'Baixa Cragea', value: 'Viagem concluída' },
 ];
 
 const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
@@ -28,10 +39,21 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())[0];
   }, [trips]);
 
-  const handleUpdateStatus = async (trip: Trip, nextStatus: TripStatus) => {
+  // Detecta se é a operação especial VW/Cragea
+  const isVWCrageaTrip = useMemo(() => {
+    if (!activeTrip) return false;
+    const isVW = activeTrip.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
+    const isCragea = activeTrip.destination?.name?.toUpperCase().includes('CRAGEA') || 
+                     activeTrip.scheduling?.location?.toUpperCase().includes('CRAGEA');
+    return isVW && isCragea;
+  }, [activeTrip]);
+
+  const handleUpdateStatus = async (trip: Trip, nextStatus: TripStatus, label?: string) => {
     if (isUpdating) return;
     if (trip.status === nextStatus) return;
-    if (!confirm(`CONFIRMAR ESTA POSIÇÃO: ${nextStatus.toUpperCase()}?`)) return;
+    
+    const confirmLabel = label || nextStatus.toUpperCase();
+    if (!confirm(`CONFIRMAR ESTA POSIÇÃO: ${confirmLabel}?`)) return;
 
     setIsUpdating(true);
     const success = await driverService.updateTripStatus(trip, nextStatus, user);
@@ -44,7 +66,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     setIsUpdating(false);
   };
 
-  // Funções estabilizadas para o ScannerModal não piscar
   const handleOpenScanner = useCallback(() => setIsScannerOpen(true), []);
   const handleCloseScanner = useCallback(() => setIsScannerOpen(false), []);
   const handleScannerSuccess = useCallback(async () => {
@@ -84,7 +105,12 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             <div className="p-7 space-y-6">
               <div className="flex justify-between items-start border-b border-white/5 pb-6">
                 <div>
-                  <p className="text-4xl font-black tracking-tighter text-blue-500 leading-none">OS {activeTrip.os}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-4xl font-black tracking-tighter text-blue-500 leading-none">OS {activeTrip.os}</p>
+                    {isVWCrageaTrip && (
+                      <span className="px-2 py-0.5 bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded text-[6px] font-black uppercase tracking-tighter">Operação VW</span>
+                    )}
+                  </div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase mt-2.5 leading-tight">{activeTrip.customer.name}</p>
                 </div>
                 <div className="text-right">
@@ -127,7 +153,9 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between">
                   <div>
                     <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Posição Atual</p>
-                    <p className="text-lg font-black uppercase text-blue-400 mt-1">{activeTrip.status}</p>
+                    <p className="text-lg font-black uppercase text-blue-400 mt-1">
+                      {isVWCrageaTrip && activeTrip.status === 'Viagem concluída' ? 'BAIXA CRAGEA' : activeTrip.status}
+                    </p>
                   </div>
                   <button 
                     onClick={() => setShowPicker(!showPicker)}
@@ -139,23 +167,43 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 
                 {showPicker && (
                   <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 duration-300">
-                    {ALL_STATUSES.map((status) => {
-                      const isCurrent = activeTrip.status === status;
-                      return (
-                        <button 
-                          key={status}
-                          disabled={isUpdating || isCurrent}
-                          onClick={() => handleUpdateStatus(activeTrip, status)}
-                          className={`py-5 px-3 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all border flex items-center justify-center text-center leading-tight ${
-                            isCurrent 
-                            ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 opacity-50' 
-                            : 'bg-white/5 border-white/10 text-slate-400 active:scale-95 active:bg-blue-600 active:text-white'
-                          }`}
-                        >
-                          {status}
-                        </button>
-                      );
-                    })}
+                    {isVWCrageaTrip ? (
+                      VW_CRAGEA_STATUSES.map((st) => {
+                        const isCurrent = activeTrip.status === st.value;
+                        return (
+                          <button 
+                            key={st.value}
+                            disabled={isUpdating || isCurrent}
+                            onClick={() => handleUpdateStatus(activeTrip, st.value, st.label)}
+                            className={`py-5 px-3 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all border flex items-center justify-center text-center leading-tight ${
+                              isCurrent 
+                              ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 opacity-50' 
+                              : 'bg-white/5 border-white/10 text-slate-400 active:scale-95 active:bg-blue-600 active:text-white'
+                            }`}
+                          >
+                            {st.label}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      DEFAULT_STATUSES.map((status) => {
+                        const isCurrent = activeTrip.status === status;
+                        return (
+                          <button 
+                            key={status}
+                            disabled={isUpdating || isCurrent}
+                            onClick={() => handleUpdateStatus(activeTrip, status)}
+                            className={`py-5 px-3 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all border flex items-center justify-center text-center leading-tight ${
+                              isCurrent 
+                              ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 opacity-50' 
+                              : 'bg-white/5 border-white/10 text-slate-400 active:scale-95 active:bg-blue-600 active:text-white'
+                            }`}
+                          >
+                            {status}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 )}
               </div>
