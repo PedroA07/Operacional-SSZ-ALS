@@ -27,7 +27,7 @@ export const driverRepository = {
       beneficiary_name: driver.beneficiaryName || null,
       beneficiary_phone: driver.beneficiaryPhone || null,
       beneficiary_email: driver.beneficiaryEmail || null,
-      // beneficiary_cnpj removido pois não consta na estrutura do banco informada
+      beneficiary_cnpj: driver.beneficiaryCnpj || null, // Agora incluído (deve rodar o SQL)
       payment_preference: driver.paymentPreference || 'PIX',
       whatsapp_group_name: driver.whatsappGroupName || null,
       whatsapp_group_link: driver.whatsappGroupLink || null,
@@ -69,7 +69,7 @@ export const driverRepository = {
     beneficiaryName: d.beneficiary_name || d.beneficiaryName,
     beneficiaryPhone: d.beneficiary_phone || d.beneficiaryPhone,
     beneficiaryEmail: d.beneficiary_email || d.beneficiaryEmail,
-    // Note: beneficiaryCnpj não será carregado pois não está no DB
+    beneficiaryCnpj: d.beneficiary_cnpj || d.beneficiaryCnpj,
     paymentPreference: d.payment_preference || d.paymentPreference,
     whatsappGroupName: d.whatsapp_group_name || d.whatsappGroupName,
     whatsappGroupLink: d.whatsapp_group_link || d.whatsappGroupLink,
@@ -82,25 +82,27 @@ export const driverRepository = {
     try {
       const payload = this.mapToDb(driver);
       
-      console.log("Tentando salvar no Supabase:", payload.id);
-      
       const { error } = await supabase
         .from('drivers')
         .upsert(payload);
       
       if (error) {
-        console.error("ERRO SUPABASE DETALHADO:", {
+        console.error("❌ ERRO AO SALVAR MOTORISTA NO SUPABASE:", {
           message: error.message,
           code: error.code,
-          hint: error.hint,
-          details: error.details
+          details: error.details,
+          hint: error.hint
         });
+        // Se der erro de coluna não encontrada, avisa o usuário sobre o SQL
+        if (error.message.includes("column") && error.message.includes("not found")) {
+          alert(`ERRO DE BANCO: A coluna ${error.message.split('"')[1]} não existe na tabela drivers.`);
+        }
         return false;
       }
       
       return true;
     } catch (e) {
-      console.error("Erro inesperado no save motorista:", e);
+      console.error("❌ ERRO INESPERADO (Catch) ao salvar motorista:", e);
       return false;
     }
   },
@@ -111,7 +113,6 @@ export const driverRepository = {
       if (error) throw error;
       return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
-      console.error("Erro ao buscar motoristas:", e);
       return [];
     }
   },
