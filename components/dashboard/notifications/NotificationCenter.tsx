@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Notification, NotificationOrigin, NotificationPreference } from '../../../types';
+import { User, Notification, NotificationOrigin } from '../../../types';
 import { db } from '../../../utils/storage';
 import NotificationSettings from './NotificationSettings';
+import NotificationDetailModal from './NotificationDetailModal';
 
 interface NotificationCenterProps {
   user: User;
@@ -15,6 +16,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<NotificationOrigin>('OPERACIONAL');
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = useCallback(async (isAutoRefresh = false) => {
@@ -59,6 +64,12 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
     } else {
       setView('list');
     }
+  };
+
+  const handleNotifClick = (n: Notification) => {
+    setSelectedNotification(n);
+    setIsDetailOpen(true);
+    setIsOpen(false);
   };
 
   const filteredNotifications = notifications.filter(n => {
@@ -111,24 +122,36 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
               ) : filteredNotifications.length === 0 ? (
                 <div className="py-24 text-center text-slate-300 text-[10px] font-black uppercase italic">Sem novas atividades</div>
               ) : filteredNotifications.map(n => (
-                <div key={n.id} className="p-5 bg-slate-50/50 border border-slate-100 rounded-[1.8rem] transition-all group relative overflow-hidden">
+                <button 
+                  key={n.id} 
+                  onClick={() => handleNotifClick(n)}
+                  className="w-full text-left p-5 bg-slate-50/50 border border-slate-100 rounded-[1.8rem] transition-all hover:bg-slate-50 group relative overflow-hidden active:scale-[0.98]"
+                >
                    <div className={`absolute top-0 left-0 w-1 h-full ${n.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
                    <div className="flex justify-between items-start mb-3">
                       <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${n.origin === 'MOTORISTA' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>{n.type.replace(/_/g, ' ')}</span>
                       <p className="text-[8px] font-mono font-black text-slate-400">{new Date(n.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
                    </div>
                    <h5 className="text-[11px] font-black text-slate-800 uppercase leading-tight group-hover:text-blue-600 transition-colors">{n.title}</h5>
-                   <p className="text-[10px] text-slate-500 font-medium mt-1 leading-snug">{n.description}</p>
+                   <p className="text-[10px] text-slate-500 font-medium mt-1 leading-snug truncate">{n.description}</p>
                    {n.summary?.os && (
                      <div className="mt-4 p-3 bg-white rounded-2xl border border-slate-100 grid grid-cols-2 gap-3 shadow-inner">
                         <div><p className="text-[7px] font-black text-slate-300 uppercase leading-none">OS</p><p className="text-[10px] font-black text-blue-600 mt-1 uppercase">{n.summary.os}</p></div>
                         <div><p className="text-[7px] font-black text-slate-300 uppercase leading-none">Motorista</p><p className="text-[9px] font-black text-slate-700 mt-1 uppercase truncate">{n.summary.motorista}</p></div>
                      </div>
                    )}
-                </div>
+                </button>
               ))}
            </div>
         </div>
+      )}
+
+      {selectedNotification && (
+        <NotificationDetailModal 
+          isOpen={isDetailOpen} 
+          onClose={() => { setIsDetailOpen(false); setSelectedNotification(null); }} 
+          notification={selectedNotification} 
+        />
       )}
     </div>
   );

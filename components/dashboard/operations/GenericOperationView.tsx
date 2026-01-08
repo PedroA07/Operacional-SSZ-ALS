@@ -11,6 +11,7 @@ import DriverLocationModal from './DriverLocationModal';
 import DocumentViewerModal from './DocumentViewerModal';
 import VWStatusSelector from './VWStatusSelector';
 import ViewFilters from './ViewFilters';
+import { maskCNPJ } from '../../../utils/masks';
 
 interface GenericOperationViewProps {
   user: User;
@@ -44,7 +45,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isDriversCollapsed, setIsDriversCollapsed] = useState(false);
   
-  // Estados de Filtro
   const [activeMainTab, setActiveMainTab] = useState<'overview' | 'clients'>('overview');
   const [activeStatusTab, setActiveStatusTab] = useState<'ativas' | 'concluida' | 'cancelada'>('ativas');
   const [searchQuery, setSearchQuery] = useState('');
@@ -134,14 +134,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(t => 
-        t.os.toLowerCase().includes(q) || 
-        t.container?.toLowerCase().includes(q) || 
-        t.driver.name.toLowerCase().includes(q) ||
-        t.customer.name.toLowerCase().includes(q) ||
-        t.ship?.toLowerCase().includes(q) ||
-        t.booking?.toLowerCase().includes(q)
-      );
+      result = result.filter(t => t.os.toLowerCase().includes(q) || t.container?.toLowerCase().includes(q) || t.driver.name.toLowerCase().includes(q) || t.customer.name.toLowerCase().includes(q) || t.ship?.toLowerCase().includes(q) || t.booking?.toLowerCase().includes(q));
     }
 
     if (startDate) result = result.filter(t => t.dateTime >= startDate);
@@ -159,8 +152,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
-    (t) => {},
-    (t) => {},
+    (t) => {}, (t) => {},
     handleOpenDocModal,
     async (id) => { if(confirm('Excluir viagem?')) { await db.deleteTrip(id, user); loadLocalData(); } },
     loadLocalData,
@@ -192,74 +184,72 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                   {[{ id: 'ativas', label: 'Em Aberto / Ativas', color: 'blue' }, { id: 'concluida', label: 'Concluídas', color: 'emerald' }, { id: 'cancelada', label: 'Canceladas', color: 'red' }].map(tab => (<button key={tab.id} onClick={() => setActiveStatusTab(tab.id as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${activeStatusTab === tab.id ? `bg-${tab.color}-600 text-white shadow-lg` : `bg-slate-50 text-slate-400 hover:bg-slate-100`}`}>{tab.label}</button>))}
                 </div>
             </div>
-
-            <ViewFilters 
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              startDate={startDate}
-              onStartDateChange={setStartDate}
-              endDate={endDate}
-              onEndDateChange={setEndDate}
-              onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); }}
-            />
-            
+            <ViewFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); }} />
             <div className="grid grid-cols-1 gap-8">
               {activeStatusTab === 'ativas' && filteredDrivers.length > 0 && !searchQuery && !startDate && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between px-2">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Motoristas Vinculados</h4>
-                    <button 
-                      onClick={() => setIsDriversCollapsed(!isDriversCollapsed)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-200"
-                    >
-                      <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isDriversCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      <span className="text-[8px] font-black uppercase">{isDriversCollapsed ? 'Mostrar Lista' : 'Encolher Lista'}</span>
-                    </button>
-                  </div>
-                  {!isDriversCollapsed && (
-                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                      <SmartOperationTable userId={user.id} componentId={`op-drivers-${type}-${categoryName}`} title="" columns={driverColumns} data={filteredDrivers} defaultVisibleKeys={['name', 'plateHorse', 'status']} />
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between px-2"><h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Motoristas Vinculados</h4><button onClick={() => setIsDriversCollapsed(!isDriversCollapsed)} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-xl text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-200"><svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isDriversCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg><span className="text-[8px] font-black uppercase">{isDriversCollapsed ? 'Mostrar' : 'Encolher'}</span></button></div>
+                  {!isDriversCollapsed && (<div className="animate-in fade-in slide-in-from-top-2 duration-300"><SmartOperationTable userId={user.id} componentId={`op-drivers-${type}-${categoryName}`} title="" columns={driverColumns} data={filteredDrivers} defaultVisibleKeys={['name', 'plateHorse', 'status']} /></div>)}
                 </div>
               )}
-              
               <SmartOperationTable userId={user.id} componentId={`op-trips-${type}-${categoryName}-${activeStatusTab}`} title={`Fila de Viagens: ${activeStatusTab === 'ativas' ? 'Pendentes & Em Execução' : activeStatusTab.toUpperCase()}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
             </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in zoom-in-95 duration-500">
-           {linkedCustomers.map(client => (<button key={client.id} onClick={() => { setActiveMainTab('overview'); onNavigate({ type: 'client', categoryName, clientName: client.name }); }} className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all text-left group"><div className="flex justify-between items-start mb-6"><div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-black group-hover:bg-blue-600 group-hover:text-white transition-colors shadow-inner">{client.name.substring(0,2).toUpperCase()}</div></div><h3 className="font-black text-slate-800 uppercase text-sm leading-tight mb-2 group-hover:text-blue-600 transition-colors truncate">{client.legalName || client.name}</h3><div className="space-y-1"><p className="text-[9px] font-bold text-slate-400 uppercase">{client.city} - {client.state}</p></div></button>))}
+           {linkedCustomers.map(client => (
+            <button 
+              key={client.id} 
+              onClick={() => { setActiveMainTab('overview'); onNavigate({ type: 'client', categoryName, clientName: client.name }); }} 
+              className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all text-left group flex flex-col h-full"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-black group-hover:bg-blue-600 group-hover:text-white transition-colors shadow-inner">
+                  {client.name.substring(0,2).toUpperCase()}
+                </div>
+                <div className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[7px] font-black uppercase tracking-tighter border border-emerald-100">Ativo</div>
+              </div>
+              
+              <div className="flex-1 space-y-4">
+                 <div>
+                    <h3 className="font-black text-slate-800 uppercase text-[11px] leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
+                      {client.legalName || client.name}
+                    </h3>
+                    {client.legalName && client.name !== client.legalName && (
+                       <p className="text-[8px] font-bold text-slate-400 uppercase italic mt-1">FAN: {client.name}</p>
+                    )}
+                 </div>
+
+                 <div className="space-y-2 border-t border-slate-50 pt-4">
+                    <div className="flex flex-col">
+                       <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Documento</span>
+                       <span className="text-[9px] font-mono font-bold text-slate-500">{maskCNPJ(client.cnpj)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                       <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Localidade</span>
+                       <span className="text-[9px] font-black text-slate-700 uppercase">{client.city} - {client.state}</span>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="mt-6 flex items-center gap-2 text-[8px] font-black text-blue-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                 Visualizar Unidade
+                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+              </div>
+            </button>
+           ))}
         </div>
       )}
 
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
-             <div className="text-center border-b border-slate-100 pb-6 shrink-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento</p>
-                <p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p>
-             </div>
+             <div className="text-center border-b border-slate-100 pb-6 shrink-0"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento</p><p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p></div>
              <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-1">
-                {isVWCrageaTrip ? (
-                   <VWStatusSelector currentStatus={tempStatus} onSelect={setTempStatus} />
-                ) : (
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Novo Status</label>
-                    <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                        {['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                )}
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora do Evento</label>
-                   <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
-                </div>
+                {isVWCrageaTrip ? (<VWStatusSelector currentStatus={tempStatus} onSelect={setTempStatus} />) : (<div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Novo Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>)}
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora do Evento</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
              </div>
-             <div className="grid gap-3 pt-4 border-t border-slate-100 shrink-0">
-                <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button>
-                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
-             </div>
+             <div className="grid gap-3 pt-4 border-t border-slate-100 shrink-0"><button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button><button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button></div>
           </div>
         </div>
       )}
