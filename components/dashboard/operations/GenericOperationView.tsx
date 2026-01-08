@@ -22,7 +22,7 @@ interface GenericOperationViewProps {
   allTrips: Trip[];
   availableOps: OperationDefinition[];
   categories: Category[];
-  onNavigate: (view: { type: 'category' | 'client', id?: string, categoryName: string, clientName?: string }) => void;
+  onNavigate: (view: { type: 'list' | 'category' | 'client', id?: string, categoryName: string, clientName?: string }) => void;
   onLocateDriver: (driverId: string) => void;
   density?: 'compact' | 'comfortable';
 }
@@ -50,7 +50,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [endDate, setEndDate] = useState('');
   const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
   
-  // Novos controles: Pesquisa de cliente e Densidade local
+  // Novos controles requisitados
   const [clientSearchText, setClientSearchText] = useState('');
   const [localDensity, setLocalDensity] = useState<'compact' | 'comfortable'>(initialDensity || 'compact');
 
@@ -151,7 +151,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           <div className={`w-16 h-16 ${selectedFilterClient === 'TODOS' ? 'bg-slate-900' : 'bg-blue-600'} rounded-[2rem] flex items-center justify-center text-white font-black shadow-2xl shrink-0 transition-colors`}>{categoryName.substring(0, 2).toUpperCase()}</div>
           <div>
             <div className="flex items-center gap-3">
-              <button onClick={() => onNavigate({ type: 'list' })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-500 hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              <button onClick={() => onNavigate({ type: 'list', categoryName })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-500 hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
               <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{categoryName}</h1>
             </div>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1 ml-11">{selectedFilterClient === 'TODOS' ? 'Visão Consolidada da Categoria' : `Monitorando: ${selectedFilterClient}`}</p>
@@ -166,7 +166,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
       </header>
 
-      {/* PAINEL DE CLIENTES COM BUSCA INTEGRADA */}
       <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-5">
          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
             <div>
@@ -190,22 +189,14 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
             {categoryCustomers.map(c => (
               <button key={c.id} onClick={() => setSelectedFilterClient(c.name)} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap border ${selectedFilterClient === c.name ? 'bg-blue-600 text-white border-blue-600 shadow-xl scale-105' : 'text-slate-400 bg-slate-50 border-slate-100 hover:bg-white'}`}>{c.name}</button>
             ))}
-            {categoryCustomers.length === 0 && clientSearchText && (
-               <p className="text-[10px] font-bold text-slate-300 uppercase italic py-4">Nenhum cliente localizado com "{clientSearchText}"</p>
-            )}
          </div>
       </div>
 
       <ViewFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); setSelectedFilterClient('TODOS'); setClientSearchText(''); }} />
       
       <div className={localDensity === 'compact' ? 'table-compact' : ''}>
-        <SmartOperationTable userId={user.id} componentId={`op-trips-${categoryName}-${selectedFilterClient}`} title={`Fila de Monitoramento › ${selectedFilterClient}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+        <SmartOperationTable userId={user.id} componentId={`op-trips-${categoryName}-${selectedFilterClient}`} title={`Painel de Carga › ${selectedFilterClient}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
       </div>
-
-      <style>{`
-        .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; }
-        .table-compact table th { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; }
-      `}</style>
 
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -225,6 +216,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
       {isTripModalOpen && <TripModal isOpen={isTripModalOpen} onClose={() => setIsTripModalOpen(false)} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} />}
       {isDriverDocsModalOpen && selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => setIsDriverDocsModalOpen(false)} trip={selectedTrip} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />}
+      
+      <style>{`
+        .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; }
+        .table-compact table th { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; }
+      `}</style>
     </div>
   );
 };

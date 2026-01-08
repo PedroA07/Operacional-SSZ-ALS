@@ -103,6 +103,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     // FILTRO DE DATA ROBUSTO (YYYY-MM-DD)
     if (startDate || endDate) {
       result = result.filter(t => {
+        // Extrai apenas o dia YYYY-MM-DD da data da programação
         const tripDate = t.dateTime.split('T')[0];
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;

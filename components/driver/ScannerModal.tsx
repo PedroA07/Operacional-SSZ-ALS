@@ -99,7 +99,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   return (
     <div className="fixed inset-0 z-[5000] bg-black flex flex-col h-[100dvh] overflow-hidden">
       <header className="px-6 py-4 bg-slate-950/95 border-b border-white/10 flex justify-between items-center shrink-0 z-50 pt-8">
-        <div><p className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Scanner de Alta Precisão</p><h3 className="text-xs font-black text-white uppercase mt-1">OS {trip.os}</h3></div>
+        <div><p className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Scanner de Documentos ALS</p><h3 className="text-xs font-black text-white uppercase mt-1">OS {trip.os}</h3></div>
         <button onClick={onClose} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-white"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button>
       </header>
 
@@ -108,30 +108,29 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
           <>
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             
-            {/* OVERLAY COM MÁSCARA A4 E BORDAS SUAVES */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                <div className="w-full h-full relative">
-                  {/* MÁSCARA ESCURA PERIFÉRICA */}
-                  <div className="absolute inset-0 bg-black/80" style={{
-                    maskImage: 'radial-gradient(ellipse at center, transparent 35%, black 60%)',
-                    WebkitMaskImage: 'radial-gradient(ellipse at center, transparent 35%, black 60%)'
+                  {/* Máscara Profissional Opaca */}
+                  <div className="absolute inset-0 bg-black/90" style={{
+                    maskImage: 'radial-gradient(ellipse at center, transparent 35%, black 65%)',
+                    WebkitMaskImage: 'radial-gradient(ellipse at center, transparent 35%, black 65%)'
                   }}></div>
                   
-                  {/* MOLDE A4 ARREDONDADO */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] aspect-[1/1.41] max-h-[75%] border-2 border-white/20 rounded-[3rem] shadow-[0_0_0_9999px_rgba(0,0,0,0.4)] flex items-center justify-center">
-                    <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-blue-500 rounded-tl-[3rem] shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-                    <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-blue-500 rounded-tr-[3rem] shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-                    <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-blue-500 rounded-bl-[3rem] shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-                    <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-blue-500 rounded-br-[3rem] shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
+                  {/* Molde A4 Arredondado */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] aspect-[1/1.41] max-h-[75%] border-2 border-white/10 rounded-[3rem] shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex items-center justify-center">
+                    <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-blue-500 rounded-tl-[3rem] shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
+                    <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-blue-500 rounded-tr-[3rem] shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
+                    <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-blue-500 rounded-bl-[3rem] shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
+                    <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-blue-500 rounded-br-[3rem] shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
                     
-                    <p className="text-[9px] font-black text-white/50 uppercase tracking-[0.4em] text-center px-10">Centralize o Documento no Molde</p>
+                    <p className="text-[9px] font-black text-white/50 uppercase tracking-[0.4em] text-center px-10">Centralize o Documento</p>
                   </div>
                </div>
             </div>
 
             <div className="absolute bottom-10 w-full flex items-center justify-center gap-10 px-10 z-50">
                <button onClick={() => capturedImages.length > 0 && setShowSessionGallery(true)} className="relative w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-white border border-white/10 active:scale-95 transition-all overflow-hidden">{capturedImages.length > 0 ? <><img src={capturedImages[capturedImages.length-1].url} className="w-full h-full object-cover opacity-60" /><span className="absolute inset-0 flex items-center justify-center text-[11px] font-black bg-blue-600/40">{capturedImages.length}</span></> : <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="2.5"/></svg>}</button>
-               <button onClick={capturePhoto} className="w-20 h-20 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center shadow-[0_0_40px_rgba(37,99,235,0.3)] active:scale-75 transition-all"><div className="w-14 h-14 bg-blue-600 rounded-full border-2 border-white/20"></div></button>
+               <button onClick={capturePhoto} className="w-20 h-20 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center shadow-[0_0_40px_rgba(37,99,235,0.4)] active:scale-75 transition-all"><div className="w-14 h-14 bg-blue-600 rounded-full border-2 border-white/20"></div></button>
                <button onClick={handleFinish} disabled={capturedImages.length === 0} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${capturedImages.length > 0 ? 'bg-emerald-600 text-white shadow-lg active:scale-95' : 'bg-slate-800 text-slate-600'}`}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg></button>
             </div>
           </>
@@ -159,7 +158,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       <canvas ref={canvasRef} className="hidden" />
 
       {isSaving && (
-        <div className="absolute inset-0 z-[6000] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white"><div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div><p className="text-[10px] font-black uppercase tracking-[0.4em] mt-6 animate-pulse">Enviando Documentos...</p></div>
+        <div className="absolute inset-0 z-[6000] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white"><div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div><p className="text-[10px] font-black uppercase tracking-[0.4em] mt-6 animate-pulse">Sincronizando Dossiê...</p></div>
       )}
     </div>
   );

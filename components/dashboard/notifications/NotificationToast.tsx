@@ -25,7 +25,7 @@ const NotificationToast: React.FC = () => {
 
     setActiveToast(notif);
     
-    // REGRA: Apenas toca som se NÃO for motorista (conforme solicitado)
+    // Regra: Motoristas não ouvem notificações para não serem interrompidos durante a direção
     const sessionStr = sessionStorage.getItem('als_active_session');
     const currentUser: User | null = sessionStr ? JSON.parse(sessionStr) : null;
     const isDriver = currentUser?.role === 'driver' || currentUser?.role === 'motoboy';
