@@ -4,6 +4,7 @@ import { Trip, User, TripStatus, StatusHistoryEntry, DriverCapturedDoc } from '.
 import ScannerModal from '../ScannerModal';
 import { db } from '../../../utils/storage';
 import ImageViewer from '../../shared/ImageViewer';
+import DriverDocsGallery from '../DriverDocsGallery';
 
 interface HomeTabProps {
   user: User;
@@ -32,6 +33,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [scannerInitialImage, setScannerInitialImage] = useState<string | null>(null);
   const [activePhoto, setActivePhoto] = useState<DriverCapturedDoc | null>(null);
   
@@ -123,6 +125,22 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             </div>
           </div>
 
+          {/* GALERIA DE MINIATURAS NA HOME */}
+          {activeTrip.driver_docs && activeTrip.driver_docs.length > 0 && (
+             <div className="space-y-3">
+                <div className="flex justify-between items-center px-1">
+                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Minhas fotos nesta OS</p>
+                   <button onClick={() => setIsGalleryOpen(true)} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Ver Todas ({activeTrip.driver_docs.length})</button>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                   {activeTrip.driver_docs.map((doc) => (
+                      <button key={doc.id} onClick={() => setActivePhoto(doc)} className="w-16 h-20 shrink-0 bg-slate-800 rounded-xl overflow-hidden border border-white/10 relative shadow-lg active:scale-95 transition-all"><img src={doc.url} className="w-full h-full object-cover" /></button>
+                   ))}
+                   <button onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }} className="w-16 h-20 shrink-0 bg-blue-600/10 border-2 border-dashed border-blue-500/30 rounded-xl flex flex-col items-center justify-center gap-1 text-blue-400 active:bg-blue-600 active:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg><span className="text-[7px] font-black uppercase tracking-tighter">+ Foto</span></button>
+                </div>
+             </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
              <button onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }} className="py-5 bg-blue-600 rounded-3xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>
@@ -163,6 +181,10 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
       {isScannerOpen && activeTrip && (
         <ScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onSuccess={onRefresh} trip={activeTrip} user={user} initialImage={scannerInitialImage} />
+      )}
+
+      {isGalleryOpen && activeTrip && (
+        <DriverDocsGallery isOpen={isGalleryOpen} onClose={() => setIsGalleryOpen(false)} docs={activeTrip.driver_docs || []} os={activeTrip.os} />
       )}
 
       {activePhoto && (

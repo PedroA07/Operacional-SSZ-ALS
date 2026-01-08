@@ -117,7 +117,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
     if (startDate || endDate) {
       result = result.filter(t => {
-        const tripDate = t.dateTime.split('T')[0];
+        // Normaliza para o dia exato YYYY-MM-DD
+        const tripDate = t.dateTime.substring(0, 10);
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
         return true;
@@ -151,7 +152,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           <div className={`w-16 h-16 ${selectedFilterClient === 'TODOS' ? 'bg-slate-900' : 'bg-blue-600'} rounded-[2rem] flex items-center justify-center text-white font-black shadow-2xl shrink-0 transition-colors`}>{categoryName.substring(0, 2).toUpperCase()}</div>
           <div>
             <div className="flex items-center gap-3">
-              <button onClick={() => onNavigate({ type: 'list', categoryName })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-500 hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              <button onClick={() => onNavigate({ type: 'list', categoryName })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
               <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{categoryName}</h1>
             </div>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1 ml-11">{selectedFilterClient === 'TODOS' ? 'Visão Consolidada da Categoria' : `Monitorando: ${selectedFilterClient}`}</p>

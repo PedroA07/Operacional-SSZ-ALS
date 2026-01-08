@@ -30,6 +30,12 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const isFirstLoadRef = useRef(true);
 
   const checkUnread = useCallback(async (myTrips: Trip[]) => {
+    // Se o centro de notificações estiver aberto, o contador deve ser zero.
+    if (isNotifCenterOpen) {
+      setUnreadCount(0);
+      return;
+    }
+
     const data = await db.getNotifications();
     const myOSs = new Set(myTrips.map(t => t.os.toUpperCase()));
     const clearedStr = localStorage.getItem('als_cleared_notifs');
@@ -46,11 +52,10 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     }).length;
     
     setUnreadCount(count);
-  }, [user.id]);
+  }, [user.id, isNotifCenterOpen]);
 
   const loadPortalData = useCallback(async () => {
     try {
-      // Forçar limpeza de qualquer cache de estado anterior antes do fetch
       const [allDrivers, allTrips] = await Promise.all([
         db.getDrivers(),
         db.getTrips()
@@ -72,11 +77,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
                (userCPF !== '' && tripDriverCPF === userCPF);
       }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
-      // Silenciado conforme solicitado: Apenas atualização visual, sem som agressivo.
-      const currentIds = new Set(myTrips.map(t => t.id));
-      lastTripIdsRef.current = currentIds;
-      isFirstLoadRef.current = false;
-
       setDriver(currentDriver || null);
       setTrips(myTrips);
       checkUnread(myTrips);
@@ -86,6 +86,13 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       setIsLoading(false);
     }
   }, [user.driverId, user.username, checkUnread]);
+
+  const handleOpenNotifCenter = () => {
+    setIsNotifCenterOpen(true);
+    setUnreadCount(0);
+    // Atualiza o timestamp da última visualização para limpar notificações futuras de OSs antigas
+    localStorage.setItem(`als_driver_last_viewed_${user.id}`, new Date().toISOString());
+  };
 
   useEffect(() => {
     loadPortalData();
@@ -125,7 +132,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         </div>
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => setIsNotifCenterOpen(true)}
+            onClick={handleOpenNotifCenter}
             className="relative w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
