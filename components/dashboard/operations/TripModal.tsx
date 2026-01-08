@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trip, Driver, Customer, Category, Port, PreStacking } from '../../../types';
+import { Trip, Driver, Customer, Category, Port, PreStacking, User } from '../../../types';
 import { db } from '../../../utils/storage';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import TripForm from './TripForm';
@@ -22,8 +22,12 @@ const TripModal: React.FC<TripModalProps> = ({
 }) => {
   const [ports, setPorts] = useState<(Port | PreStacking)[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
+    const saved = sessionStorage.getItem('als_active_session');
+    if (saved) setCurrentUser(JSON.parse(saved));
+
     const loadPorts = async () => {
       const [p, ps] = await Promise.all([db.getPorts(), db.getPreStacking()]);
       setPorts([...p, ...ps]);
@@ -32,12 +36,11 @@ const TripModal: React.FC<TripModalProps> = ({
   }, []);
 
   const handleSave = async (formData: any) => {
-    if (isSaving) return;
+    if (isSaving || !currentUser) return;
     setIsSaving(true);
     try {
       const tripId = editTrip?.id || `trip-${Date.now()}`;
       
-      // Sincroniza vínculos de categoria
       if (formData.driver && formData.customer) {
         await osCategoryService.syncVinculos(formData.category || 'Geral', formData.driver, formData.customer);
       }
@@ -57,7 +60,8 @@ const TripModal: React.FC<TripModalProps> = ({
         }
       };
 
-      await db.saveTrip(payload as any);
+      // REGRA: Passar o currentUser como segundo argumento para disparar notificação
+      await db.saveTrip(payload as any, currentUser);
       onSuccess();
       onClose();
     } catch (err) {
@@ -72,9 +76,8 @@ const TripModal: React.FC<TripModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[95vh] flex flex-col border border-white/20">
+      <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[92vh] flex flex-col border border-white/20">
         
-        {/* HEADER MODAL */}
         <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
           <div className="flex items-center gap-4">
              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg font-black italic">ALS</div>
@@ -88,7 +91,6 @@ const TripModal: React.FC<TripModalProps> = ({
           </button>
         </div>
         
-        {/* FORM CONTAINER */}
         <div className="p-12 overflow-y-auto custom-scrollbar flex-1 bg-[#fcfdfe]">
           <TripForm 
             editTrip={editTrip}

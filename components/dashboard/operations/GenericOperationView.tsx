@@ -212,13 +212,13 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
               
               <div className="flex-1 space-y-4">
                  <div className="space-y-1">
-                    <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Razão Social</span>
-                    <h3 className="font-black text-slate-800 uppercase text-[11px] leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
-                      {client.legalName || client.name}
+                    <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Nome Fantasia</span>
+                    <h3 className="font-black text-blue-600 uppercase text-[12px] leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">
+                      {client.name}
                     </h3>
                     <div className="pt-2">
-                       <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Nome Fantasia</span>
-                       <p className="text-[9px] font-bold text-slate-500 uppercase italic mt-1 line-clamp-1">{client.name}</p>
+                       <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Razão Social</span>
+                       <p className="text-[9px] font-bold text-slate-500 uppercase italic mt-1 line-clamp-1">{client.legalName || client.name}</p>
                     </div>
                  </div>
 
