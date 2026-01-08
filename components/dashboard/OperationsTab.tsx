@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db } from '../../utils/storage';
@@ -49,7 +49,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
+  
+  // ESTADOS CRÍTICOS PARA MANTER O STATUS FIXO
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const isUpdatingRef = useRef(false);
 
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
   const [startDate, setStartDate] = useState('');
@@ -70,13 +73,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     return saved ? JSON.parse(saved) : [];
   });
 
-  useEffect(() => {
-    localStorage.setItem(`als_opt_types_${user.id}`, JSON.stringify(filterTypes));
-    localStorage.setItem(`als_opt_clients_${user.id}`, JSON.stringify(filterClientNames));
-    localStorage.setItem(`als_opt_drivers_${user.id}`, JSON.stringify(filterDriverNames));
-  }, [filterTypes, filterClientNames, filterDriverNames, user.id]);
-
   const loadData = useCallback(async () => {
+    // Se estiver salvando, ignora o carregamento automático para não sobrescrever a tela
+    if (isUpdatingRef.current) return;
+
     try {
       const [t, c, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPreStacking()]);
       setTrips(t || []);
@@ -89,16 +89,25 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   useEffect(() => { 
     loadData();
-    const interval = setInterval(loadData, 30000);
+    const interval = setInterval(() => {
+      if (!isUpdatingRef.current) loadData();
+    }, 30000);
     return () => clearInterval(interval);
   }, [loadData]);
 
+  // LÓGICA SEPARADA E PROTEGIDA DE ATUALIZAÇÃO
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     
     setIsSavingStatus(true);
-    const newEntry: StatusHistoryEntry = { status: tempStatus, dateTime: new Date(statusTime).toISOString() };
-    const updatedTrip = { 
+    isUpdatingRef.current = true; // Bloqueia o Refresh de background
+
+    const newEntry: StatusHistoryEntry = { 
+      status: tempStatus, 
+      dateTime: new Date(statusTime).toISOString() 
+    };
+
+    const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
       statusTime: newEntry.dateTime, 
@@ -106,31 +115,40 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     };
 
     try {
-      // Atualização Otimista: Muda na tela antes de confirmar no banco
+      // 1. Atualiza a tela imediatamente (Optimistic)
       setTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
       
+      // 2. Tenta salvar no banco
       const success = await db.saveTrip(updatedTrip, user);
-      if (!success) throw new Error("Database rejection");
+      
+      if (!success) {
+        throw new Error("Erro na gravação do banco");
+      }
 
+      // 3. Fecha o modal apenas após sucesso real
       setIsStatusModalOpen(false);
-      await loadData();
+      
+      // 4. Aguarda um pequeno delay para o Postgres consolidar antes de re-ler
+      setTimeout(async () => {
+        await loadData();
+        isUpdatingRef.current = false; // Libera o Refresh
+        setIsSavingStatus(false);
+      }, 1000);
+
     } catch (e) {
-      alert("Falha ao sincronizar status com o servidor. Verifique sua conexão.");
-      await loadData(); // Reverte para o estado do banco
-    } finally {
+      alert("Falha crítica na sincronização. O status voltará ao valor original.");
+      isUpdatingRef.current = false;
       setIsSavingStatus(false);
+      await loadData(); // Reverte a tela puxando do banco
     }
   };
 
   const openStatusEditor = (t: Trip, s: TripStatus) => {
     setSelectedTrip(t);
     setTempStatus(s);
-    
-    // Ajuste de fuso horário local para o input datetime-local
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     setStatusTime(now.toISOString().slice(0, 16));
-    
     setIsStatusModalOpen(true);
   };
 

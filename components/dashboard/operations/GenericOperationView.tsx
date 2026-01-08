@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, StatusHistoryEntry, PreStacking, Port, Category } from '../../../types';
 import SmartOperationTable from './SmartOperationTable';
 import { db } from '../../../utils/storage';
@@ -43,7 +43,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [statusTime, setStatusTime] = useState('');
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isDriversCollapsed, setIsDriversCollapsed] = useState(false);
+  
+  // PROTEÇÃO CONTRA VOLTA DE STATUS
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const isUpdatingRef = useRef(false);
   
   const [activeMainTab, setActiveMainTab] = useState<'overview' | 'clients'>('overview');
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
@@ -52,6 +55,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [endDate, setEndDate] = useState('');
 
   const loadLocalData = useCallback(async () => {
+    if (isUpdatingRef.current) return;
+
     try {
       const [t, cats, p, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPorts(), db.getPreStacking()]);
       setAllTrips(t || []);
@@ -64,7 +69,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
   useEffect(() => {
     loadLocalData();
-    const interval = setInterval(loadLocalData, 30000);
+    const interval = setInterval(() => {
+      if (!isUpdatingRef.current) loadLocalData();
+    }, 30000);
     return () => clearInterval(interval);
   }, [loadLocalData]);
 
@@ -81,7 +88,13 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     if (!selectedTrip || isSavingStatus) return;
     
     setIsSavingStatus(true);
-    const newEntry: StatusHistoryEntry = { status: tempStatus, dateTime: new Date(statusTime).toISOString() };
+    isUpdatingRef.current = true;
+
+    const newEntry: StatusHistoryEntry = { 
+      status: tempStatus, 
+      dateTime: new Date(statusTime).toISOString() 
+    };
+
     const updatedTrip = { 
       ...selectedTrip, 
       status: tempStatus, 
@@ -90,19 +103,27 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     };
 
     try {
-      // Otimismo visual
+      // 1. Atualização Otimista Visual
       setAllTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
       
+      // 2. Gravação Direta
       const success = await db.saveTrip(updatedTrip, user);
-      if (!success) throw new Error("Database error");
+      if (!success) throw new Error("Database rejection");
       
       setIsStatusModalOpen(false);
-      await loadLocalData();
+
+      // 3. Aguarda propagação do banco antes de liberar o refresh
+      setTimeout(async () => {
+        await loadLocalData();
+        isUpdatingRef.current = false;
+        setIsSavingStatus(false);
+      }, 1000);
+
     } catch (e) {
       alert("Falha ao atualizar status no banco de dados.");
-      await loadLocalData();
-    } finally {
+      isUpdatingRef.current = false;
       setIsSavingStatus(false);
+      await loadLocalData();
     }
   };
 
@@ -183,7 +204,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); loadLocalData(); }, 
-    (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(false); /* Simula clique no menu se necessário mas melhor abrir modal específico */ },
+    (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(false); },
     (t) => {}, // Minuta
     handleOpenDocModal,
     async (id) => { if(confirm('Excluir viagem permanentemente?')) { await db.deleteTrip(id, user); loadLocalData(); } },
