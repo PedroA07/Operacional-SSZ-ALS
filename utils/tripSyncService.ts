@@ -75,7 +75,8 @@ export const tripSyncService = {
         cpf: driver.cpf
       },
       status: 'Pendente',
-      statusHistory: [{ status: 'Pendente', dateTime: now }],
+      // Fix: Added missing required property 'createdAt' to match StatusHistoryEntry interface
+      statusHistory: [{ status: 'Pendente', dateTime: now, createdAt: now }],
       advancePayment: { status: 'BLOQUEADO' },
       balancePayment: { status: 'AGUARDANDO_DOCS' },
       documents: [],

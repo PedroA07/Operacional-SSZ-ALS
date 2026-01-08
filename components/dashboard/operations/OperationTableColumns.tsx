@@ -106,7 +106,7 @@ export const getOperationTableColumns = (
     if (status === 'Viagem cancelada') {
       return isLatest 
         ? 'bg-amber-500 border-amber-600 text-white shadow-md ring-2 ring-amber-50' 
-        : 'bg-amber-50 border-amber-100 text-amber-600';
+        : 'bg-amber-100 text-amber-600 border-amber-100';
     }
     return isLatest 
       ? 'bg-blue-600 border-blue-700 text-white shadow-md ring-2 ring-blue-50' 
@@ -147,7 +147,12 @@ export const getOperationTableColumns = (
            </div>
         </div>
         <div className="flex flex-col gap-1.5 border-l-2 border-blue-50 pl-3">
-           {(t.statusHistory || []).slice().sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).slice(0, 3).map((step, idx) => (
+           {/* REGRA: Ordenar pelo createdAt (registro real) decrescente */}
+           {(t.statusHistory || [])
+             .slice()
+             .sort((a,b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime())
+             .slice(0, 3)
+             .map((step, idx) => (
              <div key={idx} className={`flex flex-col p-1.5 rounded-lg border ${getStatusStyle(step.status, idx === 0)}`}>
                 <div className="flex justify-between items-center gap-4">
                   <span className="text-[7.5px] font-black uppercase truncate">{step.status}</span>

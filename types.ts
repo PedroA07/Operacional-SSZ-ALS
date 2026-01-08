@@ -40,7 +40,7 @@ export type NotificationType =
   | 'TRIP_UPDATED'
   | 'STATUS_UPDATED' 
   | 'PAYMENT_LIBERATED' 
-  | 'DRIVER_CREATED'
+  | 'DRIVER_CREATED' 
   | 'DRIVER_UPDATED'
   | 'CUSTOMER_CREATED'
   | 'CUSTOMER_UPDATED'
@@ -118,7 +118,8 @@ export type TripStatus =
 
 export interface StatusHistoryEntry {
   status: TripStatus;
-  dateTime: string;
+  dateTime: string; // Horário Operacional (informado pelo usuário)
+  createdAt: string; // Horário de Registro (real do sistema)
 }
 
 export interface PaymentStatus {

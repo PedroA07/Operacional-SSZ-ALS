@@ -97,7 +97,8 @@ export const driverService = {
       status: nextStatus,
       statusTime: now,
       statusHistory: [
-        { status: nextStatus, dateTime: now },
+        // Fix: Added missing required property 'createdAt' to match StatusHistoryEntry interface
+        { status: nextStatus, dateTime: now, createdAt: now },
         ...(trip.statusHistory || [])
       ]
     };

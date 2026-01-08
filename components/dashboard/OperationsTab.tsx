@@ -84,9 +84,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     setIsSavingStatus(true);
     isUpdatingRef.current = true;
 
+    // REGRA: createdAt é o horário real de agora
+    const now = new Date().toISOString();
     const newEntry: StatusHistoryEntry = { 
       status: tempStatus, 
-      dateTime: new Date(statusTime).toISOString() 
+      dateTime: new Date(statusTime).toISOString(), // Operacional
+      createdAt: now // Real/Registro
     };
 
     const updatedTrip: Trip = { 
@@ -99,6 +102,16 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     try {
       const success = await db.saveTrip(updatedTrip, user);
       if (!success) throw new Error("Erro de banco");
+      
+      // Envia notificação explícita do evento
+      await db.addNotification(
+        user, 
+        'STATUS_UPDATED', 
+        `OS ${selectedTrip.os}: ${tempStatus}`, 
+        `Status atualizado para "${tempStatus}" às ${new Date(statusTime).toLocaleTimeString('pt-BR')}.`,
+        { os: selectedTrip.os, motorista: selectedTrip.driver.name, placa: selectedTrip.driver.plateHorse }
+      );
+
       setIsStatusModalOpen(false);
       onRefresh();
     } catch (e) {
@@ -307,7 +320,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
                   </div>
                 )}
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora (Operacional)</label>
                   <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
                 </div>
              </div>

@@ -92,9 +92,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     setIsSavingStatus(true);
     isUpdatingRef.current = true;
 
+    // Fix: Added missing required property 'createdAt' to match StatusHistoryEntry interface
     const newEntry: StatusHistoryEntry = { 
       status: tempStatus, 
-      dateTime: new Date(statusTime).toISOString() 
+      dateTime: new Date(statusTime).toISOString(),
+      createdAt: new Date().toISOString()
     };
 
     const updatedTrip = { 
@@ -402,7 +404,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={onLocalRefresh} preStackingUnits={preStackingUnits} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
-      {isDriverDocsModalOpen && selectedTrip && (<DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={onLocalRefresh} />)}
+      {isDriverDocsModalOpen && selectedTrip && (<DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={onRefresh} />)}
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
     </div>
   );

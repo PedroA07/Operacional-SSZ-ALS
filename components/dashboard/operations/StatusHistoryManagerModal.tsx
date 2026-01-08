@@ -29,8 +29,8 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
       let newMainTime = trip.dateTime;
 
       if (newHistory.length > 0) {
-        // Ordena por data para garantir que o primeiro é o mais recente
-        const sorted = [...newHistory].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+        // Ordena por data de registro para garantir que o primeiro é o mais recente registrado
+        const sorted = [...newHistory].sort((a, b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime());
         newMainStatus = sorted[0].status;
         newMainTime = sorted[0].dateTime;
       }
@@ -68,14 +68,20 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
           {(!trip.statusHistory || trip.statusHistory.length === 0) ? (
             <div className="py-20 text-center text-slate-300 font-black uppercase italic text-xs">Sem histórico registrado</div>
           ) : (
-            trip.statusHistory.slice().sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((entry, idx) => (
+            trip.statusHistory
+              .slice()
+              .sort((a,b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime())
+              .map((entry, idx) => (
               <div key={idx} className="flex items-center justify-between p-5 bg-slate-50 border border-slate-100 rounded-2xl group hover:border-blue-200 transition-all">
                 <div className="flex items-start gap-4">
                   <div className={`w-2 h-2 rounded-full mt-1.5 ${idx === 0 ? 'bg-blue-600 animate-pulse' : 'bg-slate-300'}`}></div>
                   <div>
                     <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{entry.status}</p>
                     <p className="text-[9px] font-mono font-bold text-slate-400 mt-1.5">
-                      {new Date(entry.dateTime).toLocaleString('pt-BR')}
+                      Op: {new Date(entry.dateTime).toLocaleString('pt-BR')}
+                    </p>
+                    <p className="text-[7px] font-mono text-slate-300 mt-0.5 uppercase">
+                      Reg: {entry.createdAt ? new Date(entry.createdAt).toLocaleString('pt-BR') : 'Legado'}
                     </p>
                   </div>
                 </div>
@@ -93,7 +99,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
 
         <div className="p-6 bg-slate-50 border-t border-slate-100 text-center shrink-0">
           <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-            * Ao excluir um status, o status principal da viagem será revertido para a posição anterior automaticamente.
+            * O histórico é ordenado pela hora exata em que o status foi gravado no sistema.
           </p>
         </div>
       </div>

@@ -1,8 +1,9 @@
 
 import React, { useMemo, useState, useCallback } from 'react';
-import { Trip, User, TripStatus } from '../../../types';
+import { Trip, User, TripStatus, StatusHistoryEntry } from '../../../types';
 import { driverService } from '../../../utils/driverService';
 import ScannerModal from '../ScannerModal';
+import { db } from '../../../utils/storage';
 
 interface HomeTabProps {
   user: User;
@@ -54,14 +55,44 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     if (!confirm(`CONFIRMAR ESTA POSIÇÃO: ${confirmLabel}?`)) return;
 
     setIsUpdating(true);
-    const success = await driverService.updateTripStatus(trip, nextStatus, user);
-    if (success) {
-      setShowPicker(false);
-      await onRefresh();
-    } else {
-      alert("Erro ao conectar. Verifique seu sinal de internet.");
+    
+    // REGRA: Captura o horário real de registro
+    const now = new Date().toISOString();
+    const newEntry: StatusHistoryEntry = {
+      status: nextStatus,
+      dateTime: now, // Horário operacional para o motorista costuma ser agora
+      createdAt: now // Horário real de registro
+    };
+
+    const updatedTrip: Trip = {
+      ...trip,
+      status: nextStatus,
+      statusTime: now,
+      statusHistory: [newEntry, ...(trip.statusHistory || [])]
+    };
+
+    try {
+      const success = await db.saveTrip(updatedTrip, user);
+      if (success) {
+        // Notificação em tempo real
+        await db.addNotification(
+          user,
+          'STATUS_UPDATED',
+          `Motorista ${user.displayName}: ${nextStatus}`,
+          `A OS ${trip.os} foi atualizada pelo motorista no aplicativo.`,
+          { os: trip.os, motorista: user.displayName, placa: trip.driver.plateHorse }
+        );
+
+        setShowPicker(false);
+        await onRefresh();
+      } else {
+        alert("Erro ao conectar. Verifique seu sinal de internet.");
+      }
+    } catch (e) {
+      alert("Erro crítico ao salvar status.");
+    } finally {
+      setIsUpdating(false);
     }
-    setIsUpdating(false);
   };
 
   const handleOpenScanner = useCallback(() => setIsScannerOpen(true), []);

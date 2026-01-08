@@ -14,13 +14,13 @@ const NotificationToast: React.FC = () => {
     // Converte o formato do banco para o tipo Notification do App
     const notif: Notification = {
       id: String(data.id),
-      title: data.title || data.type.replace(/_/g, ' '),
-      description: data.message,
-      type: data.type as NotificationType,
+      title: data.title || data.type?.replace(/_/g, ' ') || 'Alerta do Sistema',
+      description: data.message || '',
+      type: (data.type as NotificationType) || 'SYSTEM',
       origin: (data.origin as NotificationOrigin) || 'OPERACIONAL',
       authorName: data.user_name || 'Sistema',
       authorId: data.user_id || 'system',
-      timestamp: data.timestamp,
+      timestamp: data.timestamp || new Date().toISOString(),
       summary: { ...data.summary, os: data.os_ref }
     };
 
@@ -37,6 +37,9 @@ const NotificationToast: React.FC = () => {
       if (sessionUserStr) {
         const user = JSON.parse(sessionUserStr) as User;
         if (user.notificationPrefs) prefs = user.notificationPrefs;
+        
+        // REGRA: Não mostrar notificação para o próprio autor (opcional, ALS costuma preferir feedback visual)
+        // if (user.id === notif.authorId) return;
       }
     } catch (err) {}
 
@@ -60,23 +63,30 @@ const NotificationToast: React.FC = () => {
         audioUtils.playNotification();
       }
       
-      // Auto-hide após 8 segundos
+      // Dispara evento global para atualizar contadores no NotificationCenter
+      window.dispatchEvent(new CustomEvent('als_new_notification_event'));
+
+      // Auto-hide após 10 segundos
       setTimeout(() => {
-        setActiveToast(null);
-      }, 8000);
+        setActiveToast(prev => prev?.id === notif.id ? null : prev);
+      }, 10000);
     }
   }, []);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      console.warn("Supabase Realtime: Cliente não inicializado.");
+      return;
+    }
 
     // INSCRIÇÃO REALTIME: Escuta a tabela 'notifications' para QUALQUER usuário
+    // IMPORTANTE: A tabela 'notifications' deve estar na Publication 'supabase_realtime' no painel
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel('public-notifications')
       .on(
         'postgres_changes',
         {
-          event: 'INSERT', // Apenas quando for gravado com sucesso no DB
+          event: 'INSERT', 
           schema: 'public',
           table: 'notifications'
         },
@@ -84,7 +94,11 @@ const NotificationToast: React.FC = () => {
           processNotification(payload);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.debug("ALS Realtime: Conectado ao servidor de notificações.");
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
