@@ -50,12 +50,12 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
   const loadPortalData = useCallback(async () => {
     try {
+      // Forçar limpeza de qualquer cache de estado anterior antes do fetch
       const [allDrivers, allTrips] = await Promise.all([
         db.getDrivers(),
         db.getTrips()
       ]);
 
-      // Identificação robusta (CPF do login ou ID vinculado)
       const targetDriverId = String(user.driverId || '').trim();
       const userCPF = String(user.username || '').replace(/\D/g, '');
       
@@ -72,15 +72,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
                (userCPF !== '' && tripDriverCPF === userCPF);
       }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
-      // Alerta sonoro para novas viagens pendentes
+      // Silenciado conforme solicitado: Apenas atualização visual, sem som agressivo.
       const currentIds = new Set(myTrips.map(t => t.id));
-      if (!isFirstLoadRef.current) {
-        const newTrip = myTrips.find(t => !lastTripIdsRef.current.has(t.id) && t.status === 'Pendente');
-        if (newTrip) {
-          const isMuted = localStorage.getItem('als_driver_muted') === 'true';
-          if (!isMuted) audioUtils.playAlert();
-        }
-      }
       lastTripIdsRef.current = currentIds;
       isFirstLoadRef.current = false;
 

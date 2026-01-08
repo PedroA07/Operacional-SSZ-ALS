@@ -21,25 +21,42 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
   const [previewData, setPreviewData] = useState({ url: '', title: '' });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerInitialImage, setScannerInitialImage] = useState<string | null>(null);
 
-  // Estados para visualizar fotos capturadas
   const [activePhoto, setActivePhoto] = useState<DriverCapturedDoc | null>(null);
 
   const ocRef = useRef<HTMLDivElement>(null);
   const minutaRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenScanner = useCallback(() => {
+    setScannerInitialImage(null);
     setIsScannerOpen(true);
   }, []);
+
+  const handleOpenFiles = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setScannerInitialImage(ev.target?.result as string);
+        setIsScannerOpen(true);
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
+  };
 
   const handleCloseScanner = useCallback(() => {
     setIsScannerOpen(false);
   }, []);
 
   const handleScannerSuccess = useCallback(async () => {
-    // Ao enviar documentos, atualizamos a lista local
     await onRefresh();
-    // E também a viagem selecionada para mostrar as novas fotos
     const updated = trips.find(t => t.id === selectedTrip?.id);
     if (updated) setSelectedTrip(updated);
   }, [onRefresh, selectedTrip?.id, trips]);
@@ -70,7 +87,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
   return (
     <div className="space-y-4 animate-in fade-in duration-500 pb-24">
       
-      {/* TEMPLATES OCULTOS PARA GERAÇÃO */}
       <div style={{ position: 'fixed', left: '-9999px', top: '-9999px' }}>
          {selectedTrip?.ocFormData && <div ref={ocRef}><OrdemColetaTemplate formData={selectedTrip.ocFormData} selectedDriver={selectedTrip.driver} selectedRemetente={selectedTrip.customer} selectedDestinatario={selectedTrip.destination} /></div>}
          {selectedTrip?.preStackingFormData && <div ref={minutaRef}><PreStackingTemplate formData={selectedTrip.preStackingFormData} selectedDriver={selectedTrip.driver} selectedRemetente={selectedTrip.customer} selectedDestinatario={selectedTrip.destination} /></div>}
@@ -114,37 +130,33 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
                  <div className="flex flex-col"><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Navio / Booking</span><span className="text-xs font-bold text-slate-300 uppercase">{selectedTrip.ship || '---'} | {selectedTrip.booking || '---'}</span></div>
               </section>
 
-              {/* BOTÃO PARA ANEXAR DOCUMENTOS NA VIAGEM SELECIONADA */}
-              <button 
-                onClick={handleOpenScanner}
-                className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-[2.2rem] flex items-center justify-center gap-4 border border-white/10 shadow-xl active:scale-95 transition-all"
-              >
-                <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center text-white">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </div>
-                <div className="text-left">
-                  <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Anexar a esta OS</p>
-                  <p className="text-[8px] text-blue-200 font-bold uppercase mt-1">Enviar canhotos / Fotos</p>
-                </div>
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                 <button 
+                  onClick={handleOpenScanner}
+                  className="py-5 bg-blue-600 rounded-[2.2rem] flex flex-col items-center justify-center gap-2 border border-white/10 shadow-xl active:scale-95 transition-all"
+                 >
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2.5"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span className="text-[9px] font-black text-white uppercase tracking-widest">Usar Câmera</span>
+                 </button>
+                 <button 
+                  onClick={handleOpenFiles}
+                  className="py-5 bg-slate-800 rounded-[2.2rem] flex flex-col items-center justify-center gap-2 border border-white/5 shadow-xl active:scale-95 transition-all"
+                 >
+                    <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Anexar Doc</span>
+                 </button>
+                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*,.pdf" onChange={handleFileUpload} />
+              </div>
 
-              {/* SEÇÃO DE FOTOS ENVIADAS PELO MOTORISTA */}
               {selectedTrip.driver_docs && selectedTrip.driver_docs.length > 0 && (
                 <section className="space-y-3">
                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Minhas Capturas (Fotos)</p>
                    <div className="grid grid-cols-2 gap-3">
                       {selectedTrip.driver_docs.map((doc) => (
-                        <button 
-                          key={doc.id}
-                          onClick={() => setActivePhoto(doc)}
-                          className="aspect-[3/4] bg-slate-900 rounded-3xl border border-white/10 overflow-hidden relative shadow-lg active:scale-95 transition-all"
-                        >
+                        <button key={doc.id} onClick={() => setActivePhoto(doc)} className="aspect-[3/4] bg-slate-900 rounded-3xl border border-white/10 overflow-hidden relative shadow-lg active:scale-95 transition-all">
                            <img src={doc.url} className="w-full h-full object-cover" alt="Scan" />
                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
                               <p className="text-[7px] font-black text-white/70 uppercase">{new Date(doc.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
-                           </div>
-                           <div className="absolute top-3 right-3 w-6 h-6 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2.5"/></svg>
                            </div>
                         </button>
                       ))}
@@ -154,7 +166,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
 
               <section className="space-y-3">
                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Documentos Liberados</p>
-                 
                  {selectedTrip.ocFormData && (
                    <button onClick={() => generatePDF(ocRef, `OC - OS ${selectedTrip.os}`)} className="w-full p-6 bg-blue-600/10 border border-blue-500/30 rounded-3xl flex items-center justify-between active:scale-95 transition-all shadow-lg">
                       <div className="flex items-center gap-4 text-left">
@@ -164,7 +175,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
                       <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
                    </button>
                  )}
-
                  {selectedTrip.preStackingFormData && (
                    <button onClick={() => generatePDF(minutaRef, `Minuta - OS ${selectedTrip.os}`)} className="w-full p-6 bg-emerald-600/10 border border-emerald-500/30 rounded-3xl flex items-center justify-between active:scale-95 transition-all shadow-lg">
                       <div className="flex items-center gap-4 text-left">
@@ -174,13 +184,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
                       <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
                    </button>
                  )}
-
-                 {selectedTrip.osDoc && (
-                   <button onClick={() => { setPreviewData({ url: selectedTrip.osDoc!.url, title: 'OS Original' }); setIsDocViewerOpen(true); }} className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl flex items-center justify-between active:bg-blue-600 transition-all">
-                      <div className="flex items-center gap-4"><span className="text-[11px] font-black uppercase text-white">Anexo OS PDF</span></div>
-                      <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" strokeWidth="2"/></svg>
-                   </button>
-                 )}
               </section>
            </div>
            
@@ -188,7 +191,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
         </div>
       )}
 
-      {/* MODAL DE VISUALIZAÇÃO DE FOTO DO MOTORISTA - CORREÇÃO LAYOUT E FECHAMENTO */}
       {activePhoto && (
         <div className="fixed inset-0 z-[5000] bg-slate-950 flex flex-col animate-in fade-in duration-300 overflow-hidden">
            <header className="h-20 bg-slate-900 border-b border-white/10 flex items-center justify-between px-6 shrink-0 safe-top">
@@ -196,45 +198,18 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Minha Captura</p>
                 <p className="text-xs font-bold text-white uppercase truncate mt-1">Enviada em {new Date(activePhoto.timestamp).toLocaleString('pt-BR')}</p>
               </div>
-              <button 
-                onClick={() => setActivePhoto(null)} 
-                className="w-12 h-12 bg-red-600 text-white rounded-2xl flex items-center justify-center active:bg-red-700 transition-all shadow-xl shrink-0"
-              >
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
+              <button onClick={() => setActivePhoto(null)} className="w-12 h-12 bg-red-600 text-white rounded-2xl flex items-center justify-center active:bg-red-700 transition-all shadow-xl shrink-0"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
            </header>
-           
-           <div className="flex-1 overflow-hidden p-4 flex items-center justify-center bg-black">
-              <ImageViewer url={activePhoto.url} className="w-full h-full max-w-4xl" />
-           </div>
-
-           <div className="p-6 bg-slate-900 border-t border-white/5 safe-bottom shrink-0">
-              <p className="text-[8px] text-slate-500 font-bold uppercase text-center leading-relaxed">
-                 Use os controles de Zoom e Rotação para conferir a legibilidade dos dados.
-              </p>
-           </div>
+           <div className="flex-1 overflow-hidden p-4 flex items-center justify-center bg-black"><ImageViewer url={activePhoto.url} className="w-full h-full max-w-4xl" /></div>
         </div>
       )}
 
       {isScannerOpen && selectedTrip && (
-        <ScannerModal 
-          isOpen={isScannerOpen}
-          onClose={handleCloseScanner}
-          onSuccess={handleScannerSuccess}
-          trip={selectedTrip}
-          user={user}
-        />
+        <ScannerModal isOpen={isScannerOpen} onClose={handleCloseScanner} onSuccess={handleScannerSuccess} trip={selectedTrip} user={user} initialImage={scannerInitialImage} />
       )}
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewData.url} title={previewData.title} />
-      
       {isGenerating && <div className="fixed inset-0 z-[2000] bg-black/80 flex flex-col items-center justify-center space-y-4"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div><p className="text-[10px] font-black text-white uppercase tracking-widest">Processando Documento...</p></div>}
-
-      <style>{`
-        .safe-top { padding-top: env(safe-area-inset-top); }
-        .safe-bottom { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-      `}</style>
     </div>
   );
 };

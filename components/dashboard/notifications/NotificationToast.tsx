@@ -25,10 +25,17 @@ const NotificationToast: React.FC = () => {
 
     setActiveToast(notif);
     
-    if (notif.origin === 'MOTORISTA') {
-      audioUtils.playDriverUpdate();
-    } else {
-      audioUtils.playNotification();
+    // REGRA: Apenas toca som se NÃO for motorista (conforme solicitado)
+    const sessionStr = sessionStorage.getItem('als_active_session');
+    const currentUser: User | null = sessionStr ? JSON.parse(sessionStr) : null;
+    const isDriver = currentUser?.role === 'driver' || currentUser?.role === 'motoboy';
+
+    if (!isDriver) {
+      if (notif.origin === 'MOTORISTA') {
+        audioUtils.playDriverUpdate();
+      } else {
+        audioUtils.playNotification();
+      }
     }
     
     window.dispatchEvent(new CustomEvent('als_new_notification_event'));
@@ -54,7 +61,7 @@ const NotificationToast: React.FC = () => {
     <div className="fixed top-6 right-6 z-[9999] w-80 animate-in slide-in-from-right-full duration-500">
        <div 
          onClick={() => setActiveToast(null)}
-         className="bg-slate-950/95 backdrop-blur-xl text-white p-5 rounded-[2rem] shadow-[0_40px_100px_rgba(0,0,0,0.6)] border border-white/10 flex flex-col gap-2 relative overflow-hidden group active:scale-95 transition-all"
+         className="bg-slate-950/95 backdrop-blur-xl text-white p-5 rounded-[2rem] shadow-[0_40px_100px_rgba(0,0,0,0.6)] border border-white/10 flex flex-col gap-2 relative overflow-hidden group active:scale-95 transition-all cursor-pointer"
        >
           <div className={`absolute top-0 left-0 w-1.5 h-full ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-600'}`}></div>
           <div className="flex justify-between items-center"><div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full animate-pulse ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div><p className="text-[8px] font-black uppercase tracking-widest opacity-60">{activeToast.origin}</p></div><svg className="w-4 h-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></div>

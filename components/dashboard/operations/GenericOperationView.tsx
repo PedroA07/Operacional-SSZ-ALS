@@ -24,11 +24,11 @@ interface GenericOperationViewProps {
   categories: Category[];
   onNavigate: (view: { type: 'category' | 'client', id?: string, categoryName: string, clientName?: string }) => void;
   onLocateDriver: (driverId: string) => void;
-  density: 'compact' | 'comfortable';
+  density?: 'compact' | 'comfortable';
 }
 
 const GenericOperationView: React.FC<GenericOperationViewProps> = ({ 
-  user, type, categoryName, clientName, drivers, customers, allTrips, availableOps, categories, onNavigate, onLocateDriver, density
+  user, type, categoryName, clientName, drivers, customers, allTrips, availableOps, categories, onNavigate, onLocateDriver, density: initialDensity
 }) => {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
@@ -49,6 +49,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
+  
+  // Novos controles: Pesquisa de cliente e Densidade local
+  const [clientSearchText, setClientSearchText] = useState('');
+  const [localDensity, setLocalDensity] = useState<'compact' | 'comfortable'>(initialDensity || 'compact');
 
   const loadAuxData = useCallback(async () => {
     const [p, ps] = await Promise.all([db.getPorts(), db.getPreStacking()]);
@@ -57,33 +61,26 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
   useEffect(() => { loadAuxData(); }, [loadAuxData]);
 
-  // Fix: Implemented missing handleUpdateStatus function to process status changes
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     setIsSavingStatus(true);
     const now = new Date().toISOString();
-    
-    // Converte statusTime para ISO string para o banco de dados
     const eventTime = new Date(statusTime).toISOString();
 
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
       statusTime: eventTime, 
-      statusHistory: [
-        { status: tempStatus, dateTime: eventTime, createdAt: now }, 
-        ...(selectedTrip.statusHistory || [])
-      ] 
+      statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: now }, ...(selectedTrip.statusHistory || [])] 
     };
 
     try {
       if (await db.saveTrip(updatedTrip, user)) {
         setIsStatusModalOpen(false);
-        // Notifica o app para atualizar os dados globalmente
         window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
       }
     } catch (e) { 
-      alert("Erro ao atualizar status. Verifique sua conexão."); 
+      alert("Erro ao atualizar status."); 
     } finally { 
       setIsSavingStatus(false); 
     }
@@ -91,8 +88,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
   const categoryCustomers = useMemo(() => {
     const names = new Set(allTrips.filter(t => t.category === categoryName).map(t => t.customer.name));
-    return customers.filter(c => names.has(c.name)).sort((a,b) => a.name.localeCompare(b.name));
-  }, [allTrips, categoryName, customers]);
+    return customers
+      .filter(c => names.has(c.name))
+      .filter(c => c.name.toUpperCase().includes(clientSearchText.toUpperCase()))
+      .sort((a,b) => a.name.localeCompare(b.name));
+  }, [allTrips, categoryName, customers, clientSearchText]);
 
   const filteredTrips = useMemo(() => {
     let result = allTrips.filter(t => {
@@ -142,7 +142,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); }
   );
 
-  // Fix: Defined missing labelClass for the status update modal
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
 
   return (
@@ -150,23 +149,57 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-6">
           <div className={`w-16 h-16 ${selectedFilterClient === 'TODOS' ? 'bg-slate-900' : 'bg-blue-600'} rounded-[2rem] flex items-center justify-center text-white font-black shadow-2xl shrink-0 transition-colors`}>{categoryName.substring(0, 2).toUpperCase()}</div>
-          <div><h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{categoryName}</h1><p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1">{selectedFilterClient === 'TODOS' ? 'Visão Consolidada da Categoria' : `Monitorando: ${selectedFilterClient}`}</p></div>
+          <div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => onNavigate({ type: 'list' })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-500 hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{categoryName}</h1>
+            </div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1 ml-11">{selectedFilterClient === 'TODOS' ? 'Visão Consolidada da Categoria' : `Monitorando: ${selectedFilterClient}`}</p>
+          </div>
         </div>
-        <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} initialCategory={categoryName} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} variant="primary" />
+        <div className="flex items-center gap-4">
+           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+              <button onClick={() => setLocalDensity('compact')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${localDensity === 'compact' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Compacto</button>
+              <button onClick={() => setLocalDensity('comfortable')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${localDensity === 'comfortable' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Amplo</button>
+           </div>
+           <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} initialCategory={categoryName} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} variant="primary" />
+        </div>
       </header>
 
-      {/* TABS DE CLIENTES ESTILO PREMIUM */}
-      <div className="bg-white p-2 rounded-[2.2rem] border border-slate-200 shadow-sm flex gap-2 overflow-x-auto no-scrollbar">
-         <button onClick={() => setSelectedFilterClient('TODOS')} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap ${selectedFilterClient === 'TODOS' ? 'bg-slate-900 text-white shadow-xl scale-105' : 'text-slate-400 hover:bg-slate-50'}`}>Todos os Clientes</button>
-         {categoryCustomers.map(c => (
-           <button key={c.id} onClick={() => setSelectedFilterClient(c.name)} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap ${selectedFilterClient === c.name ? 'bg-blue-600 text-white shadow-xl scale-105' : 'text-slate-400 hover:bg-slate-50'}`}>{c.name}</button>
-         ))}
+      {/* PAINEL DE CLIENTES COM BUSCA INTEGRADA */}
+      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-5">
+         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+            <div>
+               <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Navegação por Clientes</h3>
+               <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">Selecione para filtrar o monitoramento abaixo</p>
+            </div>
+            <div className="relative w-full md:w-64">
+               <input 
+                 type="text" 
+                 placeholder="FILTRAR CLIENTE..." 
+                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all"
+                 value={clientSearchText}
+                 onChange={e => setClientSearchText(e.target.value)}
+               />
+               <svg className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>
+            </div>
+         </div>
+
+         <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+            <button onClick={() => setSelectedFilterClient('TODOS')} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap border ${selectedFilterClient === 'TODOS' ? 'bg-slate-900 text-white border-slate-900 shadow-xl scale-105' : 'text-slate-400 bg-slate-50 border-slate-100 hover:bg-white'}`}>Todos os Clientes</button>
+            {categoryCustomers.map(c => (
+              <button key={c.id} onClick={() => setSelectedFilterClient(c.name)} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap border ${selectedFilterClient === c.name ? 'bg-blue-600 text-white border-blue-600 shadow-xl scale-105' : 'text-slate-400 bg-slate-50 border-slate-100 hover:bg-white'}`}>{c.name}</button>
+            ))}
+            {categoryCustomers.length === 0 && clientSearchText && (
+               <p className="text-[10px] font-bold text-slate-300 uppercase italic py-4">Nenhum cliente localizado com "{clientSearchText}"</p>
+            )}
+         </div>
       </div>
 
-      <ViewFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); setSelectedFilterClient('TODOS'); }} />
+      <ViewFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); setSelectedFilterClient('TODOS'); setClientSearchText(''); }} />
       
-      <div className={density === 'compact' ? 'table-compact' : ''}>
-        <SmartOperationTable userId={user.id} componentId={`op-trips-${categoryName}-${selectedFilterClient}`} title={`Monitoramento de Carga › ${selectedFilterClient}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+      <div className={localDensity === 'compact' ? 'table-compact' : ''}>
+        <SmartOperationTable userId={user.id} componentId={`op-trips-${categoryName}-${selectedFilterClient}`} title={`Fila de Monitoramento › ${selectedFilterClient}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
       </div>
 
       <style>{`
@@ -190,7 +223,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       {isHistoryModalOpen && selectedTrip && <StatusHistoryManagerModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} trip={selectedTrip} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />}
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => setIsSchedulingModalOpen(false)} trip={selectedTrip} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} preStackingUnits={preStackingUnits} />
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
-      {/* Adicionado TripModal e DriverDocsViewerModal para garantir funcionalidade total se ativados pelas colunas */}
       {isTripModalOpen && <TripModal isOpen={isTripModalOpen} onClose={() => setIsTripModalOpen(false)} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} />}
       {isDriverDocsModalOpen && selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => setIsDriverDocsModalOpen(false)} trip={selectedTrip} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />}
     </div>
