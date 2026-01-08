@@ -4,8 +4,9 @@ import { Trip } from '../types';
 
 export const tripRepository = {
   mapToDb: (trip: Trip) => {
-    // Garante que dateTime seja uma string ISO válida para o PostgreSQL
+    // Garante que todas as datas sejam enviadas como ISO String para o Postgres
     const validDate = trip.dateTime ? new Date(trip.dateTime).toISOString() : new Date().toISOString();
+    const validStatusDate = trip.statusTime ? new Date(trip.statusTime).toISOString() : validDate;
     
     return {
       id: trip.id,
@@ -13,7 +14,7 @@ export const tripRepository = {
       booking: trip.booking?.toUpperCase() || '',
       ship: trip.ship?.toUpperCase() || '',
       data_time: validDate, 
-      status_time: trip.statusTime ? new Date(trip.statusTime).toISOString() : validDate,
+      status_time: validStatusDate,
       is_late: trip.isLate || false,
       type: trip.type || 'EXPORTAÇÃO',
       container_type: trip.containerType || null,
@@ -59,8 +60,9 @@ export const tripRepository = {
       os: d.os || 'SEM OS',
       booking: d.booking || '',
       ship: d.ship || '',
-      dateTime: d.data_time || d.dateTime || d.created_at || new Date().toISOString(),
-      statusTime: d.status_time || d.statusTime || d.created_at,
+      // Prioriza data_time do banco (snake_case)
+      dateTime: d.data_time || d.dateTime || new Date().toISOString(),
+      statusTime: d.status_time || d.statusTime || d.data_time,
       isLate: d.is_late ?? false,
       type: d.type || 'EXPORTAÇÃO',
       containerType: d.container_type || d.containerType || '40HC',
@@ -98,7 +100,7 @@ export const tripRepository = {
       if (error) throw error;
       return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
-      console.error("Erro ao carregar viagens:", e);
+      console.error("Erro ao carregar viagens via Repositório:", e);
       return [];
     }
   },
@@ -108,12 +110,12 @@ export const tripRepository = {
       const payload = this.mapToDb(trip);
       const { error } = await supabase.from('trips').upsert(payload);
       if (error) {
-        console.error("Erro no salvamento (Trip):", error.message);
+        console.error("Erro ao persistir Viagem (Trip):", error.message);
         return false;
       }
       return true;
     } catch (e) {
-      console.error("Erro fatal no repositório de viagens:", e);
+      console.error("Erro crítico no repositório de viagens:", e);
       return false;
     }
   }

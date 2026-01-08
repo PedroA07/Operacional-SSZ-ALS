@@ -85,21 +85,21 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     };
 
     try {
-      // Força o salvamento direto no banco via db.saveTrip
+      // PERSISTÊNCIA DIRETA NO SUPABASE
       const success = await db.saveTrip(updatedTrip, user);
       
       if (success) {
-        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Status atualizado via App Motorista.`, { os: activeTrip.os, motorista: user.displayName });
+        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Atualizado pelo motorista.`, { os: activeTrip.os, motorista: user.displayName });
         setShowPicker(false);
         setIsConfirmModalOpen(false);
         setPendingStatus(null);
         await onRefresh();
       } else {
-        alert("Erro de conexão com o servidor ALS. Tente novamente.");
+        alert("Erro ao sincronizar com o banco de dados. Tente novamente.");
       }
     } catch (e) { 
-      console.error("Erro ao atualizar status:", e);
-      alert("Falha técnica ao sincronizar status."); 
+      console.error("Erro status motorista:", e);
+      alert("Falha técnica de rede."); 
     } finally { 
       setIsUpdating(false); 
     }
@@ -138,7 +138,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           className={`flex items-center gap-2 px-4 py-2.5 bg-white/5 rounded-xl text-slate-400 active:scale-90 transition-all border border-white/5 ${isUpdating ? 'opacity-50' : ''}`}
         >
           <svg className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2.5"/></svg>
-          <span className="text-[8px] font-black uppercase tracking-widest">{isUpdating ? 'Sincronizando...' : 'Atualizar Página'}</span>
+          <span className="text-[8px] font-black uppercase tracking-widest">{isUpdating ? 'Sincronizando...' : 'Atualizar Dados'}</span>
         </button>
       </div>
 
@@ -154,20 +154,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               <p className="text-[9px] text-blue-400 font-bold uppercase mt-1">{new Date(activeTrip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
             </div>
           </div>
-
-          {activeTrip.driver_docs && activeTrip.driver_docs.length > 0 && (
-             <div className="space-y-3">
-                <div className="flex justify-between items-center px-1">
-                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Fotos Enviadas ({activeTrip.driver_docs.length})</p>
-                   <button onClick={() => setIsGalleryOpen(true)} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Ver Todas</button>
-                </div>
-                <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                   {activeTrip.driver_docs.map((doc) => (
-                      <button key={doc.id} onClick={() => setActivePhoto(doc)} className="w-16 h-20 shrink-0 bg-slate-800 rounded-xl overflow-hidden border border-white/10 relative shadow-lg active:scale-95 transition-all"><img src={doc.url} className="w-full h-full object-cover" /></button>
-                   ))}
-                </div>
-             </div>
-          )}
 
           <div className="grid grid-cols-2 gap-3">
              <button onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }} className="py-5 bg-blue-600 rounded-3xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">

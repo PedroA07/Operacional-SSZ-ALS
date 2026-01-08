@@ -45,7 +45,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
-  // Padronização com a Home: Visão Geral / Ativas / etc.
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -186,7 +185,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
             <div className="relative">
               <input 
                 type="text" 
-                placeholder="BUSCAR OS, CONTAINER, MOTORISTA..."
+                placeholder="BUSCAR OS, CONTAINER..."
                 className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
