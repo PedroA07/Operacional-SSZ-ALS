@@ -6,6 +6,5 @@ export const ADMIN_CREDENTIALS = {
 
 export const APP_CONFIG = {
   companyName: 'ALS Transportes',
-  version: '5.5.0',
-  // O sistema agora utiliza o Supabase Storage nativo
+  version: '5.5.2',
 };

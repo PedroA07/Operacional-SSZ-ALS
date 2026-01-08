@@ -28,7 +28,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   
   const lastTripIdsRef = useRef<Set<string>>(new Set());
   const isFirstLoadRef = useRef(true);
-  const gpsWatchRef = useRef<number | null>(null);
 
   const checkUnread = useCallback(async (myTrips: Trip[]) => {
     const data = await db.getNotifications();
@@ -56,29 +55,24 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         db.getTrips()
       ]);
 
-      // 1. Identifica o cadastro de motorista vinculado
+      // Identificação robusta (CPF do login ou ID vinculado)
       const targetDriverId = String(user.driverId || '').trim();
-      const userCPF = String(user.username || '').replace(/\D/g, ''); // O login do motorista é o CPF
+      const userCPF = String(user.username || '').replace(/\D/g, '');
       
       const currentDriver = allDrivers.find(d => 
-        String(d.id).trim() === targetDriverId || 
-        d.cpf.replace(/\D/g, '') === userCPF
+        (targetDriverId !== '' && String(d.id).trim() === targetDriverId) || 
+        (userCPF !== '' && d.cpf.replace(/\D/g, '') === userCPF)
       );
 
-      // 2. Filtra as viagens com lógica de contingência (ID ou CPF)
       const myTrips = allTrips.filter(t => {
         if (!t.driver) return false;
-        
         const tripDriverId = String(t.driver.id || '').trim();
         const tripDriverCPF = String(t.driver.cpf || '').replace(/\D/g, '');
-
-        const matchById = targetDriverId !== '' && tripDriverId === targetDriverId;
-        const matchByCPF = userCPF !== '' && tripDriverCPF === userCPF;
-
-        return matchById || matchByCPF;
+        return (targetDriverId !== '' && tripDriverId === targetDriverId) || 
+               (userCPF !== '' && tripDriverCPF === userCPF);
       }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
-      // Alerta sonoro para novas viagens
+      // Alerta sonoro para novas viagens pendentes
       const currentIds = new Set(myTrips.map(t => t.id));
       if (!isFirstLoadRef.current) {
         const newTrip = myTrips.find(t => !lastTripIdsRef.current.has(t.id) && t.status === 'Pendente');
@@ -94,7 +88,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       setTrips(myTrips);
       checkUnread(myTrips);
     } catch (e) {
-      console.error("ALS Driver Sync Error:", e);
+      console.error("Erro na sincronização ALS:", e);
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +96,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadPortalData();
-    const syncInterval = setInterval(loadPortalData, 20000);
+    const syncInterval = setInterval(loadPortalData, 15000);
     const clockInterval = setInterval(() => {
       setSessionTime(timeUtils.calculateDuration(user.lastLogin));
     }, 1000);
@@ -113,35 +107,11 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     };
   }, [loadPortalData, user.lastLogin]);
 
-  useEffect(() => {
-    if (!user.driverId) return;
-    const startGpsTracking = () => {
-      if (!navigator.geolocation) return;
-      if (gpsWatchRef.current !== null) navigator.geolocation.clearWatch(gpsWatchRef.current);
-      gpsWatchRef.current = navigator.geolocation.watchPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          try { await db.updateDriverLocation(user.driverId!, latitude, longitude); } catch (e) {}
-        },
-        () => console.warn("GPS ALS: Sinal fraco."),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    };
-    startGpsTracking();
-    return () => { if (gpsWatchRef.current !== null) navigator.geolocation.clearWatch(gpsWatchRef.current); };
-  }, [user.driverId]);
-
-  const handleOpenNotifCenter = () => {
-    setIsNotifCenterOpen(true);
-    localStorage.setItem(`als_driver_last_viewed_${user.id}`, new Date().toISOString());
-    setUnreadCount(0);
-  };
-
   if (isLoading) {
     return (
       <div className="h-[100dvh] flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Conectando aos Servidores...</p>
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Carregando Painel...</p>
       </div>
     );
   }
@@ -162,14 +132,14 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         </div>
         <div className="flex items-center gap-4">
           <button 
-            onClick={handleOpenNotifCenter}
-            className="relative w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 active:text-blue-500 transition-colors"
+            onClick={() => setIsNotifCenterOpen(true)}
+            className="relative w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
             {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 border-2 border-slate-950 rounded-full text-[8px] font-black flex items-center justify-center text-white animate-bounce">{unreadCount}</span>}
           </button>
-          <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-white/5">
-            {(driver?.photo || user.photo) ? <img src={driver?.photo || user.photo} className="w-full h-full object-cover" /> : <div className="text-xs font-black text-blue-400 italic">ALS</div>}
+          <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl">
+            {driver?.photo ? <img src={driver.photo} className="w-full h-full object-cover" /> : <div className="text-xs font-black text-blue-400 italic">ALS</div>}
           </div>
         </div>
       </header>
@@ -182,12 +152,11 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         {activeTab === 'download' && <DownloadAppTab />}
       </main>
 
-      <nav className="shrink-0 h-22 pb-6 bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around px-4 z-50">
+      <nav className="shrink-0 h-22 pb-6 bg-slate-950/95 border-t border-white/10 flex items-center justify-around px-4 z-50">
         {[
           { id: 'inicio', label: 'Home', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
           { id: 'viagens', label: 'Viagens', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
           { id: 'docs', label: 'Docs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-          { id: 'download', label: 'App', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
           { id: 'perfil', label: 'Perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' }
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex flex-col items-center gap-1.5 transition-all py-2 px-3 rounded-2xl ${activeTab === tab.id ? 'text-blue-500 scale-110' : 'text-slate-600'}`}>
@@ -197,11 +166,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         ))}
       </nav>
 
-      <DriverNotificationCenter 
-        isOpen={isNotifCenterOpen} 
-        onClose={() => setIsNotifCenterOpen(false)} 
-        driverTrips={trips}
-      />
+      <DriverNotificationCenter isOpen={isNotifCenterOpen} onClose={() => setIsNotifCenterOpen(false)} driverTrips={trips} />
     </div>
   );
 };

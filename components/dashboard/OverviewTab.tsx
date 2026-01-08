@@ -10,38 +10,26 @@ interface OverviewTabProps {
 const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers }) => {
   const stats = useMemo(() => {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    // String no formato local YYYY-MM-DD para comparar corretamente
+    const todayStr = now.toLocaleDateString('en-CA'); // en-CA retorna YYYY-MM-DD
     
-    // Início e fim da semana atual
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
 
-    // Próxima semana
-    const startOfNextWeek = new Date(endOfWeek);
-    startOfNextWeek.setDate(endOfWeek.getDate() + 1);
-    const endOfNextWeek = new Date(startOfNextWeek);
-    endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
-
-    const checkInInterval = (dateStr: string, start: Date, end: Date) => {
-      const d = new Date(dateStr);
-      return d >= start && d <= end;
-    };
-
-    // Corrected: Use 'Viagem concluída' to match TripStatus type
-    const activeTrips = trips.filter(t => t.status !== 'Viagem concluída');
+    const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
     const driversInTripIds = new Set(activeTrips.map(t => t.driver.id));
 
     return {
-      today: trips.filter(t => t.dateTime.startsWith(todayStr)).length,
-      thisWeek: trips.filter(t => checkInInterval(t.dateTime, startOfWeek, endOfWeek)).length,
-      nextWeek: trips.filter(t => checkInInterval(t.dateTime, startOfNextWeek, endOfNextWeek)).length,
-      // Corrected: Use 'Viagem concluída' to match TripStatus type
+      today: trips.filter(t => t.dateTime.split('T')[0] === todayStr).length,
+      thisWeek: trips.filter(t => {
+        const d = new Date(t.dateTime);
+        return d >= startOfWeek && d <= endOfWeek;
+      }).length,
       completed: trips.filter(t => t.status === 'Viagem concluída').length,
       pending: activeTrips.length,
       delayed: trips.filter(t => t.isLate).length,
-      // Frota
       driversInTrip: driversInTripIds.size,
       driversScheduled: trips.filter(t => t.status === 'Pendente').length,
       driversAvailable: drivers.filter(d => d.status === 'Ativo' && !driversInTripIds.has(d.id)).length
@@ -65,23 +53,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers }) => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card title="Viagens Hoje" value={stats.today} color="bg-blue-500" icon="📅" sub="Programadas para hoje" />
-        <Card title="Esta Semana" value={stats.thisWeek} color="bg-indigo-500" icon="📊" sub="Total acumulado da semana" />
-        <Card title="Próxima Semana" value={stats.nextWeek} color="bg-slate-500" icon="⏭️" sub="Previsão de demanda" />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card title="Concluídas" value={stats.completed} color="bg-emerald-500" icon="✅" />
-        <Card title="Pendentes" value={stats.pending} color="bg-amber-500" icon="⏳" />
-        <div className="bg-red-600 p-6 rounded-[2rem] shadow-xl shadow-red-500/20 text-white col-span-2 flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-             <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Alerta de Atrasos</p>
-             <span className="text-2xl animate-pulse">⚠️</span>
-          </div>
-          <div className="flex items-end justify-between mt-4">
-             <p className="text-5xl font-black">{stats.delayed}</p>
-             <p className="text-[10px] font-bold uppercase text-right opacity-80">Motoristas fora do<br/>horário previsto</p>
-          </div>
-        </div>
+        <Card title="Concluídas Geral" value={stats.completed} color="bg-emerald-500" icon="✅" sub="Total no banco de dados" />
+        <Card title="Ativas na Fila" value={stats.pending} color="bg-amber-500" icon="⏳" sub="Pendentes ou em execução" />
       </div>
 
       <div className="bg-slate-900 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">

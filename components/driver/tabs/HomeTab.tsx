@@ -1,7 +1,6 @@
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { Trip, User, TripStatus, StatusHistoryEntry } from '../../../types';
-import { driverService } from '../../../utils/driverService';
 import ScannerModal from '../ScannerModal';
 import { db } from '../../../utils/storage';
 
@@ -32,8 +31,10 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerInitialImage, setScannerInitialImage] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Ordenação prioritária: Pendentes e Ativas primeiro, mais recentes em cima
   const activeTrip = useMemo(() => {
     return [...trips]
       .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
@@ -49,232 +50,100 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   }, [activeTrip]);
 
   const handleUpdateStatus = async (trip: Trip, nextStatus: TripStatus, label?: string) => {
-    if (isUpdating) return;
-    if (trip.status === nextStatus) return;
-    
-    const confirmLabel = label || nextStatus.toUpperCase();
-    if (!confirm(`CONFIRMAR ESTA POSIÇÃO: ${confirmLabel}?`)) return;
+    if (isUpdating || trip.status === nextStatus) return;
+    if (!confirm(`CONFIRMAR POSIÇÃO: ${label || nextStatus.toUpperCase()}?`)) return;
 
     setIsUpdating(true);
     const now = new Date().toISOString();
-    const newEntry: StatusHistoryEntry = {
-      status: nextStatus,
-      dateTime: now,
-      createdAt: now
-    };
-
     const updatedTrip: Trip = {
       ...trip,
       status: nextStatus,
       statusTime: now,
-      statusHistory: [newEntry, ...(trip.statusHistory || [])]
+      statusHistory: [{ status: nextStatus, dateTime: now, createdAt: now }, ...(trip.statusHistory || [])]
     };
 
     try {
-      const success = await db.saveTrip(updatedTrip, user);
-      if (success) {
-        await db.addNotification(
-          user,
-          'STATUS_UPDATED',
-          `Posição: ${nextStatus}`,
-          `A OS ${trip.os} foi atualizada pelo motorista no aplicativo.`,
-          { os: trip.os, motorista: user.displayName, placa: trip.driver.plateHorse }
-        );
+      if (await db.saveTrip(updatedTrip, user)) {
+        await db.addNotification(user, 'STATUS_UPDATED', `OS ${trip.os}: ${nextStatus}`, `Status atualizado via App Motorista.`, { os: trip.os, motorista: user.displayName });
         setShowPicker(false);
         await onRefresh();
-      } else {
-        alert("Erro de conexão. Verifique sua rede.");
       }
-    } catch (e) {
-      alert("Falha técnica ao atualizar status.");
-    } finally {
-      setIsUpdating(false);
+    } catch (e) { alert("Falha na rede."); } finally { setIsUpdating(false); }
+  };
+
+  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setScannerInitialImage(ev.target?.result as string);
+        setIsScannerOpen(true);
+      };
+      reader.readAsDataURL(file);
     }
-  };
-
-  const handleOpenScanner = useCallback(() => setIsScannerOpen(true), []);
-  const handleCloseScanner = useCallback(() => setIsScannerOpen(false), []);
-  const handleScannerSuccess = useCallback(async () => {
-    await onRefresh();
-  }, [onRefresh]);
-
-  const handleReloadPage = () => {
-    window.location.reload();
-  };
-
-  const getStatusColor = (status: TripStatus) => {
-    if (status === 'Viagem concluída') return 'text-emerald-400';
-    if (status === 'Viagem cancelada') return 'text-amber-400';
-    return 'text-blue-400';
+    e.target.value = ''; // Reset input
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-24">
-      <section className="space-y-4">
-        <div className="flex justify-between items-center px-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Minha Programação</h2>
-            {activeTrip && (
-              <span className="px-2 py-0.5 bg-blue-500 text-white rounded text-[7px] font-black uppercase shadow-[0_0_8px_rgba(59,130,246,0.5)]">Próxima OS</span>
-            )}
-          </div>
-          
-          <button 
-            onClick={handleReloadPage}
-            className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-slate-400 hover:text-white active:scale-90 transition-all group"
-          >
-            <svg className="w-3.5 h-3.5 group-active:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span className="text-[8px] font-black uppercase tracking-widest">Atualizar</span>
-          </button>
-        </div>
-
-        {activeTrip ? (
-          <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden backdrop-blur-xl">
-            <div className="p-7 space-y-6">
-              <div className="flex justify-between items-start border-b border-white/5 pb-5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-3xl font-black tracking-tighter text-blue-500 leading-none">OS {activeTrip.os}</p>
-                    {isVWCrageaTrip && (
-                      <span className="px-2 py-0.5 bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded text-[6px] font-black uppercase">Operação VW</span>
-                    )}
-                  </div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 leading-tight">{activeTrip.customer.name}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-white leading-none">
-                    {new Date(activeTrip.dateTime).toLocaleDateString('pt-BR')}
-                  </p>
-                  <p className="text-[9px] text-blue-400 font-bold uppercase mt-1">
-                    {new Date(activeTrip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-slate-950 p-6 rounded-3xl border border-white/10 shadow-inner flex flex-col items-center justify-center relative overflow-hidden group">
-                 <div className="absolute top-0 right-0 p-2 opacity-5">
-                    <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                 </div>
-                 <span className="text-[8px] font-black text-blue-500 uppercase tracking-[0.3em] mb-2">Equipamento Vinculado</span>
-                 <p className="text-2xl font-mono font-black text-white tracking-widest break-all text-center">
-                    {activeTrip.container || 'A DEFINIR'}
-                 </p>
-                 <div className="flex gap-4 mt-3">
-                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">TARA: {activeTrip.tara || '---'}</span>
-                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">TIPO: {activeTrip.containerType || '---'}</span>
-                 </div>
-              </div>
-
-              <button 
-                onClick={handleOpenScanner}
-                className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl flex items-center justify-center gap-4 border border-white/10 shadow-xl active:scale-95 transition-all group"
-              >
-                <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center text-white">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </div>
-                <div className="text-left">
-                  <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Anexar Documentos</p>
-                  <p className="text-[8px] font-bold text-blue-200 uppercase mt-1">Notas Fiscais / Canhotos / Fotos</p>
-                </div>
-              </button>
-
-              {activeTrip.scheduling && activeTrip.scheduling.location && (
-                <div className="bg-emerald-500/10 rounded-3xl p-5 border border-emerald-500/20 space-y-2 animate-in zoom-in-95">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Agendamento Local</p>
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                  </div>
-                  <p className="text-xs font-black text-white uppercase truncate">{activeTrip.scheduling.location}</p>
-                </div>
-              )}
-
-              <div className="space-y-4 pt-2">
-                <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between">
-                  <div className="min-w-0 flex-1 pr-4">
-                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Posição em Tempo Real</p>
-                    <p className={`text-base font-black uppercase mt-1 truncate ${getStatusColor(activeTrip.status)}`}>
-                      {isVWCrageaTrip && activeTrip.status === 'Viagem concluída' ? 'BAIXA CRAGEA' : activeTrip.status}
-                    </p>
-                  </div>
-                  <button 
-                    onClick={() => setShowPicker(!showPicker)}
-                    className={`px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase transition-all border shrink-0 ${showPicker ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-white/10 text-slate-300'}`}
-                  >
-                    {showPicker ? 'Ocultar' : 'Alterar'}
-                  </button>
-                </div>
-                
-                {showPicker && (
-                  <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 duration-300">
-                    {isVWCrageaTrip ? (
-                      VW_CRAGEA_STATUSES.map((st) => {
-                        const isCurrent = activeTrip.status === st.value;
-                        return (
-                          <button 
-                            key={st.value}
-                            disabled={isUpdating || isCurrent}
-                            onClick={() => handleUpdateStatus(activeTrip, st.value, st.label)}
-                            className={`py-4 px-2 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all border flex items-center justify-center text-center leading-tight ${
-                              isCurrent 
-                              ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 opacity-50' 
-                              : 'bg-white/5 border-white/10 text-slate-400 active:scale-95 active:bg-blue-600 active:text-white'
-                            }`}
-                          >
-                            {st.label}
-                          </button>
-                        );
-                      })
-                    ) : (
-                      DEFAULT_STATUSES.map((status) => {
-                        const isCurrent = activeTrip.status === status;
-                        return (
-                          <button 
-                            key={status}
-                            disabled={isUpdating || isCurrent}
-                            onClick={() => handleUpdateStatus(activeTrip, status)}
-                            className={`py-4 px-2 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all border flex items-center justify-center text-center leading-tight ${
-                              isCurrent 
-                              ? 'bg-blue-600/20 border-blue-500/50 text-blue-400 opacity-50' 
-                              : 'bg-white/5 border-white/10 text-slate-400 active:scale-95 active:bg-blue-600 active:text-white'
-                            }`}
-                          >
-                            {status}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="py-24 bg-slate-900/30 rounded-[2.5rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center text-center px-8">
-             <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-6 text-slate-600">
-               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" strokeWidth="2.5"/></svg>
-             </div>
-             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Nenhuma programação ativa localizada para o seu CPF.</p>
-             <button onClick={() => onRefresh()} className="mt-4 text-blue-500 font-bold text-[9px] uppercase hover:underline">Tentar sincronizar agora</button>
-          </div>
-        )}
-      </section>
-
-      <div className="pt-4 pb-8">
-        <p className="text-[8px] text-slate-800 font-bold uppercase tracking-[0.5em] text-center">
-          ALS TRANSPORTES OPERACIONAL V4.1.2
-        </p>
+    <div className="space-y-8 animate-in fade-in duration-700 pb-24">
+      <div className="flex justify-between items-center px-1">
+        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Fila Atual</h2>
+        <button onClick={() => onRefresh()} className="p-2 bg-white/5 rounded-xl text-slate-400 active:scale-95 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2.5"/></svg></button>
       </div>
 
+      {activeTrip ? (
+        <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] shadow-2xl p-7 space-y-6">
+          <div className="flex justify-between items-start border-b border-white/5 pb-5">
+            <div>
+              <p className="text-3xl font-black tracking-tighter text-blue-500 leading-none">OS {activeTrip.os}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 leading-tight">{activeTrip.customer.name}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-black text-white">{new Date(activeTrip.dateTime).toLocaleDateString('pt-BR')}</p>
+              <p className="text-[9px] text-blue-400 font-bold uppercase mt-1">{new Date(activeTrip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+             <button onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }} className="py-5 bg-blue-600 rounded-3xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-all shadow-xl">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>
+                <span className="text-[8px] font-black uppercase text-white tracking-widest">Usar Câmera</span>
+             </button>
+             <button onClick={() => fileInputRef.current?.click()} className="py-5 bg-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-all border border-white/5 shadow-xl">
+                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="2.5"/></svg>
+                <span className="text-[8px] font-black uppercase text-slate-300 tracking-widest">Anexar Arquivo</span>
+             </button>
+             <input type="file" ref={fileInputRef} className="hidden" accept="image/*,.pdf" onChange={handleGalleryUpload} />
+          </div>
+
+          <div className="space-y-4 pt-2">
+            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between">
+              <div className="min-w-0 flex-1 pr-4">
+                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Posição Atual</p>
+                <p className="text-sm font-black uppercase mt-1 truncate text-blue-400">{activeTrip.status}</p>
+              </div>
+              <button onClick={() => setShowPicker(!showPicker)} className="px-5 py-3 rounded-2xl text-[9px] font-black uppercase bg-slate-800 border border-white/10 text-white active:bg-blue-600 transition-all">{showPicker ? 'Fechar' : 'Alterar'}</button>
+            </div>
+            
+            {showPicker && (
+              <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 duration-300">
+                {(isVWCrageaTrip ? VW_CRAGEA_STATUSES : DEFAULT_STATUSES.map(s => ({label: s, value: s}))).map((st: any) => (
+                  <button key={st.value} disabled={isUpdating} onClick={() => handleUpdateStatus(activeTrip, st.value, st.label)} className={`py-4 px-2 rounded-2xl text-[8px] font-black uppercase tracking-tighter border transition-all ${activeTrip.status === st.value ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400 active:bg-blue-600 active:text-white'}`}>{st.label}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="py-24 bg-slate-900/30 rounded-[2.5rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center text-center px-8">
+           <svg className="w-12 h-12 text-slate-700 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" strokeWidth="2.5"/></svg>
+           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Nenhuma programação ativa localizada para o seu CPF.</p>
+           <button onClick={() => onRefresh()} className="mt-6 text-blue-500 font-bold text-[9px] uppercase hover:underline">Verificar agora</button>
+        </div>
+      )}
+
       {isScannerOpen && activeTrip && (
-        <ScannerModal 
-          isOpen={isScannerOpen}
-          onClose={handleCloseScanner}
-          onSuccess={handleScannerSuccess}
-          trip={activeTrip}
-          user={user}
-        />
+        <ScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onSuccess={onRefresh} trip={activeTrip} user={user} initialImage={scannerInitialImage} />
       )}
     </div>
   );
