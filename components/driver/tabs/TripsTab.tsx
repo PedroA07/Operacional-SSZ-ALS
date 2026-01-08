@@ -80,8 +80,31 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
     }
   };
 
-  const filteredTrips = useMemo(() => {
-    return trips.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+  // ORDENAÇÃO SOLICITADA: ATUAL -> PRÓXIMA (PENDENTE) -> CONCLUÍDAS
+  const sortedTrips = useMemo(() => {
+    return [...trips].sort((a, b) => {
+      const getPriority = (trip: Trip) => {
+        if (trip.status === 'Viagem concluída' || trip.status === 'Viagem cancelada') return 3;
+        if (trip.status === 'Pendente') return 2;
+        return 1; // "Atual" = em andamento
+      };
+
+      const priorityA = getPriority(a);
+      const priorityB = getPriority(b);
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+
+      // Dentro da mesma prioridade, ordena por data (mais recente primeiro se concluída, mais próxima primeiro se ativa/pendente)
+      const timeA = new Date(a.dateTime).getTime();
+      const timeB = new Date(b.dateTime).getTime();
+      
+      if (priorityA === 3) {
+        return timeB - timeA; // Concluídas: mais recentes no topo da seção
+      }
+      return timeA - timeB; // Ativas/Pendentes: mais próximas no topo
+    });
   }, [trips]);
 
   return (
@@ -95,22 +118,44 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
       <div className="px-1 py-4"><h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Minhas Viagens</h2></div>
 
       <div className="space-y-3">
-        {filteredTrips.map((t) => {
+        {sortedTrips.map((t) => {
           const tripDate = new Date(t.dateTime);
+          const isFinished = t.status === 'Viagem concluída' || t.status === 'Viagem cancelada';
+          const isPending = t.status === 'Pendente';
+          const isActive = !isFinished && !isPending;
+
           return (
-            <button key={t.id} onClick={() => setSelectedTrip(t)} className="w-full p-6 rounded-[2rem] bg-slate-900 border border-white/10 text-left flex flex-col gap-2 shadow-xl active:scale-95 transition-all">
+            <button 
+              key={t.id} 
+              onClick={() => setSelectedTrip(t)} 
+              className={`w-full p-6 rounded-[2rem] border text-left flex flex-col gap-2 transition-all active:scale-[0.98] shadow-xl ${
+                isActive 
+                ? 'bg-blue-600 border-blue-400/30 ring-4 ring-blue-500/10' 
+                : isPending 
+                ? 'bg-slate-900 border-white/10' 
+                : 'bg-slate-950/50 border-white/5 opacity-60 grayscale-[0.5]'
+              }`}
+            >
                <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xl font-black text-blue-500 leading-none">OS {t.os}</p>
+                    <p className={`text-xl font-black leading-none ${isActive ? 'text-white' : 'text-blue-500'}`}>OS {t.os}</p>
                     <div className="flex items-center gap-2 mt-2">
-                       <span className="text-[9px] font-black text-white">{tripDate.toLocaleDateString('pt-BR')}</span>
+                       <span className={`text-[9px] font-black ${isActive ? 'text-blue-100' : 'text-white'}`}>{tripDate.toLocaleDateString('pt-BR')}</span>
                        <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-                       <span className="text-[9px] font-black text-blue-400">{tripDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                       <span className={`text-[9px] font-black ${isActive ? 'text-blue-200' : 'text-blue-400'}`}>{tripDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
                     </div>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${t.status === 'Viagem concluída' ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'}`}>{t.status}</span>
+                  <span className={`px-2.5 py-1 rounded-xl text-[7px] font-black uppercase ${
+                    isActive 
+                    ? 'bg-white text-blue-600' 
+                    : isFinished 
+                    ? 'bg-slate-800 text-slate-400' 
+                    : 'bg-blue-900/40 text-blue-400 border border-blue-500/20'
+                  }`}>
+                    {isActive ? '● EM ANDAMENTO' : t.status}
+                  </span>
                </div>
-               <p className="text-[10px] font-bold text-slate-400 uppercase truncate mt-1">{t.customer.name}</p>
+               <p className={`text-[10px] font-bold uppercase truncate mt-1 ${isActive ? 'text-white/80' : 'text-slate-400'}`}>{t.customer.name}</p>
             </button>
           );
         })}

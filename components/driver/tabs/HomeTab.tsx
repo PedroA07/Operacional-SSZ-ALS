@@ -1,10 +1,11 @@
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
-import { Trip, User, TripStatus, StatusHistoryEntry, DriverCapturedDoc } from '../../../types';
+import { Trip, User, TripStatus, DriverCapturedDoc } from '../../../types';
 import ScannerModal from '../ScannerModal';
 import { db } from '../../../utils/storage';
 import ImageViewer from '../../shared/ImageViewer';
 import DriverDocsGallery from '../DriverDocsGallery';
+import StatusConfirmModal from '../StatusConfirmModal';
 
 interface HomeTabProps {
   user: User;
@@ -37,6 +38,10 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [scannerInitialImage, setScannerInitialImage] = useState<string | null>(null);
   const [activePhoto, setActivePhoto] = useState<DriverCapturedDoc | null>(null);
   
+  // Estados para o novo Modal de Confirmação
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<TripStatus | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeTrip = useMemo(() => {
@@ -53,24 +58,33 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     return isVW && isCragea;
   }, [activeTrip]);
 
-  const handleUpdateStatus = async (trip: Trip, nextStatus: TripStatus, label?: string) => {
-    if (isUpdating || trip.status === nextStatus) return;
-    if (!confirm(`CONFIRMAR POSIÇÃO: ${label || nextStatus.toUpperCase()}?`)) return;
+  const handleStatusSelect = (status: TripStatus) => {
+    if (isUpdating || activeTrip?.status === status) return;
+    setPendingStatus(status);
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmUpdate = async (dateTime: string) => {
+    if (!activeTrip || !pendingStatus) return;
 
     setIsUpdating(true);
     const now = new Date().toISOString();
     const updatedTrip: Trip = {
-      ...trip,
-      status: nextStatus,
-      statusTime: now,
-      statusHistory: [{ status: nextStatus, dateTime: now, createdAt: now }, ...(trip.statusHistory || [])]
+      ...activeTrip,
+      status: pendingStatus,
+      statusTime: dateTime,
+      statusHistory: [
+        { status: pendingStatus, dateTime: dateTime, createdAt: now },
+        ...(activeTrip.statusHistory || [])
+      ]
     };
 
     try {
-      // PERSISTÊNCIA GARANTIDA COM OBJETO USER COMPLETO
       if (await db.saveTrip(updatedTrip, user)) {
-        await db.addNotification(user, 'STATUS_UPDATED', `OS ${trip.os}: ${nextStatus}`, `Status atualizado via App Motorista.`, { os: trip.os, motorista: user.displayName });
+        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Status atualizado via App Motorista.`, { os: activeTrip.os, motorista: user.displayName });
         setShowPicker(false);
+        setIsConfirmModalOpen(false);
+        setPendingStatus(null);
         await onRefresh();
       }
     } catch (e) { 
@@ -84,7 +98,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     if (isUpdating) return;
     setIsUpdating(true);
     try {
-      // FORÇA RECARREGAMENTO TOTAL DO BROWSER PARA LIMPAR CACHE
       window.location.reload();
     } finally {
       setTimeout(() => setIsUpdating(false), 2000);
@@ -158,18 +171,30 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           </div>
 
           <div className="space-y-4 pt-2">
-            <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between">
-              <div className="min-w-0 flex-1 pr-4">
+            <button 
+              onClick={() => setShowPicker(!showPicker)}
+              className="w-full bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between group active:scale-[0.98] transition-all"
+            >
+              <div className="min-w-0 flex-1 pr-4 text-left">
                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Posição Atual</p>
                 <p className="text-sm font-black uppercase mt-1 truncate text-blue-400">{activeTrip.status}</p>
               </div>
-              <button onClick={() => setShowPicker(!showPicker)} className={`px-5 py-3 rounded-2xl text-[9px] font-black uppercase border transition-all ${showPicker ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-white/10 text-white'}`}>{showPicker ? 'Fechar' : 'Alterar'}</button>
-            </div>
+              <div className={`px-5 py-3 rounded-2xl text-[9px] font-black uppercase border transition-all ${showPicker ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-white/10 text-white group-hover:bg-slate-700'}`}>
+                {showPicker ? 'Fechar' : 'Alterar'}
+              </div>
+            </button>
             
             {showPicker && (
               <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 duration-300">
                 {(isVWCrageaTrip ? VW_CRAGEA_STATUSES : DEFAULT_STATUSES.map(s => ({label: s, value: s}))).map((st: any) => (
-                  <button key={st.value} disabled={isUpdating} onClick={() => handleUpdateStatus(activeTrip, st.value, st.label)} className={`py-4 px-2 rounded-2xl text-[8px] font-black uppercase tracking-tighter border transition-all ${activeTrip.status === st.value ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400 active:bg-blue-600 active:text-white'}`}>{st.label}</button>
+                  <button 
+                    key={st.value} 
+                    disabled={isUpdating} 
+                    onClick={() => handleStatusSelect(st.value)} 
+                    className={`py-4 px-2 rounded-2xl text-[8px] font-black uppercase tracking-tighter border transition-all ${activeTrip.status === st.value ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400 active:bg-blue-600 active:text-white'}`}
+                  >
+                    {st.label}
+                  </button>
                 ))}
               </div>
             )}
@@ -189,6 +214,16 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
       {isGalleryOpen && activeTrip && (
         <DriverDocsGallery isOpen={isGalleryOpen} onClose={() => setIsGalleryOpen(false)} docs={activeTrip.driver_docs || []} os={activeTrip.os} />
+      )}
+
+      {isConfirmModalOpen && pendingStatus && (
+        <StatusConfirmModal 
+          isOpen={isConfirmModalOpen} 
+          onClose={() => { setIsConfirmModalOpen(false); setPendingStatus(null); }}
+          onConfirm={handleConfirmUpdate}
+          status={pendingStatus}
+          isSaving={isUpdating}
+        />
       )}
 
       {activePhoto && (
