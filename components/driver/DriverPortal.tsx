@@ -27,10 +27,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   
   const lastTripIdsRef = useRef<Set<string>>(new Set());
-  const isFirstLoadRef = useRef(true);
 
   const checkUnread = useCallback(async (myTrips: Trip[]) => {
-    // Se o centro de notificações estiver aberto, o contador deve ser zero.
     if (isNotifCenterOpen) {
       setUnreadCount(0);
       return;
@@ -45,7 +43,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     const lastViewed = lastViewedStr ? new Date(lastViewedStr).getTime() : 0;
 
     const count = data.filter(n => {
-      const isMine = myOSs.has(n.summary?.os?.toUpperCase() || '');
+      const osRef = n.summary?.os?.toUpperCase() || '';
+      const isMine = myOSs.has(osRef);
       const notCleared = !clearedIds.includes(n.id);
       const notSeen = new Date(n.timestamp).getTime() > lastViewed;
       return isMine && notCleared && notSeen;
@@ -61,20 +60,25 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         db.getTrips()
       ]);
 
-      const targetDriverId = String(user.driverId || '').trim();
+      const targetDriverId = String(user.driverId || '').replace('drv-', '').trim();
       const userCPF = String(user.username || '').replace(/\D/g, '');
       
-      const currentDriver = allDrivers.find(d => 
-        (targetDriverId !== '' && String(d.id).trim() === targetDriverId) || 
-        (userCPF !== '' && d.cpf.replace(/\D/g, '') === userCPF)
-      );
+      const currentDriver = allDrivers.find(d => {
+        const dId = String(d.id).replace('drv-', '').trim();
+        const dCpf = String(d.cpf).replace(/\D/g, '');
+        return (targetDriverId !== '' && dId === targetDriverId) || (userCPF !== '' && dCpf === userCPF);
+      });
 
+      // Busca TODAS as viagens onde o motorista coincida (ID ou CPF)
       const myTrips = allTrips.filter(t => {
         if (!t.driver) return false;
-        const tripDriverId = String(t.driver.id || '').trim();
+        const tripDriverId = String(t.driver.id || '').replace('drv-', '').trim();
         const tripDriverCPF = String(t.driver.cpf || '').replace(/\D/g, '');
-        return (targetDriverId !== '' && tripDriverId === targetDriverId) || 
-               (userCPF !== '' && tripDriverCPF === userCPF);
+        
+        const matchId = targetDriverId !== '' && tripDriverId === targetDriverId;
+        const matchCpf = userCPF !== '' && tripDriverCPF === userCPF;
+        
+        return matchId || matchCpf;
       }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
       setDriver(currentDriver || null);
@@ -90,7 +94,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const handleOpenNotifCenter = () => {
     setIsNotifCenterOpen(true);
     setUnreadCount(0);
-    // Atualiza o timestamp da última visualização para limpar notificações futuras de OSs antigas
     localStorage.setItem(`als_driver_last_viewed_${user.id}`, new Date().toISOString());
   };
 

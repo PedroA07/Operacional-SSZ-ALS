@@ -79,7 +79,8 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     if (isUpdating) return;
     setIsUpdating(true);
     try {
-      await onRefresh();
+      // Força o re-carregamento total da página como solicitado
+      window.location.reload();
     } finally {
       setTimeout(() => setIsUpdating(false), 1000);
     }
@@ -108,7 +109,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           className={`flex items-center gap-2 px-4 py-2.5 bg-white/5 rounded-xl text-slate-400 active:scale-90 transition-all border border-white/5 ${isUpdating ? 'opacity-50 grayscale' : ''}`}
         >
           <svg className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2.5"/></svg>
-          <span className="text-[8px] font-black uppercase tracking-widest">Atualizar</span>
+          <span className="text-[8px] font-black uppercase tracking-widest">Atualizar Página</span>
         </button>
       </div>
 
@@ -125,7 +126,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             </div>
           </div>
 
-          {/* GALERIA DE MINIATURAS NA HOME */}
           {activeTrip.driver_docs && activeTrip.driver_docs.length > 0 && (
              <div className="space-y-3">
                 <div className="flex justify-between items-center px-1">

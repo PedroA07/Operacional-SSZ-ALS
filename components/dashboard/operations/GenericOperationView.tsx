@@ -50,7 +50,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [endDate, setEndDate] = useState('');
   const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
   
-  // Novos controles requisitados
   const [clientSearchText, setClientSearchText] = useState('');
   const [localDensity, setLocalDensity] = useState<'compact' | 'comfortable'>(initialDensity || 'compact');
 
@@ -96,7 +95,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
   const filteredTrips = useMemo(() => {
     let result = allTrips.filter(t => {
-      const matchCategory = t.category?.toUpperCase() === categoryName.toUpperCase();
+      if (!t.category) return false;
+      const matchCategory = t.category.toUpperCase() === categoryName.toUpperCase();
       if (selectedFilterClient !== 'TODOS') {
          return matchCategory && (t.customer?.name === selectedFilterClient || t.subCategory === selectedFilterClient);
       }
@@ -117,7 +117,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
     if (startDate || endDate) {
       result = result.filter(t => {
-        // Normaliza para o dia exato YYYY-MM-DD
+        // Normalização robusta YYYY-MM-DD
         const tripDate = t.dateTime.substring(0, 10);
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
