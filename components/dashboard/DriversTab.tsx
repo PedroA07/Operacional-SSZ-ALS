@@ -465,6 +465,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                       <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha do Portal"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
                       <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Dossiê Digital"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
                       <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar Cadastro"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => { setItemToDelete(d); setIsDeleteModalOpen(true); }} className="p-2 text-slate-300 hover:text-red-500" title="Excluir Motorista"><Icons.Excluir /></button>
                     </td>
                   </tr>
                 );
@@ -672,134 +673,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
           </div>
         </div>
       )}
-
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[1400px]">
-            <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-5">Identificação / Beneficiário</th>
-                <th className="px-6 py-5">Documentação</th>
-                <th className="px-6 py-5">Vínculos Operacionais</th>
-                <th className="px-6 py-5">Equipamento (Placa/Ano)</th>
-                <th className="px-6 py-5">Contatos / WhatsApp</th>
-                <th className="px-6 py-5">Portal (Login / Senha)</th>
-                <th className="px-6 py-5">Status / Vínculo</th>
-                <th className="px-6 py-5 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredDrivers.map(d => {
-                const linkedUser = users.find(u => u.driverId === d.id);
-                const isThirdParty = d.beneficiaryCnpj && d.beneficiaryCnpj.replace(/\D/g, '') !== d.cpf.replace(/\D/g, '');
-                const beneficiaryKey = isThirdParty ? d.beneficiaryCnpj.replace(/\D/g, '').slice(-4) : null;
-
-                return (
-                  <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
-                    <td className="px-6 py-4 max-w-[240px]">
-                      <div className="flex items-start gap-3">
-                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 mt-1">
-                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 text-[8px]">ALS</div>}
-                         </div>
-                         <div>
-                            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight mb-2">{d.name}</p>
-                            <div className="bg-blue-50/50 p-2 rounded-xl border border-blue-100/50 space-y-0.5">
-                               <p className="text-[7px] font-black text-blue-500 uppercase leading-none">Beneficiário:</p>
-                               <p className="text-[10px] font-bold text-slate-600 uppercase truncate">{d.beneficiaryName || d.name}</p>
-                               <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{d.beneficiaryCnpj || d.cpf} | {d.paymentPreference || 'PIX'}</p>
-                            </div>
-                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="space-y-1 mt-1">
-                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CPF: <span className="font-mono text-slate-800 font-bold">{d.cpf}</span></p>
-                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">RG: <span className="font-mono text-slate-800 font-bold">{d.rg || '---'}</span></p>
-                          <div className="flex items-center justify-between gap-4">
-                             <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CNH: <span className="font-mono text-slate-800 font-bold">{d.cnh || '---'}</span></p>
-                             {d.cnhPdfUrl && (
-                               <button 
-                                 onClick={() => handleViewCnh(d.cnhPdfUrl!)} 
-                                 className="flex items-center gap-1.5 px-2 py-1 bg-red-50 text-red-600 rounded-lg border border-red-100 hover:bg-red-600 hover:text-white transition-all group/pdf shadow-sm"
-                               >
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeWidth="2.5"/></svg>
-                                  <span className="text-[7px] font-black uppercase">Ver PDF</span>
-                               </button>
-                             )}
-                          </div>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4 max-w-[200px]">
-                       <div className="flex flex-wrap gap-1 mt-1">
-                          {d.operations && d.operations.length > 0 ? d.operations.map((op, i) => (
-                             <span key={i} className="px-2 py-1 bg-blue-600 text-white rounded-lg text-[7px] font-black uppercase tracking-tighter">
-                                {op.category} › {op.client}
-                             </span>
-                          )) : <span className="text-[9px] text-slate-300 font-bold italic uppercase tracking-widest">Sem Vínculos</span>}
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="mt-1 space-y-3">
-                          <div>
-                             <p className="text-[7px] font-black text-slate-300 uppercase mb-1">Cavalo</p>
-                             <div className="flex items-center gap-2">
-                                <span className="bg-slate-900 text-white px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateHorse}</span>
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{d.yearHorse || '---'}</span>
-                             </div>
-                          </div>
-                          <div>
-                             <p className="text-[7px] font-black text-slate-300 uppercase mb-1">Carreta</p>
-                             <div className="flex items-center gap-2">
-                                <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateTrailer}</span>
-                                <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter">{d.yearTrailer || '---'}</span>
-                             </div>
-                          </div>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="mt-1 space-y-1">
-                          <p className="text-blue-600 font-black text-[11px] leading-none">{d.phone}</p>
-                          <p className="text-[9px] text-slate-400 font-bold lowercase truncate max-w-[150px]">{d.email || '---'}</p>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-100 space-y-1.5 mt-1">
-                          <div className="flex justify-between items-center gap-4">
-                             <span className="text-[8px] font-black uppercase text-blue-400">Login:</span>
-                             <span className="text-slate-800 font-mono font-bold text-[10px]">{d.cpf.replace(/\D/g, '')}</span>
-                          </div>
-                          <div className="flex justify-between items-center gap-4">
-                             <span className="text-[8px] font-black uppercase text-blue-400">Senha:</span>
-                             <span className="text-emerald-600 font-mono font-black text-[10px]">{linkedUser?.password || d.generatedPassword || '---'}</span>
-                          </div>
-                          {beneficiaryKey && (
-                            <div className="flex justify-between items-center gap-2 pt-1 border-t border-blue-100/50">
-                               <span className="text-[7px] font-black uppercase text-blue-500 whitespace-nowrap">Chave Benf:</span>
-                               <span className="text-blue-700 font-mono font-black text-[9px]">{beneficiaryKey}</span>
-                            </div>
-                          )}
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="mt-1 flex flex-col gap-1.5">
-                          <span className={`w-fit px-2.5 py-1 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                             {d.status}
-                          </span>
-                          <p className="text-[9px] font-black text-slate-400 uppercase">{d.driverType}</p>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
-                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha do Portal"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Dossiê Digital"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar Cadastro"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* MODAL VISUALIZAÇÃO CNH PDF */}
       {isCnhModalOpen && currentCnhUrl && (
