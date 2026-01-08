@@ -59,24 +59,14 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const isUpdatingRef = useRef(false);
 
-  const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
+  // Alterado para 'geral' por padrão para garantir que qualquer viagem carregada apareça
+  const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   
-  const [filterTypes, setFilterTypes] = useState<string[]>(() => {
-    const saved = localStorage.getItem(`als_opt_types_${user.id}`);
-    return saved ? JSON.parse(saved) : ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
-  });
-  
-  const [filterClientNames, setFilterClientNames] = useState<string[]>(() => {
-    const saved = localStorage.getItem(`als_opt_clients_${user.id}`);
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [filterDriverNames, setFilterDriverNames] = useState<string[]>(() => {
-    const saved = localStorage.getItem(`als_opt_drivers_${user.id}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [filterTypes, setFilterTypes] = useState<string[]>([]);
+  const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
+  const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
 
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
@@ -84,12 +74,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     setIsSavingStatus(true);
     isUpdatingRef.current = true;
 
-    // REGRA: createdAt é o horário real de agora
     const now = new Date().toISOString();
     const newEntry: StatusHistoryEntry = { 
       status: tempStatus, 
-      dateTime: new Date(statusTime).toISOString(), // Operacional
-      createdAt: now // Real/Registro
+      dateTime: new Date(statusTime).toISOString(),
+      createdAt: now 
     };
 
     const updatedTrip: Trip = { 
@@ -103,7 +92,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       const success = await db.saveTrip(updatedTrip, user);
       if (!success) throw new Error("Erro de banco");
       
-      // Envia notificação explícita do evento
       await db.addNotification(
         user, 
         'STATUS_UPDATED', 
@@ -227,8 +215,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
            <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1 w-full lg:w-auto">
              {[
-               { id: 'geral', label: 'Visão Geral (Ativas + Concl.)', color: 'slate' },
-               { id: 'ativas', label: 'Viagens Ativas', color: 'blue' },
+               { id: 'geral', label: 'Visão Geral (Tudo)', color: 'slate' },
+               { id: 'ativas', label: 'Fila Ativa', color: 'blue' },
                { id: 'concluida', label: 'Concluídas', color: 'emerald' },
                { id: 'cancelada', label: 'Canceladas', color: 'amber' }
              ].map(tab => (
@@ -260,14 +248,24 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
           customers={customers} drivers={drivers} 
         />
         
-        <SmartOperationTable 
-          userId={user.id} 
-          componentId="ops-global" 
-          title={`Monitoramento Global: ${activeStatusTab === 'geral' ? 'Visão Geral (Ativas + Concluídas)' : activeStatusTab === 'ativas' ? 'Fila Ativa' : activeStatusTab.toUpperCase()}`} 
-          columns={columns} 
-          data={filteredTrips} 
-          defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
-        />
+        {trips.length === 0 ? (
+          <div className="py-20 text-center bg-white rounded-[2.5rem] border border-dashed border-slate-200">
+             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 7v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V7m-16 0h16M4 7l8-4 8 4M4 10l8 4 8-4" strokeWidth="2"/></svg>
+             </div>
+             <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhuma viagem encontrada no banco de dados.</p>
+             <button onClick={onRefresh} className="mt-4 text-blue-600 font-bold text-[10px] uppercase hover:underline">Tentar Sincronizar Agora</button>
+          </div>
+        ) : (
+          <SmartOperationTable 
+            userId={user.id} 
+            componentId="ops-global" 
+            title={`Monitoramento: ${activeStatusTab.toUpperCase()}`} 
+            columns={columns} 
+            data={filteredTrips} 
+            defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
+          />
+        )}
       </div>
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />

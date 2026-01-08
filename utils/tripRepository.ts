@@ -9,7 +9,7 @@ export const tripRepository = {
       os: trip.os,
       booking: trip.booking,
       ship: trip.ship,
-      data_time: trip.dateTime, // Alinhado com o ERD
+      data_time: trip.dateTime, 
       status_time: trip.statusTime || trip.statusHistory?.[0]?.dateTime || new Date().toISOString(),
       is_late: trip.isLate,
       type: trip.type,
@@ -20,13 +20,13 @@ export const tripRepository = {
       tara: trip.tara || null,
       seal: trip.seal || null,
       cva: trip.cva || null,
-      customer: trip.customer, // Objeto JSONB
-      destination: trip.destination || null, // Objeto JSONB
-      driver: trip.driver, // Objeto JSONB
+      customer: trip.customer, 
+      destination: trip.destination || null, 
+      driver: trip.driver, 
       status: trip.status,
-      status_history: trip.statusHistory || [], // Array JSONB
-      advance_payment: trip.advancePayment, // Objeto JSONB
-      balance_payment: trip.balancePayment, // Objeto JSONB
+      status_history: trip.statusHistory || [], 
+      advance_payment: trip.advancePayment, 
+      balance_payment: trip.balancePayment, 
       os_doc: trip.osDoc || null,
       agendamento_doc: trip.agendamentoDoc || null,
       completo_doc: trip.completoDoc || null,
@@ -36,7 +36,7 @@ export const tripRepository = {
       nf_doc: trip.nfDoc || null,
       nf_key: trip.nfKey || null,
       oc_form_data: trip.ocFormData || null,
-      pre_stacking_form_data: trip.preStackingFormData || null,
+      pre_stack_form_data: trip.preStackingFormData || null,
       scheduling: trip.scheduling || null,
       driver_docs: trip.driver_docs || []
     };
@@ -53,24 +53,24 @@ export const tripRepository = {
 
     return {
       id: d.id,
-      os: d.os,
-      booking: d.booking,
-      ship: d.ship,
-      dateTime: d.data_time || d.dateTime,
-      statusTime: d.status_time || d.statusTime,
+      os: d.os || 'SEM OS',
+      booking: d.booking || '',
+      ship: d.ship || '',
+      dateTime: d.data_time || d.created_at || d.dateTime || new Date().toISOString(),
+      statusTime: d.status_time || d.statusTime || d.created_at,
       isLate: d.is_late ?? false,
-      type: d.type,
-      containerType: d.container_type || d.containerType,
-      category: d.category,
-      subCategory: d.sub_category || d.subCategory,
-      container: d.container,
-      tara: d.tara,
-      seal: d.seal,
-      cva: d.cva,
-      customer: safeParse(d.customer, {}),
+      type: d.type || 'EXPORTAÇÃO',
+      containerType: d.container_type || d.containerType || '40HC',
+      category: d.category || 'Geral',
+      subCategory: d.sub_category || d.subCategory || '',
+      container: d.container || '',
+      tara: d.tara || '',
+      seal: d.seal || '',
+      cva: d.cva || '',
+      customer: safeParse(d.customer, { name: 'Cliente Indefinido' }),
       destination: safeParse(d.destination, null),
-      driver: safeParse(d.driver, {}),
-      status: d.status,
+      driver: safeParse(d.driver, { name: 'Motorista Indefinido' }),
+      status: d.status || 'Pendente',
       statusHistory: safeParse(d.status_history || d.statusHistory, []),
       advancePayment: safeParse(d.advance_payment || d.advancePayment, { status: 'BLOQUEADO' }),
       balancePayment: safeParse(d.balance_payment || d.balancePayment, { status: 'AGUARDANDO_DOCS' }),
@@ -83,7 +83,7 @@ export const tripRepository = {
       nfDoc: d.nf_doc || d.nfDoc,
       nfKey: d.nf_key || d.nfKey,
       ocFormData: safeParse(d.oc_form_data || d.ocFormData, null),
-      preStackingFormData: safeParse(d.pre_stacking_form_data || d.preStackingFormData, null),
+      preStackingFormData: safeParse(d.pre_stack_form_data || d.pre_stacking_form_data || d.preStackingFormData, null),
       scheduling: safeParse(d.scheduling, undefined),
       driver_docs: safeParse(d.driver_docs, []) 
     };
@@ -91,11 +91,25 @@ export const tripRepository = {
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
     try {
-      const { data, error } = await supabase.from('trips').select('*').order('data_time', { ascending: false });
-      if (error) throw error;
-      return (data || []).map(d => this.mapFromDb(d));
+      console.log("ALS System: Iniciando busca de viagens...");
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*');
+
+      if (error) {
+        console.error("Erro Supabase (Trips Query):", error.message);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        console.warn("ALS System: A consulta retornou zero viagens.");
+        return [];
+      }
+
+      console.log(`ALS System: ${data.length} viagens recuperadas. Iniciando mapeamento...`);
+      return data.map(d => this.mapFromDb(d));
     } catch (e) {
-      console.error("Erro ao buscar viagens do Supabase:", e);
+      console.error("ALS System: Falha crítica ao recuperar viagens:", e);
       return [];
     }
   },
@@ -106,7 +120,7 @@ export const tripRepository = {
       const { error } = await supabase.from('trips').upsert(payload);
       if (error) {
         console.error("Erro Supabase (Trip Upsert):", error.message);
-        throw error;
+        return false;
       }
       return true;
     } catch (e) {

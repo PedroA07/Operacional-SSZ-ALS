@@ -13,15 +13,12 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_U
 export const db = {
   // USUÁRIOS
   getUsers: async (): Promise<User[]> => {
-    if (!supabase) {
-      console.warn("ALS System: Supabase não configurado.");
-      return [];
-    }
+    if (!supabase) return [];
     try {
       const { data, error } = await supabase.from('users').select('*');
       if (error) {
-        console.error("Erro ao buscar usuários:", error.message);
-        throw error;
+        console.error("DB Error (Users):", error.message);
+        return [];
       }
       return (data || []).map(u => ({
         id: u.id,
@@ -39,9 +36,7 @@ export const db = {
         lastSeen: u.last_seen || u.lastseen,
         presence_status: u.presence_status
       }));
-    } catch (e) { 
-      return []; 
-    }
+    } catch (e) { return []; }
   },
 
   saveUser: async (user: User) => {
@@ -60,7 +55,6 @@ export const db = {
       is_first_login: user.isFirstLogin,
       presence_status: user.presence_status || 'offline'
     });
-    if (error) console.error("Erro ao salvar usuário:", error.message);
     return !error;
   },
 
@@ -86,7 +80,10 @@ export const db = {
 
   // VIAGENS
   getTrips: async (): Promise<Trip[]> => {
-    if (!supabase) return [];
+    if (!supabase) {
+      console.warn("DB Warning: Supabase não inicializado.");
+      return [];
+    }
     return await tripRepository.getAll(supabase);
   },
 
@@ -113,10 +110,7 @@ export const db = {
   getCustomers: async (): Promise<Customer[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('customers').select('*').order('name');
-    if (error) {
-      console.error("Erro ao buscar clientes:", error.message);
-      return [];
-    }
+    if (error) return [];
     return (data || []).map(c => ({
       ...c,
       legalName: c.legal_name || c.legalName,
@@ -138,7 +132,6 @@ export const db = {
       state: customer.state,
       operations: customer.operations || []
     });
-    if (error) console.error("Erro ao salvar cliente:", error.message);
     return !error;
   },
 
@@ -311,7 +304,6 @@ export const db = {
   },
 
   // PREFERÊNCIAS DE UI
-  // Fix: Added missing method getPreferences to resolve error in SmartOperationTable
   getPreferences: (userId: string) => {
     const key = `als_prefs_${userId}`;
     const saved = localStorage.getItem(key);
@@ -322,7 +314,6 @@ export const db = {
     }
   },
 
-  // Fix: Added missing method savePreference to resolve error in SmartOperationTable
   savePreference: (userId: string, componentId: string, visibleColumns: string[]) => {
     const key = `als_prefs_${userId}`;
     const prefs = db.getPreferences(userId);
@@ -334,9 +325,9 @@ export const db = {
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try {
-      const { data, error } = await supabase.from('users').select('id').limit(1).single();
+      const { error } = await supabase.from('users').select('id').limit(1).single();
       if (error && error.code !== 'PGRST116') {
-        console.error("Conexão Supabase Falhou:", error.message);
+        console.error("DB Connection Failure:", error.message);
         return false;
       }
       return true;
@@ -355,7 +346,7 @@ export const db = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ALS_Supabase_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `ALS_Backup_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   },
 
@@ -371,7 +362,7 @@ export const db = {
       if (data.trips) for (const t of data.trips) await db.saveTrip(t);
       return true;
     } catch (e) {
-      console.error("Erro na importação:", e);
+      console.error("Import error:", e);
       return false;
     }
   }
