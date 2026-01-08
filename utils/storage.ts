@@ -13,27 +13,35 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_U
 export const db = {
   // USUÁRIOS
   getUsers: async (): Promise<User[]> => {
-    if (!supabase) return [];
+    if (!supabase) {
+      console.warn("ALS System: Supabase não configurado.");
+      return [];
+    }
     try {
       const { data, error } = await supabase.from('users').select('*');
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar usuários:", error.message);
+        throw error;
+      }
       return (data || []).map(u => ({
         id: u.id,
         username: u.username,
         password: u.password,
-        displayName: u.displayname || u.display_name,
+        displayName: u.display_name || u.displayname || u.username,
         role: u.role,
-        lastLogin: u.lastlogin || u.last_login,
+        lastLogin: u.last_login || u.lastlogin,
         photo: u.photo,
         position: u.position,
-        driverId: u.driverid || u.driver_id,
-        staffId: u.staffid || u.staff_id,
+        driverId: u.driver_id || u.driverid,
+        staffId: u.staff_id || u.staffid,
         status: u.status,
-        isFirstLogin: u.isfirstlogin || u.is_first_login,
-        lastSeen: u.lastseen || u.last_seen,
+        isFirstLogin: u.is_first_login ?? u.isfirstlogin,
+        lastSeen: u.last_seen || u.lastseen,
         presence_status: u.presence_status
       }));
-    } catch (e) { return []; }
+    } catch (e) { 
+      return []; 
+    }
   },
 
   saveUser: async (user: User) => {
@@ -42,16 +50,17 @@ export const db = {
       id: user.id,
       username: user.username,
       password: user.password,
-      displayname: user.displayName,
+      display_name: user.displayName,
       role: user.role,
-      lastlogin: user.lastLogin,
+      last_login: user.lastLogin,
       status: user.status || 'Ativo',
-      driverid: user.driverId,
-      staffid: user.staffId,
+      driver_id: user.driverId,
+      staff_id: user.staffId,
       position: user.position,
-      isfirstlogin: user.isFirstLogin,
+      is_first_login: user.isFirstLogin,
       presence_status: user.presence_status || 'offline'
     });
+    if (error) console.error("Erro ao salvar usuário:", error.message);
     return !error;
   },
 
@@ -65,7 +74,7 @@ export const db = {
     if (!supabase) return false;
     const success = await driverRepository.save(supabase, driver);
     if (success && actingUser) {
-      await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Atualizado', `Motorista ${driver.name} sincronizado no Supabase.`, { os: 'CADASTRO', motorista: driver.name, placa: driver.plateHorse });
+      await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Sincronizado', `Motorista ${driver.name} atualizado no banco de dados.`, { os: 'CADASTRO', motorista: driver.name, placa: driver.plateHorse });
     }
     return success;
   },
@@ -86,7 +95,7 @@ export const db = {
     const success = await tripRepository.save(supabase, trip);
     if (success && actingUser) {
       const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse, cliente: trip.customer.name };
-      await db.addNotification(actingUser, 'TRIP_UPDATED', 'Viagem Sincronizada', `OS ${trip.os} salva na nuvem ALS.`, summary);
+      await db.addNotification(actingUser, 'TRIP_UPDATED', 'Viagem Sincronizada', `Dados da OS ${trip.os} enviados para a nuvem.`, summary);
     }
     return success;
   },
@@ -95,7 +104,7 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('trips').delete().eq('id', id);
     if (!error && actingUser) {
-      await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `Programação excluída do banco de dados.`, { os: 'EXCLUÍDA' });
+      await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `Programação excluída do servidor ALS.`, { os: 'EXCLUÍDA' });
     }
     return !error;
   },
@@ -103,11 +112,15 @@ export const db = {
   // CLIENTES
   getCustomers: async (): Promise<Customer[]> => {
     if (!supabase) return [];
-    const { data } = await supabase.from('customers').select('*').order('name');
+    const { data, error } = await supabase.from('customers').select('*').order('name');
+    if (error) {
+      console.error("Erro ao buscar clientes:", error.message);
+      return [];
+    }
     return (data || []).map(c => ({
       ...c,
-      legalName: c.legalName || c.legal_name,
-      zipCode: c.zipCode || c.zip_code
+      legalName: c.legal_name || c.legalName,
+      zipCode: c.zip_code || c.zipCode
     })) as Customer[];
   },
 
@@ -125,13 +138,10 @@ export const db = {
       state: customer.state,
       operations: customer.operations || []
     });
-    if (!error && actingUser) {
-      await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cliente Atualizado', `Cliente ${customer.name} salvo com sucesso.`, { cliente: customer.name });
-    }
+    if (error) console.error("Erro ao salvar cliente:", error.message);
     return !error;
   },
 
-  // Fix: Added missing deleteCustomer method
   deleteCustomer: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('customers').delete().eq('id', id);
@@ -141,11 +151,12 @@ export const db = {
   // PORTOS E PRE-STACKING
   getPorts: async (): Promise<Port[]> => {
     if (!supabase) return [];
-    const { data } = await supabase.from('ports').select('*').order('name');
+    const { data, error } = await supabase.from('ports').select('*').order('name');
+    if (error) return [];
     return (data || []).map(p => ({
       ...p,
-      legalName: p.legalName || p.legal_name,
-      zipCode: p.zipCode || p.zip_code
+      legalName: p.legal_name || p.legalName,
+      zipCode: p.zip_code || p.zipCode
     })) as Port[];
   },
 
@@ -165,7 +176,6 @@ export const db = {
     return !error;
   },
 
-  // Fix: Added missing deletePort method
   deletePort: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('ports').delete().eq('id', id);
@@ -174,11 +184,12 @@ export const db = {
 
   getPreStacking: async (): Promise<PreStacking[]> => {
     if (!supabase) return [];
-    const { data } = await supabase.from('pre_stacking').select('*').order('name');
+    const { data, error } = await supabase.from('pre_stacking').select('*').order('name');
+    if (error) return [];
     return (data || []).map(ps => ({
       ...ps,
-      legalName: ps.legalName || ps.legal_name,
-      zipCode: ps.zipCode || ps.zip_code
+      legalName: ps.legal_name || ps.legalName,
+      zipCode: ps.zip_code || ps.zipCode
     })) as PreStacking[];
   },
 
@@ -198,7 +209,6 @@ export const db = {
     return !error;
   },
 
-  // Fix: Added missing deletePreStacking method
   deletePreStacking: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').delete().eq('id', id);
@@ -215,12 +225,11 @@ export const db = {
     if (!supabase) return false;
     const success = await staffRepository.save(supabase, staff);
     if (success && password) {
-      await supabase.from('users').update({ password }).eq('staffid', staff.id);
+      await supabase.from('users').update({ password }).eq('staff_id', staff.id);
     }
     return success;
   },
 
-  // Fix: Added missing deleteStaff method
   deleteStaff: async (id: string) => {
     if (!supabase) return false;
     return await staffRepository.delete(supabase, id);
@@ -228,7 +237,8 @@ export const db = {
 
   getCategories: async (): Promise<Category[]> => {
     if (!supabase) return [];
-    const { data } = await supabase.from('categories').select('*').order('name');
+    const { data, error } = await supabase.from('categories').select('*').order('name');
+    if (error) return [];
     return (data || []).map(c => ({
       id: c.id,
       name: c.name,
@@ -265,7 +275,8 @@ export const db = {
 
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
-    const { data } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(40);
+    const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(50);
+    if (error) return [];
     return (data || []).map(n => ({
       id: String(n.id),
       title: n.title,
@@ -284,7 +295,7 @@ export const db = {
     if (supabase) {
       await supabase.from('users').update({ 
         presence_status: status, 
-        lastseen: new Date().toISOString() 
+        last_seen: new Date().toISOString() 
       }).eq('id', userId);
     }
   },
@@ -299,23 +310,39 @@ export const db = {
     return !error;
   },
 
+  // PREFERÊNCIAS DE UI
+  // Fix: Added missing method getPreferences to resolve error in SmartOperationTable
+  getPreferences: (userId: string) => {
+    const key = `als_prefs_${userId}`;
+    const saved = localStorage.getItem(key);
+    try {
+      return saved ? JSON.parse(saved) : { visibleColumns: {} };
+    } catch {
+      return { visibleColumns: {} };
+    }
+  },
+
+  // Fix: Added missing method savePreference to resolve error in SmartOperationTable
+  savePreference: (userId: string, componentId: string, visibleColumns: string[]) => {
+    const key = `als_prefs_${userId}`;
+    const prefs = db.getPreferences(userId);
+    if (!prefs.visibleColumns) prefs.visibleColumns = {};
+    prefs.visibleColumns[componentId] = visibleColumns;
+    localStorage.setItem(key, JSON.stringify(prefs));
+  },
+
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try {
-      const { error } = await supabase.from('users').select('id').limit(1);
-      return !error;
-    } catch { return false; }
-  },
-
-  getPreferences: (userId: string) => {
-    const saved = localStorage.getItem(`als_prefs_${userId}`);
-    return saved ? JSON.parse(saved) : { visibleColumns: {} };
-  },
-
-  savePreference: (userId: string, componentId: string, columns: string[]) => {
-    const prefs = db.getPreferences(userId);
-    prefs.visibleColumns[componentId] = columns;
-    localStorage.setItem(`als_prefs_${userId}`, JSON.stringify(prefs));
+      const { data, error } = await supabase.from('users').select('id').limit(1).single();
+      if (error && error.code !== 'PGRST116') {
+        console.error("Conexão Supabase Falhou:", error.message);
+        return false;
+      }
+      return true;
+    } catch { 
+      return false; 
+    }
   },
 
   exportBackup: async () => {
@@ -328,29 +355,23 @@ export const db = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ALS_Full_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `ALS_Supabase_Backup_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   },
 
-  // Fix: Implemented missing importBackup method
   importBackup: async (file: File) => {
     if (!supabase) return false;
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      
-      // Perform imports
       if (data.drivers) for (const d of data.drivers) await db.saveDriver(d);
       if (data.customers) for (const c of data.customers) await db.saveCustomer(c);
       if (data.ports) for (const p of data.ports) await db.savePort(p);
       if (data.preStacking) for (const ps of data.preStacking) await db.savePreStacking(ps);
       if (data.trips) for (const t of data.trips) await db.saveTrip(t);
-      if (data.staff) for (const s of data.staff) await db.saveStaff(s);
-      if (data.categories) for (const c of data.categories) await db.saveCategory(c);
-      
       return true;
     } catch (e) {
-      console.error("Import error:", e);
+      console.error("Erro na importação:", e);
       return false;
     }
   }

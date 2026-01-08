@@ -3,10 +3,6 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Driver } from '../types';
 
 export const driverRepository = {
-  /**
-   * Converte o objeto Driver do TypeScript (camelCase) 
-   * para o formato exato das colunas do Banco de Dados (snake_case) fornecido pelo usuário.
-   */
   mapToDb: (driver: Driver) => {
     return {
       id: driver.id,
@@ -42,9 +38,6 @@ export const driverRepository = {
     };
   },
 
-  /**
-   * Converte do Banco de Dados para o objeto Driver do App
-   */
   mapFromDb: (d: any): Driver => ({
     id: d.id,
     photo: d.photo,
@@ -73,8 +66,8 @@ export const driverRepository = {
     paymentPreference: d.payment_preference || d.paymentPreference,
     whatsappGroupName: d.whatsapp_group_name || d.whatsappGroupName,
     whatsappGroupLink: d.whatsapp_group_link || d.whatsappGroupLink,
-    currentLat: d.current_lat || d.currentLat,
-    currentLng: d.current_lng || d.currentLng,
+    currentLat: d.current_lat ? Number(d.current_lat) : undefined,
+    currentLng: d.current_lng ? Number(d.current_lng) : undefined,
     lastLocationAt: d.last_location_at || d.lastLocationAt
   }),
 
@@ -83,7 +76,7 @@ export const driverRepository = {
       const payload = this.mapToDb(driver);
       const { error } = await supabase.from('drivers').upsert(payload);
       if (error) {
-        console.error("ERRO SUPABASE DRIVER:", error.message);
+        console.error("Erro Supabase (Driver Upsert):", error.message);
         return false;
       }
       return true;
@@ -98,6 +91,7 @@ export const driverRepository = {
       if (error) throw error;
       return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
+      console.error("Erro ao buscar motoristas:", e);
       return [];
     }
   },

@@ -9,7 +9,7 @@ export const tripRepository = {
       os: trip.os,
       booking: trip.booking,
       ship: trip.ship,
-      data_time: trip.dateTime, // Conforme ERD: data_time
+      data_time: trip.dateTime, // Alinhado com o ERD
       status_time: trip.statusTime || trip.statusHistory?.[0]?.dateTime || new Date().toISOString(),
       is_late: trip.isLate,
       type: trip.type,
@@ -20,13 +20,13 @@ export const tripRepository = {
       tara: trip.tara || null,
       seal: trip.seal || null,
       cva: trip.cva || null,
-      customer: trip.customer,
-      destination: trip.destination || null,
-      driver: trip.driver,
+      customer: trip.customer, // Objeto JSONB
+      destination: trip.destination || null, // Objeto JSONB
+      driver: trip.driver, // Objeto JSONB
       status: trip.status,
-      status_history: trip.statusHistory || [],
-      advance_payment: trip.advancePayment,
-      balance_payment: trip.balancePayment,
+      status_history: trip.statusHistory || [], // Array JSONB
+      advance_payment: trip.advancePayment, // Objeto JSONB
+      balance_payment: trip.balancePayment, // Objeto JSONB
       os_doc: trip.osDoc || null,
       agendamento_doc: trip.agendamentoDoc || null,
       completo_doc: trip.completoDoc || null,
@@ -90,15 +90,27 @@ export const tripRepository = {
   },
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
-    const { data, error } = await supabase.from('trips').select('*').order('data_time', { ascending: false });
-    if (error) throw error;
-    return (data || []).map(d => this.mapFromDb(d));
+    try {
+      const { data, error } = await supabase.from('trips').select('*').order('data_time', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(d => this.mapFromDb(d));
+    } catch (e) {
+      console.error("Erro ao buscar viagens do Supabase:", e);
+      return [];
+    }
   },
 
   async save(supabase: SupabaseClient, trip: Trip) {
-    const payload = this.mapToDb(trip);
-    const { error } = await supabase.from('trips').upsert(payload);
-    if (error) throw error;
-    return true;
+    try {
+      const payload = this.mapToDb(trip);
+      const { error } = await supabase.from('trips').upsert(payload);
+      if (error) {
+        console.error("Erro Supabase (Trip Upsert):", error.message);
+        throw error;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 };
