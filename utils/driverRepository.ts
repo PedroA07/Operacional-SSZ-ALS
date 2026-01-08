@@ -3,9 +3,17 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Driver } from '../types';
 
 export const driverRepository = {
+  /**
+   * Converte o objeto Driver do TypeScript (camelCase) 
+   * para o formato do Banco de Dados (snake_case)
+   */
   mapToDb: (driver: Driver) => {
+    // Filtra operações para garantir que o JSONB seja válido
     const cleanOperations = Array.isArray(driver.operations) 
-      ? driver.operations.map(op => ({ category: op.category, client: op.client }))
+      ? driver.operations.map(op => ({ 
+          category: op.category || '', 
+          client: op.client || '' 
+        }))
       : [];
 
     return {
@@ -42,6 +50,9 @@ export const driverRepository = {
     };
   },
 
+  /**
+   * Converte do Banco de Dados para o objeto Driver
+   */
   mapFromDb: (d: any): Driver => ({
     id: d.id,
     photo: d.photo,
@@ -78,14 +89,24 @@ export const driverRepository = {
   async save(supabase: SupabaseClient, driver: Driver) {
     try {
       const payload = this.mapToDb(driver);
+      
+      // Upsert no Supabase
       const { error } = await supabase.from('drivers').upsert(payload);
+      
       if (error) {
-        console.error("ERRO SUPABASE UPSERT DRIVER:", error);
+        console.error("❌ ERRO NO SUPABASE (Upsert Driver):", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         return false;
       }
+      
+      console.log("✅ Motorista salvo com sucesso no banco.");
       return true;
     } catch (e) {
-      console.error("Erro catch driverRepository.save:", e);
+      console.error("❌ Erro inesperado no driverRepository.save:", e);
       return false;
     }
   },
@@ -96,7 +117,7 @@ export const driverRepository = {
       if (error) throw error;
       return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
-      console.error("Erro driverRepository.getAll:", e);
+      console.error("❌ Erro driverRepository.getAll:", e);
       return [];
     }
   },

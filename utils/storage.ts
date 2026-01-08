@@ -17,6 +17,10 @@ try {
 
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
+if (!supabase) {
+  console.warn("⚠️ ALS LOGÍSTICA: Supabase não configurado. O sistema operará apenas em cache local.");
+}
+
 const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 20000): Promise<T> => {
   return Promise.race([
     Promise.resolve(promise),
@@ -125,7 +129,7 @@ export const db = {
       }
       return success;
     } catch (e) { 
-      console.error("Erro db.saveTrip:", e);
+      console.error("Erro ao salvar viagem:", e);
       return false; 
     }
   },
@@ -142,9 +146,12 @@ export const db = {
     };
     try { 
       const { error } = await supabase.from('users').upsert(payload); 
-      if (error) console.error("Erro db.saveUser:", error);
-      return !error; 
-    } catch (e) { return false; }
+      if (error) throw error;
+      return true; 
+    } catch (e) { 
+      console.error("Erro ao salvar usuário:", e);
+      return false; 
+    }
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
@@ -156,7 +163,7 @@ export const db = {
       }
       return success;
     } catch (e) { 
-      console.error("Erro db.saveDriver:", e);
+      console.error("Erro crítico db.saveDriver:", e);
       return false; 
     }
   },
@@ -166,79 +173,70 @@ export const db = {
     try {
       const payload = { 
         id: customer.id,
-        name: customer.name?.toUpperCase(),
-        legal_name: customer.legalName?.toUpperCase(),
+        name: customer.name,
+        legal_name: customer.legalName,
         cnpj: customer.cnpj,
-        address: customer.address?.toUpperCase(),
-        neighborhood: customer.neighborhood?.toUpperCase(),
+        address: customer.address,
+        neighborhood: customer.neighborhood,
         zip_code: customer.zipCode,
-        city: customer.city?.toUpperCase(),
-        state: customer.state?.toUpperCase(),
+        city: customer.city,
+        state: customer.state,
         operations: customer.operations || []
       };
       const { error } = await supabase.from('customers').upsert(payload);
-      if (error) {
-        console.error("Erro Supabase upsert customers:", error);
-        return false;
-      }
+      if (error) throw error;
       if (actingUser) {
         await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cadastro Cliente', `Cliente ${customer.name} atualizado no servidor.`, { cliente: customer.name });
       }
       return true;
     } catch (e) { 
-      console.error("Erro catch db.saveCustomer:", e);
+      console.error("Erro ao salvar cliente:", e);
       return false; 
     }
   },
 
   savePort: async (port: Port, actingUser?: User) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
+    const payload = {
+      id: port.id,
+      name: port.name,
+      legal_name: port.legalName,
+      cnpj: port.cnpj,
+      address: port.address,
+      neighborhood: port.neighborhood,
+      zip_code: port.zipCode,
+      city: port.city,
+      state: port.state
+    };
     try {
-      const payload = {
-        id: port.id,
-        name: port.name?.toUpperCase(),
-        legal_name: port.legalName?.toUpperCase(),
-        cnpj: port.cnpj,
-        address: port.address?.toUpperCase(),
-        neighborhood: port.neighborhood?.toUpperCase(),
-        zip_code: port.zipCode,
-        city: port.city?.toUpperCase(),
-        state: port.state?.toUpperCase()
-      };
       const { error } = await supabase.from('ports').upsert(payload);
-      if (error) {
-        console.error("Erro Supabase upsert ports:", error);
-        return false;
-      }
+      if (error) throw error;
       return true;
     } catch (e) {
-      console.error("Erro catch db.savePort:", e);
+      console.error("Erro ao salvar porto:", e);
       return false;
     }
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
+    const payload = {
+      id: ps.id,
+      name: ps.name,
+      legal_name: ps.legalName,
+      cnpj: ps.cnpj,
+      address: ps.address,
+      neighborhood: ps.neighborhood,
+      zip_code: ps.zipCode,
+      city: ps.city,
+      state: ps.state
+    };
     try {
-      const payload = {
-        id: ps.id,
-        name: ps.name?.toUpperCase(),
-        legal_name: ps.legalName?.toUpperCase(),
-        cnpj: ps.cnpj,
-        address: ps.address?.toUpperCase(),
-        neighborhood: ps.neighborhood?.toUpperCase(),
-        zip_code: ps.zipCode,
-        city: ps.city?.toUpperCase(),
-        state: ps.state?.toUpperCase()
-      };
       const { error } = await supabase.from('pre_stacking').upsert(payload);
-      if (error) {
-        console.error("Erro Supabase upsert pre_stacking:", error);
-        return false;
-      }
+      if (error) throw error;
       return true;
     } catch (e) {
-      console.error("Erro catch db.savePreStacking:", e);
+      console.error("Erro ao salvar pre-stacking:", e);
       return false;
     }
   },
@@ -252,13 +250,22 @@ export const db = {
         if (userData) await supabase.from('users').update({ password }).eq('id', userData.id);
       }
       return success;
-    } catch (e) { return false; }
+    } catch (e) { 
+      console.error("Erro ao salvar staff:", e);
+      return false; 
+    }
   },
 
   saveCategory: async (category: Category, actingUser?: User) => {
     if (!supabase) return true;
-    const { error } = await supabase.from('categories').upsert({ id: category.id, name: category.name, parent_id: category.parentId });
-    return !error;
+    try {
+      const { error } = await supabase.from('categories').upsert({ id: category.id, name: category.name, parent_id: category.parentId });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error("Erro ao salvar categoria:", e);
+      return false;
+    }
   },
 
   getNotifications: async (): Promise<Notification[]> => {
@@ -335,14 +342,20 @@ export const db = {
 
   deleteDriver: async (id: string) => {
     if (!supabase) return true;
-    const { error } = await supabase.from('drivers').delete().eq('id', id);
-    return !error;
+    try {
+      const { error } = await supabase.from('drivers').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (e) { return false; }
   },
 
   deleteCustomer: async (id: string) => {
     if (!supabase) return true;
-    const { error } = await supabase.from('customers').delete().eq('id', id);
-    return !error;
+    try {
+      const { error } = await supabase.from('customers').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (e) { return false; }
   },
 
   deletePort: async (id: string) => {
