@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Driver, OperationDefinition, User, Customer } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
@@ -37,6 +38,12 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+
+  // Estados de busca profunda
+  const [deepSearchCPF, setDeepSearchCPF] = useState('');
+  const [isDeepSearching, setIsDeepSearching] = useState(false);
+  const [deepSearchResult, setDeepSearchResult] = useState<Driver | null>(null);
+  const [duplicateAlert, setDuplicateAlert] = useState<Driver | null>(null);
 
   const [tempCategory, setTempCategory] = useState(availableOps[0]?.category || '');
   const [tempClient, setTempClient] = useState('Geral');
@@ -78,6 +85,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   const handleOpenModal = (d?: Driver) => {
     setForm(d ? { ...d, operations: d.operations || [] } : initialForm);
     setEditingId(d?.id);
+    setDuplicateAlert(null);
     setTempCategory(availableOps[0]?.category || '');
     setTempClient('Geral');
     setIsModalOpen(true);
@@ -91,6 +99,34 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   const handleViewCnh = (url: string) => {
     setCurrentCnhUrl(url);
     setIsCnhModalOpen(true);
+  };
+
+  const handleDeepSearch = async () => {
+    if (deepSearchCPF.length < 11) return;
+    setIsDeepSearching(true);
+    setDeepSearchResult(null);
+    try {
+      const found = await db.getDriverByCPF(deepSearchCPF);
+      if (found) {
+        setDeepSearchResult(found);
+      } else {
+        alert("Nenhum motorista encontrado com este CPF no banco de dados ALS.");
+      }
+    } catch (e) {
+      alert("Falha na consulta ao servidor.");
+    } finally {
+      setIsDeepSearching(false);
+    }
+  };
+
+  const checkCPFExistence = async (cpf: string) => {
+    if (editingId) return; // Não verifica em edição
+    if (cpf.replace(/\D/g, '').length === 11) {
+      const found = await db.getDriverByCPF(cpf);
+      setDuplicateAlert(found || null);
+    } else {
+      setDuplicateAlert(null);
+    }
   };
 
   const executeDelete = async () => {
@@ -143,6 +179,10 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
+    if (duplicateAlert && !editingId) {
+      alert("Este CPF já possui cadastro. Use a busca para localizar o registro existente.");
+      return;
+    }
     setIsSaving(true);
     try {
       const drvId = editingId || `drv-${Date.now()}`;
@@ -246,8 +286,10 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
 
   return (
     <div className="max-w-full mx-auto space-y-6">
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="flex-1">
+      
+      {/* SEÇÃO DE BUSCA E CONSULTA PROFUNDA */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        <div className="flex-1 w-full">
           <ListFilters 
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -258,8 +300,51 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
             placeholder="BUSCAR MOTORISTA, CPF OU PLACA..."
           />
         </div>
-        <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl active:scale-95 shrink-0 h-[58px] mt-[-24px]">Novo Motorista</button>
+        
+        <div className="w-full lg:w-auto flex flex-col md:flex-row gap-4">
+           <div className="bg-slate-900 p-4 rounded-[2rem] border border-white/5 shadow-xl flex items-center gap-3">
+              <input 
+                type="text" 
+                placeholder="CONSULTAR CPF..." 
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-blue-400 outline-none w-40"
+                value={deepSearchCPF}
+                onChange={e => setDeepSearchCPF(maskCPF(e.target.value))}
+              />
+              <button 
+                onClick={handleDeepSearch}
+                disabled={isDeepSearching || deepSearchCPF.length < 14}
+                className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all disabled:opacity-30 shrink-0"
+                title="Consultar no Banco ALS"
+              >
+                {isDeepSearching ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>}
+              </button>
+           </div>
+           <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-500 transition-all shadow-xl active:scale-95 shrink-0 h-[68px]">Novo Motorista</button>
+        </div>
       </div>
+
+      {/* RESULTADO DA BUSCA PROFUNDA (OVERLAY RÁPIDO) */}
+      {deepSearchResult && (
+        <div className="bg-blue-600/10 border border-blue-500/30 p-6 rounded-[2.5rem] flex items-center justify-between animate-in slide-in-from-top-4">
+           <div className="flex items-center gap-6">
+              <div className="w-16 h-16 rounded-2xl bg-white/10 overflow-hidden shrink-0 border border-white/10">
+                 {deepSearchResult.photo ? <img src={deepSearchResult.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-blue-400 italic">ALS</div>}
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none mb-1">Registro Localizado no Banco</p>
+                 <h4 className="text-xl font-black text-white uppercase">{deepSearchResult.name}</h4>
+                 <div className="flex gap-4 mt-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">CPF: {deepSearchResult.cpf}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">STATUS: {deepSearchResult.status}</span>
+                 </div>
+              </div>
+           </div>
+           <div className="flex gap-3">
+              <button onClick={() => setDeepSearchResult(null)} className="px-5 py-3 text-slate-400 font-black uppercase text-[9px]">Ocultar</button>
+              <button onClick={() => { handleOpenModal(deepSearchResult); setDeepSearchResult(null); }} className="px-6 py-3 bg-white text-blue-600 rounded-xl font-black uppercase text-[9px] shadow-lg hover:scale-105 transition-all">Abrir Ficha de Cadastro</button>
+           </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -279,7 +364,333 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
             <tbody className="divide-y divide-slate-100">
               {filteredDrivers.map(d => {
                 const linkedUser = users.find(u => u.driverId === d.id);
-                // Lógica de Chave do Beneficiário
+                const isThirdParty = d.beneficiaryCnpj && d.beneficiaryCnpj.replace(/\D/g, '') !== d.cpf.replace(/\D/g, '');
+                const beneficiaryKey = isThirdParty ? d.beneficiaryCnpj.replace(/\D/g, '').slice(-4) : null;
+
+                return (
+                  <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
+                    <td className="px-6 py-4 max-w-[240px]">
+                      <div className="flex items-start gap-3">
+                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 mt-1">
+                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 text-[8px]">ALS</div>}
+                         </div>
+                         <div>
+                            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight mb-2">{d.name}</p>
+                            <div className="bg-blue-50/50 p-2 rounded-xl border border-blue-100/50 space-y-0.5">
+                               <p className="text-[7px] font-black text-blue-500 uppercase leading-none">Beneficiário:</p>
+                               <p className="text-[10px] font-bold text-slate-600 uppercase truncate">{d.beneficiaryName || d.name}</p>
+                               <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{d.beneficiaryCnpj || d.cpf} | {d.paymentPreference || 'PIX'}</p>
+                            </div>
+                         </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="space-y-1 mt-1">
+                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CPF: <span className="font-mono text-slate-800 font-bold">{d.cpf}</span></p>
+                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">RG: <span className="font-mono text-slate-800 font-bold">{d.rg || '---'}</span></p>
+                          <div className="flex items-center justify-between gap-4">
+                             <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CNH: <span className="font-mono text-slate-800 font-bold">{d.cnh || '---'}</span></p>
+                             {d.cnhPdfUrl && (
+                               <button 
+                                 onClick={() => handleViewCnh(d.cnhPdfUrl!)} 
+                                 className="flex items-center gap-1.5 px-2 py-1 bg-red-50 text-red-600 rounded-lg border border-red-100 hover:bg-red-600 hover:text-white transition-all group/pdf shadow-sm"
+                               >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeWidth="2.5"/></svg>
+                                  <span className="text-[7px] font-black uppercase">Ver PDF</span>
+                               </button>
+                             )}
+                          </div>
+                       </div>
+                    </td>
+                    <td className="px-6 py-4 max-w-[200px]">
+                       <div className="flex flex-wrap gap-1 mt-1">
+                          {d.operations && d.operations.length > 0 ? d.operations.map((op, i) => (
+                             <span key={i} className="px-2 py-1 bg-blue-600 text-white rounded-lg text-[7px] font-black uppercase tracking-tighter">
+                                {op.category} › {op.client}
+                             </span>
+                          )) : <span className="text-[9px] text-slate-300 font-bold italic uppercase tracking-widest">Sem Vínculos</span>}
+                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="mt-1 space-y-3">
+                          <div>
+                             <p className="text-[7px] font-black text-slate-300 uppercase mb-1">Cavalo</p>
+                             <div className="flex items-center gap-2">
+                                <span className="bg-slate-900 text-white px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateHorse}</span>
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{d.yearHorse || '---'}</span>
+                             </div>
+                          </div>
+                          <div>
+                             <p className="text-[7px] font-black text-slate-300 uppercase mb-1">Carreta</p>
+                             <div className="flex items-center gap-2">
+                                <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateTrailer}</span>
+                                <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter">{d.yearTrailer || '---'}</span>
+                             </div>
+                          </div>
+                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="mt-1 space-y-1">
+                          <p className="text-blue-600 font-black text-[11px] leading-none">{d.phone}</p>
+                          <p className="text-[9px] text-slate-400 font-bold lowercase truncate max-w-[150px]">{d.email || '---'}</p>
+                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-100 space-y-1.5 mt-1">
+                          <div className="flex justify-between items-center gap-4">
+                             <span className="text-[8px] font-black uppercase text-blue-400">Login:</span>
+                             <span className="text-slate-800 font-mono font-bold text-[10px]">{d.cpf.replace(/\D/g, '')}</span>
+                          </div>
+                          <div className="flex justify-between items-center gap-4">
+                             <span className="text-[8px] font-black uppercase text-blue-400">Senha:</span>
+                             <span className="text-emerald-600 font-mono font-black text-[10px]">{linkedUser?.password || d.generatedPassword || '---'}</span>
+                          </div>
+                          {beneficiaryKey && (
+                            <div className="flex justify-between items-center gap-2 pt-1 border-t border-blue-100/50">
+                               <span className="text-[7px] font-black uppercase text-blue-500 whitespace-nowrap">Chave Benf:</span>
+                               <span className="text-blue-700 font-mono font-black text-[9px]">{beneficiaryKey}</span>
+                            </div>
+                          )}
+                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="mt-1 flex flex-col gap-1.5">
+                          <span className={`w-fit px-2.5 py-1 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                             {d.status}
+                          </span>
+                          <p className="text-[9px] font-black text-slate-400 uppercase">{d.driverType}</p>
+                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
+                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha do Portal"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Dossiê Digital"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar Cadastro"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODAL CADASTRO / EDIÇÃO */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-transparent backdrop-blur-xl">
+          <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh] animate-in zoom-in-95 duration-500">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-black text-slate-800 text-lg uppercase">{editingId ? 'Editar Cadastro' : 'Novo Motorista'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
+              
+              {/* ALERTA DE DUPLICIDADE (DINÂMICO) */}
+              {duplicateAlert && (
+                <div className="p-6 bg-amber-50 border border-amber-200 rounded-3xl flex items-center justify-between gap-4 animate-in slide-in-from-top-4">
+                   <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
+                         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
+                      </div>
+                      <div>
+                         <p className="text-[11px] font-black text-amber-800 uppercase tracking-tight">CPF Já cadastrado no sistema</p>
+                         <p className="text-[9px] font-bold text-amber-600 uppercase mt-1">Este documento pertence a: {duplicateAlert.name} ({duplicateAlert.status})</p>
+                      </div>
+                   </div>
+                   <button 
+                     type="button"
+                     onClick={() => handleOpenModal(duplicateAlert)}
+                     className="px-6 py-2.5 bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-amber-700 transition-all"
+                   >
+                     Abrir Ficha Existente
+                   </button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-12 gap-8">
+                 <div className="col-span-3">
+                    <label className={labelClass}>Foto do Motorista</label>
+                    <div onClick={() => fileInputRef.current?.click()} className="aspect-[3/4] rounded-3xl bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden group">
+                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : (
+                         <>
+                           <svg className="w-8 h-8 text-slate-300 mb-2 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2"/></svg>
+                           <span className="text-[8px] font-black text-slate-400 uppercase">Anexar Imagem</span>
+                         </>
+                       )}
+                    </div>
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                 </div>
+
+                 <div className="col-span-9 space-y-5">
+                    <div className="space-y-1">
+                       <label className={labelClass}>Nome Completo</label>
+                       <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-black uppercase text-xl focus:border-blue-500 outline-none" value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                       <div className="space-y-1">
+                          <label className={labelClass}>CPF</label>
+                          <input 
+                            required 
+                            className={`${inputClasses} ${duplicateAlert && !editingId ? 'border-amber-500 bg-amber-50' : ''}`} 
+                            value={form.cpf} 
+                            onChange={e => {
+                              const val = maskCPF(e.target.value);
+                              setForm({...form, cpf: val});
+                              checkCPFExistence(val);
+                            }} 
+                          />
+                       </div>
+                       <div className="space-y-1"><label className={labelClass}>RG</label><input className={inputClasses} value={form.rg} onChange={e => setForm({...form, rg: maskRG(e.target.value)})} /></div>
+                       <div className="space-y-1"><label className={labelClass}>Registro CNH</label><input className={inputClasses} value={form.cnh} onChange={e => setForm({...form, cnh: e.target.value.toUpperCase()})} /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-1"><label className={labelClass}>Telefone Celular</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
+                       <div className="space-y-1"><label className={labelClass}>E-mail</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value.toLowerCase()})} /></div>
+                    </div>
+                 </div>
+              </div>
+
+              {/* VÍNCULOS OPERACIONAIS */}
+              <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-white/5 space-y-6">
+                 <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Gestão de Vínculos Operacionais</h4>
+                 </div>
+                 <div className="grid grid-cols-12 gap-4">
+                    <div className="col-span-5">
+                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Categoria Master</label>
+                       <select 
+                         value={tempCategory}
+                         onChange={(e) => {
+                            setTempCategory(e.target.value);
+                            setTempClient('Geral');
+                         }}
+                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500"
+                       >
+                          {availableOps.map(op => <option key={op.id} value={op.category} className="bg-slate-900">{op.category}</option>)}
+                       </select>
+                    </div>
+                    <div className="col-span-5">
+                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Cliente Vinculado</label>
+                       <select 
+                         value={tempClient}
+                         onChange={(e) => setTempClient(e.target.value)}
+                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500"
+                       >
+                          <option value="Geral" className="bg-slate-900">Geral / Todos da Categoria</option>
+                          {filteredCustomersForOps.map((c) => (
+                             <option key={c.id} value={c.name} className="bg-slate-900">
+                               {c.name} ({c.city})
+                             </option>
+                          ))}
+                       </select>
+                    </div>
+                    <div className="col-span-2 flex items-end">
+                       <button 
+                         type="button" 
+                         onClick={addOperation}
+                         className="w-full py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-500 transition-all shadow-lg"
+                       >
+                          Adicionar
+                       </button>
+                    </div>
+                 </div>
+                 <div className="flex flex-wrap gap-2 pt-2">
+                    {form.operations?.map((op, i) => (
+                       <div key={i} className="group flex items-center gap-2 px-3 py-2 bg-white/10 rounded-xl border border-white/5">
+                          <span className="text-[9px] font-black text-white uppercase">{op.category} › {op.client}</span>
+                          <button type="button" onClick={() => removeOperation(i)} className="text-slate-500 hover:text-red-400"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+                       </div>
+                    ))}
+                 </div>
+              </div>
+
+              <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white shadow-2xl">
+                 <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-6">Informações do Veículo</h4>
+                 <div className="grid grid-cols-2 gap-8">
+                    <div className="grid grid-cols-3 gap-3">
+                       <div className="col-span-2 space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Placa Cavalo</label><input required className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" value={form.plateHorse} onChange={e => setForm({...form, plateHorse: maskPlate(e.target.value)})} /></div>
+                       <div className="space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" maxLength={4} value={form.yearHorse} onChange={e => setForm({...form, yearHorse: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                       <div className="col-span-2 space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Placa Carreta</label><input required className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: maskPlate(e.target.value)})} /></div>
+                       <div className="space-y-1"><label className={labelClass}>Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" maxLength={4} value={form.yearTrailer} onChange={e => setForm({...form, yearTrailer: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 space-y-6">
+                 <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Módulo Financeiro (Beneficiário)</h4>
+                    <button type="button" onClick={() => setForm({...form, beneficiaryName: form.name, beneficiaryCnpj: form.cpf, beneficiaryPhone: form.phone})} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Copiar dados do motorista</button>
+                 </div>
+                 <div className="grid grid-cols-12 gap-5">
+                    <div className="col-span-3 space-y-1">
+                       <label className={labelClass}>Preferência Pagamento</label>
+                       <select className={inputClasses} value={form.paymentPreference} onChange={e => setForm({...form, paymentPreference: e.target.value as any})}>
+                          <option value="PIX">PIX (INSTANTÂNEO)</option>
+                          <option value="TED">TED (TRANSFERÊNCIA)</option>
+                       </select>
+                    </div>
+                    <div className="col-span-6 space-y-1">
+                       <label className={labelClass}>Nome Completo Favorecido</label>
+                       <input className={inputClasses} value={form.beneficiaryName} onChange={e => setForm({...form, beneficiaryName: e.target.value.toUpperCase()})} />
+                    </div>
+                    <div className="col-span-3 space-y-1">
+                       <label className={labelClass}>CPF / CNPJ Beneficiário</label>
+                       <input className={inputClasses} value={form.beneficiaryCnpj} onChange={e => setForm({...form, beneficiaryCnpj: e.target.value})} />
+                    </div>
+                    <div className="col-span-4 space-y-1">
+                       <label className={labelClass}>Telefone para Comprovante</label>
+                       <input className={inputClasses} value={form.beneficiaryPhone} onChange={e => setForm({...form, beneficiaryPhone: maskPhone(e.target.value)})} />
+                    </div>
+                    <div className="col-span-8 space-y-1">
+                       <label className={labelClass}>E-mail / Chave PIX</label>
+                       <input className={`${inputClasses} lowercase`} value={form.beneficiaryEmail} onChange={e => setForm({...form, beneficiaryEmail: e.target.value})} />
+                    </div>
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                 <div className="p-8 bg-emerald-50 rounded-[2.5rem] border border-emerald-100 space-y-5">
+                    <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Comunicação WhatsApp</h4>
+                    <div className="space-y-1"><label className={labelClass}>Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm({...form, whatsappGroupName: e.target.value.toUpperCase()})} placeholder="EX: OPERAÇÃO ALS - SANTOS" /></div>
+                    <div className="space-y-1"><label className={labelClass}>Link de Convite</label><input className={`${inputClasses} lowercase`} value={form.whatsappGroupLink} onChange={e => setForm({...form, whatsappGroupLink: e.target.value})} placeholder="https://chat.whatsapp.com/..." /></div>
+                 </div>
+                 <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-5">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Configurações de Status</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-1"><label className={labelClass}>Tipo de Vínculo</label><select className={inputClasses} value={form.driverType} onChange={e => setForm({...form, driverType: e.target.value as any})}><option value="Externo">Terceiro / Externo</option><option value="Frota">Frota ALS</option><option value="Motoboy">Motoboy</option></select></div>
+                       <div className="space-y-1"><label className={labelClass}>Status Sistema</label><select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}><option value="Ativo">Ativo / Liberado</option><option value="Inativo">Inativo / Bloqueado</option></select></div>
+                    </div>
+                    <div className="pt-2">
+                       <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-[0.98] disabled:opacity-50">
+                          {isSaving ? 'Gravando Dados...' : 'Finalizar Cadastro'}
+                       </button>
+                    </div>
+                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse min-w-[1400px]">
+            <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-5">Identificação / Beneficiário</th>
+                <th className="px-6 py-5">Documentação</th>
+                <th className="px-6 py-5">Vínculos Operacionais</th>
+                <th className="px-6 py-5">Equipamento (Placa/Ano)</th>
+                <th className="px-6 py-5">Contatos / WhatsApp</th>
+                <th className="px-6 py-5">Portal (Login / Senha)</th>
+                <th className="px-6 py-5">Status / Vínculo</th>
+                <th className="px-6 py-5 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredDrivers.map(d => {
+                const linkedUser = users.find(u => u.driverId === d.id);
                 const isThirdParty = d.beneficiaryCnpj && d.beneficiaryCnpj.replace(/\D/g, '') !== d.cpf.replace(/\D/g, '');
                 const beneficiaryKey = isThirdParty ? d.beneficiaryCnpj.replace(/\D/g, '').slice(-4) : null;
 
@@ -451,191 +862,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                  </div>
               </div>
            </div>
-        </div>
-      )}
-
-      {/* MODAL CADASTRO / EDIÇÃO */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-transparent">
-          <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-black text-slate-800 text-lg uppercase">{editingId ? 'Editar Cadastro' : 'Novo Motorista'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-              
-              <div className="grid grid-cols-12 gap-8">
-                 <div className="col-span-3">
-                    <label className={labelClass}>Foto do Motorista</label>
-                    <div onClick={() => fileInputRef.current?.click()} className="aspect-[3/4] rounded-3xl bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden group">
-                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : (
-                         <>
-                           <svg className="w-8 h-8 text-slate-300 mb-2 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2"/></svg>
-                           <span className="text-[8px] font-black text-slate-400 uppercase">Anexar Imagem</span>
-                         </>
-                       )}
-                    </div>
-                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
-                 </div>
-
-                 <div className="col-span-9 space-y-5">
-                    <div className="space-y-1">
-                       <label className={labelClass}>Nome Completo</label>
-                       <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-black uppercase text-xl focus:border-blue-500 outline-none" value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                       <div className="space-y-1"><label className={labelClass}>CPF</label><input required className={inputClasses} value={form.cpf} onChange={e => setForm({...form, cpf: maskCPF(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className={labelClass}>RG</label><input className={inputClasses} value={form.rg} onChange={e => setForm({...form, rg: maskRG(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className={labelClass}>Registro CNH</label><input className={inputClasses} value={form.cnh} onChange={e => setForm({...form, cnh: e.target.value.toUpperCase()})} /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="space-y-1"><label className={labelClass}>Telefone Celular</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className={labelClass}>E-mail</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value.toLowerCase()})} /></div>
-                    </div>
-                 </div>
-              </div>
-
-              {/* VÍNCULOS OPERACIONAIS */}
-              <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-white/5 space-y-6">
-                 <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Gestão de Vínculos Operacionais</h4>
-                 </div>
-                 <div className="grid grid-cols-12 gap-4">
-                    <div className="col-span-5">
-                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Categoria Master</label>
-                       <select 
-                         value={tempCategory}
-                         onChange={(e) => {
-                            setTempCategory(e.target.value);
-                            setTempClient('Geral');
-                         }}
-                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500"
-                       >
-                          {availableOps.map(op => <option key={op.id} value={op.category} className="bg-slate-900">{op.category}</option>)}
-                       </select>
-                    </div>
-                    <div className="col-span-5">
-                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Cliente Vinculado</label>
-                       <select 
-                         value={tempClient}
-                         onChange={(e) => setTempClient(e.target.value)}
-                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500"
-                       >
-                          <option value="Geral" className="bg-slate-900">Geral / Todos da Categoria</option>
-                          {filteredCustomersForOps.map((c) => (
-                             <option key={c.id} value={c.name} className="bg-slate-900">
-                               {c.name} ({c.city})
-                             </option>
-                          ))}
-                       </select>
-                    </div>
-                    <div className="col-span-2 flex items-end">
-                       <button 
-                         type="button" 
-                         onClick={addOperation}
-                         className="w-full py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-500 transition-all shadow-lg"
-                       >
-                          Adicionar
-                       </button>
-                    </div>
-                 </div>
-                 <div className="flex flex-wrap gap-2 pt-2">
-                    {form.operations?.map((op, i) => (
-                       <div key={i} className="group flex items-center gap-2 px-3 py-2 bg-white/10 rounded-xl border border-white/5">
-                          <span className="text-[9px] font-black text-white uppercase">{op.category} › {op.client}</span>
-                          <button type="button" onClick={() => removeOperation(i)} className="text-slate-500 hover:text-red-400"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
-                       </div>
-                    ))}
-                 </div>
-              </div>
-
-              {/* ANEXO CNH PDF */}
-              <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 flex items-center justify-between gap-6">
-                 <div className="flex-1">
-                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Documento CNH (.PDF)</h4>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase">Anexe a cópia digitalizada do documento para arquivamento no dossiê.</p>
-                 </div>
-                 <div className="flex items-center gap-4">
-                    {form.cnhPdfUrl && (
-                       <div className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-600 rounded-xl border border-emerald-200">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
-                          <span className="text-[8px] font-black uppercase">Anexo OK</span>
-                       </div>
-                    )}
-                    <button type="button" onClick={() => cnhInputRef.current?.click()} className="px-6 py-3 bg-white border-2 border-blue-200 text-blue-600 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                       {form.cnhPdfUrl ? 'Substituir PDF' : 'Selecionar Arquivo'}
-                    </button>
-                    <input type="file" className="hidden" accept="application/pdf" ref={cnhInputRef} onChange={handleCnhUpload} />
-                 </div>
-              </div>
-
-              <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white shadow-2xl">
-                 <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-6">Informações do Veículo</h4>
-                 <div className="grid grid-cols-2 gap-8">
-                    <div className="grid grid-cols-3 gap-3">
-                       <div className="col-span-2 space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Placa Cavalo</label><input required className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" value={form.plateHorse} onChange={e => setForm({...form, plateHorse: maskPlate(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" maxLength={4} value={form.yearHorse} onChange={e => setForm({...form, yearHorse: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                       <div className="col-span-2 space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Placa Carreta</label><input required className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: maskPlate(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" maxLength={4} value={form.yearTrailer} onChange={e => setForm({...form, yearTrailer: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 space-y-6">
-                 <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Módulo Financeiro (Beneficiário)</h4>
-                    <button type="button" onClick={() => setForm({...form, beneficiaryName: form.name, beneficiaryCnpj: form.cpf, beneficiaryPhone: form.phone})} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Copiar dados do motorista</button>
-                 </div>
-                 <div className="grid grid-cols-12 gap-5">
-                    <div className="col-span-3 space-y-1">
-                       <label className={labelClass}>Preferência Pagamento</label>
-                       <select className={inputClasses} value={form.paymentPreference} onChange={e => setForm({...form, paymentPreference: e.target.value as any})}>
-                          <option value="PIX">PIX (INSTANTÂNEO)</option>
-                          <option value="TED">TED (TRANSFERÊNCIA)</option>
-                       </select>
-                    </div>
-                    <div className="col-span-6 space-y-1">
-                       <label className={labelClass}>Nome Completo Favorecido</label>
-                       <input className={inputClasses} value={form.beneficiaryName} onChange={e => setForm({...form, beneficiaryName: e.target.value.toUpperCase()})} />
-                    </div>
-                    <div className="col-span-3 space-y-1">
-                       <label className={labelClass}>CPF / CNPJ Beneficiário</label>
-                       <input className={inputClasses} value={form.beneficiaryCnpj} onChange={e => setForm({...form, beneficiaryCnpj: e.target.value})} />
-                    </div>
-                    <div className="col-span-4 space-y-1">
-                       <label className={labelClass}>Telefone para Comprovante</label>
-                       <input className={inputClasses} value={form.beneficiaryPhone} onChange={e => setForm({...form, beneficiaryPhone: maskPhone(e.target.value)})} />
-                    </div>
-                    <div className="col-span-8 space-y-1">
-                       <label className={labelClass}>E-mail / Chave PIX</label>
-                       <input className={`${inputClasses} lowercase`} value={form.beneficiaryEmail} onChange={e => setForm({...form, beneficiaryEmail: e.target.value})} />
-                    </div>
-                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-8">
-                 <div className="p-8 bg-emerald-50 rounded-[2.5rem] border border-emerald-100 space-y-5">
-                    <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Comunicação WhatsApp</h4>
-                    <div className="space-y-1"><label className={labelClass}>Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm({...form, whatsappGroupName: e.target.value.toUpperCase()})} placeholder="EX: OPERAÇÃO ALS - SANTOS" /></div>
-                    <div className="space-y-1"><label className={labelClass}>Link de Convite</label><input className={`${inputClasses} lowercase`} value={form.whatsappGroupLink} onChange={e => setForm({...form, whatsappGroupLink: e.target.value})} placeholder="https://chat.whatsapp.com/..." /></div>
-                 </div>
-                 <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-5">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Configurações de Status</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="space-y-1"><label className={labelClass}>Tipo de Vínculo</label><select className={inputClasses} value={form.driverType} onChange={e => setForm({...form, driverType: e.target.value as any})}><option value="Externo">Terceiro / Externo</option><option value="Frota">Frota ALS</option><option value="Motoboy">Motoboy</option></select></div>
-                       <div className="space-y-1"><label className={labelClass}>Status Sistema</label><select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}><option value="Ativo">Ativo / Liberado</option><option value="Inativo">Inativo / Bloqueado</option></select></div>
-                    </div>
-                    <div className="pt-2">
-                       <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-[0.98] disabled:opacity-50">
-                          {isSaving ? 'Gravando Dados...' : 'Finalizar Cadastro'}
-                       </button>
-                    </div>
-                 </div>
-              </div>
-            </form>
-          </div>
         </div>
       )}
 

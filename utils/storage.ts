@@ -64,6 +64,24 @@ export const db = {
     return await driverRepository.getAll(supabase);
   },
 
+  getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
+    if (!supabase) return null;
+    try {
+      const cleanCPF = cpf.replace(/\D/g, '');
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*')
+        .or(`cpf.eq.${cleanCPF},cpf.eq.${cpf}`)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data ? driverRepository.mapFromDb(data) : null;
+    } catch (e) {
+      console.error("Erro ao buscar CPF:", e);
+      return null;
+    }
+  },
+
   saveDriver: async (driver: Driver, actingUser?: User) => {
     if (!supabase) return false;
     const success = await driverRepository.save(supabase, driver);
