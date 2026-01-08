@@ -97,7 +97,6 @@ export const getOperationTableColumns = (
   };
 
   const getStatusStyle = (status: TripStatus, isLatest: boolean) => {
-    // REGRA: Concluída em Verde (emerald), Cancelada em Amarelo (amber)
     if (status === 'Viagem concluída') {
       return isLatest 
         ? 'bg-emerald-600 border-emerald-700 text-white shadow-md ring-2 ring-emerald-50' 
@@ -144,6 +143,7 @@ export const getOperationTableColumns = (
            <button onClick={() => openStatusEditor(t, t.status)} className="p-1 hover:text-blue-500 transition-colors bg-slate-50 rounded-lg border border-slate-100"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg></button>
         </div>
         <div className="flex flex-col gap-1.5 border-l-2 border-blue-50 pl-3">
+           {/* REFORÇO DE ORDENAÇÃO: Mais recente no topo */}
            {(t.statusHistory || []).slice().sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((step, idx) => (
              <div key={idx} className={`flex flex-col p-1.5 rounded-lg border ${getStatusStyle(step.status, idx === 0)}`}>
                 <div className="flex justify-between items-center gap-4">

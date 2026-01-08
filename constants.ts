@@ -1,11 +1,11 @@
 
 export const ADMIN_CREDENTIALS = {
   username: 'operacional_ssz',
-  password: 'ssz_password_2025'
+  password: 'operaçoes'
 };
 
 export const APP_CONFIG = {
   companyName: 'ALS Transportes',
-  version: '5.4.0',
+  version: '5.5.0',
   // O sistema agora utiliza o Supabase Storage nativo
 };

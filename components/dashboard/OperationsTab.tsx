@@ -50,7 +50,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [statusTime, setStatusTime] = useState('');
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   
-  // ESTADOS CRÍTICOS PARA MANTER O STATUS FIXO
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const isUpdatingRef = useRef(false);
 
@@ -74,7 +73,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   });
 
   const loadData = useCallback(async () => {
-    // Se estiver salvando, ignora o carregamento automático para não sobrescrever a tela
     if (isUpdatingRef.current) return;
 
     try {
@@ -91,22 +89,22 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     loadData();
     const interval = setInterval(() => {
       if (!isUpdatingRef.current) loadData();
-    }, 30000);
+    }, 10000); // Sincronismo acelerado (10s)
     return () => clearInterval(interval);
   }, [loadData]);
 
-  // LÓGICA SEPARADA E PROTEGIDA DE ATUALIZAÇÃO
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     
     setIsSavingStatus(true);
-    isUpdatingRef.current = true; // Bloqueia o Refresh de background
+    isUpdatingRef.current = true;
 
     const newEntry: StatusHistoryEntry = { 
       status: tempStatus, 
       dateTime: new Date(statusTime).toISOString() 
     };
 
+    // Newest entry always at the top (index 0)
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
@@ -115,31 +113,24 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     };
 
     try {
-      // 1. Atualiza a tela imediatamente (Optimistic)
+      // 1. Atualização Otimista
       setTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
       
-      // 2. Tenta salvar no banco
+      // 2. Gravação imediata sem delay artificial
       const success = await db.saveTrip(updatedTrip, user);
       
-      if (!success) {
-        throw new Error("Erro na gravação do banco");
-      }
+      if (!success) throw new Error("Erro de banco");
 
-      // 3. Fecha o modal apenas após sucesso real
       setIsStatusModalOpen(false);
       
-      // 4. Aguarda um pequeno delay para o Postgres consolidar antes de re-ler
-      setTimeout(async () => {
-        await loadData();
-        isUpdatingRef.current = false; // Libera o Refresh
-        setIsSavingStatus(false);
-      }, 1000);
-
+      // 3. Recarrega dados reais imediatamente
+      await loadData();
     } catch (e) {
-      alert("Falha crítica na sincronização. O status voltará ao valor original.");
+      alert("Erro ao sincronizar status. Tente novamente.");
+      await loadData(); 
+    } finally {
       isUpdatingRef.current = false;
       setIsSavingStatus(false);
-      await loadData(); // Reverte a tela puxando do banco
     }
   };
 

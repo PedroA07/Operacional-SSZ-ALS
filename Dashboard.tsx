@@ -70,10 +70,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   useEffect(() => { 
     loadAllData();
     
-    // Refresh automático direto do Banco de Dados a cada 30 segundos
+    // REFRESH ACELERADO: 10 segundos para feedback rápido da operação
     const refreshDataInterval = setInterval(() => {
       loadAllData();
-    }, 30000);
+    }, 10000);
 
     return () => {
       clearInterval(refreshDataInterval);
@@ -211,7 +211,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                  <div>
                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Excluir Viagem</h3>
                     <p className="text-sm text-slate-400 mt-2">Deseja remover permanentemente esta programação?</p>
-                    <div className="mt-6 p-5 bg-slate-50 rounded-3xl border border-slate-100 text-left space-y-1">
+                    <div className="mt-6 p-5 bg-slate-50 rounded-2xl border border-slate-100 text-left space-y-1">
                        <p className="text-[9px] font-black text-blue-600 uppercase">OS:</p>
                        <p className="text-sm font-black text-slate-700 uppercase">{tripToDelete.os}</p>
                     </div>
