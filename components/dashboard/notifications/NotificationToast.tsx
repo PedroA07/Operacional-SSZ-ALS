@@ -11,7 +11,8 @@ const NotificationToast: React.FC = () => {
     const data = payload.new;
     if (!data) return;
 
-    // Converte o formato do banco para o tipo Notification do App
+    console.log("ALS Realtime: Notificação recebida ->", data.title);
+
     const notif: Notification = {
       id: String(data.id),
       title: data.title || data.type?.replace(/_/g, ' ') || 'Alerta do Sistema',
@@ -37,13 +38,9 @@ const NotificationToast: React.FC = () => {
       if (sessionUserStr) {
         const user = JSON.parse(sessionUserStr) as User;
         if (user.notificationPrefs) prefs = user.notificationPrefs;
-        
-        // REGRA: Não mostrar notificação para o próprio autor (opcional, ALS costuma preferir feedback visual)
-        // if (user.id === notif.authorId) return;
       }
     } catch (err) {}
 
-    // Lógica de filtragem baseada em preferências individuais
     let shouldShow = false;
     const type = notif.type;
 
@@ -56,17 +53,14 @@ const NotificationToast: React.FC = () => {
     if (shouldShow) {
       setActiveToast(notif);
       
-      // SONS DIFERENCIADOS PARA TODOS
       if (notif.origin === 'MOTORISTA' || ['DRIVER_DOC_UPLOADED', 'STATUS_UPDATED'].includes(type)) {
         audioUtils.playDriverUpdate();
       } else {
         audioUtils.playNotification();
       }
       
-      // Dispara evento global para atualizar contadores no NotificationCenter
       window.dispatchEvent(new CustomEvent('als_new_notification_event'));
 
-      // Auto-hide após 10 segundos
       setTimeout(() => {
         setActiveToast(prev => prev?.id === notif.id ? null : prev);
       }, 10000);
@@ -74,29 +68,19 @@ const NotificationToast: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!supabase) {
-      console.warn("Supabase Realtime: Cliente não inicializado.");
-      return;
-    }
+    if (!supabase) return;
 
-    // INSCRIÇÃO REALTIME: Escuta a tabela 'notifications' para QUALQUER usuário
-    // IMPORTANTE: A tabela 'notifications' deve estar na Publication 'supabase_realtime' no painel
+    // Conecta ao canal público de notificações
     const channel = supabase
-      .channel('public-notifications')
+      .channel('realtime:public:notifications')
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT', 
-          schema: 'public',
-          table: 'notifications'
-        },
-        (payload) => {
-          processNotification(payload);
-        }
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        (payload) => processNotification(payload)
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.debug("ALS Realtime: Conectado ao servidor de notificações.");
+          console.debug("ALS Realtime: Monitorando banco de dados...");
         }
       });
 
@@ -121,7 +105,7 @@ const NotificationToast: React.FC = () => {
              <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full animate-pulse ${isDriverAlert ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
                 <p className={`text-[8px] font-black uppercase tracking-widest ${isDriverAlert ? 'text-emerald-400' : 'text-blue-400'}`}>
-                  {isDriverAlert ? 'Alerta Realtime: Motorista' : 'Alerta Realtime: Sistema'}
+                  {isDriverAlert ? 'Ação do Motorista' : 'Alerta do Operacional'}
                 </p>
              </div>
              <div className="text-white/20 group-hover:text-white transition-colors">
@@ -143,11 +127,11 @@ const NotificationToast: React.FC = () => {
              </div>
           </div>
 
-          {(activeToast.summary?.os || activeToast.summary?.motorista) && (
+          {(activeToast.summary?.os || activeToast.summary?.placa) && (
             <div className="mt-3 px-3 py-2 bg-white/5 rounded-xl border border-white/5 flex justify-between items-center">
                <div>
-                  <span className="text-[8px] font-black text-blue-400 uppercase tracking-tighter">OS Referenciada:</span>
-                  <p className="text-[10px] font-mono font-bold text-white uppercase">{activeToast.summary?.os ? `Nº ${activeToast.summary.os}` : activeToast.summary?.motorista}</p>
+                  <span className="text-[8px] font-black text-blue-400 uppercase tracking-tighter">Referência:</span>
+                  <p className="text-[10px] font-mono font-bold text-white uppercase">{activeToast.summary?.os ? `OS ${activeToast.summary.os}` : 'SISTEMA'}</p>
                </div>
                {activeToast.summary?.placa && (
                  <span className="bg-slate-800 px-2 py-0.5 rounded text-[8px] font-mono text-slate-300 border border-white/5">{activeToast.summary.placa}</span>

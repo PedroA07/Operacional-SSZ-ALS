@@ -91,7 +91,7 @@ export const getOperationTableColumns = (
     return (
       <label className="flex items-center gap-2 px-2 py-1 bg-white border border-slate-100 text-slate-400 rounded-lg hover:border-blue-300 transition-all cursor-pointer mt-2 group">
         <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(trip, type, e)} />
-        <svg className="w-2.5 h-2.5 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+        <svg className="w-2.5 h-2.5 group-hover:text-blue-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
         <span className="text-[7px] font-black uppercase">Anexar</span>
       </label>
     );
@@ -147,9 +147,9 @@ export const getOperationTableColumns = (
            </div>
         </div>
         <div className="flex flex-col gap-1.5 border-l-2 border-blue-50 pl-3">
-           {/* REGRA: Ordenar pelo createdAt (registro real) decrescente */}
            {(t.statusHistory || [])
              .slice()
+             // ORDENAÇÃO POR REGISTRO REAL (createdAt)
              .sort((a,b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime())
              .slice(0, 3)
              .map((step, idx) => (

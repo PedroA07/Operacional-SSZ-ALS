@@ -213,12 +213,85 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            )}
            {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(false); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
-           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
-           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(false); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
+           {activeTab === DashboardTab.MOTORISTAS && (
+            <DriversTab 
+              drivers={drivers} 
+              customers={customers} 
+              onSaveDriver={async (d, id) => { 
+                const success = await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); 
+                if (success) {
+                  await loadAllData(false); 
+                } else {
+                  alert("Erro ao salvar motorista no banco de dados.");
+                }
+              }} 
+              onDeleteDriver={async id => { 
+                await db.deleteDriver(id); 
+                await loadAllData(false); 
+              }} 
+              availableOps={availableOps} 
+            />
+           )}
+           {activeTab === DashboardTab.CLIENTES && (
+            <CustomersTab 
+              customers={customers} 
+              onSaveCustomer={async (c, id) => { 
+                const success = await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); 
+                if (success) {
+                  await loadAllData(false); 
+                } else {
+                  alert("Erro ao salvar cliente no banco de dados. Verifique sua conexão ou permissões.");
+                }
+              }} 
+              onDeleteCustomer={async id => { 
+                if(confirm('Excluir cliente?')) { 
+                  await db.deleteCustomer(id); 
+                  await loadAllData(false); 
+                } 
+              }} 
+              isAdmin={user.role === 'admin'} 
+            />
+           )}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(false); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
-           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(false); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(false); } }} />}
-           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(false); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
+           {activeTab === DashboardTab.PORTOS && (
+            <PortsTab 
+              ports={ports} 
+              onSavePort={async (p, id) => { 
+                const success = await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); 
+                if (success) {
+                  await loadAllData(false); 
+                } else {
+                  alert("Erro ao salvar porto no banco de dados.");
+                }
+              }} 
+              onDeletePort={async id => { 
+                if(confirm('Excluir porto?')) { 
+                  await db.deletePort(id); 
+                  await loadAllData(false); 
+                } 
+              }} 
+            />
+           )}
+           {activeTab === DashboardTab.PRE_STACKING && (
+            <PreStackingTab 
+              preStacking={preStacking} 
+              onSavePreStacking={async (p, id) => { 
+                const success = await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); 
+                if (success) {
+                  await loadAllData(false); 
+                } else {
+                  alert("Erro ao salvar unidade no banco de dados.");
+                }
+              }} 
+              onDeletePreStacking={async id => { 
+                if(confirm('Excluir unidade?')) { 
+                  await db.deletePreStacking(id); 
+                  await loadAllData(false); 
+                } 
+              }} 
+            />
+           )}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
         </div>
       </main>

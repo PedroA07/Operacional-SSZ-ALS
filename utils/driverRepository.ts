@@ -18,9 +18,9 @@ export const driverRepository = {
       cnh_pdf_url: driver.cnhPdfUrl || null,
       phone: driver.phone || null,
       email: driver.email?.toLowerCase() || null,
-      plate_horse: driver.plateHorse || null,
+      plate_horse: driver.plateHorse?.toUpperCase() || null,
       year_horse: driver.yearHorse || null,
-      plate_trailer: driver.plateTrailer || null,
+      plate_trailer: driver.plateTrailer?.toUpperCase() || null,
       year_trailer: driver.yearTrailer || null,
       driver_type: driver.driverType || 'Externo',
       status: driver.status || 'Ativo',
@@ -49,52 +49,58 @@ export const driverRepository = {
     cpf: d.cpf,
     rg: d.rg,
     cnh: d.cnh,
-    cnhPdfUrl: d.cnh_pdf_url,
+    cnhPdfUrl: d.cnh_pdf_url || d.cnhPdfUrl,
     phone: d.phone,
     email: d.email,
-    plateHorse: d.plate_horse,
-    yearHorse: d.year_horse,
-    plateTrailer: d.plate_trailer,
-    yearTrailer: d.year_trailer,
-    driverType: d.driver_type,
+    plateHorse: d.plate_horse || d.plateHorse,
+    yearHorse: d.year_horse || d.yearHorse,
+    plateTrailer: d.plate_trailer || d.plateTrailer,
+    yearTrailer: d.year_trailer || d.yearTrailer,
+    driverType: d.driver_type || d.driverType,
     status: d.status,
-    statusLastChangeDate: d.status_last_change_date,
-    beneficiaryName: d.beneficiary_name,
-    beneficiaryPhone: d.beneficiary_phone,
-    beneficiaryEmail: d.beneficiary_email,
-    beneficiaryCnpj: d.beneficiary_cnpj,
-    paymentPreference: d.payment_preference,
-    whatsappGroupName: d.whatsapp_group_name,
-    whatsappGroupLink: d.whatsapp_group_link,
-    registrationDate: d.registration_date,
+    statusLastChangeDate: d.status_last_change_date || d.statusLastChangeDate,
+    beneficiaryName: d.beneficiary_name || d.beneficiaryName,
+    beneficiaryPhone: d.beneficiary_phone || d.beneficiaryPhone,
+    beneficiaryEmail: d.beneficiary_email || d.beneficiaryEmail,
+    beneficiaryCnpj: d.beneficiary_cnpj || d.beneficiaryCnpj,
+    paymentPreference: d.payment_preference || d.paymentPreference,
+    whatsappGroupName: d.whatsapp_group_name || d.whatsappGroupName,
+    whatsappGroupLink: d.whatsapp_group_link || d.whatsappGroupLink,
+    registrationDate: d.registration_date || d.registrationDate,
     operations: Array.isArray(d.operations) ? d.operations : [],
-    tripsCount: d.trips_count || 0,
-    generatedPassword: d.generated_password,
-    currentLat: d.current_lat,
-    currentLng: d.current_lng,
-    lastLocationAt: d.last_location_at
+    tripsCount: d.trips_count || d.tripsCount || 0,
+    generatedPassword: d.generated_password || d.generatedPassword,
+    currentLat: d.current_lat || d.currentLat,
+    currentLng: d.current_lng || d.currentLng,
+    lastLocationAt: d.last_location_at || d.lastLocationAt
   }),
 
   async save(supabase: SupabaseClient, driver: Driver) {
-    const payload = this.mapToDb(driver);
-    const { error } = await supabase.from('drivers').upsert(payload);
-    if (error) {
-      console.error("ERRO CRÍTICO SUPABASE UPSERT DRIVER:", error);
+    try {
+      const payload = this.mapToDb(driver);
+      const { error } = await supabase.from('drivers').upsert(payload);
+      if (error) {
+        console.error("ERRO SUPABASE UPSERT DRIVER:", error);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error("Erro catch driverRepository.save:", e);
       return false;
     }
-    return true;
   },
 
   async getAll(supabase: SupabaseClient): Promise<Driver[]> {
-    const { data, error } = await supabase.from('drivers').select('*');
-    if (error) {
-      console.error("ERRO GET ALL DRIVERS:", error);
+    try {
+      const { data, error } = await supabase.from('drivers').select('*');
+      if (error) throw error;
+      return (data || []).map(d => this.mapFromDb(d));
+    } catch (e) {
+      console.error("Erro driverRepository.getAll:", e);
       return [];
     }
-    return (data || []).map(d => this.mapFromDb(d));
   },
 
-  // Added delete method for driver records
   async delete(supabase: SupabaseClient, id: string) {
     const { error } = await supabase.from('drivers').delete().eq('id', id);
     if (error) throw error;
