@@ -29,53 +29,63 @@ const TripForm: React.FC<TripFormProps> = ({
 
   const [searches, setSearches] = useState({ customer: '', destination: '', driver: '' });
   const [dropdowns, setDropdowns] = useState({ customer: false, destination: false, driver: false });
+  const isInitialized = useRef(false);
   const dropdownRefs = {
     customer: useRef<HTMLDivElement>(null),
     destination: useRef<HTMLDivElement>(null),
     driver: useRef<HTMLDivElement>(null)
   };
 
+  // REGRA: Inicializa o formulário apenas uma vez ou quando a OS de edição mudar
   useEffect(() => {
     if (editTrip) {
-      const date = new Date(editTrip.dateTime);
-      const offset = date.getTimezoneOffset() * 60000;
-      const localDate = new Date(date.getTime() - offset).toISOString().slice(0, 16);
+      // Se estiver editando e mudar a viagem, ou for a primeira carga
+      if (!isInitialized.current || (formData.id !== editTrip.id)) {
+        const date = new Date(editTrip.dateTime);
+        const offset = date.getTimezoneOffset() * 60000;
+        const localDate = new Date(date.getTime() - offset).toISOString().slice(0, 16);
 
-      setFormData({
-        ...editTrip,
-        dateTime: localDate,
-        agencia: editTrip.ocFormData?.agencia || '',
-        padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
-        embarcador: editTrip.ocFormData?.embarcador || '',
-        autColeta: editTrip.ocFormData?.autColeta || '',
-        obs: editTrip.ocFormData?.obs || '',
-        cva: editTrip.cva || '',
-        tara: editTrip.tara || '',
-        seal: editTrip.seal || ''
-      });
-      setSearches({
-        customer: editTrip.customer?.legalName || editTrip.customer?.name || '',
-        destination: editTrip.destination?.legalName || editTrip.destination?.name || '',
-        driver: editTrip.driver?.name || ''
-      });
+        setFormData({
+          ...editTrip,
+          dateTime: localDate,
+          agencia: editTrip.ocFormData?.agencia || '',
+          padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
+          embarcador: editTrip.ocFormData?.embarcador || '',
+          autColeta: editTrip.ocFormData?.autColeta || '',
+          obs: editTrip.ocFormData?.obs || '',
+          cva: editTrip.cva || '',
+          tara: editTrip.tara || '',
+          seal: editTrip.seal || ''
+        });
+        setSearches({
+          customer: editTrip.customer?.name || editTrip.customer?.legalName || '',
+          destination: editTrip.destination?.name || editTrip.destination?.legalName || '',
+          driver: editTrip.driver?.name || ''
+        });
+        isInitialized.current = true;
+      }
     } else {
-      setFormData({
-        os: '', booking: '', ship: '', 
-        dateTime: new Date().toISOString().slice(0, 16),
-        type: 'EXPORTAÇÃO', status: 'Pendente',
-        category: initialCategory || '',
-        subCategory: initialCustomer?.name || '',
-        container: '', tara: '', seal: '', cva: '', 
-        containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', 
-        embarcador: '', obs: '', autColeta: '',
-        customer: initialCustomer ? { ...initialCustomer } : null,
-        destination: null, driver: null
-      });
-      setSearches({
-        customer: initialCustomer ? (initialCustomer.legalName || initialCustomer.name) : '',
-        destination: '',
-        driver: ''
-      });
+      // Se for nova viagem e ainda não inicializou
+      if (!isInitialized.current) {
+        setFormData({
+          os: '', booking: '', ship: '', 
+          dateTime: new Date().toISOString().slice(0, 16),
+          type: 'EXPORTAÇÃO', status: 'Pendente',
+          category: initialCategory || '',
+          subCategory: initialCustomer?.name || '',
+          container: '', tara: '', seal: '', cva: '', 
+          containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', 
+          embarcador: '', obs: '', autColeta: '',
+          customer: initialCustomer ? { ...initialCustomer } : null,
+          destination: null, driver: null
+        });
+        setSearches({
+          customer: initialCustomer ? initialCustomer.name : '',
+          destination: '',
+          driver: ''
+        });
+        isInitialized.current = true;
+      }
     }
   }, [editTrip, initialCategory, initialCustomer]);
 
@@ -165,7 +175,7 @@ const TripForm: React.FC<TripFormProps> = ({
             <div className="relative">
               <input 
                 type="text"
-                placeholder="BUSCAR RAZÃO OU FANTASIA..."
+                placeholder="BUSCAR NOME FANTASIA OU RAZÃO..."
                 className={`${inputClass} pr-12 ${formData.customer ? 'border-emerald-200 bg-emerald-50/30' : ''}`}
                 value={searches.customer}
                 onFocus={() => setDropdowns(d => ({ ...d, customer: true }))}
@@ -182,18 +192,18 @@ const TripForm: React.FC<TripFormProps> = ({
             {dropdowns.customer && (
               <div className="absolute z-[100] w-full mt-2 bg-white rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden animate-in slide-in-from-top-2">
                 <div className="max-h-72 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                  {customers.filter(c => (c.legalName || c.name).toUpperCase().includes(searches.customer.toUpperCase())).map(c => (
+                  {customers.filter(c => (c.name || c.legalName || '').toUpperCase().includes(searches.customer.toUpperCase())).map(c => (
                     <button 
                       key={c.id} type="button"
                       onClick={() => {
                         setFormData({...formData, customer: c, subCategory: c.name});
-                        setSearches({...searches, customer: c.legalName || c.name});
+                        setSearches({...searches, customer: c.name || c.legalName || ''});
                         setDropdowns(d => ({ ...d, customer: false }));
                       }}
                       className="w-full text-left p-4 rounded-2xl hover:bg-blue-50 transition-all border border-transparent hover:border-blue-100 group"
                     >
-                      <p className="text-[11px] font-black text-slate-800 uppercase leading-tight group-hover:text-blue-700">{c.legalName || c.name}</p>
-                      {c.legalName && c.name !== c.legalName && <p className="text-[9px] font-bold text-blue-400 uppercase italic mt-0.5">FAN: {c.name}</p>}
+                      <p className="text-[11px] font-black text-blue-600 uppercase leading-tight group-hover:text-blue-700">{c.name}</p>
+                      {c.legalName && c.name !== c.legalName && <p className="text-[9px] font-bold text-slate-400 uppercase italic mt-0.5 truncate">RS: {c.legalName}</p>}
                       <div className="flex items-center gap-2 mt-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
                         <p className="text-[9px] font-black text-slate-400 uppercase">{c.city} - {c.state}</p>
@@ -227,17 +237,17 @@ const TripForm: React.FC<TripFormProps> = ({
             {dropdowns.destination && (
               <div className="absolute z-[100] w-full mt-2 bg-white rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden animate-in slide-in-from-top-2">
                 <div className="max-h-72 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                  {ports.filter(p => (p.legalName || p.name).toUpperCase().includes(searches.destination.toUpperCase())).map(p => (
+                  {ports.filter(p => (p.name || p.legalName || '').toUpperCase().includes(searches.destination.toUpperCase())).map(p => (
                     <button 
                       key={p.id} type="button"
                       onClick={() => {
                         setFormData({...formData, destination: p});
-                        setSearches({...searches, destination: p.legalName || p.name});
+                        setSearches({...searches, destination: p.name || p.legalName || ''});
                         setDropdowns(d => ({ ...d, destination: false }));
                       }}
                       className="w-full text-left p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-indigo-100 group"
                     >
-                      <p className="text-[11px] font-black text-slate-700 uppercase leading-tight group-hover:text-slate-900">{p.legalName || p.name}</p>
+                      <p className="text-[11px] font-black text-slate-700 uppercase leading-tight group-hover:text-slate-900">{p.name}</p>
                       <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest">{p.city} - {p.state}</p>
                     </button>
                   ))}
