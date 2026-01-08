@@ -25,6 +25,15 @@ const TripModal: React.FC<TripModalProps> = ({
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
+    if (isOpen) {
+      window.dispatchEvent(new CustomEvent('als_is_editing', { detail: true }));
+    }
+    return () => {
+      window.dispatchEvent(new CustomEvent('als_is_editing', { detail: false }));
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) setCurrentUser(JSON.parse(saved));
 
@@ -60,7 +69,6 @@ const TripModal: React.FC<TripModalProps> = ({
         }
       };
 
-      // REGRA: Passar o currentUser como segundo argumento para disparar notificação
       await db.saveTrip(payload as any, currentUser);
       onSuccess();
       onClose();
