@@ -13,7 +13,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   const [rotation, setRotation] = useState(0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  // Fix: Initialize dragStart with zeroed coordinates as clientX and clientY are not defined during initial state setup.
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   
   const [isExtracting, setIsExtracting] = useState(false);
@@ -22,6 +21,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   const [copyFeedback, setCopyFeedback] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Resetar ao mudar de URL
+  useEffect(() => {
+    handleReset();
+  }, [url]);
 
   const handleZoomIn = () => setScale(prev => Math.min(prev + 0.25, 5));
   const handleZoomOut = () => setScale(prev => Math.max(prev - 0.25, 0.5));
@@ -45,7 +49,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     setExtractedText(null);
     
     try {
-      // Processamento 100% local utilizando o motor Tesseract instalado via importmap
       const text = await ocrService.extractAllText(url, (p) => setOcrProgress(p));
       setExtractedText(text || 'Nenhum texto identificado no documento.');
     } catch (err) {
@@ -97,7 +100,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   return (
     <div 
       ref={containerRef}
-      className={`relative w-full h-full flex flex-col bg-slate-900/10 rounded-[2rem] overflow-hidden group select-none ${className}`}
+      className={`relative w-full h-full flex flex-col bg-slate-900 rounded-[2rem] overflow-hidden group select-none ${className}`}
       style={{ cursor: isDragging ? 'grabbing' : (scale > 1 ? 'move' : 'default') }}
     >
       <div 
@@ -112,7 +115,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
           <img src={url} alt={alt} className="max-w-full max-h-full object-contain shadow-2xl pointer-events-none" onDoubleClick={handleReset} draggable={false} />
         </div>
 
-        {/* LOADING PROGRESS ESTILO WINDOWS */}
         {isExtracting && (
           <div className="absolute inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in">
              <div className="w-64 space-y-4">
@@ -163,7 +165,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
           onClick={handleExtractText} 
           disabled={isExtracting} 
           className={`px-5 py-3 rounded-xl transition-all flex items-center gap-2 ${extractedText ? 'bg-blue-600 text-white shadow-lg' : 'text-white hover:bg-white/10'}`} 
-          title="Ações de Texto (Windows Style)"
+          title="Ações de Texto"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Ações de Texto</span>

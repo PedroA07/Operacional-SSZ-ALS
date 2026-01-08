@@ -191,8 +191,15 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       result = result.filter(t => t.os.toLowerCase().includes(q) || t.container?.toLowerCase().includes(q) || t.driver.name.toLowerCase().includes(q) || t.customer.name.toLowerCase().includes(q) || t.ship?.toLowerCase().includes(q) || t.booking?.toLowerCase().includes(q));
     }
 
-    if (startDate) result = result.filter(t => t.dateTime >= startDate);
-    if (endDate) result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
+    // CORREÇÃO FILTRO DATA: Comparação apenas da parte YYYY-MM-DD
+    if (startDate || endDate) {
+      result = result.filter(t => {
+        const tripDateOnly = t.dateTime.split('T')[0];
+        if (startDate && tripDateOnly < startDate) return false;
+        if (endDate && tripDateOnly > endDate) return false;
+        return true;
+      });
+    }
 
     // REGRA SOLICITADA: Organizar sempre pela data e hora da operação (Ordem Crescente)
     result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));

@@ -188,27 +188,27 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
         </div>
       )}
 
-      {/* MODAL DE VISUALIZAÇÃO DE FOTO DO MOTORISTA */}
+      {/* MODAL DE VISUALIZAÇÃO DE FOTO DO MOTORISTA - CORREÇÃO LAYOUT E FECHAMENTO */}
       {activePhoto && (
-        <div className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[5000] bg-slate-950 flex flex-col animate-in fade-in duration-300 overflow-hidden">
            <header className="h-20 bg-slate-900 border-b border-white/10 flex items-center justify-between px-6 shrink-0 safe-top">
-              <div className="min-w-0">
+              <div className="min-w-0 pr-4">
                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Minha Captura</p>
                 <p className="text-xs font-bold text-white uppercase truncate mt-1">Enviada em {new Date(activePhoto.timestamp).toLocaleString('pt-BR')}</p>
               </div>
               <button 
                 onClick={() => setActivePhoto(null)} 
-                className="w-12 h-12 bg-red-600 text-white rounded-2xl flex items-center justify-center active:bg-red-700 transition-all shadow-xl"
+                className="w-12 h-12 bg-red-600 text-white rounded-2xl flex items-center justify-center active:bg-red-700 transition-all shadow-xl shrink-0"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
            </header>
            
-           <div className="flex-1 overflow-hidden p-4">
-              <ImageViewer url={activePhoto.url} />
+           <div className="flex-1 overflow-hidden p-4 flex items-center justify-center bg-black">
+              <ImageViewer url={activePhoto.url} className="w-full h-full max-w-4xl" />
            </div>
 
-           <div className="p-6 bg-slate-900 border-t border-white/5 safe-bottom">
+           <div className="p-6 bg-slate-900 border-t border-white/5 safe-bottom shrink-0">
               <p className="text-[8px] text-slate-500 font-bold uppercase text-center leading-relaxed">
                  Use os controles de Zoom e Rotação para conferir a legibilidade dos dados.
               </p>
@@ -233,6 +233,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
       <style>{`
         .safe-top { padding-top: env(safe-area-inset-top); }
         .safe-bottom { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   );
