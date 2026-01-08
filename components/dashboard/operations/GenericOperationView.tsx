@@ -9,11 +9,10 @@ import SchedulingEditModal from './SchedulingEditModal';
 import DriverDocsViewerModal from './DriverDocsViewerModal';
 import DriverLocationModal from './DriverLocationModal';
 import DocumentViewerModal from './DocumentViewerModal';
-import VWStatusSelector from './VWStatusSelector';
+import ClientVisualizationPanel from './ClientVisualizationPanel';
 import ViewFilters from './ViewFilters';
 import StatusHistoryManagerModal from './StatusHistoryManagerModal';
 import TripModal from './TripModal';
-import { maskCNPJ } from '../../../utils/masks';
 
 interface GenericOperationViewProps {
   user: User;
@@ -38,25 +37,22 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
-  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
   
-  const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
-  const [isDriversCollapsed, setIsDriversCollapsed] = useState(false);
-  
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
-  const [activeMainTab, setActiveMainTab] = useState<'overview' | 'clients'>('overview');
+  // Opções de Visualização
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedFilterClient, setSelectedFilterClient] = useState<string>('TODOS');
-  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
+  const [viewMode, setViewMode] = useState<'compact' | 'comfortable'>('compact');
+  const [showOnlyAlerts, setShowOnlyAlerts] = useState(false);
 
   const loadAuxData = useCallback(async () => {
     try {
@@ -101,12 +97,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const filteredTrips = useMemo(() => {
     let result = allTrips.filter(t => {
       const matchCategory = t.category?.toUpperCase() === categoryName.toUpperCase();
-      if (type === 'category') {
-        if (selectedFilterClient !== 'TODOS') return matchCategory && t.customer?.name === selectedFilterClient;
-        return matchCategory;
+      if (selectedFilterClient !== 'TODOS') {
+         return matchCategory && (t.customer?.name === selectedFilterClient || t.subCategory === selectedFilterClient);
       }
-      const matchClient = (t.customer?.name?.toUpperCase() === clientName?.toUpperCase()) || (t.subCategory?.toUpperCase() === clientName?.toUpperCase());
-      return matchCategory && matchClient;
+      return matchCategory;
     });
 
     if (activeStatusTab === 'ativas') {
@@ -116,12 +110,15 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     else if (activeStatusTab === 'cancelada') result = result.filter(t => t.status === 'Viagem cancelada');
     else if (activeStatusTab === 'geral') result = result.filter(t => t.status !== 'Viagem cancelada');
 
+    if (showOnlyAlerts) {
+      result = result.filter(t => t.isLate);
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(t => t.os.toLowerCase().includes(q) || t.container?.toLowerCase().includes(q) || t.driver.name.toLowerCase().includes(q) || t.customer.name.toLowerCase().includes(q));
     }
 
-    // CORREÇÃO DATA: Comparação apenas YYYY-MM-DD
     if (startDate || endDate) {
       result = result.filter(t => {
         const tripDate = t.dateTime.split('T')[0];
@@ -132,7 +129,12 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     }
 
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [allTrips, categoryName, clientName, type, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient]);
+  }, [allTrips, categoryName, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient, showOnlyAlerts]);
+
+  const categoryCustomers = useMemo(() => {
+    const names = new Set(allTrips.filter(t => t.category === categoryName).map(t => t.customer.name));
+    return customers.filter(c => names.has(c.name));
+  }, [allTrips, categoryName, customers]);
 
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
@@ -150,18 +152,30 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   );
 
   return (
-    <div className="space-y-8 animate-in slide-in-from-right duration-300">
+    <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-6">
-          <div className={`w-16 h-16 ${type === 'category' ? 'bg-slate-900' : 'bg-blue-600'} rounded-[2rem] flex items-center justify-center text-white font-black shadow-2xl shrink-0`}>{type === 'category' ? categoryName.substring(0, 2).toUpperCase() : clientName?.substring(0, 2).toUpperCase()}</div>
-          <div><div className="flex items-center gap-3">{type === 'client' && (<button onClick={() => onNavigate({ type: 'category', categoryName })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>)}<h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{type === 'category' ? categoryName : clientName}</h1></div><p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1">{categoryName}</p></div>
+          <div className={`w-16 h-16 ${type === 'category' ? 'bg-slate-900' : 'bg-blue-600'} rounded-[2rem] flex items-center justify-center text-white font-black shadow-2xl shrink-0`}>{categoryName.substring(0, 2).toUpperCase()}</div>
+          <div><div className="flex items-center gap-3">{type === 'client' && (<button onClick={() => onNavigate({ type: 'category', categoryName })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>)}<h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{categoryName}</h1></div><p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1">{selectedFilterClient !== 'TODOS' ? `Filtro Ativo: ${selectedFilterClient}` : 'Monitoramento Geral de Categoria'}</p></div>
         </div>
         <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} initialCategory={categoryName} onSuccess={onLocalRefresh} variant="primary" />
       </header>
 
+      <ClientVisualizationPanel 
+        customers={categoryCustomers}
+        selectedClient={selectedFilterClient}
+        onClientChange={setSelectedFilterClient}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        showOnlyAlerts={showOnlyAlerts}
+        onToggleAlerts={() => setShowOnlyAlerts(!showOnlyAlerts)}
+      />
+
       <ViewFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); setSelectedFilterClient('TODOS'); }} />
       
-      <SmartOperationTable userId={user.id} componentId={`op-trips-${categoryName}`} title={`Fila de Monitoramento`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+      <div className={viewMode === 'compact' ? 'table-compact' : ''}>
+        <SmartOperationTable userId={user.id} componentId={`op-trips-${categoryName}`} title={`Painel Operacional › ${categoryName}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+      </div>
 
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -181,6 +195,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={onLocalRefresh} preStackingUnits={preStackingUnits} />
       {isDriverDocsModalOpen && selectedTrip && (<DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={onLocalRefresh} />)}
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
+
+      <style>{`
+        .table-compact table td { padding-top: 0.75rem !important; padding-bottom: 0.75rem !important; font-size: 9px !important; }
+        .table-compact table th { padding-top: 0.75rem !important; padding-bottom: 0.75rem !important; }
+      `}</style>
     </div>
   );
 };
