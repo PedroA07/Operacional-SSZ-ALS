@@ -27,8 +27,16 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
   };
 
   const stats = {
-    pendingAdvances: trips.filter(t => t.advancePayment?.status !== 'PAGO' && t.advancePayment?.status !== 'LIBERAR').length,
-    pendingBalances: trips.filter(t => t.advancePayment?.status === 'LIBERAR' || t.advancePayment?.status === 'PAGO').filter(t => t.balancePayment?.status !== 'PAGO' && t.balancePayment?.status !== 'LIBERAR').length,
+    pendingAdvances: trips.filter(t => {
+      const isNotPaid = t.advancePayment?.status !== 'PAGO' && t.advancePayment?.status !== 'LIBERAR';
+      const isRelevant = ['Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Viagem concluída'].includes(t.status);
+      return isNotPaid && isRelevant;
+    }).length,
+    pendingBalances: trips.filter(t => {
+       const isNotPaid = t.balancePayment?.status !== 'PAGO' && t.balancePayment?.status !== 'LIBERAR';
+       const isFinished = t.status === 'Viagem concluída';
+       return isNotPaid && isFinished;
+    }).length,
     pendingContracts: trips.filter(t => t.status === 'Viagem concluída' && (t.balancePayment?.status === 'LIBERAR' || t.balancePayment?.status === 'PAGO') && !t.freightContractDoc).length
   };
 
@@ -66,7 +74,7 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
                <p className="text-3xl font-black text-blue-700">{stats.pendingAdvances}</p>
             </div>
             <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 text-center">
-               <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Fila Saldo</p>
+               <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Fila Saldo (CONCLUÍDAS)</p>
                <p className="text-3xl font-black text-indigo-700">{stats.pendingBalances}</p>
             </div>
             <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
@@ -82,7 +90,7 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
           <AdvanceSubTab userId={user.id} trips={trips} onUpdate={handleUpdate} />
         )}
         {activeSubTab === 'balance' && (
-          <BalanceSubTab userId={user.id} trips={trips.filter(t => t.advancePayment?.status === 'LIBERAR' || t.advancePayment?.status === 'PAGO')} onUpdate={handleUpdate} />
+          <BalanceSubTab userId={user.id} trips={trips} onUpdate={handleUpdate} />
         )}
         {activeSubTab === 'contracts' && (
           <FreightContractsSubTab userId={user.id} trips={trips} onUpdate={handleUpdate} />

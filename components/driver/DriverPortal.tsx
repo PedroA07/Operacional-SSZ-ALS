@@ -30,20 +30,25 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const isFirstLoadRef = useRef(true);
   const gpsWatchRef = useRef<number | null>(null);
 
-  const checkUnread = async (myTrips: Trip[]) => {
+  const checkUnread = useCallback(async (myTrips: Trip[]) => {
     const data = await db.getNotifications();
     const myOSs = new Set(myTrips.map(t => t.os.toUpperCase()));
     const clearedStr = localStorage.getItem('als_cleared_notifs');
     const clearedIds: string[] = clearedStr ? JSON.parse(clearedStr) : [];
     
+    // REGRA: Notificações não lidas são as que o timestamp é posterior a última visualização do sino
+    const lastViewedStr = localStorage.getItem(`als_driver_last_viewed_${user.id}`);
+    const lastViewed = lastViewedStr ? new Date(lastViewedStr).getTime() : 0;
+
     const count = data.filter(n => {
       const isMine = myOSs.has(n.summary?.os?.toUpperCase() || '');
       const notCleared = !clearedIds.includes(n.id);
-      return isMine && notCleared;
+      const notSeen = new Date(n.timestamp).getTime() > lastViewed;
+      return isMine && notCleared && notSeen;
     }).length;
     
     setUnreadCount(count);
-  };
+  }, [user.id]);
 
   const loadPortalData = useCallback(async () => {
     try {
@@ -75,7 +80,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [user.driverId]);
+  }, [user.driverId, checkUnread]);
 
   useEffect(() => {
     loadPortalData();
@@ -108,6 +113,13 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     return () => { if (gpsWatchRef.current !== null) navigator.geolocation.clearWatch(gpsWatchRef.current); };
   }, [user.driverId]);
 
+  const handleOpenNotifCenter = () => {
+    setIsNotifCenterOpen(true);
+    // REGRA: Salva o timestamp da visualização para zerar o contador
+    localStorage.setItem(`als_driver_last_viewed_${user.id}`, new Date().toISOString());
+    setUnreadCount(0);
+  };
+
   if (isLoading) {
     return (
       <div className="h-[100dvh] flex flex-col items-center justify-center bg-[#020617]">
@@ -133,7 +145,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         </div>
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => setIsNotifCenterOpen(true)}
+            onClick={handleOpenNotifCenter}
             className="relative w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 active:text-blue-500 transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>

@@ -182,7 +182,27 @@ export const db = {
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
     try {
-      const { data, error } = await withTimeout(supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(30));
+      // REGRA: Apagar notificações com mais de 7 dias
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+      const cutoffISO = cutoff.toISOString();
+      
+      // Tenta limpar o banco (Manutenção Automática)
+      try {
+        await supabase.from('notifications').delete().lt('timestamp', cutoffISO);
+      } catch (e) {
+        console.warn("Manutenção: Erro ao limpar notificações antigas.");
+      }
+
+      // Busca apenas as recentes (últimos 7 dias)
+      const { data, error } = await withTimeout(
+        supabase.from('notifications')
+          .select('*')
+          .gte('timestamp', cutoffISO) // Garante o filtro de 7 dias também na busca
+          .order('timestamp', { ascending: false })
+          .limit(50)
+      );
+
       if (error) throw error;
       return (data || []).map(n => ({
         id: String(n.id), title: n.title || n.type.replace(/_/g, ' '), 
