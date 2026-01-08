@@ -54,12 +54,14 @@ const TripModal: React.FC<TripModalProps> = ({
         await osCategoryService.syncVinculos(formData.category || 'Geral', formData.driver, formData.customer);
       }
 
+      // Prepara o payload final preservando o histórico se for edição
       const payload = {
         ...formData,
         id: tripId,
         dateTime: new Date(formData.dateTime).toISOString(),
         isLate: editTrip?.isLate || false,
         documents: editTrip?.documents || [],
+        status: editTrip?.status || 'Pendente',
         statusHistory: editTrip?.statusHistory || [{ status: 'Pendente', dateTime: new Date().toISOString() }],
         advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },
         balancePayment: editTrip?.balancePayment || { status: 'AGUARDANDO_DOCS' },

@@ -15,7 +15,8 @@ export const getOperationTableColumns = (
   onEditScheduling: (t: Trip) => void,
   actingUser: User,
   onLocateDriver: (driverId: string) => void,
-  onViewDriverDocs: (t: Trip) => void 
+  onViewDriverDocs: (t: Trip) => void,
+  onOpenHistoryManager: (t: Trip) => void 
 ) => {
   
   const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -140,11 +141,13 @@ export const getOperationTableColumns = (
       <div className="flex flex-col gap-2 min-w-[220px]">
         <div className="flex items-center justify-between group">
            <p className="text-xs font-black text-blue-700 tracking-tight">OS: {t.os}</p>
-           <button onClick={() => openStatusEditor(t, t.status)} className="p-1 hover:text-blue-500 transition-colors bg-slate-50 rounded-lg border border-slate-100"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg></button>
+           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => onOpenHistoryManager(t)} className="p-1 hover:text-blue-500 transition-colors bg-slate-50 rounded-lg border border-slate-100" title="Gerenciar Histórico"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg></button>
+              <button onClick={() => openStatusEditor(t, t.status)} className="p-1 hover:text-blue-500 transition-colors bg-slate-50 rounded-lg border border-slate-100" title="Novo Status"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg></button>
+           </div>
         </div>
         <div className="flex flex-col gap-1.5 border-l-2 border-blue-50 pl-3">
-           {/* REFORÇO DE ORDENAÇÃO: Mais recente no topo */}
-           {(t.statusHistory || []).slice().sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((step, idx) => (
+           {(t.statusHistory || []).slice().sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).slice(0, 3).map((step, idx) => (
              <div key={idx} className={`flex flex-col p-1.5 rounded-lg border ${getStatusStyle(step.status, idx === 0)}`}>
                 <div className="flex justify-between items-center gap-4">
                   <span className="text-[7.5px] font-black uppercase truncate">{step.status}</span>
@@ -152,6 +155,9 @@ export const getOperationTableColumns = (
                 </div>
              </div>
            ))}
+           {(t.statusHistory?.length || 0) > 3 && (
+             <button onClick={() => onOpenHistoryManager(t)} className="text-[7px] font-black text-blue-500 uppercase tracking-widest text-left hover:underline">+ Ver Histórico Completo</button>
+           )}
         </div>
       </div>
     )

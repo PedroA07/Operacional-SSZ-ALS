@@ -11,6 +11,8 @@ import DriverLocationModal from './DriverLocationModal';
 import DocumentViewerModal from './DocumentViewerModal';
 import VWStatusSelector from './VWStatusSelector';
 import ViewFilters from './ViewFilters';
+import StatusHistoryManagerModal from './StatusHistoryManagerModal';
+import TripModal from './TripModal';
 import { maskCNPJ } from '../../../utils/masks';
 
 interface GenericOperationViewProps {
@@ -20,19 +22,21 @@ interface GenericOperationViewProps {
   clientName?: string;
   drivers: Driver[];
   customers: Customer[];
+  allTrips: Trip[]; // Centralizado no Dashboard
   availableOps: OperationDefinition[];
+  categories: Category[];
   onNavigate: (view: { type: 'category' | 'client', id?: string, categoryName: string, clientName?: string }) => void;
   onLocateDriver: (driverId: string) => void;
 }
 
 const GenericOperationView: React.FC<GenericOperationViewProps> = ({ 
-  user, type, categoryName, clientName, drivers, customers, availableOps, onNavigate, onLocateDriver
+  user, type, categoryName, clientName, drivers, customers, allTrips, availableOps, categories, onNavigate, onLocateDriver
 }) => {
-  const [allTrips, setAllTrips] = useState<Trip[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
@@ -44,7 +48,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isDriversCollapsed, setIsDriversCollapsed] = useState(false);
   
-  // PROTEÇÃO CONTRA VOLTA DE STATUS
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const isUpdatingRef = useRef(false);
   
@@ -53,27 +56,20 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedFilterClient, setSelectedFilterClient] = useState<string>('TODOS');
 
-  const loadLocalData = useCallback(async () => {
-    if (isUpdatingRef.current) return;
-
+  const loadAuxData = useCallback(async () => {
     try {
-      const [t, cats, p, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPorts(), db.getPreStacking()]);
-      setAllTrips(t || []);
-      setCategories(cats || []);
+      const [p, ps] = await Promise.all([db.getPorts(), db.getPreStacking()]);
       setPreStackingUnits([...(p || []), ...(ps || [])]);
-    } catch (e) {
-      console.error("Erro em visualização genérica:", e);
-    }
+    } catch (e) {}
   }, []);
 
-  useEffect(() => {
-    loadLocalData();
-    const interval = setInterval(() => {
-      if (!isUpdatingRef.current) loadLocalData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [loadLocalData]);
+  useEffect(() => { loadAuxData(); }, [loadAuxData]);
+
+  const onLocalRefresh = () => {
+    window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+  };
 
   const openStatusEditor = (trip: Trip, status: TripStatus) => {
     setSelectedTrip(trip);
@@ -82,6 +78,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     setStatusTime(now.toISOString().slice(0, 16));
     setIsStatusModalOpen(true);
+  };
+
+  const openHistoryManager = (t: Trip) => {
+    setSelectedTrip(t);
+    setIsHistoryModalOpen(true);
   };
 
   const handleUpdateStatus = async () => {
@@ -103,27 +104,15 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     };
 
     try {
-      // 1. Atualização Otimista Visual
-      setAllTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
-      
-      // 2. Gravação Direta
       const success = await db.saveTrip(updatedTrip, user);
       if (!success) throw new Error("Database rejection");
-      
       setIsStatusModalOpen(false);
-
-      // 3. Aguarda propagação do banco antes de liberar o refresh
-      setTimeout(async () => {
-        await loadLocalData();
-        isUpdatingRef.current = false;
-        setIsSavingStatus(false);
-      }, 1000);
-
+      onLocalRefresh();
     } catch (e) {
-      alert("Falha ao atualizar status no banco de dados.");
+      alert("Falha ao atualizar status.");
+    } finally {
       isUpdatingRef.current = false;
       setIsSavingStatus(false);
-      await loadLocalData();
     }
   };
 
@@ -142,13 +131,15 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     setIsDocViewerOpen(true);
   };
 
-  const isVWCrageaTrip = useMemo(() => {
-    if (!selectedTrip) return false;
-    const isVW = selectedTrip.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
-    const isCragea = selectedTrip.destination?.name?.toUpperCase().includes('CRAGEA') || 
-                     selectedTrip.scheduling?.location?.toUpperCase().includes('CRAGEA');
+  const isVWCrageaTrip = (t: Trip | null) => {
+    if (!t) return false;
+    const isVW = t.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
+    const isCragea = t.destination?.name?.toUpperCase().includes('CRAGEA') || 
+                     t.scheduling?.location?.toUpperCase().includes('CRAGEA');
     return isVW && isCragea;
-  }, [selectedTrip]);
+  };
+
+  const linkedCustomers = useMemo(() => customers.filter(c => c.operations?.some(op => op.toUpperCase() === categoryName.toUpperCase())), [customers, categoryName]);
 
   const filteredDrivers = drivers.filter(d => 
     d.operations.some(op => {
@@ -158,12 +149,15 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     })
   );
 
-  const linkedCustomers = useMemo(() => customers.filter(c => c.operations?.some(op => op.toUpperCase() === categoryName.toUpperCase())), [customers, categoryName]);
-
   const filteredTrips = useMemo(() => {
     let result = allTrips.filter(t => {
       const matchCategory = t.category?.toUpperCase() === categoryName.toUpperCase();
-      if (type === 'category') return matchCategory;
+      if (type === 'category') {
+        if (selectedFilterClient !== 'TODOS') {
+          return matchCategory && t.customer?.name === selectedFilterClient;
+        }
+        return matchCategory;
+      }
       const matchClient = (t.customer?.name?.toUpperCase() === clientName?.toUpperCase()) || (t.subCategory?.toUpperCase() === clientName?.toUpperCase());
       return matchCategory && matchClient;
     });
@@ -188,7 +182,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     if (endDate) result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
 
     return result;
-  }, [allTrips, categoryName, clientName, type, activeStatusTab, searchQuery, startDate, endDate]);
+  }, [allTrips, categoryName, clientName, type, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient]);
 
   const currentDedicatedCustomer = useMemo(() => {
     if (type !== 'client') return undefined;
@@ -203,16 +197,17 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
-    (t) => { setSelectedTrip(t); loadLocalData(); }, 
+    (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(false); },
     (t) => {}, // Minuta
     handleOpenDocModal,
-    async (id) => { if(confirm('Excluir viagem permanentemente?')) { await db.deleteTrip(id, user); loadLocalData(); } },
-    loadLocalData,
+    async (id) => { if(confirm('Excluir viagem permanentemente?')) { await db.deleteTrip(id, user); onLocalRefresh(); } },
+    onLocalRefresh,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
     handleLocateDriverInternal,
-    handleViewDriverDocs
+    handleViewDriverDocs,
+    openHistoryManager
   );
 
   return (
@@ -230,7 +225,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           categories={categories}
           initialCategory={categoryName}
           initialCustomer={currentDedicatedCustomer}
-          onSuccess={loadLocalData}
+          onSuccess={onLocalRefresh}
           variant="primary"
         />
       </div>
@@ -263,8 +258,22 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                     </button>
                   ))}
                 </div>
+
+                {type === 'category' && (
+                  <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Filtrar por Cliente:</span>
+                    <select 
+                      className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:border-blue-500"
+                      value={selectedFilterClient}
+                      onChange={e => setSelectedFilterClient(e.target.value)}
+                    >
+                      <option value="TODOS">TODOS OS CLIENTES</option>
+                      {linkedCustomers.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+                )}
             </div>
-            <ViewFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); }} />
+            <ViewFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); setSelectedFilterClient('TODOS'); }} />
             <div className="grid grid-cols-1 gap-8">
               {activeStatusTab === 'ativas' && filteredDrivers.length > 0 && !searchQuery && !startDate && (
                 <div className="space-y-4">
@@ -328,7 +337,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
              <div className="text-center border-b border-slate-100 pb-6 shrink-0"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento</p><p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p></div>
              <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-1">
-                {isVWCrageaTrip ? (<VWStatusSelector currentStatus={tempStatus} onSelect={setTempStatus} />) : (<div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Novo Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>)}
+                {isVWCrageaTrip(selectedTrip) ? (<VWStatusSelector currentStatus={tempStatus} onSelect={setTempStatus} />) : (<div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Novo Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>)}
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora do Evento</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
              </div>
              <div className="grid gap-3 pt-4 border-t border-slate-100 shrink-0">
@@ -345,9 +354,31 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
       )}
 
-      <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadLocalData} preStackingUnits={preStackingUnits} />
+      {isHistoryModalOpen && selectedTrip && (
+        <StatusHistoryManagerModal 
+          isOpen={isHistoryModalOpen} 
+          onClose={() => { setIsHistoryModalOpen(false); setSelectedTrip(null); }} 
+          trip={selectedTrip} 
+          user={user} 
+          onSuccess={() => { onLocalRefresh(); setIsHistoryModalOpen(false); }} 
+        />
+      )}
+
+      {isTripModalOpen && selectedTrip && (
+        <TripModal 
+          isOpen={isTripModalOpen} 
+          onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} 
+          onSuccess={onLocalRefresh} 
+          drivers={drivers} 
+          customers={customers} 
+          categories={categories} 
+          editTrip={selectedTrip} 
+        />
+      )}
+
+      <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={onLocalRefresh} preStackingUnits={preStackingUnits} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
-      {isDriverDocsModalOpen && selectedTrip && (<DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={loadLocalData} />)}
+      {isDriverDocsModalOpen && selectedTrip && (<DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={onLocalRefresh} />)}
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
     </div>
   );

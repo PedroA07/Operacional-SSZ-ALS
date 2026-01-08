@@ -17,6 +17,8 @@ import CategoryManagerModal from './operations/CategoryManagerModal';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import PreStackingForm from './forms/PreStackingForm';
 import VWStatusSelector from './operations/VWStatusSelector';
+import StatusHistoryManagerModal from './operations/StatusHistoryManagerModal';
+import TripModal from './operations/TripModal';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
 interface OperationsTabProps {
@@ -24,18 +26,21 @@ interface OperationsTabProps {
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
+  trips: Trip[];
+  categories: Category[];
+  preStacking: PreStacking[];
   availableOps: OperationDefinition[];
   activeView: { type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string };
   setActiveView: (view: any) => void;
-  onDeleteTrip?: (id: string) => void;
+  onDeleteTrip: (id: string) => void;
+  onRefresh: () => void;
 }
 
-const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers, ports, availableOps, activeView, setActiveView, onDeleteTrip }) => {
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
-  
+const OperationsTab: React.FC<OperationsTabProps> = ({ 
+  user, drivers, customers, ports, trips, categories, preStacking, availableOps, activeView, setActiveView, onDeleteTrip, onRefresh 
+}) => {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
@@ -43,6 +48,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isMinutaFormOpen, setIsMinutaFormOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
@@ -72,27 +78,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     return saved ? JSON.parse(saved) : [];
   });
 
-  const loadData = useCallback(async () => {
-    if (isUpdatingRef.current) return;
-
-    try {
-      const [t, c, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPreStacking()]);
-      setTrips(t || []);
-      setCategories(c || []);
-      setPreStacking(ps || []);
-    } catch (e) {
-      console.error("Erro ao carregar dados de operações:", e);
-    }
-  }, []);
-
-  useEffect(() => { 
-    loadData();
-    const interval = setInterval(() => {
-      if (!isUpdatingRef.current) loadData();
-    }, 10000); // Sincronismo acelerado (10s)
-    return () => clearInterval(interval);
-  }, [loadData]);
-
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     
@@ -104,7 +89,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       dateTime: new Date(statusTime).toISOString() 
     };
 
-    // Newest entry always at the top (index 0)
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
@@ -113,21 +97,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     };
 
     try {
-      // 1. Atualização Otimista
-      setTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
-      
-      // 2. Gravação imediata sem delay artificial
       const success = await db.saveTrip(updatedTrip, user);
-      
       if (!success) throw new Error("Erro de banco");
-
       setIsStatusModalOpen(false);
-      
-      // 3. Recarrega dados reais imediatamente
-      await loadData();
+      onRefresh();
     } catch (e) {
-      alert("Erro ao sincronizar status. Tente novamente.");
-      await loadData(); 
+      alert("Erro ao sincronizar status.");
     } finally {
       isUpdatingRef.current = false;
       setIsSavingStatus(false);
@@ -143,18 +118,23 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     setIsStatusModalOpen(true);
   };
 
+  const openHistoryManager = (t: Trip) => {
+    setSelectedTrip(t);
+    setIsHistoryModalOpen(true);
+  };
+
   const handleLocateDriver = (driverId: string) => {
     setLocationDriverId(driverId);
     setIsLocationModalOpen(true);
   };
 
-  const isVWCrageaTrip = useMemo(() => {
-    if (!selectedTrip) return false;
-    const isVW = selectedTrip.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
-    const isCragea = selectedTrip.destination?.name?.toUpperCase().includes('CRAGEA') || 
-                     selectedTrip.scheduling?.location?.toUpperCase().includes('CRAGEA');
+  const isVWCrageaTrip = (t: Trip | null) => {
+    if (!t) return false;
+    const isVW = t.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
+    const isCragea = t.destination?.name?.toUpperCase().includes('CRAGEA') || 
+                     t.scheduling?.location?.toUpperCase().includes('CRAGEA');
     return isVW && isCragea;
-  }, [selectedTrip]);
+  };
 
   const filteredTrips = useMemo(() => {
     let result = [...trips];
@@ -187,16 +167,17 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   const columns = getOperationTableColumns(
     openStatusEditor,
-    (t) => { setSelectedTrip(t); loadData(); }, 
+    (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); }, 
     (url, title) => { setPreviewDocData({ url, title }); setIsDocViewerOpen(true); },
     async (id) => { if(onDeleteTrip) onDeleteTrip(id); },
-    loadData,
+    onRefresh,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
     handleLocateDriver,
-    (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); }
+    (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
+    openHistoryManager
   );
 
   if (activeView.type !== 'list') {
@@ -205,7 +186,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         user={user} type={activeView.type === 'category' ? 'category' : 'client'} 
         categoryName={activeView.categoryName || ''} clientName={activeView.clientName} 
         drivers={drivers} customers={customers} availableOps={availableOps} onNavigate={setActiveView}
-        onLocateDriver={handleLocateDriver}
+        onLocateDriver={handleLocateDriver} allTrips={trips} categories={categories}
       />
     );
   }
@@ -223,7 +204,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
              drivers={drivers}
              customers={customers}
              categories={categories}
-             onSuccess={loadData}
+             onSuccess={onRefresh}
              variant="dark"
            />
         </div>
@@ -278,7 +259,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
-      <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadData} preStackingUnits={[...ports, ...preStacking]} />
+      <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={onRefresh} preStackingUnits={[...ports, ...preStacking]} />
 
       {isOCFormOpen && selectedTrip && (
         <div className="fixed inset-0 z-[800] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4">
@@ -287,7 +268,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                  <h3 className="font-black text-xs uppercase tracking-widest">Edição de Ordem de Coleta › OS {selectedTrip.os}</h3>
                  <button onClick={() => setIsOCFormOpen(false)} className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
               </header>
-              <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); loadData(); }} initialData={{ ...selectedTrip.ocFormData, os: selectedTrip.os, driverId: selectedTrip.driver.id, remetenteId: selectedTrip.customer.id, destinatarioId: selectedTrip.destination?.id || '' }} />
+              <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); onRefresh(); }} initialData={{ ...selectedTrip.ocFormData, os: selectedTrip.os, driverId: selectedTrip.driver.id, remetenteId: selectedTrip.customer.id, destinatarioId: selectedTrip.destination?.id || '' }} />
            </div>
         </div>
       )}
@@ -299,12 +280,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                  <h3 className="font-black text-xs uppercase tracking-widest">Edição de Minuta › OS {selectedTrip.os}</h3>
                  <button onClick={() => setIsMinutaFormOpen(false)} className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
               </header>
-              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaFormOpen(false); loadData(); }} initialOS={selectedTrip.os} />
+              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaFormOpen(false); onRefresh(); }} initialOS={selectedTrip.os} />
            </div>
         </div>
       )}
 
-      {selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={loadData} />}
+      {selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={onRefresh} />}
       
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -315,7 +296,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
              </div>
 
              <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-1">
-                {isVWCrageaTrip ? (
+                {isVWCrageaTrip(selectedTrip) ? (
                   <VWStatusSelector currentStatus={tempStatus} onSelect={setTempStatus} />
                 ) : (
                   <div className="space-y-1">
@@ -350,12 +331,34 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         </div>
       )}
 
+      {isHistoryModalOpen && selectedTrip && (
+        <StatusHistoryManagerModal 
+          isOpen={isHistoryModalOpen} 
+          onClose={() => { setIsHistoryModalOpen(false); setSelectedTrip(null); }} 
+          trip={selectedTrip} 
+          user={user} 
+          onSuccess={() => { onRefresh(); setIsHistoryModalOpen(false); }} 
+        />
+      )}
+
+      {isTripModalOpen && selectedTrip && (
+        <TripModal 
+          isOpen={isTripModalOpen} 
+          onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} 
+          onSuccess={onRefresh} 
+          drivers={drivers} 
+          customers={customers} 
+          categories={categories} 
+          editTrip={selectedTrip} 
+        />
+      )}
+
       {isCategoryModalOpen && (
         <CategoryManagerModal 
           isOpen={isCategoryModalOpen} 
           onClose={() => setIsCategoryModalOpen(false)} 
           categories={categories} 
-          onSuccess={loadData} 
+          onSuccess={onRefresh} 
           actingUser={user} 
         />
       )}
