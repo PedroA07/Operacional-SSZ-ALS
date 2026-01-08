@@ -69,7 +69,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
   const handleNotifClick = (n: Notification) => {
     setSelectedNotification(n);
     setIsDetailOpen(true);
-    setIsOpen(false);
+    setIsOpen(false); // Fecha o dropdown ao abrir o detalhe (foco total)
   };
 
   const filteredNotifications = notifications.filter(n => {
@@ -125,7 +125,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
                 <button 
                   key={n.id} 
                   onClick={() => handleNotifClick(n)}
-                  className="w-full text-left p-5 bg-slate-50/50 border border-slate-100 rounded-[1.8rem] transition-all hover:bg-slate-50 group relative overflow-hidden active:scale-[0.98]"
+                  className="w-full text-left p-5 bg-slate-50/50 border border-slate-100 rounded-[1.8rem] transition-all hover:bg-slate-50 group relative overflow-hidden active:scale-[0.98] outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                    <div className={`absolute top-0 left-0 w-1 h-full ${n.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
                    <div className="flex justify-between items-start mb-3">
