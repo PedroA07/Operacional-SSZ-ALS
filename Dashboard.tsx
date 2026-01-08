@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
 import DriversTab from './components/dashboard/DriversTab';
@@ -39,6 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
+  const [isLoadingInitial, setIsLoadingInitial] = useState(true);
 
   const [isDeleteTripModalOpen, setIsDeleteTripModalOpen] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
@@ -46,7 +47,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
-  const loadAllData = useCallback(async () => {
+  const loadAllData = useCallback(async (isFirstLoad = false) => {
+    if (isFirstLoad) setIsLoadingInitial(true);
     try {
       const [d, c, p, ps, s, t, cats] = await Promise.all([
         db.getDrivers(),
@@ -66,19 +68,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       setTrips(t || []);
       setCategories(cats || []);
     } catch (e) {
-      console.error("Erro na sincronização Direta:", e);
+      console.error("Erro na sincronização ALS:", e);
+    } finally {
+      if (isFirstLoad) setIsLoadingInitial(false);
     }
   }, []);
 
   useEffect(() => { 
-    loadAllData();
+    loadAllData(true);
     
-    // REFRESH ACELERADO: 10 segundos para feedback rápido da operação
-    const refreshDataInterval = setInterval(() => {
-      loadAllData();
-    }, 10000);
-
-    const handleGlobalRefresh = () => loadAllData();
+    // Refresh em background a cada 15 segundos para manter dados vivos
+    const refreshDataInterval = setInterval(() => loadAllData(false), 15000);
+    
+    const handleGlobalRefresh = () => loadAllData(false);
     window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
 
     return () => {
@@ -101,11 +103,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     try {
       const success = await db.deleteTrip(tripToDelete.id, user);
       if (success) {
-        await loadAllData();
+        await loadAllData(false);
         setIsDeleteTripModalOpen(false);
         setTripToDelete(null);
       } else {
-        alert("Não foi possível excluir. Verifique sua conexão com o banco.");
+        alert("Não foi possível excluir. Verifique sua conexão.");
       }
     } catch (e) {
       alert('Erro crítico de comunicação.');
@@ -131,6 +133,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       </div>
     );
   };
+
+  if (isLoadingInitial) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6 animate-pulse">Sincronizando Módulos Operacionais...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
@@ -197,18 +208,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                activeView={opsView} 
                setActiveView={setOpsView} 
                onDeleteTrip={handleDeleteTripRequest}
-               onRefresh={loadAllData}
+               onRefresh={() => loadAllData(false)}
              />
            )}
-           {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(); }} />}
+           {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(false); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
-           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(); }} availableOps={availableOps} />}
-           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(); } }} isAdmin={user.role === 'admin'} />}
-           {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(); }} />}
+           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
+           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(false); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
+           {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(false); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
-           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(); } }} />}
-           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(); } }} />}
-           {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
+           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(false); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(false); } }} />}
+           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(false); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
+           {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
         </div>
       </main>
 
