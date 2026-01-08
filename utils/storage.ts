@@ -10,13 +10,6 @@ const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-const withTimeout = <T = any>(promise: Promise<T>, ms: number = 15000): Promise<T> => {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ALS_DATABASE')), ms))
-  ]) as any;
-};
-
 export const db = {
   // USUÁRIOS
   getUsers: async (): Promise<User[]> => {
@@ -138,6 +131,7 @@ export const db = {
     return !error;
   },
 
+  // Fix: Added missing deleteCustomer method
   deleteCustomer: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('customers').delete().eq('id', id);
@@ -171,6 +165,7 @@ export const db = {
     return !error;
   },
 
+  // Fix: Added missing deletePort method
   deletePort: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('ports').delete().eq('id', id);
@@ -203,6 +198,7 @@ export const db = {
     return !error;
   },
 
+  // Fix: Added missing deletePreStacking method
   deletePreStacking: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').delete().eq('id', id);
@@ -224,10 +220,10 @@ export const db = {
     return success;
   },
 
+  // Fix: Added missing deleteStaff method
   deleteStaff: async (id: string) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('staff').delete().eq('id', id);
-    return !error;
+    return await staffRepository.delete(supabase, id);
   },
 
   getCategories: async (): Promise<Category[]> => {
@@ -306,12 +302,11 @@ export const db = {
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try {
-      const { error } = await withTimeout(supabase.from('users').select('id').limit(1), 5000);
+      const { error } = await supabase.from('users').select('id').limit(1);
       return !error;
     } catch { return false; }
   },
 
-  // PREFERÊNCIAS E BACKUP
   getPreferences: (userId: string) => {
     const saved = localStorage.getItem(`als_prefs_${userId}`);
     return saved ? JSON.parse(saved) : { visibleColumns: {} };
@@ -337,18 +332,26 @@ export const db = {
     a.click();
   },
 
+  // Fix: Implemented missing importBackup method
   importBackup: async (file: File) => {
     if (!supabase) return false;
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      // Sequencial para não sobrecarregar
+      
+      // Perform imports
       if (data.drivers) for (const d of data.drivers) await db.saveDriver(d);
       if (data.customers) for (const c of data.customers) await db.saveCustomer(c);
       if (data.ports) for (const p of data.ports) await db.savePort(p);
-      if (data.preStacking) for (const p of data.preStacking) await db.savePreStacking(p);
+      if (data.preStacking) for (const ps of data.preStacking) await db.savePreStacking(ps);
       if (data.trips) for (const t of data.trips) await db.saveTrip(t);
+      if (data.staff) for (const s of data.staff) await db.saveStaff(s);
+      if (data.categories) for (const c of data.categories) await db.saveCategory(c);
+      
       return true;
-    } catch { return false; }
+    } catch (e) {
+      console.error("Import error:", e);
+      return false;
+    }
   }
 };

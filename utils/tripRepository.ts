@@ -9,7 +9,7 @@ export const tripRepository = {
       os: trip.os,
       booking: trip.booking,
       ship: trip.ship,
-      data_time: trip.dateTime, // Mapeado conforme print do banco
+      data_time: trip.dateTime, // Conforme ERD: data_time
       status_time: trip.statusTime || trip.statusHistory?.[0]?.dateTime || new Date().toISOString(),
       is_late: trip.isLate,
       type: trip.type,
@@ -56,7 +56,7 @@ export const tripRepository = {
       os: d.os,
       booking: d.booking,
       ship: d.ship,
-      dateTime: d.data_time || d.dateTime, // Prioriza data_time do banco
+      dateTime: d.data_time || d.dateTime,
       statusTime: d.status_time || d.statusTime,
       isLate: d.is_late ?? false,
       type: d.type,

@@ -5,7 +5,7 @@ import { Driver } from '../types';
 export const driverRepository = {
   /**
    * Converte o objeto Driver do TypeScript (camelCase) 
-   * para o formato exato das colunas do Banco de Dados (snake_case)
+   * para o formato exato das colunas do Banco de Dados (snake_case) fornecido pelo usuário.
    */
   mapToDb: (driver: Driver) => {
     return {
@@ -94,7 +94,7 @@ export const driverRepository = {
 
   async getAll(supabase: SupabaseClient): Promise<Driver[]> {
     try {
-      const { data, error } = await supabase.from('drivers').select('*');
+      const { data, error } = await supabase.from('drivers').select('*').order('name');
       if (error) throw error;
       return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
