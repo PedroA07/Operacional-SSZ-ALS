@@ -97,6 +97,7 @@ export const getOperationTableColumns = (
   };
 
   const getStatusStyle = (status: TripStatus, isLatest: boolean) => {
+    // REGRA: Concluída em Verde (emerald), Cancelada em Amarelo (amber)
     if (status === 'Viagem concluída') {
       return isLatest 
         ? 'bg-emerald-600 border-emerald-700 text-white shadow-md ring-2 ring-emerald-50' 

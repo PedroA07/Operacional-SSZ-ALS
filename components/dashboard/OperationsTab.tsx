@@ -50,7 +50,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [statusTime, setStatusTime] = useState('');
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
 
-  // Estados de Filtro
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -128,7 +127,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     } else if (activeStatusTab === 'cancelada') {
       result = result.filter(t => t.status === 'Viagem cancelada');
     } else if (activeStatusTab === 'geral') {
-      // Mostra tudo exceto canceladas (ou tudo se preferir)
+      // REGRA: Visão Geral mostra viagens Pendentes/Ativas E Concluídas, ocultando apenas canceladas.
       result = result.filter(t => t.status !== 'Viagem cancelada');
     }
 
@@ -190,7 +189,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
            <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1 w-full lg:w-auto">
              {[
-               { id: 'geral', label: 'Visão Geral', color: 'slate' },
+               { id: 'geral', label: 'Visão Geral (Ativas + Concl.)', color: 'slate' },
                { id: 'ativas', label: 'Viagens Ativas', color: 'blue' },
                { id: 'concluida', label: 'Concluídas', color: 'emerald' },
                { id: 'cancelada', label: 'Canceladas', color: 'amber' }
@@ -200,7 +199,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
                  onClick={() => setActiveStatusTab(tab.id as any)}
                  className={`flex-1 lg:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${
                    activeStatusTab === tab.id 
-                   ? `bg-${tab.color === 'slate' ? 'slate-900' : tab.color + '-600'} text-white shadow-lg` 
+                   ? `bg-${tab.color === 'slate' ? 'slate-900' : (tab.color === 'emerald' ? 'emerald-600' : (tab.color === 'amber' ? 'amber-500' : 'blue-600'))} text-white shadow-lg` 
                    : 'bg-transparent text-slate-400 hover:bg-slate-50'
                  }`}
                >
