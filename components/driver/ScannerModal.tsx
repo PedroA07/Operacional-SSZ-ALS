@@ -18,7 +18,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const [isSaving, setIsSaving] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   
-  const videoRef = useRef<HTMLElement | any>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -35,7 +35,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   }, []);
 
   const startCamera = useCallback(async () => {
-    if (streamRef.current || (videoRef.current && videoRef.current.srcObject)) return;
+    if (streamRef.current) return;
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -52,13 +52,13 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         videoRef.current.srcObject = stream;
         
         videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play().catch((e: any) => console.error("Auto-play error:", e));
+          videoRef.current?.play().catch(e => console.error("Auto-play error:", e));
           setIsCameraReady(true);
         };
       }
     } catch (err) {
-      console.error("Erro Câmera:", err);
-      // Se falhar a câmera (ex: em desktop sem cam), permitimos usar apenas o anexo
+      console.error("Camera access error:", err);
+      // Fallback para permitir apenas anexo se a câmera falhar
       setIsCameraReady(false);
     }
   }, []);
@@ -135,10 +135,11 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
 
     setIsSaving(true);
     try {
+      // Busca a viagem mais atualizada para evitar sobrescrever docs
       const allTrips = await db.getTrips();
       const latestTrip = allTrips.find(t => t.id === trip.id);
       
-      if (!latestTrip) throw new Error("Viagem não localizada.");
+      if (!latestTrip) throw new Error("OS não localizada.");
 
       const currentDocs = Array.isArray(latestTrip.driver_docs) ? latestTrip.driver_docs : [];
       const updatedTrip: Trip = {
@@ -161,8 +162,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         onClose();
       }
     } catch (err: any) {
-      console.error("Erro ao salvar documentos:", err);
-      alert(`Erro: ${err.message || 'Falha ao enviar fotos.'}`);
+      alert(`Falha ao salvar: ${err.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -174,7 +174,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     <div className="fixed inset-0 z-[2000] bg-black flex flex-col h-[100dvh] overflow-hidden">
       <header className="px-6 py-4 bg-slate-950/95 border-b border-white/10 flex justify-between items-center shrink-0 z-50">
         <div>
-          <p className="text-[9px] font-black text-blue-500 uppercase tracking-[0.2em] leading-none">Scanner Digital ALS</p>
+          <p className="text-[9px] font-black text-blue-500 uppercase tracking-[0.2em] leading-none">Câmera de Documentos ALS</p>
           <h3 className="text-xs font-black text-white uppercase mt-1">OS {trip.os}</h3>
         </div>
         <button onClick={onClose} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-white active:bg-red-600 transition-all">
@@ -188,7 +188,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         ) : step === 'camera' ? (
            <div className="flex flex-col items-center gap-4 text-slate-500 text-center px-10">
               <svg className="w-12 h-12 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/></svg>
-              <p className="text-[10px] font-black uppercase tracking-widest">Câmera indisponível.<br/>Use o botão de anexo abaixo.</p>
+              <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">Câmera indisponível.<br/>Use o botão de anexo para enviar fotos da galeria.</p>
            </div>
         ) : null}
 
@@ -196,7 +196,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
           <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none z-10">
             <div className="w-full max-w-[320px] aspect-[1/1.414] border-2 border-dashed border-blue-500/50 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]">
                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
-                 <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">Enquadre o documento</p>
+                 <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Enquadre o Documento</p>
                </div>
             </div>
           </div>
@@ -211,7 +211,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         )}
 
         {step === 'camera' && (
-          <div className="absolute bottom-8 left-0 w-full flex items-center justify-center gap-10 z-40">
+          <div className="absolute bottom-10 left-0 w-full flex items-center justify-center gap-10 z-40">
              <input type="file" ref={fileInputRef} className="hidden" accept="image/*,.pdf" onChange={handleFileSelect} />
              
              <button 
@@ -219,10 +219,10 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
                className="w-14 h-14 bg-white/10 rounded-2xl flex flex-col items-center justify-center text-white border border-white/10 active:scale-90 transition-all shadow-xl"
              >
                 <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="2"/></svg>
-                <span className="text-[7px] font-black uppercase tracking-tighter">Anexar</span>
+                <span className="text-[7px] font-black uppercase tracking-tighter">Galeria</span>
              </button>
 
-             <button onClick={capturePhoto} disabled={!isCameraReady} className={`w-20 h-20 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center active:scale-75 transition-all shadow-[0_0_40px_rgba(59,130,246,0.6)] ${!isCameraReady ? 'opacity-30 grayscale' : ''}`}>
+             <button onClick={capturePhoto} disabled={!isCameraReady} className={`w-20 h-20 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center active:scale-75 transition-all shadow-[0_0_40px_rgba(59,130,246,0.4)] ${!isCameraReady ? 'opacity-30 grayscale' : ''}`}>
                <div className="w-14 h-14 bg-white border-2 border-slate-200 rounded-full shadow-inner"></div>
              </button>
              
@@ -232,7 +232,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
                       {capturedImages.length}
                    </div>
                 )}
-                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-slate-500">
+                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-slate-700">
                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" strokeWidth="2"/></svg>
                 </div>
              </div>
@@ -242,12 +242,12 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
 
       <canvas ref={canvasRef} className="hidden" />
 
-      <footer className="p-6 bg-slate-950 border-t border-white/10 shrink-0 z-50 safe-bottom">
+      <footer className="p-6 bg-slate-950 border-t border-white/10 shrink-0 z-50 pb-10">
         {step === 'preview' ? (
           <div className="flex flex-col gap-3">
              <div className="grid grid-cols-2 gap-3">
                 <button onClick={() => { setStep('camera'); setCurrentImage(null); }} className="py-4 bg-slate-900 text-slate-300 rounded-2xl text-[10px] font-black uppercase border border-white/5">Refazer</button>
-                <button onClick={handleAddMore} className="py-4 bg-blue-600/10 text-blue-400 border border-blue-500/20 rounded-2xl text-[10px] font-black uppercase">+ Página</button>
+                <button onClick={handleAddMore} className="py-4 bg-blue-600/10 text-blue-400 border border-blue-500/20 rounded-2xl text-[10px] font-black uppercase">+ Adicionar</button>
              </div>
              <button disabled={isSaving} onClick={handleFinish} className="w-full py-5 bg-emerald-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl active:bg-emerald-700 transition-all flex items-center justify-center gap-3">
                {isSaving ? 'Salvando...' : 'Finalizar e Enviar'}
@@ -257,15 +257,11 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
           <div className="flex items-center justify-between gap-4">
              <button onClick={onClose} className="flex-1 py-4 bg-slate-900 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Cancelar</button>
              {capturedImages.length > 0 && (
-                <button onClick={handleFinish} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all">Enviar {capturedImages.length} Foto(s)</button>
+                <button onClick={handleFinish} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all">Enviar {capturedImages.length} Capturas</button>
              )}
           </div>
         )}
       </footer>
-
-      <style>{`
-        .safe-bottom { padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
-      `}</style>
     </div>
   );
 };

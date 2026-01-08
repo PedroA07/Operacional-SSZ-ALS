@@ -33,6 +33,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [showPicker, setShowPicker] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
+  // Ordenação prioritária: Pendentes e Ativas primeiro, mais recentes em cima
   const activeTrip = useMemo(() => {
     return [...trips]
       .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
@@ -75,17 +76,17 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
         await db.addNotification(
           user,
           'STATUS_UPDATED',
-          `Motorista ${user.displayName}: ${nextStatus}`,
+          `Posição: ${nextStatus}`,
           `A OS ${trip.os} foi atualizada pelo motorista no aplicativo.`,
           { os: trip.os, motorista: user.displayName, placa: trip.driver.plateHorse }
         );
         setShowPicker(false);
         await onRefresh();
       } else {
-        alert("Erro ao conectar. Verifique seu sinal de internet.");
+        alert("Erro de conexão. Verifique sua rede.");
       }
     } catch (e) {
-      alert("Erro crítico ao salvar status.");
+      alert("Falha técnica ao atualizar status.");
     } finally {
       setIsUpdating(false);
     }
@@ -114,7 +115,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           <div className="flex items-center gap-3">
             <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Minha Programação</h2>
             {activeTrip && (
-              <span className="px-2 py-0.5 bg-blue-500 text-white rounded text-[7px] font-black uppercase shadow-[0_0_8px_rgba(59,130,246,0.5)]">Próxima na Fila</span>
+              <span className="px-2 py-0.5 bg-blue-500 text-white rounded text-[7px] font-black uppercase shadow-[0_0_8px_rgba(59,130,246,0.5)]">Próxima OS</span>
             )}
           </div>
           
@@ -125,7 +126,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             <svg className="w-3.5 h-3.5 group-active:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <span className="text-[8px] font-black uppercase tracking-widest">Sincronizar</span>
+            <span className="text-[8px] font-black uppercase tracking-widest">Atualizar</span>
           </button>
         </div>
 
@@ -175,7 +176,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Anexar Documentos</p>
-                  <p className="text-[8px] font-bold text-blue-200 uppercase mt-1">Notas Fiscais / Canhotos</p>
+                  <p className="text-[8px] font-bold text-blue-200 uppercase mt-1">Notas Fiscais / Canhotos / Fotos</p>
                 </div>
               </button>
 
@@ -201,7 +202,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                     onClick={() => setShowPicker(!showPicker)}
                     className={`px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase transition-all border shrink-0 ${showPicker ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-white/10 text-slate-300'}`}
                   >
-                    {showPicker ? 'Fechar' : 'Alterar'}
+                    {showPicker ? 'Ocultar' : 'Alterar'}
                   </button>
                 </div>
                 
@@ -254,8 +255,8 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
              <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-6 text-slate-600">
                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" strokeWidth="2.5"/></svg>
              </div>
-             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Sem programações pendentes para o seu CPF.</p>
-             <button onClick={() => onRefresh()} className="mt-4 text-blue-500 font-bold text-[9px] uppercase hover:underline">Verificar novamente</button>
+             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Nenhuma programação ativa localizada para o seu CPF.</p>
+             <button onClick={() => onRefresh()} className="mt-4 text-blue-500 font-bold text-[9px] uppercase hover:underline">Tentar sincronizar agora</button>
           </div>
         )}
       </section>

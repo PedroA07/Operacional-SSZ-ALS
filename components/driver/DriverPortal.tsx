@@ -56,15 +56,29 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         db.getTrips()
       ]);
 
-      // Comparação robusta de IDs (trim e toString)
-      const targetId = String(user.driverId || '').trim();
-      const currentDriver = allDrivers.find(d => String(d.id).trim() === targetId);
+      // 1. Identifica o cadastro de motorista vinculado
+      const targetDriverId = String(user.driverId || '').trim();
+      const userCPF = String(user.username || '').replace(/\D/g, ''); // O login do motorista é o CPF
       
+      const currentDriver = allDrivers.find(d => 
+        String(d.id).trim() === targetDriverId || 
+        d.cpf.replace(/\D/g, '') === userCPF
+      );
+
+      // 2. Filtra as viagens com lógica de contingência (ID ou CPF)
       const myTrips = allTrips.filter(t => {
-        const tripDriverId = String(t.driver?.id || '').trim();
-        return tripDriverId === targetId && targetId !== '';
+        if (!t.driver) return false;
+        
+        const tripDriverId = String(t.driver.id || '').trim();
+        const tripDriverCPF = String(t.driver.cpf || '').replace(/\D/g, '');
+
+        const matchById = targetDriverId !== '' && tripDriverId === targetDriverId;
+        const matchByCPF = userCPF !== '' && tripDriverCPF === userCPF;
+
+        return matchById || matchByCPF;
       }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
+      // Alerta sonoro para novas viagens
       const currentIds = new Set(myTrips.map(t => t.id));
       if (!isFirstLoadRef.current) {
         const newTrip = myTrips.find(t => !lastTripIdsRef.current.has(t.id) && t.status === 'Pendente');
@@ -80,11 +94,11 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       setTrips(myTrips);
       checkUnread(myTrips);
     } catch (e) {
-      console.error("Erro na sincronização ALS:", e);
+      console.error("ALS Driver Sync Error:", e);
     } finally {
       setIsLoading(false);
     }
-  }, [user.driverId, checkUnread]);
+  }, [user.driverId, user.username, checkUnread]);
 
   useEffect(() => {
     loadPortalData();
@@ -109,7 +123,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
           const { latitude, longitude } = position.coords;
           try { await db.updateDriverLocation(user.driverId!, latitude, longitude); } catch (e) {}
         },
-        () => console.warn("GPS ALS: Erro de sinal."),
+        () => console.warn("GPS ALS: Sinal fraco."),
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     };
@@ -127,7 +141,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     return (
       <div className="h-[100dvh] flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Sincronizando Dados...</p>
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Conectando aos Servidores...</p>
       </div>
     );
   }
@@ -155,7 +169,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
             {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 border-2 border-slate-950 rounded-full text-[8px] font-black flex items-center justify-center text-white animate-bounce">{unreadCount}</span>}
           </button>
           <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-white/5">
-            {driver?.photo ? <img src={driver.photo} className="w-full h-full object-cover" /> : <div className="text-xs font-black text-blue-400 italic">ALS</div>}
+            {(driver?.photo || user.photo) ? <img src={driver?.photo || user.photo} className="w-full h-full object-cover" /> : <div className="text-xs font-black text-blue-400 italic">ALS</div>}
           </div>
         </div>
       </header>
