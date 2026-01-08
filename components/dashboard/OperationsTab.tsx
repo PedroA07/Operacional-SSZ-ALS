@@ -57,11 +57,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   
   const [isSavingStatus, setIsSavingStatus] = useState(false);
-  const isUpdatingRef = useRef(false);
-
+  
+  // Estados de Visualização Global
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
   
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
@@ -69,125 +70,62 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
 
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
-    
     setIsSavingStatus(true);
-    isUpdatingRef.current = true;
-
     const now = new Date().toISOString();
-    const newEntry: StatusHistoryEntry = { 
-      status: tempStatus, 
-      dateTime: new Date(statusTime).toISOString(),
-      createdAt: now 
-    };
-
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
-      statusTime: newEntry.dateTime, 
-      statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] 
+      statusTime: new Date(statusTime).toISOString(), 
+      statusHistory: [{ status: tempStatus, dateTime: new Date(statusTime).toISOString(), createdAt: now }, ...(selectedTrip.statusHistory || [])] 
     };
-
     try {
-      const success = await db.saveTrip(updatedTrip, user);
-      if (!success) throw new Error("Erro de banco");
-      
-      await db.addNotification(
-        user, 
-        'STATUS_UPDATED', 
-        `OS ${selectedTrip.os}: ${tempStatus}`, 
-        `Status atualizado para "${tempStatus}" às ${new Date(statusTime).toLocaleTimeString('pt-BR')}.`,
-        { os: selectedTrip.os, motorista: selectedTrip.driver.name, placa: selectedTrip.driver.plateHorse }
-      );
-
-      setIsStatusModalOpen(false);
-      onRefresh();
-    } catch (e) {
-      alert("Erro ao sincronizar status.");
-    } finally {
-      isUpdatingRef.current = false;
-      setIsSavingStatus(false);
-    }
-  };
-
-  const openStatusEditor = (t: Trip, s: TripStatus) => {
-    setSelectedTrip(t);
-    setTempStatus(s);
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    setStatusTime(now.toISOString().slice(0, 16));
-    setIsStatusModalOpen(true);
-  };
-
-  const openHistoryManager = (t: Trip) => {
-    setSelectedTrip(t);
-    setIsHistoryModalOpen(true);
-  };
-
-  const handleLocateDriver = (driverId: string) => {
-    setLocationDriverId(driverId);
-    setIsLocationModalOpen(true);
-  };
-
-  const isVWCrageaTrip = (t: Trip | null) => {
-    if (!t) return false;
-    const isVW = t.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
-    const isCragea = t.destination?.name?.toUpperCase().includes('CRAGEA') || 
-                     t.scheduling?.location?.toUpperCase().includes('CRAGEA');
-    return isVW && isCragea;
+      if (await db.saveTrip(updatedTrip, user)) {
+        setIsStatusModalOpen(false);
+        onRefresh();
+      }
+    } catch (e) { alert("Erro de rede."); } finally { setIsSavingStatus(false); }
   };
 
   const filteredTrips = useMemo(() => {
     let result = [...trips];
 
     if (activeStatusTab === 'ativas') {
-      const activeStatuses: TripStatus[] = [
-        'Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 
-        'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 
-        'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 
-        'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'
-      ];
-      result = result.filter(t => activeStatuses.includes(t.status));
-    } else if (activeStatusTab === 'concluida') {
-      result = result.filter(t => t.status === 'Viagem concluída');
-    } else if (activeStatusTab === 'cancelada') {
-      result = result.filter(t => t.status === 'Viagem cancelada');
-    } else if (activeStatusTab === 'geral') {
-      result = result.filter(t => t.status !== 'Viagem cancelada');
-    }
+      const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
+      result = result.filter(t => active.includes(t.status));
+    } else if (activeStatusTab === 'concluida') result = result.filter(t => t.status === 'Viagem concluída');
+    else if (activeStatusTab === 'cancelada') result = result.filter(t => t.status === 'Viagem cancelada');
+    else if (activeStatusTab === 'geral') result = result.filter(t => t.status !== 'Viagem cancelada');
 
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
     
-    // CORREÇÃO FILTRO DATA: Comparação apenas da parte YYYY-MM-DD
+    // FILTRO DE DATA ROBUSTO (YYYY-MM-DD)
     if (startDate || endDate) {
       result = result.filter(t => {
-        const tripDateOnly = t.dateTime.split('T')[0];
-        if (startDate && tripDateOnly < startDate) return false;
-        if (endDate && tripDateOnly > endDate) return false;
+        const tripDate = t.dateTime.split('T')[0];
+        if (startDate && tripDate < startDate) return false;
+        if (endDate && tripDate > endDate) return false;
         return true;
       });
     }
 
-    // REGRA SOLICITADA: Organizar sempre pela data e hora da operação (Ordem Crescente)
-    result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-
-    return result;
+    return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate]);
 
   const columns = getOperationTableColumns(
-    openStatusEditor,
+    (t, s) => { setSelectedTrip(t); setTempStatus(s); const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); setStatusTime(d.toISOString().slice(0,16)); setIsStatusModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); }, 
     (url, title) => { setPreviewDocData({ url, title }); setIsDocViewerOpen(true); },
-    async (id) => { if(onDeleteTrip) onDeleteTrip(id); },
+    async (id) => onDeleteTrip(id),
     onRefresh,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
-    handleLocateDriver,
+    (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
-    openHistoryManager
+    (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); }
   );
 
   if (activeView.type !== 'list') {
@@ -196,192 +134,54 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         user={user} type={activeView.type === 'category' ? 'category' : 'client'} 
         categoryName={activeView.categoryName || ''} clientName={activeView.clientName} 
         drivers={drivers} customers={customers} availableOps={availableOps} onNavigate={setActiveView}
-        onLocateDriver={handleLocateDriver} allTrips={trips} categories={categories}
+        onLocateDriver={(id) => { setLocationDriverId(id); setIsLocationModalOpen(true); }} allTrips={trips} categories={categories}
+        density={density}
       />
     );
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-end">
-        <div className="flex-1">
-           <CategoryNavigation availableOps={availableOps} customers={customers} onNavigate={setActiveView} />
-        </div>
-        <div className="pb-2 flex gap-3">
-           <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
-           <OperationRegisterAction 
-             user={user}
-             drivers={drivers}
-             customers={customers}
-             categories={categories}
-             onSuccess={onRefresh}
-             variant="dark"
-           />
+    <div className="space-y-8 animate-in fade-in duration-300">
+      <div className="flex flex-col lg:flex-row justify-between items-end gap-6">
+        <div className="flex-1 w-full"><CategoryNavigation availableOps={availableOps} customers={customers} onNavigate={setActiveView} /></div>
+        <div className="flex flex-col items-end gap-4 w-full lg:w-auto">
+           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+              <button onClick={() => setDensity('compact')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${density === 'compact' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Compacto</button>
+              <button onClick={() => setDensity('comfortable')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${density === 'comfortable' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Amplo</button>
+           </div>
+           <div className="flex gap-3">
+              <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
+              <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
+           </div>
         </div>
       </div>
 
       <div className="pt-8 border-t border-slate-200 space-y-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-           <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1 w-full lg:w-auto">
-             {[
-               { id: 'geral', label: 'Visão Geral (Tudo)', color: 'slate' },
-               { id: 'ativas', label: 'Fila Ativa', color: 'blue' },
-               { id: 'concluida', label: 'Concluídas', color: 'emerald' },
-               { id: 'cancelada', label: 'Canceladas', color: 'amber' }
-             ].map(tab => (
-               <button 
-                 key={tab.id} 
-                 onClick={() => setActiveStatusTab(tab.id as any)}
-                 className={`flex-1 lg:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${
-                   activeStatusTab === tab.id 
-                   ? `bg-${tab.color === 'slate' ? 'slate-900' : (tab.color === 'emerald' ? 'emerald-600' : (tab.color === 'amber' ? 'amber-500' : 'blue-600'))} text-white shadow-lg` 
-                   : 'bg-transparent text-slate-400 hover:bg-slate-50'
-                 }`}
-               >
-                 {tab.label}
-               </button>
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+           <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1 w-full lg:w-auto overflow-x-auto">
+             {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
+               <button key={tab} onClick={() => setActiveStatusTab(tab as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>{tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}</button>
              ))}
            </div>
-
-           <DateRangeFilter 
-             startDate={startDate} onStartDateChange={setStartDate}
-             endDate={endDate} onEndDateChange={setEndDate}
-             onClear={() => { setStartDate(''); setEndDate(''); }}
-           />
+           <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
         </div>
-
-        <OperationFilters 
-          selectedTypes={filterTypes} onTypesChange={setFilterTypes} 
-          selectedClients={filterClientNames} onClientsChange={setFilterClientNames} 
-          selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} 
-          customers={customers} drivers={drivers} 
-        />
         
-        {trips.length === 0 ? (
-          <div className="py-20 text-center bg-white rounded-[2.5rem] border border-dashed border-slate-200">
-             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 7v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V7m-16 0h16M4 7l8-4 8 4M4 10l8 4 8-4" strokeWidth="2"/></svg>
-             </div>
-             <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhuma viagem encontrada no banco de dados.</p>
-             <button onClick={onRefresh} className="mt-4 text-blue-600 font-bold text-[10px] uppercase hover:underline">Tentar Sincronizar Agora</button>
-          </div>
-        ) : (
-          <SmartOperationTable 
-            userId={user.id} 
-            componentId="ops-global" 
-            title={`Monitoramento: ${activeStatusTab.toUpperCase()}`} 
-            columns={columns} 
-            data={filteredTrips} 
-            defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
-          />
-        )}
+        <OperationFilters selectedTypes={filterTypes} onTypesChange={setFilterTypes} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} />
+        
+        <div className={density === 'compact' ? 'table-compact' : ''}>
+           <SmartOperationTable userId={user.id} componentId="ops-global" title={`Painel Geral ALS`} columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+        </div>
       </div>
+
+      <style>{`
+        .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; }
+        .table-compact table th { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; }
+      `}</style>
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={onRefresh} preStackingUnits={[...ports, ...preStacking]} />
-
-      {isOCFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[800] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4">
-           <div className="bg-white w-full max-w-[1700px] h-[95vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
-              <header className="px-8 py-5 bg-blue-600 text-white flex justify-between items-center">
-                 <h3 className="font-black text-xs uppercase tracking-widest">Edição de Ordem de Coleta › OS {selectedTrip.os}</h3>
-                 <button onClick={() => setIsOCFormOpen(false)} className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
-              </header>
-              <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); onRefresh(); }} initialData={{ ...selectedTrip.ocFormData, os: selectedTrip.os, driverId: selectedTrip.driver.id, remetenteId: selectedTrip.customer.id, destinatarioId: selectedTrip.destination?.id || '' }} />
-           </div>
-        </div>
-      )}
-
-      {isMinutaFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[800] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4">
-           <div className="bg-white w-full max-w-[1700px] h-[95vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
-              <header className="px-8 py-5 bg-emerald-600 text-white flex justify-between items-center">
-                 <h3 className="font-black text-xs uppercase tracking-widest">Edição de Minuta › OS {selectedTrip.os}</h3>
-                 <button onClick={() => setIsMinutaFormOpen(false)} className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
-              </header>
-              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaFormOpen(false); onRefresh(); }} initialOS={selectedTrip.os} />
-           </div>
-        </div>
-      )}
-
-      {selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={onRefresh} />}
-      
-      {isStatusModalOpen && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
-             <div className="text-center border-b border-slate-100 pb-6 shrink-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atualizar Evento</p>
-                <p className="text-lg font-black text-blue-600 uppercase mt-1">OS: {selectedTrip?.os}</p>
-             </div>
-
-             <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-1">
-                {isVWCrageaTrip(selectedTrip) ? (
-                  <VWStatusSelector currentStatus={tempStatus} onSelect={setTempStatus} />
-                ) : (
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Novo Status</label>
-                    <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                      {['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                )}
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora (Operacional)</label>
-                  <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
-                </div>
-             </div>
-
-             <div className="grid gap-3 pt-4 border-t border-slate-100 shrink-0">
-                <button 
-                  disabled={isSavingStatus}
-                  onClick={handleUpdateStatus} 
-                  className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isSavingStatus ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Gravando...
-                    </>
-                  ) : 'Confirmar Atualização'}
-                </button>
-                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
-             </div>
-          </div>
-        </div>
-      )}
-
-      {isHistoryModalOpen && selectedTrip && (
-        <StatusHistoryManagerModal 
-          isOpen={isHistoryModalOpen} 
-          onClose={() => { setIsHistoryModalOpen(false); setSelectedTrip(null); }} 
-          trip={selectedTrip} 
-          user={user} 
-          onSuccess={() => { onRefresh(); setIsHistoryModalOpen(false); }} 
-        />
-      )}
-
-      {isTripModalOpen && selectedTrip && (
-        <TripModal 
-          isOpen={isTripModalOpen} 
-          onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} 
-          onSuccess={onRefresh} 
-          drivers={drivers} 
-          customers={customers} 
-          categories={categories} 
-          editTrip={selectedTrip} 
-        />
-      )}
-
-      {isCategoryModalOpen && (
-        <CategoryManagerModal 
-          isOpen={isCategoryModalOpen} 
-          onClose={() => setIsCategoryModalOpen(false)} 
-          categories={categories} 
-          onSuccess={onRefresh} 
-          actingUser={user} 
-        />
-      )}
+      {isHistoryModalOpen && selectedTrip && <StatusHistoryManagerModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} trip={selectedTrip} user={user} onSuccess={onRefresh} />}
     </div>
   );
 };

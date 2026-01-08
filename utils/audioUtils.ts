@@ -2,40 +2,31 @@
 export const audioUtils = {
   playNotification: () => {
     try {
-      // Som Padrão: "Ping" suave e estável
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      // Som Suave: "Crystal Ping"
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
       audio.preload = 'auto';
-      audio.volume = 0.45;
+      audio.volume = 0.3;
       const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          console.warn("Audio: Bloqueado pelo navegador. Interação necessária.");
-        });
-      }
+      if (playPromise !== undefined) playPromise.catch(() => {});
     } catch (e) {}
   },
   playDriverUpdate: () => {
     try {
-      // Som Prioritário: "Ding-ding" agudo para motoristas
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
+      // Som Discreto: "Pop soft"
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
       audio.preload = 'auto';
-      audio.volume = 0.55;
+      audio.volume = 0.35;
       const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {});
-      }
+      if (playPromise !== undefined) playPromise.catch(() => {});
     } catch (e) {}
   },
   playAlert: () => {
     try {
-      // Alerta crítico
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/1003/1003-preview.mp3');
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2359/2359-preview.mp3');
       audio.preload = 'auto';
-      audio.volume = 0.4;
+      audio.volume = 0.25;
       const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {});
-      }
+      if (playPromise !== undefined) playPromise.catch(() => {});
     } catch (e) {}
   }
 };

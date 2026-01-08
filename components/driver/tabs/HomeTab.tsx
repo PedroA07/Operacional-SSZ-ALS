@@ -73,6 +73,12 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     } catch (e) { alert("Falha na rede."); } finally { setIsUpdating(false); }
   };
 
+  const handleManualRefresh = async () => {
+    setIsUpdating(true);
+    await onRefresh();
+    setTimeout(() => setIsUpdating(false), 800);
+  };
+
   const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -90,7 +96,14 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     <div className="space-y-8 animate-in fade-in duration-700 pb-24">
       <div className="flex justify-between items-center px-1">
         <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Minha Viagem Atual</h2>
-        <button onClick={() => onRefresh()} className="p-2 bg-white/5 rounded-xl text-slate-400 active:scale-95 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2.5"/></svg></button>
+        <button 
+          onClick={handleManualRefresh} 
+          disabled={isUpdating}
+          className={`flex items-center gap-2 px-4 py-2.5 bg-white/5 rounded-xl text-slate-400 active:scale-90 transition-all border border-white/5 ${isUpdating ? 'opacity-50 grayscale' : ''}`}
+        >
+          <svg className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2.5"/></svg>
+          <span className="text-[8px] font-black uppercase tracking-widest">Atualizar</span>
+        </button>
       </div>
 
       {activeTrip ? (
@@ -106,28 +119,14 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             </div>
           </div>
 
-          {/* NOVOS DOCUMENTOS ENVIADOS - VISUALIZAÇÃO RÁPIDA */}
           {activeTrip.driver_docs && activeTrip.driver_docs.length > 0 && (
              <div className="space-y-3">
                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Documentos que você enviou nesta OS:</p>
                 <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                    {activeTrip.driver_docs.map((doc) => (
-                      <button 
-                        key={doc.id}
-                        onClick={() => setActivePhoto(doc)}
-                        className="w-16 h-20 shrink-0 bg-slate-800 rounded-xl overflow-hidden border border-white/10 relative shadow-lg active:scale-95 transition-all"
-                      >
-                         <img src={doc.url} className="w-full h-full object-cover" />
-                         <div className="absolute inset-0 bg-blue-600/20"></div>
-                      </button>
+                      <button key={doc.id} onClick={() => setActivePhoto(doc)} className="w-16 h-20 shrink-0 bg-slate-800 rounded-xl overflow-hidden border border-white/10 relative shadow-lg active:scale-95 transition-all"><img src={doc.url} className="w-full h-full object-cover" /></button>
                    ))}
-                   <button 
-                    onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }}
-                    className="w-16 h-20 shrink-0 bg-blue-600/10 border-2 border-dashed border-blue-500/30 rounded-xl flex flex-col items-center justify-center gap-1 text-blue-400 active:bg-blue-600 active:text-white transition-all"
-                   >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>
-                      <span className="text-[7px] font-black uppercase tracking-tighter">+ Foto</span>
-                   </button>
+                   <button onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }} className="w-16 h-20 shrink-0 bg-blue-600/10 border-2 border-dashed border-blue-500/30 rounded-xl flex flex-col items-center justify-center gap-1 text-blue-400 active:bg-blue-600 active:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg><span className="text-[7px] font-black uppercase tracking-tighter">+ Foto</span></button>
                 </div>
              </div>
           )}
@@ -165,8 +164,8 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       ) : (
         <div className="py-24 bg-slate-900/30 rounded-[2.5rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center text-center px-8">
            <svg className="w-12 h-12 text-slate-700 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" strokeWidth="2.5"/></svg>
-           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Nenhuma programação ativa localizada para o seu CPF.</p>
-           <button onClick={() => onRefresh()} className="mt-6 text-blue-500 font-bold text-[9px] uppercase hover:underline">Verificar agora</button>
+           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Nenhuma programação ativa localizada.</p>
+           <button onClick={handleManualRefresh} className="mt-6 text-blue-500 font-bold text-[9px] uppercase hover:underline">Verificar agora</button>
         </div>
       )}
 
@@ -180,9 +179,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               <p className="text-[10px] font-black text-white uppercase tracking-widest">Visualizar Captura</p>
               <button onClick={() => setActivePhoto(null)} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-white"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button>
            </header>
-           <div className="flex-1 overflow-hidden p-4">
-              <ImageViewer url={activePhoto.url} />
-           </div>
+           <div className="flex-1 overflow-hidden p-4"><ImageViewer url={activePhoto.url} /></div>
         </div>
       )}
     </div>
