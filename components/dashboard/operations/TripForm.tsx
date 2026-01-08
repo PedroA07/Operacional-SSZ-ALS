@@ -20,7 +20,6 @@ interface TripFormProps {
 const TripForm: React.FC<TripFormProps> = ({ 
   editTrip, initialCategory, initialCustomer, drivers, customers, categories, ports, onCancel, onSave, isSaving 
 }) => {
-  // Estado isolado e completo para evitar resets
   const [formData, setFormData] = useState<any>({
     os: '', booking: '', ship: '', dateTime: '', type: 'EXPORTAÇÃO', status: 'Pendente',
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
@@ -36,7 +35,6 @@ const TripForm: React.FC<TripFormProps> = ({
     driver: useRef<HTMLDivElement>(null)
   };
 
-  // Inicialização única e estável
   useEffect(() => {
     if (editTrip) {
       const date = new Date(editTrip.dateTime);
@@ -61,20 +59,26 @@ const TripForm: React.FC<TripFormProps> = ({
         driver: editTrip.driver?.name || ''
       });
     } else {
-      setFormData(prev => ({
-        ...prev,
+      setFormData({
+        os: '', booking: '', ship: '', 
         dateTime: new Date().toISOString().slice(0, 16),
+        type: 'EXPORTAÇÃO', status: 'Pendente',
         category: initialCategory || '',
+        subCategory: initialCustomer?.name || '',
+        container: '', tara: '', seal: '', cva: '', 
+        containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', 
+        embarcador: '', obs: '', autColeta: '',
         customer: initialCustomer ? { ...initialCustomer } : null,
-        subCategory: initialCustomer?.name || ''
-      }));
-      if (initialCustomer) {
-        setSearches(s => ({ ...s, customer: initialCustomer.legalName || initialCustomer.name }));
-      }
+        destination: null, driver: null
+      });
+      setSearches({
+        customer: initialCustomer ? (initialCustomer.legalName || initialCustomer.name) : '',
+        destination: '',
+        driver: ''
+      });
     }
-  }, [editTrip]);
+  }, [editTrip, initialCategory, initialCustomer]);
 
-  // Fechar dropdowns ao clicar fora
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (dropdownRefs.customer.current && !dropdownRefs.customer.current.contains(e.target as Node)) setDropdowns(d => ({ ...d, customer: false }));
@@ -102,7 +106,6 @@ const TripForm: React.FC<TripFormProps> = ({
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-10 pb-10">
       
-      {/* SEÇÃO 1: CABEÇALHO DA OPERAÇÃO */}
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Identificação Master</h4>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
@@ -153,12 +156,10 @@ const TripForm: React.FC<TripFormProps> = ({
         </div>
       </div>
 
-      {/* SEÇÃO 2: PARCEIROS COMERCIAIS */}
       <div className="space-y-6">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] ml-4">II. Clientes e Destinos</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           
-          {/* SELETOR DE CLIENTE SOFT PREMIUM */}
           <div className="relative" ref={dropdownRefs.customer}>
             <label className={labelClass}>Cliente Contratante</label>
             <div className="relative">
@@ -204,7 +205,6 @@ const TripForm: React.FC<TripFormProps> = ({
             )}
           </div>
 
-          {/* SELETOR DE DESTINO SOFT PREMIUM */}
           <div className="relative" ref={dropdownRefs.destination}>
             <label className={labelClass}>Local de Entrega / Destino</label>
             <div className="relative">
@@ -248,7 +248,6 @@ const TripForm: React.FC<TripFormProps> = ({
         </div>
       </div>
 
-      {/* SEÇÃO 3: DETALHES TÉCNICOS DA UNIDADE */}
       <div className="bg-white p-8 rounded-[3rem] border border-slate-100 space-y-8 shadow-sm">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">III. Equipamento e Unidade</h4>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -290,7 +289,6 @@ const TripForm: React.FC<TripFormProps> = ({
         </div>
       </div>
 
-      {/* SEÇÃO 4: DADOS DE LOGÍSTICA MARÍTIMA */}
       <div className="bg-slate-900 p-10 rounded-[3rem] text-white shadow-2xl space-y-8 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-8 opacity-5">
            <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M20 21c-1.39 0-2.78-.47-4-1.32-2.44 1.71-5.56 1.71-8 0C6.78 20.53 5.39 21 4 21H2v2h2c1.38 0 2.74-.35 4-.99 2.52 1.29 5.48 1.29 8 0 1.26.64 2.62.99 4 .99h2v-2h-2zM3.95 19H4c1.6 0 3.02-.88 4-2 .98 1.12 2.4 2 4 2s3.02-.88 4-2c.98 1.12 2.4 2 4 2h.05l1.89-6.68c.08-.26.06-.54-.06-.78s-.34-.42-.6-.5L20 10.62V6c0-1.1-.9-2-2-2h-3V1H9v3H6c-1.1 0-2 .9-2 2v4.62l-1.29.37c-.26.08-.48.26-.6.5s-.14.52-.06.78L3.95 19zM6 6h12v4.38l-6 1.71-6-1.71V6z" /></svg>
@@ -318,10 +316,8 @@ const TripForm: React.FC<TripFormProps> = ({
         </div>
       </div>
 
-      {/* SEÇÃO 5: ALOCAÇÃO DE RECURSO */}
       <div className="space-y-6">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] ml-4">V. Alocação de Recurso</h4>
-        {/* MOTORISTA SOFT SELECTOR */}
         <div className="relative" ref={dropdownRefs.driver}>
           <label className={labelClass}>Motorista Alocado</label>
           <div className="relative">
@@ -362,9 +358,8 @@ const TripForm: React.FC<TripFormProps> = ({
         </div>
       </div>
 
-      {/* FOOTER AÇÕES FIXO */}
       <div className="flex gap-4 pt-8 border-t border-slate-100 mt-10">
-        <button type="button" onClick={onCancel} className="px-8 py-5 bg-slate-100 text-slate-500 rounded-2xl text-[11px] font-black uppercase hover:bg-slate-200 transition-all active:scale-95">Descartar</button>
+        <button type="button" onClick={onCancel} className="px-8 py-5 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all active:scale-95">Descartar</button>
         <button 
           type="submit" 
           disabled={isSaving || !formData.os || !formData.customer || !formData.driver}

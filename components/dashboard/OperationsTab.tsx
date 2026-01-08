@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db } from '../../utils/storage';
-import TripModal from './operations/TripModal';
+import OperationRegisterAction from './operations/OperationRegisterAction';
 import SchedulingEditModal from './operations/SchedulingEditModal';
 import DriverDocsViewerModal from './operations/DriverDocsViewerModal';
 import DocumentViewerModal from './operations/DocumentViewerModal';
@@ -35,7 +35,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [categories, setCategories] = useState<Category[]>([]);
   const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
   
-  const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
@@ -142,7 +141,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   const columns = getOperationTableColumns(
     (t, s) => { setSelectedTrip(t); setTempStatus(s); setStatusTime(new Date().toISOString().slice(0, 16)); setIsStatusModalOpen(true); },
-    (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
+    (t) => { setSelectedTrip(t); loadData(); }, 
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); }, 
     (url, title) => { setPreviewDocData({ url, title }); setIsDocViewerOpen(true); },
@@ -171,8 +170,16 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         <div className="flex-1">
            <CategoryNavigation availableOps={availableOps} customers={customers} onNavigate={setActiveView} />
         </div>
-        <div className="pb-2">
+        <div className="pb-2 flex gap-3">
            <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
+           <OperationRegisterAction 
+             user={user}
+             drivers={drivers}
+             customers={customers}
+             categories={categories}
+             onSuccess={loadData}
+             variant="dark"
+           />
         </div>
       </div>
 
@@ -250,7 +257,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         </div>
       )}
 
-      <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} />
       {selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={loadData} />}
       
       {isStatusModalOpen && (

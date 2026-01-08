@@ -1,10 +1,10 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, StatusHistoryEntry, PreStacking, Port } from '../../../types';
+import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, StatusHistoryEntry, PreStacking, Port, Category } from '../../../types';
 import SmartOperationTable from './SmartOperationTable';
 import { db } from '../../../utils/storage';
 import { getOperationTableColumns } from './OperationTableColumns';
-import TripModal from './TripModal';
+import OperationRegisterAction from './OperationRegisterAction';
 import SchedulingEditModal from './SchedulingEditModal';
 import DriverDocsViewerModal from './DriverDocsViewerModal';
 import DriverLocationModal from './DriverLocationModal';
@@ -29,8 +29,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   user, type, categoryName, clientName, drivers, customers, availableOps, onNavigate, onLocateDriver
 }) => {
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [isTripModalOpen, setIsTripModalOpen] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
@@ -143,6 +142,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     return result;
   }, [allTrips, categoryName, clientName, type, activeStatusTab, searchQuery, startDate, endDate]);
 
+  const currentDedicatedCustomer = useMemo(() => {
+    if (type !== 'client') return undefined;
+    return customers.find(c => c.name.toUpperCase() === clientName?.toUpperCase());
+  }, [customers, clientName, type]);
+
   const driverColumns = [
     { key: 'name', label: 'Motorista', render: (d: any) => (<div><p className="font-bold text-slate-800 uppercase text-[11px]">{d.name}</p><p className="text-[8px] text-slate-400 font-bold mt-0.5">{d.driverType}</p></div>)},
     { key: 'plateHorse', label: 'Placa Cavalo', render: (d: any) => <span className="font-mono font-black text-blue-600 text-xs">{d.plateHorse}</span> },
@@ -151,7 +155,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
-    (t) => { setSelectedTrip(t); setIsTripModalOpen(true); },
+    (t) => { setSelectedTrip(t); loadLocalData(); }, 
     (t) => {}, (t) => {},
     handleOpenDocModal,
     async (id) => { if(confirm('Excluir viagem?')) { await db.deleteTrip(id, user); loadLocalData(); } },
@@ -169,7 +173,17 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           <div className={`w-16 h-16 ${type === 'category' ? 'bg-slate-900' : 'bg-blue-600'} rounded-[2rem] flex items-center justify-center text-white font-black italic shadow-2xl shrink-0`}>{type === 'category' ? categoryName.substring(0, 2).toUpperCase() : clientName?.substring(0, 2).toUpperCase()}</div>
           <div><div className="flex items-center gap-3">{type === 'client' && (<button onClick={() => onNavigate({ type: 'category', categoryName })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200 hover:text-slate-600 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>)}<h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">{type === 'category' ? categoryName : clientName}</h1></div><p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-2">{type === 'category' ? 'Monitoramento de Categoria Master' : `Página Dedicada • ${categoryName}`}</p></div>
         </div>
-        <button onClick={() => { setSelectedTrip(null); setIsTripModalOpen(true); }} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center gap-3 active:scale-95"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>Nova Programação</button>
+        
+        <OperationRegisterAction 
+          user={user}
+          drivers={drivers}
+          customers={customers}
+          categories={categories}
+          initialCategory={categoryName}
+          initialCustomer={currentDedicatedCustomer}
+          onSuccess={loadLocalData}
+          variant="primary"
+        />
       </div>
 
       <div className="flex border-b border-slate-200 gap-8">
@@ -256,7 +270,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
       )}
 
-      <TripModal isOpen={isTripModalOpen} onClose={() => { setIsTripModalOpen(false); setSelectedTrip(null); }} onSuccess={loadLocalData} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} initialCustomer={type === 'client' ? customers.find(c => c.name === clientName) : undefined} />
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={loadLocalData} preStackingUnits={preStackingUnits} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
       {isDriverDocsModalOpen && selectedTrip && (<DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => { setIsDriverDocsModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} user={user} onSuccess={loadLocalData} />)}
