@@ -11,6 +11,22 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
+  // Desbloqueio de áudio no primeiro clique global
+  useEffect(() => {
+    const unlockAudio = () => {
+      const silentAudio = new Audio();
+      silentAudio.play().catch(() => {});
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
+
   useEffect(() => {
     const initSession = async () => {
       try {

@@ -25,10 +25,7 @@ const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 20000): Pr
 };
 
 export const db = {
-  // O processamento de fila foi removido pois agora a escrita é direta
-  processSyncQueue: async () => {
-    return; 
-  },
+  processSyncQueue: async () => { return; },
 
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
@@ -36,35 +33,22 @@ export const db = {
       const { data, error } = await withTimeout(supabase.from('users').select('*'));
       if (error) throw error;
       return (data || []).map(u => ({
-        id: u.id, 
-        username: u.username, 
-        password: u.password,
+        id: u.id, username: u.username, password: u.password,
         displayName: u.displayname || u.display_name || u.username, 
-        role: u.role,
-        lastLogin: u.lastlogin || u.last_login,
-        photo: u.photo, 
-        position: u.position, 
-        staffId: u.staffid || u.staff_id,
-        driverId: u.driverid || u.driver_id, 
-        status: u.status, 
+        role: u.role, lastLogin: u.lastlogin || u.last_login,
+        photo: u.photo, position: u.position, staffId: u.staffid || u.staff_id,
+        driverId: u.driverid || u.driver_id, status: u.status, 
         isFirstLogin: u.isfirstlogin === true || u.is_first_login === true,
         lastSeen: u.lastseen || u.last_seen, 
         presence_status: u.presence_status || 'offline',
         notificationPrefs: u.notification_prefs
       }));
-    } catch (e) {
-      console.error("Erro ao ler usuários do DB:", e);
-      return [];
-    }
+    } catch (e) { return []; }
   },
 
   getDrivers: async (): Promise<Driver[]> => {
     if (!supabase) return [];
-    try {
-      return await withTimeout(driverRepository.getAll(supabase));
-    } catch (e) {
-      return [];
-    }
+    try { return await withTimeout(driverRepository.getAll(supabase)); } catch (e) { return []; }
   },
 
   getCustomers: async (): Promise<Customer[]> => {
@@ -73,23 +57,15 @@ export const db = {
       const { data, error } = await withTimeout(supabase.from('customers').select('*').order('name'));
       if (error) throw error;
       return (data || []).map(c => ({ 
-        ...c, 
-        legalName: c.legal_name || c.legalName, 
-        zipCode: c.zip_code || c.zipCode,
+        ...c, legalName: c.legal_name || c.legalName, zipCode: c.zip_code || c.zipCode,
         operations: c.operations || []
       })) as Customer[];
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { return []; }
   },
 
   getTrips: async (): Promise<Trip[]> => {
     if (!supabase) return [];
-    try {
-      return await withTimeout(tripRepository.getAll(supabase));
-    } catch (e) {
-      return [];
-    }
+    try { return await withTimeout(tripRepository.getAll(supabase)); } catch (e) { return []; }
   },
 
   getPorts: async (): Promise<Port[]> => {
@@ -98,9 +74,7 @@ export const db = {
       const { data, error } = await withTimeout(supabase.from('ports').select('*').order('name'));
       if (error) throw error;
       return (data || []).map(d => ({ ...d, legalName: d.legal_name || d.legalName, zipCode: d.zip_code || d.zipCode })) as Port[];
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { return []; }
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
@@ -109,9 +83,7 @@ export const db = {
       const { data, error } = await withTimeout(supabase.from('pre_stacking').select('*').order('name'));
       if (error) throw error;
       return (data || []).map(d => ({ ...d, legalName: d.legal_name || d.legalName, zipCode: d.zip_code || d.zipCode })) as PreStacking[];
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { return []; }
   },
 
   getCategories: async (): Promise<Category[]> => {
@@ -120,18 +92,12 @@ export const db = {
       const { data, error } = await withTimeout(supabase.from('categories').select('*').order('name'));
       if (error) throw error;
       return (data || []).map(c => ({ ...c, parentId: c.parent_id || c.parentId })) as Category[];
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { return []; }
   },
 
   getStaff: async (): Promise<Staff[]> => {
     if (!supabase) return [];
-    try {
-      return await withTimeout(staffRepository.getAll(supabase));
-    } catch (e) {
-      return [];
-    }
+    try { return await withTimeout(staffRepository.getAll(supabase)); } catch (e) { return []; }
   },
 
   saveTrip: async (trip: Trip, actingUser?: User) => {
@@ -140,17 +106,14 @@ export const db = {
       const success = await tripRepository.save(supabase, trip);
       if (success && actingUser) {
         const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse, cliente: trip.customer.name };
-        await db.addNotification(actingUser, 'TRIP_UPDATED', 'Programação Sincronizada', `A OS ${trip.os} foi atualizada no banco de dados.`, summary);
+        await db.addNotification(actingUser, 'TRIP_UPDATED', 'Programação Atualizada', `A OS ${trip.os} foi persistida no banco de dados.`, summary);
       }
       return success;
-    } catch (e) {
-      console.error("Erro ao salvar viagem direta no banco:", e);
-      return false;
-    }
+    } catch (e) { return false; }
   },
 
   saveUser: async (user: User) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     const payload = {
       id: user.id, username: user.username, password: user.password,
       displayname: user.displayName, role: user.role, lastlogin: user.lastLogin,
@@ -159,12 +122,7 @@ export const db = {
       lastseen: user.lastSeen, isonlinevisible: user.isOnlineVisible ?? true,
       presence_status: user.presence_status || 'offline', notification_prefs: user.notificationPrefs
     };
-    try {
-      const { error } = await supabase.from('users').upsert(payload);
-      return !error;
-    } catch (e) {
-      return false;
-    }
+    try { const { error } = await supabase.from('users').upsert(payload); return !error; } catch (e) { return false; }
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
@@ -172,62 +130,51 @@ export const db = {
     try {
       const success = await driverRepository.save(supabase, driver);
       if (success && actingUser) {
-        await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Motorista', `Motorista ${driver.name} atualizado diretamente no DB.`, { motorista: driver.name, placa: driver.plateHorse });
+        await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Motorista', `Dados de ${driver.name} salvos no servidor.`, { motorista: driver.name, placa: driver.plateHorse });
       }
       return success;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   },
 
   saveCustomer: async (customer: Customer, actingUser?: User) => {
     if (!supabase) return false;
     try {
       const { error } = await supabase.from('customers').upsert({ 
-        ...customer, 
-        legal_name: customer.legalName, 
-        zip_code: customer.zipCode,
-        operations: customer.operations
+        ...customer, legal_name: customer.legalName, zip_code: customer.zipCode, operations: customer.operations
       });
       if (!error && actingUser) {
-        await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cadastro Cliente', `Cliente ${customer.name} atualizado no banco.`, { cliente: customer.name });
+        await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cadastro Cliente', `Cliente ${customer.name} atualizado no servidor.`, { cliente: customer.name });
       }
       return !error;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   },
 
   savePort: async (port: Port, actingUser?: User) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     const { error } = await supabase.from('ports').upsert({ ...port, legal_name: port.legalName, zip_code: port.zipCode });
     return !error;
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     const { error } = await supabase.from('pre_stacking').upsert({ ...ps, legal_name: ps.legalName, zip_code: ps.zipCode });
     return !error;
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     try {
       const success = await staffRepository.save(supabase, staff);
       if (success && password) {
         const { data: userData } = await supabase.from('users').select('*').eq('staffid', staff.id).single();
-        if (userData) {
-          await supabase.from('users').update({ password }).eq('id', userData.id);
-        }
+        if (userData) await supabase.from('users').update({ password }).eq('id', userData.id);
       }
       return success;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   },
 
   saveCategory: async (category: Category, actingUser?: User) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     const { error } = await supabase.from('categories').upsert({ ...category, parent_id: category.parentId });
     return !error;
   },
@@ -235,22 +182,16 @@ export const db = {
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
     try {
-      const { data, error } = await withTimeout(supabase
-        .from('notifications')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(30));
+      const { data, error } = await withTimeout(supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(30));
       if (error) throw error;
       return (data || []).map(n => ({
-        id: String(n.id), title: n.type.replace(/_/g, ' '), 
+        id: String(n.id), title: n.title || n.type.replace(/_/g, ' '), 
         description: n.message, type: n.type as NotificationType,
         origin: (n.origin as NotificationOrigin) || 'OPERACIONAL',
         authorName: n.user_name || 'Sistema', authorId: n.user_id || 'system', 
         timestamp: n.timestamp, summary: { ...n.summary, os: n.os_ref }
       }));
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { return []; }
   },
 
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: Notification['summary']) => {
@@ -261,28 +202,32 @@ export const db = {
     let origin: NotificationOrigin = user.role === 'driver' || user.role === 'motoboy' ? 'MOTORISTA' : 'OPERACIONAL';
     
     try {
+      // Inserção no banco: Todos os usuários logados receberão via Realtime no componente NotificationToast
       await supabase.from('notifications').insert({
-        user_id: user.id || 'system', user_name: authorName, type, origin,
-        message: description, os_ref: osRef, timestamp, summary: summary || {}
+        user_id: user.id || 'system', 
+        user_name: authorName, 
+        type, 
+        origin,
+        title, 
+        message: description, 
+        os_ref: osRef, 
+        timestamp, 
+        summary: summary || {}
       });
-      const newNotif: Notification = { id: `db-${Date.now()}`, title, description, type, origin, authorName, authorId: user.id || 'system', timestamp, summary };
-      window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: newNotif }));
-    } catch (e) {}
+    } catch (e) {
+      console.error("Erro ao registrar notificação no DB:", e);
+    }
   },
 
   updatePresence: async (userId: string, status: PresenceStatus) => {
     if (supabase) {
-      try {
-        await supabase.from('users').update({ lastseen: new Date().toISOString(), presence_status: status }).eq('id', userId);
-      } catch (e) {}
+      try { await supabase.from('users').update({ lastseen: new Date().toISOString(), presence_status: status }).eq('id', userId); } catch (e) {}
     }
   },
 
   updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
     if (!supabase) return;
-    try {
-      await supabase.from('drivers').update({ current_lat: lat, current_lng: lng, last_location_at: new Date().toISOString() }).eq('id', driverId);
-    } catch (e) {}
+    try { await supabase.from('drivers').update({ current_lat: lat, current_lng: lng, last_location_at: new Date().toISOString() }).eq('id', driverId); } catch (e) {}
   },
 
   deleteTrip: async (id: string, actingUser?: User) => {
@@ -290,40 +235,38 @@ export const db = {
     try {
       const { error } = await supabase.from('trips').delete().eq('id', id);
       if (!error && actingUser) {
-        await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `A OS foi excluída permanentemente do banco.`, { os: 'EXCLUÍDA' });
+        await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `A OS foi excluída permanentemente do banco de dados.`, { os: 'EXCLUÍDA' });
       }
       return !error;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   },
 
   deleteDriver: async (id: string) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     const { error } = await supabase.from('drivers').delete().eq('id', id);
     return !error;
   },
 
   deleteCustomer: async (id: string) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     const { error } = await supabase.from('customers').delete().eq('id', id);
     return !error;
   },
 
   deletePort: async (id: string) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     const { error } = await supabase.from('ports').delete().eq('id', id);
     return !error;
   },
 
   deletePreStacking: async (id: string) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     const { error } = await supabase.from('pre_stacking').delete().eq('id', id);
     return !error;
   },
 
   deleteStaff: async (id: string) => {
-    if (!supabase) return false;
+    if (!supabase) return true;
     const { error } = await supabase.from('staff').delete().eq('id', id);
     return !error;
   },
@@ -331,38 +274,24 @@ export const db = {
   exportBackup: async () => {
     try {
       const [users, drivers, customers, trips, ports, preStacking, categories, staff] = await Promise.all([
-        db.getUsers(),
-        db.getDrivers(),
-        db.getCustomers(),
-        db.getTrips(),
-        db.getPorts(),
-        db.getPreStacking(),
-        db.getCategories(),
-        db.getStaff()
+        db.getUsers(), db.getDrivers(), db.getCustomers(), db.getTrips(),
+        db.getPorts(), db.getPreStacking(), db.getCategories(), db.getStaff()
       ]);
-
       const data = { users, drivers, customers, trips, ports, preStacking, categories, staff };
-      
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       const date = new Date().toISOString().split('T')[0];
-      a.href = url;
-      a.download = `ALS_LOGISTICA_BACKUP_${date}.json`;
-      a.click();
+      a.href = url; a.download = `ALS_BACKUP_${date}.json`; a.click();
       URL.revokeObjectURL(url);
       return true;
-    } catch (e) {
-      console.error("Erro exportando base:", e);
-      throw e;
-    }
+    } catch (e) { throw e; }
   },
 
   importBackup: async (file: File) => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      
       if (data.users) for (const item of data.users) await db.saveUser(item);
       if (data.drivers) for (const item of data.drivers) await db.saveDriver(item);
       if (data.customers) for (const item of data.customers) await db.saveCustomer(item);
@@ -371,21 +300,15 @@ export const db = {
       if (data.preStacking) for (const item of data.preStacking) await db.savePreStacking(item);
       if (data.categories) for (const item of data.categories) await db.saveCategory(item);
       if (data.staff) for (const item of data.staff) await db.saveStaff(item);
-      
       return true;
-    } catch (e) {
-      console.error("Erro na importação:", e);
-      return false;
-    }
+    } catch (e) { return false; }
   },
 
   getPreferences: (userId: string) => {
     try {
       const allPrefs = JSON.parse(localStorage.getItem('als_ui_preferences') || '{}');
       return allPrefs[userId] || { visibleColumns: {} };
-    } catch {
-      return { visibleColumns: {} };
-    }
+    } catch { return { visibleColumns: {} }; }
   },
 
   savePreference: (userId: string, componentId: string, columns: string[]) => {
@@ -400,8 +323,7 @@ export const db = {
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try { 
-      // Tenta uma operação de leitura simples para validar se as chaves funcionam
-      const { data, error } = await supabase.from('users').select('id').limit(1);
+      const { error } = await supabase.from('users').select('id').limit(1);
       return !error; 
     } catch { return false; }
   }

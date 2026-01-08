@@ -1,59 +1,95 @@
 
-import React, { useState, useEffect } from 'react';
-import { Notification, User } from '../../../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Notification, User, NotificationType, NotificationOrigin } from '../../../types';
 import { audioUtils } from '../../../utils/audioUtils';
+import { supabase } from '../../../utils/storage';
 
 const NotificationToast: React.FC = () => {
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
 
-  useEffect(() => {
-    const handleNewNotif = (e: any) => {
-      const notif = e.detail as Notification;
-      
-      let prefs = { 
-        newTrip: true, 
-        statusUpdate: true, 
-        paymentLiberated: true, 
-        systemChanges: true, 
-        newRegistrations: true 
-      };
+  const processNotification = useCallback((payload: any) => {
+    const data = payload.new;
+    if (!data) return;
 
-      try {
-        const sessionUserStr = sessionStorage.getItem('als_active_session');
-        if (sessionUserStr) {
-          const user = JSON.parse(sessionUserStr) as User;
-          if (user.notificationPrefs) prefs = user.notificationPrefs;
-        }
-      } catch (err) {}
-
-      let shouldShow = false;
-      if (notif.type === 'TRIP_CREATED' && prefs.newTrip) shouldShow = true;
-      else if (['STATUS_UPDATED', 'OC_GENERATED', 'LIBERACAO_GENERATED', 'MINUTA_GENERATED', 'DRIVER_DOC_UPLOADED'].includes(notif.type) && prefs.statusUpdate) shouldShow = true;
-      else if (['DRIVER_CREATED', 'CUSTOMER_CREATED', 'PORT_CREATED', 'PRESTACKING_CREATED', 'CATEGORY_CREATED'].includes(notif.type) && prefs.newRegistrations) shouldShow = true;
-      else if (notif.type === 'PAYMENT_LIBERATED' && prefs.paymentLiberated) shouldShow = true;
-      else if (['DELETED', 'SYSTEM'].includes(notif.type) && prefs.systemChanges) shouldShow = true;
-
-      if (shouldShow) {
-        setActiveToast(notif);
-        
-        // DIFERENCIAÇÃO SONORA
-        if (notif.origin === 'MOTORISTA' || notif.type === 'DRIVER_DOC_UPLOADED' || notif.type === 'STATUS_UPDATED') {
-          audioUtils.playDriverUpdate();
-        } else {
-          audioUtils.playNotification();
-        }
-        
-        const timer = setTimeout(() => {
-          setActiveToast(null);
-        }, 8000);
-        
-        return () => clearTimeout(timer);
-      }
+    // Converte o formato do banco para o tipo Notification do App
+    const notif: Notification = {
+      id: String(data.id),
+      title: data.title || data.type.replace(/_/g, ' '),
+      description: data.message,
+      type: data.type as NotificationType,
+      origin: (data.origin as NotificationOrigin) || 'OPERACIONAL',
+      authorName: data.user_name || 'Sistema',
+      authorId: data.user_id || 'system',
+      timestamp: data.timestamp,
+      summary: { ...data.summary, os: data.os_ref }
     };
 
-    window.addEventListener('als_new_notification_event', handleNewNotif);
-    return () => window.removeEventListener('als_new_notification_event', handleNewNotif);
+    let prefs = { 
+      newTrip: true, 
+      statusUpdate: true, 
+      paymentLiberated: true, 
+      systemChanges: true, 
+      newRegistrations: true 
+    };
+
+    try {
+      const sessionUserStr = sessionStorage.getItem('als_active_session');
+      if (sessionUserStr) {
+        const user = JSON.parse(sessionUserStr) as User;
+        if (user.notificationPrefs) prefs = user.notificationPrefs;
+      }
+    } catch (err) {}
+
+    // Lógica de filtragem baseada em preferências individuais
+    let shouldShow = false;
+    const type = notif.type;
+
+    if (type === 'TRIP_CREATED' && prefs.newTrip) shouldShow = true;
+    else if (['STATUS_UPDATED', 'OC_GENERATED', 'LIBERACAO_GENERATED', 'MINUTA_GENERATED', 'DRIVER_DOC_UPLOADED', 'TRIP_UPDATED'].includes(type) && prefs.statusUpdate) shouldShow = true;
+    else if (['DRIVER_CREATED', 'CUSTOMER_CREATED', 'PORT_CREATED', 'PRESTACKING_CREATED', 'CATEGORY_CREATED'].includes(type) && prefs.newRegistrations) shouldShow = true;
+    else if (type === 'PAYMENT_LIBERATED' && prefs.paymentLiberated) shouldShow = true;
+    else if (['DELETED', 'SYSTEM'].includes(type) && prefs.systemChanges) shouldShow = true;
+
+    if (shouldShow) {
+      setActiveToast(notif);
+      
+      // SONS DIFERENCIADOS PARA TODOS
+      if (notif.origin === 'MOTORISTA' || ['DRIVER_DOC_UPLOADED', 'STATUS_UPDATED'].includes(type)) {
+        audioUtils.playDriverUpdate();
+      } else {
+        audioUtils.playNotification();
+      }
+      
+      // Auto-hide após 8 segundos
+      setTimeout(() => {
+        setActiveToast(null);
+      }, 8000);
+    }
   }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    // INSCRIÇÃO REALTIME: Escuta a tabela 'notifications' para QUALQUER usuário
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT', // Apenas quando for gravado com sucesso no DB
+          schema: 'public',
+          table: 'notifications'
+        },
+        (payload) => {
+          processNotification(payload);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [processNotification]);
 
   if (!activeToast) return null;
 
@@ -61,19 +97,22 @@ const NotificationToast: React.FC = () => {
 
   return (
     <div className="fixed top-20 right-6 z-[2000] w-85 animate-in slide-in-from-right-full duration-500">
-       <div className={`bg-slate-950/95 backdrop-blur-xl text-white p-5 rounded-[2.2rem] shadow-[0_30px_70px_rgba(0,0,0,0.5)] border ${isDriverAlert ? 'border-emerald-500/30' : 'border-white/10'} flex flex-col gap-2 relative overflow-hidden group`}>
+       <div 
+         onClick={() => setActiveToast(null)}
+         className={`bg-slate-950/95 backdrop-blur-xl text-white p-5 rounded-[2.2rem] shadow-[0_30px_70px_rgba(0,0,0,0.5)] border cursor-pointer ${isDriverAlert ? 'border-emerald-500/30' : 'border-white/10'} flex flex-col gap-2 relative overflow-hidden group active:scale-95 transition-all`}
+       >
           <div className={`absolute top-0 left-0 w-1.5 h-full ${isDriverAlert ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.5)]'}`}></div>
           
           <div className="flex justify-between items-center mb-1">
              <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full animate-pulse ${isDriverAlert ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
                 <p className={`text-[8px] font-black uppercase tracking-widest ${isDriverAlert ? 'text-emerald-400' : 'text-blue-400'}`}>
-                  {isDriverAlert ? 'Alerta do Motorista' : 'Alerta do Sistema'}
+                  {isDriverAlert ? 'Alerta Realtime: Motorista' : 'Alerta Realtime: Sistema'}
                 </p>
              </div>
-             <button onClick={() => setActiveToast(null)} className="text-white/20 hover:text-white transition-colors p-1">
+             <div className="text-white/20 group-hover:text-white transition-colors">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-             </button>
+             </div>
           </div>
 
           <div className="flex items-start gap-4">
@@ -93,8 +132,8 @@ const NotificationToast: React.FC = () => {
           {(activeToast.summary?.os || activeToast.summary?.motorista) && (
             <div className="mt-3 px-3 py-2 bg-white/5 rounded-xl border border-white/5 flex justify-between items-center">
                <div>
-                  <span className="text-[8px] font-black text-blue-400 uppercase tracking-tighter">Referência:</span>
-                  <p className="text-[10px] font-mono font-bold text-white uppercase">{activeToast.summary?.os ? `OS ${activeToast.summary.os}` : activeToast.summary?.motorista}</p>
+                  <span className="text-[8px] font-black text-blue-400 uppercase tracking-tighter">OS Referenciada:</span>
+                  <p className="text-[10px] font-mono font-bold text-white uppercase">{activeToast.summary?.os ? `Nº ${activeToast.summary.os}` : activeToast.summary?.motorista}</p>
                </div>
                {activeToast.summary?.placa && (
                  <span className="bg-slate-800 px-2 py-0.5 rounded text-[8px] font-mono text-slate-300 border border-white/5">{activeToast.summary.placa}</span>
