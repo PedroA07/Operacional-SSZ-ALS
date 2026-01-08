@@ -67,22 +67,27 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     };
 
     try {
+      // PERSISTÊNCIA GARANTIDA COM OBJETO USER COMPLETO
       if (await db.saveTrip(updatedTrip, user)) {
         await db.addNotification(user, 'STATUS_UPDATED', `OS ${trip.os}: ${nextStatus}`, `Status atualizado via App Motorista.`, { os: trip.os, motorista: user.displayName });
         setShowPicker(false);
         await onRefresh();
       }
-    } catch (e) { alert("Falha na rede."); } finally { setIsUpdating(false); }
+    } catch (e) { 
+      alert("Falha de sincronização. Verifique sua internet."); 
+    } finally { 
+      setIsUpdating(false); 
+    }
   };
 
   const handleManualRefresh = async () => {
     if (isUpdating) return;
     setIsUpdating(true);
     try {
-      // Força o re-carregamento total da página como solicitado
+      // FORÇA RECARREGAMENTO TOTAL DO BROWSER PARA LIMPAR CACHE
       window.location.reload();
     } finally {
-      setTimeout(() => setIsUpdating(false), 1000);
+      setTimeout(() => setIsUpdating(false), 2000);
     }
   };
 
@@ -106,10 +111,10 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
         <button 
           onClick={handleManualRefresh} 
           disabled={isUpdating}
-          className={`flex items-center gap-2 px-4 py-2.5 bg-white/5 rounded-xl text-slate-400 active:scale-90 transition-all border border-white/5 ${isUpdating ? 'opacity-50 grayscale' : ''}`}
+          className={`flex items-center gap-2 px-4 py-2.5 bg-white/5 rounded-xl text-slate-400 active:scale-90 transition-all border border-white/5 ${isUpdating ? 'opacity-50' : ''}`}
         >
           <svg className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2.5"/></svg>
-          <span className="text-[8px] font-black uppercase tracking-widest">Atualizar Página</span>
+          <span className="text-[8px] font-black uppercase tracking-widest">{isUpdating ? 'Atualizando...' : 'Atualizar Página'}</span>
         </button>
       </div>
 
@@ -129,14 +134,13 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           {activeTrip.driver_docs && activeTrip.driver_docs.length > 0 && (
              <div className="space-y-3">
                 <div className="flex justify-between items-center px-1">
-                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Minhas fotos nesta OS</p>
-                   <button onClick={() => setIsGalleryOpen(true)} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Ver Todas ({activeTrip.driver_docs.length})</button>
+                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Fotos Enviadas ({activeTrip.driver_docs.length})</p>
+                   <button onClick={() => setIsGalleryOpen(true)} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Ver Todas</button>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                    {activeTrip.driver_docs.map((doc) => (
                       <button key={doc.id} onClick={() => setActivePhoto(doc)} className="w-16 h-20 shrink-0 bg-slate-800 rounded-xl overflow-hidden border border-white/10 relative shadow-lg active:scale-95 transition-all"><img src={doc.url} className="w-full h-full object-cover" /></button>
                    ))}
-                   <button onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }} className="w-16 h-20 shrink-0 bg-blue-600/10 border-2 border-dashed border-blue-500/30 rounded-xl flex flex-col items-center justify-center gap-1 text-blue-400 active:bg-blue-600 active:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg><span className="text-[7px] font-black uppercase tracking-tighter">+ Foto</span></button>
                 </div>
              </div>
           )}
@@ -159,7 +163,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Posição Atual</p>
                 <p className="text-sm font-black uppercase mt-1 truncate text-blue-400">{activeTrip.status}</p>
               </div>
-              <button onClick={() => setShowPicker(!showPicker)} className="px-5 py-3 rounded-2xl text-[9px] font-black uppercase bg-slate-800 border border-white/10 text-white active:bg-blue-600 transition-all">{showPicker ? 'Fechar' : 'Alterar'}</button>
+              <button onClick={() => setShowPicker(!showPicker)} className={`px-5 py-3 rounded-2xl text-[9px] font-black uppercase border transition-all ${showPicker ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-white/10 text-white'}`}>{showPicker ? 'Fechar' : 'Alterar'}</button>
             </div>
             
             {showPicker && (

@@ -25,8 +25,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const [sessionTime, setSessionTime] = useState('00:00:00');
   const [isNotifCenterOpen, setIsNotifCenterOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  
-  const lastTripIdsRef = useRef<Set<string>>(new Set());
 
   const checkUnread = useCallback(async (myTrips: Trip[]) => {
     if (isNotifCenterOpen) {
@@ -60,23 +58,26 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         db.getTrips()
       ]);
 
-      const targetDriverId = String(user.driverId || '').replace('drv-', '').trim();
-      const userCPF = String(user.username || '').replace(/\D/g, '');
+      // NORMALIZAÇÃO PARA VÍNCULO INFALÍVEL
+      const targetDriverIdClean = String(user.driverId || '').replace('drv-', '').trim();
+      const userCPFOnlyNumbers = String(user.username || '').replace(/\D/g, '');
       
       const currentDriver = allDrivers.find(d => {
-        const dId = String(d.id).replace('drv-', '').trim();
-        const dCpf = String(d.cpf).replace(/\D/g, '');
-        return (targetDriverId !== '' && dId === targetDriverId) || (userCPF !== '' && dCpf === userCPF);
+        const dIdClean = String(d.id).replace('drv-', '').trim();
+        const dCpfClean = String(d.cpf).replace(/\D/g, '');
+        return (targetDriverIdClean !== '' && dIdClean === targetDriverIdClean) || 
+               (userCPFOnlyNumbers !== '' && dCpfClean === userCPFOnlyNumbers);
       });
 
-      // Busca TODAS as viagens onde o motorista coincida (ID ou CPF)
+      // Busca por ID limpo OU CPF limpo em TODAS as viagens
       const myTrips = allTrips.filter(t => {
         if (!t.driver) return false;
-        const tripDriverId = String(t.driver.id || '').replace('drv-', '').trim();
-        const tripDriverCPF = String(t.driver.cpf || '').replace(/\D/g, '');
         
-        const matchId = targetDriverId !== '' && tripDriverId === targetDriverId;
-        const matchCpf = userCPF !== '' && tripDriverCPF === userCPF;
+        const tripDrvIdClean = String(t.driver.id || '').replace('drv-', '').trim();
+        const tripDrvCpfClean = String(t.driver.cpf || '').replace(/\D/g, '');
+        
+        const matchId = targetDriverIdClean !== '' && tripDrvIdClean === targetDriverIdClean;
+        const matchCpf = userCPFOnlyNumbers !== '' && tripDrvCpfClean === userCPFOnlyNumbers;
         
         return matchId || matchCpf;
       }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());

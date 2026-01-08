@@ -115,9 +115,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       result = result.filter(t => t.os.toLowerCase().includes(q) || t.container?.toLowerCase().includes(q) || t.driver.name.toLowerCase().includes(q));
     }
 
+    // LOGICA CORRIGIDA: Comparação de data YYYY-MM-DD
     if (startDate || endDate) {
       result = result.filter(t => {
-        // Normalização robusta YYYY-MM-DD
         const tripDate = t.dateTime.substring(0, 10);
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
