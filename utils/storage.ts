@@ -4,7 +4,6 @@ import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notif
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
-import { offlineManager } from './offlineManager';
 
 let SUPABASE_URL = '';
 let SUPABASE_KEY = '';
@@ -18,228 +17,140 @@ try {
 
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-export const KEYS = {
-  DRIVERS: 'drivers',
-  CUSTOMERS: 'customers',
-  PORTS: 'ports',
-  PRE_STACKING: 'pre_stacking',
-  STAFF: 'staff',
-  USERS: 'users',
-  TRIPS: 'trips',
-  CATEGORIES: 'categories',
-  NOTIFICATIONS: 'notifications'
-};
-
-const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 8000): Promise<T> => {
+const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 15000): Promise<T> => {
   return Promise.race([
     Promise.resolve(promise),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms))
+    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_DATABASE')), ms))
   ]) as any;
 };
 
 export const db = {
+  // O processamento de fila foi removido pois agora a escrita é direta
   processSyncQueue: async () => {
-    if (!supabase) return;
-    const queue = offlineManager.getQueue();
-    if (queue.length === 0) return;
-
-    for (const item of queue) {
-      try {
-        let success = false;
-        switch (item.type) {
-          case 'TRIP':
-            await tripRepository.save(supabase, item.payload);
-            success = true;
-            break;
-          case 'DRIVER':
-            await driverRepository.save(supabase, item.payload);
-            success = true;
-            break;
-          case 'CUSTOMER':
-            await supabase.from('customers').upsert({ 
-              ...item.payload, 
-              legal_name: item.payload.legalName, 
-              zip_code: item.payload.zipCode,
-              operations: item.payload.operations
-            });
-            success = true;
-            break;
-          case 'PORT':
-            await supabase.from('ports').upsert({ ...item.payload, legal_name: item.payload.legalName, zip_code: item.payload.zipCode });
-            success = true;
-            break;
-          case 'PRESTACKING':
-            await supabase.from('pre_stacking').upsert({ ...item.payload, legal_name: item.payload.legalName, zip_code: item.payload.zipCode });
-            success = true;
-            break;
-          case 'STAFF':
-            await staffRepository.save(supabase, item.payload);
-            success = true;
-            break;
-          case 'CATEGORY':
-            await supabase.from('categories').upsert({ ...item.payload, parent_id: item.payload.parentId });
-            success = true;
-            break;
-        }
-
-        if (success) offlineManager.removeFromQueue(item.id);
-      } catch (e) {
-        offlineManager.updateAttempt(item.id);
-      }
-    }
+    return; 
   },
 
   getUsers: async (): Promise<User[]> => {
-    if (supabase) {
-      try {
-        const { data, error } = await withTimeout(supabase.from('users').select('*'));
-        if (!error && data) {
-          const mapped = data.map(u => ({
-            id: u.id, 
-            username: u.username, 
-            password: u.password,
-            displayName: u.displayname || u.display_name || u.username, 
-            role: u.role,
-            lastLogin: u.lastlogin || u.last_login || new Date().toISOString(),
-            photo: u.photo, 
-            position: u.position, 
-            staffId: u.staffid || u.staff_id,
-            driverId: u.driverid || u.driver_id, 
-            status: u.status, 
-            isFirstLogin: u.isfirstlogin === true || u.is_first_login === true,
-            lastSeen: u.lastseen || u.last_seen, 
-            isOnlineVisible: u.isonlinevisible ?? u.is_online_visible ?? true,
-            presence_status: u.presence_status || 'offline',
-            notificationPrefs: u.notification_prefs
-          }));
-          offlineManager.setRegistry(KEYS.USERS, mapped);
-          return mapped;
-        }
-      } catch (e) {}
+    if (!supabase) return [];
+    try {
+      const { data, error } = await withTimeout(supabase.from('users').select('*'));
+      if (error) throw error;
+      return (data || []).map(u => ({
+        id: u.id, 
+        username: u.username, 
+        password: u.password,
+        displayName: u.displayname || u.display_name || u.username, 
+        role: u.role,
+        lastLogin: u.lastlogin || u.last_login,
+        photo: u.photo, 
+        position: u.position, 
+        staffId: u.staffid || u.staff_id,
+        driverId: u.driverid || u.driver_id, 
+        status: u.status, 
+        isFirstLogin: u.isfirstlogin === true || u.is_first_login === true,
+        lastSeen: u.lastseen || u.last_seen, 
+        presence_status: u.presence_status || 'offline',
+        notificationPrefs: u.notification_prefs
+      }));
+    } catch (e) {
+      console.error("Erro ao ler usuários do DB:", e);
+      return [];
     }
-    return offlineManager.getRegistry<User>(KEYS.USERS);
   },
 
   getDrivers: async (): Promise<Driver[]> => {
-    if (supabase) {
-      try {
-        const data = await withTimeout(driverRepository.getAll(supabase));
-        if (data) { offlineManager.setRegistry(KEYS.DRIVERS, data); return data; }
-      } catch (e) {}
+    if (!supabase) return [];
+    try {
+      return await withTimeout(driverRepository.getAll(supabase));
+    } catch (e) {
+      return [];
     }
-    return offlineManager.getRegistry<Driver>(KEYS.DRIVERS);
   },
 
   getCustomers: async (): Promise<Customer[]> => {
-    if (supabase) {
-      try {
-        const { data } = await withTimeout(supabase.from('customers').select('*'));
-        if (data) {
-          const mapped = data.map(c => ({ 
-            ...c, 
-            legalName: c.legal_name || c.legalName, 
-            zipCode: c.zip_code || c.zipCode,
-            operations: c.operations || []
-          })) as Customer[];
-          offlineManager.setRegistry(KEYS.CUSTOMERS, mapped);
-          return mapped;
-        }
-      } catch (e) {}
+    if (!supabase) return [];
+    try {
+      const { data, error } = await withTimeout(supabase.from('customers').select('*').order('name'));
+      if (error) throw error;
+      return (data || []).map(c => ({ 
+        ...c, 
+        legalName: c.legal_name || c.legalName, 
+        zipCode: c.zip_code || c.zipCode,
+        operations: c.operations || []
+      })) as Customer[];
+    } catch (e) {
+      return [];
     }
-    return offlineManager.getRegistry<Customer>(KEYS.CUSTOMERS);
   },
 
   getTrips: async (): Promise<Trip[]> => {
-    if (supabase) {
-      try {
-        const data = await withTimeout(tripRepository.getAll(supabase));
-        if (data) { offlineManager.setRegistry(KEYS.TRIPS, data); return data; }
-      } catch (e) {}
+    if (!supabase) return [];
+    try {
+      return await withTimeout(tripRepository.getAll(supabase));
+    } catch (e) {
+      return [];
     }
-    return offlineManager.getRegistry<Trip>(KEYS.TRIPS);
   },
 
   getPorts: async (): Promise<Port[]> => {
-    if (supabase) {
-      try {
-        const { data } = await withTimeout(supabase.from('ports').select('*'));
-        if (data) {
-          const mapped = data.map(d => ({ ...d, legalName: d.legal_name || d.legalName, zipCode: d.zip_code || d.zipCode })) as Port[];
-          offlineManager.setRegistry(KEYS.PORTS, mapped);
-          return mapped;
-        }
-      } catch (e) {}
+    if (!supabase) return [];
+    try {
+      const { data, error } = await withTimeout(supabase.from('ports').select('*').order('name'));
+      if (error) throw error;
+      return (data || []).map(d => ({ ...d, legalName: d.legal_name || d.legalName, zipCode: d.zip_code || d.zipCode })) as Port[];
+    } catch (e) {
+      return [];
     }
-    return offlineManager.getRegistry<Port>(KEYS.PORTS);
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
-    if (supabase) {
-      try {
-        const { data } = await withTimeout(supabase.from('pre_stacking').select('*'));
-        if (data) {
-          const mapped = data.map(d => ({ ...d, legalName: d.legal_name || d.legalName, zipCode: d.zip_code || d.zipCode })) as PreStacking[];
-          offlineManager.setRegistry(KEYS.PRE_STACKING, mapped);
-          return mapped;
-        }
-      } catch (e) {}
+    if (!supabase) return [];
+    try {
+      const { data, error } = await withTimeout(supabase.from('pre_stacking').select('*').order('name'));
+      if (error) throw error;
+      return (data || []).map(d => ({ ...d, legalName: d.legal_name || d.legalName, zipCode: d.zip_code || d.zipCode })) as PreStacking[];
+    } catch (e) {
+      return [];
     }
-    return offlineManager.getRegistry<PreStacking>(KEYS.PRE_STACKING);
   },
 
   getCategories: async (): Promise<Category[]> => {
-    if (supabase) {
-      try {
-        const { data } = await withTimeout(supabase.from('categories').select('*'));
-        if (data) {
-          const mapped = data.map(c => ({ ...c, parentId: c.parent_id || c.parentId })) as Category[];
-          offlineManager.setRegistry(KEYS.CATEGORIES, mapped);
-          return mapped;
-        }
-      } catch (e) {}
+    if (!supabase) return [];
+    try {
+      const { data, error } = await withTimeout(supabase.from('categories').select('*').order('name'));
+      if (error) throw error;
+      return (data || []).map(c => ({ ...c, parentId: c.parent_id || c.parentId })) as Category[];
+    } catch (e) {
+      return [];
     }
-    return offlineManager.getRegistry<Category>(KEYS.CATEGORIES);
   },
 
   getStaff: async (): Promise<Staff[]> => {
-    if (supabase) {
-      try {
-        const data = await withTimeout(staffRepository.getAll(supabase));
-        if (data) { offlineManager.setRegistry(KEYS.STAFF, data); return data; }
-      } catch (e) {}
+    if (!supabase) return [];
+    try {
+      return await withTimeout(staffRepository.getAll(supabase));
+    } catch (e) {
+      return [];
     }
-    return offlineManager.getRegistry<Staff>(KEYS.STAFF);
   },
 
   saveTrip: async (trip: Trip, actingUser?: User) => {
-    const current = offlineManager.getRegistry<Trip>(KEYS.TRIPS);
-    const idx = current.findIndex(t => t.id === trip.id);
-    const oldTrip = idx >= 0 ? current[idx] : null;
-    
-    if (idx >= 0) current[idx] = trip; else current.push(trip);
-    offlineManager.setRegistry(KEYS.TRIPS, current);
-
-    offlineManager.addToQueue('TRIP', 'UPSERT', trip);
-
-    if (actingUser) {
-      const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse, cliente: trip.customer.name };
-      if (!oldTrip) {
-        await db.addNotification(actingUser, 'TRIP_CREATED', 'Nova Programação', `A OS ${trip.os} foi cadastrada por ${actingUser.displayName}.`, summary);
-      } else if (oldTrip.status !== trip.status) {
-        await db.addNotification(actingUser, 'STATUS_UPDATED', 'Status de Viagem', `A OS ${trip.os} foi alterada para "${trip.status}" por ${actingUser.displayName}.`, summary);
+    if (!supabase) return false;
+    try {
+      const success = await tripRepository.save(supabase, trip);
+      if (success && actingUser) {
+        const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse, cliente: trip.customer.name };
+        await db.addNotification(actingUser, 'TRIP_UPDATED', 'Programação Sincronizada', `A OS ${trip.os} foi atualizada no banco de dados.`, summary);
       }
+      return success;
+    } catch (e) {
+      console.error("Erro ao salvar viagem direta no banco:", e);
+      return false;
     }
-    
-    db.processSyncQueue();
-    return true;
   },
 
   saveUser: async (user: User) => {
-    const current = offlineManager.getRegistry<User>(KEYS.USERS);
-    const idx = current.findIndex(u => u.id === user.id);
-    if (idx >= 0) current[idx] = user; else current.push(user);
-    offlineManager.setRegistry(KEYS.USERS, current);
-
+    if (!supabase) return false;
     const payload = {
       id: user.id, username: user.username, password: user.password,
       displayname: user.displayName, role: user.role, lastlogin: user.lastLogin,
@@ -248,125 +159,115 @@ export const db = {
       lastseen: user.lastSeen, isonlinevisible: user.isOnlineVisible ?? true,
       presence_status: user.presence_status || 'offline', notification_prefs: user.notificationPrefs
     };
-
-    if (supabase) {
-      try { await supabase.from('users').upsert(payload); } catch (e) {}
+    try {
+      const { error } = await supabase.from('users').upsert(payload);
+      return !error;
+    } catch (e) {
+      return false;
     }
-    return true;
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
-    const current = offlineManager.getRegistry<Driver>(KEYS.DRIVERS);
-    const idx = current.findIndex(d => d.id === driver.id);
-    if (idx >= 0) current[idx] = driver; else current.push(driver);
-    offlineManager.setRegistry(KEYS.DRIVERS, current);
-
-    offlineManager.addToQueue('DRIVER', 'UPSERT', driver);
-    if (actingUser) await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Atualizado', `Motorista ${driver.name} atualizado por ${actingUser.displayName}.`, { motorista: driver.name, placa: driver.plateHorse });
-    db.processSyncQueue();
-    return true;
+    if (!supabase) return false;
+    try {
+      const success = await driverRepository.save(supabase, driver);
+      if (success && actingUser) {
+        await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Motorista', `Motorista ${driver.name} atualizado diretamente no DB.`, { motorista: driver.name, placa: driver.plateHorse });
+      }
+      return success;
+    } catch (e) {
+      return false;
+    }
   },
 
   saveCustomer: async (customer: Customer, actingUser?: User) => {
-    const current = offlineManager.getRegistry<Customer>(KEYS.CUSTOMERS);
-    const idx = current.findIndex(c => c.id === customer.id);
-    if (idx >= 0) current[idx] = customer; else current.push(customer);
-    offlineManager.setRegistry(KEYS.CUSTOMERS, current);
-
-    offlineManager.addToQueue('CUSTOMER', 'UPSERT', customer);
-    if (actingUser) await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cadastro Cliente', `Cliente ${customer.name} atualizado por ${actingUser.displayName}.`, { cliente: customer.name });
-    db.processSyncQueue();
-    return true;
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('customers').upsert({ 
+        ...customer, 
+        legal_name: customer.legalName, 
+        zip_code: customer.zipCode,
+        operations: customer.operations
+      });
+      if (!error && actingUser) {
+        await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cadastro Cliente', `Cliente ${customer.name} atualizado no banco.`, { cliente: customer.name });
+      }
+      return !error;
+    } catch (e) {
+      return false;
+    }
   },
 
   savePort: async (port: Port, actingUser?: User) => {
-    const current = offlineManager.getRegistry<Port>(KEYS.PORTS);
-    const idx = current.findIndex(p => p.id === port.id);
-    if (idx >= 0) current[idx] = port; else current.push(port);
-    offlineManager.setRegistry(KEYS.PORTS, current);
-    offlineManager.addToQueue('PORT', 'UPSERT', port);
-    db.processSyncQueue();
-    return true;
+    if (!supabase) return false;
+    const { error } = await supabase.from('ports').upsert({ ...port, legal_name: port.legalName, zip_code: port.zipCode });
+    return !error;
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
-    const current = offlineManager.getRegistry<PreStacking>(KEYS.PRE_STACKING);
-    const idx = current.findIndex(p => p.id === ps.id);
-    if (idx >= 0) current[idx] = ps; else current.push(ps);
-    offlineManager.setRegistry(KEYS.PRE_STACKING, current);
-    offlineManager.addToQueue('PRESTACKING', 'UPSERT', ps);
-    db.processSyncQueue();
-    return true;
+    if (!supabase) return false;
+    const { error } = await supabase.from('pre_stacking').upsert({ ...ps, legal_name: ps.legalName, zip_code: ps.zipCode });
+    return !error;
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
-    const current = offlineManager.getRegistry<Staff>(KEYS.STAFF);
-    const idx = current.findIndex(s => s.id === staff.id);
-    if (idx >= 0) current[idx] = staff; else current.push(staff);
-    offlineManager.setRegistry(KEYS.STAFF, current);
-    
-    offlineManager.addToQueue('STAFF', 'UPSERT', staff);
-
-    if (password) {
-      const users = await db.getUsers();
-      const linked = users.find(u => u.staffId === staff.id);
-      if (linked) await db.saveUser({ ...linked, password });
+    if (!supabase) return false;
+    try {
+      const success = await staffRepository.save(supabase, staff);
+      if (success && password) {
+        const { data: userData } = await supabase.from('users').select('*').eq('staffid', staff.id).single();
+        if (userData) {
+          await supabase.from('users').update({ password }).eq('id', userData.id);
+        }
+      }
+      return success;
+    } catch (e) {
+      return false;
     }
-
-    db.processSyncQueue();
-    return true;
   },
 
   saveCategory: async (category: Category, actingUser?: User) => {
-    const current = offlineManager.getRegistry<Category>(KEYS.CATEGORIES);
-    const idx = current.findIndex(c => c.id === category.id);
-    if (idx >= 0) current[idx] = category; else current.push(category);
-    offlineManager.setRegistry(KEYS.CATEGORIES, current);
-    offlineManager.addToQueue('CATEGORY', 'UPSERT', category);
-    db.processSyncQueue();
-    return true;
+    if (!supabase) return false;
+    const { error } = await supabase.from('categories').upsert({ ...category, parent_id: category.parentId });
+    return !error;
   },
 
   getNotifications: async (): Promise<Notification[]> => {
-    if (supabase) {
-      try {
-        const { data, error } = await withTimeout(supabase
-          .from('notifications')
-          .select('*')
-          .order('timestamp', { ascending: false })
-          .limit(50));
-        if (!error && data) {
-          const mapped: Notification[] = data.map(n => ({
-            id: String(n.id), title: n.type.replace(/_/g, ' '), 
-            description: n.message, type: n.type as NotificationType,
-            origin: (n.origin as NotificationOrigin) || 'OPERACIONAL',
-            authorName: n.user_name || 'Sistema', authorId: n.user_id || 'system', 
-            timestamp: n.timestamp, summary: { ...n.summary, os: n.os_ref }
-          }));
-          return mapped;
-        }
-      } catch (e) {}
+    if (!supabase) return [];
+    try {
+      const { data, error } = await withTimeout(supabase
+        .from('notifications')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(30));
+      if (error) throw error;
+      return (data || []).map(n => ({
+        id: String(n.id), title: n.type.replace(/_/g, ' '), 
+        description: n.message, type: n.type as NotificationType,
+        origin: (n.origin as NotificationOrigin) || 'OPERACIONAL',
+        authorName: n.user_name || 'Sistema', authorId: n.user_id || 'system', 
+        timestamp: n.timestamp, summary: { ...n.summary, os: n.os_ref }
+      }));
+    } catch (e) {
+      return [];
     }
-    return [];
   },
 
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: Notification['summary']) => {
+    if (!supabase) return;
     const authorName = user.displayName || user.username || 'Sistema';
     const timestamp = new Date().toISOString();
     const osRef = summary?.os || '';
     let origin: NotificationOrigin = user.role === 'driver' || user.role === 'motoboy' ? 'MOTORISTA' : 'OPERACIONAL';
     
-    if (supabase) {
-      try {
-        await supabase.from('notifications').insert({
-          user_id: user.id || 'system', user_name: authorName, type, origin,
-          message: description, os_ref: osRef, timestamp, summary: summary || {}
-        });
-      } catch (e) {}
-    }
-    
-    const newNotif: Notification = { id: `local-${Date.now()}`, title, description, type, origin, authorName, authorId: user.id || 'system', timestamp, summary };
-    window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: newNotif }));
+    try {
+      await supabase.from('notifications').insert({
+        user_id: user.id || 'system', user_name: authorName, type, origin,
+        message: description, os_ref: osRef, timestamp, summary: summary || {}
+      });
+      const newNotif: Notification = { id: `db-${Date.now()}`, title, description, type, origin, authorName, authorId: user.id || 'system', timestamp, summary };
+      window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: newNotif }));
+    } catch (e) {}
   },
 
   updatePresence: async (userId: string, status: PresenceStatus) => {
@@ -378,122 +279,130 @@ export const db = {
   },
 
   updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
-    const now = new Date().toISOString();
-    if (supabase) {
-      try {
-        await supabase.from('drivers').update({ current_lat: lat, current_lng: lng, last_location_at: now }).eq('id', driverId);
-      } catch (e) {}
-    }
+    if (!supabase) return;
+    try {
+      await supabase.from('drivers').update({ current_lat: lat, current_lng: lng, last_location_at: new Date().toISOString() }).eq('id', driverId);
+    } catch (e) {}
   },
 
   deleteTrip: async (id: string, actingUser?: User) => {
-    const current = offlineManager.getRegistry<Trip>(KEYS.TRIPS);
-    const trip = current.find(t => t.id === id);
-    offlineManager.setRegistry(KEYS.TRIPS, current.filter(t => t.id !== id));
-    
-    if (supabase) {
-      try { await supabase.from('trips').delete().eq('id', id); } catch (e) {}
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('trips').delete().eq('id', id);
+      if (!error && actingUser) {
+        await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `A OS foi excluída permanentemente do banco.`, { os: 'EXCLUÍDA' });
+      }
+      return !error;
+    } catch (e) {
+      return false;
     }
-
-    if (actingUser && trip) {
-      await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `A OS ${trip.os} foi removida por ${actingUser.displayName}.`, { os: trip.os, motorista: trip.driver.name });
-    }
-    return true;
   },
 
   deleteDriver: async (id: string) => {
-    const current = offlineManager.getRegistry<Driver>(KEYS.DRIVERS);
-    offlineManager.setRegistry(KEYS.DRIVERS, current.filter(d => d.id !== id));
-    if (supabase) { try { await supabase.from('drivers').delete().eq('id', id); } catch (e) {} }
-    return true;
+    if (!supabase) return false;
+    const { error } = await supabase.from('drivers').delete().eq('id', id);
+    return !error;
   },
 
   deleteCustomer: async (id: string) => {
-    const current = offlineManager.getRegistry<Customer>(KEYS.CUSTOMERS);
-    offlineManager.setRegistry(KEYS.CUSTOMERS, current.filter(c => c.id !== id));
-    if (supabase) { try { await supabase.from('customers').delete().eq('id', id); } catch (e) {} }
-    return true;
+    if (!supabase) return false;
+    const { error } = await supabase.from('customers').delete().eq('id', id);
+    return !error;
   },
 
   deletePort: async (id: string) => {
-    const current = offlineManager.getRegistry<Port>(KEYS.PORTS);
-    offlineManager.setRegistry(KEYS.PORTS, current.filter(p => p.id !== id));
-    if (supabase) { try { await supabase.from('ports').delete().eq('id', id); } catch (e) {} }
-    return true;
+    if (!supabase) return false;
+    const { error } = await supabase.from('ports').delete().eq('id', id);
+    return !error;
   },
 
   deletePreStacking: async (id: string) => {
-    const current = offlineManager.getRegistry<PreStacking>(KEYS.PRE_STACKING);
-    offlineManager.setRegistry(KEYS.PRE_STACKING, current.filter(p => p.id !== id));
-    if (supabase) { try { await supabase.from('pre_stacking').delete().eq('id', id); } catch (e) {} }
-    return true;
+    if (!supabase) return false;
+    const { error } = await supabase.from('pre_stacking').delete().eq('id', id);
+    return !error;
   },
 
   deleteStaff: async (id: string) => {
-    const current = offlineManager.getRegistry<Staff>(KEYS.STAFF);
-    offlineManager.setRegistry(KEYS.STAFF, current.filter(s => s.id !== id));
-    if (supabase) { try { await supabase.from('staff').delete().eq('id', id); } catch (e) {} }
-    return true;
+    if (!supabase) return false;
+    const { error } = await supabase.from('staff').delete().eq('id', id);
+    return !error;
+  },
+
+  // Added exportBackup to fix property missing error in SystemTab
+  exportBackup: async () => {
+    try {
+      const [users, drivers, customers, trips, ports, preStacking, categories, staff] = await Promise.all([
+        db.getUsers(),
+        db.getDrivers(),
+        db.getCustomers(),
+        db.getTrips(),
+        db.getPorts(),
+        db.getPreStacking(),
+        db.getCategories(),
+        db.getStaff()
+      ]);
+
+      const data = { users, drivers, customers, trips, ports, preStacking, categories, staff };
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().split('T')[0];
+      a.href = url;
+      a.download = `ALS_LOGISTICA_BACKUP_${date}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (e) {
+      console.error("Erro exportando base:", e);
+      throw e;
+    }
+  },
+
+  // Added importBackup to fix property missing error in SystemTab
+  importBackup: async (file: File) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      if (data.users) for (const item of data.users) await db.saveUser(item);
+      if (data.drivers) for (const item of data.drivers) await db.saveDriver(item);
+      if (data.customers) for (const item of data.customers) await db.saveCustomer(item);
+      if (data.trips) for (const item of data.trips) await db.saveTrip(item);
+      if (data.ports) for (const item of data.ports) await db.savePort(item);
+      if (data.preStacking) for (const item of data.preStacking) await db.savePreStacking(item);
+      if (data.categories) for (const item of data.categories) await db.saveCategory(item);
+      if (data.staff) for (const item of data.staff) await db.saveStaff(item);
+      
+      return true;
+    } catch (e) {
+      console.error("Erro na importação:", e);
+      return false;
+    }
   },
 
   getPreferences: (userId: string) => {
-    const allPrefs = JSON.parse(localStorage.getItem('als_ui_preferences') || '{}');
-    return allPrefs[userId] || { visibleColumns: {} };
+    try {
+      const allPrefs = JSON.parse(localStorage.getItem('als_ui_preferences') || '{}');
+      return allPrefs[userId] || { visibleColumns: {} };
+    } catch {
+      return { visibleColumns: {} };
+    }
   },
 
   savePreference: (userId: string, componentId: string, columns: string[]) => {
-    const allPrefs = JSON.parse(localStorage.getItem('als_ui_preferences') || '{}');
-    if (!allPrefs[userId]) allPrefs[userId] = { visibleColumns: {} };
-    allPrefs[userId].visibleColumns[componentId] = columns;
-    localStorage.setItem('als_ui_preferences', JSON.stringify(allPrefs));
-  },
-
-  exportBackup: async () => {
-    const backup: Record<string, any> = {};
-    Object.values(KEYS).forEach(key => {
-      backup[key] = offlineManager.getRegistry(key);
-    });
-    
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ALS_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  },
-
-  importBackup: async (file: File): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const content = JSON.parse(e.target?.result as string);
-          if (!content || typeof content !== 'object') {
-            resolve(false);
-            return;
-          }
-          
-          Object.values(KEYS).forEach(key => {
-            if (Array.isArray(content[key])) {
-              offlineManager.setRegistry(key, content[key]);
-            }
-          });
-          resolve(true);
-        } catch (error) {
-          console.error("Erro na importação ALS:", error);
-          resolve(false);
-        }
-      };
-      reader.onerror = () => resolve(false);
-      reader.readAsText(file);
-    });
+    try {
+      const allPrefs = JSON.parse(localStorage.getItem('als_ui_preferences') || '{}');
+      if (!allPrefs[userId]) allPrefs[userId] = { visibleColumns: {} };
+      allPrefs[userId].visibleColumns[componentId] = columns;
+      localStorage.setItem('als_ui_preferences', JSON.stringify(allPrefs));
+    } catch {}
   },
 
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try { 
-      const { error } = await withTimeout(supabase.from('users').select('count', { count: 'exact', head: true }).limit(1), 3000); 
+      const { error } = await withTimeout(supabase.from('users').select('count', { count: 'exact', head: true }).limit(1), 5000); 
       return !error; 
     } catch { return false; }
   }

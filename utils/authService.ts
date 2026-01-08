@@ -8,70 +8,60 @@ import { offlineManager } from './offlineManager';
 export const authService = {
   /**
    * Realiza o login consultando o banco de dados em tempo real.
+   * Ignora caches locais para garantir validação de senha atualizada.
    */
   async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string; forceChange?: boolean }> {
     const inputUser = username.trim().toLowerCase();
     const now = new Date().toISOString();
     
     try {
-      // 1. Tenta buscar o usuário DIRETAMENTE no Supabase
+      // 1. Tenta buscar o usuário DIRETAMENTE no Supabase (Sem usar db.getUsers que pode estar cacheado)
       if (supabase) {
-        try {
-          const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .ilike('username', inputUser)
-            .single();
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('username', inputUser)
+          .single();
 
-          if (!error && data) {
-            if (data.password !== password) {
-              return { success: false, error: 'Chave de segurança incorreta.' };
-            }
-
-            if (data.status === 'Inativo') {
-              return { success: false, error: 'Este acesso foi desativado.' };
-            }
-
-            const dbUser: User = {
-              id: data.id,
-              username: data.username,
-              password: data.password,
-              displayName: data.displayname || data.display_name || data.username,
-              role: data.role,
-              lastLogin: now,
-              photo: data.photo,
-              position: data.position,
-              staffId: data.staffid || data.staff_id,
-              driverId: data.driverid || data.driver_id,
-              status: data.status,
-              isFirstLogin: data.isfirstlogin === true || data.is_first_login === true,
-              notificationPrefs: data.notification_prefs
-            };
-
-            // LIMPEZA DE CACHE: Força o sistema a baixar tudo novo após login
-            offlineManager.clearAllCache();
-            
-            await db.saveUser(dbUser);
-            const forceChange = passwordRule.shouldForceChange(dbUser);
-            return { success: true, user: dbUser, forceChange };
+        if (!error && data) {
+          // Validação de Senha Direta
+          if (data.password !== password) {
+            return { success: false, error: 'Chave de segurança incorreta para este operador.' };
           }
-        } catch (dbErr) {
-          console.error("Erro Supabase Auth:", dbErr);
+
+          if (data.status === 'Inativo') {
+            return { success: false, error: 'Este acesso foi desativado pela administração.' };
+          }
+
+          const dbUser: User = {
+            id: data.id,
+            username: data.username,
+            password: data.password,
+            displayName: data.displayname || data.display_name || data.username,
+            role: data.role,
+            lastLogin: now,
+            photo: data.photo,
+            position: data.position,
+            staffId: data.staffid || data.staff_id,
+            driverId: data.driverid || data.driver_id,
+            status: data.status,
+            isFirstLogin: data.isfirstlogin === true || data.is_first_login === true,
+            notificationPrefs: data.notification_prefs,
+            presence_status: 'online'
+          };
+
+          // SUCESSO: Limpa o cache para forçar download de dados novos no Dashboard
+          offlineManager.clearAllCache();
+          
+          // Atualiza o registro no DB e Cache Local
+          await db.saveUser(dbUser);
+          
+          const forceChange = passwordRule.shouldForceChange(dbUser);
+          return { success: true, user: dbUser, forceChange };
         }
       }
 
-      // 2. Fallback para cache local se rede falhar
-      const cachedUsers = await db.getUsers();
-      const cachedUser = cachedUsers.find(u => u.username.toLowerCase() === inputUser);
-
-      if (cachedUser) {
-        if (cachedUser.password === password) {
-          return { success: true, user: cachedUser, forceChange: passwordRule.shouldForceChange(cachedUser) };
-        }
-        return { success: false, error: 'Chave incorreta (Modo Offline).' };
-      }
-
-      // 3. Fallback mestre (Admin de emergência)
+      // 2. Fallback Mestre: Caso o banco falhe ou o usuário seja o admin master fixo
       if (inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && password === ADMIN_CREDENTIALS.password) {
         const masterAdmin: User = {
           id: 'admin-master',
@@ -80,7 +70,7 @@ export const authService = {
           role: 'admin',
           lastLogin: now,
           isFirstLogin: false,
-          position: 'Administração SSZ'
+          position: 'Administração ALS SSZ'
         };
         
         offlineManager.clearAllCache();
@@ -88,9 +78,10 @@ export const authService = {
         return { success: true, user: masterAdmin, forceChange: false };
       }
 
-      return { success: false, error: 'Usuário não localizado.' };
+      return { success: false, error: 'Usuário não localizado no banco de dados central.' };
     } catch (err) {
-      return { success: false, error: 'Erro de comunicação interna.' };
+      console.error("Erro crítico de autenticação:", err);
+      return { success: false, error: 'Falha de comunicação com o servidor ALS.' };
     }
   },
 

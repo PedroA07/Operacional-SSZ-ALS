@@ -1,7 +1,7 @@
 
 /**
- * ALS OFFLINE MANAGER v1.1
- * Gerencia o cache local de registros e a fila de sincronização de saída.
+ * ALS OFFLINE MANAGER v1.2
+ * Gerencia o cache local de registros e a limpeza profunda de dados.
  */
 
 const STORAGE_KEYS = {
@@ -38,17 +38,28 @@ export const offlineManager = {
   },
 
   /**
-   * Remove todos os dados cacheados para forçar o download limpo do banco de dados.
+   * Remove TODOS os dados de cache para garantir que a próxima carga venha 100% do banco.
    */
   clearAllCache: () => {
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith(STORAGE_KEYS.CACHE_PREFIX) || key.startsWith(STORAGE_KEYS.LAST_SYNC)) {
-        localStorage.removeItem(key);
+    const keysToRemove: string[] = [];
+    
+    // Identifica todas as chaves do ALS
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (
+        key.startsWith(STORAGE_KEYS.CACHE_PREFIX) || 
+        key.startsWith(STORAGE_KEYS.LAST_SYNC) ||
+        key.includes('als_opt_') || // Filtros de colunas
+        key === 'als_active_session'
+      )) {
+        keysToRemove.push(key);
       }
-    });
-    // Mantemos as filas de sincronização pendentes por segurança, 
-    // mas limpamos os registros de visualização.
-    console.log("ALS: Cache local de registros removido.");
+    }
+
+    // Remove as chaves encontradas
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    
+    console.log("ALS System: Cache de dados e preferências purgado.");
   },
 
   // --- GESTÃO DE FILA (CACHE DE ESCRITA) ---
@@ -69,18 +80,24 @@ export const offlineManager = {
   },
 
   getQueue: (): SyncItem[] => {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.QUEUE) || '[]');
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEYS.QUEUE) || '[]');
+    } catch {
+      return [];
+    }
   },
 
   removeFromQueue: (id: string) => {
-    const queue: SyncItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.QUEUE) || '[]');
-    const filtered = queue.filter(item => item.id !== id);
+    // Fix: Changed 'this.getQueue()' to 'offlineManager.getQueue()' to fix 'Object is possibly undefined' in arrow function
+    const queue = offlineManager.getQueue();
+    const filtered = queue.filter((item: SyncItem) => item.id !== id);
     localStorage.setItem(STORAGE_KEYS.QUEUE, JSON.stringify(filtered));
   },
 
   updateAttempt: (id: string) => {
-    const queue: SyncItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.QUEUE) || '[]');
-    const updated = queue.map(item => {
+    // Fix: Changed 'this.getQueue()' to 'offlineManager.getQueue()' to fix 'Object is possibly undefined' in arrow function
+    const queue = offlineManager.getQueue();
+    const updated = queue.map((item: SyncItem) => {
       if (item.id === id) return { ...item, attempts: item.attempts + 1 };
       return item;
     });
