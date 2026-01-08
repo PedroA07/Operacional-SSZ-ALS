@@ -55,13 +55,11 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     if (!confirm(`CONFIRMAR ESTA POSIÇÃO: ${confirmLabel}?`)) return;
 
     setIsUpdating(true);
-    
-    // REGRA: Captura o horário real de registro
     const now = new Date().toISOString();
     const newEntry: StatusHistoryEntry = {
       status: nextStatus,
-      dateTime: now, // Horário operacional para o motorista costuma ser agora
-      createdAt: now // Horário real de registro
+      dateTime: now,
+      createdAt: now
     };
 
     const updatedTrip: Trip = {
@@ -74,7 +72,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     try {
       const success = await db.saveTrip(updatedTrip, user);
       if (success) {
-        // Notificação em tempo real
         await db.addNotification(
           user,
           'STATUS_UPDATED',
@@ -82,7 +79,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           `A OS ${trip.os} foi atualizada pelo motorista no aplicativo.`,
           { os: trip.os, motorista: user.displayName, placa: trip.driver.plateHorse }
         );
-
         setShowPicker(false);
         await onRefresh();
       } else {
@@ -113,7 +109,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-24">
-      
       <section className="space-y-4">
         <div className="flex justify-between items-center px-1">
           <div className="flex items-center gap-3">
@@ -130,7 +125,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             <svg className="w-3.5 h-3.5 group-active:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <span className="text-[8px] font-black uppercase tracking-widest">Atualizar</span>
+            <span className="text-[8px] font-black uppercase tracking-widest">Sincronizar</span>
           </button>
         </div>
 
@@ -259,14 +254,15 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
              <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-6 text-slate-600">
                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" strokeWidth="2.5"/></svg>
              </div>
-             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Sem programações pendentes.</p>
+             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Sem programações pendentes para o seu CPF.</p>
+             <button onClick={() => onRefresh()} className="mt-4 text-blue-500 font-bold text-[9px] uppercase hover:underline">Verificar novamente</button>
           </div>
         )}
       </section>
 
       <div className="pt-4 pb-8">
         <p className="text-[8px] text-slate-800 font-bold uppercase tracking-[0.5em] text-center">
-          ALS TRANSPORTES OPERACIONAL V4.1
+          ALS TRANSPORTES OPERACIONAL V4.1.2
         </p>
       </div>
 

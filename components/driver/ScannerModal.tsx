@@ -21,6 +21,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const videoRef = useRef<HTMLElement | any>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -57,10 +58,10 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       }
     } catch (err) {
       console.error("Erro Câmera:", err);
-      alert("Erro ao acessar câmera. Verifique as permissões.");
-      onClose();
+      // Se falhar a câmera (ex: em desktop sem cam), permitimos usar apenas o anexo
+      setIsCameraReady(false);
     }
-  }, [onClose]);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -83,10 +84,22 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Captura em qualidade alta para manter legibilidade das NFs
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       setCurrentImage(dataUrl);
       setStep('preview');
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setCurrentImage(result);
+        setStep('preview');
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -106,7 +119,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const handleFinish = async () => {
     if (isSaving) return;
     
-    // Prepara a lista final com as capturadas anteriormente e a atual se houver
     const finalNewDocs: DriverCapturedDoc[] = [...capturedImages];
     if (currentImage) {
       finalNewDocs.push({
@@ -123,24 +135,20 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
 
     setIsSaving(true);
     try {
-      // 1. Busca a viagem atualizada para garantir que não sobrescrevemos outros dados
       const allTrips = await db.getTrips();
       const latestTrip = allTrips.find(t => t.id === trip.id);
       
       if (!latestTrip) throw new Error("Viagem não localizada.");
 
-      // 2. Mescla os documentos antigos com os novos capturados
       const currentDocs = Array.isArray(latestTrip.driver_docs) ? latestTrip.driver_docs : [];
       const updatedTrip: Trip = {
         ...latestTrip,
         driver_docs: [...currentDocs, ...finalNewDocs]
       };
       
-      // 3. Salva a viagem (o actingUser 'user' passado aqui garante o autor na notificação)
       const saved = await db.saveTrip(updatedTrip, user);
       
       if (saved) {
-        // Disparo explícito de notificação caso o saveTrip automático não o faça
         await db.addNotification(
           user,
           'DRIVER_DOC_UPLOADED',
@@ -175,7 +183,14 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       </header>
 
       <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
-        <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover transition-opacity duration-300 ${step === 'preview' ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`} />
+        {isCameraReady ? (
+          <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover transition-opacity duration-300 ${step === 'preview' ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`} />
+        ) : step === 'camera' ? (
+           <div className="flex flex-col items-center gap-4 text-slate-500 text-center px-10">
+              <svg className="w-12 h-12 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/></svg>
+              <p className="text-[10px] font-black uppercase tracking-widest">Câmera indisponível.<br/>Use o botão de anexo abaixo.</p>
+           </div>
+        ) : null}
 
         {step === 'camera' && (
           <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none z-10">
@@ -196,15 +211,31 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         )}
 
         {step === 'camera' && (
-          <div className="absolute bottom-8 left-0 w-full flex flex-col items-center gap-4 z-40">
-             {capturedImages.length > 0 && (
-               <div className="bg-blue-600 px-4 py-1.5 rounded-full text-[10px] font-black text-white uppercase shadow-2xl">
-                 {capturedImages.length} Pág. na Pilha
-               </div>
-             )}
+          <div className="absolute bottom-8 left-0 w-full flex items-center justify-center gap-10 z-40">
+             <input type="file" ref={fileInputRef} className="hidden" accept="image/*,.pdf" onChange={handleFileSelect} />
+             
+             <button 
+               onClick={() => fileInputRef.current?.click()}
+               className="w-14 h-14 bg-white/10 rounded-2xl flex flex-col items-center justify-center text-white border border-white/10 active:scale-90 transition-all shadow-xl"
+             >
+                <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="2"/></svg>
+                <span className="text-[7px] font-black uppercase tracking-tighter">Anexar</span>
+             </button>
+
              <button onClick={capturePhoto} disabled={!isCameraReady} className={`w-20 h-20 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center active:scale-75 transition-all shadow-[0_0_40px_rgba(59,130,246,0.6)] ${!isCameraReady ? 'opacity-30 grayscale' : ''}`}>
                <div className="w-14 h-14 bg-white border-2 border-slate-200 rounded-full shadow-inner"></div>
              </button>
+             
+             <div className="w-14 h-14 flex items-center justify-center relative">
+                {capturedImages.length > 0 && (
+                   <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-[10px] font-black text-white shadow-lg border-2 border-slate-950">
+                      {capturedImages.length}
+                   </div>
+                )}
+                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-slate-500">
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" strokeWidth="2"/></svg>
+                </div>
+             </div>
           </div>
         )}
       </div>
@@ -215,7 +246,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         {step === 'preview' ? (
           <div className="flex flex-col gap-3">
              <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setStep('camera')} className="py-4 bg-slate-900 text-slate-300 rounded-2xl text-[10px] font-black uppercase border border-white/5">Refazer</button>
+                <button onClick={() => { setStep('camera'); setCurrentImage(null); }} className="py-4 bg-slate-900 text-slate-300 rounded-2xl text-[10px] font-black uppercase border border-white/5">Refazer</button>
                 <button onClick={handleAddMore} className="py-4 bg-blue-600/10 text-blue-400 border border-blue-500/20 rounded-2xl text-[10px] font-black uppercase">+ Página</button>
              </div>
              <button disabled={isSaving} onClick={handleFinish} className="w-full py-5 bg-emerald-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl active:bg-emerald-700 transition-all flex items-center justify-center gap-3">

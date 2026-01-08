@@ -36,7 +36,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
     const clearedStr = localStorage.getItem('als_cleared_notifs');
     const clearedIds: string[] = clearedStr ? JSON.parse(clearedStr) : [];
     
-    // REGRA: Notificações não lidas são as que o timestamp é posterior a última visualização do sino
     const lastViewedStr = localStorage.getItem(`als_driver_last_viewed_${user.id}`);
     const lastViewed = lastViewedStr ? new Date(lastViewedStr).getTime() : 0;
 
@@ -57,9 +56,14 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         db.getTrips()
       ]);
 
-      const currentDriver = allDrivers.find(d => String(d.id) === String(user.driverId));
-      const myTrips = allTrips.filter(t => String(t.driver?.id) === String(user.driverId))
-        .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+      // Comparação robusta de IDs (trim e toString)
+      const targetId = String(user.driverId || '').trim();
+      const currentDriver = allDrivers.find(d => String(d.id).trim() === targetId);
+      
+      const myTrips = allTrips.filter(t => {
+        const tripDriverId = String(t.driver?.id || '').trim();
+        return tripDriverId === targetId && targetId !== '';
+      }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
       const currentIds = new Set(myTrips.map(t => t.id));
       if (!isFirstLoadRef.current) {
@@ -115,7 +119,6 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
   const handleOpenNotifCenter = () => {
     setIsNotifCenterOpen(true);
-    // REGRA: Salva o timestamp da visualização para zerar o contador
     localStorage.setItem(`als_driver_last_viewed_${user.id}`, new Date().toISOString());
     setUnreadCount(0);
   };
