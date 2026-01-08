@@ -1,28 +1,48 @@
 
-import React, { useState, useMemo, useRef } from 'react';
-import { Trip, DriverCapturedDoc } from '../../../types';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { Trip, DriverCapturedDoc, User } from '../../../types';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import DocumentViewerModal from '../../dashboard/operations/DocumentViewerModal';
 import OrdemColetaTemplate from '../../dashboard/forms/OrdemColetaTemplate';
 import PreStackingTemplate from '../../dashboard/forms/PreStackingTemplate';
 import ImageViewer from '../../shared/ImageViewer';
+import ScannerModal from '../ScannerModal';
 
 interface TripsTabProps {
   trips: Trip[];
+  user: User;
+  onRefresh: () => Promise<void>;
 }
 
-const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
+const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [previewData, setPreviewData] = useState({ url: '', title: '' });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Estados para visualizar fotos capturadas
   const [activePhoto, setActivePhoto] = useState<DriverCapturedDoc | null>(null);
 
   const ocRef = useRef<HTMLDivElement>(null);
   const minutaRef = useRef<HTMLDivElement>(null);
+
+  const handleOpenScanner = useCallback(() => {
+    setIsScannerOpen(true);
+  }, []);
+
+  const handleCloseScanner = useCallback(() => {
+    setIsScannerOpen(false);
+  }, []);
+
+  const handleScannerSuccess = useCallback(async () => {
+    // Ao enviar documentos, atualizamos a lista local
+    await onRefresh();
+    // E também a viagem selecionada para mostrar as novas fotos
+    const updated = trips.find(t => t.id === selectedTrip?.id);
+    if (updated) setSelectedTrip(updated);
+  }, [onRefresh, selectedTrip?.id, trips]);
 
   const generatePDF = async (ref: React.RefObject<HTMLDivElement>, title: string) => {
     if (!ref.current || isGenerating) return;
@@ -93,6 +113,20 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
                  <div className="flex flex-col"><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Equipamento</span><span className="text-sm font-mono font-black text-blue-400">{selectedTrip.container || 'A DEFINIR'}</span></div>
                  <div className="flex flex-col"><span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Navio / Booking</span><span className="text-xs font-bold text-slate-300 uppercase">{selectedTrip.ship || '---'} | {selectedTrip.booking || '---'}</span></div>
               </section>
+
+              {/* BOTÃO PARA ANEXAR DOCUMENTOS NA VIAGEM SELECIONADA */}
+              <button 
+                onClick={handleOpenScanner}
+                className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-[2.2rem] flex items-center justify-center gap-4 border border-white/10 shadow-xl active:scale-95 transition-all"
+              >
+                <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center text-white">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Anexar a esta OS</p>
+                  <p className="text-[8px] text-blue-200 font-bold uppercase mt-1">Enviar canhotos / Fotos</p>
+                </div>
+              </button>
 
               {/* SEÇÃO DE FOTOS ENVIADAS PELO MOTORISTA */}
               {selectedTrip.driver_docs && selectedTrip.driver_docs.length > 0 && (
@@ -180,6 +214,16 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips }) => {
               </p>
            </div>
         </div>
+      )}
+
+      {isScannerOpen && selectedTrip && (
+        <ScannerModal 
+          isOpen={isScannerOpen}
+          onClose={handleCloseScanner}
+          onSuccess={handleScannerSuccess}
+          trip={selectedTrip}
+          user={user}
+        />
       )}
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewData.url} title={previewData.title} />

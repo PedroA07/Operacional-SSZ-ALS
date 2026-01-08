@@ -10,6 +10,7 @@ import DocsTab from './tabs/DocsTab';
 import ProfileTab from './tabs/ProfileTab';
 import DownloadAppTab from './tabs/DownloadAppTab';
 import NotificationToast from '../dashboard/notifications/NotificationToast';
+import DriverNotificationCenter from './DriverNotificationCenter';
 
 interface DriverPortalProps {
   user: User;
@@ -22,10 +23,27 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionTime, setSessionTime] = useState('00:00:00');
+  const [isNotifCenterOpen, setIsNotifCenterOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   
   const lastTripIdsRef = useRef<Set<string>>(new Set());
   const isFirstLoadRef = useRef(true);
   const gpsWatchRef = useRef<number | null>(null);
+
+  const checkUnread = async (myTrips: Trip[]) => {
+    const data = await db.getNotifications();
+    const myOSs = new Set(myTrips.map(t => t.os.toUpperCase()));
+    const clearedStr = localStorage.getItem('als_cleared_notifs');
+    const clearedIds: string[] = clearedStr ? JSON.parse(clearedStr) : [];
+    
+    const count = data.filter(n => {
+      const isMine = myOSs.has(n.summary?.os?.toUpperCase() || '');
+      const notCleared = !clearedIds.includes(n.id);
+      return isMine && notCleared;
+    }).length;
+    
+    setUnreadCount(count);
+  };
 
   const loadPortalData = useCallback(async () => {
     try {
@@ -42,7 +60,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       if (!isFirstLoadRef.current) {
         const newTrip = myTrips.find(t => !lastTripIdsRef.current.has(t.id) && t.status === 'Pendente');
         if (newTrip) {
-          audioUtils.playAlert();
+          const isMuted = localStorage.getItem('als_driver_muted') === 'true';
+          if (!isMuted) audioUtils.playAlert();
         }
       }
       lastTripIdsRef.current = currentIds;
@@ -50,6 +69,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
       setDriver(currentDriver || null);
       setTrips(myTrips);
+      checkUnread(myTrips);
     } catch (e) {
       console.error("Erro na sincronização ALS:", e);
     } finally {
@@ -59,8 +79,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadPortalData();
-    // INTERVALO PRO MOTORISTA: 30 segundos
-    const syncInterval = setInterval(loadPortalData, 30000);
+    const syncInterval = setInterval(loadPortalData, 20000);
     const clockInterval = setInterval(() => {
       setSessionTime(timeUtils.calculateDuration(user.lastLogin));
     }, 1000);
@@ -108,18 +127,27 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{sessionTime}</p>
            </div>
-           <h1 className="text-xl font-black uppercase tracking-tight text-white leading-none truncate max-w-[200px]">
+           <h1 className="text-xl font-black uppercase tracking-tight text-white leading-none truncate max-w-[150px]">
              {driver?.name?.split(' ')[0] || user.displayName.split(' ')[0]}
            </h1>
         </div>
-        <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-white/5">
-          {driver?.photo ? <img src={driver.photo} className="w-full h-full object-cover" /> : <div className="text-xs font-black text-blue-400 italic">ALS</div>}
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setIsNotifCenterOpen(true)}
+            className="relative w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 active:text-blue-500 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 border-2 border-slate-950 rounded-full text-[8px] font-black flex items-center justify-center text-white animate-bounce">{unreadCount}</span>}
+          </button>
+          <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-white/5">
+            {driver?.photo ? <img src={driver.photo} className="w-full h-full object-cover" /> : <div className="text-xs font-black text-blue-400 italic">ALS</div>}
+          </div>
         </div>
       </header>
 
       <main className="flex-1 px-5 pt-6 overflow-y-auto custom-scrollbar">
         {activeTab === 'inicio' && <HomeTab user={user} trips={trips} onRefresh={loadPortalData} />}
-        {activeTab === 'viagens' && <TripsTab trips={trips} />}
+        {activeTab === 'viagens' && <TripsTab trips={trips} user={user} onRefresh={loadPortalData} />}
         {activeTab === 'docs' && <DocsTab trips={trips} driver={driver} />}
         {activeTab === 'perfil' && <ProfileTab user={user} driver={driver} onLogout={onLogout} />}
         {activeTab === 'download' && <DownloadAppTab />}
@@ -139,6 +167,12 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
           </button>
         ))}
       </nav>
+
+      <DriverNotificationCenter 
+        isOpen={isNotifCenterOpen} 
+        onClose={() => setIsNotifCenterOpen(false)} 
+        driverTrips={trips}
+      />
     </div>
   );
 };
