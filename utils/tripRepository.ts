@@ -4,15 +4,12 @@ import { Trip } from '../types';
 
 export const tripRepository = {
   mapToDb: (trip: Trip) => {
-    // Garantimos que driver_docs seja um array limpo para o Supabase (JSONB)
-    const driverDocs = Array.isArray(trip.driver_docs) ? trip.driver_docs : [];
-
     return {
       id: trip.id,
       os: trip.os,
       booking: trip.booking,
       ship: trip.ship,
-      date_time: trip.dateTime,
+      data_time: trip.dateTime, // Mapeado conforme print do banco
       status_time: trip.statusTime || trip.statusHistory?.[0]?.dateTime || new Date().toISOString(),
       is_late: trip.isLate,
       type: trip.type,
@@ -41,7 +38,7 @@ export const tripRepository = {
       oc_form_data: trip.ocFormData || null,
       pre_stacking_form_data: trip.preStackingFormData || null,
       scheduling: trip.scheduling || null,
-      driver_docs: driverDocs 
+      driver_docs: trip.driver_docs || []
     };
   },
 
@@ -49,12 +46,7 @@ export const tripRepository = {
     const safeParse = (val: any, fallback: any) => {
       if (!val) return fallback;
       if (typeof val === 'string') {
-        try {
-          return JSON.parse(val);
-        } catch (e) {
-          console.error("Erro ao parsear campo JSON:", e);
-          return fallback;
-        }
+        try { return JSON.parse(val); } catch { return fallback; }
       }
       return val; 
     };
@@ -64,9 +56,9 @@ export const tripRepository = {
       os: d.os,
       booking: d.booking,
       ship: d.ship,
-      dateTime: d.date_time || d.dateTime,
+      dateTime: d.data_time || d.dateTime, // Prioriza data_time do banco
       statusTime: d.status_time || d.statusTime,
-      isLate: d.is_late ?? d.isLate ?? false,
+      isLate: d.is_late ?? false,
       type: d.type,
       containerType: d.container_type || d.containerType,
       category: d.category,
@@ -98,10 +90,7 @@ export const tripRepository = {
   },
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
-    const { data, error } = await supabase
-      .from('trips')
-      .select('*')
-      .order('date_time', { ascending: false });
+    const { data, error } = await supabase.from('trips').select('*').order('data_time', { ascending: false });
     if (error) throw error;
     return (data || []).map(d => this.mapFromDb(d));
   },
@@ -109,15 +98,6 @@ export const tripRepository = {
   async save(supabase: SupabaseClient, trip: Trip) {
     const payload = this.mapToDb(trip);
     const { error } = await supabase.from('trips').upsert(payload);
-    if (error) {
-      console.error("Erro ao salvar no Supabase (trips):", error);
-      throw error;
-    }
-    return true;
-  },
-
-  async delete(supabase: SupabaseClient, id: string) {
-    const { error } = await supabase.from('trips').delete().eq('id', id);
     if (error) throw error;
     return true;
   }

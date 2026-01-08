@@ -5,199 +5,159 @@ import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
 
-let SUPABASE_URL = '';
-let SUPABASE_KEY = '';
-
-try {
-  // @ts-ignore
-  SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || (process.env as any).VITE_SUPABASE_URL || '';
-  // @ts-ignore
-  SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (process.env as any).VITE_SUPABASE_ANON_KEY || '';
-} catch (e) {}
+const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-if (!supabase) {
-  console.warn("⚠️ ALS LOGÍSTICA: Supabase não configurado. O sistema operará apenas em cache local.");
-}
-
-const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 20000): Promise<T> => {
+const withTimeout = <T = any>(promise: Promise<T>, ms: number = 15000): Promise<T> => {
   return Promise.race([
-    Promise.resolve(promise),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_DATABASE')), ms))
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ALS_DATABASE')), ms))
   ]) as any;
 };
 
 export const db = {
-  processSyncQueue: async () => { return; },
-
+  // USUÁRIOS
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
     try {
-      const { data, error } = await withTimeout(supabase.from('users').select('*'));
+      const { data, error } = await supabase.from('users').select('*');
       if (error) throw error;
       return (data || []).map(u => ({
-        id: u.id, username: u.username, password: u.password,
-        displayName: u.displayname || u.display_name || u.username, 
-        role: u.role, lastLogin: u.lastlogin || u.last_login,
-        photo: u.photo, position: u.position, staffId: u.staffid || u.staff_id,
-        driverId: u.driverid || u.driver_id, status: u.status, 
-        isFirstLogin: u.isfirstlogin === true || u.is_first_login === true,
-        lastSeen: u.lastseen || u.last_seen, 
-        presence_status: u.presence_status || 'offline',
-        notificationPrefs: u.notification_prefs
+        id: u.id,
+        username: u.username,
+        password: u.password,
+        displayName: u.displayname || u.display_name,
+        role: u.role,
+        lastLogin: u.lastlogin || u.last_login,
+        photo: u.photo,
+        position: u.position,
+        driverId: u.driverid || u.driver_id,
+        staffId: u.staffid || u.staff_id,
+        status: u.status,
+        isFirstLogin: u.isfirstlogin || u.is_first_login,
+        lastSeen: u.lastseen || u.last_seen,
+        presence_status: u.presence_status
       }));
     } catch (e) { return []; }
   },
 
+  saveUser: async (user: User) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('users').upsert({
+      id: user.id,
+      username: user.username,
+      password: user.password,
+      displayname: user.displayName,
+      role: user.role,
+      lastlogin: user.lastLogin,
+      status: user.status || 'Ativo',
+      driverid: user.driverId,
+      staffid: user.staffId,
+      position: user.position,
+      isfirstlogin: user.isFirstLogin,
+      presence_status: user.presence_status || 'offline'
+    });
+    return !error;
+  },
+
+  // MOTORISTAS
   getDrivers: async (): Promise<Driver[]> => {
     if (!supabase) return [];
-    try { return await withTimeout(driverRepository.getAll(supabase)); } catch (e) { return []; }
-  },
-
-  getCustomers: async (): Promise<Customer[]> => {
-    if (!supabase) return [];
-    try {
-      const { data, error } = await withTimeout(supabase.from('customers').select('*').order('name'));
-      if (error) throw error;
-      return (data || []).map(c => ({ 
-        ...c, 
-        legalName: c.legal_name || c.legalName, 
-        zipCode: c.zip_code || c.zipCode,
-        operations: c.operations || []
-      })) as Customer[];
-    } catch (e) { return []; }
-  },
-
-  getTrips: async (): Promise<Trip[]> => {
-    if (!supabase) return [];
-    try { return await withTimeout(tripRepository.getAll(supabase)); } catch (e) { return []; }
-  },
-
-  getPorts: async (): Promise<Port[]> => {
-    if (!supabase) return [];
-    try {
-      const { data, error } = await withTimeout(supabase.from('ports').select('*').order('name'));
-      if (error) throw error;
-      return (data || []).map(d => ({ 
-        ...d, 
-        legalName: d.legal_name || d.legalName, 
-        zipCode: d.zip_code || d.zipCode 
-      })) as Port[];
-    } catch (e) { return []; }
-  },
-
-  getPreStacking: async (): Promise<PreStacking[]> => {
-    if (!supabase) return [];
-    try {
-      const { data, error } = await withTimeout(supabase.from('pre_stacking').select('*').order('name'));
-      if (error) throw error;
-      return (data || []).map(d => ({ 
-        ...d, 
-        legalName: d.legal_name || d.legalName, 
-        zipCode: d.zip_code || d.zipCode 
-      })) as PreStacking[];
-    } catch (e) { return []; }
-  },
-
-  getCategories: async (): Promise<Category[]> => {
-    if (!supabase) return [];
-    try {
-      const { data, error } = await withTimeout(supabase.from('categories').select('*').order('name'));
-      if (error) throw error;
-      return (data || []).map(c => ({ ...c, parentId: c.parent_id || c.parentId })) as Category[];
-    } catch (e) { return []; }
-  },
-
-  getStaff: async (): Promise<Staff[]> => {
-    if (!supabase) return [];
-    try { return await withTimeout(staffRepository.getAll(supabase)); } catch (e) { return []; }
-  },
-
-  saveTrip: async (trip: Trip, actingUser?: User) => {
-    if (!supabase) return false;
-    try {
-      const success = await tripRepository.save(supabase, trip);
-      if (success && actingUser) {
-        const summary = { 
-          os: trip.os, 
-          motorista: trip.driver.name, 
-          placa: trip.driver.plateHorse, 
-          cliente: trip.customer.name 
-        };
-        await db.addNotification(actingUser, 'TRIP_UPDATED', 'Programação Atualizada', `A OS ${trip.os} foi persistida no banco de dados.`, summary);
-      }
-      return success;
-    } catch (e) { 
-      console.error("Erro ao salvar viagem:", e);
-      return false; 
-    }
-  },
-
-  saveUser: async (user: User) => {
-    if (!supabase) return true;
-    const payload = {
-      id: user.id, username: user.username, password: user.password,
-      displayname: user.displayName, role: user.role, lastlogin: user.lastLogin,
-      photo: user.photo, position: user.position, staffid: user.staffId,
-      driverid: user.driverId, status: user.status, isfirstlogin: user.isFirstLogin === true,
-      lastseen: user.lastSeen, isonlinevisible: user.isOnlineVisible ?? true,
-      presence_status: user.presence_status || 'offline', notification_prefs: user.notificationPrefs
-    };
-    try { 
-      const { error } = await supabase.from('users').upsert(payload); 
-      if (error) throw error;
-      return true; 
-    } catch (e) { 
-      console.error("Erro ao salvar usuário:", e);
-      return false; 
-    }
+    return await driverRepository.getAll(supabase);
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
     if (!supabase) return false;
-    try {
-      const success = await driverRepository.save(supabase, driver);
-      if (success && actingUser) {
-        await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Motorista', `Dados de ${driver.name} salvos no servidor.`, { motorista: driver.name, placa: driver.plateHorse });
-      }
-      return success;
-    } catch (e) { 
-      console.error("Erro crítico db.saveDriver:", e);
-      return false; 
+    const success = await driverRepository.save(supabase, driver);
+    if (success && actingUser) {
+      await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Cadastro Atualizado', `Motorista ${driver.name} sincronizado no Supabase.`, { os: 'CADASTRO', motorista: driver.name, placa: driver.plateHorse });
     }
+    return success;
+  },
+
+  deleteDriver: async (id: string) => {
+    if (!supabase) return false;
+    return await driverRepository.delete(supabase, id);
+  },
+
+  // VIAGENS
+  getTrips: async (): Promise<Trip[]> => {
+    if (!supabase) return [];
+    return await tripRepository.getAll(supabase);
+  },
+
+  saveTrip: async (trip: Trip, actingUser?: User) => {
+    if (!supabase) return false;
+    const success = await tripRepository.save(supabase, trip);
+    if (success && actingUser) {
+      const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse, cliente: trip.customer.name };
+      await db.addNotification(actingUser, 'TRIP_UPDATED', 'Viagem Sincronizada', `OS ${trip.os} salva na nuvem ALS.`, summary);
+    }
+    return success;
+  },
+
+  deleteTrip: async (id: string, actingUser?: User) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('trips').delete().eq('id', id);
+    if (!error && actingUser) {
+      await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `Programação excluída do banco de dados.`, { os: 'EXCLUÍDA' });
+    }
+    return !error;
+  },
+
+  // CLIENTES
+  getCustomers: async (): Promise<Customer[]> => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('customers').select('*').order('name');
+    return (data || []).map(c => ({
+      ...c,
+      legalName: c.legalName || c.legal_name,
+      zipCode: c.zipCode || c.zip_code
+    })) as Customer[];
   },
 
   saveCustomer: async (customer: Customer, actingUser?: User) => {
     if (!supabase) return false;
-    try {
-      const payload = { 
-        id: customer.id,
-        name: customer.name,
-        legal_name: customer.legalName,
-        cnpj: customer.cnpj,
-        address: customer.address,
-        neighborhood: customer.neighborhood,
-        zip_code: customer.zipCode,
-        city: customer.city,
-        state: customer.state,
-        operations: customer.operations || []
-      };
-      const { error } = await supabase.from('customers').upsert(payload);
-      if (error) throw error;
-      if (actingUser) {
-        await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cadastro Cliente', `Cliente ${customer.name} atualizado no servidor.`, { cliente: customer.name });
-      }
-      return true;
-    } catch (e) { 
-      console.error("Erro ao salvar cliente:", e);
-      return false; 
+    const { error } = await supabase.from('customers').upsert({
+      id: customer.id,
+      name: customer.name,
+      legal_name: customer.legalName,
+      cnpj: customer.cnpj,
+      address: customer.address,
+      neighborhood: customer.neighborhood,
+      zip_code: customer.zipCode,
+      city: customer.city,
+      state: customer.state,
+      operations: customer.operations || []
+    });
+    if (!error && actingUser) {
+      await db.addNotification(actingUser, 'CUSTOMER_UPDATED', 'Cliente Atualizado', `Cliente ${customer.name} salvo com sucesso.`, { cliente: customer.name });
     }
+    return !error;
+  },
+
+  deleteCustomer: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('customers').delete().eq('id', id);
+    return !error;
+  },
+
+  // PORTOS E PRE-STACKING
+  getPorts: async (): Promise<Port[]> => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('ports').select('*').order('name');
+    return (data || []).map(p => ({
+      ...p,
+      legalName: p.legalName || p.legal_name,
+      zipCode: p.zipCode || p.zip_code
+    })) as Port[];
   },
 
   savePort: async (port: Port, actingUser?: User) => {
-    if (!supabase) return true;
-    const payload = {
+    if (!supabase) return false;
+    const { error } = await supabase.from('ports').upsert({
       id: port.id,
       name: port.name,
       legal_name: port.legalName,
@@ -207,20 +167,29 @@ export const db = {
       zip_code: port.zipCode,
       city: port.city,
       state: port.state
-    };
-    try {
-      const { error } = await supabase.from('ports').upsert(payload);
-      if (error) throw error;
-      return true;
-    } catch (e) {
-      console.error("Erro ao salvar porto:", e);
-      return false;
-    }
+    });
+    return !error;
+  },
+
+  deletePort: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('ports').delete().eq('id', id);
+    return !error;
+  },
+
+  getPreStacking: async (): Promise<PreStacking[]> => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('pre_stacking').select('*').order('name');
+    return (data || []).map(ps => ({
+      ...ps,
+      legalName: ps.legalName || ps.legal_name,
+      zipCode: ps.zipCode || ps.zip_code
+    })) as PreStacking[];
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
-    if (!supabase) return true;
-    const payload = {
+    if (!supabase) return false;
+    const { error } = await supabase.from('pre_stacking').upsert({
       id: ps.id,
       name: ps.name,
       legal_name: ps.legalName,
@@ -230,242 +199,156 @@ export const db = {
       zip_code: ps.zipCode,
       city: ps.city,
       state: ps.state
-    };
-    try {
-      const { error } = await supabase.from('pre_stacking').upsert(payload);
-      if (error) throw error;
-      return true;
-    } catch (e) {
-      console.error("Erro ao salvar pre-stacking:", e);
-      return false;
-    }
-  },
-
-  saveStaff: async (staff: Staff, password?: string) => {
-    if (!supabase) return true;
-    try {
-      const success = await staffRepository.save(supabase, staff);
-      if (success && password) {
-        const { data: userData } = await supabase.from('users').select('*').eq('staffid', staff.id).single();
-        if (userData) await supabase.from('users').update({ password }).eq('id', userData.id);
-      }
-      return success;
-    } catch (e) { 
-      console.error("Erro ao salvar staff:", e);
-      return false; 
-    }
-  },
-
-  saveCategory: async (category: Category, actingUser?: User) => {
-    if (!supabase) return true;
-    try {
-      const { error } = await supabase.from('categories').upsert({ id: category.id, name: category.name, parent_id: category.parentId });
-      if (error) throw error;
-      return true;
-    } catch (e) {
-      console.error("Erro ao salvar categoria:", e);
-      return false;
-    }
-  },
-
-  getNotifications: async (): Promise<Notification[]> => {
-    if (!supabase) return [];
-    try {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 7);
-      const cutoffISO = cutoff.toISOString();
-      
-      const { data, error } = await withTimeout(
-        supabase.from('notifications')
-          .select('*')
-          .gte('timestamp', cutoffISO)
-          .order('timestamp', { ascending: false })
-          .limit(50)
-      );
-
-      if (error) throw error;
-      return (data || []).map(n => ({
-        id: String(n.id), title: n.title || n.type?.replace(/_/g, ' '), 
-        description: n.message, type: n.type as NotificationType,
-        origin: (n.origin as NotificationOrigin) || 'OPERACIONAL',
-        authorName: n.user_name || 'Sistema', authorId: n.user_id || 'system', 
-        timestamp: n.timestamp, summary: { ...n.summary, os: n.os_ref }
-      }));
-    } catch (e) { return []; }
-  },
-
-  addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: Notification['summary']) => {
-    if (!supabase) return;
-    const authorName = user.displayName || user.username || 'Sistema';
-    const timestamp = new Date().toISOString();
-    const osRef = summary?.os || '';
-    let origin: NotificationOrigin = user.role === 'driver' || user.role === 'motoboy' ? 'MOTORISTA' : 'OPERACIONAL';
-    
-    try {
-      await supabase.from('notifications').insert({
-        user_id: user.id || 'system', 
-        user_name: authorName, 
-        type, 
-        origin,
-        title, 
-        message: description, 
-        os_ref: osRef, 
-        timestamp, 
-        summary: summary || {}
-      });
-    } catch (e) {
-      console.error("Erro ao registrar notificação no DB:", e);
-    }
-  },
-
-  updatePresence: async (userId: string, status: PresenceStatus) => {
-    if (supabase) {
-      try { await supabase.from('users').update({ lastseen: new Date().toISOString(), presence_status: status }).eq('id', userId); } catch (e) {}
-    }
-  },
-
-  updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
-    if (!supabase) return;
-    try { await supabase.from('drivers').update({ current_lat: lat, current_lng: lng, last_location_at: new Date().toISOString() }).eq('id', driverId); } catch (e) {}
-  },
-
-  deleteTrip: async (id: string, actingUser?: User) => {
-    if (!supabase) return false;
-    try {
-      const { error } = await supabase.from('trips').delete().eq('id', id);
-      if (!error && actingUser) {
-        await db.addNotification(actingUser, 'DELETED', 'Viagem Removida', `A OS foi excluída permanentemente do banco de dados.`, { os: 'EXCLUÍDA' });
-      }
-      return !error;
-    } catch (e) { return false; }
-  },
-
-  deleteDriver: async (id: string) => {
-    if (!supabase) return true;
-    try {
-      const { error } = await supabase.from('drivers').delete().eq('id', id);
-      if (error) throw error;
-      return true;
-    } catch (e) { return false; }
-  },
-
-  deleteCustomer: async (id: string) => {
-    if (!supabase) return true;
-    try {
-      const { error } = await supabase.from('customers').delete().eq('id', id);
-      if (error) throw error;
-      return true;
-    } catch (e) { return false; }
-  },
-
-  deletePort: async (id: string) => {
-    if (!supabase) return true;
-    const { error } = await supabase.from('ports').delete().eq('id', id);
+    });
     return !error;
   },
 
   deletePreStacking: async (id: string) => {
-    if (!supabase) return true;
+    if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').delete().eq('id', id);
     return !error;
   },
 
+  // STAFF E CATEGORIAS
+  getStaff: async (): Promise<Staff[]> => {
+    if (!supabase) return [];
+    return await staffRepository.getAll(supabase);
+  },
+
+  saveStaff: async (staff: Staff, password?: string) => {
+    if (!supabase) return false;
+    const success = await staffRepository.save(supabase, staff);
+    if (success && password) {
+      await supabase.from('users').update({ password }).eq('staffid', staff.id);
+    }
+    return success;
+  },
+
   deleteStaff: async (id: string) => {
-    if (!supabase) return true;
+    if (!supabase) return false;
     const { error } = await supabase.from('staff').delete().eq('id', id);
     return !error;
   },
 
-  getPreferences: (userId: string) => {
-    const saved = localStorage.getItem(`als_prefs_${userId}`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return { visibleColumns: {} };
-      }
-    }
-    return { visibleColumns: {} };
+  getCategories: async (): Promise<Category[]> => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('categories').select('*').order('name');
+    return (data || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      parentId: c.parent_id
+    })) as Category[];
   },
 
-  savePreference: (userId: string, componentId: string, columns: string[]) => {
-    const current = db.getPreferences(userId);
-    if (!current.visibleColumns) current.visibleColumns = {};
-    current.visibleColumns[componentId] = columns;
-    localStorage.setItem(`als_prefs_${userId}`, JSON.stringify(current));
+  saveCategory: async (category: Category, actingUser?: User) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('categories').upsert({
+      id: category.id,
+      name: category.name,
+      parent_id: category.parentId
+    });
+    return !error;
   },
 
-  exportBackup: async () => {
-    try {
-      const [drivers, customers, ports, preStacking, trips, categories, staff] = await Promise.all([
-        db.getDrivers(),
-        db.getCustomers(),
-        db.getPorts(),
-        db.getPreStacking(),
-        db.getTrips(),
-        db.getCategories(),
-        db.getStaff()
-      ]);
+  // NOTIFICAÇÕES
+  addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: any) => {
+    if (!supabase) return;
+    const origin: NotificationOrigin = (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL';
+    await supabase.from('notifications').insert({
+      user_id: user.id,
+      user_name: user.displayName,
+      type,
+      origin,
+      title,
+      message: description,
+      os_ref: summary?.os || '',
+      summary: summary || {},
+      timestamp: new Date().toISOString()
+    });
+  },
 
-      const backup = {
-        drivers, customers, ports, preStacking, trips, categories, staff,
-        exportedAt: new Date().toISOString(),
-        version: '5.5.0'
-      };
+  getNotifications: async (): Promise<Notification[]> => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(40);
+    return (data || []).map(n => ({
+      id: String(n.id),
+      title: n.title,
+      description: n.message,
+      type: n.type as NotificationType,
+      origin: n.origin as NotificationOrigin,
+      authorName: n.user_name,
+      authorId: n.user_id,
+      timestamp: n.timestamp,
+      summary: { ...n.summary, os: n.os_ref }
+    }));
+  },
 
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `als_backup_${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error("Erro na exportação de backup:", e);
+  // STATUS E PRESENÇA
+  updatePresence: async (userId: string, status: PresenceStatus) => {
+    if (supabase) {
+      await supabase.from('users').update({ 
+        presence_status: status, 
+        lastseen: new Date().toISOString() 
+      }).eq('id', userId);
     }
   },
 
-  importBackup: async (file: File): Promise<boolean> => {
-    try {
-      const text = await file.text();
-      const backup = JSON.parse(text);
-      if (!backup.exportedAt) return false;
-      const actingUser: User = { id: 'system', username: 'system', displayName: 'Importador', role: 'admin', lastLogin: new Date().toISOString() };
-      
-      if (backup.drivers) {
-        for (const d of backup.drivers) await db.saveDriver(d, actingUser);
-      }
-      if (backup.customers) {
-        for (const c of backup.customers) await db.saveCustomer(c, actingUser);
-      }
-      if (backup.ports) {
-        for (const p of backup.ports) await db.savePort(p, actingUser);
-      }
-      if (backup.preStacking) {
-        for (const ps of backup.preStacking) await db.savePreStacking(ps, actingUser);
-      }
-      if (backup.trips) {
-        for (const t of backup.trips) await db.saveTrip(t, actingUser);
-      }
-      if (backup.categories) {
-        for (const cat of backup.categories) await db.saveCategory(cat, actingUser);
-      }
-      if (backup.staff) {
-        for (const s of backup.staff) await db.saveStaff(s);
-      }
-      
-      return true;
-    } catch (e) {
-      console.error("Erro na importação de backup:", e);
-      return false;
-    }
+  updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('drivers').update({ 
+      current_lat: lat, 
+      current_lng: lng, 
+      last_location_at: new Date().toISOString() 
+    }).eq('id', driverId);
+    return !error;
   },
 
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
-    try { 
-      const { error } = await withTimeout(supabase.from('users').select('id').limit(1));
-      return !error; 
+    try {
+      const { error } = await withTimeout(supabase.from('users').select('id').limit(1), 5000);
+      return !error;
+    } catch { return false; }
+  },
+
+  // PREFERÊNCIAS E BACKUP
+  getPreferences: (userId: string) => {
+    const saved = localStorage.getItem(`als_prefs_${userId}`);
+    return saved ? JSON.parse(saved) : { visibleColumns: {} };
+  },
+
+  savePreference: (userId: string, componentId: string, columns: string[]) => {
+    const prefs = db.getPreferences(userId);
+    prefs.visibleColumns[componentId] = columns;
+    localStorage.setItem(`als_prefs_${userId}`, JSON.stringify(prefs));
+  },
+
+  exportBackup: async () => {
+    const [drivers, customers, ports, ps, trips, staff, categories] = await Promise.all([
+      db.getDrivers(), db.getCustomers(), db.getPorts(), 
+      db.getPreStacking(), db.getTrips(), db.getStaff(), db.getCategories()
+    ]);
+    const data = { drivers, customers, ports, preStacking: ps, trips, staff, categories, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ALS_Full_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+  },
+
+  importBackup: async (file: File) => {
+    if (!supabase) return false;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      // Sequencial para não sobrecarregar
+      if (data.drivers) for (const d of data.drivers) await db.saveDriver(d);
+      if (data.customers) for (const c of data.customers) await db.saveCustomer(c);
+      if (data.ports) for (const p of data.ports) await db.savePort(p);
+      if (data.preStacking) for (const p of data.preStacking) await db.savePreStacking(p);
+      if (data.trips) for (const t of data.trips) await db.saveTrip(t);
+      return true;
     } catch { return false; }
   }
 };

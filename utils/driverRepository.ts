@@ -27,7 +27,7 @@ export const driverRepository = {
       beneficiary_name: driver.beneficiaryName || null,
       beneficiary_phone: driver.beneficiaryPhone || null,
       beneficiary_email: driver.beneficiaryEmail || null,
-      beneficiary_cnpj: driver.beneficiaryCnpj || null, // Agora incluído (deve rodar o SQL)
+      beneficiary_cnpj: driver.beneficiaryCnpj || null, 
       payment_preference: driver.paymentPreference || 'PIX',
       whatsapp_group_name: driver.whatsappGroupName || null,
       whatsapp_group_link: driver.whatsappGroupLink || null,
@@ -81,28 +81,13 @@ export const driverRepository = {
   async save(supabase: SupabaseClient, driver: Driver) {
     try {
       const payload = this.mapToDb(driver);
-      
-      const { error } = await supabase
-        .from('drivers')
-        .upsert(payload);
-      
+      const { error } = await supabase.from('drivers').upsert(payload);
       if (error) {
-        console.error("❌ ERRO AO SALVAR MOTORISTA NO SUPABASE:", {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint
-        });
-        // Se der erro de coluna não encontrada, avisa o usuário sobre o SQL
-        if (error.message.includes("column") && error.message.includes("not found")) {
-          alert(`ERRO DE BANCO: A coluna ${error.message.split('"')[1]} não existe na tabela drivers.`);
-        }
+        console.error("ERRO SUPABASE DRIVER:", error.message);
         return false;
       }
-      
       return true;
     } catch (e) {
-      console.error("❌ ERRO INESPERADO (Catch) ao salvar motorista:", e);
       return false;
     }
   },
@@ -119,7 +104,6 @@ export const driverRepository = {
 
   async delete(supabase: SupabaseClient, id: string) {
     const { error } = await supabase.from('drivers').delete().eq('id', id);
-    if (error) throw error;
-    return true;
+    return !error;
   }
 };
