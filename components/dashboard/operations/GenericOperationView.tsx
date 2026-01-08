@@ -57,6 +57,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedFilterClient, setSelectedFilterClient] = useState<string>('TODOS');
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
 
   const loadAuxData = useCallback(async () => {
     try {
@@ -139,7 +140,18 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     return isVW && isCragea;
   };
 
-  const linkedCustomers = useMemo(() => customers.filter(c => c.operations?.some(op => op.toUpperCase() === categoryName.toUpperCase())), [customers, categoryName]);
+  const linkedCustomers = useMemo(() => {
+    let list = customers.filter(c => c.operations?.some(op => op.toUpperCase() === categoryName.toUpperCase()));
+    if (clientSearchQuery) {
+      const q = clientSearchQuery.toLowerCase();
+      list = list.filter(c => 
+        c.name.toLowerCase().includes(q) || 
+        c.legalName?.toLowerCase().includes(q) || 
+        c.cnpj.includes(q)
+      );
+    }
+    return list;
+  }, [customers, categoryName, clientSearchQuery]);
 
   const filteredDrivers = drivers.filter(d => 
     d.operations.some(op => {
@@ -285,50 +297,62 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
             </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in zoom-in-95 duration-500">
-           {linkedCustomers.map(client => (
-            <button 
-              key={client.id} 
-              onClick={() => { setActiveMainTab('overview'); onNavigate({ type: 'client', categoryName, clientName: client.name }); }} 
-              className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all text-left group flex flex-col h-full"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-black group-hover:bg-blue-600 group-hover:text-white transition-colors shadow-inner">
-                  {client.name.substring(0,2).toUpperCase()}
-                </div>
-                <div className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[7px] font-black uppercase tracking-tighter border border-emerald-100">Ativo</div>
-              </div>
-              
-              <div className="flex-1 space-y-4">
-                 <div className="space-y-1">
-                    <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Nome Fantasia</span>
-                    <h3 className="font-black text-blue-600 uppercase text-[12px] leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">
-                      {client.name}
-                    </h3>
-                    <div className="pt-2">
-                       <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Razão Social</span>
-                       <p className="text-[9px] font-bold text-slate-500 uppercase italic mt-1 line-clamp-1">{client.legalName || client.name}</p>
+        <div className="space-y-6">
+           <div className="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm flex items-center px-8 gap-4">
+              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input 
+                type="text" 
+                placeholder="Pesquisar cliente vinculado..." 
+                className="flex-1 bg-transparent border-none outline-none text-[11px] font-black uppercase text-slate-700"
+                value={clientSearchQuery}
+                onChange={e => setClientSearchQuery(e.target.value)}
+              />
+           </div>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in zoom-in-95 duration-500">
+              {linkedCustomers.map(client => (
+                <button 
+                  key={client.id} 
+                  onClick={() => { setActiveMainTab('overview'); onNavigate({ type: 'client', categoryName, clientName: client.name }); }} 
+                  className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all text-left group flex flex-col h-full"
+                >
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-black group-hover:bg-blue-600 group-hover:text-white transition-colors shadow-inner">
+                      {client.name.substring(0,2).toUpperCase()}
                     </div>
-                 </div>
+                    <div className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[7px] font-black uppercase tracking-tighter border border-emerald-100">Ativo</div>
+                  </div>
+                  
+                  <div className="flex-1 space-y-4">
+                    <div className="space-y-1">
+                        <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Nome Fantasia</span>
+                        <h3 className="font-black text-blue-600 uppercase text-[12px] leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">
+                          {client.name}
+                        </h3>
+                        <div className="pt-2">
+                          <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest leading-none">Razão Social</span>
+                          <p className="text-[9px] font-bold text-slate-500 uppercase italic mt-1 line-clamp-1">{client.legalName || client.name}</p>
+                        </div>
+                    </div>
 
-                 <div className="space-y-3 border-t border-slate-50 pt-4">
-                    <div className="flex flex-col">
-                       <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Documento CNPJ</span>
-                       <span className="text-[9px] font-mono font-bold text-blue-600">{maskCNPJ(client.cnpj)}</span>
+                    <div className="space-y-3 border-t border-slate-50 pt-4">
+                        <div className="flex flex-col">
+                          <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Documento CNPJ</span>
+                          <span className="text-[9px] font-mono font-bold text-blue-600">{maskCNPJ(client.cnpj)}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Localidade</span>
+                          <span className="text-[9px] font-black text-slate-700 uppercase">{client.city} - {client.state}</span>
+                        </div>
                     </div>
-                    <div className="flex flex-col">
-                       <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Localidade</span>
-                       <span className="text-[9px] font-black text-slate-700 uppercase">{client.city} - {client.state}</span>
-                    </div>
-                 </div>
-              </div>
+                  </div>
 
-              <div className="mt-6 flex items-center gap-2 text-[8px] font-black text-blue-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                 Visualizar Unidade
-                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
-            </button>
-           ))}
+                  <div className="mt-6 flex items-center gap-2 text-[8px] font-black text-blue-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                    Visualizar Unidade
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                </button>
+              ))}
+           </div>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip } from './types';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
 import DriversTab from './components/dashboard/DriversTab';
 import FormsTab from './components/dashboard/FormsTab';
@@ -37,6 +37,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
 
   const [isDeleteTripModalOpen, setIsDeleteTripModalOpen] = useState(false);
@@ -47,13 +48,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const loadAllData = useCallback(async () => {
     try {
-      const [d, c, p, ps, s, t] = await Promise.all([
+      const [d, c, p, ps, s, t, cats] = await Promise.all([
         db.getDrivers(),
         db.getCustomers(),
         db.getPorts(),
         db.getPreStacking(),
         db.getStaff(),
-        db.getTrips()
+        db.getTrips(),
+        db.getCategories()
       ]);
 
       setDrivers(d || []);
@@ -62,6 +64,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       setPreStacking(ps || []);
       setStaffList(s || []);
       setTrips(t || []);
+      setCategories(cats || []);
     } catch (e) {
       console.error("Erro na sincronização Direta:", e);
     }
@@ -75,8 +78,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       loadAllData();
     }, 10000);
 
+    const handleGlobalRefresh = () => loadAllData();
+    window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
+
     return () => {
       clearInterval(refreshDataInterval);
+      window.removeEventListener('als_force_global_refresh', handleGlobalRefresh);
     };
   }, [loadAllData]);
 
@@ -184,9 +191,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                drivers={drivers} 
                customers={customers} 
                ports={ports}
+               trips={trips}
+               categories={categories}
+               preStacking={preStacking}
                activeView={opsView} 
                setActiveView={setOpsView} 
                onDeleteTrip={handleDeleteTripRequest}
+               onRefresh={loadAllData}
              />
            )}
            {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(); }} />}

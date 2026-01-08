@@ -29,63 +29,53 @@ const TripForm: React.FC<TripFormProps> = ({
 
   const [searches, setSearches] = useState({ customer: '', destination: '', driver: '' });
   const [dropdowns, setDropdowns] = useState({ customer: false, destination: false, driver: false });
-  const isInitialized = useRef(false);
   const dropdownRefs = {
     customer: useRef<HTMLDivElement>(null),
     destination: useRef<HTMLDivElement>(null),
     driver: useRef<HTMLDivElement>(null)
   };
 
-  // REGRA: Inicializa o formulário apenas uma vez ou quando a OS de edição mudar
   useEffect(() => {
     if (editTrip) {
-      // Se estiver editando e mudar a viagem, ou for a primeira carga
-      if (!isInitialized.current || (formData.id !== editTrip.id)) {
-        const date = new Date(editTrip.dateTime);
-        const offset = date.getTimezoneOffset() * 60000;
-        const localDate = new Date(date.getTime() - offset).toISOString().slice(0, 16);
+      const date = new Date(editTrip.dateTime);
+      const offset = date.getTimezoneOffset() * 60000;
+      const localDate = new Date(date.getTime() - offset).toISOString().slice(0, 16);
 
-        setFormData({
-          ...editTrip,
-          dateTime: localDate,
-          agencia: editTrip.ocFormData?.agencia || '',
-          padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
-          embarcador: editTrip.ocFormData?.embarcador || '',
-          autColeta: editTrip.ocFormData?.autColeta || '',
-          obs: editTrip.ocFormData?.obs || '',
-          cva: editTrip.cva || '',
-          tara: editTrip.tara || '',
-          seal: editTrip.seal || ''
-        });
-        setSearches({
-          customer: editTrip.customer?.name || editTrip.customer?.legalName || '',
-          destination: editTrip.destination?.name || editTrip.destination?.legalName || '',
-          driver: editTrip.driver?.name || ''
-        });
-        isInitialized.current = true;
-      }
+      setFormData({
+        ...editTrip,
+        dateTime: localDate,
+        agencia: editTrip.ocFormData?.agencia || '',
+        padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
+        embarcador: editTrip.ocFormData?.embarcador || '',
+        autColeta: editTrip.ocFormData?.autColeta || '',
+        obs: editTrip.ocFormData?.obs || '',
+        cva: editTrip.cva || '',
+        tara: editTrip.tara || '',
+        seal: editTrip.seal || ''
+      });
+      setSearches({
+        customer: editTrip.customer?.name || editTrip.customer?.legalName || '',
+        destination: editTrip.destination?.name || editTrip.destination?.legalName || '',
+        driver: editTrip.driver?.name || ''
+      });
     } else {
-      // Se for nova viagem e ainda não inicializou
-      if (!isInitialized.current) {
-        setFormData({
-          os: '', booking: '', ship: '', 
-          dateTime: new Date().toISOString().slice(0, 16),
-          type: 'EXPORTAÇÃO', status: 'Pendente',
-          category: initialCategory || '',
-          subCategory: initialCustomer?.name || '',
-          container: '', tara: '', seal: '', cva: '', 
-          containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', 
-          embarcador: '', obs: '', autColeta: '',
-          customer: initialCustomer ? { ...initialCustomer } : null,
-          destination: null, driver: null
-        });
-        setSearches({
-          customer: initialCustomer ? initialCustomer.name : '',
-          destination: '',
-          driver: ''
-        });
-        isInitialized.current = true;
-      }
+      setFormData({
+        os: '', booking: '', ship: '', 
+        dateTime: new Date().toISOString().slice(0, 16),
+        type: 'EXPORTAÇÃO', status: 'Pendente',
+        category: initialCategory || '',
+        subCategory: initialCustomer?.name || '',
+        container: '', tara: '', seal: '', cva: '', 
+        containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', 
+        embarcador: '', obs: '', autColeta: '',
+        customer: initialCustomer ? { ...initialCustomer } : null,
+        destination: null, driver: null
+      });
+      setSearches({
+        customer: initialCustomer ? initialCustomer.name : '',
+        destination: '',
+        driver: ''
+      });
     }
   }, [editTrip, initialCategory, initialCustomer]);
 
