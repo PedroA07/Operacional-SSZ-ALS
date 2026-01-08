@@ -43,6 +43,7 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
   };
 
   const selectAll = (fullList: string[], setter: (l: string[]) => void) => setter(fullList);
+  const deselectAll = (setter: (l: string[]) => void) => setter([]);
 
   const DropdownHeader = ({ label, count, isOpen, onClick }: any) => (
     <button 
@@ -63,7 +64,10 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
         <DropdownHeader label="TIPOS" count={selectedTypes.length} isOpen={openDropdown === 'types'} onClick={() => setOpenDropdown(openDropdown === 'types' ? null : 'types')} />
         {openDropdown === 'types' && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 animate-in fade-in zoom-in-95">
-             <button onClick={() => selectAll(MODALITIES, onTypesChange)} className="w-full text-left px-3 py-2 rounded-lg text-[10px] font-black uppercase text-blue-600 border border-blue-50 mb-2">Selecionar Todos</button>
+             <div className="flex gap-2 mb-3">
+                <button onClick={() => selectAll(MODALITIES, onTypesChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-blue-600 border border-blue-100 hover:bg-blue-50 transition-colors">Marcar Todos</button>
+                <button onClick={() => deselectAll(onTypesChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-100 hover:bg-slate-50 transition-colors">Desmarcar</button>
+             </div>
              <div className="space-y-1">
                 {MODALITIES.map(t => (
                   <label key={t} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer">
@@ -83,7 +87,10 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
         {openDropdown === 'clients' && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 animate-in fade-in zoom-in-95">
              <input type="text" placeholder="BUSCAR CLIENTE..." className="w-full px-4 py-2 mb-3 bg-slate-50 rounded-xl text-[10px] outline-none" value={clientSearch} onChange={e => setClientSearch(e.target.value)} />
-             <button onClick={() => selectAll(customers.map(c => c.name), onClientsChange)} className="w-full text-left px-3 py-2 rounded-lg text-[10px] font-black uppercase text-blue-600 border border-blue-50 mb-2">Selecionar Todos</button>
+             <div className="flex gap-2 mb-3">
+                <button onClick={() => selectAll(customers.map(c => c.name), onClientsChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-blue-600 border border-blue-100 hover:bg-blue-50">Marcar Todos</button>
+                <button onClick={() => deselectAll(onClientsChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-100 hover:bg-slate-50">Desmarcar</button>
+             </div>
              <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1 pr-1">
                 {filteredCustomers.map(c => (
                   <label key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer">
@@ -103,7 +110,10 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
         {openDropdown === 'drivers' && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 animate-in fade-in zoom-in-95">
              <input type="text" placeholder="BUSCAR MOTORISTA..." className="w-full px-4 py-2 mb-3 bg-slate-50 rounded-xl text-[10px] outline-none" value={driverSearch} onChange={e => setDriverSearch(e.target.value)} />
-             <button onClick={() => selectAll(drivers.map(d => d.name), onDriversChange)} className="w-full text-left px-3 py-2 rounded-lg text-[10px] font-black uppercase text-blue-600 border border-blue-50 mb-2">Selecionar Todos</button>
+             <div className="flex gap-2 mb-3">
+                <button onClick={() => selectAll(drivers.map(d => d.name), onDriversChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-blue-600 border border-blue-100 hover:bg-blue-50">Marcar Todos</button>
+                <button onClick={() => deselectAll(onDriversChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-100 hover:bg-slate-50">Desmarcar</button>
+             </div>
              <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1 pr-1">
                 {filteredDriversList.map(d => (
                   <label key={d.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer">
@@ -121,7 +131,7 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
           onClick={() => { onTypesChange([]); onClientsChange([]); onDriversChange([]); setOpenDropdown(null); }}
           className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
         >
-          Limpar Filtros
+          Limpar Tudo
         </button>
       </div>
     </div>

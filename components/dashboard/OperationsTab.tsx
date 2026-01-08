@@ -12,6 +12,8 @@ import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
 import DateRangeFilter from './operations/DateRangeFilter';
 import CategoryNavigation from './operations/CategoryNavigation';
+import CategoryControl from './operations/CategoryControl';
+import CategoryManagerModal from './operations/CategoryManagerModal';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import PreStackingForm from './forms/PreStackingForm';
 import VWStatusSelector from './operations/VWStatusSelector';
@@ -41,6 +43,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [isOCFormOpen, setIsOCFormOpen] = useState(false);
   const [isMinutaFormOpen, setIsMinutaFormOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
@@ -113,7 +116,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const filteredTrips = useMemo(() => {
     let result = [...trips];
 
-    // Filtro por Status da Viagem
     if (activeStatusTab === 'ativas') {
       const activeStatuses: TripStatus[] = [
         'Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 
@@ -128,7 +130,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       result = result.filter(t => t.status === 'Viagem cancelada');
     }
 
-    // Outros Filtros
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
@@ -166,14 +167,21 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
 
   return (
     <div className="space-y-8">
-      <CategoryNavigation availableOps={availableOps} customers={customers} onNavigate={setActiveView} />
+      <div className="flex justify-between items-end">
+        <div className="flex-1">
+           <CategoryNavigation availableOps={availableOps} customers={customers} onNavigate={setActiveView} />
+        </div>
+        <div className="pb-2">
+           <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
+        </div>
+      </div>
 
       <div className="pt-8 border-t border-slate-200 space-y-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
            <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1 w-full lg:w-auto">
              {[
                { id: 'ativas', label: 'Viagens Ativas', color: 'blue' },
-               { id: 'concluida', label: 'Concluídas', color: 'emerald' },
+               { id: 'concluida', label: 'Concluídas / Baixa Cragea', color: 'emerald' },
                { id: 'cancelada', label: 'Canceladas', color: 'red' }
              ].map(tab => (
                <button 
@@ -207,7 +215,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         <SmartOperationTable 
           userId={user.id} 
           componentId="ops-global" 
-          title={`Monitoramento Global: ${activeStatusTab === 'ativas' ? 'Fila Ativa' : activeStatusTab === 'concluida' ? 'Concluídas' : 'Canceladas'}`} 
+          title={`Monitoramento Global: ${activeStatusTab === 'ativas' ? 'Fila Ativa' : activeStatusTab === 'concluida' ? 'Concluídas (Baixa Cragea)' : activeStatusTab.toUpperCase()}`} 
           columns={columns} 
           data={filteredTrips} 
           defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
@@ -276,6 +284,16 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
              </div>
           </div>
         </div>
+      )}
+
+      {isCategoryModalOpen && (
+        <CategoryManagerModal 
+          isOpen={isCategoryModalOpen} 
+          onClose={() => setIsCategoryModalOpen(false)} 
+          categories={categories} 
+          onSuccess={loadData} 
+          actingUser={user} 
+        />
       )}
     </div>
   );

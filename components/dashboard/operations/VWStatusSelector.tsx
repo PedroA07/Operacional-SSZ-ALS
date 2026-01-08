@@ -26,6 +26,7 @@ const VWStatusSelector: React.FC<VWStatusSelectorProps> = ({ currentStatus, onSe
         return (
           <button
             key={opt.value}
+            type="button"
             onClick={() => onSelect(opt.value)}
             className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 flex items-center justify-between px-6 border-2 ${
               isSelected 

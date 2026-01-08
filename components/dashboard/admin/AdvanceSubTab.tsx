@@ -13,14 +13,22 @@ interface Props {
 const AdvanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
   const [showLiberated, setShowLiberated] = useState(false);
 
-  // REGRA: Só aparecem adiantamentos se o motorista já iniciou a viagem retirando o equipamento
-  const pendingTrips = trips.filter(t => 
-    t.advancePayment?.status !== 'PAGO' && 
-    t.advancePayment?.status !== 'LIBERAR' &&
-    (t.status === 'Retirada de vazio' || t.status === 'Retirada do cheio')
-  );
+  // REGRA: Aparecem adiantamentos se iniciou a viagem OU se é Volks e já concluiu (Baixa Cragea)
+  const pendingTrips = trips.filter(t => {
+    const isNotPaidOrLiberated = t.advancePayment?.status !== 'PAGO' && t.advancePayment?.status !== 'LIBERAR';
+    const isStarted = t.status === 'Retirada de vazio' || t.status === 'Retirada do cheio';
+    const isConcludedVolks = t.status === 'Viagem concluída' && t.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
+    
+    return isNotPaidOrLiberated && (isStarted || isConcludedVolks);
+  });
 
-  const liberatedTrips = trips.filter(t => t.advancePayment?.status === 'LIBERAR' || t.advancePayment?.status === 'PAGO');
+  const liberatedTrips = trips.filter(t => {
+    const isLiberatedOrPaid = t.advancePayment?.status === 'LIBERAR' || t.advancePayment?.status === 'PAGO';
+    // Mantém na lista se estiver em trânsito ou se for conclusão da Volks
+    const isRelevantStatus = t.status !== 'Viagem concluída' || t.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
+    
+    return isLiberatedOrPaid && isRelevantStatus;
+  });
 
   const handleToggleLiberation = (t: Trip, isChecked: boolean) => {
     if (isChecked) {
@@ -68,11 +76,15 @@ const AdvanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
     {
       key: 'trip_status',
       label: 'Status Atual',
-      render: (t: Trip) => (
-        <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[8px] font-black uppercase border border-blue-100">
-          {t.status}
-        </span>
-      )
+      render: (t: Trip) => {
+        const isVolks = t.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
+        const displayStatus = (isVolks && t.status === 'Viagem concluída') ? 'BAIXA CRAGEA' : t.status;
+        return (
+          <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase border ${t.status === 'Viagem concluída' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+            {displayStatus}
+          </span>
+        );
+      }
     },
     { 
       key: 'action', 
@@ -106,7 +118,9 @@ const AdvanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
           <button onClick={() => setShowLiberated(false)} className={`px-5 py-2.5 rounded-lg text-[9px] font-black uppercase transition-all ${!showLiberated ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Pendentes ({pendingTrips.length})</button>
           <button onClick={() => setShowLiberated(true)} className={`px-5 py-2.5 rounded-lg text-[9px] font-black uppercase transition-all ${showLiberated ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Liberados ({liberatedTrips.length})</button>
         </div>
-        <p className="text-[7px] text-blue-500 font-bold uppercase italic">Fila baseada em Retirada de Vazio/Cheio</p>
+        <div className="text-right">
+           <p className="text-[7px] text-blue-500 font-bold uppercase italic">Fila baseada em Retiradas e Baixas Volks</p>
+        </div>
       </div>
 
       <SmartOperationTable 
