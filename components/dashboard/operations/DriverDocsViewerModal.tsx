@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Trip, DriverCapturedDoc, User } from '../../../types';
 import { db } from '../../../utils/storage';
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
@@ -21,6 +21,12 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
 
+  // Estados para Novo Documento
+  const [isAddingMode, setIsAddingMode] = useState<'none' | 'choice' | 'camera'>('none');
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     setDocs(trip.driver_docs || []);
   }, [trip.driver_docs]);
@@ -30,6 +36,78 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       setManualKey(selectedDoc.extractedKey || '');
     }
   }, [selectedDoc]);
+
+  // --- LÓGICA DE CAPTURA / UPLOAD ---
+
+  const startCamera = async () => {
+    setIsAddingMode('camera');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setIsCameraReady(true);
+      }
+    } catch (err) {
+      alert("Não foi possível acessar a câmera.");
+      setIsAddingMode('choice');
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraReady(false);
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(videoRef.current, 0, 0);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      saveNewDoc(dataUrl);
+      stopCamera();
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        saveNewDoc(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const saveNewDoc = async (url: string) => {
+    const newDoc: DriverCapturedDoc = {
+      id: `op-scan-${Date.now()}`,
+      url: url,
+      timestamp: new Date().toISOString()
+    };
+    
+    const updatedDocs = [...docs, newDoc];
+    setDocs(updatedDocs);
+    setSelectedDoc(newDoc);
+    setIsAddingMode('none');
+    
+    try {
+      await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
+      onSuccess();
+    } catch (e) {
+      alert("Erro ao salvar anexo no banco.");
+    }
+  };
+
+  // --- LÓGICA DE IA E GESTÃO ---
 
   const extractNFKey = async (doc: DriverCapturedDoc) => {
     if (isProcessing) return;
@@ -98,7 +176,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
         <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-6">
             <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="2"/></svg></div>
-            <div><p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Dossiê de Fotos do Motorista</p><h3 className="text-xl font-black uppercase">OS {trip.os} › {trip.driver.name}</h3></div>
+            <div><p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Dossiê de Fotos e Documentos</p><h3 className="text-xl font-black uppercase">OS {trip.os} › {trip.driver.name}</h3></div>
           </div>
           <button onClick={onClose} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button>
         </div>
@@ -106,11 +184,22 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
         <div className="flex-1 overflow-hidden flex">
           {/* GALERIA ESQUERDA (Thumbnails) */}
           <div className="w-48 bg-slate-50 border-r border-slate-200 overflow-y-auto custom-scrollbar p-4 space-y-4 shrink-0">
+             {/* BOTAO ADICIONAR NOVO */}
+             <button 
+                onClick={() => setIsAddingMode('choice')}
+                className="w-full aspect-video rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-2 hover:border-blue-500 hover:bg-blue-50 transition-all group"
+             >
+                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+                </div>
+                <span className="text-[8px] font-black text-slate-400 uppercase group-hover:text-blue-600">Novo Anexo</span>
+             </button>
+
              {docs.length === 0 ? (
                <div className="py-24 text-center text-slate-300 font-bold uppercase italic text-[8px]">Sem fotos</div>
-             ) : docs.map(doc => (
+             ) : docs.slice().reverse().map(doc => (
                <button 
-                 key={doc.id} onClick={() => setSelectedDoc(doc)}
+                 key={doc.id} onClick={() => { setSelectedDoc(doc); setIsAddingMode('none'); }}
                  className={`w-full aspect-video rounded-xl overflow-hidden border-2 transition-all ${selectedDoc?.id === doc.id ? 'border-blue-600 scale-105 shadow-md' : 'border-transparent opacity-60 hover:opacity-100'}`}
                >
                  <img src={doc.url} className="w-full h-full object-cover" alt="" />
@@ -118,19 +207,51 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
              ))}
           </div>
 
-          {/* VISUALIZAÇÃO CENTRAL (Foco na Imagem) */}
+          {/* VISUALIZAÇÃO CENTRAL (Foco na Imagem ou Camera) */}
           <div className="flex-1 bg-slate-100 p-8 flex items-center justify-center relative overflow-hidden">
-             {selectedDoc ? (
+             
+             {isAddingMode === 'choice' && (
+                <div className="flex gap-6 animate-in zoom-in-95">
+                   <button onClick={startCamera} className="w-48 h-56 bg-white rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center justify-center gap-4 hover:border-blue-500 transition-all group">
+                      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
+                      <span className="text-[10px] font-black uppercase text-slate-400 group-hover:text-blue-600">Usar Câmera</span>
+                   </button>
+                   <button onClick={() => fileInputRef.current?.click()} className="w-48 h-56 bg-white rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center justify-center gap-4 hover:border-emerald-500 transition-all group">
+                      <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg></div>
+                      <span className="text-[10px] font-black uppercase text-slate-400 group-hover:text-emerald-600">Escolher Arquivo</span>
+                   </button>
+                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+                </div>
+             )}
+
+             {isAddingMode === 'camera' && (
+                <div className="w-full max-w-2xl bg-black rounded-3xl overflow-hidden shadow-2xl relative">
+                   <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                   <div className="absolute inset-0 border-2 border-white/20 m-12 rounded-2xl pointer-events-none border-dashed flex items-center justify-center">
+                      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Enquadre o Documento</p>
+                   </div>
+                   <div className="absolute bottom-8 left-0 w-full flex justify-center gap-4">
+                      <button onClick={() => { stopCamera(); setIsAddingMode('choice'); }} className="px-6 py-3 bg-white/10 backdrop-blur-md text-white rounded-xl text-[10px] font-black uppercase border border-white/20">Voltar</button>
+                      <button onClick={capturePhoto} className="w-16 h-16 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center shadow-2xl active:scale-90 transition-all">
+                         <div className="w-10 h-10 bg-blue-600 rounded-full"></div>
+                      </button>
+                   </div>
+                </div>
+             )}
+
+             {isAddingMode === 'none' && selectedDoc && (
                <div className="w-full h-full rounded-3xl overflow-hidden shadow-inner border border-slate-200 bg-black">
                   <ImageViewer url={selectedDoc.url} />
                </div>
-             ) : (
-               <div className="text-center text-slate-300 font-black uppercase tracking-widest">Selecione uma imagem para começar</div>
+             )}
+             
+             {isAddingMode === 'none' && !selectedDoc && (
+               <div className="text-center text-slate-300 font-black uppercase tracking-widest">Selecione uma imagem ou anexe um novo documento</div>
              )}
           </div>
 
           {/* BARRA LATERAL DIREITA (Ferramentas) */}
-          {selectedDoc && (
+          {selectedDoc && isAddingMode === 'none' && (
             <div className="w-80 bg-white border-l border-slate-200 p-8 flex flex-col gap-8 shrink-0 overflow-y-auto custom-scrollbar animate-in slide-in-from-right duration-500">
                <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-6">Processamento & IA</p>
@@ -172,7 +293,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       {/* MODAL CONFIRMAÇÃO EXCLUSÃO */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 animate-in fade-in">
-           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
+           <div className="bg-white w-full max-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
               <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-100"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>
               <div><h4 className="text-lg font-black uppercase text-slate-800">Remover Foto?</h4><p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Esta ação é irreversível e o arquivo será apagado do dossiê.</p></div>
               <div className="grid grid-cols-2 gap-3">
