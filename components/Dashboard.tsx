@@ -6,7 +6,7 @@ import DriversTab from './dashboard/DriversTab';
 import FormsTab from './dashboard/FormsTab';
 import CustomersTab from './dashboard/CustomersTab';
 import PortsTab from './dashboard/PortsTab';
-import PreStackingTab from './components/dashboard/PreStackingTab';
+import PreStackingTab from './dashboard/PreStackingTab';
 import OperationsTab from './dashboard/OperationsTab';
 import AdminTab from './dashboard/AdminTab';
 import StaffTab from './dashboard/StaffTab';

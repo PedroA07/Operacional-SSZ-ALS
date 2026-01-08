@@ -10,9 +10,9 @@ let SUPABASE_KEY = '';
 
 try {
   // @ts-ignore
-  SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+  SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || (process.env as any).VITE_SUPABASE_URL || '';
   // @ts-ignore
-  SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+  SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (process.env as any).VITE_SUPABASE_ANON_KEY || '';
 } catch (e) {}
 
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
