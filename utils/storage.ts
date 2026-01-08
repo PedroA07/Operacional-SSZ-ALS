@@ -17,7 +17,7 @@ try {
 
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 15000): Promise<T> => {
+const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 20000): Promise<T> => {
   return Promise.race([
     Promise.resolve(promise),
     new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_DATABASE')), ms))
@@ -328,7 +328,6 @@ export const db = {
     return !error;
   },
 
-  // Added exportBackup to fix property missing error in SystemTab
   exportBackup: async () => {
     try {
       const [users, drivers, customers, trips, ports, preStacking, categories, staff] = await Promise.all([
@@ -359,7 +358,6 @@ export const db = {
     }
   },
 
-  // Added importBackup to fix property missing error in SystemTab
   importBackup: async (file: File) => {
     try {
       const text = await file.text();
@@ -402,7 +400,8 @@ export const db = {
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try { 
-      const { error } = await withTimeout(supabase.from('users').select('count', { count: 'exact', head: true }).limit(1), 5000); 
+      // Tenta uma operação de leitura simples para validar se as chaves funcionam
+      const { data, error } = await supabase.from('users').select('id').limit(1);
       return !error; 
     } catch { return false; }
   }

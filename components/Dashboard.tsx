@@ -6,7 +6,7 @@ import DriversTab from './dashboard/DriversTab';
 import FormsTab from './dashboard/FormsTab';
 import CustomersTab from './dashboard/CustomersTab';
 import PortsTab from './dashboard/PortsTab';
-import PreStackingTab from './dashboard/PreStackingTab';
+import PreStackingTab from './components/dashboard/PreStackingTab';
 import OperationsTab from './dashboard/OperationsTab';
 import AdminTab from './dashboard/AdminTab';
 import StaffTab from './dashboard/StaffTab';
@@ -39,6 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isDeleteTripModalOpen, setIsDeleteTripModalOpen] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
@@ -67,14 +68,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       setCategories(cats || []);
     } catch (e) {
       console.error("Erro na sincronização Direta:", e);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => { 
     loadAllData();
-    const refreshDataInterval = setInterval(loadAllData, 10000);
+    const refreshDataInterval = setInterval(loadAllData, 15000);
     
-    // Listener para refresh forçado via eventos personalizados (usado em modais profundos)
     const handleGlobalRefresh = () => loadAllData();
     window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
 
@@ -128,6 +130,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       </div>
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6">Sincronizando com a nuvem ALS...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
