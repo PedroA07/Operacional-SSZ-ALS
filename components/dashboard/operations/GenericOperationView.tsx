@@ -92,7 +92,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     setIsSavingStatus(true);
     isUpdatingRef.current = true;
 
-    // Fix: Added missing required property 'createdAt' to match StatusHistoryEntry interface
     const newEntry: StatusHistoryEntry = { 
       status: tempStatus, 
       dateTime: new Date(statusTime).toISOString(),
@@ -194,6 +193,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
     if (startDate) result = result.filter(t => t.dateTime >= startDate);
     if (endDate) result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
+
+    // REGRA SOLICITADA: Organizar sempre pela data e hora da operação (Ordem Crescente)
+    result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
 
     return result;
   }, [allTrips, categoryName, clientName, type, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient]);

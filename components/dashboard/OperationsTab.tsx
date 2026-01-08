@@ -59,7 +59,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const isUpdatingRef = useRef(false);
 
-  // Alterado para 'geral' por padrão para garantir que qualquer viagem carregada apareça
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -162,6 +161,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     
     if (startDate) result = result.filter(t => t.dateTime >= startDate);
     if (endDate) result = result.filter(t => t.dateTime <= endDate + 'T23:59:59');
+
+    // REGRA SOLICITADA: Organizar sempre pela data e hora da operação (Ordem Crescente)
+    result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
 
     return result;
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate]);

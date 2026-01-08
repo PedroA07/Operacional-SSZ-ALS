@@ -146,19 +146,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
     }
   };
 
-  const handleCnhUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== 'application/pdf') {
-        alert("Selecione um arquivo PDF para a CNH.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => setForm(prev => ({ ...prev, cnhPdfUrl: reader.result as string }));
-      reader.readAsDataURL(file);
-    }
-  };
-
   const addOperation = () => {
     if (!tempCategory || !tempClient) return;
     const exists = form.operations?.some(op => op.category === tempCategory && op.client === tempClient);
@@ -346,6 +333,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
         </div>
       )}
 
+      {/* TABELA DE MOTORISTAS */}
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse min-w-[1400px]">
