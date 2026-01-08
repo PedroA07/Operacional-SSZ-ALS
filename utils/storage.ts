@@ -38,7 +38,6 @@ const withTimeout = <T = any>(promise: Promise<T> | any, ms: number = 8000): Pro
 };
 
 export const db = {
-  // --- PROCESSADOR DE SINCRONIZAÇÃO (CHAMADO PELO DASHBOARD) ---
   processSyncQueue: async () => {
     if (!supabase) return;
     const queue = offlineManager.getQueue();
@@ -57,7 +56,12 @@ export const db = {
             success = true;
             break;
           case 'CUSTOMER':
-            await supabase.from('customers').upsert({ ...item.payload, legal_name: item.payload.legalName, zip_code: item.payload.zipCode });
+            await supabase.from('customers').upsert({ 
+              ...item.payload, 
+              legal_name: item.payload.legalName, 
+              zip_code: item.payload.zipCode,
+              operations: item.payload.operations
+            });
             success = true;
             break;
           case 'PORT':
@@ -85,20 +89,26 @@ export const db = {
     }
   },
 
-  // --- LEITURAS COM CACHE ---
-
   getUsers: async (): Promise<User[]> => {
     if (supabase) {
       try {
         const { data, error } = await withTimeout(supabase.from('users').select('*'));
         if (!error && data) {
           const mapped = data.map(u => ({
-            id: u.id, username: u.username, password: u.password,
-            displayName: u.displayname || u.username, role: u.role,
-            lastLogin: u.lastlogin || new Date().toISOString(),
-            photo: u.photo, position: u.position, staffId: u.staffid,
-            driverId: u.driverid, status: u.status, isFirstLogin: u.isfirstlogin === true,
-            lastSeen: u.lastseen, isOnlineVisible: u.isonlinevisible ?? true,
+            id: u.id, 
+            username: u.username, 
+            password: u.password,
+            displayName: u.displayname || u.display_name || u.username, 
+            role: u.role,
+            lastLogin: u.lastlogin || u.last_login || new Date().toISOString(),
+            photo: u.photo, 
+            position: u.position, 
+            staffId: u.staffid || u.staff_id,
+            driverId: u.driverid || u.driver_id, 
+            status: u.status, 
+            isFirstLogin: u.isfirstlogin === true || u.is_first_login === true,
+            lastSeen: u.lastseen || u.last_seen, 
+            isOnlineVisible: u.isonlinevisible ?? u.is_online_visible ?? true,
             presence_status: u.presence_status || 'offline',
             notificationPrefs: u.notification_prefs
           }));
@@ -125,7 +135,12 @@ export const db = {
       try {
         const { data } = await withTimeout(supabase.from('customers').select('*'));
         if (data) {
-          const mapped = data.map(c => ({ ...c, legalName: c.legal_name, zipCode: c.zip_code })) as Customer[];
+          const mapped = data.map(c => ({ 
+            ...c, 
+            legalName: c.legal_name || c.legalName, 
+            zipCode: c.zip_code || c.zipCode,
+            operations: c.operations || []
+          })) as Customer[];
           offlineManager.setRegistry(KEYS.CUSTOMERS, mapped);
           return mapped;
         }
@@ -149,7 +164,7 @@ export const db = {
       try {
         const { data } = await withTimeout(supabase.from('ports').select('*'));
         if (data) {
-          const mapped = data.map(d => ({ ...d, legalName: d.legal_name, zipCode: d.zip_code })) as Port[];
+          const mapped = data.map(d => ({ ...d, legalName: d.legal_name || d.legalName, zipCode: d.zip_code || d.zipCode })) as Port[];
           offlineManager.setRegistry(KEYS.PORTS, mapped);
           return mapped;
         }
@@ -163,7 +178,7 @@ export const db = {
       try {
         const { data } = await withTimeout(supabase.from('pre_stacking').select('*'));
         if (data) {
-          const mapped = data.map(d => ({ ...d, legalName: d.legal_name, zipCode: d.zip_code })) as PreStacking[];
+          const mapped = data.map(d => ({ ...d, legalName: d.legal_name || d.legalName, zipCode: d.zip_code || d.zipCode })) as PreStacking[];
           offlineManager.setRegistry(KEYS.PRE_STACKING, mapped);
           return mapped;
         }
@@ -177,7 +192,7 @@ export const db = {
       try {
         const { data } = await withTimeout(supabase.from('categories').select('*'));
         if (data) {
-          const mapped = data.map(c => ({ ...c, parentId: c.parent_id })) as Category[];
+          const mapped = data.map(c => ({ ...c, parentId: c.parent_id || c.parentId })) as Category[];
           offlineManager.setRegistry(KEYS.CATEGORIES, mapped);
           return mapped;
         }
@@ -196,10 +211,7 @@ export const db = {
     return offlineManager.getRegistry<Staff>(KEYS.STAFF);
   },
 
-  // --- ESCRITAS ENFILEIRADAS (OFFLINE FIRST) ---
-
   saveTrip: async (trip: Trip, actingUser?: User) => {
-    // 1. Atualiza Cache Local Imediato para UX
     const current = offlineManager.getRegistry<Trip>(KEYS.TRIPS);
     const idx = current.findIndex(t => t.id === trip.id);
     const oldTrip = idx >= 0 ? current[idx] : null;
@@ -207,10 +219,8 @@ export const db = {
     if (idx >= 0) current[idx] = trip; else current.push(trip);
     offlineManager.setRegistry(KEYS.TRIPS, current);
 
-    // 2. Adiciona à Fila de Sync
     offlineManager.addToQueue('TRIP', 'UPSERT', trip);
 
-    // 3. Notificações locais
     if (actingUser) {
       const summary = { os: trip.os, motorista: trip.driver.name, placa: trip.driver.plateHorse, cliente: trip.customer.name };
       if (!oldTrip) {
@@ -220,7 +230,6 @@ export const db = {
       }
     }
     
-    // 4. Tenta processar fila imediatamente
     db.processSyncQueue();
     return true;
   },
@@ -318,8 +327,6 @@ export const db = {
     return true;
   },
 
-  // --- OUTROS ---
-
   getNotifications: async (): Promise<Notification[]> => {
     if (supabase) {
       try {
@@ -403,7 +410,6 @@ export const db = {
 
   deleteCustomer: async (id: string) => {
     const current = offlineManager.getRegistry<Customer>(KEYS.CUSTOMERS);
-    const idx = current.findIndex(c => c.id === id);
     offlineManager.setRegistry(KEYS.CUSTOMERS, current.filter(c => c.id !== id));
     if (supabase) { try { await supabase.from('customers').delete().eq('id', id); } catch (e) {} }
     return true;
@@ -442,9 +448,6 @@ export const db = {
     localStorage.setItem('als_ui_preferences', JSON.stringify(allPrefs));
   },
 
-  // --- BACKUP & RESTORE ---
-
-  /* Fix: Add exportBackup to fixed SystemTab.tsx error line 20 */
   exportBackup: async () => {
     const backup: Record<string, any> = {};
     Object.values(KEYS).forEach(key => {
@@ -460,7 +463,6 @@ export const db = {
     URL.revokeObjectURL(url);
   },
 
-  /* Fix: Add importBackup to fixed SystemTab.tsx error line 39 */
   importBackup: async (file: File): Promise<boolean> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
