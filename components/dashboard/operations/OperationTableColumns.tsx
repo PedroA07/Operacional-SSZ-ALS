@@ -96,6 +96,22 @@ export const getOperationTableColumns = (
     );
   };
 
+  const getStatusStyle = (status: TripStatus, isLatest: boolean) => {
+    if (status === 'Viagem concluída') {
+      return isLatest 
+        ? 'bg-emerald-600 border-emerald-700 text-white shadow-md ring-2 ring-emerald-50' 
+        : 'bg-emerald-50 border-emerald-100 text-emerald-600';
+    }
+    if (status === 'Viagem cancelada') {
+      return isLatest 
+        ? 'bg-amber-500 border-amber-600 text-white shadow-md ring-2 ring-amber-50' 
+        : 'bg-amber-50 border-amber-100 text-amber-600';
+    }
+    return isLatest 
+      ? 'bg-blue-600 border-blue-700 text-white shadow-md ring-2 ring-blue-50' 
+      : 'bg-white border-slate-100 text-slate-400';
+  };
+
   return [
   { 
     key: 'dateTime', 
@@ -128,10 +144,10 @@ export const getOperationTableColumns = (
         </div>
         <div className="flex flex-col gap-1.5 border-l-2 border-blue-50 pl-3">
            {(t.statusHistory || []).slice().sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((step, idx) => (
-             <div key={idx} className={`flex flex-col p-1.5 rounded-lg border ${idx === 0 ? 'bg-blue-600 border-blue-700 text-white shadow-md ring-2 ring-blue-50' : 'bg-white border-slate-100 text-slate-400'}`}>
+             <div key={idx} className={`flex flex-col p-1.5 rounded-lg border ${getStatusStyle(step.status, idx === 0)}`}>
                 <div className="flex justify-between items-center gap-4">
                   <span className="text-[7.5px] font-black uppercase truncate">{step.status}</span>
-                  <span className={`font-mono text-[7px] font-bold ${idx === 0 ? 'text-blue-200' : 'text-slate-300'}`}>{new Date(step.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                  <span className={`font-mono text-[7px] font-bold ${idx === 0 ? 'text-white/70' : 'text-slate-300'}`}>{new Date(step.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
                 </div>
              </div>
            ))}
@@ -189,7 +205,6 @@ export const getOperationTableColumns = (
     label: '6. Cliente', 
     render: (t: Trip) => (
       <div className="flex flex-col space-y-0.5 max-w-[250px] whitespace-normal">
-        {/* NOME FANTASIA PRIMEIRO */}
         <p className="font-black text-blue-600 uppercase text-[11px] leading-tight">{t.customer?.name}</p>
         {t.customer?.legalName && t.customer.legalName !== t.customer.name && (
           <p className="text-[8px] font-bold text-slate-400 uppercase italic leading-tight">RS: {t.customer.legalName}</p>

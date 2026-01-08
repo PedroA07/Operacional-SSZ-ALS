@@ -74,6 +74,12 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     window.location.reload();
   };
 
+  const getStatusColor = (status: TripStatus) => {
+    if (status === 'Viagem concluída') return 'text-emerald-400';
+    if (status === 'Viagem cancelada') return 'text-amber-400';
+    return 'text-blue-400';
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-24">
       
@@ -100,7 +106,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
         {activeTrip ? (
           <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden backdrop-blur-xl">
             <div className="p-7 space-y-6">
-              {/* CABEÇALHO: OS E DATA/HORA */}
               <div className="flex justify-between items-start border-b border-white/5 pb-5">
                 <div>
                   <div className="flex items-center gap-2">
@@ -121,7 +126,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 </div>
               </div>
 
-              {/* FOCO: CONTAINER / EQUIPAMENTO (Destaque principal solicitado) */}
               <div className="bg-slate-950 p-6 rounded-3xl border border-white/10 shadow-inner flex flex-col items-center justify-center relative overflow-hidden group">
                  <div className="absolute top-0 right-0 p-2 opacity-5">
                     <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
@@ -141,7 +145,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl flex items-center justify-center gap-4 border border-white/10 shadow-xl active:scale-95 transition-all group"
               >
                 <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center text-white">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Anexar Documentos</p>
@@ -163,7 +167,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                 <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between">
                   <div className="min-w-0 flex-1 pr-4">
                     <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Posição em Tempo Real</p>
-                    <p className="text-base font-black uppercase text-blue-400 mt-1 truncate">
+                    <p className={`text-base font-black uppercase mt-1 truncate ${getStatusColor(activeTrip.status)}`}>
                       {isVWCrageaTrip && activeTrip.status === 'Viagem concluída' ? 'BAIXA CRAGEA' : activeTrip.status}
                     </p>
                   </div>

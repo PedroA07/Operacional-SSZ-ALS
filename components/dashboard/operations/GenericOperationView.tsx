@@ -45,7 +45,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [isDriversCollapsed, setIsDriversCollapsed] = useState(false);
   
   const [activeMainTab, setActiveMainTab] = useState<'overview' | 'clients'>('overview');
-  const [activeStatusTab, setActiveStatusTab] = useState<'ativas' | 'concluida' | 'cancelada'>('ativas');
+  const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -129,6 +129,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       result = result.filter(t => t.status === 'Viagem concluída');
     } else if (activeStatusTab === 'cancelada') {
       result = result.filter(t => t.status === 'Viagem cancelada');
+    } else if (activeStatusTab === 'geral') {
+      result = result.filter(t => t.status !== 'Viagem cancelada');
     }
 
     if (searchQuery) {
@@ -195,7 +197,24 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         <div className="space-y-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-2 w-fit shrink-0">
-                  {[{ id: 'ativas', label: 'Em Aberto / Ativas', color: 'blue' }, { id: 'concluida', label: 'Concluídas', color: 'emerald' }, { id: 'cancelada', label: 'Canceladas', color: 'red' }].map(tab => (<button key={tab.id} onClick={() => setActiveStatusTab(tab.id as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${activeStatusTab === tab.id ? `bg-${tab.color}-600 text-white shadow-lg` : `bg-slate-50 text-slate-400 hover:bg-slate-100`}`}>{tab.label}</button>))}
+                  {[
+                    { id: 'geral', label: 'Visão Geral', color: 'slate' },
+                    { id: 'ativas', label: 'Em Aberto', color: 'blue' }, 
+                    { id: 'concluida', label: 'Concluídas', color: 'emerald' }, 
+                    { id: 'cancelada', label: 'Canceladas', color: 'amber' }
+                  ].map(tab => (
+                    <button 
+                      key={tab.id} 
+                      onClick={() => setActiveStatusTab(tab.id as any)} 
+                      className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${
+                        activeStatusTab === tab.id 
+                        ? `bg-${tab.color === 'slate' ? 'slate-900' : tab.color + '-600'} text-white shadow-lg` 
+                        : `bg-slate-50 text-slate-400 hover:bg-slate-100`
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
             </div>
             <ViewFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); }} />
@@ -206,7 +225,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                   {!isDriversCollapsed && (<div className="animate-in fade-in slide-in-from-top-2 duration-300"><SmartOperationTable userId={user.id} componentId={`op-drivers-${type}-${categoryName}`} title="" columns={driverColumns} data={filteredDrivers} defaultVisibleKeys={['name', 'plateHorse', 'status']} /></div>)}
                 </div>
               )}
-              <SmartOperationTable userId={user.id} componentId={`op-trips-${type}-${categoryName}-${activeStatusTab}`} title={`Fila de Viagens: ${activeStatusTab === 'ativas' ? 'Pendentes & Em Execução' : activeStatusTab.toUpperCase()}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+              <SmartOperationTable userId={user.id} componentId={`op-trips-${type}-${categoryName}-${activeStatusTab}`} title={`Fila de Viagens: ${activeStatusTab === 'geral' ? 'Visão Geral (Ativas + Concluídas)' : activeStatusTab === 'ativas' ? 'Pendentes & Em Execução' : activeStatusTab.toUpperCase()}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
             </div>
         </div>
       ) : (
@@ -250,7 +269,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
               <div className="mt-6 flex items-center gap-2 text-[8px] font-black text-blue-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
                  Visualizar Unidade
-                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </div>
             </button>
            ))}

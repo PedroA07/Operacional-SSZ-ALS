@@ -5,16 +5,18 @@ import { db as database } from './storage';
 export const osCategoryService = {
   /**
    * Detecta a categoria baseada nos padrões de OS solicitados
+   * Aliança: numero+ALC+serie_numeros+A
+   * Mercosul: numero+SP+serie_numeros+A
    */
   detectCategoryFromOS: (os: string): string | null => {
     const cleanOS = os.toUpperCase().trim();
     
-    // Padrão Aliança: (número) + ALC + (7 números) + A
-    const aliancaRegex = /^[0-9]*ALC[0-9]{7}A$/;
+    // Padrão Aliança: (número opcional) + ALC + (1 ou mais números) + A
+    const aliancaRegex = /^[0-9]*ALC[0-9]+A$/;
     if (aliancaRegex.test(cleanOS)) return 'Aliança';
 
-    // Padrão Mercosul: (número) + SP + (6 números) + A
-    const mercosulRegex = /^[0-9]*SP[0-9]{6}A$/;
+    // Padrão Mercosul: (número opcional) + SP + (1 ou mais números) + A
+    const mercosulRegex = /^[0-9]*SP[0-9]+A$/;
     if (mercosulRegex.test(cleanOS)) return 'Mercosul';
 
     return null; // Caso não identifique
@@ -24,12 +26,11 @@ export const osCategoryService = {
    * Sincroniza os vínculos do Motorista e do Cliente com a nova categoria
    */
   syncVinculos: async (category: string, driver: any, customer: any) => {
-    if (!category || category === 'Nenhum') return;
+    if (!category || category === 'Nenhum' || category === 'Geral') return;
 
     const normalizedCategory = category.trim().toUpperCase();
     const normalizedClient = (customer?.name || 'GERAL').trim().toUpperCase();
 
-    // 1. Atualizar Motorista (Padrão: {category, client})
     if (driver && driver.id) {
       const currentDrivers = await database.getDrivers();
       const dbDriver = currentDrivers.find(d => d.id === driver.id);
@@ -53,7 +54,6 @@ export const osCategoryService = {
       }
     }
 
-    // 2. Atualizar Cliente (Padrão: string[])
     if (customer && customer.id) {
       const currentCustomers = await database.getCustomers();
       const dbCust = currentCustomers.find(c => c.id === customer.id);

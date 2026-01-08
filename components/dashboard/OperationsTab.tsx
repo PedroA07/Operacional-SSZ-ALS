@@ -51,7 +51,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
 
   // Estados de Filtro
-  const [activeStatusTab, setActiveStatusTab] = useState<'ativas' | 'concluida' | 'cancelada'>('ativas');
+  const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [filterTypes, setFilterTypes] = useState<string[]>(() => {
@@ -127,6 +127,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
       result = result.filter(t => t.status === 'Viagem concluída');
     } else if (activeStatusTab === 'cancelada') {
       result = result.filter(t => t.status === 'Viagem cancelada');
+    } else if (activeStatusTab === 'geral') {
+      // Mostra tudo exceto canceladas (ou tudo se preferir)
+      result = result.filter(t => t.status !== 'Viagem cancelada');
     }
 
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
@@ -187,16 +190,17 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
            <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1 w-full lg:w-auto">
              {[
+               { id: 'geral', label: 'Visão Geral', color: 'slate' },
                { id: 'ativas', label: 'Viagens Ativas', color: 'blue' },
-               { id: 'concluida', label: 'Concluídas / Baixa Cragea', color: 'emerald' },
-               { id: 'cancelada', label: 'Canceladas', color: 'red' }
+               { id: 'concluida', label: 'Concluídas', color: 'emerald' },
+               { id: 'cancelada', label: 'Canceladas', color: 'amber' }
              ].map(tab => (
                <button 
                  key={tab.id} 
                  onClick={() => setActiveStatusTab(tab.id as any)}
                  className={`flex-1 lg:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${
                    activeStatusTab === tab.id 
-                   ? `bg-${tab.color}-600 text-white shadow-lg` 
+                   ? `bg-${tab.color === 'slate' ? 'slate-900' : tab.color + '-600'} text-white shadow-lg` 
                    : 'bg-transparent text-slate-400 hover:bg-slate-50'
                  }`}
                >
@@ -222,7 +226,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
         <SmartOperationTable 
           userId={user.id} 
           componentId="ops-global" 
-          title={`Monitoramento Global: ${activeStatusTab === 'ativas' ? 'Fila Ativa' : activeStatusTab === 'concluida' ? 'Concluídas (Baixa Cragea)' : activeStatusTab.toUpperCase()}`} 
+          title={`Monitoramento Global: ${activeStatusTab === 'geral' ? 'Visão Geral (Ativas + Concluídas)' : activeStatusTab === 'ativas' ? 'Fila Ativa' : activeStatusTab.toUpperCase()}`} 
           columns={columns} 
           data={filteredTrips} 
           defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
