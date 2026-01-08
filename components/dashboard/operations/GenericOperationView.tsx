@@ -11,6 +11,7 @@ import DocumentViewerModal from './DocumentViewerModal';
 import ViewFilters from './ViewFilters';
 import StatusHistoryManagerModal from './StatusHistoryManagerModal';
 import TripModal from './TripModal';
+import DateRangeFilter from './DateRangeFilter';
 
 interface GenericOperationViewProps {
   user: User;
@@ -44,7 +45,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
-  const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
+  // Padronização com a Home: Visão Geral / Ativas / etc.
+  const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -115,7 +117,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       result = result.filter(t => t.os.toLowerCase().includes(q) || t.container?.toLowerCase().includes(q) || t.driver.name.toLowerCase().includes(q));
     }
 
-    // LOGICA CORRIGIDA: Comparação de data YYYY-MM-DD
     if (startDate || endDate) {
       result = result.filter(t => {
         const tripDate = t.dateTime.substring(0, 10);
@@ -167,16 +168,52 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
       </header>
 
+      {/* FILTROS DE STATUS PADRONIZADOS */}
+      <div className="flex flex-col lg:flex-row justify-between items-center gap-6 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+         <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
+           {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
+             <button 
+               key={tab} 
+               onClick={() => setActiveStatusTab(tab as any)} 
+               className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}
+             >
+               {tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}
+             </button>
+           ))}
+         </div>
+         
+         <div className="flex-1 w-full max-w-md">
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="BUSCAR OS, CONTAINER, MOTORISTA..."
+                className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+              <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>
+            </div>
+         </div>
+
+         <DateRangeFilter 
+            startDate={startDate} 
+            onStartDateChange={setStartDate} 
+            endDate={endDate} 
+            onEndDateChange={setEndDate} 
+            onClear={() => { setStartDate(''); setEndDate(''); }} 
+         />
+      </div>
+
       <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-5">
          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
             <div>
-               <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Navegação por Clientes</h3>
-               <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">Selecione para filtrar o monitoramento abaixo</p>
+               <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Filtrar por Cliente desta Categoria</h3>
+               <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">Selecione para restringir a lista de monitoramento</p>
             </div>
             <div className="relative w-full md:w-64">
                <input 
                  type="text" 
-                 placeholder="FILTRAR CLIENTE..." 
+                 placeholder="BUSCAR CLIENTE..." 
                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all"
                  value={clientSearchText}
                  onChange={e => setClientSearchText(e.target.value)}
@@ -186,17 +223,15 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
          </div>
 
          <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-            <button onClick={() => setSelectedFilterClient('TODOS')} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap border ${selectedFilterClient === 'TODOS' ? 'bg-slate-900 text-white border-slate-900 shadow-xl scale-105' : 'text-slate-400 bg-slate-50 border-slate-100 hover:bg-white'}`}>Todos os Clientes</button>
+            <button onClick={() => setSelectedFilterClient('TODOS')} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap border ${selectedFilterClient === 'TODOS' ? 'bg-blue-600 text-white border-blue-600 shadow-xl' : 'text-slate-400 bg-slate-50 border-slate-100 hover:bg-white'}`}>Todos os Clientes</button>
             {categoryCustomers.map(c => (
-              <button key={c.id} onClick={() => setSelectedFilterClient(c.name)} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap border ${selectedFilterClient === c.name ? 'bg-blue-600 text-white border-blue-600 shadow-xl scale-105' : 'text-slate-400 bg-slate-50 border-slate-100 hover:bg-white'}`}>{c.name}</button>
+              <button key={c.id} onClick={() => setSelectedFilterClient(c.name)} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap border ${selectedFilterClient === c.name ? 'bg-slate-900 text-white border-slate-900 shadow-xl' : 'text-slate-400 bg-slate-50 border-slate-100 hover:bg-white'}`}>{c.name}</button>
             ))}
          </div>
       </div>
-
-      <ViewFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setSearchQuery(''); setStartDate(''); setEndDate(''); setSelectedFilterClient('TODOS'); setClientSearchText(''); }} />
       
       <div className={localDensity === 'compact' ? 'table-compact' : ''}>
-        <SmartOperationTable userId={user.id} componentId={`op-trips-${categoryName}-${selectedFilterClient}`} title={`Painel de Carga › ${selectedFilterClient}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+        <SmartOperationTable userId={user.id} componentId={`op-trips-${categoryName}-${selectedFilterClient}`} title={`Cargas Filtradas: ${selectedFilterClient}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
       </div>
 
       {isStatusModalOpen && (

@@ -38,7 +38,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [scannerInitialImage, setScannerInitialImage] = useState<string | null>(null);
   const [activePhoto, setActivePhoto] = useState<DriverCapturedDoc | null>(null);
   
-  // Estados para o novo Modal de Confirmação
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<TripStatus | null>(null);
 
@@ -68,27 +67,39 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     if (!activeTrip || !pendingStatus) return;
 
     setIsUpdating(true);
-    const now = new Date().toISOString();
+    const nowISO = new Date().toISOString();
+    const eventISO = new Date(dateTime).toISOString();
+    
     const updatedTrip: Trip = {
       ...activeTrip,
       status: pendingStatus,
-      statusTime: dateTime,
+      statusTime: eventISO,
       statusHistory: [
-        { status: pendingStatus, dateTime: dateTime, createdAt: now },
+        { 
+          status: pendingStatus, 
+          dateTime: eventISO, 
+          createdAt: nowISO 
+        },
         ...(activeTrip.statusHistory || [])
       ]
     };
 
     try {
-      if (await db.saveTrip(updatedTrip, user)) {
+      // Força o salvamento direto no banco via db.saveTrip
+      const success = await db.saveTrip(updatedTrip, user);
+      
+      if (success) {
         await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Status atualizado via App Motorista.`, { os: activeTrip.os, motorista: user.displayName });
         setShowPicker(false);
         setIsConfirmModalOpen(false);
         setPendingStatus(null);
         await onRefresh();
+      } else {
+        alert("Erro de conexão com o servidor ALS. Tente novamente.");
       }
     } catch (e) { 
-      alert("Falha de sincronização. Verifique sua internet."); 
+      console.error("Erro ao atualizar status:", e);
+      alert("Falha técnica ao sincronizar status."); 
     } finally { 
       setIsUpdating(false); 
     }
@@ -127,7 +138,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           className={`flex items-center gap-2 px-4 py-2.5 bg-white/5 rounded-xl text-slate-400 active:scale-90 transition-all border border-white/5 ${isUpdating ? 'opacity-50' : ''}`}
         >
           <svg className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2.5"/></svg>
-          <span className="text-[8px] font-black uppercase tracking-widest">{isUpdating ? 'Atualizando...' : 'Atualizar Página'}</span>
+          <span className="text-[8px] font-black uppercase tracking-widest">{isUpdating ? 'Sincronizando...' : 'Atualizar Página'}</span>
         </button>
       </div>
 

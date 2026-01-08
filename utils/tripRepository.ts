@@ -4,29 +4,32 @@ import { Trip } from '../types';
 
 export const tripRepository = {
   mapToDb: (trip: Trip) => {
+    // Garante que dateTime seja uma string ISO válida para o PostgreSQL
+    const validDate = trip.dateTime ? new Date(trip.dateTime).toISOString() : new Date().toISOString();
+    
     return {
       id: trip.id,
-      os: trip.os,
-      booking: trip.booking,
-      ship: trip.ship,
-      data_time: trip.dateTime, 
-      status_time: trip.statusTime || trip.statusHistory?.[0]?.dateTime || new Date().toISOString(),
-      is_late: trip.isLate,
-      type: trip.type,
+      os: trip.os?.toUpperCase() || '',
+      booking: trip.booking?.toUpperCase() || '',
+      ship: trip.ship?.toUpperCase() || '',
+      data_time: validDate, 
+      status_time: trip.statusTime ? new Date(trip.statusTime).toISOString() : validDate,
+      is_late: trip.isLate || false,
+      type: trip.type || 'EXPORTAÇÃO',
       container_type: trip.containerType || null,
-      category: trip.category,
+      category: trip.category || 'Geral',
       sub_category: trip.subCategory || null,
-      container: trip.container,
+      container: trip.container?.toUpperCase() || '',
       tara: trip.tara || null,
-      seal: trip.seal || null,
-      cva: trip.cva || null,
+      seal: trip.seal?.toUpperCase() || null,
+      cva: trip.cva?.toUpperCase() || null,
       customer: trip.customer, 
       destination: trip.destination || null, 
       driver: trip.driver, 
-      status: trip.status,
+      status: trip.status || 'Pendente',
       status_history: trip.statusHistory || [], 
-      advance_payment: trip.advancePayment, 
-      balance_payment: trip.balancePayment, 
+      advance_payment: trip.advancePayment || { status: 'BLOQUEADO' }, 
+      balance_payment: trip.balancePayment || { status: 'AGUARDANDO_DOCS' }, 
       os_doc: trip.osDoc || null,
       agendamento_doc: trip.agendamentoDoc || null,
       completo_doc: trip.completoDoc || null,
@@ -56,7 +59,7 @@ export const tripRepository = {
       os: d.os || 'SEM OS',
       booking: d.booking || '',
       ship: d.ship || '',
-      dateTime: d.data_time || d.created_at || d.dateTime || new Date().toISOString(),
+      dateTime: d.data_time || d.dateTime || d.created_at || new Date().toISOString(),
       statusTime: d.status_time || d.statusTime || d.created_at,
       isLate: d.is_late ?? false,
       type: d.type || 'EXPORTAÇÃO',
@@ -83,7 +86,7 @@ export const tripRepository = {
       nfDoc: d.nf_doc || d.nfDoc,
       nfKey: d.nf_key || d.nfKey,
       ocFormData: safeParse(d.oc_form_data || d.ocFormData, null),
-      preStackingFormData: safeParse(d.pre_stack_form_data || d.pre_stacking_form_data || d.preStackingFormData, null),
+      preStackingFormData: safeParse(d.pre_stack_form_data || d.preStackingFormData, null),
       scheduling: safeParse(d.scheduling, undefined),
       driver_docs: safeParse(d.driver_docs, []) 
     };
@@ -91,25 +94,11 @@ export const tripRepository = {
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
     try {
-      console.log("ALS System: Iniciando busca de viagens...");
-      const { data, error } = await supabase
-        .from('trips')
-        .select('*');
-
-      if (error) {
-        console.error("Erro Supabase (Trips Query):", error.message);
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        console.warn("ALS System: A consulta retornou zero viagens.");
-        return [];
-      }
-
-      console.log(`ALS System: ${data.length} viagens recuperadas. Iniciando mapeamento...`);
-      return data.map(d => this.mapFromDb(d));
+      const { data, error } = await supabase.from('trips').select('*');
+      if (error) throw error;
+      return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
-      console.error("ALS System: Falha crítica ao recuperar viagens:", e);
+      console.error("Erro ao carregar viagens:", e);
       return [];
     }
   },
@@ -119,11 +108,12 @@ export const tripRepository = {
       const payload = this.mapToDb(trip);
       const { error } = await supabase.from('trips').upsert(payload);
       if (error) {
-        console.error("Erro Supabase (Trip Upsert):", error.message);
+        console.error("Erro no salvamento (Trip):", error.message);
         return false;
       }
       return true;
     } catch (e) {
+      console.error("Erro fatal no repositório de viagens:", e);
       return false;
     }
   }
