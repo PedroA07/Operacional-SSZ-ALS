@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db } from '../../utils/storage';
@@ -49,10 +49,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
 
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  
   const [filterTypes, setFilterTypes] = useState<string[]>(() => {
     const saved = localStorage.getItem(`als_opt_types_${user.id}`);
     return saved ? JSON.parse(saved) : ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
@@ -74,28 +76,62 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     localStorage.setItem(`als_opt_drivers_${user.id}`, JSON.stringify(filterDriverNames));
   }, [filterTypes, filterClientNames, filterDriverNames, user.id]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [t, c, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPreStacking()]);
       setTrips(t || []);
       setCategories(c || []);
       setPreStacking(ps || []);
-    } catch (e) {}
-  };
+    } catch (e) {
+      console.error("Erro ao carregar dados de operações:", e);
+    }
+  }, []);
 
   useEffect(() => { 
     loadData();
-    const interval = setInterval(loadData, 15000);
+    const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadData]);
 
   const handleUpdateStatus = async () => {
-    if (!selectedTrip) return;
+    if (!selectedTrip || isSavingStatus) return;
+    
+    setIsSavingStatus(true);
     const newEntry: StatusHistoryEntry = { status: tempStatus, dateTime: new Date(statusTime).toISOString() };
-    const updatedTrip = { ...selectedTrip, status: tempStatus, statusTime: newEntry.dateTime, statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] };
-    await db.saveTrip(updatedTrip, user);
-    setIsStatusModalOpen(false);
-    loadData();
+    const updatedTrip = { 
+      ...selectedTrip, 
+      status: tempStatus, 
+      statusTime: newEntry.dateTime, 
+      statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] 
+    };
+
+    try {
+      // Atualização Otimista: Muda na tela antes de confirmar no banco
+      setTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
+      
+      const success = await db.saveTrip(updatedTrip, user);
+      if (!success) throw new Error("Database rejection");
+
+      setIsStatusModalOpen(false);
+      await loadData();
+    } catch (e) {
+      alert("Falha ao sincronizar status com o servidor. Verifique sua conexão.");
+      await loadData(); // Reverte para o estado do banco
+    } finally {
+      setIsSavingStatus(false);
+    }
+  };
+
+  const openStatusEditor = (t: Trip, s: TripStatus) => {
+    setSelectedTrip(t);
+    setTempStatus(s);
+    
+    // Ajuste de fuso horário local para o input datetime-local
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    setStatusTime(now.toISOString().slice(0, 16));
+    
+    setIsStatusModalOpen(true);
   };
 
   const handleLocateDriver = (driverId: string) => {
@@ -127,7 +163,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
     } else if (activeStatusTab === 'cancelada') {
       result = result.filter(t => t.status === 'Viagem cancelada');
     } else if (activeStatusTab === 'geral') {
-      // REGRA: Visão Geral mostra viagens Pendentes/Ativas E Concluídas, ocultando apenas canceladas.
       result = result.filter(t => t.status !== 'Viagem cancelada');
     }
 
@@ -142,7 +177,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate]);
 
   const columns = getOperationTableColumns(
-    (t, s) => { setSelectedTrip(t); setTempStatus(s); setStatusTime(new Date().toISOString().slice(0, 16)); setIsStatusModalOpen(true); },
+    openStatusEditor,
     (t) => { setSelectedTrip(t); loadData(); }, 
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); }, 
@@ -288,7 +323,18 @@ const OperationsTab: React.FC<OperationsTabProps> = ({ user, drivers, customers,
              </div>
 
              <div className="grid gap-3 pt-4 border-t border-slate-100 shrink-0">
-                <button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button>
+                <button 
+                  disabled={isSavingStatus}
+                  onClick={handleUpdateStatus} 
+                  className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSavingStatus ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Gravando...
+                    </>
+                  ) : 'Confirmar Atualização'}
+                </button>
                 <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
              </div>
           </div>

@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, StatusHistoryEntry, PreStacking, Port, Category } from '../../../types';
 import SmartOperationTable from './SmartOperationTable';
 import { db } from '../../../utils/storage';
@@ -43,6 +43,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [statusTime, setStatusTime] = useState('');
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isDriversCollapsed, setIsDriversCollapsed] = useState(false);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
   
   const [activeMainTab, setActiveMainTab] = useState<'overview' | 'clients'>('overview');
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('ativas');
@@ -50,18 +51,22 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const loadLocalData = async () => {
-    const [t, cats, p, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPorts(), db.getPreStacking()]);
-    setAllTrips(t);
-    setCategories(cats);
-    setPreStackingUnits([...p, ...ps]);
-  };
+  const loadLocalData = useCallback(async () => {
+    try {
+      const [t, cats, p, ps] = await Promise.all([db.getTrips(), db.getCategories(), db.getPorts(), db.getPreStacking()]);
+      setAllTrips(t || []);
+      setCategories(cats || []);
+      setPreStackingUnits([...(p || []), ...(ps || [])]);
+    } catch (e) {
+      console.error("Erro em visualização genérica:", e);
+    }
+  }, []);
 
   useEffect(() => {
     loadLocalData();
-    const interval = setInterval(loadLocalData, 15000);
+    const interval = setInterval(loadLocalData, 30000);
     return () => clearInterval(interval);
-  }, [categoryName, clientName]);
+  }, [loadLocalData]);
 
   const openStatusEditor = (trip: Trip, status: TripStatus) => {
     setSelectedTrip(trip);
@@ -73,12 +78,32 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   };
 
   const handleUpdateStatus = async () => {
-    if (!selectedTrip) return;
+    if (!selectedTrip || isSavingStatus) return;
+    
+    setIsSavingStatus(true);
     const newEntry: StatusHistoryEntry = { status: tempStatus, dateTime: new Date(statusTime).toISOString() };
-    const updatedTrip = { ...selectedTrip, status: tempStatus, statusTime: newEntry.dateTime, statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] };
-    await db.saveTrip(updatedTrip, user);
-    setIsStatusModalOpen(false);
-    loadLocalData();
+    const updatedTrip = { 
+      ...selectedTrip, 
+      status: tempStatus, 
+      statusTime: newEntry.dateTime, 
+      statusHistory: [newEntry, ...(selectedTrip.statusHistory || [])] 
+    };
+
+    try {
+      // Otimismo visual
+      setAllTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
+      
+      const success = await db.saveTrip(updatedTrip, user);
+      if (!success) throw new Error("Database error");
+      
+      setIsStatusModalOpen(false);
+      await loadLocalData();
+    } catch (e) {
+      alert("Falha ao atualizar status no banco de dados.");
+      await loadLocalData();
+    } finally {
+      setIsSavingStatus(false);
+    }
   };
 
   const handleLocateDriverInternal = (driverId: string) => {
@@ -116,9 +141,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
   const filteredTrips = useMemo(() => {
     let result = allTrips.filter(t => {
-      const matchCategory = t.category.toUpperCase() === categoryName.toUpperCase();
+      const matchCategory = t.category?.toUpperCase() === categoryName.toUpperCase();
       if (type === 'category') return matchCategory;
-      const matchClient = (t.customer.name.toUpperCase() === clientName?.toUpperCase()) || (t.subCategory?.toUpperCase() === clientName?.toUpperCase());
+      const matchClient = (t.customer?.name?.toUpperCase() === clientName?.toUpperCase()) || (t.subCategory?.toUpperCase() === clientName?.toUpperCase());
       return matchCategory && matchClient;
     });
 
@@ -158,9 +183,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const tripColumns = getOperationTableColumns(
     openStatusEditor,
     (t) => { setSelectedTrip(t); loadLocalData(); }, 
-    (t) => {}, (t) => {},
+    (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(false); /* Simula clique no menu se necessário mas melhor abrir modal específico */ },
+    (t) => {}, // Minuta
     handleOpenDocModal,
-    async (id) => { if(confirm('Excluir viagem?')) { await db.deleteTrip(id, user); loadLocalData(); } },
+    async (id) => { if(confirm('Excluir viagem permanentemente?')) { await db.deleteTrip(id, user); loadLocalData(); } },
     loadLocalData,
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
@@ -284,7 +310,16 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                 {isVWCrageaTrip ? (<VWStatusSelector currentStatus={tempStatus} onSelect={setTempStatus} />) : (<div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Novo Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase outline-none focus:border-blue-500" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>)}
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora do Evento</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
              </div>
-             <div className="grid gap-3 pt-4 border-t border-slate-100 shrink-0"><button onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Atualização</button><button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button></div>
+             <div className="grid gap-3 pt-4 border-t border-slate-100 shrink-0">
+                <button 
+                  disabled={isSavingStatus}
+                  onClick={handleUpdateStatus} 
+                  className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                   {isSavingStatus ? (<div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>) : 'Confirmar Atualização'}
+                </button>
+                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3 hover:text-red-500 transition-colors">Cancelar</button>
+             </div>
           </div>
         </div>
       )}
