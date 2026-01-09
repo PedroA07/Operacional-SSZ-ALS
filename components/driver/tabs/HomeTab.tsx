@@ -7,6 +7,7 @@ import ImageViewer from '../../shared/ImageViewer';
 import DriverDocsGallery from '../DriverDocsGallery';
 import StatusConfirmModal from '../StatusConfirmModal';
 import RefreshPageButton from '../RefreshPageButton';
+import SchedulingInfo from '../SchedulingInfo';
 
 interface HomeTabProps {
   user: User;
@@ -141,7 +142,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             <div className="flex-1 min-w-0 pr-4">
               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1.5">{activeTrip.type}</p>
               <h1 className="text-4xl font-black tracking-tighter text-white leading-none">OS {activeTrip.os}</h1>
-              {/* Informação do cliente movida para baixo da OS com fonte menor conforme solicitado */}
               <p className="text-[11px] font-bold text-slate-400 uppercase mt-2.5 leading-tight">
                 {activeTrip.customer.legalName || activeTrip.customer.name}
               </p>
@@ -170,6 +170,11 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           </div>
 
           <div className="p-8 space-y-7">
+            {/* Bloco de Agendamento (se houver) */}
+            {activeTrip.scheduling && (
+               <SchedulingInfo trip={activeTrip} />
+            )}
+
             <div className="space-y-6">
               <div className="space-y-1.5">
                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Localidade da Operação</span>
