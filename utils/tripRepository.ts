@@ -9,7 +9,7 @@ export const tripRepository = {
       os: trip.os?.toUpperCase() || '',
       booking: trip.booking?.toUpperCase() || '',
       ship: trip.ship?.toUpperCase() || '',
-      date_time: trip.dateTime, // Nome exato na sua imagem
+      date_time: trip.dateTime, 
       status_time: trip.statusTime || trip.dateTime,
       is_late: trip.isLate || false,
       type: trip.type || 'EXPORTAÇÃO',
@@ -20,9 +20,9 @@ export const tripRepository = {
       tara: trip.tara || null,
       seal: trip.seal?.toUpperCase() || null,
       cva: trip.cva?.toUpperCase() || null,
-      customer: trip.customer, // Objeto JSON
+      customer: trip.customer, 
       destination: trip.destination || null, 
-      driver: trip.driver, // Objeto JSON
+      driver: trip.driver, 
       status: trip.status || 'Pendente',
       status_history: trip.statusHistory || [], 
       advance_payment: trip.advancePayment || { status: 'BLOQUEADO' }, 

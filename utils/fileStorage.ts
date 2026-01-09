@@ -20,7 +20,21 @@ export const fileStorage = {
   },
 
   /**
-   * Realiza o upload de um arquivo (File ou Base64) para o Supabase Storage.
+   * Converte Base64 para Uint8Array de forma estável para ambientes Mobile
+   */
+  base64ToUint8Array: (base64: string) => {
+    const base64Content = base64.split(',')[1];
+    const binaryString = window.atob(base64Content);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  },
+
+  /**
+   * Realiza o upload de um arquivo para o Supabase Storage.
    */
   uploadFile: async (
     file: File | string, 
@@ -28,7 +42,7 @@ export const fileStorage = {
     fileName: string,
     bucket: 'drivers' | 'trips' = 'trips'
   ): Promise<string> => {
-    if (!supabase) throw new Error("Supabase não configurado.");
+    if (!supabase) throw new Error("Supabase não configurado localmente.");
 
     const cleanFileName = fileName.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
     const path = `${folder}/${Date.now()}_${cleanFileName}`;
@@ -38,9 +52,7 @@ export const fileStorage = {
       let contentType = 'application/octet-stream';
 
       if (typeof file === 'string' && file.startsWith('data:')) {
-        // Converte Base64 para Blob para o Supabase aceitar
-        const res = await fetch(file);
-        body = await res.blob();
+        body = fileStorage.base64ToUint8Array(file);
         contentType = file.split(';')[0].split(':')[1];
       } else {
         body = file;
@@ -57,8 +69,8 @@ export const fileStorage = {
       if (error) throw error;
       return data.path; 
     } catch (error) {
-      console.error("Erro no Upload Supabase:", error);
-      throw error;
+      console.error("Erro no Upload Supabase Storage:", error);
+      throw error; // Repassa para o modal decidir pelo fallback
     }
   }
 };
