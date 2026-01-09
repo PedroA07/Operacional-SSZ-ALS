@@ -4,7 +4,7 @@ import { Trip } from '../types';
 
 export const tripRepository = {
   mapToDb: (trip: Trip) => {
-    // Garante formato ISO 8601 para compatibilidade total com PostgreSQL timestamptz
+    // Garante que as datas sejam enviadas no formato ISO String
     const validDate = trip.dateTime ? new Date(trip.dateTime).toISOString() : new Date().toISOString();
     const validStatusDate = trip.statusTime ? new Date(trip.statusTime).toISOString() : validDate;
     
@@ -55,10 +55,11 @@ export const tripRepository = {
       return val; 
     };
 
-    // Normalização das datas para evitar discrepância de fuso horário local
-    const normalizeDate = (dateStr: string) => {
-      if (!dateStr) return new Date().toISOString();
-      return new Date(dateStr).toISOString();
+    // Função de normalização robusta para o app
+    const parseDate = (val: any) => {
+      if (!val) return new Date().toISOString();
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
     };
 
     return {
@@ -66,8 +67,9 @@ export const tripRepository = {
       os: d.os || 'SEM OS',
       booking: d.booking || '',
       ship: d.ship || '',
-      dateTime: normalizeDate(d.data_time || d.dateTime),
-      statusTime: normalizeDate(d.status_time || d.statusTime || d.data_time),
+      // Mapeia data_time do banco para dateTime do app
+      dateTime: parseDate(d.data_time || d.dateTime),
+      statusTime: parseDate(d.status_time || d.statusTime || d.data_time),
       isLate: d.is_late ?? false,
       type: d.type || 'EXPORTAÇÃO',
       containerType: d.container_type || d.containerType || '40HC',
@@ -105,7 +107,7 @@ export const tripRepository = {
       if (error) throw error;
       return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
-      console.error("Erro ao carregar viagens (TripRepo):", e);
+      console.error("Erro ao carregar viagens via Repositório:", e);
       return [];
     }
   },

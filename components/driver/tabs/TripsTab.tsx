@@ -81,7 +81,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
   };
 
   // ORDENAÇÃO ALS PREMIUM: 
-  // 1. Em viagem (Atual)
+  // 1. Em viagem (Ativas, da mais antiga para mais nova)
   // 2. Pendentes (Próximas, por data crescente)
   // 3. Concluídas/Canceladas (Histórico, por data decrescente)
   const sortedTrips = useMemo(() => {
@@ -102,7 +102,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
       const timeB = new Date(b.dateTime).getTime();
 
       if (priorityA === 3) return timeB - timeA; // Concluídas: mais recentes no topo da seção
-      return timeA - timeB; // Ativas/Pendentes: mais próximas no topo da seção
+      return timeA - timeB; // Ativas/Pendentes: mais antigas no topo para serem feitas primeiro
     });
   }, [trips]);
 

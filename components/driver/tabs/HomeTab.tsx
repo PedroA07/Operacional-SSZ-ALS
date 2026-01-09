@@ -47,6 +47,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const activeTrip = useMemo(() => {
     return [...trips]
       .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
+      // Ordenação por tempo (getTime) garantindo que o menor valor (mais antigo) fique no índice [0]
       .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())[0];
   }, [trips]);
 
@@ -69,7 +70,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
     setIsUpdating(true);
     const nowISO = new Date().toISOString();
-    // Normaliza a data do evento para ISO String estável
+    // O modal já retorna a data normalizada, usamos o valor de tempo real do evento
     const eventISO = new Date(dateTime).toISOString();
     
     const updatedTrip: Trip = {
@@ -87,21 +88,19 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     };
 
     try {
-      // Força o salvamento via db.saveTrip que utiliza o tripRepository mapeado
       const success = await db.saveTrip(updatedTrip, user);
-      
       if (success) {
-        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Status atualizado via Portal do Motorista.`, { os: activeTrip.os, motorista: user.displayName });
+        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Posição atualizada para ${pendingStatus}.`, { os: activeTrip.os, motorista: user.displayName });
         setShowPicker(false);
         setIsConfirmModalOpen(false);
         setPendingStatus(null);
         await onRefresh();
       } else {
-        alert("Falha ao sincronizar com o banco de dados. Verifique sua conexão.");
+        alert("Falha ao sincronizar com o banco de dados.");
       }
     } catch (e) { 
       console.error("Erro ao atualizar status:", e);
-      alert("Erro técnico ao salvar posição."); 
+      alert("Erro técnico ao salvar."); 
     } finally { 
       setIsUpdating(false); 
     }
@@ -152,8 +151,11 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 leading-tight">{activeTrip.customer.name}</p>
             </div>
             <div className="text-right">
+              {/* Exibição forçada em horário local do motorista */}
               <p className="text-[10px] font-black text-white">{new Date(activeTrip.dateTime).toLocaleDateString('pt-BR')}</p>
-              <p className="text-[9px] text-blue-400 font-bold uppercase mt-1">{new Date(activeTrip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
+              <p className="text-[11px] text-blue-400 font-black uppercase mt-1">
+                {new Date(activeTrip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
+              </p>
             </div>
           </div>
 
