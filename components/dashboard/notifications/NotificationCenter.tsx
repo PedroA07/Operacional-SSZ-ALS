@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { User, Notification, NotificationOrigin } from '../../../types';
 import { db } from '../../../utils/storage';
 import NotificationSettings from './NotificationSettings';
@@ -69,14 +69,23 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
   const handleNotifClick = (n: Notification) => {
     setSelectedNotification(n);
     setIsDetailOpen(true);
-    setIsOpen(false); // Fecha o dropdown ao abrir o detalhe (foco total)
+    setIsOpen(false); 
   };
+
+  const unreadPerOrigin = useMemo(() => {
+    const lastCheckStr = localStorage.getItem(`als_notif_last_check_${user.id}`);
+    const lastCheck = lastCheckStr ? new Date(lastCheckStr).getTime() : 0;
+    return {
+      operacional: notifications.filter(n => n.origin === 'OPERACIONAL' && new Date(n.timestamp).getTime() > lastCheck).length,
+      motorista: notifications.filter(n => n.origin === 'MOTORISTA' && new Date(n.timestamp).getTime() > lastCheck).length
+    };
+  }, [notifications, user.id]);
 
   const filteredNotifications = notifications.filter(n => {
     if (activeTab === 'OPERACIONAL') {
       return n.origin === 'OPERACIONAL';
     } else {
-      return n.origin === 'MOTORISTA' || ['STATUS_UPDATED', 'DRIVER_DOC_UPLOADED', 'DRIVER_PROFILE_UPDATED'].includes(n.type);
+      return n.origin === 'MOTORISTA';
     }
   });
 
@@ -110,8 +119,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
 
               {view === 'list' && (
                 <div className="flex bg-slate-200/50 p-1.5 rounded-2xl gap-1">
-                   <button onClick={() => setActiveTab('OPERACIONAL')} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'OPERACIONAL' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Operacional</button>
-                   <button onClick={() => setActiveTab('MOTORISTA')} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'MOTORISTA' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Motorista</button>
+                   <button onClick={() => setActiveTab('OPERACIONAL')} className={`relative flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'OPERACIONAL' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
+                     Operacional
+                     {unreadPerOrigin.operacional > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>}
+                   </button>
+                   <button onClick={() => setActiveTab('MOTORISTA')} className={`relative flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'MOTORISTA' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
+                     Motorista
+                     {unreadPerOrigin.motorista > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>}
+                   </button>
                 </div>
               )}
            </div>

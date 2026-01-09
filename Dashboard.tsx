@@ -17,6 +17,7 @@ import OnlineStatus from './components/dashboard/OnlineStatus';
 import DatabaseStatus from './components/dashboard/DatabaseStatus';
 import UserProfile from './components/dashboard/UserProfile';
 import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
+import NotificationToast from './components/dashboard/notifications/NotificationToast';
 import { DEFAULT_OPERATIONS } from './constants/operations';
 import { db } from './utils/storage';
 import { Icons } from './constants/icons';
@@ -145,6 +146,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
+      <NotificationToast />
       <aside className={`${sidebarState === 'open' ? 'w-80' : sidebarState === 'collapsed' ? 'w-20' : 'w-0'} bg-[#0f172a] text-slate-400 flex flex-col shadow-[10px_0_50px_rgba(0,0,0,0.3)] z-50 transition-all duration-500 relative overflow-hidden`}>
         <div className="p-6 border-b border-slate-800/50 space-y-4">
           <div className="flex items-center gap-4 mb-2">

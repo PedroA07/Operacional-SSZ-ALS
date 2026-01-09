@@ -38,6 +38,7 @@ const NotificationToast: React.FC = () => {
       }
     }
     
+    // Notifica outros componentes interessados (como o sininho no header)
     window.dispatchEvent(new CustomEvent('als_new_notification_event'));
 
     setTimeout(() => {
@@ -47,12 +48,24 @@ const NotificationToast: React.FC = () => {
 
   useEffect(() => {
     if (!supabase) return;
+    
+    // Inscrição Realtime no canal de notificações
     const channel = supabase
-      .channel('realtime:public:notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, processNotification)
-      .subscribe();
+      .channel('realtime_notifications_global')
+      .on(
+        'postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'notifications' }, 
+        processNotification
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.debug('ALS Cloud Sync: Realtime Notifications Enabled');
+        }
+      });
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      supabase.removeChannel(channel); 
+    };
   }, [processNotification]);
 
   if (!activeToast) return null;
@@ -64,7 +77,7 @@ const NotificationToast: React.FC = () => {
          className="bg-slate-950/95 backdrop-blur-xl text-white p-5 rounded-[2rem] shadow-[0_40px_100px_rgba(0,0,0,0.6)] border border-white/10 flex flex-col gap-2 relative overflow-hidden group active:scale-95 transition-all cursor-pointer"
        >
           <div className={`absolute top-0 left-0 w-1.5 h-full ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-600'}`}></div>
-          <div className="flex justify-between items-center"><div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full animate-pulse ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div><p className="text-[8px] font-black uppercase tracking-widest opacity-60">{activeToast.origin}</p></div><svg className="w-4 h-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></div>
+          <div className="flex justify-between items-center"><div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full animate-pulse ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-50'}`}></div><p className="text-[8px] font-black uppercase tracking-widest opacity-60">{activeToast.origin}</p></div><svg className="w-4 h-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></div>
           <div className="flex items-start gap-4">
              <div className="flex-1 min-w-0"><h4 className="text-[11px] font-black uppercase leading-tight truncate">{activeToast.title}</h4><p className="text-[10px] text-slate-400 font-medium leading-snug mt-1">{activeToast.description}</p></div>
           </div>
