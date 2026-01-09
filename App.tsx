@@ -11,7 +11,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Inicialização de Sessão
+  // Inicialização de Sessão baseada 100% no Banco de Dados
   useEffect(() => {
     const initSession = async () => {
       try {
@@ -19,16 +19,8 @@ const App: React.FC = () => {
         if (saved) {
           const sessionData: User = JSON.parse(saved);
           
-          // No "Admin Master", confiamos na sessão local para agilizar o carregamento
-          if (sessionData.id === 'admin-master') {
-            setUser(sessionData);
-            setCurrentScreen(AppScreen.DASHBOARD);
-            setIsInitializing(false);
-            return;
-          }
-
-          // Para outros usuários, re-validamos com o banco com um timeout curto
-          const timeout = new Promise((_, rej) => setTimeout(rej, 3000));
+          // Re-valida o usuário com o banco de dados para garantir permissões atuais
+          const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 4000));
           const usersFetch = db.getUsers();
           
           try {
@@ -40,16 +32,19 @@ const App: React.FC = () => {
               await db.updatePresence(dbUser.id, 'online');
               setCurrentScreen(AppScreen.DASHBOARD);
             } else {
+              // Se o usuário foi deletado ou inativado no banco, limpa a sessão
               sessionStorage.removeItem('als_active_session');
+              setCurrentScreen(AppScreen.LOGIN);
             }
           } catch (e) {
-            // Em caso de timeout/erro, mantemos logado se já tinha sessão para não travar o operacional
+            // Em caso de instabilidade do banco durante o refresh, 
+            // mantemos o usuário logado com os dados da sessão (modo resiliente)
             setUser(sessionData);
             setCurrentScreen(AppScreen.DASHBOARD);
           }
         }
       } catch (e) {
-        console.error("Sessão corrompida:", e);
+        console.error("Erro na restauração de sessão:", e);
         sessionStorage.removeItem('als_active_session');
       } finally {
         setIsInitializing(false);

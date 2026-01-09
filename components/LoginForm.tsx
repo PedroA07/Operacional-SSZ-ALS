@@ -15,6 +15,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+    
     setError('');
     setIsLoading(true);
 
@@ -24,10 +26,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         onLoginSuccess(result.user);
       } else {
         setError(result.error || 'Credenciais inválidas.');
+        setIsLoading(false);
       }
     } catch (err) {
-      setError('Falha crítica no sistema de segurança.');
-    } finally {
+      console.error("Critical Login Exception:", err);
+      setError('Ocorreu uma falha inesperada. Tente o acesso mestre.');
       setIsLoading(false);
     }
   };
@@ -41,7 +44,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       <div className="w-full max-w-[440px] animate-in fade-in zoom-in-95 duration-1000 slide-in-from-bottom-12">
         <div className="bg-white/[0.03] backdrop-blur-2xl p-10 md:p-14 rounded-[3.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.5)] border border-white/10 flex flex-col items-center">
           
-          {/* Logo Premium */}
+          {/* Logo ALS */}
           <div className="flex flex-col items-center mb-12">
             <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center shadow-[0_20px_50px_rgba(37,99,235,0.3)] mb-6 transform hover:scale-105 transition-transform duration-500">
                <span className="text-[#2563eb] font-black italic text-4xl select-none">ALS</span>
@@ -60,6 +63,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 <input 
                   type="text" 
                   required 
+                  autoComplete="username"
                   className="w-full px-7 py-5 bg-white/5 border border-white/5 text-white font-bold rounded-2xl focus:border-blue-500 focus:bg-white/10 outline-none transition-all placeholder:text-slate-700" 
                   placeholder="ex: operacional_ssz"
                   value={username} 
@@ -80,6 +84,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 <input 
                   type="password" 
                   required 
+                  autoComplete="current-password"
                   className="w-full px-7 py-5 bg-white/5 border border-white/5 text-white font-bold rounded-2xl focus:border-blue-500 focus:bg-white/10 outline-none transition-all placeholder:text-slate-700" 
                   placeholder="••••••••"
                   value={password} 
@@ -94,7 +99,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
             </div>
 
             {error && (
-              <div className="p-5 text-[10px] font-black uppercase text-red-400 bg-red-500/10 rounded-2xl border border-red-500/20 animate-shake text-center">
+              <div className="p-5 text-[10px] font-black uppercase text-red-400 bg-red-500/10 rounded-2xl border border-red-500/20 animate-shake text-center leading-relaxed">
                 {error}
               </div>
             )}
@@ -115,11 +120,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
             </button>
           </form>
 
-          {/* Rodapé de Informação */}
+          {/* Rodapé Informativo */}
           <div className="mt-14 flex flex-col items-center gap-6">
             <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full border border-white/5">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Servidores de Dados Online</span>
+              <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Sistemas Operacionais ALS</span>
             </div>
             <p className="text-[7px] text-slate-600 font-bold uppercase tracking-[0.5em] text-center leading-loose">
               Uso Restrito ALS Logística<br/>Tecnologia de Monitoramento v6.0

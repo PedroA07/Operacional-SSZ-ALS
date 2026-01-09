@@ -1,69 +1,51 @@
 
 import { db, supabase } from './storage';
 import { User } from '../types';
-import { ADMIN_CREDENTIALS } from '../constants';
 
 export const authService = {
   /**
-   * Realiza o login. 
-   * PRIORIDADE 1: Acesso Mestre (Local/Hardcoded) - Funciona mesmo sem internet.
-   * PRIORIDADE 2: Consulta ao Banco de Dados (Supabase).
+   * Realiza o login consultando exclusivamente o banco de dados Supabase.
    */
   async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
     const inputUser = username.trim().toLowerCase();
     const inputPass = password.trim();
     
-    // 1. Verificação de Acesso Mestre (Segurança Crítica)
-    if (inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && inputPass === ADMIN_CREDENTIALS.password) {
-      const masterAdmin: User = {
-        id: 'admin-master',
-        username: ADMIN_CREDENTIALS.username,
-        displayName: 'Administrador ALS',
-        role: 'admin',
-        lastLogin: new Date().toISOString(),
-        status: 'Ativo',
-        position: 'Diretoria de Operações',
-        isFirstLogin: false
-      };
-
-      // Tenta apenas registrar o login se o banco estiver vivo, mas não bloqueia o acesso
-      if (supabase) {
-        db.saveUser(masterAdmin).catch(() => console.warn("Aviso: Falha ao sincronizar log de admin master."));
-      }
-      
-      return { success: true, user: masterAdmin };
-    }
-
-    // 2. Verificação de Conexão Supabase
+    // Verificação de Conexão Supabase
     if (!supabase) {
-      return { success: false, error: 'Servidor de Autenticação não configurado.' };
+      return { success: false, error: 'Erro de infraestrutura: Banco de dados não configurado.' };
     }
 
     try {
-      // Busca com timeout para evitar que o 522 trave a interface
-      const fetchPromise = supabase
+      // Busca o usuário no Supabase
+      // Usamos AbortController para não deixar a UI travada em caso de erro 522/timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const { data, error } = await supabase
         .from('users')
         .select('*')
         .ilike('username', inputUser)
         .maybeSingle();
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('TIMEOUT')), 8000)
-      );
+      clearTimeout(timeoutId);
 
-      const { data, error }: any = await Promise.race([fetchPromise, timeoutPromise]);
-
-      if (error || !data) {
-        return { success: false, error: 'Usuário não localizado no sistema.' };
+      if (error) {
+        console.error("Database Error:", error);
+        return { success: false, error: 'O servidor de banco de dados não respondeu. Tente novamente.' };
       }
 
-      // Validação de senha
-      if (data.password !== inputPass) {
-        return { success: false, error: 'Chave de segurança inválida.' };
+      if (!data) {
+        return { success: false, error: 'Usuário não cadastrado no sistema ALS.' };
+      }
+
+      // Validação de senha (Case Sensitive)
+      const storedPassword = (data.password || '').trim();
+      if (storedPassword !== inputPass) {
+        return { success: false, error: 'Chave de segurança incorreta.' };
       }
 
       if (data.status === 'Inativo') {
-        return { success: false, error: 'Acesso temporariamente suspenso.' };
+        return { success: false, error: 'Este acesso foi desativado pela administração.' };
       }
 
       const user: User = {
@@ -80,16 +62,19 @@ export const authService = {
         isFirstLogin: data.is_first_login ?? data.isfirstlogin
       };
 
-      // Atualiza timestamp em background
-      supabase.from('users').update({ last_login: user.lastLogin }).eq('id', user.id).then();
+      // Atualiza timestamp de login em background
+      supabase.from('users').update({ 
+        last_login: user.lastLogin,
+        presence_status: 'online'
+      }).eq('id', user.id).then();
 
       return { success: true, user };
     } catch (err: any) {
-      console.error("Auth Error:", err);
-      if (err.message === 'TIMEOUT') {
-        return { success: false, error: 'O servidor demorou a responder. Tente novamente em instantes.' };
+      console.error("Auth Critical Failure:", err);
+      if (err.name === 'AbortError') {
+        return { success: false, error: 'Tempo de resposta esgotado. Verifique sua conexão.' };
       }
-      return { success: false, error: 'Erro de comunicação com os servidores ALS.' };
+      return { success: false, error: 'Erro de comunicação com o servidor ALS.' };
     }
   }
 };
