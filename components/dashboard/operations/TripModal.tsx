@@ -85,7 +85,7 @@ const TripModal: React.FC<TripModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
       <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[92vh] flex flex-col border border-white/20">
         
         <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">

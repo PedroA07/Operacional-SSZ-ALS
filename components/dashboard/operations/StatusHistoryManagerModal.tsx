@@ -24,12 +24,10 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
       const newHistory = [...(trip.statusHistory || [])];
       newHistory.splice(index, 1);
 
-      // Determina o novo status principal baseado no que sobrou no histórico
       let newMainStatus: TripStatus = 'Pendente';
       let newMainTime = trip.dateTime;
 
       if (newHistory.length > 0) {
-        // Ordena por data de registro para garantir que o primeiro é o mais recente registrado
         const sorted = [...newHistory].sort((a, b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime());
         newMainStatus = sorted[0].status;
         newMainTime = sorted[0].dateTime;
@@ -78,10 +76,10 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
                   <div>
                     <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{entry.status}</p>
                     <p className="text-[9px] font-mono font-bold text-slate-400 mt-1.5">
-                      Op: {new Date(entry.dateTime).toLocaleString('pt-BR')}
+                      Op: {new Date(entry.dateTime).toLocaleDateString('pt-BR')} {new Date(entry.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                     <p className="text-[7px] font-mono text-slate-300 mt-0.5 uppercase">
-                      Reg: {entry.createdAt ? new Date(entry.createdAt).toLocaleString('pt-BR') : 'Legado'}
+                      Reg: {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('pt-BR') + ' ' + new Date(entry.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Legado'}
                     </p>
                   </div>
                 </div>

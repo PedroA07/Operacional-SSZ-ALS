@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Trip, User, DriverCapturedDoc } from '../../types';
 import { db } from '../../utils/storage';
+import { fileStorage } from '../../utils/fileStorage';
 
 interface ScannerModalProps {
   isOpen: boolean;
@@ -13,7 +14,6 @@ interface ScannerModalProps {
 }
 
 const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess, trip, user, initialImage }) => {
-  // Inicializa o estado baseado na existência de uma imagem inicial (anexo da galeria)
   const [step, setStep] = useState<'camera' | 'preview'>(initialImage ? 'preview' : 'camera');
   const [capturedImages, setCapturedImages] = useState<DriverCapturedDoc[]>([]);
   const [currentImage, setCurrentImage] = useState<string | null>(initialImage || null);
@@ -35,7 +35,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   }, []);
 
   const startCamera = useCallback(async () => {
-    // Não inicia a câmera se estivermos em modo de preview (anexo)
     if (step === 'preview') return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -60,7 +59,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       if (initialImage) {
         setCurrentImage(initialImage);
         setStep('preview');
-        // Garante que a câmera pare caso estivesse aberta
         stopCamera();
       } else {
         startCamera();
@@ -87,29 +85,44 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     setCapturedImages(prev => [...prev, newDoc]);
     setCurrentImage(null);
     setStep('camera');
-    // Reinicia a câmera para a próxima foto se não for anexo único
     startCamera();
   };
 
   const handleFinish = async () => {
     if (isSaving) return;
-    const finalDocs = [...capturedImages];
+    
+    const docsToUpload = [...capturedImages];
     if (currentImage) {
-      finalDocs.push({ id: `scan-${Date.now()}`, url: currentImage, timestamp: new Date().toISOString() });
+      docsToUpload.push({ id: `scan-${Date.now()}`, url: currentImage, timestamp: new Date().toISOString() });
     }
     
-    if (finalDocs.length === 0) {
+    if (docsToUpload.length === 0) {
       onClose();
       return;
     }
 
     setIsSaving(true);
-    const updatedTrip: Trip = { 
-      ...trip, 
-      driver_docs: [...(trip.driver_docs || []), ...finalDocs] 
-    };
-
+    
     try {
+      const uploadedDocs: DriverCapturedDoc[] = [];
+      
+      // Processa cada imagem: Upload para Storage e obtém URL pública
+      for (const doc of docsToUpload) {
+        if (doc.url.startsWith('data:')) {
+          const fileName = `driver_upload_${trip.os}_${Date.now()}.jpg`;
+          const storagePath = await fileStorage.uploadFile(doc.url, 'docs', fileName, 'trips');
+          const publicUrl = fileStorage.getPublicUrl(storagePath, 'trips');
+          uploadedDocs.push({ ...doc, url: publicUrl });
+        } else {
+          uploadedDocs.push(doc);
+        }
+      }
+
+      const updatedTrip: Trip = { 
+        ...trip, 
+        driver_docs: [...(trip.driver_docs || []), ...uploadedDocs] 
+      };
+
       const success = await db.saveTrip(updatedTrip, user);
       if (success) {
         await onSuccess();
@@ -117,7 +130,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       }
     } catch (e) {
       console.error("Erro ao salvar anexo:", e);
-      alert("Falha ao sincronizar arquivos. Verifique sua conexão.");
+      alert("Falha ao sincronizar arquivos com o servidor ALS. Tente novamente.");
     } finally {
       setIsSaving(false);
     }
@@ -158,7 +171,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
             <div className="absolute bottom-10 w-full flex items-center justify-center gap-10 px-10 z-50">
                <button onClick={() => capturedImages.length > 0 && setShowSessionGallery(true)} className="relative w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-white border border-white/10 active:scale-95 transition-all overflow-hidden">{capturedImages.length > 0 ? <><img src={capturedImages[capturedImages.length-1].url} className="w-full h-full object-cover opacity-60" /><span className="absolute inset-0 flex items-center justify-center text-[11px] font-black bg-blue-600/40">{capturedImages.length}</span></> : <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="2.5"/></svg>}</button>
                <button onClick={capturePhoto} className="w-20 h-20 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center shadow-[0_0_40px_rgba(37,99,235,0.4)] active:scale-75 transition-all"><div className="w-14 h-14 bg-blue-600 rounded-full border-2 border-white/20"></div></button>
-               <button onClick={handleFinish} disabled={capturedImages.length === 0} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${capturedImages.length > 0 ? 'bg-emerald-600 text-white shadow-lg active:scale-95' : 'bg-slate-800 text-slate-600'}`}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg></button>
+               <button onClick={handleFinish} disabled={capturedImages.length === 0 && !currentImage} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${ (capturedImages.length > 0 || currentImage) ? 'bg-emerald-600 text-white shadow-lg active:scale-95' : 'bg-slate-800 text-slate-600'}`}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg></button>
             </div>
           </>
         )}

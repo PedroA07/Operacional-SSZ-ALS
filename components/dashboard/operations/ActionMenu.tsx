@@ -78,8 +78,8 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
     }
 
     return (
-      <label className="flex items-center gap-2 py-2 px-3 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer group">
-        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(trip, type, e)} />
+      <label className="flex items-center gap-2 py-2 px-3 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer group" onClick={(e) => e.stopPropagation()}>
+        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => { e.stopPropagation(); handleFileUpload(trip, type, e); }} />
         <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
         <span className="text-[9px] font-black text-slate-400 group-hover:text-blue-600 uppercase tracking-tight">Anexar {label}</span>
       </label>
@@ -90,7 +90,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
     <div className="relative" ref={menuRef}>
       <div className="flex items-center gap-1.5">
          <button 
-           onClick={() => onViewDriverDocs(trip)}
+           onClick={(e) => { e.stopPropagation(); onViewDriverDocs(trip); }}
            className="px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2"
            title="Fotos enviadas pelo Motorista"
          >
@@ -99,7 +99,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
          </button>
 
          <button 
-           onClick={() => setIsOpen(!isOpen)}
+           onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
            className={`p-2 rounded-xl border-2 transition-all ${isOpen ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'}`}
          >
            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
@@ -111,15 +111,15 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
           <div className="p-4 space-y-4">
              <div className="space-y-1">
                 <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest px-2 mb-2">Gestão da Viagem</p>
-                <button onClick={() => { onEditTrip(trip); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-900 hover:text-white rounded-xl transition-all group">
+                <button onClick={(e) => { e.stopPropagation(); onEditTrip(trip); setIsOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2.5 hover:bg-slate-900 hover:text-white rounded-xl transition-all group">
                    <svg className="w-4 h-4 text-slate-400 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                    <span className="text-[10px] font-black uppercase">Editar Programação</span>
                 </button>
-                <button onClick={() => { onEditOC(trip); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-600 hover:text-white rounded-xl transition-all group">
+                <button onClick={(e) => { e.stopPropagation(); onEditOC(trip); setIsOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2.5 hover:bg-blue-600 hover:text-white rounded-xl transition-all group">
                   <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                    <span className="text-[10px] font-black uppercase">Editar Ordem Coleta</span>
                 </button>
-                <button onClick={() => { onEditMinuta(trip); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-emerald-600 hover:text-white rounded-xl transition-all group">
+                <button onClick={(e) => { e.stopPropagation(); onEditMinuta(trip); setIsOpen(false); }} className="w-full text-left flex items-center gap-3 px-3 py-2.5 hover:bg-emerald-600 hover:text-white rounded-xl transition-all group">
                    <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
                    <span className="text-[10px] font-black uppercase">Minuta Pre-Stacking</span>
                 </button>
@@ -133,8 +133,8 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
              </div>
 
              <button 
-               onClick={() => { onDeleteTrip(trip.id); setIsOpen(false); }}
-               className="w-full flex items-center gap-3 px-3 py-3 mt-2 text-red-500 hover:bg-red-50 rounded-xl transition-all group"
+               onClick={(e) => { e.stopPropagation(); onDeleteTrip(trip.id); setIsOpen(false); }}
+               className="w-full text-left flex items-center gap-3 px-3 py-3 mt-2 text-red-500 hover:bg-red-50 rounded-xl transition-all group"
              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
                 <span className="text-[10px] font-black uppercase">Excluir Viagem</span>

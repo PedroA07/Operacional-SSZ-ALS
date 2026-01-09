@@ -124,7 +124,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
     if (startDate || endDate) {
       result = result.filter(t => {
-        const tripDate = t.dateTime.substring(0, 10);
+        // Normaliza para comparação de data YYYY-MM-DD
+        const tripDate = t.dateTime ? t.dateTime.substring(0, 10) : "";
+        if (!tripDate) return false;
+        
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
         return true;
@@ -134,7 +137,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [allTrips, categoryName, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient]);
 
-  const tripColumns = getOperationTableColumns(
+  const tripColumns = useMemo(() => getOperationTableColumns(
     (t, s) => { setSelectedTrip(t); setTempStatus(s); const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); setStatusTime(d.toISOString().slice(0,16)); setIsStatusModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); },
@@ -147,7 +150,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); }
-  );
+  ), [user]);
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
 
@@ -239,7 +242,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       </div>
 
       {isStatusModalOpen && (
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">
              <div className="text-center shrink-0"><p className="text-lg font-black text-blue-600 uppercase">OS: {selectedTrip?.os}</p></div>
              <div className="space-y-4">
@@ -258,13 +261,13 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       {isDriverDocsModalOpen && selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => setIsDriverDocsModalOpen(false)} trip={selectedTrip} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />}
       
       {isOCFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[2000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[3300] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
           <OrdemColetaForm drivers={drivers} customers={customers} ports={preStackingUnits as any} onClose={() => { setIsOCFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} initialData={selectedTrip.ocFormData} />
         </div>
       )}
 
       {isMinutaFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[2000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[3300] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
           <PreStackingForm drivers={drivers} customers={customers} ports={preStackingUnits as any} onClose={() => { setIsMinutaFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} initialOS={selectedTrip.os} />
         </div>
       )}

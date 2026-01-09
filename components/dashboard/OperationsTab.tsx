@@ -111,7 +111,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate]);
 
-  const columns = getOperationTableColumns(
+  const columns = useMemo(() => getOperationTableColumns(
     (t, s) => { setSelectedTrip(t); setTempStatus(s); const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); setStatusTime(d.toISOString().slice(0,16)); setIsStatusModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); }, 
@@ -124,7 +124,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); }
-  );
+  ), [user, onRefresh, onDeleteTrip]);
 
   if (activeView.type !== 'list') {
     return (
@@ -177,13 +177,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       {isHistoryModalOpen && selectedTrip && <StatusHistoryManagerModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} trip={selectedTrip} user={user} onSuccess={onRefresh} />}
       
       {isOCFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[2000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
           <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); onRefresh(); }} initialData={selectedTrip.ocFormData} />
         </div>
       )}
 
       {isMinutaFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[2000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
           <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaFormOpen(false); onRefresh(); }} initialOS={selectedTrip.os} />
         </div>
       )}
