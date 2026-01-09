@@ -45,11 +45,12 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   // REGRA: A operação atual deve ser a programação MAIS ANTIGA que não está concluída ou cancelada
   const activeTrip = useMemo(() => {
-    const sorted = [...trips]
+    const activeList = [...trips]
       .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
+      // Ordenação crescente por tempo (o menor timestamp = mais antigo = deve ser feito primeiro)
       .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
     
-    return sorted[0];
+    return activeList[0];
   }, [trips]);
 
   const isVWCrageaTrip = useMemo(() => {
@@ -71,7 +72,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
     setIsUpdating(true);
     const nowISO = new Date().toISOString();
-    // Normalizamos a data do evento para ISO estrito
+    // A data retornada pelo modal já deve estar em ISO
     const eventISO = new Date(dateTime).toISOString();
     
     const updatedTrip: Trip = {
@@ -92,17 +93,17 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       const success = await db.saveTrip(updatedTrip, user);
       
       if (success) {
-        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Posição atualizada via Portal.`, { os: activeTrip.os, motorista: user.displayName });
+        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Posição atualizada para ${pendingStatus}.`, { os: activeTrip.os, motorista: user.displayName });
         setShowPicker(false);
         setIsConfirmModalOpen(false);
         setPendingStatus(null);
         await onRefresh();
       } else {
-        alert("Falha ao salvar no banco de dados. Tente novamente.");
+        alert("Falha ao sincronizar com o banco de dados.");
       }
     } catch (e) { 
       console.error("Erro ao atualizar status:", e);
-      alert("Erro técnico de conexão."); 
+      alert("Erro técnico ao salvar posição."); 
     } finally { 
       setIsUpdating(false); 
     }
@@ -153,6 +154,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 leading-tight">{activeTrip.customer.name}</p>
             </div>
             <div className="text-right">
+              {/* Exibição forçada de data e hora em fuso local brasileiro */}
               <p className="text-[10px] font-black text-white">{new Date(activeTrip.dateTime).toLocaleDateString('pt-BR')}</p>
               <p className="text-[11px] text-blue-400 font-black uppercase mt-1">
                 {new Date(activeTrip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
