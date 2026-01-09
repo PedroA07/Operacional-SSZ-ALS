@@ -79,7 +79,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 
     return (
       <label className="flex items-center gap-2 py-2 px-3 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer group" onClick={(e) => e.stopPropagation()}>
-        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => { e.stopPropagation(); handleFileUpload(trip, type, e); }} />
+        <input type="file" className="hidden" accept=".pdf,image/*" multiple onChange={(e) => { e.stopPropagation(); handleFileUpload(trip, type, e); }} />
         <svg className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
         <span className="text-[9px] font-black text-slate-400 group-hover:text-blue-600 uppercase tracking-tight">Anexar {label}</span>
       </label>
@@ -94,7 +94,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
            className="px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2"
            title="Fotos enviadas pelo Motorista"
          >
-           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
            {trip.driver_docs && trip.driver_docs.length > 0 && <span className="text-[9px] font-black">{trip.driver_docs.length}</span>}
          </button>
 
@@ -127,6 +127,11 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 
              <div className="space-y-1 pt-3 border-t border-slate-50">
                 <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest px-2 mb-2">Documentos e Anexos</p>
+                <label className="flex items-center gap-3 px-3 py-3 bg-blue-600 text-white rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-md active:scale-95 group mb-2" onClick={(e) => e.stopPropagation()}>
+                    <input type="file" className="hidden" accept="image/*,.pdf" multiple onChange={(e) => { e.stopPropagation(); handleFileUpload(trip, 'BATCH', e); setIsOpen(false); }} />
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+                    <span className="text-[10px] font-black uppercase tracking-tight">Anexar Lote de Arquivos</span>
+                </label>
                 <DocItem type="OS_PDF" label="OS Original PDF" iconColor="bg-emerald-500" />
                 <DocItem type="CTE" label="Arquivo do CT-e" iconColor="bg-indigo-500" />
                 <DocItem type="COMPLETO" label="Dossiê Completo" iconColor="bg-blue-500" />

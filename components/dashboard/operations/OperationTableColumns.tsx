@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Trip, TripStatus, TripDocument, User } from '../../../types';
+import { Trip, TripStatus, TripDocument, User, DriverCapturedDoc } from '../../../types';
 import { db } from '../../../utils/storage';
 import ActionMenu from './ActionMenu';
 
@@ -19,11 +19,49 @@ export const getOperationTableColumns = (
   onOpenHistoryManager: (t: Trip) => void 
 ) => {
   
-  const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO', e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO' | 'BATCH', e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     
+    const updatedTrip = { ...trip };
+    // Fix: Explicitly cast Array.from result to File[] to avoid unknown type errors in readAsDataURL
+    const filesArray = Array.from(files) as File[];
+
+    // Se for um upload em LOTE (BATCH), adicionamos todos ao driver_docs
+    if (type === 'BATCH') {
+      const newDocs: DriverCapturedDoc[] = [];
+      
+      for (const file of filesArray) {
+        const reader = new FileReader();
+        const promise = new Promise<void>((resolve) => {
+          reader.onload = () => {
+            newDocs.push({
+              id: `batch-doc-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+              url: reader.result as string,
+              timestamp: new Date().toISOString()
+            });
+            resolve();
+          };
+          // Fix: reader.readAsDataURL expects a Blob; file is now typed as File (which extends Blob)
+          reader.readAsDataURL(file);
+        });
+        await promise;
+      }
+
+      updatedTrip.driver_docs = [...(updatedTrip.driver_docs || []), ...newDocs];
+      
+      try {
+        await db.saveTrip(updatedTrip, actingUser);
+        await db.addNotification(actingUser, 'DOC_ATTACHED', `Lote de Arquivos`, `${actingUser.displayName} anexou ${filesArray.length} arquivos no dossiê da OS ${trip.os}.`, { os: trip.os, motorista: trip.driver.name });
+        onRefreshData();
+      } catch (err) { alert("Erro ao salvar lote no banco."); }
+      return;
+    }
+
+    // Se for um tipo específico (OS, CTE, etc), processamos o primeiro e o restante vai pro dossiê se houver mais de um
+    const firstFile = filesArray[0];
     const reader = new FileReader();
+    
     reader.onload = async () => {
       let prefix = 'DOC';
       let docLabel = 'Documento';
@@ -35,14 +73,42 @@ export const getOperationTableColumns = (
       else if (type === 'COMPLETO') { prefix = 'DOSSIE'; docLabel = 'Dossiê Completo'; }
 
       const customFileName = `${prefix} - ${trip.driver.name} - ${trip.os}`;
-      const doc: TripDocument = { id: `${type.toLowerCase()}-${Date.now()}`, type: type as any, url: reader.result as string, fileName: customFileName, uploadDate: new Date().toISOString() };
+      const doc: TripDocument = { 
+        id: `${type.toLowerCase()}-${Date.now()}`, 
+        type: type as any, 
+        url: reader.result as string, 
+        fileName: customFileName, 
+        uploadDate: new Date().toISOString() 
+      };
 
-      const updatedTrip = { ...trip };
       if (type === 'OS_PDF') updatedTrip.osDoc = doc;
       else if (type === 'AGENDAMENTO') updatedTrip.agendamentoDoc = doc;
       else if (type === 'CTE') updatedTrip.cteDoc = doc;
       else if (type === 'CVA') updatedTrip.cvaDoc = doc;
       else if (type === 'COMPLETO') updatedTrip.completoDoc = doc;
+
+      // Se o usuário selecionou mais de um arquivo para um campo específico,
+      // salvamos os excedentes no dossiê geral para não perdê-los.
+      if (filesArray.length > 1) {
+        const extraDocs: DriverCapturedDoc[] = [];
+        for (let i = 1; i < filesArray.length; i++) {
+          const extraReader = new FileReader();
+          const p = new Promise<void>((res) => {
+            extraReader.onload = () => {
+              extraDocs.push({
+                id: `extra-doc-${Date.now()}-${i}`,
+                url: extraReader.result as string,
+                timestamp: new Date().toISOString()
+              });
+              res();
+            };
+            // Fix: extraReader.readAsDataURL expects a Blob; filesArray[i] is now typed as File
+            extraReader.readAsDataURL(filesArray[i]);
+          });
+          await p;
+        }
+        updatedTrip.driver_docs = [...(updatedTrip.driver_docs || []), ...extraDocs];
+      }
       
       try {
         await db.saveTrip(updatedTrip, actingUser);
@@ -50,7 +116,8 @@ export const getOperationTableColumns = (
         onRefreshData();
       } catch (err) { alert("Erro ao salvar no banco."); }
     };
-    reader.readAsDataURL(file);
+    // Fix: reader.readAsDataURL expects a Blob; firstFile is now typed as File
+    reader.readAsDataURL(firstFile);
   };
 
   const deleteDocument = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO') => {
@@ -90,7 +157,7 @@ export const getOperationTableColumns = (
 
     return (
       <label className="flex items-center gap-2 px-2 py-1 bg-white border border-slate-100 text-slate-400 rounded-lg hover:border-blue-300 transition-all cursor-pointer mt-2 group">
-        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(trip, type, e)} />
+        <input type="file" className="hidden" accept=".pdf,image/*" multiple onChange={(e) => handleFileUpload(trip, type, e)} />
         <svg className="w-2.5 h-2.5 group-hover:text-blue-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
         <span className="text-[7px] font-black uppercase">Anexar</span>
       </label>
