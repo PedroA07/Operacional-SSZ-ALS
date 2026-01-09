@@ -8,93 +8,56 @@ import { tripRepository } from './tripRepository';
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-// Inicialização com configurações globais otimizadas
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_KEY, {
-      auth: { 
-        persistSession: false,
-        autoRefreshToken: true
-      },
+      auth: { persistSession: false, autoRefreshToken: true },
       global: { 
         headers: { 'x-application-name': 'als-transportes' },
-        fetch: (url, options) => {
-          // Garante que o fetch tenha um timeout razoável no nível do navegador
-          return fetch(url, { ...options, cache: 'no-store' });
-        }
+        fetch: (url, options) => fetch(url, { ...options, cache: 'no-store' })
       }
     }) 
   : null;
 
 export const db = {
-  // ... (restante do código permanece igual)
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
-    try {
-      const { data, error } = await supabase.from('users').select('*');
-      if (error) {
-        console.error("DB Error (Users):", error.message);
-        return [];
-      }
-      return (data || []).map(u => ({
-        id: u.id,
-        username: u.username,
-        password: u.password,
-        displayName: u.display_name || u.displayname || u.username,
-        role: u.role,
-        lastLogin: u.last_login || u.lastlogin,
-        photo: u.photo,
-        position: u.position,
-        driverId: u.driver_id || u.driverid,
-        staffId: u.staff_id || u.staffid,
-        status: u.status,
-        isFirstLogin: u.is_first_login ?? u.isfirstlogin,
-        lastSeen: u.last_seen || u.lastseen,
-        presence_status: u.presence_status
-      }));
-    } catch (e) { return []; }
+    const { data, error } = await supabase.from('users').select('*');
+    if (error) throw error; // Lançar erro ao invés de retornar []
+    return (data || []).map(u => ({
+      id: u.id, username: u.username, password: u.password,
+      displayName: u.display_name || u.displayname || u.username,
+      role: u.role, lastLogin: u.last_login || u.lastlogin,
+      photo: u.photo, position: u.position, driverId: u.driver_id || u.driverid,
+      staffId: u.staff_id || u.staffid, status: u.status,
+      isFirstLogin: u.is_first_login ?? u.isfirstlogin,
+      lastSeen: u.last_seen || u.lastseen, presence_status: u.presence_status
+    }));
   },
 
   saveUser: async (user: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('users').upsert({
-      id: user.id,
-      username: user.username,
-      password: user.password,
-      display_name: user.displayName,
-      role: user.role,
-      last_login: user.lastLogin,
-      status: user.status || 'Ativo',
-      driver_id: user.driverId,
-      staff_id: user.staffId,
-      position: user.position,
-      is_first_login: user.isFirstLogin,
+      id: user.id, username: user.username, password: user.password,
+      display_name: user.displayName, role: user.role, last_login: user.lastLogin,
+      status: user.status || 'Ativo', driver_id: user.driverId, staff_id: user.staffId,
+      position: user.position, is_first_login: user.isFirstLogin,
       presence_status: user.presence_status || 'offline'
     });
     return !error;
   },
 
-  // MOTORISTAS
   getDrivers: async (): Promise<Driver[]> => {
     if (!supabase) return [];
-    return await driverRepository.getAll(supabase);
+    const drivers = await driverRepository.getAll(supabase);
+    return drivers;
   },
 
   getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
     if (!supabase) return null;
-    try {
-      const cleanCPF = cpf.replace(/\D/g, '');
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('*')
-        .or(`cpf.eq.${cleanCPF},cpf.eq.${cpf}`)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data ? driverRepository.mapFromDb(data) : null;
-    } catch (e) {
-      console.error("Erro ao buscar CPF:", e);
-      return null;
-    }
+    const cleanCPF = cpf.replace(/\D/g, '');
+    const { data, error } = await supabase.from('drivers').select('*').or(`cpf.eq.${cleanCPF},cpf.eq.${cpf}`).maybeSingle();
+    if (error) throw error;
+    return data ? driverRepository.mapFromDb(data) : null;
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
@@ -111,7 +74,6 @@ export const db = {
     return await driverRepository.delete(supabase, id);
   },
 
-  // VIAGENS
   getTrips: async (): Promise<Trip[]> => {
     if (!supabase) return [];
     return await tripRepository.getAll(supabase);
@@ -136,30 +98,21 @@ export const db = {
     return !error;
   },
 
-  // CLIENTES
   getCustomers: async (): Promise<Customer[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('customers').select('*').order('name');
-    if (error) return [];
+    if (error) throw error;
     return (data || []).map(c => ({
-      ...c,
-      legalName: c.legal_name || c.legalName,
-      zipCode: c.zip_code || c.zipCode
+      ...c, legalName: c.legal_name || c.legalName, zipCode: c.zip_code || c.zipCode
     })) as Customer[];
   },
 
   saveCustomer: async (customer: Customer, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('customers').upsert({
-      id: customer.id,
-      name: customer.name,
-      legal_name: customer.legalName,
-      cnpj: customer.cnpj,
-      address: customer.address,
-      neighborhood: customer.neighborhood,
-      zip_code: customer.zipCode,
-      city: customer.city,
-      state: customer.state,
+      id: customer.id, name: customer.name, legal_name: customer.legalName,
+      cnpj: customer.cnpj, address: customer.address, neighborhood: customer.neighborhood,
+      zip_code: customer.zipCode, city: customer.city, state: customer.state,
       operations: customer.operations || []
     });
     return !error;
@@ -171,30 +124,21 @@ export const db = {
     return !error;
   },
 
-  // PORTOS E PRE-STACKING
   getPorts: async (): Promise<Port[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('ports').select('*').order('name');
-    if (error) return [];
+    if (error) throw error;
     return (data || []).map(p => ({
-      ...p,
-      legalName: p.legal_name || p.legalName,
-      zipCode: p.zip_code || p.zipCode
+      ...p, legalName: p.legal_name || p.legalName, zipCode: p.zip_code || p.zipCode
     })) as Port[];
   },
 
   savePort: async (port: Port, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('ports').upsert({
-      id: port.id,
-      name: port.name,
-      legal_name: port.legalName,
-      cnpj: port.cnpj,
-      address: port.address,
-      neighborhood: port.neighborhood,
-      zip_code: port.zipCode,
-      city: port.city,
-      state: port.state
+      id: port.id, name: port.name, legal_name: port.legalName, cnpj: port.cnpj,
+      address: port.address, neighborhood: port.neighborhood, zip_code: port.zipCode,
+      city: port.city, state: port.state
     });
     return !error;
   },
@@ -208,26 +152,18 @@ export const db = {
   getPreStacking: async (): Promise<PreStacking[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('pre_stacking').select('*').order('name');
-    if (error) return [];
+    if (error) throw error;
     return (data || []).map(ps => ({
-      ...ps,
-      legalName: ps.legal_name || ps.legalName,
-      zipCode: ps.zip_code || ps.zipCode
+      ...ps, legalName: ps.legal_name || ps.legalName, zipCode: ps.zip_code || ps.zipCode
     })) as PreStacking[];
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').upsert({
-      id: ps.id,
-      name: ps.name,
-      legal_name: ps.legalName,
-      cnpj: ps.cnpj,
-      address: ps.address,
-      neighborhood: ps.neighborhood,
-      zip_code: ps.zipCode,
-      city: ps.city,
-      state: ps.state
+      id: ps.id, name: ps.name, legal_name: ps.legalName, cnpj: ps.cnpj,
+      address: ps.address, neighborhood: ps.neighborhood, zip_code: ps.zipCode,
+      city: ps.city, state: ps.state
     });
     return !error;
   },
@@ -238,7 +174,6 @@ export const db = {
     return !error;
   },
 
-  // STAFF E CATEGORIAS
   getStaff: async (): Promise<Staff[]> => {
     if (!supabase) return [];
     return await staffRepository.getAll(supabase);
@@ -261,59 +196,42 @@ export const db = {
   getCategories: async (): Promise<Category[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('categories').select('*').order('name');
-    if (error) return [];
+    if (error) throw error;
     return (data || []).map(c => ({
-      id: c.id,
-      name: c.name,
-      parentId: c.parent_id
+      id: c.id, name: c.name, parent_id: c.parent_id
     })) as Category[];
   },
 
   saveCategory: async (category: Category, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('categories').upsert({
-      id: category.id,
-      name: category.name,
-      parent_id: category.parentId
+      id: category.id, name: category.name, parent_id: category.parentId
     });
     return !error;
   },
 
-  // NOTIFICAÇÕES
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: any) => {
     if (!supabase) return;
     const origin: NotificationOrigin = (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL';
     await supabase.from('notifications').insert({
-      user_id: user.id,
-      user_name: user.displayName,
-      type,
-      origin,
-      title,
-      message: description,
-      os_ref: summary?.os || '',
-      summary: summary || {},
-      timestamp: new Date().toISOString()
+      user_id: user.id, user_name: user.displayName, type, origin,
+      title, message: description, os_ref: summary?.os || '',
+      summary: summary || {}, timestamp: new Date().toISOString()
     });
   },
 
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(50);
-    if (error) return [];
+    if (error) throw error;
     return (data || []).map(n => ({
-      id: String(n.id),
-      title: n.title,
-      description: n.message,
-      type: n.type as NotificationType,
-      origin: n.origin as NotificationOrigin,
-      authorName: n.user_name,
-      authorId: n.user_id,
-      timestamp: n.timestamp,
+      id: String(n.id), title: n.title, description: n.message,
+      type: n.type as NotificationType, origin: n.origin as NotificationOrigin,
+      authorName: n.user_name, authorId: n.user_id, timestamp: n.timestamp,
       summary: { ...n.summary, os: n.os_ref }
     }));
   },
 
-  // STATUS E PRESENÇA
   updatePresence: async (userId: string, status: PresenceStatus) => {
     if (supabase) {
       await supabase.from('users').update({ 
@@ -323,17 +241,20 @@ export const db = {
     }
   },
 
-  updateDriverLocation: async (driverId: string, lat: number, lng: number) => {
+  checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
-    const { error } = await supabase.from('drivers').update({ 
-      current_lat: lat, 
-      current_lng: lng, 
-      last_location_at: new Date().toISOString() 
-    }).eq('id', driverId);
-    return !error;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); 
+      const { error } = await supabase.from('users').select('id').limit(1).abortSignal(controller.signal);
+      clearTimeout(timeoutId);
+      return !error;
+    } catch { return false; }
   },
 
-  // PREFERÊNCIAS DE UI
+  /**
+   * getPreferences: fix for Error in components/dashboard/operations/SmartOperationTable.tsx
+   */
   getPreferences: (userId: string) => {
     const key = `als_prefs_${userId}`;
     const saved = localStorage.getItem(key);
@@ -344,39 +265,15 @@ export const db = {
     }
   },
 
-  savePreference: (userId: string, componentId: string, visibleColumns: string[]) => {
+  /**
+   * savePreference: fix for Error in components/dashboard/operations/SmartOperationTable.tsx
+   */
+  savePreference: (userId: string, componentId: string, columns: string[]) => {
     const key = `als_prefs_${userId}`;
     const prefs = db.getPreferences(userId);
     if (!prefs.visibleColumns) prefs.visibleColumns = {};
-    prefs.visibleColumns[componentId] = visibleColumns;
+    prefs.visibleColumns[componentId] = columns;
     localStorage.setItem(key, JSON.stringify(prefs));
-  },
-
-  /**
-   * CheckConnection Robusto:
-   * Tenta uma query super leve com timeout estendido.
-   */
-  checkConnection: async (): Promise<boolean> => {
-    if (!supabase) return false;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); 
-
-      const { error } = await supabase
-        .from('users')
-        .select('id')
-        .limit(1)
-        .abortSignal(controller.signal);
-
-      clearTimeout(timeoutId);
-
-      if (error) {
-        return false;
-      }
-      return true;
-    } catch { 
-      return false; 
-    }
   },
 
   exportBackup: async () => {
@@ -387,8 +284,7 @@ export const db = {
     const data = { drivers, customers, ports, preStacking: ps, trips, staff, categories, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+    const a = document.createElement('a'); a.href = url;
     a.download = `ALS_Backup_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   },
@@ -404,9 +300,6 @@ export const db = {
       if (data.preStacking) for (const ps of data.preStacking) await db.savePreStacking(ps);
       if (data.trips) for (const t of data.trips) await db.saveTrip(t);
       return true;
-    } catch (e) {
-      console.error("Import error:", e);
-      return false;
-    }
+    } catch { return false; }
   }
 };

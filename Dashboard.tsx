@@ -40,7 +40,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
+  
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [isDeleteTripModalOpen, setIsDeleteTripModalOpen] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
@@ -48,10 +50,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
-  const loadAllData = useCallback(async (isFirstLoad = false) => {
-    if (isFirstLoad) setIsLoadingInitial(true);
+  const loadAllData = useCallback(async (showLoading = false) => {
+    if (showLoading) setIsLoadingInitial(true);
+    setIsSyncing(true);
+    
     try {
-      const [d, c, p, ps, s, t, cats] = await Promise.all([
+      // Tenta buscar os dados
+      const responses = await Promise.allSettled([
         db.getDrivers(),
         db.getCustomers(),
         db.getPorts(),
@@ -61,25 +66,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         db.getCategories()
       ]);
 
-      setDrivers(d || []);
-      setCustomers(c || []);
-      setPorts(p || []);
-      setPreStacking(ps || []);
-      setStaffList(s || []);
-      setTrips(t || []);
-      setCategories(cats || []);
+      // Só atualiza o estado se a resposta for bem sucedida (evita sumir dados por erro de rede)
+      if (responses[0].status === 'fulfilled') setDrivers(responses[0].value);
+      if (responses[1].status === 'fulfilled') setCustomers(responses[1].value);
+      if (responses[2].status === 'fulfilled') setPorts(responses[2].value);
+      if (responses[3].status === 'fulfilled') setPreStacking(responses[3].value);
+      if (responses[4].status === 'fulfilled') setStaffList(responses[4].value);
+      if (responses[5].status === 'fulfilled') setTrips(responses[5].value);
+      if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
+
     } catch (e) {
       console.error("Erro na sincronização ALS:", e);
     } finally {
-      if (isFirstLoad) setIsLoadingInitial(false);
+      setIsLoadingInitial(false);
+      setIsSyncing(false);
     }
   }, []);
 
   useEffect(() => { 
     loadAllData(true);
     
-    // Refresh em background a cada 15 segundos para manter dados vivos
-    const refreshDataInterval = setInterval(() => loadAllData(false), 15000);
+    // Refresh silencioso a cada 20 segundos
+    const refreshDataInterval = setInterval(() => loadAllData(false), 20000);
     
     const handleGlobalRefresh = () => loadAllData(false);
     window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
@@ -139,14 +147,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6 animate-pulse">Sincronizando Módulos Operacionais...</p>
+        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6 animate-pulse">Sincronizando Módulos ALS...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
+    <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900 relative">
       <NotificationToast />
+      
+      {/* Indicador de Sincronismo Silencioso */}
+      {isSyncing && !isLoadingInitial && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4">
+           <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+           <span className="text-[8px] font-black text-white uppercase tracking-widest">Sincronizando Nuvem...</span>
+        </div>
+      )}
+
       <aside className={`${sidebarState === 'open' ? 'w-80' : sidebarState === 'collapsed' ? 'w-20' : 'w-0'} bg-[#0f172a] text-slate-400 flex flex-col shadow-[10px_0_50px_rgba(0,0,0,0.3)] z-50 transition-all duration-500 relative overflow-hidden`}>
         <div className="p-6 border-b border-slate-800/50 space-y-4">
           <div className="flex items-center gap-4 mb-2">
@@ -187,7 +204,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <button onClick={() => setSidebarState(s => s === 'open' ? 'collapsed' : 'open')} className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90 border border-transparent hover:border-slate-200">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
-              <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">{activeTab}</h2>
+              <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{activeTab}</h2>
            </div>
            <div className="flex items-center gap-4">
               <DatabaseStatus />
@@ -221,11 +238,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               customers={customers} 
               onSaveDriver={async (d, id) => { 
                 const success = await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); 
-                if (success) {
-                  await loadAllData(false); 
-                } else {
-                  alert("Erro ao salvar motorista no banco de dados.");
-                }
+                if (success) await loadAllData(false);
               }} 
               onDeleteDriver={async id => { 
                 await db.deleteDriver(id); 
@@ -239,11 +252,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               customers={customers} 
               onSaveCustomer={async (c, id) => { 
                 const success = await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); 
-                if (success) {
-                  await loadAllData(false); 
-                } else {
-                  alert("Erro ao salvar cliente no banco de dados. Verifique sua conexão ou permissões.");
-                }
+                if (success) await loadAllData(false);
               }} 
               onDeleteCustomer={async id => { 
                 if(confirm('Excluir cliente?')) { 
@@ -261,11 +270,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               ports={ports} 
               onSavePort={async (p, id) => { 
                 const success = await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); 
-                if (success) {
-                  await loadAllData(false); 
-                } else {
-                  alert("Erro ao salvar porto no banco de dados.");
-                }
+                if (success) await loadAllData(false);
               }} 
               onDeletePort={async id => { 
                 if(confirm('Excluir porto?')) { 
@@ -280,11 +285,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               preStacking={preStacking} 
               onSavePreStacking={async (p, id) => { 
                 const success = await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); 
-                if (success) {
-                  await loadAllData(false); 
-                } else {
-                  alert("Erro ao salvar unidade no banco de dados.");
-                }
+                if (success) await loadAllData(false);
               }} 
               onDeletePreStacking={async id => { 
                 if(confirm('Excluir unidade?')) { 

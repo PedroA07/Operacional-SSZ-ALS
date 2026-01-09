@@ -22,6 +22,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   const [driver, setDriver] = useState<Driver | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [sessionTime, setSessionTime] = useState('00:00:00');
   const [isNotifCenterOpen, setIsNotifCenterOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -32,31 +33,49 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       return;
     }
 
-    const data = await db.getNotifications();
-    const myOSs = new Set(myTrips.map(t => t.os.toUpperCase()));
-    const clearedStr = localStorage.getItem('als_cleared_notifs');
-    const clearedIds: string[] = clearedStr ? JSON.parse(clearedStr) : [];
-    
-    const lastViewedStr = localStorage.getItem(`als_driver_last_viewed_${user.id}`);
-    const lastViewed = lastViewedStr ? new Date(lastViewedStr).getTime() : 0;
+    try {
+      const data = await db.getNotifications();
+      const myOSs = new Set(myTrips.map(t => t.os.toUpperCase()));
+      const clearedStr = localStorage.getItem('als_cleared_notifs');
+      const clearedIds: string[] = clearedStr ? JSON.parse(clearedStr) : [];
+      
+      const lastViewedStr = localStorage.getItem(`als_driver_last_viewed_${user.id}`);
+      const lastViewed = lastViewedStr ? new Date(lastViewedStr).getTime() : 0;
 
-    const count = data.filter(n => {
-      const osRef = n.summary?.os?.toUpperCase() || '';
-      const isMine = myOSs.has(osRef);
-      const notCleared = !clearedIds.includes(n.id);
-      const notSeen = new Date(n.timestamp).getTime() > lastViewed;
-      return isMine && notCleared && notSeen;
-    }).length;
-    
-    setUnreadCount(count);
+      const count = data.filter(n => {
+        const osRef = n.summary?.os?.toUpperCase() || '';
+        const isMine = myOSs.has(osRef);
+        const notCleared = !clearedIds.includes(n.id);
+        const notSeen = new Date(n.timestamp).getTime() > lastViewed;
+        return isMine && notCleared && notSeen;
+      }).length;
+      
+      setUnreadCount(count);
+    } catch (e) {}
   }, [user.id, isNotifCenterOpen]);
 
-  const loadPortalData = useCallback(async () => {
+  const loadPortalData = useCallback(async (showInitial = false) => {
+    if (showInitial) setIsLoading(true);
+    setIsSyncing(true);
+
     try {
-      const [allDrivers, allTrips] = await Promise.all([
+      const [driversResp, tripsResp] = await Promise.allSettled([
         db.getDrivers(),
         db.getTrips()
       ]);
+
+      let allDrivers: Driver[] = [];
+      let allTrips: Trip[] = [];
+
+      if (driversResp.status === 'fulfilled') allDrivers = driversResp.value;
+      if (tripsResp.status === 'fulfilled') allTrips = tripsResp.value;
+
+      // Se ambas falharam, não processa para não limpar os dados da tela
+      if (driversResp.status === 'rejected' && tripsResp.status === 'rejected') {
+        setIsSyncing(false);
+        setIsLoading(false);
+        return;
+      }
 
       // NORMALIZAÇÃO PARA VÍNCULO INFALÍVEL
       const targetDriverIdClean = String(user.driverId || '').replace('drv-', '').trim();
@@ -69,26 +88,27 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
                (userCPFOnlyNumbers !== '' && dCpfClean === userCPFOnlyNumbers);
       });
 
-      // Busca por ID limpo OU CPF limpo em TODAS as viagens
       const myTrips = allTrips.filter(t => {
         if (!t.driver) return false;
-        
         const tripDrvIdClean = String(t.driver.id || '').replace('drv-', '').trim();
         const tripDrvCpfClean = String(t.driver.cpf || '').replace(/\D/g, '');
-        
         const matchId = targetDriverIdClean !== '' && tripDrvIdClean === targetDriverIdClean;
         const matchCpf = userCPFOnlyNumbers !== '' && tripDrvCpfClean === userCPFOnlyNumbers;
-        
         return matchId || matchCpf;
       }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
-      setDriver(currentDriver || null);
-      setTrips(myTrips);
-      checkUnread(myTrips);
+      // SÓ ATUALIZA SE TROUXER DADOS (Evita flickering de lista vazia por timeout)
+      if (driversResp.status === 'fulfilled') setDriver(currentDriver || null);
+      if (tripsResp.status === 'fulfilled') {
+        setTrips(myTrips);
+        checkUnread(myTrips);
+      }
+      
     } catch (e) {
       console.error("Erro na sincronização ALS:", e);
     } finally {
       setIsLoading(false);
+      setIsSyncing(false);
     }
   }, [user.driverId, user.username, checkUnread]);
 
@@ -99,8 +119,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   };
 
   useEffect(() => {
-    loadPortalData();
-    const syncInterval = setInterval(loadPortalData, 15000);
+    loadPortalData(true);
+    const syncInterval = setInterval(() => loadPortalData(false), 20000);
     const clockInterval = setInterval(() => {
       setSessionTime(timeUtils.calculateDuration(user.lastLogin));
     }, 1000);
@@ -123,6 +143,13 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
   return (
     <div className="h-[100dvh] bg-[#020617] text-white flex flex-col font-sans select-none overflow-hidden relative">
       <NotificationToast />
+
+      {/* Sync Indicator Silencioso p/ Motorista */}
+      {isSyncing && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 px-3 py-1 rounded-full shadow-lg animate-in fade-in">
+           <span className="text-[7px] font-black uppercase tracking-widest text-white">Sincronizando...</span>
+        </div>
+      )}
 
       <header className="p-6 pt-12 flex justify-between items-center bg-slate-950/60 border-b border-white/5 shrink-0 backdrop-blur-md z-40">
         <div>
@@ -149,8 +176,8 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       </header>
 
       <main className="flex-1 px-5 pt-6 overflow-y-auto custom-scrollbar">
-        {activeTab === 'inicio' && <HomeTab user={user} trips={trips} onRefresh={loadPortalData} />}
-        {activeTab === 'viagens' && <TripsTab trips={trips} user={user} onRefresh={loadPortalData} />}
+        {activeTab === 'inicio' && <HomeTab user={user} trips={trips} onRefresh={() => loadPortalData(false)} />}
+        {activeTab === 'viagens' && <TripsTab trips={trips} user={user} onRefresh={() => loadPortalData(false)} />}
         {activeTab === 'docs' && <DocsTab trips={trips} driver={driver} />}
         {activeTab === 'perfil' && <ProfileTab user={user} driver={driver} onLogout={onLogout} />}
         {activeTab === 'download' && <DownloadAppTab />}
