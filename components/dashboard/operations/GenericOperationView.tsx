@@ -8,10 +8,12 @@ import OperationRegisterAction from './OperationRegisterAction';
 import SchedulingEditModal from './SchedulingEditModal';
 import DriverDocsViewerModal from './DriverDocsViewerModal';
 import DocumentViewerModal from './DocumentViewerModal';
-import ViewFilters from './ViewFilters';
 import StatusHistoryManagerModal from './StatusHistoryManagerModal';
 import TripModal from './TripModal';
 import DateRangeFilter from './DateRangeFilter';
+import OrdemColetaForm from '../forms/OrdemColetaForm';
+import PreStackingForm from '../forms/PreStackingForm';
+import DriverLocationModal from './DriverLocationModal';
 
 interface GenericOperationViewProps {
   user: User;
@@ -38,14 +40,17 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
-  const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
+  const [isOCFormOpen, setIsOCFormOpen] = useState(false);
+  const [isMinutaFormOpen, setIsMinutaFormOpen] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   
+  const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
-  // FILTROS DE STATUS PADRONIZADOS
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -132,14 +137,14 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const tripColumns = getOperationTableColumns(
     (t, s) => { setSelectedTrip(t); setTempStatus(s); const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); setStatusTime(d.toISOString().slice(0,16)); setIsStatusModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
-    (t) => { setSelectedTrip(t); },
-    (t) => {},
+    (t) => { setSelectedTrip(t); setIsOCFormOpen(true); },
+    (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); },
     (url, title) => { setPreviewDocData({ url, title }); setIsDocViewerOpen(true); },
     async (id) => { if(confirm('Excluir?')) { await db.deleteTrip(id, user); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); } },
     () => window.dispatchEvent(new CustomEvent('als_force_global_refresh')),
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
-    onLocateDriver,
+    (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); }
   );
@@ -168,7 +173,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
       </header>
 
-      {/* FILTROS DE STATUS PADRONIZADOS */}
       <div className="flex flex-col lg:flex-row justify-between items-center gap-6 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
          <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
            {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
@@ -253,6 +257,20 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       {isTripModalOpen && <TripModal isOpen={isTripModalOpen} onClose={() => setIsTripModalOpen(false)} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} />}
       {isDriverDocsModalOpen && selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => setIsDriverDocsModalOpen(false)} trip={selectedTrip} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />}
       
+      {isOCFormOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[2000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+          <OrdemColetaForm drivers={drivers} customers={customers} ports={preStackingUnits as any} onClose={() => { setIsOCFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} initialData={selectedTrip.ocFormData} />
+        </div>
+      )}
+
+      {isMinutaFormOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[2000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+          <PreStackingForm drivers={drivers} customers={customers} ports={preStackingUnits as any} onClose={() => { setIsMinutaFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} initialOS={selectedTrip.os} />
+        </div>
+      )}
+
+      <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
+
       <style>{`
         .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; }
         .table-compact table th { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; }

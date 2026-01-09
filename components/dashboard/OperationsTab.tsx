@@ -58,7 +58,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
-  // Estados de Visualização Global
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -100,15 +99,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
     
-    // FILTRO DE DATA ROBUSTO (YYYY-MM-DD)
     if (startDate || endDate) {
       result = result.filter(t => {
-        // Normaliza a data da viagem para o dia YYYY-MM-DD
         const tripDate = t.dateTime.substring(0, 10);
-        
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
-        
         return true;
       });
     }
@@ -176,15 +171,39 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         </div>
       </div>
 
-      <style>{`
-        .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; }
-        .table-compact table th { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; }
-      `}</style>
-
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={onRefresh} preStackingUnits={[...ports, ...preStacking]} />
       {isHistoryModalOpen && selectedTrip && <StatusHistoryManagerModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} trip={selectedTrip} user={user} onSuccess={onRefresh} />}
+      
+      {isOCFormOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[2000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+          <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); onRefresh(); }} initialData={selectedTrip.ocFormData} />
+        </div>
+      )}
+
+      {isMinutaFormOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[2000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+          <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaFormOpen(false); onRefresh(); }} initialOS={selectedTrip.os} />
+        </div>
+      )}
+
+      {isTripModalOpen && (
+        <TripModal isOpen={isTripModalOpen} onClose={() => setIsTripModalOpen(false)} onSuccess={onRefresh} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} />
+      )}
+
+      {isDriverDocsModalOpen && selectedTrip && (
+        <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => setIsDriverDocsModalOpen(false)} trip={selectedTrip} user={user} onSuccess={onRefresh} />
+      )}
+
+      {isCategoryModalOpen && (
+        <CategoryManagerModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} categories={categories} onSuccess={onRefresh} actingUser={user} />
+      )}
+
+      <style>{`
+        .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; }
+        .table-compact table th { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; }
+      `}</style>
     </div>
   );
 };
