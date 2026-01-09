@@ -53,8 +53,12 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  
+  // Data de hoje formatada para o input (YYYY-MM-DD)
+  const today = new Date().toLocaleDateString('en-CA');
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  
   const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
   
   const [clientSearchText, setClientSearchText] = useState('');
@@ -249,7 +253,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                 <div className="space-y-1"><label className={labelClass}>Novo Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
                 <div className="space-y-1"><label className={labelClass}>Data/Hora Evento</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
              </div>
-             <div className="grid gap-3 pt-4"><button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 active:scale-95">{isSavingStatus ? 'Gravando...' : 'Atualizar Posição'}</button><button onClick={() => setIsStatusModalOpen(false)} className="w-full text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button></div>
+             <div className="grid gap-3 pt-4"><button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 active:scale-95">{isSavingStatus ? 'Gravando...' : 'Atualizar Posição'}</button><button onClick={() => setIsStatusModalOpen(false)} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button></div>
           </div>
         </div>
       )}

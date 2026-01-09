@@ -59,8 +59,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  
+  // Data de hoje formatada para o input (YYYY-MM-DD)
+  const today = new Date().toLocaleDateString('en-CA');
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  
   const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
   
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
