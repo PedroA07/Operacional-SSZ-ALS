@@ -4,18 +4,13 @@ import { Trip } from '../types';
 
 export const tripRepository = {
   mapToDb: (trip: Trip) => {
-    // Garante que as datas sejam enviadas no formato ISO String
-    // Ao usar new Date(string).toISOString(), o JS lida com a conversão para UTC para o banco
-    const validDate = trip.dateTime ? new Date(trip.dateTime).toISOString() : new Date().toISOString();
-    const validStatusDate = trip.statusTime ? new Date(trip.statusTime).toISOString() : validDate;
-    
     return {
       id: trip.id,
       os: trip.os?.toUpperCase() || '',
       booking: trip.booking?.toUpperCase() || '',
       ship: trip.ship?.toUpperCase() || '',
-      data_time: validDate, 
-      status_time: validStatusDate,
+      data_time: trip.dateTime, 
+      status_time: trip.statusTime || trip.dateTime,
       is_late: trip.isLate || false,
       type: trip.type || 'EXPORTAÇÃO',
       container_type: trip.containerType || null,
@@ -56,22 +51,14 @@ export const tripRepository = {
       return val; 
     };
 
-    // Função de normalização rigorosa para evitar saltos de fuso horário
-    const parseDate = (val: any) => {
-      if (!val) return new Date().toISOString();
-      const date = new Date(val);
-      // Retornamos a ISO String que mantém a informação de fuso para o front-end converter localmente
-      return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
-    };
-
     return {
       id: d.id,
       os: d.os || 'SEM OS',
       booking: d.booking || '',
       ship: d.ship || '',
-      // Mapeia data_time do banco para dateTime do app
-      dateTime: parseDate(d.data_time || d.dateTime),
-      statusTime: parseDate(d.status_time || d.statusTime || d.data_time),
+      // Prioriza data_time da tabela original
+      dateTime: d.data_time || d.dateTime,
+      statusTime: d.status_time || d.statusTime || d.data_time,
       isLate: d.is_late ?? false,
       type: d.type || 'EXPORTAÇÃO',
       containerType: d.container_type || d.containerType || '40HC',
@@ -109,7 +96,7 @@ export const tripRepository = {
       if (error) throw error;
       return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
-      console.error("Erro ao carregar viagens via Repositório:", e);
+      console.error("Erro ao carregar viagens via TripRepository:", e);
       return [];
     }
   },
@@ -118,13 +105,8 @@ export const tripRepository = {
     try {
       const payload = this.mapToDb(trip);
       const { error } = await supabase.from('trips').upsert(payload);
-      if (error) {
-        console.error("Erro no salvamento Supabase:", error.message);
-        return false;
-      }
-      return true;
+      return !error;
     } catch (e) {
-      console.error("Erro fatal no salvamento:", e);
       return false;
     }
   }
