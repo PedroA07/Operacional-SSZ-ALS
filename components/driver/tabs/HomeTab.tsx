@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useRef } from 'react';
 import { Trip, User, TripStatus, DriverCapturedDoc } from '../../../types';
 import ScannerModal from '../ScannerModal';
@@ -36,7 +35,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [showPicker, setShowPicker] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const [scannerInitialImage, setScannerInitialImage] = useState<string | null>(null);
+  const [scannerInitialImages, setScannerInitialImages] = useState<string[]>([]);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<TripStatus | null>(null);
 
@@ -109,16 +108,22 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     }
   };
 
-  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const result = ev.target?.result as string;
-        setScannerInitialImage(result);
-        setIsScannerOpen(true);
-      };
-      reader.readAsDataURL(file);
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // Fix: Explicitly cast Array.from result to File[] to avoid unknown type errors in map and readAsDataURL
+      const fileList = Array.from(files) as File[];
+      const readPromises = fileList.map(file => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+      });
+
+      const results = await Promise.all(readPromises);
+      setScannerInitialImages(results);
+      setIsScannerOpen(true);
     }
     e.target.value = '';
   };
@@ -181,7 +186,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             </div>
 
             <div className="grid grid-cols-3 gap-3 pt-2">
-              <button onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }} className="py-5 bg-blue-600 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active:scale-95 transition-all shadow-lg">
+              <button onClick={() => { setScannerInitialImages([]); setIsScannerOpen(true); }} className="py-5 bg-blue-600 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active:scale-95 transition-all shadow-lg">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/></svg>
                   <span className="text-[7px] font-black uppercase text-white tracking-widest">Câmera</span>
               </button>
@@ -196,7 +201,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                     <span className="absolute top-2 right-2 w-4 h-4 bg-emerald-500 rounded-full text-[8px] font-black flex items-center justify-center text-white">{activeTrip.driver_docs.length}</span>
                   )}
               </button>
-              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleGalleryUpload} />
+              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleGalleryUpload} />
             </div>
 
             <div className="space-y-4 pt-6 border-t border-white/5">
@@ -241,7 +246,14 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       )}
 
       {isScannerOpen && activeTrip && (
-        <ScannerModal isOpen={isScannerOpen} onClose={() => { setIsScannerOpen(false); setScannerInitialImage(null); }} onSuccess={onRefresh} trip={activeTrip} user={user} initialImage={scannerInitialImage} />
+        <ScannerModal 
+          isOpen={isScannerOpen} 
+          onClose={() => { setIsScannerOpen(false); setScannerInitialImages([]); }} 
+          onSuccess={onRefresh} 
+          trip={activeTrip} 
+          user={user} 
+          initialImages={scannerInitialImages} 
+        />
       )}
 
       {isGalleryOpen && activeTrip && (

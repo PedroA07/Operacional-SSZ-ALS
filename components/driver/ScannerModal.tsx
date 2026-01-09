@@ -10,13 +10,13 @@ interface ScannerModalProps {
   onSuccess: () => Promise<void>;
   trip: Trip;
   user: User;
-  initialImage?: string | null;
+  initialImages?: string[];
 }
 
-const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess, trip, user, initialImage }) => {
-  const [step, setStep] = useState<'camera' | 'preview'>(initialImage ? 'preview' : 'camera');
+const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess, trip, user, initialImages = [] }) => {
+  const [step, setStep] = useState<'camera' | 'preview'>('camera');
   const [capturedImages, setCapturedImages] = useState<DriverCapturedDoc[]>([]);
-  const [currentImage, setCurrentImage] = useState<string | null>(initialImage || null);
+  const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [showSessionGallery, setShowSessionGallery] = useState(false);
@@ -56,16 +56,33 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
 
   useEffect(() => {
     if (isOpen) {
-      if (initialImage) {
-        setCurrentImage(initialImage);
-        setStep('preview');
-        stopCamera();
+      if (initialImages.length > 0) {
+        // Converte as imagens recebidas em documentos
+        const newDocs: DriverCapturedDoc[] = initialImages.map((url, i) => ({
+          id: `attach-${Date.now()}-${i}`,
+          url: url,
+          timestamp: new Date().toISOString()
+        }));
+        
+        setCapturedImages(prev => [...prev, ...newDocs]);
+        
+        if (initialImages.length === 1) {
+          // Se for só uma, abre o preview
+          setCurrentImage(initialImages[0]);
+          setStep('preview');
+          stopCamera();
+        } else {
+          // Se forem várias, abre a galeria da sessão para o motorista ver todas
+          setShowSessionGallery(true);
+          setStep('camera');
+          startCamera();
+        }
       } else {
         startCamera();
       }
     }
     return () => stopCamera();
-  }, [isOpen, initialImage, startCamera, stopCamera]);
+  }, [isOpen, initialImages, startCamera, stopCamera]);
 
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -86,7 +103,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     const docsToUpload = [...capturedImages];
     const imageToInclude = forceImage || currentImage;
     
-    if (imageToInclude) {
+    if (imageToInclude && !capturedImages.find(c => c.url === imageToInclude)) {
       docsToUpload.push({ 
         id: `scan-preview-${Date.now()}`, 
         url: imageToInclude, 
@@ -145,18 +162,14 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const handleKeepPhoto = () => {
     if (!currentImage) return;
 
-    // Se veio da galeria (initialImage), o "Confirmar" deve finalizar o processo imediatamente
-    if (initialImage) {
-      handleFinish(currentImage);
-      return;
-    }
-
-    // Se veio da câmera, adiciona à fila e volta para tirar mais fotos
+    // Se veio da galeria e é apenas uma, o "Confirmar" pode finalizar direto se o usuário quiser,
+    // mas para manter consistência, adicionamos à fila.
     const newDoc: DriverCapturedDoc = { 
       id: `scan-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, 
       url: currentImage, 
       timestamp: new Date().toISOString() 
     };
+    
     setCapturedImages(prev => [...prev, newDoc]);
     setCurrentImage(null);
     setStep('camera');
@@ -214,13 +227,9 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
              <div className="flex gap-4 mt-8 pb-4">
                 <button 
                   onClick={() => { 
-                    if (initialImage) {
-                      onClose();
-                    } else {
-                      setStep('camera'); 
-                      setCurrentImage(null); 
-                      startCamera(); 
-                    }
+                    setStep('camera'); 
+                    setCurrentImage(null); 
+                    startCamera(); 
                   }} 
                   className="flex-1 py-5 bg-slate-900 text-slate-300 rounded-[2rem] text-[10px] font-black uppercase tracking-widest border border-white/5 active:bg-red-600 transition-colors"
                 >
@@ -231,7 +240,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
                   className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>
-                  {initialImage ? 'Confirmar e Enviar' : 'Próxima Foto'}
+                  Adicionar à Fila
                 </button>
              </div>
           </div>
@@ -239,9 +248,12 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
 
         {showSessionGallery && (
           <div className="absolute inset-0 z-[100] bg-slate-950 flex flex-col animate-in slide-in-from-bottom duration-300">
-             <header className="p-6 bg-slate-900 border-b border-white/10 flex justify-between items-center shrink-0 pt-10"><h4 className="text-sm font-black text-white uppercase tracking-widest">Capturas da Sessão</h4><button onClick={() => setShowSessionGallery(false)} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-white"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button></header>
+             <header className="p-6 bg-slate-900 border-b border-white/10 flex justify-between items-center shrink-0 pt-10"><h4 className="text-sm font-black text-white uppercase tracking-widest">Fotos na Fila de Envio</h4><button onClick={() => setShowSessionGallery(false)} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-white"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button></header>
              <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 gap-4 custom-scrollbar">{capturedImages.map((img, i) => (<div key={img.id} className="aspect-[3/4] bg-slate-900 rounded-2xl overflow-hidden border border-white/10 relative group"><img src={img.url} className="w-full h-full object-cover" alt="" /><div className="absolute top-2 left-2 bg-black/60 px-2 py-0.5 rounded text-[8px] text-white">#{i+1}</div><button onClick={() => setCapturedImages(capturedImages.filter(ci => ci.id !== img.id))} className="absolute top-2 right-2 w-7 h-7 bg-red-600 rounded-lg flex items-center justify-center text-white"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button></div>))}</div>
-             <div className="p-6 bg-slate-950 border-t border-white/10 shrink-0 pb-10"><button onClick={() => setShowSessionGallery(false)} className="w-full py-5 bg-blue-600 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-widest shadow-xl">Voltar para Câmera</button></div>
+             <div className="p-6 bg-slate-950 border-t border-white/10 shrink-0 pb-10 flex flex-col gap-3">
+                <button onClick={() => handleFinish()} className="w-full py-5 bg-emerald-600 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg> Enviar Todas ({capturedImages.length})</button>
+                <button onClick={() => setShowSessionGallery(false)} className="w-full py-4 bg-white/5 text-slate-400 rounded-[2rem] text-[9px] font-black uppercase">Voltar para Câmera</button>
+             </div>
           </div>
         )}
       </div>
@@ -252,7 +264,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         <div className="absolute inset-0 z-[6000] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white">
            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
            <p className="text-[10px] font-black uppercase tracking-[0.4em] mt-6 animate-pulse">Sincronizando Dossiê...</p>
-           <p className="text-[8px] text-slate-500 uppercase mt-2">Aguarde a confirmação da nuvem</p>
+           <p className="text-[8px] text-slate-500 uppercase mt-2">Enviando {capturedImages.length} documento(s)</p>
         </div>
       )}
     </div>
