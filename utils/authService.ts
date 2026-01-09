@@ -1,99 +1,113 @@
 
-import { db, supabase } from './storage';
+import { supabase, db } from './storage';
 import { User } from '../types';
+import { ADMIN_CREDENTIALS } from '../constants';
 
 export const authService = {
   /**
-   * Realiza o login consultando exclusivamente o banco de dados Supabase.
-   * Tratamento robusto para erros de CORS e Timeout (522).
+   * Realiza o login consultando a tabela 'users' no Supabase.
+   * Busca pelo campo 'username' e valida a coluna 'password'.
    */
-  async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
+  async login(username: string, password: string, retry = true): Promise<{ success: boolean; user?: User; error?: string; isDatabaseDown?: boolean }> {
     const inputUser = username.trim().toLowerCase();
     const inputPass = password.trim();
     
     if (!inputUser || !inputPass) {
-      return { success: false, error: 'Preencha todos os campos.' };
+      return { success: false, error: 'Preencha usuário e senha.' };
     }
 
-    // Verificação de Instalação do Cliente Supabase
+    // Fallback de Emergência: Caso o banco esteja offline ou para configuração inicial
+    const isMaster = inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && inputPass === ADMIN_CREDENTIALS.password;
+
     if (!supabase) {
-      return { success: false, error: 'Configuração do banco de dados ausente (URL/KEY).' };
+      if (isMaster) {
+        return { success: true, user: this.getMasterUser() };
+      }
+      return { success: false, error: 'Configuração de banco ausente.', isDatabaseDown: true };
     }
 
     try {
-      // AbortController para evitar que a requisição fique pendente infinitamente (causa do 522)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de limite
+      const timeoutId = setTimeout(() => controller.abort(), 10000); 
 
-      // Consulta direta à tabela 'users'
-      // Buscamos apenas os campos necessários para validação
+      // Busca na tabela 'users' onde a coluna 'username' é igual ao input
       const { data, error } = await supabase
         .from('users')
-        .select('id, username, password, display_name, role, photo, position, driver_id, staff_id, status, is_first_login')
+        .select('*')
         .eq('username', inputUser)
-        .limit(1);
+        .maybeSingle();
 
       clearTimeout(timeoutId);
 
-      if (error) {
-        console.error("Supabase Error Response:", error);
-        return { success: false, error: `Erro no servidor ALS: ${error.message}` };
+      if (error) throw error;
+
+      // Se não encontrar no banco, verifica se é o acesso mestre
+      if (!data) {
+        if (isMaster) return { success: true, user: this.getMasterUser() };
+        return { success: false, error: 'Usuário não localizado.' };
       }
 
-      if (!data || data.length === 0) {
-        return { success: false, error: 'Usuário não localizado na base de dados.' };
+      // Validação da coluna 'password' no banco
+      if (data.password !== inputPass) {
+        return { success: false, error: 'Senha incorreta.' };
       }
 
-      const userData = data[0];
-
-      // Validação de Senha (Strict)
-      if (userData.password !== inputPass) {
-        return { success: false, error: 'Chave de segurança inválida.' };
-      }
-
-      // Validação de Status
-      if (userData.status === 'Inativo') {
-        return { success: false, error: 'Acesso suspenso. Entre em contato com a administração.' };
+      if (data.status === 'Inativo') {
+        return { success: false, error: 'Este acesso está desativado.' };
       }
 
       const user: User = {
-        id: userData.id,
-        username: userData.username,
-        displayName: userData.display_name || userData.username,
-        role: userData.role,
+        id: data.id,
+        username: data.username,
+        displayName: data.display_name || data.displayname || data.username,
+        role: data.role,
         lastLogin: new Date().toISOString(),
-        photo: userData.photo,
-        position: userData.position,
-        driverId: userData.driver_id,
-        staffId: userData.staff_id,
-        status: userData.status,
-        isFirstLogin: userData.is_first_login
+        photo: data.photo,
+        position: data.position,
+        driverId: data.driver_id || data.driverid,
+        staffId: data.staff_id || data.staffid,
+        status: data.status,
+        isFirstLogin: data.is_first_login ?? data.isfirstlogin
       };
 
-      // Tenta atualizar o log de acesso em background
-      supabase.from('users').update({ 
-        last_login: user.lastLogin,
-        presence_status: 'online'
-      }).eq('id', user.id).then();
+      // Atualiza timestamp em background
+      supabase.from('users').update({ last_login: user.lastLogin, presence_status: 'online' }).eq('id', user.id).then();
 
       return { success: true, user };
 
     } catch (err: any) {
       console.error("Auth Exception:", err);
 
-      // Tratamento específico para o erro de CORS/Rede/522 relatado no console
-      if (err instanceof TypeError && err.message === 'Failed to fetch') {
-        return { 
-          success: false, 
-          error: 'Falha de conexão: O navegador foi bloqueado ao tentar acessar o servidor ALS (CORS/Timeout). Verifique sua internet ou VPN.' 
-        };
+      // Tenta novamente uma vez se for erro de timeout (acordando o banco)
+      if (retry && (err.name === 'AbortError' || err.message?.includes('fetch'))) {
+        await new Promise(r => setTimeout(r, 1500));
+        return this.login(username, password, false);
       }
 
-      if (err.name === 'AbortError') {
-        return { success: false, error: 'O servidor demorou muito para responder (Tempo Esgotado).' };
-      }
+      // Se der erro de conexão mas for o master, permite entrar para manutenção
+      if (isMaster) return { success: true, user: this.getMasterUser() };
 
-      return { success: false, error: 'Ocorreu uma falha na comunicação com o banco de dados.' };
+      return { 
+        success: false, 
+        error: 'Servidor ALS não respondeu. Tente novamente em instantes.',
+        isDatabaseDown: true 
+      };
     }
+  },
+
+  /**
+   * Retorna o objeto de usuário master estático
+   */
+  getMasterUser(): User {
+    return {
+      id: 'admin-master',
+      username: ADMIN_CREDENTIALS.username,
+      displayName: 'Operacional Master',
+      role: 'admin',
+      lastLogin: new Date().toISOString(),
+      status: 'Ativo',
+      position: 'Administração SSZ',
+      isFirstLogin: false
+    };
   }
 };

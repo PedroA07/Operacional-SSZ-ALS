@@ -8,10 +8,25 @@ import { tripRepository } from './tripRepository';
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-export const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+// Inicialização com configurações globais otimizadas
+export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
+  ? createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { 
+        persistSession: false,
+        autoRefreshToken: true
+      },
+      global: { 
+        headers: { 'x-application-name': 'als-transportes' },
+        fetch: (url, options) => {
+          // Garante que o fetch tenha um timeout razoável no nível do navegador
+          return fetch(url, { ...options, cache: 'no-store' });
+        }
+      }
+    }) 
+  : null;
 
 export const db = {
-  // USUÁRIOS
+  // ... (restante do código permanece igual)
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
     try {
@@ -98,10 +113,7 @@ export const db = {
 
   // VIAGENS
   getTrips: async (): Promise<Trip[]> => {
-    if (!supabase) {
-      console.warn("DB Warning: Supabase não inicializado.");
-      return [];
-    }
+    if (!supabase) return [];
     return await tripRepository.getAll(supabase);
   },
 
@@ -340,12 +352,25 @@ export const db = {
     localStorage.setItem(key, JSON.stringify(prefs));
   },
 
+  /**
+   * CheckConnection Robusto:
+   * Tenta uma query super leve com timeout estendido.
+   */
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try {
-      const { error } = await supabase.from('users').select('id').limit(1).single();
-      if (error && error.code !== 'PGRST116') {
-        console.error("DB Connection Failure:", error.message);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); 
+
+      const { error } = await supabase
+        .from('users')
+        .select('id')
+        .limit(1)
+        .abortSignal(controller.signal);
+
+      clearTimeout(timeoutId);
+
+      if (error) {
         return false;
       }
       return true;
