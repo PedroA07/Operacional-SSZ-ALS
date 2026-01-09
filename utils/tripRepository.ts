@@ -96,23 +96,18 @@ export const tripRepository = {
   },
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
-    try {
-      const { data, error } = await supabase.from('trips').select('*');
-      if (error) throw error;
-      return (data || []).map(d => this.mapFromDb(d));
-    } catch (e) {
-      console.error("Erro ao ler banco de dados:", e);
-      return [];
+    const { data, error } = await supabase.from('trips').select('*');
+    if (error) {
+      console.error("Erro Supabase Trips:", error);
+      throw error; // Lança o erro para que o Dashboard não limpe a lista
     }
+    return (data || []).map(d => this.mapFromDb(d));
   },
 
   async save(supabase: SupabaseClient, trip: Trip) {
-    try {
-      const payload = this.mapToDb(trip);
-      const { error } = await supabase.from('trips').upsert(payload);
-      return !error;
-    } catch (e) {
-      return false;
-    }
+    const payload = this.mapToDb(trip);
+    const { error } = await supabase.from('trips').upsert(payload);
+    if (error) throw error;
+    return true;
   }
 };

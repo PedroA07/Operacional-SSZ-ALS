@@ -72,32 +72,24 @@ export const driverRepository = {
   }),
 
   async save(supabase: SupabaseClient, driver: Driver) {
-    try {
-      const payload = this.mapToDb(driver);
-      const { error } = await supabase.from('drivers').upsert(payload);
-      if (error) {
-        console.error("Erro Supabase (Driver Upsert):", error.message);
-        return false;
-      }
-      return true;
-    } catch (e) {
-      return false;
-    }
+    const payload = this.mapToDb(driver);
+    const { error } = await supabase.from('drivers').upsert(payload);
+    if (error) throw error;
+    return true;
   },
 
   async getAll(supabase: SupabaseClient): Promise<Driver[]> {
-    try {
-      const { data, error } = await supabase.from('drivers').select('*').order('name');
-      if (error) throw error;
-      return (data || []).map(d => this.mapFromDb(d));
-    } catch (e) {
-      console.error("Erro ao buscar motoristas:", e);
-      return [];
+    const { data, error } = await supabase.from('drivers').select('*').order('name');
+    if (error) {
+      console.error("Erro Supabase Drivers:", error);
+      throw error;
     }
+    return (data || []).map(d => this.mapFromDb(d));
   },
 
   async delete(supabase: SupabaseClient, id: string) {
     const { error } = await supabase.from('drivers').delete().eq('id', id);
-    return !error;
+    if (error) throw error;
+    return true;
   }
 };
