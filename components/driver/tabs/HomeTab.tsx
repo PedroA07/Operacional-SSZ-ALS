@@ -6,6 +6,7 @@ import { db } from '../../../utils/storage';
 import ImageViewer from '../../shared/ImageViewer';
 import DriverDocsGallery from '../DriverDocsGallery';
 import StatusConfirmModal from '../StatusConfirmModal';
+import RefreshPageButton from '../RefreshPageButton';
 
 interface HomeTabProps {
   user: User;
@@ -108,12 +109,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     }
   };
 
-  const handleManualRefresh = async () => {
-    setIsUpdating(true);
-    await onRefresh();
-    setTimeout(() => setIsUpdating(false), 1000);
-  };
-
   const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -132,10 +127,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     <div className="space-y-6 animate-in fade-in duration-700 pb-24">
       <div className="flex justify-between items-center px-1">
         <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Programação em Curso</h2>
-        <button onClick={handleManualRefresh} disabled={isUpdating} className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl text-slate-400 active:scale-90 transition-all border border-white/5">
-          <svg className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2.5"/></svg>
-          <span className="text-[8px] font-black uppercase">Atualizar</span>
-        </button>
+        <RefreshPageButton />
       </div>
 
       {activeTrip ? (
@@ -244,7 +236,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" strokeWidth="3"/></svg>
            </div>
            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">Nenhuma programação localizada para hoje.</p>
-           <button onClick={handleManualRefresh} className="mt-8 text-blue-500 font-black text-[10px] uppercase tracking-widest hover:underline px-8 py-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">Verificar Novamente</button>
+           <RefreshPageButton />
         </div>
       )}
 
