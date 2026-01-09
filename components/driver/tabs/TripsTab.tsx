@@ -42,7 +42,8 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
-        setScannerInitialImage(ev.target?.result as string);
+        const result = ev.target?.result as string;
+        setScannerInitialImage(result);
         setIsScannerOpen(true);
       };
       reader.readAsDataURL(file);
@@ -52,13 +53,17 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
 
   const handleCloseScanner = useCallback(() => {
     setIsScannerOpen(false);
+    setScannerInitialImage(null);
   }, []);
 
   const handleScannerSuccess = useCallback(async () => {
     await onRefresh();
-    const updated = trips.find(t => t.id === selectedTrip?.id);
-    if (updated) setSelectedTrip(updated);
-  }, [onRefresh, selectedTrip?.id, trips]);
+    if (selectedTrip) {
+      // Re-localiza a viagem atualizada para manter o dossiê aberto correto
+      const updated = trips.find(t => t.id === selectedTrip.id);
+      if (updated) setSelectedTrip(updated);
+    }
+  }, [onRefresh, selectedTrip, trips]);
 
   const sortedTrips = useMemo(() => {
     return [...trips].sort((a, b) => {
@@ -159,12 +164,16 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
               <div className="grid grid-cols-2 gap-3">
                  <button onClick={handleOpenScanner} className="py-6 bg-blue-600 rounded-[2.2rem] flex flex-col items-center justify-center gap-2 border border-white/10 shadow-xl active:scale-95 transition-all"><svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2.5"/><path strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span className="text-[9px] font-black text-white uppercase tracking-widest">Capturar</span></button>
                  <button onClick={handleOpenFiles} className="py-6 bg-slate-800 rounded-[2.2rem] flex flex-col items-center justify-center gap-2 border border-white/5 shadow-xl active:scale-95 transition-all"><svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Anexar</span></button>
-                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*,.pdf" onChange={handleFileUpload} />
+                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
               </div>
            </div>
            
            <div className="p-6 bg-slate-950 border-t border-white/5 shrink-0"><button onClick={() => setSelectedTrip(null)} className="w-full py-5 bg-slate-900 text-slate-500 rounded-3xl text-[10px] font-black uppercase tracking-widest active:bg-white active:text-slate-950 transition-all">Fechar Detalhes</button></div>
         </div>
+      )}
+
+      {isScannerOpen && selectedTrip && (
+        <ScannerModal isOpen={isScannerOpen} onClose={handleCloseScanner} onSuccess={handleScannerSuccess} trip={selectedTrip} user={user} initialImage={scannerInitialImage} />
       )}
     </div>
   );

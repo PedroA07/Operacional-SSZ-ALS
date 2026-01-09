@@ -13,6 +13,7 @@ interface ScannerModalProps {
 }
 
 const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess, trip, user, initialImage }) => {
+  // Inicializa o estado baseado na existência de uma imagem inicial (anexo da galeria)
   const [step, setStep] = useState<'camera' | 'preview'>(initialImage ? 'preview' : 'camera');
   const [capturedImages, setCapturedImages] = useState<DriverCapturedDoc[]>([]);
   const [currentImage, setCurrentImage] = useState<string | null>(initialImage || null);
@@ -34,6 +35,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   }, []);
 
   const startCamera = useCallback(async () => {
+    // Não inicia a câmera se estivermos em modo de preview (anexo)
     if (step === 'preview') return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -47,7 +49,10 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
           setIsCameraReady(true);
         };
       }
-    } catch (err) { setIsCameraReady(false); }
+    } catch (err) { 
+      setIsCameraReady(false); 
+      console.error("Erro ao acessar câmera:", err);
+    }
   }, [step]);
 
   useEffect(() => {
@@ -55,12 +60,14 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       if (initialImage) {
         setCurrentImage(initialImage);
         setStep('preview');
+        // Garante que a câmera pare caso estivesse aberta
+        stopCamera();
       } else {
         startCamera();
       }
     }
     return () => stopCamera();
-  }, [isOpen, startCamera, stopCamera, initialImage]);
+  }, [isOpen, initialImage]);
 
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -80,18 +87,40 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     setCapturedImages(prev => [...prev, newDoc]);
     setCurrentImage(null);
     setStep('camera');
+    // Reinicia a câmera para a próxima foto se não for anexo único
     startCamera();
   };
 
   const handleFinish = async () => {
     if (isSaving) return;
     const finalDocs = [...capturedImages];
-    if (currentImage) finalDocs.push({ id: `scan-${Date.now()}`, url: currentImage, timestamp: new Date().toISOString() });
-    if (finalDocs.length === 0) return;
+    if (currentImage) {
+      finalDocs.push({ id: `scan-${Date.now()}`, url: currentImage, timestamp: new Date().toISOString() });
+    }
+    
+    if (finalDocs.length === 0) {
+      onClose();
+      return;
+    }
+
     setIsSaving(true);
-    const updatedTrip: Trip = { ...trip, driver_docs: [...(trip.driver_docs || []), ...finalDocs] };
-    if (await db.saveTrip(updatedTrip, user)) { await onSuccess(); onClose(); }
-    setIsSaving(false);
+    const updatedTrip: Trip = { 
+      ...trip, 
+      driver_docs: [...(trip.driver_docs || []), ...finalDocs] 
+    };
+
+    try {
+      const success = await db.saveTrip(updatedTrip, user);
+      if (success) {
+        await onSuccess();
+        onClose();
+      }
+    } catch (e) {
+      console.error("Erro ao salvar anexo:", e);
+      alert("Falha ao sincronizar arquivos. Verifique sua conexão.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -110,13 +139,11 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
             
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                <div className="w-full h-full relative">
-                  {/* Máscara Profissional Opaca */}
                   <div className="absolute inset-0 bg-black/90" style={{
                     maskImage: 'radial-gradient(ellipse at center, transparent 35%, black 65%)',
                     WebkitMaskImage: 'radial-gradient(ellipse at center, transparent 35%, black 65%)'
                   }}></div>
                   
-                  {/* Molde A4 Arredondado */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] aspect-[1/1.41] max-h-[75%] border-2 border-white/10 rounded-[3rem] shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex items-center justify-center">
                     <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-blue-500 rounded-tl-[3rem] shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
                     <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-blue-500 rounded-tr-[3rem] shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
@@ -141,7 +168,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
              <div className="flex-1 bg-white rounded-3xl overflow-hidden shadow-2xl relative"><img src={currentImage} className="w-full h-full object-contain" /><div className="absolute top-4 left-4 bg-black/60 px-3 py-1.5 rounded-full text-[8px] font-black text-white uppercase tracking-widest">Confirme a Legibilidade</div></div>
              <div className="flex gap-4 mt-8 pb-4">
                 <button onClick={() => { setStep('camera'); setCurrentImage(null); startCamera(); }} className="flex-1 py-5 bg-slate-900 text-slate-300 rounded-[2rem] text-[10px] font-black uppercase tracking-widest border border-white/5 active:bg-red-600 transition-colors">Descartar</button>
-                <button onClick={handleKeepPhoto} className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>Próxima</button>
+                <button onClick={handleKeepPhoto} className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>{initialImage ? 'Confirmar' : 'Próxima'}</button>
              </div>
           </div>
         )}
