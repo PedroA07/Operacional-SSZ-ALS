@@ -57,7 +57,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     tipoOperacao: 'EXPORTAÇÃO',
     autColeta: '',
     embarcador: '',
-    horarioAgendado: '',
+    horarioAgendado: new Date().toISOString().slice(0, 16),
     obs: '',
     displayDate: new Date().toLocaleDateString('pt-BR')
   });
@@ -104,10 +104,10 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   }, [formData]);
 
   const handleInputChange = (field: string, value: string) => {
-    const upValue = value.toUpperCase();
+    const upValue = (field === 'horarioAgendado' || field === 'obs') ? value : value.toUpperCase();
     
     setFormData(prev => {
-      let next = { ...prev, [field]: (field === 'horarioAgendado' || field === 'obs') ? value : upValue };
+      let next = { ...prev, [field]: upValue };
 
       if (field === 'os') {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
@@ -204,6 +204,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   };
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
+  const selectClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm cursor-pointer";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
 
@@ -250,7 +251,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
       )}
 
-      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
+      <div className="w-full lg:w-[520px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
         
         <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 shadow-sm space-y-4">
            <div className="space-y-1">
@@ -264,93 +265,142 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
               />
            </div>
 
-           {detectedCategory && (
-             <div className="flex items-center gap-3 px-4 py-3 bg-emerald-500 text-white rounded-2xl animate-in zoom-in-95">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3"/></svg>
-                <div>
-                   <p className="text-[8px] font-black uppercase leading-none opacity-80">Categoria Identificada</p>
-                   <p className="text-[11px] font-black uppercase tracking-widest">{detectedCategory}</p>
-                </div>
-             </div>
-           )}
+           <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                 <label className={labelClass}>Tipo de Operação</label>
+                 <select className={selectClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)}>
+                    <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
+                    <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
+                    <option value="COLETA">COLETA</option>
+                    <option value="ENTREGA">ENTREGA</option>
+                    <option value="CABOTAGEM">CABOTAGEM</option>
+                 </select>
+              </div>
+              <div className="space-y-1">
+                 <label className={labelClass}>Categoria Master</label>
+                 <div className="px-4 py-3 bg-white border border-slate-200 rounded-xl font-black text-[10px] text-blue-600 flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${detectedCategory ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                    {detectedCategory || 'AGUARDANDO OS...'}
+                 </div>
+              </div>
+           </div>
         </div>
 
-        <div className="relative">
-          <label className={labelBlueClass}>1. Remetente (Cliente)</label>
-          <input 
-            type="text" 
-            placeholder="BUSCAR RAZÃO OU FANTASIA..." 
-            className={inputClasses} 
-            value={remetenteSearch} 
-            onFocus={() => setShowRemetenteResults(true)} 
-            onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} 
-          />
-          {showRemetenteResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
-              {filteredCustomers.map(c => (
-                <button 
-                  key={c.id} 
-                  className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
-                  onClick={() => { 
-                    setFormData({...formData, remetenteId: c.id}); 
-                    setRemetenteSearch(c.legalName || c.name); 
-                    setShowRemetenteResults(false); 
-                  }}
-                >
-                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <div className="grid grid-cols-1 gap-4">
+          <div className="relative">
+            <label className={labelBlueClass}>1. Remetente (Cliente)</label>
+            <input 
+              type="text" 
+              placeholder="BUSCAR RAZÃO OU FANTASIA..." 
+              className={inputClasses} 
+              value={remetenteSearch} 
+              onFocus={() => setShowRemetenteResults(true)} 
+              onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} 
+            />
+            {showRemetenteResults && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
+                {filteredCustomers.map(c => (
+                  <button 
+                    key={c.id} 
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
+                    onClick={() => { 
+                      setFormData({...formData, remetenteId: c.id}); 
+                      setRemetenteSearch(c.legalName || c.name); 
+                      setShowRemetenteResults(false); 
+                    }}
+                  >
+                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <div className="relative">
-          <label className={labelBlueClass}>2. Destinatário (Local Destino)</label>
-          <input 
-            type="text" 
-            placeholder="BUSCAR DESTINO..." 
-            className={inputClasses} 
-            value={destinatarioSearch} 
-            onFocus={() => setShowDestinatarioResults(true)} 
-            onChange={e => setDestinatarioSearch(e.target.value.toUpperCase())} 
-          />
-          {showDestinatarioResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
-              {filteredPorts.map(p => (
-                <button 
-                  key={p.id} 
-                  className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
-                  onClick={() => { 
-                    setFormData({...formData, destinatarioId: p.id}); 
-                    setDestinatarioSearch(p.legalName || p.name); 
-                    setShowDestinatarioResults(false); 
-                  }}
-                >
-                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{p.legalName || p.name}</p>
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="relative">
+            <label className={labelBlueClass}>2. Destinatário (Local Destino)</label>
+            <input 
+              type="text" 
+              placeholder="BUSCAR DESTINO..." 
+              className={inputClasses} 
+              value={destinatarioSearch} 
+              onFocus={() => setShowDestinatarioResults(true)} 
+              onChange={e => setDestinatarioSearch(e.target.value.toUpperCase())} 
+            />
+            {showDestinatarioResults && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
+                {filteredPorts.map(p => (
+                  <button 
+                    key={p.id} 
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
+                    onClick={() => { 
+                      setFormData({...formData, destinatarioId: p.id}); 
+                      setDestinatarioSearch(p.legalName || p.name); 
+                      setShowDestinatarioResults(false); 
+                    }}
+                  >
+                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{p.legalName || p.name}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>3. Dados do Equipamento</p>
+          <p className={labelClass}>3. Manifesto Marítimo</p>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
-            <div className="space-y-1"><label className={labelClass}>Genset</label><input className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
+            <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="NOME DO NAVIO" /></div>
+            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} placeholder="REF / BOOKING" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Tara</label><input className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} /></div>
-            <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} /></div>
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Armador / Agência</label>
-            <input className={`${inputClasses} ${formData.agencia ? 'bg-blue-50' : ''}`} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
+            <div className="space-y-1"><label className={labelClass}>Autorização Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} placeholder="Nº AUTORIZAÇÃO" /></div>
+            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} placeholder="SHIPPER" /></div>
           </div>
         </div>
 
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+          <p className={labelClass}>4. Dados do Equipamento</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} placeholder="ABCD1234567" /></div>
+            <div className="space-y-1">
+              <label className={labelClass}>Tipo Container</label>
+              <select className={selectClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
+                <option value="40HC">40HC</option>
+                <option value="40HR">40HR</option>
+                <option value="40DC">40DC</option>
+                <option value="20DC">20DC</option>
+                <option value="20RF">20RF</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className={labelClass}>Tara</label><input className={inputClasses} value={formData.tara} onChange={e => handleInputChange('tara', e.target.value)} placeholder="KG" /></div>
+            <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} placeholder="LACRE OFICIAL" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className={labelClass}>Padrão de Carga</label>
+              <select className={selectClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
+                <option value="CARGA GERAL">CARGA GERAL</option>
+                <option value="CARGO PREMIUM">CARGO PREMIUM</option>
+                <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
+                <option value="REEFER">REEFER</option>
+                <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
+              </select>
+            </div>
+            <div className="space-y-1"><label className={labelClass}>Armador / Agência</label><input className={`${inputClasses} bg-blue-50/30`} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+           <div className="space-y-1">
+              <label className={labelBlueClass}>5. Horário Agendado para Coleta</label>
+              <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
+           </div>
+        </div>
+
         <div className="relative">
-          <label className={labelBlueClass}>5. Motorista Alocado</label>
+          <label className={labelBlueClass}>6. Motorista Alocado</label>
           <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
           {showDriverResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
