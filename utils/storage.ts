@@ -22,7 +22,7 @@ export const db = {
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('users').select('*');
-    if (error) throw error; // Lançar erro ao invés de retornar []
+    if (error) throw error;
     return (data || []).map(u => ({
       id: u.id, username: u.username, password: u.password,
       displayName: u.display_name || u.displayname || u.username,
@@ -48,8 +48,7 @@ export const db = {
 
   getDrivers: async (): Promise<Driver[]> => {
     if (!supabase) return [];
-    const drivers = await driverRepository.getAll(supabase);
-    return drivers;
+    return await driverRepository.getAll(supabase);
   },
 
   getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
@@ -193,12 +192,94 @@ export const db = {
     return await staffRepository.delete(supabase, id);
   },
 
+  /* Added exportBackup to fix SystemTab.tsx error */
+  exportBackup: async () => {
+    if (!supabase) return;
+    try {
+      const [drivers, customers, ports, prestacking, staff, trips, categories, users] = await Promise.all([
+        db.getDrivers(),
+        db.getCustomers(),
+        db.getPorts(),
+        db.getPreStacking(),
+        db.getStaff(),
+        db.getTrips(),
+        db.getCategories(),
+        db.getUsers()
+      ]);
+
+      const data = {
+        drivers,
+        customers,
+        ports,
+        prestacking,
+        staff,
+        trips,
+        categories,
+        users,
+        exportedAt: new Date().toISOString()
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ALS_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Backup failed", e);
+      throw e;
+    }
+  },
+
+  /* Added importBackup to fix SystemTab.tsx error */
+  importBackup: async (file: File): Promise<boolean> => {
+    if (!supabase) return false;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      const promises = [];
+      
+      if (data.drivers) {
+        for (const d of data.drivers) promises.push(db.saveDriver(d));
+      }
+      if (data.customers) {
+        for (const c of data.customers) promises.push(db.saveCustomer(c));
+      }
+      if (data.ports) {
+        for (const p of data.ports) promises.push(db.savePort(p));
+      }
+      if (data.prestacking) {
+        for (const ps of data.prestacking) promises.push(db.savePreStacking(ps));
+      }
+      if (data.staff) {
+        for (const s of data.staff) promises.push(db.saveStaff(s));
+      }
+      if (data.trips) {
+        for (const t of data.trips) promises.push(db.saveTrip(t));
+      }
+      if (data.categories) {
+        for (const cat of data.categories) promises.push(db.saveCategory(cat));
+      }
+      if (data.users) {
+        for (const u of data.users) promises.push(db.saveUser(u));
+      }
+
+      await Promise.allSettled(promises);
+      return true;
+    } catch (e) {
+      console.error("Import failed", e);
+      return false;
+    }
+  },
+
   getCategories: async (): Promise<Category[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('categories').select('*').order('name');
     if (error) throw error;
     return (data || []).map(c => ({
-      id: c.id, name: c.name, parent_id: c.parent_id
+      id: c.id, name: c.name, parentId: c.parent_id || c.parentId
     })) as Category[];
   },
 
@@ -222,14 +303,40 @@ export const db = {
 
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(50);
-    if (error) throw error;
+    // Busca otimizada: Limite de 40 e ordenação por ID/Timestamp para evitar timeout
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(40);
+      
+    if (error) {
+      console.error("Erro Supabase Notificações:", error);
+      throw error; 
+    }
+    
     return (data || []).map(n => ({
       id: String(n.id), title: n.title, description: n.message,
       type: n.type as NotificationType, origin: n.origin as NotificationOrigin,
       authorName: n.user_name, authorId: n.user_id, timestamp: n.timestamp,
       summary: { ...n.summary, os: n.os_ref }
     }));
+  },
+
+  getPreferences: (userId: string) => {
+    const key = `als_prefs_${userId}`;
+    const saved = localStorage.getItem(key);
+    try {
+      return saved ? JSON.parse(saved) : { visibleColumns: {} };
+    } catch { return { visibleColumns: {} }; }
+  },
+
+  savePreference: (userId: string, componentId: string, columns: string[]) => {
+    const key = `als_prefs_${userId}`;
+    const prefs = db.getPreferences(userId);
+    if (!prefs.visibleColumns) prefs.visibleColumns = {};
+    prefs.visibleColumns[componentId] = columns;
+    localStorage.setItem(key, JSON.stringify(prefs));
   },
 
   updatePresence: async (userId: string, status: PresenceStatus) => {
@@ -249,57 +356,6 @@ export const db = {
       const { error } = await supabase.from('users').select('id').limit(1).abortSignal(controller.signal);
       clearTimeout(timeoutId);
       return !error;
-    } catch { return false; }
-  },
-
-  /**
-   * getPreferences: fix for Error in components/dashboard/operations/SmartOperationTable.tsx
-   */
-  getPreferences: (userId: string) => {
-    const key = `als_prefs_${userId}`;
-    const saved = localStorage.getItem(key);
-    try {
-      return saved ? JSON.parse(saved) : { visibleColumns: {} };
-    } catch {
-      return { visibleColumns: {} };
-    }
-  },
-
-  /**
-   * savePreference: fix for Error in components/dashboard/operations/SmartOperationTable.tsx
-   */
-  savePreference: (userId: string, componentId: string, columns: string[]) => {
-    const key = `als_prefs_${userId}`;
-    const prefs = db.getPreferences(userId);
-    if (!prefs.visibleColumns) prefs.visibleColumns = {};
-    prefs.visibleColumns[componentId] = columns;
-    localStorage.setItem(key, JSON.stringify(prefs));
-  },
-
-  exportBackup: async () => {
-    const [drivers, customers, ports, ps, trips, staff, categories] = await Promise.all([
-      db.getDrivers(), db.getCustomers(), db.getPorts(), 
-      db.getPreStacking(), db.getTrips(), db.getStaff(), db.getCategories()
-    ]);
-    const data = { drivers, customers, ports, preStacking: ps, trips, staff, categories, exportedAt: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `ALS_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-  },
-
-  importBackup: async (file: File) => {
-    if (!supabase) return false;
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (data.drivers) for (const d of data.drivers) await db.saveDriver(d);
-      if (data.customers) for (const c of data.customers) await db.saveCustomer(c);
-      if (data.ports) for (const p of data.ports) await db.savePort(p);
-      if (data.preStacking) for (const ps of data.preStacking) await db.savePreStacking(ps);
-      if (data.trips) for (const t of data.trips) await db.saveTrip(t);
-      return true;
     } catch { return false; }
   }
 };

@@ -23,24 +23,37 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = useCallback(async (isAutoRefresh = false) => {
-    if (!isAutoRefresh) setIsLoading(true);
+    if (!isAutoRefresh && notifications.length === 0) setIsLoading(true);
+    
     try {
       const data = await db.getNotifications();
-      setNotifications(data);
-      const lastCheckStr = localStorage.getItem(`als_notif_last_check_${user.id}`);
-      const lastCheck = lastCheckStr ? new Date(lastCheckStr).getTime() : 0;
-      const count = data.filter(n => new Date(n.timestamp).getTime() > lastCheck).length;
-      setUnreadCount(count);
-    } catch (e) {} finally {
-      if (!isAutoRefresh) setIsLoading(false);
+      
+      // SÓ ATUALIZA SE TROUXER DADOS (Evita limpar a lista por timeout)
+      if (data && Array.isArray(data)) {
+        setNotifications(data);
+        
+        const lastCheckStr = localStorage.getItem(`als_notif_last_check_${user.id}`);
+        const lastCheck = lastCheckStr ? new Date(lastCheckStr).getTime() : 0;
+        const count = data.filter(n => new Date(n.timestamp).getTime() > lastCheck).length;
+        setUnreadCount(count);
+      }
+    } catch (e) {
+      console.warn("Notification Sync Delay:", e);
+    } finally {
+      setIsLoading(false);
     }
-  }, [user.id]);
+  }, [user.id, notifications.length]);
 
   useEffect(() => {
     loadNotifications();
-    const interval = setInterval(() => loadNotifications(true), 15000);
+    
+    // Refresh a cada 20 segundos
+    const interval = setInterval(() => loadNotifications(true), 20000);
+    
+    // Escuta evento de novo alerta para atualizar instantaneamente
     const handleNewNotif = () => loadNotifications(true);
     window.addEventListener('als_new_notification_event', handleNewNotif);
+    
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
@@ -48,6 +61,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
+    
     return () => {
       clearInterval(interval);
       window.removeEventListener('als_new_notification_event', handleNewNotif);
@@ -81,13 +95,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
     };
   }, [notifications, user.id]);
 
-  const filteredNotifications = notifications.filter(n => {
-    if (activeTab === 'OPERACIONAL') {
-      return n.origin === 'OPERACIONAL';
-    } else {
-      return n.origin === 'MOTORISTA';
-    }
-  });
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter(n => n.origin === activeTab);
+  }, [notifications, activeTab]);
 
   return (
     <div className="relative flex items-center" ref={dropdownRef}>
@@ -132,7 +142,12 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
            </div>
            
            <div className="max-h-[480px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-white">
-              {view === 'settings' ? (
+              {isLoading && notifications.length === 0 ? (
+                <div className="py-20 flex flex-col items-center justify-center gap-3">
+                   <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sincronizando Alertas...</p>
+                </div>
+              ) : view === 'settings' ? (
                 <NotificationSettings user={user} onUpdate={(p) => {}} />
               ) : filteredNotifications.length === 0 ? (
                 <div className="py-24 text-center text-slate-300 text-[10px] font-black uppercase italic">Sem novas atividades</div>

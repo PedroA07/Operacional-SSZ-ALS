@@ -96,10 +96,17 @@ export const tripRepository = {
   },
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
-    const { data, error } = await supabase.from('trips').select('*');
+    // BUSCA OTIMIZADA: Newest first + Limit 150
+    // Isso evita o erro 57014 (Statement Timeout) quando a tabela cresce
+    const { data, error } = await supabase
+      .from('trips')
+      .select('*')
+      .order('date_time', { ascending: false })
+      .limit(150);
+
     if (error) {
-      console.error("Erro Supabase Trips:", error);
-      throw error; // Lança o erro para que o Dashboard não limpe a lista
+      console.error("Erro Crítico Supabase Trips:", error);
+      throw error; 
     }
     return (data || []).map(d => this.mapFromDb(d));
   },

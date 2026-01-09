@@ -55,7 +55,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setIsSyncing(true);
     
     try {
-      // Tenta buscar os dados
       const responses = await Promise.allSettled([
         db.getDrivers(),
         db.getCustomers(),
@@ -66,7 +65,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         db.getCategories()
       ]);
 
-      // Só atualiza o estado se a resposta for bem sucedida (evita sumir dados por erro de rede)
+      // Verificação rigorosa: Se o status for 'rejected', o estado antigo é preservado integralmente
+      // Isso mata o efeito de "sumir e aparecer" quando o banco dá timeout
       if (responses[0].status === 'fulfilled') setDrivers(responses[0].value);
       if (responses[1].status === 'fulfilled') setCustomers(responses[1].value);
       if (responses[2].status === 'fulfilled') setPorts(responses[2].value);
@@ -86,8 +86,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   useEffect(() => { 
     loadAllData(true);
     
-    // Refresh silencioso a cada 20 segundos
-    const refreshDataInterval = setInterval(() => loadAllData(false), 20000);
+    // Aumentado para 30s para evitar colisões de queries pesadas
+    const refreshDataInterval = setInterval(() => loadAllData(false), 30000);
     
     const handleGlobalRefresh = () => loadAllData(false);
     window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
@@ -156,7 +156,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900 relative">
       <NotificationToast />
       
-      {/* Indicador de Sincronismo Silencioso */}
       {isSyncing && !isLoadingInitial && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4">
            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
