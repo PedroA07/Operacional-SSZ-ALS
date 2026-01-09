@@ -192,7 +192,6 @@ export const db = {
     return await staffRepository.delete(supabase, id);
   },
 
-  /* Added exportBackup to fix SystemTab.tsx error */
   exportBackup: async () => {
     if (!supabase) return;
     try {
@@ -232,7 +231,6 @@ export const db = {
     }
   },
 
-  /* Added importBackup to fix SystemTab.tsx error */
   importBackup: async (file: File): Promise<boolean> => {
     if (!supabase) return false;
     try {
@@ -303,23 +301,27 @@ export const db = {
 
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
-    // Busca otimizada: Limite de 40 e ordenação por ID/Timestamp para evitar timeout
     const { data, error } = await supabase
       .from('notifications')
-      .select('*')
+      .select('id, title, message, type, origin, user_name, user_id, timestamp, summary, os_ref')
       .order('timestamp', { ascending: false })
-      .limit(40);
+      .limit(50);
       
     if (error) {
-      console.error("Erro Supabase Notificações:", error);
-      throw error; 
+      console.error("Supabase Notifications Error:", error);
+      return []; 
     }
     
     return (data || []).map(n => ({
-      id: String(n.id), title: n.title, description: n.message,
-      type: n.type as NotificationType, origin: n.origin as NotificationOrigin,
-      authorName: n.user_name, authorId: n.user_id, timestamp: n.timestamp,
-      summary: { ...n.summary, os: n.os_ref }
+      id: String(n.id), 
+      title: n.title || 'Alerta', 
+      description: n.message || '',
+      type: n.type as NotificationType, 
+      origin: n.origin as NotificationOrigin,
+      authorName: n.user_name || 'Sistema', 
+      authorId: n.user_id || 'system', 
+      timestamp: n.timestamp || new Date().toISOString(),
+      summary: { ...(n.summary || {}), os: n.os_ref }
     }));
   },
 
