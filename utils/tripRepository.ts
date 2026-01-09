@@ -51,11 +51,10 @@ export const tripRepository = {
       return val; 
     };
 
-    // Função interna para garantir que a string de data seja interpretada corretamente pelo JS
     const normalizeDate = (dateStr: any) => {
       if (!dateStr) return new Date().toISOString();
       if (typeof dateStr !== 'string') return new Date(dateStr).toISOString();
-      // Converte "YYYY-MM-DD HH:mm:ss" para "YYYY-MM-DDTHH:mm:ss"
+      // Resolve "YYYY-MM-DD HH:mm:ss" para "YYYY-MM-DDTHH:mm:ss" (Evita Invalid Date no Mobile)
       return dateStr.replace(' ', 'T');
     };
 
@@ -75,7 +74,7 @@ export const tripRepository = {
       tara: d.tara || '',
       seal: d.seal || '',
       cva: d.cva || '',
-      customer: safeParse(d.customer, { name: 'Cliente Indefinido' }),
+      customer: safeParse(d.customer, { name: 'Cliente Indefinido', city: '---', state: '--' }),
       destination: safeParse(d.destination, null),
       driver: safeParse(d.driver, { name: 'Motorista Indefinido' }),
       status: d.status || 'Pendente',
