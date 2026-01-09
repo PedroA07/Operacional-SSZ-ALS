@@ -3,14 +3,10 @@ import { Trip, Driver, Customer, Port, User } from '../types';
 import { db } from './storage';
 import { osCategoryService } from './osCategoryService';
 import { tripSyncService } from './tripSyncService';
+import { vinculoService } from './vinculoService';
 
 /**
  * REGRAS DE NEGÓCIO: FLUXO DE EMISSÃO DE OC -> VIAGEM
- * Este serviço garante que ao emitir um documento de OC, o sistema:
- * 1. Identifique a categoria pela OS
- * 2. Vincule motorista/cliente a essa categoria
- * 3. Crie/Atualize a viagem no dashboard de operações
- * 4. Notifique a equipe
  */
 export const ocRules = {
   /**
@@ -18,11 +14,11 @@ export const ocRules = {
    */
   async processOCWorkflow(formData: any, driver: Driver, customer: Customer, user: User, destination?: Port) {
     try {
-      // 1. Detectar Categoria baseada no padrão da OS (ALC ou SP)
-      const detectedCategory = osCategoryService.detectCategoryFromOS(formData.os) || 'Geral';
+      // 1. Detectar Categoria baseada no padrão da OS (ALC ou SP) ou usar a manual do formulário
+      const detectedCategory = formData.category || osCategoryService.detectCategoryFromOS(formData.os) || 'Geral';
 
-      // 2. Sincronizar Vínculos (Garante que o motorista apareça nos filtros da categoria)
-      await osCategoryService.syncVinculos(detectedCategory, driver, customer);
+      // 2. Sincronizar Vínculos via vinculoService (Cria categoria se não existir)
+      await vinculoService.syncVinculo(detectedCategory, driver, customer, user);
 
       // 3. Verificar se já existe uma viagem com esta OS
       const existingTrip = await tripSyncService.findExistingTrip(formData.os);

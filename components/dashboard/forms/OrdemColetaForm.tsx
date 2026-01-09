@@ -33,8 +33,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [driverSearch, setDriverSearch] = useState('');
   const [showDriverResults, setShowDriverResults] = useState(false);
 
-  const [detectedCategory, setDetectedCategory] = useState<string | null>(null);
-
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
   const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
@@ -59,6 +57,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     embarcador: '',
     horarioAgendado: new Date().toISOString().slice(0, 16),
     obs: '',
+    category: '', // Vínculo Manual ou Detectado
     displayDate: new Date().toLocaleDateString('pt-BR')
   });
 
@@ -78,8 +77,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         const p = ports.find(pt => pt.id === initialData.destinatarioId);
         if (p) setDestinatarioSearch(p.legalName || p.name);
         
-        const detected = osCategoryService.detectCategoryFromOS(initialData.os);
-        setDetectedCategory(detected);
+        const detected = initialData.category || osCategoryService.detectCategoryFromOS(initialData.os);
+        setFormData(prev => ({ ...prev, category: detected || '' }));
       }
     };
     loadCats();
@@ -111,7 +110,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
 
       if (field === 'os') {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
-        setDetectedCategory(detected);
+        if (detected) next.category = detected;
       }
 
       if (field === 'container') {
@@ -277,11 +276,23 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                  </select>
               </div>
               <div className="space-y-1">
-                 <label className={labelClass}>Categoria Master</label>
-                 <div className="px-4 py-3 bg-white border border-slate-200 rounded-xl font-black text-[10px] text-blue-600 flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${detectedCategory ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
-                    {detectedCategory || 'AGUARDANDO OS...'}
-                 </div>
+                 <label className={labelClass}>Vínculo</label>
+                 <select 
+                   className={`${selectClasses} ${formData.category ? 'text-blue-600 border-blue-200' : ''}`} 
+                   value={formData.category} 
+                   onChange={e => handleInputChange('category', e.target.value)}
+                 >
+                    <option value="">AUTO DETECTAR...</option>
+                    <option value="Aliança">ALIANÇA</option>
+                    <option value="Mercosul">MERCOSUL</option>
+                    <option value="Indústria">INDÚSTRIA</option>
+                    <option value="Carga Solta">CARGA SOLTA</option>
+                    {categories.map(cat => (
+                      !['Aliança', 'Mercosul', 'Indústria', 'Carga Solta'].includes(cat.name) && (
+                        <option key={cat.id} value={cat.name}>{cat.name.toUpperCase()}</option>
+                      )
+                    ))}
+                 </select>
               </div>
            </div>
         </div>
@@ -347,19 +358,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>3. Manifesto Marítimo</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="NOME DO NAVIO" /></div>
-            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} placeholder="REF / BOOKING" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Autorização Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} placeholder="Nº AUTORIZAÇÃO" /></div>
-            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} placeholder="SHIPPER" /></div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>4. Dados do Equipamento</p>
+          <p className={labelClass}>3. Dados do Equipamento</p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} placeholder="ABCD1234567" /></div>
             <div className="space-y-1">
@@ -393,14 +392,19 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-           <div className="space-y-1">
-              <label className={labelBlueClass}>5. Horário Agendado para Coleta</label>
-              <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
-           </div>
+          <p className={labelClass}>4. Manifesto Marítimo</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="NOME DO NAVIO" /></div>
+            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} placeholder="REF / BOOKING" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className={labelClass}>Autorização Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} placeholder="Nº AUTORIZAÇÃO" /></div>
+            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} placeholder="SHIPPER" /></div>
+          </div>
         </div>
 
         <div className="relative">
-          <label className={labelBlueClass}>6. Motorista Alocado</label>
+          <label className={labelBlueClass}>5. Motorista Alocado</label>
           <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
           {showDriverResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
@@ -409,6 +413,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
               ))}
             </div>
           )}
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+           <div className="space-y-1">
+              <label className={labelBlueClass}>6. Horário Agendado para Coleta</label>
+              <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
+           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
