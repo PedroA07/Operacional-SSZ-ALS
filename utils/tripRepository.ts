@@ -4,7 +4,7 @@ import { Trip } from '../types';
 
 export const tripRepository = {
   mapToDb: (trip: Trip) => {
-    // Garante que as datas sejam enviadas no formato ISO String compatível com o Postgres
+    // Garante formato ISO 8601 para compatibilidade total com PostgreSQL timestamptz
     const validDate = trip.dateTime ? new Date(trip.dateTime).toISOString() : new Date().toISOString();
     const validStatusDate = trip.statusTime ? new Date(trip.statusTime).toISOString() : validDate;
     
@@ -40,7 +40,7 @@ export const tripRepository = {
       nf_doc: trip.nfDoc || null,
       nf_key: trip.nfKey || null,
       oc_form_data: trip.ocFormData || null,
-      pre_stack_form_data: trip.preStackingFormData || null,
+      pre_stacking_form_data: trip.preStackingFormData || null,
       scheduling: trip.scheduling || null,
       driver_docs: trip.driver_docs || []
     };
@@ -55,14 +55,19 @@ export const tripRepository = {
       return val; 
     };
 
+    // Normalização das datas para evitar discrepância de fuso horário local
+    const normalizeDate = (dateStr: string) => {
+      if (!dateStr) return new Date().toISOString();
+      return new Date(dateStr).toISOString();
+    };
+
     return {
       id: d.id,
       os: d.os || 'SEM OS',
       booking: d.booking || '',
       ship: d.ship || '',
-      // Prioriza data_time conforme o esquema do banco de dados
-      dateTime: d.data_time || d.dateTime || d.created_at || new Date().toISOString(),
-      statusTime: d.status_time || d.statusTime || d.data_time,
+      dateTime: normalizeDate(d.data_time || d.dateTime),
+      statusTime: normalizeDate(d.status_time || d.statusTime || d.data_time),
       isLate: d.is_late ?? false,
       type: d.type || 'EXPORTAÇÃO',
       containerType: d.container_type || d.containerType || '40HC',
@@ -88,7 +93,7 @@ export const tripRepository = {
       nfDoc: d.nf_doc || d.nfDoc,
       nfKey: d.nf_key || d.nfKey,
       ocFormData: safeParse(d.oc_form_data || d.ocFormData, null),
-      preStackingFormData: safeParse(d.pre_stack_form_data || d.preStackingFormData, null),
+      preStackingFormData: safeParse(d.pre_stacking_form_data || d.preStackingFormData, null),
       scheduling: safeParse(d.scheduling, undefined),
       driver_docs: safeParse(d.driver_docs, []) 
     };
@@ -100,7 +105,7 @@ export const tripRepository = {
       if (error) throw error;
       return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
-      console.error("Erro ao carregar viagens via TripRepository:", e);
+      console.error("Erro ao carregar viagens (TripRepo):", e);
       return [];
     }
   },

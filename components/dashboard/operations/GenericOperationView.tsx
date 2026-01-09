@@ -45,7 +45,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
-  // Filtros de Status Padronizados
+  // FILTROS DE STATUS PADRONIZADOS
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');

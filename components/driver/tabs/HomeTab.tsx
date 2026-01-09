@@ -69,7 +69,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
     setIsUpdating(true);
     const nowISO = new Date().toISOString();
-    // Normaliza a data do evento para ISO
+    // Normaliza a data do evento para ISO String estável
     const eventISO = new Date(dateTime).toISOString();
     
     const updatedTrip: Trip = {
@@ -87,7 +87,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     };
 
     try {
-      // PERSISTÊNCIA DIRETA NO SUPABASE VIA REPOSITÓRIO
+      // Força o salvamento via db.saveTrip que utiliza o tripRepository mapeado
       const success = await db.saveTrip(updatedTrip, user);
       
       if (success) {
@@ -97,11 +97,11 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
         setPendingStatus(null);
         await onRefresh();
       } else {
-        alert("Falha ao sincronizar com o banco de dados.");
+        alert("Falha ao sincronizar com o banco de dados. Verifique sua conexão.");
       }
     } catch (e) { 
       console.error("Erro ao atualizar status:", e);
-      alert("Falha técnica ao salvar posição."); 
+      alert("Erro técnico ao salvar posição."); 
     } finally { 
       setIsUpdating(false); 
     }
