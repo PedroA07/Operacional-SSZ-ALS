@@ -21,7 +21,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
   const [previewData, setPreviewData] = useState({ url: '', title: '' });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [scannerInitialImage, setScannerInitialImage] = useState<string | null>(null);
+  const [scannerInitialImages, setScannerInitialImages] = useState<string[]>([]);
   const [activePhoto, setActivePhoto] = useState<DriverCapturedDoc | null>(null);
 
   const ocRef = useRef<HTMLDivElement>(null);
@@ -29,7 +29,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenScanner = useCallback(() => {
-    setScannerInitialImage(null);
+    setScannerInitialImages([]);
     setIsScannerOpen(true);
   }, []);
 
@@ -37,23 +37,30 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
     fileInputRef.current?.click();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const result = ev.target?.result as string;
-        setScannerInitialImage(result);
-        setIsScannerOpen(true);
-      };
-      reader.readAsDataURL(file);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // Fix: Explicitly cast Array.from result to File[] to avoid unknown type errors in map and readAsDataURL
+      const fileList = Array.from(files) as File[];
+      const readPromises = fileList.map(file => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          // Fixed: reader.readAsDataURL expects a Blob; file is now typed as File (which extends Blob)
+          reader.readAsDataURL(file);
+        });
+      });
+
+      const results = await Promise.all(readPromises);
+      setScannerInitialImages(results);
+      setIsScannerOpen(true);
     }
     e.target.value = '';
   };
 
   const handleCloseScanner = useCallback(() => {
     setIsScannerOpen(false);
-    setScannerInitialImage(null);
+    setScannerInitialImages([]);
   }, []);
 
   const handleScannerSuccess = useCallback(async () => {
@@ -113,7 +120,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
     return (
       <button 
         onClick={() => { setPreviewData({ url: doc.url, title: label }); setIsDocViewerOpen(true); }}
-        className={`w-full p-4 rounded-2xl border ${colors[color]} flex items-center justify-between active:scale-95 transition-all`}
+        className={`w-full p-4 rounded-2xl border ${colors[color]} flex items-center justify-between active:scale-95 transition-all group shadow-xl`}
       >
         <div className="flex items-center gap-3">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -291,8 +298,17 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
       )}
 
       {isScannerOpen && selectedTrip && (
-        <ScannerModal isOpen={isScannerOpen} onClose={handleCloseScanner} onSuccess={handleScannerSuccess} trip={selectedTrip} user={user} initialImage={scannerInitialImage} />
+        <ScannerModal 
+          isOpen={isScannerOpen} 
+          onClose={handleCloseScanner} 
+          onSuccess={handleScannerSuccess} 
+          trip={selectedTrip} 
+          user={user} 
+          initialImages={scannerInitialImages} 
+        />
       )}
+      
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleFileUpload} />
     </div>
   );
 };
