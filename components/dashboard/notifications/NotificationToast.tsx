@@ -90,7 +90,9 @@ const NotificationToast: React.FC = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full animate-pulse ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-600'}`}></div>
-              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{activeToast.origin} • EM TEMPO REAL</p>
+              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                {activeToast.origin} • {new Date(activeToast.timestamp).toLocaleDateString('pt-BR')} • EM TEMPO REAL
+              </p>
             </div>
             <svg className="w-4 h-4 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
           </div>

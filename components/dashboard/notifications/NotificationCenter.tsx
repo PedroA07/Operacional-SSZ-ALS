@@ -156,7 +156,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
                    <div className={`absolute top-0 left-0 w-1.5 h-full ${n.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
                    <div className="flex justify-between items-start mb-3">
                       <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${n.origin === 'MOTORISTA' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>{n.type.replace(/_/g, ' ')}</span>
-                      <p className="text-[8px] font-mono font-black text-slate-400">{new Date(n.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
+                      <div className="text-right">
+                        <p className="text-[7px] font-mono font-black text-slate-300 leading-none mb-1">{new Date(n.timestamp).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'})}</p>
+                        <p className="text-[9px] font-mono font-black text-slate-400 leading-none">{new Date(n.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
+                      </div>
                    </div>
                    <h5 className="text-[11px] font-black text-slate-800 uppercase leading-tight group-hover:text-blue-600 transition-colors">{n.title}</h5>
                    <p className="text-[10px] text-slate-500 font-medium mt-1 leading-snug line-clamp-2">{n.description}</p>
