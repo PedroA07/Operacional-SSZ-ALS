@@ -61,6 +61,20 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
     if (updated) setSelectedTrip(updated);
   }, [onRefresh, selectedTrip?.id, trips]);
 
+  const safeFormatDate = (isoString: string) => {
+    if (!isoString) return "--/--/----";
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return "--/--/----";
+    return d.toLocaleDateString('pt-BR');
+  };
+
+  const safeFormatTime = (isoString: string) => {
+    if (!isoString) return "--:--";
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return "--:--";
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
+
   const generatePDF = async (ref: React.RefObject<HTMLDivElement>, title: string) => {
     if (!ref.current || isGenerating) return;
     setIsGenerating(true);
@@ -113,7 +127,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
 
       <div className="space-y-3">
         {sortedTrips.map((t) => {
-          const tripDate = new Date(t.dateTime);
           const isFinished = t.status === 'Viagem concluída' || t.status === 'Viagem cancelada';
           const isPending = t.status === 'Pendente';
           const isActive = !isFinished && !isPending;
@@ -134,9 +147,9 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
                   <div>
                     <p className={`text-xl font-black leading-none ${isActive ? 'text-white' : 'text-blue-500'}`}>OS {t.os}</p>
                     <div className="flex items-center gap-2 mt-2">
-                       <span className={`text-[9px] font-black ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>{tripDate.toLocaleDateString('pt-BR')}</span>
+                       <span className={`text-[9px] font-black ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>{safeFormatDate(t.dateTime)}</span>
                        <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-                       <span className={`text-[9px] font-black ${isActive ? 'text-blue-200' : 'text-blue-400'}`}>{tripDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                       <span className={`text-[9px] font-black ${isActive ? 'text-blue-200' : 'text-blue-400'}`}>{safeFormatTime(t.dateTime)}</span>
                     </div>
                   </div>
                   <span className={`px-2.5 py-1 rounded-xl text-[7px] font-black uppercase ${

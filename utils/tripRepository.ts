@@ -54,8 +54,11 @@ export const tripRepository = {
     const normalizeDate = (dateStr: any) => {
       if (!dateStr) return new Date().toISOString();
       if (typeof dateStr !== 'string') return new Date(dateStr).toISOString();
-      // Resolve "YYYY-MM-DD HH:mm:ss" para "YYYY-MM-DDTHH:mm:ss" (Evita Invalid Date no Mobile)
-      return dateStr.replace(' ', 'T');
+      // Crucial: Converte espaço para 'T' para evitar Invalid Date em Safari/Mobile
+      // Também remove milissegundos se vierem do Postgres para padronizar
+      let cleaned = dateStr.replace(' ', 'T').split('.')[0];
+      if (cleaned.length === 10) cleaned += 'T00:00:00';
+      return cleaned;
     };
 
     return {
