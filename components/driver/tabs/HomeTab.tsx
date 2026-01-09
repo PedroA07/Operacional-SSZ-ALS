@@ -43,6 +43,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // REGRA: A operação atual deve ser a programação MAIS ANTIGA que não está concluída ou cancelada
   const activeTrip = useMemo(() => {
     return [...trips]
       .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
@@ -68,6 +69,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
     setIsUpdating(true);
     const nowISO = new Date().toISOString();
+    // Normaliza a data do evento para ISO
     const eventISO = new Date(dateTime).toISOString();
     
     const updatedTrip: Trip = {
@@ -85,21 +87,21 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     };
 
     try {
-      // PERSISTÊNCIA DIRETA NO SUPABASE
+      // PERSISTÊNCIA DIRETA NO SUPABASE VIA REPOSITÓRIO
       const success = await db.saveTrip(updatedTrip, user);
       
       if (success) {
-        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Atualizado pelo motorista.`, { os: activeTrip.os, motorista: user.displayName });
+        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Status atualizado via Portal do Motorista.`, { os: activeTrip.os, motorista: user.displayName });
         setShowPicker(false);
         setIsConfirmModalOpen(false);
         setPendingStatus(null);
         await onRefresh();
       } else {
-        alert("Erro ao sincronizar com o banco de dados. Tente novamente.");
+        alert("Falha ao sincronizar com o banco de dados.");
       }
     } catch (e) { 
-      console.error("Erro status motorista:", e);
-      alert("Falha técnica de rede."); 
+      console.error("Erro ao atualizar status:", e);
+      alert("Falha técnica ao salvar posição."); 
     } finally { 
       setIsUpdating(false); 
     }
@@ -109,9 +111,9 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     if (isUpdating) return;
     setIsUpdating(true);
     try {
-      window.location.reload();
+      await onRefresh();
     } finally {
-      setTimeout(() => setIsUpdating(false), 2000);
+      setTimeout(() => setIsUpdating(false), 1000);
     }
   };
 
