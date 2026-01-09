@@ -51,14 +51,21 @@ export const tripRepository = {
       return val; 
     };
 
+    // Função interna para garantir que a string de data seja interpretada corretamente pelo JS
+    const normalizeDate = (dateStr: any) => {
+      if (!dateStr) return new Date().toISOString();
+      if (typeof dateStr !== 'string') return new Date(dateStr).toISOString();
+      // Converte "YYYY-MM-DD HH:mm:ss" para "YYYY-MM-DDTHH:mm:ss"
+      return dateStr.replace(' ', 'T');
+    };
+
     return {
       id: d.id,
       os: d.os || 'SEM OS',
       booking: d.booking || '',
       ship: d.ship || '',
-      // Prioriza data_time da tabela original
-      dateTime: d.data_time || d.dateTime,
-      statusTime: d.status_time || d.statusTime || d.data_time,
+      dateTime: normalizeDate(d.data_time || d.dateTime),
+      statusTime: normalizeDate(d.status_time || d.statusTime || d.data_time),
       isLate: d.is_late ?? false,
       type: d.type || 'EXPORTAÇÃO',
       containerType: d.container_type || d.containerType || '40HC',
@@ -96,7 +103,6 @@ export const tripRepository = {
       if (error) throw error;
       return (data || []).map(d => this.mapFromDb(d));
     } catch (e) {
-      console.error("Erro ao carregar viagens via TripRepository:", e);
       return [];
     }
   },
