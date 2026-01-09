@@ -9,6 +9,7 @@ import { maskSeal } from '../../../utils/masks';
 import { lookupCarrierByContainer } from '../../../utils/carrierService';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import { tripSyncService } from '../../../utils/tripSyncService';
+import { ocRules } from '../../../utils/ocRules';
 import { db } from '../../../utils/storage';
 
 interface OrdemColetaFormProps {
@@ -33,7 +34,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [showDriverResults, setShowDriverResults] = useState(false);
 
   const [detectedCategory, setDetectedCategory] = useState<string | null>(null);
-  const [manualCategory, setManualCategory] = useState('');
 
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
@@ -112,7 +112,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       if (field === 'os') {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
         setDetectedCategory(detected);
-        if (detected) setManualCategory('');
       }
 
       if (field === 'container') {
@@ -122,10 +121,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
 
       if (field === 'seal') {
         next.seal = maskSeal(upValue);
-      }
-
-      if (field === 'tipo' && upValue === '40HR') {
-        next.padrao = 'REEFER';
       }
 
       return next;
@@ -147,51 +142,45 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     
     if (existing) {
       const hasChanges = tripSyncService.hasChanges(existing, formData, selectedDriver.id, selectedRemetente.id);
-      
       if (hasChanges) {
         setExistingTrip(existing);
         setShowSyncModal(true);
       } else {
-        await executeWorkflow(existing.id);
+        await executeWorkflow();
       }
     } else {
-      await executeWorkflow(null);
+      await executeWorkflow();
     }
   };
 
-  const executeWorkflow = async (existingId: string | null) => {
+  const executeWorkflow = async () => {
+    if (!currentUser || !selectedDriver || !selectedRemetente) return;
+    
     setIsExporting(true);
     setShowSyncModal(false);
     
     try {
-      const finalCategory = detectedCategory || manualCategory || 'Geral';
-      await osCategoryService.syncVinculos(finalCategory, selectedDriver, selectedRemetente);
-      const tripData = tripSyncService.mapOCtoTrip(formData, selectedDriver!, selectedRemetente!, finalCategory, selectedDestinatario);
-      await tripSyncService.sync(tripData, existingId || undefined);
+      // CHAMA A REGRA DE NEGÓCIO CENTRALIZADA (Cria a viagem em Operações)
+      await ocRules.processOCWorkflow(
+        formData, 
+        selectedDriver, 
+        selectedRemetente, 
+        currentUser, 
+        selectedDestinatario
+      );
 
-      // Dispara Notificação de Geração de OC
-      if (currentUser) {
-        await db.addNotification(
-          currentUser, 
-          'OC_GENERATED', 
-          `OC Emitida: ${formData.os}`, 
-          `Ordem de Coleta para o motorista ${selectedDriver?.name} gerada com sucesso.`,
-          { os: formData.os, motorista: selectedDriver?.name, placa: selectedDriver?.plateHorse, cliente: selectedRemetente?.name }
-        );
-      }
-
+      // GERAR PDF
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));
       const element = captureRef.current;
       if (!element) return;
+      
       const canvas = await html2canvas(element, { scale: 2.5, useCORS: true, backgroundColor: "#ffffff" });
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       
-      const driverName = selectedDriver?.name || 'MOTORISTA';
-      const osNum = formData.os || 'SEM_OS';
-      const fileName = `OC - ${driverName} - ${osNum}`;
+      const fileName = `OC - ${selectedDriver.name} - ${formData.os}`;
 
       if (pendingAction === 'print') {
         const blob = pdf.output('blob');
@@ -199,10 +188,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         const win = window.open(url, '_blank');
         if (win) {
           win.document.title = fileName;
-          win.onload = () => {
-             win.focus();
-             win.print();
-          };
+          win.onload = () => { win.focus(); win.print(); };
         }
       } else {
         pdf.save(`${fileName}.pdf`);
@@ -210,13 +196,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       
     } catch (e) { 
       console.error(e); 
+      alert("Falha ao gerar documento.");
     } finally { 
       setIsExporting(false); 
       setPendingAction(null);
     }
   };
 
-  // ... Resto do componente permanece igual ...
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
@@ -252,33 +238,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
                  </div>
                  <div>
-                    <h3 className="text-xl font-black uppercase tracking-tight">Alterações Detectadas</h3>
-                    <p className="text-[10px] font-black uppercase opacity-80 mt-1">Os dados deste formulário são diferentes dos que constam no Painel. Deseja atualizar?</p>
+                    <h3 className="text-xl font-black uppercase tracking-tight">Vincular Alterações ao Painel?</h3>
+                    <p className="text-[10px] font-black uppercase opacity-80 mt-1">Os dados desta OC são diferentes da viagem registrada. Deseja atualizar o dashboard?</p>
                  </div>
               </div>
-              
-              <div className="p-10 grid grid-cols-2 gap-10">
-                 <div className="space-y-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Dados Atuais no Painel</p>
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
-                       <p className="text-[11px] font-black text-slate-800 uppercase">{existingTrip.driver.name}</p>
-                       <p className="text-[9px] font-bold text-slate-400 uppercase">{existingTrip.customer.name}</p>
-                       <p className="text-[10px] font-mono font-bold text-blue-600">PLACA: {existingTrip.driver.plateHorse}</p>
-                    </div>
-                 </div>
-                 <div className="space-y-4">
-                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest border-b border-blue-100 pb-2">Novos Dados desta OC</p>
-                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-2">
-                       <p className="text-[11px] font-black text-blue-800 uppercase">{selectedDriver?.name}</p>
-                       <p className="text-[9px] font-bold text-blue-400 uppercase">{selectedRemetente?.name}</p>
-                       <p className="text-[10px] font-mono font-bold text-emerald-600">PLACA: {selectedDriver?.plateHorse}</p>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="p-10 bg-slate-50 border-t border-slate-100 flex gap-4">
-                 <button onClick={() => setShowSyncModal(false)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-100 transition-all">Cancelar</button>
-                 <button onClick={() => executeWorkflow(existingTrip.id)} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Substituir e {pendingAction === 'print' ? 'Imprimir' : 'Baixar'}</button>
+              <div className="p-10 flex gap-4 bg-slate-50 border-t border-slate-100">
+                 <button onClick={() => setShowSyncModal(false)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Manter Atual</button>
+                 <button onClick={() => executeWorkflow()} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Atualizar e Prosseguir</button>
               </div>
            </div>
         </div>
@@ -298,25 +264,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
               />
            </div>
 
-           {detectedCategory ? (
+           {detectedCategory && (
              <div className="flex items-center gap-3 px-4 py-3 bg-emerald-500 text-white rounded-2xl animate-in zoom-in-95">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3"/></svg>
                 <div>
                    <p className="text-[8px] font-black uppercase leading-none opacity-80">Categoria Identificada</p>
                    <p className="text-[11px] font-black uppercase tracking-widest">{detectedCategory}</p>
                 </div>
-             </div>
-           ) : formData.os.length > 5 && (
-             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                <label className="text-[8px] font-black text-amber-600 uppercase tracking-widest ml-1">Padrão não reconhecido. Selecione o vínculo:</label>
-                <select 
-                  className={inputClasses} 
-                  value={manualCategory} 
-                  onChange={e => setManualCategory(e.target.value)}
-                >
-                  <option value="">Selecione um Vínculo...</option>
-                  {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                </select>
              </div>
            )}
         </div>
@@ -333,27 +287,19 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           />
           {showRemetenteResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
-              {filteredCustomers.length > 0 ? (
-                filteredCustomers.map(c => (
-                  <button 
-                    key={c.id} 
-                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
-                    onClick={() => { 
-                      setFormData({...formData, remetenteId: c.id}); 
-                      setRemetenteSearch(c.legalName || c.name); 
-                      setShowRemetenteResults(false); 
-                    }}
-                  >
-                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
-                    <div className="flex justify-between items-center mt-0.5">
-                      <p className="text-[8px] font-bold text-slate-400 uppercase italic">{c.legalName && c.name !== c.legalName ? `FANTASIA: ${c.name}` : ''}</p>
-                      <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">{c.city} - {c.state}</p>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="p-4 text-center text-[9px] font-bold text-slate-400 uppercase italic">Nenhum cliente localizado</div>
-              )}
+              {filteredCustomers.map(c => (
+                <button 
+                  key={c.id} 
+                  className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
+                  onClick={() => { 
+                    setFormData({...formData, remetenteId: c.id}); 
+                    setRemetenteSearch(c.legalName || c.name); 
+                    setShowRemetenteResults(false); 
+                  }}
+                >
+                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -370,27 +316,19 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           />
           {showDestinatarioResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
-              {filteredPorts.length > 0 ? (
-                filteredPorts.map(p => (
-                  <button 
-                    key={p.id} 
-                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
-                    onClick={() => { 
-                      setFormData({...formData, destinatarioId: p.id}); 
-                      setDestinatarioSearch(p.legalName || p.name); 
-                      setShowDestinatarioResults(false); 
-                    }}
-                  >
-                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{p.legalName || p.name}</p>
-                    <div className="flex justify-between items-center mt-0.5">
-                      <p className="text-[8px] font-bold text-slate-400 uppercase italic">{p.legalName && p.name !== p.legalName ? `FANTASIA: ${p.name}` : ''}</p>
-                      <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">{p.city} - {p.state}</p>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="p-4 text-center text-[9px] font-bold text-slate-400 uppercase italic">Nenhum destino localizado</div>
-              )}
+              {filteredPorts.map(p => (
+                <button 
+                  key={p.id} 
+                  className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
+                  onClick={() => { 
+                    setFormData({...formData, destinatarioId: p.id}); 
+                    setDestinatarioSearch(p.legalName || p.name); 
+                    setShowDestinatarioResults(false); 
+                  }}
+                >
+                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{p.legalName || p.name}</p>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -398,7 +336,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
           <p className={labelClass}>3. Dados do Equipamento</p>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} placeholder="ABCD1234567" /></div>
+            <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} /></div>
             <div className="space-y-1"><label className={labelClass}>Genset</label><input className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -407,40 +345,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           </div>
           <div className="space-y-1">
             <label className={labelClass}>Armador / Agência</label>
-            <input className={`${inputClasses} ${formData.agencia ? 'bg-blue-50 border-blue-200' : ''}`} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className={labelClass}>Tipo</label>
-              <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
-                <option value="40HC">40HC</option>
-                <option value="40HR">40HR</option>
-                <option value="40DC">40DC</option>
-                <option value="20DC">20DC</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className={labelClass}>Padrão</label>
-              <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
-                <option value="CARGA GERAL">CARGA GERAL</option>
-                <option value="CARGO PREMIUM">CARGO PREMIUM</option>
-                <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
-                <option value="REEFER">REEFER</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>4. Dados da Operação (Logística)</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="EX: MAERSK..." /></div>
-            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} placeholder="ABC12345" /></div>
+            <input className={`${inputClasses} ${formData.agencia ? 'bg-blue-50' : ''}`} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} />
           </div>
         </div>
 
         <div className="relative">
-          <label className={labelBlueClass}>5. Motorista</label>
+          <label className={labelBlueClass}>5. Motorista Alocado</label>
           <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
           {showDriverResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
@@ -451,25 +361,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           )}
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>6. Autorização e Embarcador</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Aut. Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} /></div>
-            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} /></div>
-          </div>
-          <div className="space-y-1">
-             <label className={labelClass}>Data e Hora Agendamento</label>
-             <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
-          </div>
-        </div>
-
         <div className="grid grid-cols-2 gap-3">
            <button disabled={isExporting} onClick={() => startWorkflow('print')} className="py-5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
-             Imprimir
+             Imprimir OC
            </button>
            <button disabled={isExporting} onClick={() => startWorkflow('download')} className="py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-2">
-             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
              Baixar PDF
            </button>
         </div>
