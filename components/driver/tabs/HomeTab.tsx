@@ -43,14 +43,13 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // REGRA SOLICITADA: A operação atual deve ser a programação MAIS ANTIGA que não está concluída ou cancelada
+  // REGRA: A operação atual deve ser a programação MAIS ANTIGA que não está concluída ou cancelada
   const activeTrip = useMemo(() => {
-    const activeOnes = [...trips]
+    const sorted = [...trips]
       .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
-      // Ordenação crescente (mais antiga primeiro)
       .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
     
-    return activeOnes[0];
+    return sorted[0];
   }, [trips]);
 
   const isVWCrageaTrip = useMemo(() => {
@@ -72,7 +71,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
     setIsUpdating(true);
     const nowISO = new Date().toISOString();
-    // Normaliza a data do evento para garantir que o banco receba o horário exato selecionado
+    // Normalizamos a data do evento para ISO estrito
     const eventISO = new Date(dateTime).toISOString();
     
     const updatedTrip: Trip = {
@@ -93,17 +92,17 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       const success = await db.saveTrip(updatedTrip, user);
       
       if (success) {
-        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Posição atualizada para ${pendingStatus}.`, { os: activeTrip.os, motorista: user.displayName });
+        await db.addNotification(user, 'STATUS_UPDATED', `OS ${activeTrip.os}: ${pendingStatus}`, `Posição atualizada via Portal.`, { os: activeTrip.os, motorista: user.displayName });
         setShowPicker(false);
         setIsConfirmModalOpen(false);
         setPendingStatus(null);
         await onRefresh();
       } else {
-        alert("Falha ao sincronizar com o banco de dados. Verifique sua conexão.");
+        alert("Falha ao salvar no banco de dados. Tente novamente.");
       }
     } catch (e) { 
       console.error("Erro ao atualizar status:", e);
-      alert("Erro técnico ao salvar posição."); 
+      alert("Erro técnico de conexão."); 
     } finally { 
       setIsUpdating(false); 
     }
