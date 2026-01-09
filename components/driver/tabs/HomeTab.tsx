@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useRef } from 'react';
 import { Trip, User, TripStatus, DriverCapturedDoc } from '../../../types';
 import ScannerModal from '../ScannerModal';
@@ -111,7 +112,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      // Fix: Explicitly cast Array.from result to File[] to avoid unknown type errors in map and readAsDataURL
       const fileList = Array.from(files) as File[];
       const readPromises = fileList.map(file => {
         return new Promise<string>((resolve) => {
@@ -138,11 +138,15 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       {activeTrip ? (
         <div className="bg-slate-900 border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden">
           <div className="p-8 pb-6 flex justify-between items-start border-b border-white/5 bg-slate-950/30">
-            <div>
+            <div className="flex-1 min-w-0 pr-4">
               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1.5">{activeTrip.type}</p>
               <h1 className="text-4xl font-black tracking-tighter text-white leading-none">OS {activeTrip.os}</h1>
+              {/* Informação do cliente movida para baixo da OS com fonte menor conforme solicitado */}
+              <p className="text-[11px] font-bold text-slate-400 uppercase mt-2.5 leading-tight">
+                {activeTrip.customer.legalName || activeTrip.customer.name}
+              </p>
             </div>
-            <div className="text-right">
+            <div className="text-right shrink-0">
               <p className="text-[10px] font-black text-white">{safeFormatDate(activeTrip.dateTime)}</p>
               <p className="text-[11px] text-blue-400 font-black mt-1.5 uppercase tracking-[0.2em]">
                 {safeFormatTime(activeTrip.dateTime)}
@@ -168,11 +172,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           <div className="p-8 space-y-7">
             <div className="space-y-6">
               <div className="space-y-1.5">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Razão Social do Cliente</span>
-                <p className="text-sm font-black text-white uppercase leading-tight">{activeTrip.customer.legalName || activeTrip.customer.name}</p>
-              </div>
-
-              <div className="space-y-1.5">
                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Localidade da Operação</span>
                 <div className="flex items-center gap-3">
                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-blue-500 shadow-inner">
@@ -187,7 +186,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
             <div className="grid grid-cols-3 gap-3 pt-2">
               <button onClick={() => { setScannerInitialImages([]); setIsScannerOpen(true); }} className="py-5 bg-blue-600 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active:scale-95 transition-all shadow-lg">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/></svg>
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/></svg>
                   <span className="text-[7px] font-black uppercase text-white tracking-widest">Câmera</span>
               </button>
               <button onClick={() => fileInputRef.current?.click()} className="py-5 bg-slate-800 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active:scale-95 transition-all border border-white/10 shadow-lg">

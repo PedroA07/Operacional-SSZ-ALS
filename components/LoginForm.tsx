@@ -81,21 +81,21 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
           <form className="w-full space-y-7" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">ID de Operador</label>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Usuário:</label>
               <input 
                 type="text" 
                 required 
                 autoFocus
                 autoComplete="username"
                 className="w-full px-7 py-5 bg-white/5 border border-white/5 text-white font-bold rounded-2xl focus:border-blue-500 focus:bg-white/10 outline-none transition-all placeholder:text-slate-700" 
-                placeholder="operacional_ssz"
+                placeholder="Insira seu usuário"
                 value={username} 
                 onChange={(e) => setUsername(e.target.value)} 
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Senha do Banco</label>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Senha:</label>
               <input 
                 type="password" 
                 required 
@@ -121,11 +121,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               {isLoading ? (
                 <div className="flex items-center gap-3">
                    <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
-                   <span className="text-[10px]">Consultando Base...</span>
+                   <span className="text-[10px]">Entrando...</span>
                 </div>
               ) : (
                 <>
-                  <span>Entrar no Sistema</span>
+                  <span>Entrar</span>
                   <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </>
               )}
