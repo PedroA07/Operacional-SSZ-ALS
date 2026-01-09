@@ -14,9 +14,10 @@ const NotificationToast: React.FC = () => {
 
     console.debug("Realtime ALS Event Received:", data.type);
 
+    // Mapeamento compatível com o banco real (sem coluna title)
     const notif: Notification = {
       id: String(data.id),
-      title: data.title || 'Alerta do Sistema',
+      title: data.type ? data.type.replace(/_/g, ' ').toUpperCase() : 'ALERTA DO SISTEMA',
       description: data.message || '',
       type: (data.type as NotificationType) || 'SYSTEM',
       origin: (data.origin as NotificationOrigin) || 'OPERACIONAL',
@@ -88,7 +89,7 @@ const NotificationToast: React.FC = () => {
           <div className={`absolute top-0 left-0 w-2 h-full ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-600'}`}></div>
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full animate-pulse ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
+              <div className={`w-2 h-2 rounded-full animate-pulse ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-600'}`}></div>
               <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{activeToast.origin} • EM TEMPO REAL</p>
             </div>
             <svg className="w-4 h-4 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>

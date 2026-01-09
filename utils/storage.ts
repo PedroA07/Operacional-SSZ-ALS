@@ -292,37 +292,51 @@ export const db = {
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: any) => {
     if (!supabase) return;
     const origin: NotificationOrigin = (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL';
+    
+    // Ajustado para o seu banco: Não enviamos 'title' pois a coluna não existe.
+    // Concatenamos o título na mensagem para não perder a informação.
     await supabase.from('notifications').insert({
-      user_id: user.id, user_name: user.displayName, type, origin,
-      title, message: description, os_ref: summary?.os || '',
-      summary: summary || {}, timestamp: new Date().toISOString()
+      user_id: user.id, 
+      user_name: user.displayName, 
+      type, 
+      origin,
+      message: `${title}: ${description}`, // Guardamos o título dentro da mensagem
+      os_ref: summary?.os || '',
+      summary: summary || {}, 
+      timestamp: new Date().toISOString()
     });
   },
 
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
+    // Busca otimizada com colunas REAIS do seu banco (Visto na imagem)
     const { data, error } = await supabase
       .from('notifications')
-      .select('id, title, message, type, origin, user_name, user_id, timestamp, summary, os_ref')
+      .select('id, user_id, user_name, type, message, os_ref, timestamp, summary, origin')
       .order('timestamp', { ascending: false })
       .limit(50);
       
     if (error) {
-      console.error("Supabase Notifications Error:", error);
+      console.error("Erro Supabase Notificações:", error);
       return []; 
     }
     
-    return (data || []).map(n => ({
-      id: String(n.id), 
-      title: n.title || 'Alerta', 
-      description: n.message || '',
-      type: n.type as NotificationType, 
-      origin: n.origin as NotificationOrigin,
-      authorName: n.user_name || 'Sistema', 
-      authorId: n.user_id || 'system', 
-      timestamp: n.timestamp || new Date().toISOString(),
-      summary: { ...(n.summary || {}), os: n.os_ref }
-    }));
+    return (data || []).map(n => {
+      // Prettify do tipo para servir como título na interface
+      const displayTitle = n.type ? n.type.replace(/_/g, ' ').toUpperCase() : 'ALERTA DO SISTEMA';
+
+      return {
+        id: String(n.id), 
+        title: displayTitle, 
+        description: n.message || '',
+        type: n.type as NotificationType, 
+        origin: n.origin as NotificationOrigin,
+        authorName: n.user_name || 'Sistema', 
+        authorId: n.user_id || 'system', 
+        timestamp: n.timestamp || new Date().toISOString(),
+        summary: { ...(n.summary || {}), os: n.os_ref }
+      };
+    });
   },
 
   getPreferences: (userId: string) => {
