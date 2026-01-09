@@ -10,7 +10,7 @@ export const driverAuthService = {
    * Gera as credenciais padrão baseadas no CPF e Primeiro Nome
    */
   generateDefaults: (driver: Partial<Driver>) => {
-    const cleanCPF = driver.cpf?.replace(/\D/g, '') || '';
+    const cleanCPF = driver.cpf?.replace(/\D/g, '').toLowerCase() || '';
     const firstName = driver.name?.trim().split(' ')[0].toLowerCase() || 'als';
     return {
       username: cleanCPF,
@@ -25,13 +25,12 @@ export const driverAuthService = {
     if (!driverId) throw new Error("ID do motorista é obrigatório para sincronismo.");
 
     const defaults = driverAuthService.generateDefaults(driverData);
-    const username = defaults.username;
-    const password = customPassword || defaults.password;
+    const username = defaults.username.toLowerCase();
+    const password = (customPassword || defaults.password).trim();
 
     // CRÍTICO: Garantimos que o driverId da tabela 'drivers' seja gravado aqui no 'users'
-    // Se o usuário já existir, preservamos os campos dele e atualizamos o vínculo
     const users = await db.getUsers();
-    const existingUser = users.find(u => u.username === username);
+    const existingUser = users.find(u => u.username.toLowerCase() === username);
 
     const userPayload: User = {
       ...(existingUser || {}),
@@ -40,7 +39,7 @@ export const driverAuthService = {
       password: password,
       displayName: driverData.name || 'Motorista',
       role: driverData.driverType === 'Motoboy' ? 'motoboy' : 'driver',
-      driverId: driverId, // Campo crucial para o vínculo
+      driverId: driverId,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
       position: driverData.driverType || 'Motorista',
       status: driverData.status || 'Ativo',
@@ -59,7 +58,7 @@ export const driverAuthService = {
     const users = await db.getUsers();
     const user = users.find(u => String(u.driverId) === String(driverId));
     if (user) {
-      user.password = newPassword;
+      user.password = newPassword.trim();
       await db.saveUser(user);
       return true;
     }
