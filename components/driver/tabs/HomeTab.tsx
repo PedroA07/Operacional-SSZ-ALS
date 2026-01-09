@@ -41,6 +41,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Seleciona a viagem ativa mais próxima
   const activeTrip = useMemo(() => {
     const sorted = [...trips]
       .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
@@ -48,7 +49,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     return sorted[0];
   }, [trips]);
 
-  // Funções de formatação segura para evitar 'Invalid Date'
   const safeFormatDate = (isoString: string) => {
     if (!isoString) return "--/--/----";
     const d = new Date(isoString);
@@ -65,7 +65,8 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   const isVWCrageaTrip = useMemo(() => {
     if (!activeTrip) return false;
-    const isVW = activeTrip.customer?.name?.toUpperCase().includes('VOLKSWAGEN');
+    const isVW = activeTrip.customer?.name?.toUpperCase().includes('VOLKSWAGEN') || 
+                 activeTrip.customer?.legalName?.toUpperCase().includes('VOLKSWAGEN');
     const isCragea = activeTrip.destination?.name?.toUpperCase().includes('CRAGEA') || 
                      activeTrip.scheduling?.location?.toUpperCase().includes('CRAGEA');
     return isVW && isCragea;
@@ -129,7 +130,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-24">
       <div className="flex justify-between items-center px-1">
-        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Carga Atual</h2>
+        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Programação em Curso</h2>
         <button onClick={handleManualRefresh} disabled={isUpdating} className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl text-slate-400 active:scale-90 transition-all border border-white/5">
           <svg className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="2.5"/></svg>
           <span className="text-[8px] font-black uppercase">Sincronizar</span>
@@ -139,7 +140,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       {activeTrip ? (
         <div className="bg-slate-900 border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden">
           
-          {/* CABEÇALHO DA VIAGEM */}
+          {/* TOPO: IDENTIFICAÇÃO E DATA */}
           <div className="p-8 pb-6 flex justify-between items-start border-b border-white/5 bg-slate-950/30">
             <div>
               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1.5">{activeTrip.type}</p>
@@ -153,26 +154,23 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             </div>
           </div>
 
-          {/* CONTAINER HERO - ESPAÇO DESTACADO SÓ PRA ELE */}
-          <div className="px-8 py-8 bg-blue-600/20 border-y border-white/10 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-5">
-               <svg className="w-20 h-20 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M21 16.5C21 16.88 20.79 17.21 20.47 17.38L12.57 21.82C12.41 21.94 12.21 22 12 22C11.79 22 11.59 21.94 11.43 21.82L3.53 17.38C3.21 17.21 3 16.88 3 16.5V7.5C3 7.12 3.21 6.79 3.53 6.62L11.43 2.18C11.59 2.06 11.79 2 12 2C12.21 2 12.41 2.06 12.57 2.18L20.47 6.62C20.79 6.79 21 7.12 21 7.5V16.5Z"/></svg>
-            </div>
-            <span className="text-[9px] font-black text-blue-400 uppercase tracking-[0.3em] block mb-2">Equipamento Vinculado</span>
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          {/* EQUIPAMENTO: CONTAINER EM DESTAQUE (IGUAL OPERACIONAL) */}
+          <div className="px-8 py-8 bg-blue-600/10 border-y border-white/10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-[9px] font-black text-blue-400 uppercase tracking-[0.3em] block">Container Alocado</span>
               <p className="text-5xl font-mono font-black text-white leading-none tracking-tight">
                 {activeTrip.container || 'A DEFINIR'}
               </p>
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg border border-blue-400/30">
-                  {activeTrip.containerType || '40HC'}
-                </span>
-                {activeTrip.tara && <span className="text-[9px] font-bold text-slate-500 uppercase">Tara: {activeTrip.tara}</span>}
-              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg">
+                {activeTrip.containerType || '40HC'}
+              </span>
+              {activeTrip.tara && <span className="text-[9px] font-bold text-slate-500 uppercase">Tara: {activeTrip.tara}</span>}
             </div>
           </div>
 
-          {/* INFORMAÇÕES DO CLIENTE */}
+          {/* DOSSIÊ DO CLIENTE */}
           <div className="p-8 space-y-7">
             <div className="space-y-6">
               <div className="space-y-1.5">
@@ -188,7 +186,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               )}
 
               <div className="space-y-1.5">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Localidade de Operação</span>
+                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Localidade da Operação</span>
                 <div className="flex items-center gap-3">
                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-blue-500 shadow-inner">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>
