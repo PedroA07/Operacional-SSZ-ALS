@@ -5,76 +5,95 @@ import { User } from '../types';
 export const authService = {
   /**
    * Realiza o login consultando exclusivamente o banco de dados Supabase.
+   * Tratamento robusto para erros de CORS e Timeout (522).
    */
   async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
     const inputUser = username.trim().toLowerCase();
     const inputPass = password.trim();
     
-    // Verificação de Conexão Supabase
+    if (!inputUser || !inputPass) {
+      return { success: false, error: 'Preencha todos os campos.' };
+    }
+
+    // Verificação de Instalação do Cliente Supabase
     if (!supabase) {
-      return { success: false, error: 'Erro de infraestrutura: Banco de dados não configurado.' };
+      return { success: false, error: 'Configuração do banco de dados ausente (URL/KEY).' };
     }
 
     try {
-      // Busca o usuário no Supabase
-      // Usamos AbortController para não deixar a UI travada em caso de erro 522/timeout
+      // AbortController para evitar que a requisição fique pendente infinitamente (causa do 522)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de limite
 
+      // Consulta direta à tabela 'users'
+      // Buscamos apenas os campos necessários para validação
       const { data, error } = await supabase
         .from('users')
-        .select('*')
-        .ilike('username', inputUser)
-        .maybeSingle();
+        .select('id, username, password, display_name, role, photo, position, driver_id, staff_id, status, is_first_login')
+        .eq('username', inputUser)
+        .limit(1);
 
       clearTimeout(timeoutId);
 
       if (error) {
-        console.error("Database Error:", error);
-        return { success: false, error: 'O servidor de banco de dados não respondeu. Tente novamente.' };
+        console.error("Supabase Error Response:", error);
+        return { success: false, error: `Erro no servidor ALS: ${error.message}` };
       }
 
-      if (!data) {
-        return { success: false, error: 'Usuário não cadastrado no sistema ALS.' };
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Usuário não localizado na base de dados.' };
       }
 
-      // Validação de senha (Case Sensitive)
-      const storedPassword = (data.password || '').trim();
-      if (storedPassword !== inputPass) {
-        return { success: false, error: 'Chave de segurança incorreta.' };
+      const userData = data[0];
+
+      // Validação de Senha (Strict)
+      if (userData.password !== inputPass) {
+        return { success: false, error: 'Chave de segurança inválida.' };
       }
 
-      if (data.status === 'Inativo') {
-        return { success: false, error: 'Este acesso foi desativado pela administração.' };
+      // Validação de Status
+      if (userData.status === 'Inativo') {
+        return { success: false, error: 'Acesso suspenso. Entre em contato com a administração.' };
       }
 
       const user: User = {
-        id: data.id,
-        username: data.username,
-        displayName: data.display_name || data.displayname || data.username,
-        role: data.role,
+        id: userData.id,
+        username: userData.username,
+        displayName: userData.display_name || userData.username,
+        role: userData.role,
         lastLogin: new Date().toISOString(),
-        photo: data.photo,
-        position: data.position,
-        driverId: data.driver_id || data.driverid,
-        staffId: data.staff_id || data.staffid,
-        status: data.status,
-        isFirstLogin: data.is_first_login ?? data.isfirstlogin
+        photo: userData.photo,
+        position: userData.position,
+        driverId: userData.driver_id,
+        staffId: userData.staff_id,
+        status: userData.status,
+        isFirstLogin: userData.is_first_login
       };
 
-      // Atualiza timestamp de login em background
+      // Tenta atualizar o log de acesso em background
       supabase.from('users').update({ 
         last_login: user.lastLogin,
         presence_status: 'online'
       }).eq('id', user.id).then();
 
       return { success: true, user };
+
     } catch (err: any) {
-      console.error("Auth Critical Failure:", err);
-      if (err.name === 'AbortError') {
-        return { success: false, error: 'Tempo de resposta esgotado. Verifique sua conexão.' };
+      console.error("Auth Exception:", err);
+
+      // Tratamento específico para o erro de CORS/Rede/522 relatado no console
+      if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        return { 
+          success: false, 
+          error: 'Falha de conexão: O navegador foi bloqueado ao tentar acessar o servidor ALS (CORS/Timeout). Verifique sua internet ou VPN.' 
+        };
       }
-      return { success: false, error: 'Erro de comunicação com o servidor ALS.' };
+
+      if (err.name === 'AbortError') {
+        return { success: false, error: 'O servidor demorou muito para responder (Tempo Esgotado).' };
+      }
+
+      return { success: false, error: 'Ocorreu uma falha na comunicação com o banco de dados.' };
     }
   }
 };
