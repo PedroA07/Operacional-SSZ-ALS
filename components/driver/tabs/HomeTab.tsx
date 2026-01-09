@@ -125,7 +125,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       };
       reader.readAsDataURL(file);
     }
-    // Reseta o input para permitir selecionar o mesmo arquivo novamente se necessário
     e.target.value = '';
   };
 
@@ -141,8 +140,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
       {activeTrip ? (
         <div className="bg-slate-900 border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden">
-          
-          {/* TOPO: IDENTIFICAÇÃO E DATA */}
           <div className="p-8 pb-6 flex justify-between items-start border-b border-white/5 bg-slate-950/30">
             <div>
               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1.5">{activeTrip.type}</p>
@@ -156,7 +153,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
             </div>
           </div>
 
-          {/* EQUIPAMENTO: CONTAINER EM DESTAQUE (IGUAL OPERACIONAL) */}
           <div className="px-8 py-8 bg-blue-600/10 border-y border-white/10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div className="space-y-1">
               <span className="text-[9px] font-black text-blue-400 uppercase tracking-[0.3em] block">Container Alocado</span>
@@ -168,24 +164,16 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               <span className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg">
                 {activeTrip.containerType || '40HC'}
               </span>
-              {activeTrip.tara && <span className="text-[9px] font-bold text-slate-500 uppercase">Tara: {activeTrip.tara}</span>}
+              {activeTrip.tara && <span className="text-[9px] font-bold text-slate-500 uppercase">T: {activeTrip.tara}</span>}
             </div>
           </div>
 
-          {/* DOSSIÊ DO CLIENTE */}
           <div className="p-8 space-y-7">
             <div className="space-y-6">
               <div className="space-y-1.5">
                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Razão Social do Cliente</span>
                 <p className="text-sm font-black text-white uppercase leading-tight">{activeTrip.customer.legalName || activeTrip.customer.name}</p>
               </div>
-
-              {activeTrip.customer.legalName && activeTrip.customer.name !== activeTrip.customer.legalName && (
-                <div className="space-y-1.5 bg-white/5 p-4 rounded-2xl border border-white/5">
-                  <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Nome Fantasia</span>
-                  <p className="text-sm font-bold text-slate-200 uppercase italic leading-tight">{activeTrip.customer.name}</p>
-                </div>
-              )}
 
               <div className="space-y-1.5">
                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Localidade da Operação</span>
@@ -200,20 +188,25 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               </div>
             </div>
 
-            {/* AÇÕES DE CAMPO */}
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <button onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }} className="py-6 bg-blue-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_20px_40px_rgba(37,99,235,0.3)]">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/></svg>
-                  <span className="text-[9px] font-black uppercase text-white tracking-[0.2em]">Câmera</span>
+            <div className="grid grid-cols-3 gap-3 pt-2">
+              <button onClick={() => { setScannerInitialImage(null); setIsScannerOpen(true); }} className="py-5 bg-blue-600 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active:scale-95 transition-all shadow-lg">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="3"/></svg>
+                  <span className="text-[7px] font-black uppercase text-white tracking-widest">Câmera</span>
               </button>
-              <button onClick={() => fileInputRef.current?.click()} className="py-6 bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 active:scale-95 transition-all border border-white/10 shadow-xl">
-                  <svg className="w-7 h-7 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="3"/></svg>
-                  <span className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">Anexar</span>
+              <button onClick={() => fileInputRef.current?.click()} className="py-5 bg-slate-800 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active:scale-95 transition-all border border-white/10 shadow-lg">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="3"/></svg>
+                  <span className="text-[7px] font-black uppercase text-slate-400 tracking-widest">Anexar</span>
+              </button>
+              <button onClick={() => setIsGalleryOpen(true)} className="py-5 bg-slate-800 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active:scale-95 transition-all border border-white/10 shadow-lg relative">
+                  <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="3"/></svg>
+                  <span className="text-[7px] font-black uppercase text-slate-400 tracking-widest">Ver Fotos</span>
+                  {activeTrip.driver_docs && activeTrip.driver_docs.length > 0 && (
+                    <span className="absolute top-2 right-2 w-4 h-4 bg-emerald-500 rounded-full text-[8px] font-black flex items-center justify-center text-white">{activeTrip.driver_docs.length}</span>
+                  )}
               </button>
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleGalleryUpload} />
             </div>
 
-            {/* SELETOR DE STATUS OPERACIONAL */}
             <div className="space-y-4 pt-6 border-t border-white/5">
               <button 
                 onClick={() => setShowPicker(!showPicker)}
