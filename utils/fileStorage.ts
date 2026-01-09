@@ -23,7 +23,8 @@ export const fileStorage = {
    * Converte Base64 para Uint8Array de forma estável para ambientes Mobile
    */
   base64ToUint8Array: (base64: string) => {
-    const base64Content = base64.split(',')[1];
+    const parts = base64.split(',');
+    const base64Content = parts.length > 1 ? parts[1] : parts[0];
     const binaryString = window.atob(base64Content);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
@@ -49,11 +50,12 @@ export const fileStorage = {
 
     try {
       let body: any;
-      let contentType = 'application/octet-stream';
+      let contentType = 'image/jpeg'; // Default para capturas de câmera mobile
 
       if (typeof file === 'string' && file.startsWith('data:')) {
         body = fileStorage.base64ToUint8Array(file);
-        contentType = file.split(';')[0].split(':')[1];
+        const match = file.match(/data:([^;]+);/);
+        if (match) contentType = match[1];
       } else {
         body = file;
         if (file instanceof File) contentType = file.type;
@@ -70,7 +72,7 @@ export const fileStorage = {
       return data.path; 
     } catch (error) {
       console.error("Erro no Upload Supabase Storage:", error);
-      throw error; // Repassa para o modal decidir pelo fallback
+      throw error; 
     }
   }
 };

@@ -79,27 +79,17 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     stopCamera();
   };
 
-  const handleKeepPhoto = () => {
-    if (!currentImage) return;
-    const newDoc: DriverCapturedDoc = { 
-      id: `scan-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, 
-      url: currentImage, 
-      timestamp: new Date().toISOString() 
-    };
-    setCapturedImages(prev => [...prev, newDoc]);
-    setCurrentImage(null);
-    setStep('camera');
-    startCamera();
-  };
-
-  const handleFinish = async () => {
+  const handleFinish = async (forceImage?: string) => {
     if (isSaving) return;
     
+    // Coleta imagens da sessão + imagem atual do preview (se houver)
     const docsToUpload = [...capturedImages];
-    if (currentImage) {
+    const imageToInclude = forceImage || currentImage;
+    
+    if (imageToInclude) {
       docsToUpload.push({ 
-        id: `scan-last-${Date.now()}`, 
-        url: currentImage, 
+        id: `scan-preview-${Date.now()}`, 
+        url: imageToInclude, 
         timestamp: new Date().toISOString() 
       });
     }
@@ -114,18 +104,16 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     try {
       const finalDocsForDatabase: DriverCapturedDoc[] = [];
       
-      // Processa cada imagem: Tenta Storage, se falhar usa Base64
+      // Processa cada imagem: Tenta Storage, se falhar usa Base64 no banco
       for (const doc of docsToUpload) {
         if (doc.url.startsWith('data:')) {
           try {
-            const fileName = `drv_os_${trip.os}_${Date.now()}.jpg`;
-            // Tenta o upload oficial
+            const fileName = `drv_os_${trip.os}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.jpg`;
             const storagePath = await fileStorage.uploadFile(doc.url, 'docs', fileName, 'trips');
             const publicUrl = fileStorage.getPublicUrl(storagePath, 'trips');
             finalDocsForDatabase.push({ ...doc, url: publicUrl });
           } catch (storageErr) {
-            console.warn("Storage falhou, usando Fallback Base64 para garantir envio.");
-            // Fallback: Salva o Base64 diretamente no banco (limite do JSONB é grande o suficiente)
+            console.warn("Storage falhou no mobile, usando fallback Base64.");
             finalDocsForDatabase.push(doc);
           }
         } else {
@@ -140,18 +128,39 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
 
       const success = await db.saveTrip(updatedTrip, user);
       if (success) {
-        await db.addNotification(user, 'DRIVER_DOC_UPLOADED', `Fotos Enviadas: OS ${trip.os}`, `${user.displayName} enviou ${finalDocsForDatabase.length} novas fotos de campo.`, { os: trip.os, motorista: user.displayName });
+        await db.addNotification(user, 'DRIVER_DOC_UPLOADED', `Fotos Enviadas: OS ${trip.os}`, `${user.displayName} enviou ${finalDocsForDatabase.length} novas fotos.`, { os: trip.os, motorista: user.displayName });
         await onSuccess();
         onClose();
       } else {
-        alert("Erro ao gravar no banco de dados. Verifique sua conexão.");
+        alert("Erro ao gravar no servidor ALS. Tente novamente.");
       }
     } catch (e) {
-      console.error("Erro crítico no processo de salvamento:", e);
-      alert("Falha ao sincronizar arquivos. Tente novamente em uma área com melhor sinal.");
+      console.error("Erro crítico no salvamento:", e);
+      alert("Falha de conexão. Verifique seu sinal de internet.");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleKeepPhoto = () => {
+    if (!currentImage) return;
+
+    // Se veio da galeria (initialImage), o "Confirmar" deve finalizar o processo imediatamente
+    if (initialImage) {
+      handleFinish(currentImage);
+      return;
+    }
+
+    // Se veio da câmera, adiciona à fila e volta para tirar mais fotos
+    const newDoc: DriverCapturedDoc = { 
+      id: `scan-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, 
+      url: currentImage, 
+      timestamp: new Date().toISOString() 
+    };
+    setCapturedImages(prev => [...prev, newDoc]);
+    setCurrentImage(null);
+    setStep('camera');
+    startCamera();
   };
 
   if (!isOpen) return null;
@@ -189,17 +198,41 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
             <div className="absolute bottom-10 w-full flex items-center justify-center gap-10 px-10 z-50">
                <button onClick={() => capturedImages.length > 0 && setShowSessionGallery(true)} className="relative w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-white border border-white/10 active:scale-95 transition-all overflow-hidden">{capturedImages.length > 0 ? <><img src={capturedImages[capturedImages.length-1].url} className="w-full h-full object-cover opacity-60" alt="" /><span className="absolute inset-0 flex items-center justify-center text-[11px] font-black bg-blue-600/40">{capturedImages.length}</span></> : <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="2.5"/></svg>}</button>
                <button onClick={capturePhoto} className="w-20 h-20 bg-white rounded-full border-4 border-blue-500 flex items-center justify-center shadow-[0_0_40px_rgba(37,99,235,0.4)] active:scale-75 transition-all"><div className="w-14 h-14 bg-blue-600 rounded-full border-2 border-white/20"></div></button>
-               <button onClick={handleFinish} disabled={capturedImages.length === 0 && !currentImage} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${ (capturedImages.length > 0 || currentImage) ? 'bg-emerald-600 text-white shadow-lg active:scale-95' : 'bg-slate-800 text-slate-600'}`}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg></button>
+               <button onClick={() => handleFinish()} disabled={capturedImages.length === 0} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${ capturedImages.length > 0 ? 'bg-emerald-600 text-white shadow-lg active:scale-95' : 'bg-slate-800 text-slate-600'}`}><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg></button>
             </div>
           </>
         )}
 
         {step === 'preview' && currentImage && (
           <div className="w-full h-full p-6 animate-in zoom-in-95 flex flex-col bg-slate-950">
-             <div className="flex-1 bg-white rounded-3xl overflow-hidden shadow-2xl relative"><img src={currentImage} className="w-full h-full object-contain" alt="" /><div className="absolute top-4 left-4 bg-black/60 px-3 py-1.5 rounded-full text-[8px] font-black text-white uppercase tracking-widest">Confirme a Legibilidade</div></div>
+             <div className="flex-1 bg-white rounded-3xl overflow-hidden shadow-2xl relative">
+                <img src={currentImage} className="w-full h-full object-contain" alt="" />
+                <div className="absolute top-4 left-4 bg-black/60 px-3 py-1.5 rounded-full text-[8px] font-black text-white uppercase tracking-widest">
+                  Verifique a Legibilidade
+                </div>
+             </div>
              <div className="flex gap-4 mt-8 pb-4">
-                <button onClick={() => { setStep('camera'); setCurrentImage(null); startCamera(); }} className="flex-1 py-5 bg-slate-900 text-slate-300 rounded-[2rem] text-[10px] font-black uppercase tracking-widest border border-white/5 active:bg-red-600 transition-colors">Descartar</button>
-                <button onClick={handleKeepPhoto} className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>{initialImage ? 'Confirmar' : 'Próxima'}</button>
+                <button 
+                  onClick={() => { 
+                    if (initialImage) {
+                      onClose();
+                    } else {
+                      setStep('camera'); 
+                      setCurrentImage(null); 
+                      startCamera(); 
+                    }
+                  }} 
+                  className="flex-1 py-5 bg-slate-900 text-slate-300 rounded-[2rem] text-[10px] font-black uppercase tracking-widest border border-white/5 active:bg-red-600 transition-colors"
+                >
+                  Descartar
+                </button>
+                <button 
+                  onClick={handleKeepPhoto} 
+                  className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>
+                  {initialImage ? 'Confirmar e Enviar' : 'Próxima Foto'}
+                </button>
              </div>
           </div>
         )}
@@ -216,7 +249,11 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       <canvas ref={canvasRef} className="hidden" />
 
       {isSaving && (
-        <div className="absolute inset-0 z-[6000] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white"><div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div><p className="text-[10px] font-black uppercase tracking-[0.4em] mt-6 animate-pulse">Sincronizando Dossiê...</p></div>
+        <div className="absolute inset-0 z-[6000] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+           <p className="text-[10px] font-black uppercase tracking-[0.4em] mt-6 animate-pulse">Sincronizando Dossiê...</p>
+           <p className="text-[8px] text-slate-500 uppercase mt-2">Aguarde a confirmação da nuvem</p>
+        </div>
       )}
     </div>
   );
