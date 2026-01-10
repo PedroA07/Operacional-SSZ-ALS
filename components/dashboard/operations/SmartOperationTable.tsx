@@ -17,6 +17,7 @@ interface SmartOperationTableProps {
   title?: string;
   defaultVisibleKeys?: string[];
   onRowClick?: (row: any) => void;
+  hideInternalSearch?: boolean; // Nova prop
 }
 
 const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
@@ -26,7 +27,8 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   data,
   title,
   defaultVisibleKeys,
-  onRowClick
+  onRowClick,
+  hideInternalSearch = false
 }) => {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,7 +64,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filteredData = data.filter(row => {
+  const filteredData = hideInternalSearch ? data : data.filter(row => {
     const searchStr = searchQuery.toLowerCase();
     return Object.values(row).some(val => {
       if (typeof val === 'object' && val !== null) {
@@ -81,16 +83,18 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
         </div>
 
         <div className="flex items-center gap-3 z-20">
-          <div className="relative">
-            <input 
-              type="text" 
-              placeholder="BUSCAR..." 
-              className="pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-[10px] font-bold uppercase focus:border-blue-500 focus:bg-white outline-none w-48 transition-all bg-slate-100/50"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            <svg className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          </div>
+          {!hideInternalSearch && (
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="BUSCAR..." 
+                className="pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-[10px] font-bold uppercase focus:border-blue-500 focus:bg-white outline-none w-48 transition-all bg-slate-100/50"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+              <svg className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+          )}
 
           <div className="relative" ref={pickerRef}>
             <button 

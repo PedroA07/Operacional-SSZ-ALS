@@ -60,6 +60,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Data de hoje formatada para o input (YYYY-MM-DD)
   const today = new Date().toLocaleDateString('en-CA');
@@ -93,6 +94,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const filteredTrips = useMemo(() => {
     let result = [...trips];
 
+    // 1. Filtros de Status (Tabs)
     if (activeStatusTab === 'ativas') {
       const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
       result = result.filter(t => active.includes(t.status));
@@ -100,10 +102,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     else if (activeStatusTab === 'cancelada') result = result.filter(t => t.status === 'Viagem cancelada');
     else if (activeStatusTab === 'geral') result = result.filter(t => t.status !== 'Viagem cancelada');
 
+    // 2. Filtros Laterais
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
     
+    // 3. Filtro de Datas
     if (startDate || endDate) {
       result = result.filter(t => {
         const tripDate = t.dateTime.substring(0, 10);
@@ -113,8 +117,20 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       });
     }
 
+    // 4. Filtro de Texto (Global da Tela)
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(t => 
+        t.os.toLowerCase().includes(q) || 
+        t.container?.toLowerCase().includes(q) || 
+        t.driver.name.toLowerCase().includes(q) || 
+        t.customer.name.toLowerCase().includes(q) ||
+        (t.booking && t.booking.toLowerCase().includes(q))
+      );
+    }
+
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate]);
+  }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery]);
 
   const columns = useMemo(() => getOperationTableColumns(
     (t, s) => { setSelectedTrip(t); setTempStatus(s); const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); setStatusTime(d.toISOString().slice(0,16)); setIsStatusModalOpen(true); },
@@ -148,9 +164,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       <div className="flex flex-col lg:flex-row justify-between items-end gap-6">
         <div className="flex-1 w-full"><CategoryNavigation availableOps={availableOps} customers={customers} onNavigate={setActiveView} /></div>
         <div className="flex flex-col items-end gap-4 w-full lg:w-auto">
-           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
-              <button onClick={() => setDensity('compact')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${density === 'compact' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Compacto</button>
-              <button onClick={() => setDensity('comfortable')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${density === 'comfortable' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Amplo</button>
+           <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
+              <button onClick={() => setDensity('compact')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${density === 'compact' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Compacto</button>
+              <button onClick={() => setDensity('comfortable')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${density === 'comfortable' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Amplo</button>
            </div>
            <div className="flex gap-3">
               <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
@@ -167,13 +183,33 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
                <button key={tab} onClick={() => setActiveStatusTab(tab as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>{tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}</button>
              ))}
            </div>
+           
+           <div className="flex-1 w-full max-w-md relative group">
+              <input 
+                type="text" 
+                placeholder="BUSCAR OS, CONTAINER, MOTORISTA NA TELA..."
+                className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-50 bg-white text-[10px] font-black uppercase focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all outline-none"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+              <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+           </div>
+
            <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
         </div>
         
         <OperationFilters selectedTypes={filterTypes} onTypesChange={setFilterTypes} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} />
         
         <div className={density === 'compact' ? 'table-compact' : ''}>
-           <SmartOperationTable userId={user.id} componentId="ops-global" title={`Painel Geral ALS`} columns={columns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+           <SmartOperationTable 
+             userId={user.id} 
+             componentId="ops-global" 
+             title={`Painel Geral ALS`} 
+             columns={columns} 
+             data={filteredTrips} 
+             hideInternalSearch // Busca externa controlada pelo pai agora
+             defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
+           />
         </div>
       </div>
 
