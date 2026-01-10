@@ -4,8 +4,8 @@ export const APP_CONFIG = {
   version: '6.0.2',
 };
 
-// Added ADMIN_CREDENTIALS to fix the import error in authService.ts
+// Credenciais de administrador atualizadas conforme solicitação
 export const ADMIN_CREDENTIALS = {
   username: 'operacional_ssz',
-  password: 'Operacional_SSZ'
+  password: 'operacoes'
 };
