@@ -170,7 +170,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
            </div>
            <div className="flex gap-3">
               <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
-              <CopyAllStatusesAction trips={filteredTrips} />
+              <CopyAllStatusesAction trips={filteredTrips} allTrips={trips} />
               <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
            </div>
         </div>
@@ -216,7 +216,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => { setIsSchedulingModalOpen(false); setSelectedTrip(null); }} trip={selectedTrip} onSuccess={onRefresh} preStackingUnits={[...ports, ...preStacking]} />
-      {isHistoryModalOpen && selectedTrip && <StatusHistoryManagerModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} trip={selectedTrip} user={user} onSuccess={onRefresh} />}
+      {isHistoryModalOpen && selectedTrip && <StatusHistoryManagerModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} trip={selectedTrip} allTrips={trips} user={user} onSuccess={onRefresh} />}
       
       {isOCFormOpen && selectedTrip && (
         <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">

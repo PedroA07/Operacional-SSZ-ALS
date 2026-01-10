@@ -8,11 +8,12 @@ interface StatusHistoryManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   trip: Trip;
+  allTrips: Trip[]; // Contexto total para previsões
   user: User;
   onSuccess: () => void;
 }
 
-const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ isOpen, onClose, trip, user, onSuccess }) => {
+const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ isOpen, onClose, trip, allTrips, user, onSuccess }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
 
@@ -20,11 +21,9 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
 
   const handleCopyToEmail = async () => {
     try {
-      // Usando o formato compacto agora
-      const html = emailFormatter.toCompactRichText(trip);
-      const plain = emailFormatter.toPlainText(trip);
+      const html = emailFormatter.toCompactRichText(trip, allTrips);
+      const plain = emailFormatter.toPlainText(trip, allTrips);
 
-      // Usando ClipboardItem para copiar HTML formatado (Rich Text)
       const blobHtml = new Blob([html], { type: 'text/html' });
       const blobPlain = new Blob([plain], { type: 'text/plain' });
       
@@ -135,7 +134,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
 
         <div className="p-6 bg-slate-50 border-t border-slate-100 text-center shrink-0">
           <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-            * O botão de cópia gera um bloco compacto para stacking em e-mails.
+            * O botão de cópia gera um bloco compacto incluindo previsões inteligentes.
           </p>
         </div>
       </div>

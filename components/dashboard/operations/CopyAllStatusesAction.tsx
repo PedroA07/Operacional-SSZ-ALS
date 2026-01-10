@@ -4,18 +4,19 @@ import { Trip } from '../../../types';
 import { emailFormatter } from '../../../utils/emailFormatter';
 
 interface CopyAllStatusesActionProps {
-  trips: Trip[];
+  trips: Trip[];      // Viagens visíveis na tela
+  allTrips: Trip[];   // Contexto total para buscas de próxima agenda
 }
 
-const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) => {
+const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, allTrips }) => {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = async () => {
     if (trips.length === 0) return;
 
     try {
-      const html = emailFormatter.allTripsToRichText(trips);
-      const plain = trips.map(t => emailFormatter.toPlainText(t)).join('\n\n---\n\n');
+      const html = emailFormatter.allTripsToRichText(trips, allTrips);
+      const plain = trips.map(t => emailFormatter.toPlainText(t, allTrips)).join('\n\n---\n\n');
 
       const blobHtml = new Blob([html], { type: 'text/html' });
       const blobPlain = new Blob([plain], { type: 'text/plain' });

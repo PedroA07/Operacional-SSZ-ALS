@@ -1,20 +1,24 @@
 
 import { Trip, StatusHistoryEntry } from '../types';
+import { predictionService } from './predictionService';
 
 export const emailFormatter = {
   /**
    * Gera uma versão em HTML compacto para ser colado em e-mails.
-   * Inclui todo o histórico de status da viagem.
+   * Inclui todo o histórico de status e a PREVISÃO inteligente.
    */
-  toCompactRichText: (trip: Trip): string => {
+  toCompactRichText: (trip: Trip, allTrips: Trip[] = []): string => {
     const history = [...(trip.statusHistory || [])].sort(
       (a, b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime()
     );
+
+    const prediction = predictionService.getNextStatusPrediction(trip, allTrips);
 
     const mainColor = '#2563eb';
     const borderColor = '#e2e8f0';
     const textColor = '#1e293b';
     const subTextColor = '#64748b';
+    const predictionColor = '#0369a1';
 
     return `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: ${textColor}; border: 1px solid ${borderColor}; border-radius: 12px; margin-bottom: 16px; overflow: hidden; max-width: 600px; background-color: #ffffff;">
@@ -45,6 +49,18 @@ export const emailFormatter = {
                       ${new Date(entry.dateTime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </td>
                   </tr>
+                  ${(idx === 0 && prediction) ? `
+                    <tr>
+                      <td></td>
+                      <td colspan="2" style="padding: 2px 12px 10px 12px;">
+                        <div style="background-color: #f0f9ff; border-left: 3px solid ${predictionColor}; padding: 6px 10px; border-radius: 4px;">
+                          <span style="font-size: 10px; font-weight: 900; color: ${predictionColor}; text-transform: uppercase; letter-spacing: 0.5px;">
+                            🚀 ${prediction.label}: <span style="font-size: 12px;">${prediction.time}</span>
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ` : ''}
                 `).join('')}
               </table>
             </td>
@@ -57,11 +73,11 @@ export const emailFormatter = {
   /**
    * Gera um bloco único contendo o status de várias viagens.
    */
-  allTripsToRichText: (trips: Trip[]): string => {
-    if (trips.length === 0) return "";
+  allTripsToRichText: (visibleTrips: Trip[], allContextTrips: Trip[] = []): string => {
+    if (visibleTrips.length === 0) return "";
     
     const mainColor = '#2563eb';
-    const content = trips.map(t => emailFormatter.toCompactRichText(t)).join('');
+    const content = visibleTrips.map(t => emailFormatter.toCompactRichText(t, allContextTrips)).join('');
 
     return `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; padding: 10px; background-color: #fcfcfc;">
@@ -83,15 +99,22 @@ export const emailFormatter = {
   /**
    * Texto simples para fallback
    */
-  toPlainText: (trip: Trip): string => {
+  toPlainText: (trip: Trip, allTrips: Trip[] = []): string => {
     const history = [...(trip.statusHistory || [])].sort(
       (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
     );
 
-    return `OS: ${trip.os} | CLIENTE: ${trip.customer.name}\n` +
+    const pred = predictionService.getNextStatusPrediction(trip, allTrips);
+
+    let text = `OS: ${trip.os} | CLIENTE: ${trip.customer.name}\n` +
       `EQUIPAMENTO: ${trip.container || 'A DEFINIR'} | MOTORISTA: ${trip.driver.name}\n` +
       `HISTÓRICO:\n` +
-      history.map(h => `- ${h.status.toUpperCase()}: ${new Date(h.dateTime).toLocaleString('pt-BR')}`).join('\n') +
-      `\n--------------------------\n`;
+      history.map(h => `- ${h.status.toUpperCase()}: ${new Date(h.dateTime).toLocaleString('pt-BR')}`).join('\n');
+
+    if (pred) {
+      text += `\n>> ${pred.label.toUpperCase()}: ${pred.time}`;
+    }
+
+    return text + `\n--------------------------\n`;
   }
 };
