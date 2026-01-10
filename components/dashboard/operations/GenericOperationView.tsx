@@ -14,6 +14,7 @@ import DateRangeFilter from './DateRangeFilter';
 import OrdemColetaForm from '../forms/OrdemColetaForm';
 import PreStackingForm from '../forms/PreStackingForm';
 import DriverLocationModal from './DriverLocationModal';
+import CopyAllStatusesAction from './CopyAllStatusesAction';
 
 interface GenericOperationViewProps {
   user: User;
@@ -176,6 +177,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
               <button onClick={() => setLocalDensity('compact')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${localDensity === 'compact' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Compacto</button>
               <button onClick={() => setLocalDensity('comfortable')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${localDensity === 'comfortable' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Amplo</button>
            </div>
+           <CopyAllStatusesAction trips={filteredTrips} />
            <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} initialCategory={categoryName} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} variant="primary" />
         </div>
       </header>

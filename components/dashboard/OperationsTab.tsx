@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../../types';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../types';
 import SmartOperationTable from './operations/SmartOperationTable';
-import { db } from '../../utils/storage';
+import { db } from '../utils/storage';
 import OperationRegisterAction from './operations/OperationRegisterAction';
 import SchedulingEditModal from './operations/SchedulingEditModal';
 import DriverDocsViewerModal from './operations/DriverDocsViewerModal';
@@ -19,6 +19,7 @@ import PreStackingForm from './forms/PreStackingForm';
 import VWStatusSelector from './operations/VWStatusSelector';
 import StatusHistoryManagerModal from './operations/StatusHistoryManagerModal';
 import TripModal from './operations/TripModal';
+import CopyAllStatusesAction from './operations/CopyAllStatusesAction';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
 interface OperationsTabProps {
@@ -153,6 +154,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
            </div>
            <div className="flex gap-3">
               <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
+              <CopyAllStatusesAction trips={filteredTrips} />
               <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
            </div>
         </div>

@@ -20,8 +20,8 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
 
   const handleCopyToEmail = async () => {
     try {
-      // Use emailFormatter.toRichText directly as formatTripStatus does not exist
-      const html = emailFormatter.toRichText(trip);
+      // Usando o formato compacto agora
+      const html = emailFormatter.toCompactRichText(trip);
       const plain = emailFormatter.toPlainText(trip);
 
       // Usando ClipboardItem para copiar HTML formatado (Rich Text)
@@ -135,7 +135,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
 
         <div className="p-6 bg-slate-50 border-t border-slate-100 text-center shrink-0">
           <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-            * O botão de cópia formata os dados para um layout profissional de e-mail.
+            * O botão de cópia gera um bloco compacto para stacking em e-mails.
           </p>
         </div>
       </div>
