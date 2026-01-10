@@ -97,7 +97,7 @@ export const tripRepository = {
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
     // BUSCA OTIMIZADA: Newest first + Limit 150
-    // Isso evita o erro 57014 (Statement Timeout) quando a tabela cresce
+    // A ordenação por date_time agora usará o INDEX criado, tornando a busca instantânea
     const { data, error } = await supabase
       .from('trips')
       .select('*')

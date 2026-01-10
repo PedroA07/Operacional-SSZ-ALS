@@ -7,10 +7,8 @@ import { supabase } from '../../../utils/storage';
 const NotificationToast: React.FC = () => {
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const [progress, setProgress] = useState(100);
-  const channelRef = useRef<any>(null);
-  // Fix: Use ReturnType<typeof setTimeout> instead of NodeJS.Timeout to avoid missing namespace error in browser environment
+  
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Fix: Use ReturnType<typeof setInterval> instead of NodeJS.Timeout to avoid missing namespace error in browser environment
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearToast = useCallback(() => {
@@ -24,7 +22,7 @@ const NotificationToast: React.FC = () => {
     const data = payload.new;
     if (!data) return;
 
-    // Limpa qualquer toast anterior antes de mostrar o novo
+    // Limpa estado anterior antes de processar novo
     clearToast();
 
     const notif: Notification = {
@@ -41,6 +39,7 @@ const NotificationToast: React.FC = () => {
 
     setActiveToast(notif);
     
+    // Somente toca áudio para o operacional
     const sessionStr = sessionStorage.getItem('als_active_session');
     const currentUser: User | null = sessionStr ? JSON.parse(sessionStr) : null;
     const isDriver = currentUser?.role === 'driver' || currentUser?.role === 'motoboy';
@@ -53,17 +52,16 @@ const NotificationToast: React.FC = () => {
       }
     }
     
+    // Avisa outros componentes que há dado novo para atualizar sem polling pesado
     window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: notif }));
 
-    // Inicia cronômetro para sumir (8 segundos)
     timerRef.current = setTimeout(() => {
       setActiveToast(null);
     }, 8000);
 
-    // Barra de progresso visual
     let currentProgress = 100;
     progressIntervalRef.current = setInterval(() => {
-      currentProgress -= (100 / 80); // Atualiza a cada 100ms por 8s
+      currentProgress -= 1.25; // 100 / 80 steps
       setProgress(currentProgress);
     }, 100);
 
@@ -72,8 +70,11 @@ const NotificationToast: React.FC = () => {
   useEffect(() => {
     if (!supabase) return;
     
-    const channel = supabase
-      .channel('als-realtime-notifs-toast')
+    // Nome único por aba para evitar colisões no servidor
+    const channelName = `notifs-${Math.random().toString(36).substr(2, 9)}`;
+    const channel = supabase.channel(channelName);
+    
+    channel
       .on(
         'postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'notifications' }, 
@@ -81,10 +82,11 @@ const NotificationToast: React.FC = () => {
       )
       .subscribe();
 
-    channelRef.current = channel;
-
     return () => { 
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      // LIMPEZA CRÍTICA: Desinscreve e remove o canal do servidor do Supabase
+      channel.unsubscribe();
+      supabase.removeChannel(channel);
+      
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     };
@@ -93,12 +95,11 @@ const NotificationToast: React.FC = () => {
   if (!activeToast) return null;
 
   return (
-    <div className="fixed top-6 right-6 z-[9999] w-85 animate-in slide-in-from-right-full slide-out-to-right-full duration-500">
+    <div className="fixed top-6 right-6 z-[9999] w-85 animate-in slide-in-from-right-full duration-500">
        <div 
          onClick={clearToast}
          className="bg-slate-950/95 backdrop-blur-xl text-white p-6 rounded-[2.5rem] shadow-[0_50px_120px_rgba(0,0,0,0.7)] border border-white/10 flex flex-col gap-3 relative overflow-hidden group active:scale-95 transition-all cursor-pointer"
        >
-          {/* Barra de Progresso do Tempo */}
           <div className="absolute bottom-0 left-0 h-1 bg-white/10 w-full">
             <div 
               className={`h-full transition-all duration-100 ease-linear ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-600'}`}
