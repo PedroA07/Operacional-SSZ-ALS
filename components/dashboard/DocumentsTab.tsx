@@ -10,10 +10,13 @@ interface DocumentsTabProps {
 }
 
 const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip }) => {
+  // Padrão ALS: Inicia filtros com a data de HOJE
+  const today = new Date().toLocaleDateString('en-CA');
+  
   const [activeTab, setActiveTab] = useState<'pendentes' | 'concluidas' | 'canceladas'>('pendentes');
   const [activeCategory, setActiveCategory] = useState<string>('GERAL');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>(today);
+  const [endDate, setEndDate] = useState<string>(today);
 
   const categories = useMemo(() => {
     const cats = new Set(trips.map(t => t.category).filter(Boolean));
@@ -40,23 +43,23 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
 
   const pendingTrips = useMemo(() => {
     let list = trips.filter(t => t.status === 'Viagem concluída' && !t.completoDoc);
-    if (startDate) list = list.filter(t => t.dateTime >= startDate);
-    if (endDate) list = list.filter(t => t.dateTime <= endDate + 'T23:59:59');
+    if (startDate) list = list.filter(t => t.dateTime.substring(0, 10) >= startDate);
+    if (endDate) list = list.filter(t => t.dateTime.substring(0, 10) <= endDate);
     return list;
   }, [trips, startDate, endDate]);
 
   const finishedTrips = useMemo(() => {
     let list = trips.filter(t => t.status === 'Viagem concluída' && t.completoDoc);
     if (activeCategory !== 'GERAL') list = list.filter(t => t.category === activeCategory);
-    if (startDate) list = list.filter(t => t.dateTime >= startDate);
-    if (endDate) list = list.filter(t => t.dateTime <= endDate + 'T23:59:59');
+    if (startDate) list = list.filter(t => t.dateTime.substring(0, 10) >= startDate);
+    if (endDate) list = list.filter(t => t.dateTime.substring(0, 10) <= endDate);
     return list;
   }, [trips, activeCategory, startDate, endDate]);
 
   const canceledTrips = useMemo(() => {
     let list = trips.filter(t => t.status === 'Viagem cancelada');
-    if (startDate) list = list.filter(t => t.dateTime >= startDate);
-    if (endDate) list = list.filter(t => t.dateTime <= endDate + 'T23:59:59');
+    if (startDate) list = list.filter(t => t.dateTime.substring(0, 10) >= startDate);
+    if (endDate) list = list.filter(t => t.dateTime.substring(0, 10) <= endDate);
     return list;
   }, [trips, startDate, endDate]);
 
@@ -87,8 +90,8 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
               <label className="text-[7px] font-black text-slate-400 uppercase ml-1">Até:</label>
               <input type="date" className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={endDate} onChange={e => setEndDate(e.target.value)} />
            </div>
-           {(startDate || endDate) && (
-              <button onClick={() => { setStartDate(''); setEndDate(''); }} className="mt-4 text-[8px] font-black text-blue-600 uppercase hover:underline">Reset</button>
+           {(startDate !== today || endDate !== today) && (
+              <button onClick={() => { setStartDate(today); setEndDate(today); }} className="mt-4 text-[8px] font-black text-blue-600 uppercase hover:underline">Hoje</button>
            )}
         </div>
       </div>
