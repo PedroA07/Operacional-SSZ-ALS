@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../types';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
-import { db } from '../utils/storage';
+import { db } from '../../utils/storage';
 import OperationRegisterAction from './operations/OperationRegisterAction';
 import SchedulingEditModal from './operations/SchedulingEditModal';
 import DriverDocsViewerModal from './operations/DriverDocsViewerModal';
