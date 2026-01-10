@@ -22,7 +22,6 @@ const NotificationToast: React.FC = () => {
     const data = payload.new;
     if (!data) return;
 
-    // Limpa estado anterior antes de processar novo
     clearToast();
 
     const notif: Notification = {
@@ -39,29 +38,22 @@ const NotificationToast: React.FC = () => {
 
     setActiveToast(notif);
     
-    // Somente toca áudio para o operacional
     const sessionStr = sessionStorage.getItem('als_active_session');
     const currentUser: User | null = sessionStr ? JSON.parse(sessionStr) : null;
     const isDriver = currentUser?.role === 'driver' || currentUser?.role === 'motoboy';
 
     if (!isDriver) {
-      if (notif.origin === 'MOTORISTA') {
-        audioUtils.playDriverUpdate();
-      } else {
-        audioUtils.playNotification();
-      }
+      if (notif.origin === 'MOTORISTA') audioUtils.playDriverUpdate();
+      else audioUtils.playNotification();
     }
     
-    // Avisa outros componentes que há dado novo para atualizar sem polling pesado
     window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: notif }));
 
-    timerRef.current = setTimeout(() => {
-      setActiveToast(null);
-    }, 8000);
+    timerRef.current = setTimeout(() => setActiveToast(null), 8000);
 
     let currentProgress = 100;
     progressIntervalRef.current = setInterval(() => {
-      currentProgress -= 1.25; // 100 / 80 steps
+      currentProgress -= 1.25;
       setProgress(currentProgress);
     }, 100);
 
@@ -70,20 +62,14 @@ const NotificationToast: React.FC = () => {
   useEffect(() => {
     if (!supabase) return;
     
-    // Nome único por aba para evitar colisões no servidor
-    const channelName = `notifs-${Math.random().toString(36).substr(2, 9)}`;
-    const channel = supabase.channel(channelName);
-    
-    channel
-      .on(
-        'postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'notifications' }, 
-        processNotification
-      )
+    // Nome de canal único evita conflitos entre abas
+    const channelId = `toast-${Math.random().toString(36).substr(2, 9)}`;
+    const channel = supabase.channel(channelId)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, processNotification)
       .subscribe();
 
     return () => { 
-      // LIMPEZA CRÍTICA: Desinscreve e remove o canal do servidor do Supabase
+      // LIMPEZA CRÍTICA: Desinscreve e remove o canal para não fritar a CPU da instância Small
       channel.unsubscribe();
       supabase.removeChannel(channel);
       
@@ -98,7 +84,7 @@ const NotificationToast: React.FC = () => {
     <div className="fixed top-6 right-6 z-[9999] w-85 animate-in slide-in-from-right-full duration-500">
        <div 
          onClick={clearToast}
-         className="bg-slate-950/95 backdrop-blur-xl text-white p-6 rounded-[2.5rem] shadow-[0_50px_120px_rgba(0,0,0,0.7)] border border-white/10 flex flex-col gap-3 relative overflow-hidden group active:scale-95 transition-all cursor-pointer"
+         className="bg-slate-950/95 backdrop-blur-xl text-white p-6 rounded-[2.5rem] shadow-[0_50px_120px_rgba(0,0,0,0.7)] border border-white/10 flex flex-col gap-3 relative overflow-hidden active:scale-95 transition-all cursor-pointer"
        >
           <div className="absolute bottom-0 left-0 h-1 bg-white/10 w-full">
             <div 
@@ -106,30 +92,15 @@ const NotificationToast: React.FC = () => {
               style={{ width: `${progress}%` }}
             ></div>
           </div>
-
           <div className={`absolute top-0 left-0 w-2 h-full ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-600'}`}></div>
-          
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full animate-pulse ${activeToast.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-600'}`}></div>
-              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                {activeToast.origin} • {new Date(activeToast.timestamp).toLocaleDateString('pt-BR')}
-              </p>
-            </div>
-            <svg className="w-4 h-4 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{activeToast.origin} • AGORA</p>
+            <svg className="w-3 h-3 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
           </div>
-
-          <div className="flex flex-col">
+          <div>
              <h4 className="text-[13px] font-black uppercase leading-tight text-white mb-1">{activeToast.title}</h4>
-             <p className="text-[11px] text-slate-400 font-medium leading-snug line-clamp-3">{activeToast.description}</p>
+             <p className="text-[11px] text-slate-400 font-medium leading-snug line-clamp-2">{activeToast.description}</p>
           </div>
-
-          {activeToast.summary?.os && (
-            <div className="mt-2 px-4 py-2 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-               <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">OS Ref:</span>
-               <p className="text-[11px] font-mono font-black text-white uppercase">{activeToast.summary.os}</p>
-            </div>
-          )}
        </div>
     </div>
   );

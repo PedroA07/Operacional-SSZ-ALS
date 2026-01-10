@@ -3,8 +3,8 @@ import { useEffect, useRef } from 'react';
 import { User, PresenceStatus, AppScreen } from '../types';
 import { db } from '../utils/storage';
 
-const HEARTBEAT_INTERVAL = 30000; // 30 segundos
-const MAX_AWAY_TIME = 15 * 60 * 1000; // 15 minutos em milissegundos
+const HEARTBEAT_INTERVAL = 30000; // Sincroniza a cada 30s
+const MAX_AWAY_TIME = 15 * 60 * 1000; // 15 minutos
 
 export const usePresenceMonitor = (
   user: User | null, 
@@ -14,58 +14,53 @@ export const usePresenceMonitor = (
   const awayTimestampRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Só monitora se o usuário estiver logado e no Dashboard
-    if (!user || currentScreen !== AppScreen.DASHBOARD) {
+    // Só monitora se o usuário estiver logado e fora da tela de login
+    if (!user || currentScreen === AppScreen.LOGIN) {
       awayTimestampRef.current = null;
       return;
     }
 
-    const updatePresenceStatus = async () => {
+    const updatePresence = async () => {
       const isHidden = document.hidden;
       const status: PresenceStatus = isHidden ? 'away' : 'online';
 
-      // Gerenciamento do Timer de Inatividade
       if (isHidden) {
+        // Se a aba estiver escondida, inicia ou verifica o cronômetro
         if (awayTimestampRef.current === null) {
-          // Usuário acabou de ficar ausente
           awayTimestampRef.current = Date.now();
-          console.debug(`[Presence] Usuário ${user.username} entrou em modo AUSENTE.`);
+          console.debug(`[Presence] Usuário ${user.username} ficou ausente.`);
         } else {
-          // Verifica se já passou do tempo limite
           const elapsed = Date.now() - awayTimestampRef.current;
           if (elapsed >= MAX_AWAY_TIME) {
-            console.warn(`[Presence] Sessão expirada por inatividade (15min+). Forçando logout.`);
+            console.warn(`[Presence] Desconectando por inatividade (>15min).`);
             onLogout();
             return;
           }
         }
       } else {
-        // Usuário voltou a ficar ativo, reseta o cronômetro
-        if (awayTimestampRef.current !== null) {
-          console.debug(`[Presence] Usuário ${user.username} retornou.`);
-        }
+        // Usuário voltou à aba, reseta o tempo de ausência
         awayTimestampRef.current = null;
       }
 
-      // Envia o batimento cardíaco para o servidor
+      // Batimento cardíaco no banco para liberar conexões Realtime de outros usuários
       try {
         await db.updatePresence(user.id, status);
       } catch (e) {
-        console.error("[Presence] Falha ao sincronizar presença:", e);
+        console.warn("Falha no heartbeat de presença.");
       }
     };
 
-    // Executa imediatamente e define o intervalo
-    updatePresenceStatus();
-    const interval = setInterval(updatePresenceStatus, HEARTBEAT_INTERVAL);
+    // Executa e define intervalo
+    updatePresence();
+    const interval = setInterval(updatePresence, HEARTBEAT_INTERVAL);
 
-    // Listener para mudanças de visibilidade instantâneas
-    const handleVisibilityChange = () => updatePresenceStatus();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Evento nativo de troca de aba para resposta instantânea
+    const handleVisibility = () => updatePresence();
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [user, currentScreen, onLogout]);
 };
