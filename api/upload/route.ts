@@ -1,4 +1,3 @@
-
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 let s3Client: S3Client | null = null;
@@ -22,10 +21,13 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const path = formData.get("path") as string; // Caminho completo: "trips/123/fotos/img.jpg"
+    const path = formData.get("path") as string; 
     
     if (!file || !path) {
-      return new Response(JSON.stringify({ error: "Arquivo ou caminho ausente" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "Arquivo ou destino (path) ausente" }), { 
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
@@ -48,6 +50,9 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("[R2 Upload Error]:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 }
