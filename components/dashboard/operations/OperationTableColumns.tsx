@@ -86,21 +86,18 @@ export const getOperationTableColumns = (
   return [
     { 
       key: 'dateTime', 
-      label: '1. Prog. / Hora', 
+      label: '1. Prog.', 
       render: (t: Trip) => (
-        <div className="flex flex-col gap-1 min-w-[90px]">
-          <div className="flex items-center gap-1.5">
-            <span className="font-black text-slate-800 text-[11px]">{new Date(t.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
-            <span className="font-black text-blue-600 text-[11px]">{new Date(t.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-          </div>
-          <span className={`px-1.5 py-0.5 rounded text-[7px] font-black uppercase w-fit ${t.type === 'EXPORTAÇÃO' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{t.type}</span>
-          <span className="text-[7px] font-black text-blue-800 uppercase bg-blue-50 px-1 rounded border border-blue-100 w-fit">{t.category}</span>
+        <div className="flex flex-col gap-0.5 min-w-[75px]">
+          <span className="font-black text-slate-800 text-[10.5px] leading-tight">{new Date(t.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
+          <span className="font-black text-blue-600 text-[10.5px] leading-tight">{new Date(t.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+          <span className="text-[7px] font-black text-blue-800 uppercase bg-blue-50 px-1 rounded border border-blue-100 w-fit mt-1">{t.category?.substring(0, 8)}</span>
         </div>
       )
     },
     { 
       key: 'os_status', 
-      label: '2. OS / Status Histórico', 
+      label: '2. OS / Status', 
       render: (t: Trip) => StatusColumn(t, openStatusEditor, onOpenHistoryManager)
     },
     { 

@@ -41,36 +41,34 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     setOcrProgress(0);
   }, [selectedDoc]);
 
-  // Função de Download Refeita: Garante que o arquivo seja baixado
+  // FUNÇÃO DE DOWNLOAD CORRIGIDA: Força o salvamento como arquivo
   const handleDownload = async () => {
     if (!selectedDoc) return;
     try {
-      const fileName = `ALS_DOC_${trip.os}_${Date.now()}.jpg`;
+      const response = await fetch(selectedDoc.url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
       
-      // Se for base64, converte para blob para garantir o download
-      if (selectedDoc.url.startsWith('data:')) {
-        const res = await fetch(selectedDoc.url);
-        const blob = await res.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `DOC_${trip.os}_${Date.now()}.jpg`;
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      
+      // Limpeza
+      setTimeout(() => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(blobUrl);
-      } else {
-        // Se for link externo, tenta baixar via fetch ou abre em aba forçada
-        const link = document.createElement('a');
-        link.href = selectedDoc.url;
-        link.download = fileName;
-        link.target = "_blank";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
+      }, 100);
     } catch (e) {
-      alert("Erro ao tentar baixar o arquivo.");
+      // Fallback para download via nova aba caso o fetch falhe por CORS
+      const link = document.createElement('a');
+      link.href = selectedDoc.url;
+      link.target = '_blank';
+      link.download = `DOC_${trip.os}.jpg`;
+      link.click();
     }
   };
 
@@ -142,11 +140,11 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     setIsProcessing(true);
     setOcrProgress(0);
     try {
-      const result = await textExtractionService.extractGeneralText(selectedDoc.url, setOcrProgress);
+      const result = await textExtractionService.extractGeneralText(selectedDoc.url, (p) => setOcrProgress(p));
       setExtractedGeneralText(result);
       if (!result) alert("Nenhum texto identificado.");
     } catch (e: any) {
-      alert(e.message || "Erro ao processar imagem.");
+      alert(e.message || "Erro na extração de texto.");
     } finally {
       setIsProcessing(false);
     }
@@ -157,11 +155,11 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     setIsProcessing(true);
     setOcrProgress(0);
     try {
-      const result = await textExtractionService.extractContainer(selectedDoc.url, setOcrProgress);
+      const result = await textExtractionService.extractContainer(selectedDoc.url, (p) => setOcrProgress(p));
       setExtractedContainer(result);
       if (!result) alert("Padrão de container não encontrado.");
     } catch (e: any) {
-      alert(e.message || "Erro ao processar imagem.");
+      alert(e.message || "Erro ao processar container.");
     } finally {
       setIsProcessing(false);
     }
@@ -172,11 +170,11 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     setIsProcessing(true);
     setOcrProgress(0);
     try {
-      const result = await textExtractionService.extractNF(selectedDoc.url, setOcrProgress);
+      const result = await textExtractionService.extractNF(selectedDoc.url, (p) => setOcrProgress(p));
       setExtractedNF(result);
       if (!result) alert("Chave NF-e não localizada.");
     } catch (e: any) {
-      alert(e.message || "Erro ao processar imagem.");
+      alert(e.message || "Erro ao processar nota fiscal.");
     } finally {
       setIsProcessing(false);
     }
@@ -188,7 +186,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     else if (type === 'nf' && extractedNF) updatedTrip.nfKey = extractedNF.key;
     await db.saveTrip(updatedTrip, user);
     onSuccess();
-    alert("Dados atualizados na OS.");
+    alert("Dados vinculados com sucesso.");
   };
 
   const executeDelete = async () => {
@@ -261,7 +259,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
              {isAddingMode === 'none' && selectedDoc ? (
                <div className="w-full h-full rounded-3xl overflow-hidden bg-black"><ImageViewer url={selectedDoc.url} /></div>
              ) : isAddingMode === 'none' && (
-               <div className="text-center text-slate-300 font-black uppercase tracking-widest">Selecione uma imagem lateral</div>
+               <div className="text-center text-slate-300 font-black uppercase tracking-widest">Selecione um arquivo lateral</div>
              )}
           </div>
 
@@ -273,13 +271,13 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                   {isProcessing ? (
                     <div className="space-y-4 py-10 text-center">
                        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                       <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Digitalizando: {Math.round(ocrProgress * 100)}%</p>
+                       <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Extraindo: {Math.round(ocrProgress * 100)}%</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
                        <button onClick={handleExtractGeneralText} className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                          Processar Texto Integral
+                          Processar Todo o Texto
                        </button>
                        <div className="grid grid-cols-2 gap-2">
                           <button onClick={handleExtractContainer} className="py-3.5 bg-slate-900 text-white rounded-2xl text-[9px] font-black uppercase shadow-md hover:bg-slate-800 transition-all flex flex-col items-center justify-center gap-1.5">
@@ -297,7 +295,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                   {extractedGeneralText && (
                     <div className="mt-6 p-6 bg-slate-50 border border-slate-200 rounded-3xl space-y-4">
                        <textarea readOnly className="w-full h-40 bg-white border border-slate-100 rounded-xl p-3 text-[10px] font-mono text-slate-600 resize-none outline-none" value={extractedGeneralText} />
-                       <button onClick={() => { navigator.clipboard.writeText(extractedGeneralText); alert('Copiado.'); }} className="w-full py-3 bg-slate-800 text-white rounded-xl text-[9px] font-black uppercase">Copiar Texto</button>
+                       <button onClick={() => { navigator.clipboard.writeText(extractedGeneralText); alert('Texto copiado.'); }} className="w-full py-3 bg-slate-800 text-white rounded-xl text-[9px] font-black uppercase">Copiar Texto</button>
                     </div>
                   )}
 
@@ -333,8 +331,8 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
         </div>
       </div>
 
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 animate-in fade-in">
+      {isDeleteModalOpen && docToDelete && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
               <h4 className="text-lg font-black uppercase text-slate-800">Apagar Documento?</h4>
               <div className="grid grid-cols-2 gap-3">
