@@ -15,6 +15,7 @@ export const authService = {
       return { success: false, error: 'Preencha usuário e senha.' };
     }
 
+    // TIMESTAMP ÚNICO: Gerado no momento exato do login para ser distribuído para todos os objetos
     const nowISO = new Date().toISOString();
 
     const isMaster = inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && inputPass === ADMIN_CREDENTIALS.password;
@@ -52,17 +53,17 @@ export const authService = {
         username: data.username,
         displayName: data.display_name || data.displayname || data.username,
         role: data.role,
-        lastLogin: nowISO, // Reset do timer local
+        lastLogin: nowISO, // Alinhado com o banco
         photo: data.photo,
         position: data.position,
         driverId: data.driver_id || data.driverid,
         staffId: data.staff_id || data.staffid,
         status: data.status,
         isFirstLogin: data.is_first_login ?? data.isfirstlogin,
-        lastSeen: nowISO // Reset do timer de presença lateral (OnlineStatus)
+        lastSeen: nowISO // Alinhado com o banco
       };
 
-      // Atualização atômica no servidor para zerar o OnlineStatus widget
+      // Atualização imediata no Banco
       await supabase.from('users').update({ 
         last_login: nowISO, 
         last_seen: nowISO, 

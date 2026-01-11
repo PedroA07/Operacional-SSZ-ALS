@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { User, Staff, PresenceStatus } from '../../types';
+import { User, Staff } from '../../types';
 import { db } from '../../utils/storage';
 import { timeUtils } from '../../utils/timeUtils';
 
@@ -13,11 +13,14 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
       const u = await db.getUsers();
       setUsers(u);
+      const session = sessionStorage.getItem('als_active_session');
+      if (session) setCurrentUser(JSON.parse(session));
     } catch (e) {}
   }, []);
 
@@ -46,7 +49,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
 
-    // Se o último sinal foi há mais de 5 minutos, considera offline (evita fantasmas no timer)
+    // Se não houver sinal nos últimos 5 minutos, assume offline
     if (diffSeconds > 300) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Off' };
 
     switch (user.presence_status) {
@@ -77,7 +80,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
           <div className={`w-3 h-3 rounded-full ${totalActive > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`}></div>
           <div className="flex flex-col items-start text-left">
             <span className="text-[11px] font-black uppercase text-slate-100">{totalActive} Equipe Ativa</span>
-            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Presença Realtime</span>
+            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest leading-none">Monitoramento SSZ</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -96,7 +99,13 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
             {staffList.map(s => {
               const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
               const info = u ? getStatusInfo(u) : { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Off' };
-              const displayTime = (u && info.key !== 'offline') ? timeUtils.calculateDuration(u.lastLogin) : '00:00:00';
+              
+              // Se for o usuário logado, garante sincronia perfeita com o cabeçalho
+              const loginTimestamp = (currentUser && (u?.id === currentUser.id || (s.username === 'operacional_ssz' && currentUser.id === 'admin-master'))) 
+                ? currentUser.lastLogin 
+                : u?.lastLogin;
+
+              const displayTime = (loginTimestamp && info.key !== 'offline') ? timeUtils.calculateDuration(loginTimestamp) : '00:00:00';
 
               return (
                 <div key={s.id} className={`p-3.5 flex items-center gap-4 rounded-[1.6rem] border ${info.key === 'offline' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5'}`}>

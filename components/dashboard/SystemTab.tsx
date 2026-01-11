@@ -1,8 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { db } from '../../utils/storage';
-import { imageCompressor } from '../../utils/imageCompressor';
-import { fileStorage } from '../../utils/fileStorage';
+import FeedbackModal from '../shared/FeedbackModal';
 
 interface SystemTabProps {
   onRefresh: () => Promise<void>;
@@ -14,199 +13,104 @@ interface SystemTabProps {
 const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customersCount, portsCount }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [optProgress, setOptProgress] = useState(0);
-  const [optCurrent, setOptCurrent] = useState('');
-  const [errorCount, setErrorCount] = useState(0);
-  const [lastError, setLastError] = useState<string | null>(null);
-  const [showCorsHelp, setShowCorsHelp] = useState(false);
-
-  // Estados para Modais Customizados
-  const [modal, setModal] = useState<{ show: boolean; title: string; message: string; type: 'alert' | 'confirm'; onConfirm?: () => void }>({
-    show: false, title: '', message: '', type: 'alert'
+  const [showLocalOptGuide, setShowLocalOptGuide] = useState(false);
+  const [feedback, setFeedback] = useState<{ show: boolean; title: string; message: string; type: any; onConfirm?: () => void }>({
+    show: false, title: '', message: '', type: 'info'
   });
-
-  const showAlert = (title: string, message: string) => setModal({ show: true, title, message, type: 'alert' });
-  const showConfirm = (title: string, message: string, onConfirm: () => void) => 
-    setModal({ show: true, title, message, type: 'confirm', onConfirm });
 
   const handleExport = async () => {
     setIsExporting(true);
-    try { await db.exportBackup(); } catch (e) { showAlert("Erro", "Falha ao exportar backup."); } finally { setIsExporting(false); }
+    try { 
+      await db.exportBackup(); 
+      setFeedback({ show: true, title: "Exportação Concluída", message: "O arquivo de backup foi gerado com sucesso.", type: 'success' });
+    } catch (e) { 
+      setFeedback({ show: true, title: "Erro na Exportação", message: "Não foi possível gerar o arquivo de backup.", type: 'error' });
+    } finally { 
+      setIsExporting(false); 
+    }
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    showConfirm("Restaurar Backup", "Isso irá sobrescrever os dados atuais. Deseja prosseguir?", async () => {
-      setIsImporting(true);
-      try {
-        if (await db.importBackup(file)) { 
-          showAlert("Sucesso", "Dados importados com sucesso!"); 
-          await onRefresh(); 
-        } else {
-          showAlert("Erro", "Falha na importação do arquivo.");
+    setFeedback({ 
+      show: true, 
+      title: "Restaurar Banco de Dados", 
+      message: "Isso irá sobrescrever os dados atuais da nuvem. Deseja prosseguir?", 
+      type: 'confirm',
+      onConfirm: async () => {
+        setIsImporting(true);
+        try {
+          if (await db.importBackup(file)) { 
+            setFeedback({ show: true, title: "Restauração Finalizada", message: "Todos os dados foram sincronizados com a nuvem.", type: 'success' });
+            await onRefresh(); 
+          } else {
+            setFeedback({ show: true, title: "Falha na Importação", message: "O arquivo selecionado é inválido ou está corrompido.", type: 'error' });
+          }
+        } catch (e) { 
+          setFeedback({ show: true, title: "Erro Crítico", message: "Ocorreu um erro inesperado durante a importação.", type: 'error' });
+        } finally { 
+          setIsImporting(false); 
         }
-      } catch (e) { showAlert("Erro", "Erro crítico no processamento."); } finally { setIsImporting(false); }
+      }
     });
     e.target.value = '';
   };
 
-  const runImageOptimization = async () => {
-    showConfirm("Otimizar Armazenamento", "Deseja comprimir todas as fotos pendentes na nuvem?", async () => {
-      setIsOptimizing(true);
-      setOptProgress(0);
-      setErrorCount(0);
-      setLastError(null);
-      
-      try {
-        setOptCurrent('Iniciando análise...');
-        const [allDrivers, allStaff, allTrips] = await Promise.all([
-          db.getAllDriversMaintenance(),
-          db.getStaff(),
-          db.getAllTripsMaintenance()
-        ]);
-
-        const totalItems = allDrivers.length + allStaff.length + allTrips.reduce((acc, t) => acc + (t.driver_docs?.length || 0), 0);
-        let processedCount = 0;
-
-        const updateProgress = () => {
-          processedCount++;
-          setOptProgress(Math.round((processedCount / totalItems) * 100));
-        };
-
-        // Processamento (Staff, Motoristas, Viagens...)
-        for (const s of allStaff) {
-          if (s.photo && !s.photo.includes('_optimized') && s.photo.startsWith('http')) {
-            setOptCurrent(`Comprimindo: ${s.name}`);
-            try {
-              const compressed = await imageCompressor.compress(s.photo, { maxWidth: 400, quality: 0.7 });
-              const newUrl = await fileStorage.uploadStaffPhoto(compressed, s.id);
-              await db.saveStaff({ ...s, photo: newUrl + '?v=_optimized' });
-            } catch (e: any) { setErrorCount(prev => prev + 1); setLastError(e.message); }
-          }
-          updateProgress();
-        }
-
-        for (const d of allDrivers) {
-          if (d.photo && !d.photo.includes('_optimized') && d.photo.startsWith('http')) {
-            setOptCurrent(`Comprimindo: ${d.name}`);
-            try {
-              const compressed = await imageCompressor.compress(d.photo, { maxWidth: 400, quality: 0.7 });
-              const newUrl = await fileStorage.uploadDriverProfile(compressed, d.id);
-              await db.saveDriver({ ...d, photo: newUrl + '?v=_optimized' });
-            } catch (e: any) { setErrorCount(prev => prev + 1); setLastError(e.message); }
-          }
-          updateProgress();
-        }
-
-        for (const t of allTrips) {
-          if (t.driver_docs && t.driver_docs.length > 0) {
-            let tripChanged = false;
-            const newDocs = [];
-            for (const doc of t.driver_docs) {
-              if (doc.url && !doc.url.includes('_optimized') && doc.url.startsWith('http')) {
-                setOptCurrent(`Otimizando Docs OS ${t.os}...`);
-                try {
-                  const compressed = await imageCompressor.compress(doc.url, { maxWidth: 1600, quality: 0.75 });
-                  const newUrl = await fileStorage.uploadTripPhoto(compressed, t.os, doc.id);
-                  newDocs.push({ ...doc, url: newUrl + '?v=_optimized' });
-                  tripChanged = true;
-                } catch (e: any) { newDocs.push(doc); setErrorCount(prev => prev + 1); setLastError(e.message); }
-              } else { newDocs.push(doc); }
-              updateProgress();
-            }
-            if (tripChanged) await db.saveTrip({ ...t, driver_docs: newDocs });
-          }
-        }
-
-        setOptCurrent('Processo concluído.');
-        if (errorCount === 0) showAlert("Sucesso", "Todas as imagens foram otimizadas.");
-        await onRefresh();
-      } catch (e) {
-        showAlert("Erro", "Falha crítica na otimização.");
-      } finally {
-        setIsOptimizing(false);
-      }
-    });
-  };
-
-  // JSON ULTRA CLEAN (Sem espaços para não bugar o editor da Cloudflare)
-  const corsConfigJson = '[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"MaxAgeSeconds":3600}]';
-
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
       
-      {/* MODAL DE INTERFACE CUSTOMIZADA (Substitui Alertas) */}
-      {modal.show && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-white/20 overflow-hidden animate-in zoom-in-95">
-              <div className="p-10 text-center space-y-6">
-                 <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center ${modal.type === 'confirm' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                 </div>
-                 <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{modal.title}</h3>
-                    <p className="text-sm text-slate-500 mt-2 leading-relaxed">{modal.message}</p>
-                 </div>
-                 <div className={`grid ${modal.type === 'confirm' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
-                    <button onClick={() => setModal({ ...modal, show: false })} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Fechar</button>
-                    {modal.type === 'confirm' && (
-                      <button onClick={() => { modal.onConfirm?.(); setModal({ ...modal, show: false }); }} className="py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Confirmar</button>
-                    )}
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
+      <FeedbackModal 
+        isOpen={feedback.show} 
+        onClose={() => setFeedback({ ...feedback, show: false })}
+        title={feedback.title}
+        message={feedback.message}
+        type={feedback.type}
+        onConfirm={feedback.onConfirm}
+      />
 
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Manutenção de Dados</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de nuvem e armazenamento</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Otimização realizada via Instância Local (Node.js)</p>
         </div>
-        <button onClick={runImageOptimization} disabled={isOptimizing} className="px-6 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl flex items-center gap-3">
-             <svg className={`w-4 h-4 ${isOptimizing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-             Otimizar Storage
-        </button>
+        <div className="flex items-center gap-3">
+           <div className="px-5 py-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center gap-3">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+              <span className="text-[9px] font-black uppercase">Otimização Local Ativa</span>
+           </div>
+           <button onClick={() => setShowLocalOptGuide(true)} className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-600 transition-all">
+                Ver Instruções
+           </button>
+        </div>
       </div>
 
-      {isOptimizing && (
-        <div className="bg-slate-900 p-10 rounded-[3rem] shadow-2xl space-y-6">
-           <div className="flex justify-between items-end">
+      {showLocalOptGuide && (
+        <div className="bg-slate-900 p-10 rounded-[3rem] shadow-2xl border border-white/5 space-y-8 animate-in zoom-in-95">
+           <div className="flex justify-between items-start">
               <div>
-                 <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Atividade em Segundo Plano</p>
-                 <h4 className="text-white font-black text-lg mt-1">{optCurrent}</h4>
+                 <h3 className="text-xl font-black text-blue-400 uppercase tracking-tight">Guia de Manutenção</h3>
+                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold">Instância Local Configurada com Sucesso</p>
               </div>
-              <span className="text-2xl font-black text-white font-mono">{optProgress}%</span>
-           </div>
-           <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${optProgress}%` }}></div>
+              <button onClick={() => setShowLocalOptGuide(false)} className="text-slate-500 hover:text-white transition-colors"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg></button>
            </div>
            
-           {(lastError || errorCount > 0) && (
-             <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-3xl space-y-4">
-                <p className="text-[10px] text-slate-400 leading-relaxed font-bold">Falha no Cloudflare R2: <span className="text-white">"{lastError}"</span></p>
-                <button onClick={() => setShowCorsHelp(true)} className="px-6 py-3 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg">Ver Solução Nativa</button>
-             </div>
-           )}
-        </div>
-      )}
-
-      {showCorsHelp && (
-        <div className="bg-white p-10 rounded-[3rem] border-2 border-blue-500 shadow-2xl space-y-8 animate-in zoom-in-95">
-           <div className="flex justify-between items-start">
-              <div><h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Ajuste de CORS Nativo</h3><p className="text-xs text-slate-400 mt-1 font-bold">Este JSON resolve 100% dos erros de acesso</p></div>
-              <button onClick={() => setShowCorsHelp(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg></button>
-           </div>
-           <div className="space-y-6">
-              <p className="text-sm text-slate-600">No Cloudflare, vá em <b>R2</b> &rarr; seu Bucket &rarr; <b>Settings</b> &rarr; <b>CORS Policy</b>. Apague tudo e cole:</p>
-              <div className="relative">
-                 <pre className="bg-slate-900 text-blue-400 p-6 rounded-2xl text-[11px] font-mono break-all whitespace-pre-wrap">
-                   {corsConfigJson}
-                 </pre>
-                 <button onClick={() => { navigator.clipboard.writeText(corsConfigJson); showAlert("Copiado", "O JSON ultra clean foi copiado."); }} className="absolute top-4 right-4 bg-white/10 text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase">Copiar</button>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                 <p className="text-sm text-slate-300 leading-relaxed">Você confirmou que a otimização via instância local funcionou. Esse método é superior pois:</p>
+                 <ul className="space-y-3">
+                    <li className="flex items-center gap-3 text-xs text-slate-400"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> Contorna restrições de CORS do navegador</li>
+                    <li className="flex items-center gap-3 text-xs text-slate-400"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> Processa arquivos com maior velocidade</li>
+                    <li className="flex items-center gap-3 text-xs text-slate-400"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> Não depende de conexões instáveis do client-side</li>
+                 </ul>
+              </div>
+              <div className="bg-black/40 p-6 rounded-2xl border border-white/5">
+                 <p className="text-[10px] font-black text-blue-500 uppercase mb-4">Lembrete de Comando</p>
+                 <code className="text-[11px] font-mono text-emerald-400 block bg-black p-4 rounded-xl break-all">
+                   node optimize-v2.js
+                 </code>
+                 <p className="text-[8px] text-slate-600 mt-4 uppercase font-bold text-center italic">Rode mensalmente para limpar o armazenamento R2.</p>
               </div>
            </div>
         </div>

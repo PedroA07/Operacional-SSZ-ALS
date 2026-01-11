@@ -18,6 +18,7 @@ import DatabaseStatus from './components/dashboard/DatabaseStatus';
 import UserProfile from './components/dashboard/UserProfile';
 import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
 import NotificationToast from './components/dashboard/notifications/NotificationToast';
+import FeedbackModal from './components/shared/FeedbackModal';
 import { DEFAULT_OPERATIONS } from './constants/operations';
 import { db } from './utils/storage';
 import { Icons } from './constants/icons';
@@ -44,6 +45,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Estados para Modal de Feedback
+  const [feedback, setFeedback] = useState<{ show: boolean; title: string; message: string; type: any; onConfirm?: () => void }>({
+    show: false, title: '', message: '', type: 'info'
+  });
+
   const [isDeleteTripModalOpen, setIsDeleteTripModalOpen] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -65,8 +71,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         db.getCategories()
       ]);
 
-      // Verificação rigorosa: Se o status for 'rejected', o estado antigo é preservado integralmente
-      // Isso mata o efeito de "sumir e aparecer" quando o banco dá timeout
       if (responses[0].status === 'fulfilled') setDrivers(responses[0].value);
       if (responses[1].status === 'fulfilled') setCustomers(responses[1].value);
       if (responses[2].status === 'fulfilled') setPorts(responses[2].value);
@@ -85,13 +89,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => { 
     loadAllData(true);
-    
-    // Aumentado para 30s para evitar colisões de queries pesadas
     const refreshDataInterval = setInterval(() => loadAllData(false), 30000);
-    
     const handleGlobalRefresh = () => loadAllData(false);
     window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
-
     return () => {
       clearInterval(refreshDataInterval);
       window.removeEventListener('als_force_global_refresh', handleGlobalRefresh);
@@ -116,10 +116,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setIsDeleteTripModalOpen(false);
         setTripToDelete(null);
       } else {
-        alert("Não foi possível excluir. Verifique sua conexão.");
+        setFeedback({ show: true, title: 'Erro de Conexão', message: 'O servidor não respondeu à solicitação de exclusão.', type: 'error' });
       }
     } catch (e) {
-      alert('Erro crítico de comunicação.');
+      setFeedback({ show: true, title: 'Erro Crítico', message: 'Falha na comunicação com o banco de dados.', type: 'error' });
     } finally {
       setIsDeleting(false);
     }
@@ -155,6 +155,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   return (
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900 relative">
       <NotificationToast />
+      
+      <FeedbackModal 
+        isOpen={feedback.show} 
+        onClose={() => setFeedback({ ...feedback, show: false })}
+        title={feedback.title}
+        message={feedback.message}
+        type={feedback.type}
+        onConfirm={feedback.onConfirm}
+      />
       
       {isSyncing && !isLoadingInitial && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4">
@@ -240,8 +249,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 if (success) await loadAllData(false);
               }} 
               onDeleteDriver={async id => { 
-                await db.deleteDriver(id); 
-                await loadAllData(false); 
+                setFeedback({ show: true, title: 'Excluir Motorista?', message: 'Esta ação é irreversível.', type: 'confirm', onConfirm: async () => {
+                   await db.deleteDriver(id); 
+                   await loadAllData(false); 
+                }});
               }} 
               availableOps={availableOps} 
             />
@@ -254,10 +265,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 if (success) await loadAllData(false);
               }} 
               onDeleteCustomer={async id => { 
-                if(confirm('Excluir cliente?')) { 
-                  await db.deleteCustomer(id); 
-                  await loadAllData(false); 
-                } 
+                setFeedback({ show: true, title: 'Excluir Cliente?', message: 'Deseja remover este cliente da base?', type: 'confirm', onConfirm: async () => {
+                   await db.deleteCustomer(id); 
+                   await loadAllData(false); 
+                }});
               }} 
               isAdmin={user.role === 'admin'} 
             />
@@ -272,10 +283,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 if (success) await loadAllData(false);
               }} 
               onDeletePort={async id => { 
-                if(confirm('Excluir porto?')) { 
-                  await db.deletePort(id); 
-                  await loadAllData(false); 
-                } 
+                setFeedback({ show: true, title: 'Excluir Porto?', message: 'Remover este terminal?', type: 'confirm', onConfirm: async () => {
+                   await db.deletePort(id); 
+                   await loadAllData(false); 
+                }});
               }} 
             />
            )}
@@ -287,10 +298,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 if (success) await loadAllData(false);
               }} 
               onDeletePreStacking={async id => { 
-                if(confirm('Excluir unidade?')) { 
-                  await db.deletePreStacking(id); 
-                  await loadAllData(false); 
-                } 
+                setFeedback({ show: true, title: 'Excluir Unidade?', message: 'Remover esta unidade de Pré-Stacking?', type: 'confirm', onConfirm: async () => {
+                   await db.deletePreStacking(id); 
+                   await loadAllData(false); 
+                }});
               }} 
             />
            )}
