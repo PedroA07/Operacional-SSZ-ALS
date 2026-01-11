@@ -251,7 +251,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           columns={tripColumns} 
           data={filteredTrips} 
           onRowClick={(t) => { setSelectedTrip(t); setIsTripModalOpen(true); }}
-          defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
+          defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']} 
         />
       </div>
 

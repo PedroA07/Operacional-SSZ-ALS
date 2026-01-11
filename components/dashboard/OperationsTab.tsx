@@ -209,7 +209,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
              data={filteredTrips} 
              hideInternalSearch
              onRowClick={(t) => { setSelectedTrip(t); setIsTripModalOpen(true); }}
-             defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
+             defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']} 
            />
         </div>
       </div>
