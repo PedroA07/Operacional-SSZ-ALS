@@ -61,7 +61,6 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
         setOptProgress(Math.round((processedCount / totalItems) * 100));
       };
 
-      // 1. Otimizar Staff
       for (const s of allStaff) {
         if (s.photo && !s.photo.includes('_optimized') && s.photo.startsWith('http')) {
           setOptCurrent(`Processando Perfil: ${s.name}`);
@@ -77,7 +76,6 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
         updateProgress();
       }
 
-      // 2. Otimizar Motoristas
       for (const d of allDrivers) {
         if (d.photo && !d.photo.includes('_optimized') && d.photo.startsWith('http')) {
           setOptCurrent(`Processando Motorista: ${d.name}`);
@@ -93,7 +91,6 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
         updateProgress();
       }
 
-      // 3. Otimizar Viagens
       for (const t of allTrips) {
         if (t.driver_docs && t.driver_docs.length > 0) {
           let tripChanged = false;
@@ -126,7 +123,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
 
       setOptCurrent('Análise concluída!');
       if (errorCount > 0) {
-        alert(`Otimização finalizada com ${errorCount} erros. Verifique o guia de CORS caso persista.`);
+        alert(`Otimização finalizada com ${errorCount} erros.`);
       } else {
         alert("Otimização concluída com sucesso!");
       }
@@ -138,14 +135,13 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
     }
   };
 
-  // POLÍTICA DE CORS UNIVERSAL PARA RESOLVER "OPTIONS"
+  // JSON SIMPLIFICADO QUE O CLOUDFLARE R2 ACEITA SEM ERROS DE VALIDAÇÃO
   const corsConfigJson = JSON.stringify([
     {
       "AllowedOrigins": ["*"],
-      "AllowedMethods": ["GET", "HEAD", "OPTIONS"],
+      "AllowedMethods": ["GET", "HEAD"],
       "AllowedHeaders": ["*"],
-      "ExposeHeaders": ["Content-Type", "Content-Length"],
-      "MaxAgeSeconds": 3000
+      "MaxAgeSeconds": 3600
     }
   ], null, 2);
 
@@ -185,17 +181,16 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
              <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-3xl space-y-4">
                 <div className="flex items-center gap-3">
                    <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                   <p className="text-[11px] text-red-400 font-black uppercase">Falha Técnica (CORS/OPTIONS)</p>
+                   <p className="text-[11px] text-red-400 font-black uppercase">Falha na Leitura das Fotos</p>
                 </div>
                 <p className="text-[10px] text-slate-400 leading-relaxed font-bold">
-                  O navegador informou: <span className="text-white">"{lastError}"</span>. <br/>
-                  Isso acontece quando a política de CORS do R2 não aceita requisições <b>OPTIONS</b> do domínio da Vercel.
+                  O Cloudflare R2 bloqueou a leitura. Como o editor deles é sensível, use o novo código abaixo.
                 </p>
                 <button 
                   onClick={() => setShowCorsHelp(true)}
                   className="px-6 py-3 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-red-500 transition-all"
                 >
-                  Ver Configuração Definitiva
+                  Ver Código Corrigido
                 </button>
              </div>
            )}
@@ -206,8 +201,8 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
         <div className="bg-white p-10 rounded-[3rem] border-2 border-blue-500 shadow-2xl animate-in zoom-in-95 space-y-8">
            <div className="flex justify-between items-start">
               <div>
-                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Solução para OPTIONS na Vercel</h3>
-                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold">Cole este JSON no painel do Cloudflare R2</p>
+                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Correção de CORS: Cloudflare R2</h3>
+                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold">Este JSON remove o erro de validação do painel R2</p>
               </div>
               <button onClick={() => setShowCorsHelp(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg></button>
            </div>
@@ -215,12 +210,12 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
            <div className="space-y-6">
               <div className="flex gap-4">
                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">1</div>
-                 <p className="text-sm text-slate-600">No Cloudflare, vá em <b>R2</b> &rarr; seu Bucket &rarr; <b>Settings</b> &rarr; <b>CORS Policy</b>.</p>
+                 <p className="text-sm text-slate-600">No painel da Cloudflare, apague todo o conteúdo atual da <b>CORS Policy</b>.</p>
               </div>
               <div className="flex gap-4">
                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">2</div>
                  <div className="flex-1 space-y-4">
-                    <p className="text-sm text-slate-600">Remova qualquer regra antiga e cole este código que libera o acesso universal:</p>
+                    <p className="text-sm text-slate-600">Cole este novo código (sem o método OPTIONS explícito, para evitar o bug do editor):</p>
                     <div className="relative">
                        <pre className="bg-slate-900 text-blue-400 p-6 rounded-2xl text-[10px] font-mono overflow-x-auto border border-white/10 shadow-inner">
                          {corsConfigJson}
@@ -234,13 +229,6 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
                     </div>
                  </div>
               </div>
-           </div>
-
-           <div className="p-6 bg-amber-50 border border-amber-100 rounded-3xl">
-              <p className="text-[10px] text-amber-700 font-bold uppercase text-center leading-relaxed">
-                Importante: Ao usar <b>"*"</b> no AllowedOrigins, liberamos qualquer site para ler as imagens. <br/>
-                Isso resolve 100% dos erros de "OPTIONS" em deploys variáveis da Vercel.
-              </p>
            </div>
         </div>
       )}

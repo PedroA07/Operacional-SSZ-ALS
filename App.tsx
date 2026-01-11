@@ -13,14 +13,20 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   const handleLogout = async () => {
-    if (user) {
+    const oldId = user?.id;
+    // 1. Limpa o estado frontal imediatamente
+    setUser(null);
+    setCurrentScreen(AppScreen.LOGIN);
+    
+    // 2. Limpa o storage
+    sessionStorage.removeItem('als_active_session');
+    
+    // 3. Tenta avisar o banco (background)
+    if (oldId) {
       try {
-        await db.updatePresence(user.id, 'offline');
+        await db.updatePresence(oldId, 'offline');
       } catch (e) {}
     }
-    setUser(null);
-    sessionStorage.removeItem('als_active_session');
-    setCurrentScreen(AppScreen.LOGIN);
   };
 
   usePresenceMonitor(user, currentScreen, handleLogout);
@@ -32,7 +38,6 @@ const App: React.FC = () => {
         if (saved) {
           const sessionData: User = JSON.parse(saved);
           
-          // Verifica se o usuário ainda é válido no banco (ignora para o master operacional_ssz)
           if (sessionData.username === 'operacional_ssz') {
             setUser(sessionData);
             setCurrentScreen(AppScreen.DASHBOARD);

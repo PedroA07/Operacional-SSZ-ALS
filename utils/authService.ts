@@ -16,11 +16,13 @@ export const authService = {
       return { success: false, error: 'Preencha usuário e senha.' };
     }
 
+    const nowISO = new Date().toISOString();
+
     // 1. Verificação imediata do Administrador Mestre (Hardcoded)
     const isMaster = inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && inputPass === ADMIN_CREDENTIALS.password;
 
     if (!supabase) {
-      if (isMaster) return { success: true, user: this.getMasterUser() };
+      if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
       return { success: false, error: 'Configuração de banco ausente.', isDatabaseDown: true };
     }
 
@@ -36,14 +38,14 @@ export const authService = {
 
       // Se não houver no banco, mas for o mestre, deixa entrar
       if (!data) {
-        if (isMaster) return { success: true, user: this.getMasterUser() };
+        if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
         return { success: false, error: 'Usuário não cadastrado.' };
       }
 
       // 3. Validação de Senha do Banco
       if (data.password !== inputPass) {
         // Fallback: se a senha do banco falhar mas for a senha master para o usuário master, libera
-        if (isMaster) return { success: true, user: this.getMasterUser() };
+        if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
         return { success: false, error: 'Senha incorreta.' };
       }
 
@@ -56,7 +58,7 @@ export const authService = {
         username: data.username,
         displayName: data.display_name || data.displayname || data.username,
         role: data.role,
-        lastLogin: new Date().toISOString(),
+        lastLogin: nowISO, // FORÇA O TIMER A ZERAR NO FRONT
         photo: data.photo,
         position: data.position,
         driverId: data.driver_id || data.driverid,
@@ -65,15 +67,14 @@ export const authService = {
         isFirstLogin: data.is_first_login ?? data.isfirstlogin
       };
 
-      // Atualiza timestamp sem travar o UI
-      supabase.from('users').update({ last_login: user.lastLogin, presence_status: 'online' }).eq('id', user.id).then();
+      // Atualiza timestamp no banco
+      supabase.from('users').update({ last_login: nowISO, presence_status: 'online' }).eq('id', user.id).then();
 
       return { success: true, user };
 
     } catch (err: any) {
       console.error("Auth Exception:", err);
-      // Se o banco cair, o mestre operacional_ssz ainda consegue entrar
-      if (isMaster) return { success: true, user: this.getMasterUser() };
+      if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
 
       return { 
         success: false, 
@@ -83,13 +84,13 @@ export const authService = {
     }
   },
 
-  getMasterUser(): User {
+  getMasterUser(timestamp: string): User {
     return {
       id: 'admin-master',
       username: ADMIN_CREDENTIALS.username,
       displayName: 'Operacional Master',
       role: 'admin',
-      lastLogin: new Date().toISOString(),
+      lastLogin: timestamp,
       status: 'Ativo',
       position: 'Administração SSZ',
       isFirstLogin: false
