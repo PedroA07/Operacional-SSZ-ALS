@@ -6,21 +6,19 @@ import { timeUtils } from '../../utils/timeUtils';
 
 interface OnlineStatusProps {
   staffList: Staff[];
+  currentUser: User; // Adicionado prop para referência direta
 }
 
-const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
+const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
       const u = await db.getUsers();
       setUsers(u);
-      const session = sessionStorage.getItem('als_active_session');
-      if (session) setCurrentUser(JSON.parse(session));
     } catch (e) {}
   }, []);
 
@@ -43,13 +41,16 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     };
   }, [fetchStatus]);
 
-  const getStatusInfo = (user: User) => {
+  const getStatusInfo = (user: User, isSelf: boolean) => {
+    // Se for o próprio usuário, ele está sempre online enquanto a aba estiver aberta
+    if (isSelf) return { key: 'online', color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online' };
+    
     if (!user.lastSeen) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Off' };
     
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
 
-    // Se não houver sinal nos últimos 5 minutos, assume offline
+    // Outros usuários: se não houver sinal nos últimos 5 minutos, assume offline
     if (diffSeconds > 300) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Off' };
 
     switch (user.presence_status) {
@@ -59,17 +60,29 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
     }
   };
 
+  const staffWithStatus = useMemo(() => {
+    return staffList.map(s => {
+      const isSelf = (s.username === currentUser.username || s.id === currentUser.staffId);
+      const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
+      const info = u ? getStatusInfo(u, isSelf) : getStatusInfo({} as User, isSelf);
+      
+      // Se for eu, usa o lastLogin da prop (soberano). Se não, usa o do banco.
+      const loginTimestamp = isSelf ? currentUser.lastLogin : u?.lastLogin;
+      const displayTime = (loginTimestamp && info.key !== 'offline') ? timeUtils.calculateDuration(loginTimestamp) : '00:00:00';
+
+      return { ...s, info, displayTime };
+    });
+  }, [staffList, users, currentTime, currentUser]);
+
   const stats = useMemo(() => {
     const counts = { online: 0, away: 0, offline: 0 };
-    staffList.forEach(s => {
-      const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
-      const info = u ? getStatusInfo(u) : { key: 'offline' };
-      if (info.key === 'online') counts.online++;
-      else if (info.key === 'away') counts.away++;
+    staffWithStatus.forEach(s => {
+      if (s.info.key === 'online') counts.online++;
+      else if (s.info.key === 'away') counts.away++;
       else counts.offline++;
     });
     return counts;
-  }, [staffList, users, currentTime]);
+  }, [staffWithStatus]);
 
   const totalActive = stats.online + stats.away;
 
@@ -96,35 +109,23 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList }) => {
              </div>
           </div>
           <div className="max-h-[350px] overflow-y-auto custom-scrollbar p-4 space-y-2.5">
-            {staffList.map(s => {
-              const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
-              const info = u ? getStatusInfo(u) : { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Off' };
-              
-              // Se for o usuário logado, garante sincronia perfeita com o cabeçalho
-              const loginTimestamp = (currentUser && (u?.id === currentUser.id || (s.username === 'operacional_ssz' && currentUser.id === 'admin-master'))) 
-                ? currentUser.lastLogin 
-                : u?.lastLogin;
-
-              const displayTime = (loginTimestamp && info.key !== 'offline') ? timeUtils.calculateDuration(loginTimestamp) : '00:00:00';
-
-              return (
-                <div key={s.id} className={`p-3.5 flex items-center gap-4 rounded-[1.6rem] border ${info.key === 'offline' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5'}`}>
-                  <div className="relative shrink-0">
-                    <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center border border-white/10">
-                      {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="text-xs font-black text-slate-600">{s.name[0]}</span>}
-                    </div>
-                    <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[#0a0f1e] ${info.color}`}></div>
+            {staffWithStatus.map(s => (
+              <div key={s.id} className={`p-3.5 flex items-center gap-4 rounded-[1.6rem] border ${s.info.key === 'offline' ? 'opacity-30 border-transparent grayscale' : 'bg-white/5 border-white/5'}`}>
+                <div className="relative shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center border border-white/10 overflow-hidden">
+                    {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="text-xs font-black text-slate-600">{s.name[0]}</span>}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-black text-slate-100 uppercase truncate leading-none">{s.name}</p>
-                    <div className="flex items-center justify-between mt-1.5">
-                      <p className={`text-[7px] font-black uppercase ${info.text}`}>{info.label}</p>
-                      {info.key !== 'offline' && <span className="text-[8px] font-mono font-black text-blue-400">{displayTime}</span>}
-                    </div>
+                  <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[#0a0f1e] ${s.info.color}`}></div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-black text-slate-100 uppercase truncate leading-none">{s.name}</p>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <p className={`text-[7px] font-black uppercase ${s.info.text}`}>{s.info.label}</p>
+                    {s.info.key !== 'offline' && <span className="text-[8px] font-mono font-black text-blue-400">{s.displayTime}</span>}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}

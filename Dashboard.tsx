@@ -199,7 +199,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           </div>
         </nav>
         <div className="p-5 border-t border-slate-800/50 bg-[#0f172a] space-y-4">
-           {sidebarState === 'open' && <OnlineStatus staffList={staffList} />}
+           {/* AJUSTE AQUI: Passamos o objeto user para sincronia do timer lateral */}
+           {sidebarState === 'open' && <OnlineStatus staffList={staffList} currentUser={user} />}
            <button onClick={onLogout} className="w-full text-[9px] text-red-500 font-black uppercase hover:bg-red-500/10 py-4 rounded-2xl flex items-center justify-center gap-3 border border-red-900/20 active:scale-95 transition-all duration-300">
              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2.5"/></svg>
              <span>Sair do Sistema</span>
