@@ -120,13 +120,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     return (
       <div className="w-full">
         <div className="flex items-center group">
-          <button onClick={() => { if (tab) { setActiveTab(tab); if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' }); } }} className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-slate-800/60 text-slate-400'}`}>
+          <button 
+            onClick={() => { 
+              if (tab) { 
+                setActiveTab(tab); 
+                if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' }); 
+              } 
+            }} 
+            className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-slate-800/60 text-slate-400'}`}
+          >
             <div className={`${isActive ? 'text-white' : 'text-slate-50 group-hover:text-white'}`}>{icon}</div>
             {sidebarState === 'open' && <span className="truncate">{label}</span>}
           </button>
-          {children && sidebarState === 'open' && <button onClick={(e) => { e.stopPropagation(); setExpandedMenus(p => ({ ...p, [label]: !p[label] })); }} className={`p-3 text-slate-500 transition-all ${isExpanded ? 'rotate-180' : ''}`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg></button>}
+          {children && sidebarState === 'open' && (
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setExpandedMenus(p => ({ ...p, [label]: !p[label] })); 
+              }} 
+              className={`p-3 text-slate-500 transition-all ${isExpanded ? 'rotate-180' : ''}`}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
         </div>
-        {children && isExpanded && sidebarState === 'open' && <div className="ml-8 mt-1 space-y-1 border-l border-slate-800/50 pl-4 animate-in slide-in-from-top-2 duration-300">{children}</div>}
+        {children && isExpanded && sidebarState === 'open' && (
+          <div className="ml-8 mt-1 space-y-1 border-l border-slate-800/50 pl-4 animate-in slide-in-from-top-2 duration-300">
+            {children}
+          </div>
+        )}
       </div>
     );
   };
@@ -153,7 +177,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">
           <MenuItem tab={DashboardTab.INICIO} label="Início" icon={<Icons.Inicio />} />
           <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
-            {availableOps.map(op => <button key={op.id} onClick={() => { setActiveTab(DashboardTab.OPERACOES); setOpsView({ type: 'list' }); } }} className="w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors">• {op.category}</button>)}
+            {availableOps.map(op => (
+              <button 
+                key={op.id} 
+                onClick={() => { 
+                  setActiveTab(DashboardTab.OPERACOES); 
+                  setOpsView({ type: 'category', id: op.id, categoryName: op.category }); 
+                }} 
+                className="w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors"
+              >
+                • {op.category}
+              </button>
+            ))}
           </MenuItem>
           <MenuItem tab={DashboardTab.DOCUMENTOS} label="Documentação" icon={<Icons.Formularios />} />
           <MenuItem tab={DashboardTab.ADMINISTRATIVO} label="Financeiro" icon={<Icons.Clientes />} />
@@ -169,10 +204,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           </div>
         </nav>
         <div className="p-5 border-t border-slate-800/50 bg-[#0f172a] space-y-4">
-           {/* Added missing currentUser={user} prop to OnlineStatus to fix reported error */}
            {sidebarState === 'open' && <OnlineStatus staffList={staffList} currentUser={user} />}
            <button onClick={onLogout} className="w-full text-[9px] text-red-500 font-black uppercase hover:bg-red-500/10 py-4 rounded-2xl flex items-center justify-center gap-3 border border-red-900/20 active:scale-95 transition-all duration-300">
-             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2.5"/></svg>
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2.5"/>
+             </svg>
              <span>Sair do Sistema</span>
            </button>
         </div>
@@ -181,7 +217,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-10 shadow-sm z-40">
            <div className="flex items-center gap-5">
               <button onClick={() => setSidebarState(s => s === 'open' ? 'collapsed' : 'open')} className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90 border border-transparent hover:border-slate-200">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </button>
               <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">{activeTab}</h2>
            </div>
@@ -226,7 +264,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
               <div className="p-10 text-center space-y-6">
                  <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner border border-red-100">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/>
+                    </svg>
                  </div>
                  <div>
                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Excluir Viagem</h3>
