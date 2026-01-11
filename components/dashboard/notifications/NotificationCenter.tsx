@@ -31,7 +31,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
       if (data && Array.isArray(data) && data.length > 0) {
         setNotifications(data);
         
-        // Lógica de contador: Notificações após o último fechamento do dropdown
         const lastCheckStr = localStorage.getItem(`als_notif_last_check_${user.id}`);
         const lastCheck = lastCheckStr ? new Date(lastCheckStr).getTime() : 0;
         const count = data.filter(n => new Date(n.timestamp).getTime() > lastCheck).length;
@@ -46,13 +45,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
 
   useEffect(() => {
     loadNotifications();
-    
-    // Refresh automático (Polling de segurança)
     const interval = setInterval(() => loadNotifications(true), 15000);
     
-    // Gatilho imediato vindo do Toast Realtime
     const handleForcedRefresh = () => {
-      console.debug("Forcing Notification Sync...");
       loadNotifications(true);
     };
     
@@ -105,11 +100,11 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-4 w-[420px] bg-white rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.3)] border border-slate-100 overflow-hidden animate-in slide-in-from-top-4 zoom-in-95 duration-300 z-[300]">
+        <div className="absolute top-full right-0 mt-4 w-[380px] bg-white rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.3)] border border-slate-100 overflow-hidden animate-in slide-in-from-top-4 zoom-in-95 duration-300 z-[300]">
            <div className="p-6 bg-slate-50 border-b border-slate-100">
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{view === 'list' ? 'Centro de Atividades' : 'Preferências'}</h4>
+                  <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{view === 'list' ? 'Centro de Atividades' : 'Preferências'}</h4>
                   <p className="text-[7px] text-slate-400 font-bold uppercase mt-1 tracking-tighter">ALS TRANSPORTES LOGISTICS</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -137,38 +132,29 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
               )}
            </div>
            
-           <div className="max-h-[480px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-white min-h-[200px]">
+           <div className="max-h-[420px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-white min-h-[150px]">
               {isLoading ? (
-                <div className="py-20 flex flex-col items-center justify-center gap-3">
-                   <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sincronizando Nuvem...</p>
+                <div className="py-16 flex flex-col items-center justify-center gap-3">
+                   <div className="w-7 h-7 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Sincronizando...</p>
                 </div>
               ) : view === 'settings' ? (
-                <NotificationSettings user={user} onUpdate={(p) => {}} />
+                <NotificationSettings user={user} onUpdate={() => {}} />
               ) : filteredNotifications.length === 0 ? (
-                <div className="py-24 text-center text-slate-300 text-[10px] font-black uppercase italic">Sem atividades registradas</div>
+                <div className="py-20 text-center text-slate-300 text-[9px] font-black uppercase italic">Sem atividades registradas</div>
               ) : filteredNotifications.map(n => (
                 <button 
                   key={n.id} 
                   onClick={() => handleNotifClick(n)}
-                  className="w-full text-left p-5 bg-slate-50 border border-slate-100 rounded-[2rem] transition-all hover:bg-slate-100/80 group relative overflow-hidden active:scale-[0.98]"
+                  className="w-full text-left p-4 bg-slate-50 border border-slate-100 rounded-3xl transition-all hover:bg-slate-100/80 group relative overflow-hidden active:scale-[0.98]"
                 >
                    <div className={`absolute top-0 left-0 w-1.5 h-full ${n.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
-                   <div className="flex justify-between items-start mb-3">
-                      <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${n.origin === 'MOTORISTA' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>{n.type.replace(/_/g, ' ')}</span>
-                      <div className="text-right">
-                        <p className="text-[7px] font-mono font-black text-slate-300 leading-none mb-1">{new Date(n.timestamp).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'})}</p>
-                        <p className="text-[9px] font-mono font-black text-slate-400 leading-none">{new Date(n.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
-                      </div>
+                   <div className="flex justify-between items-start mb-2">
+                      <span className={`px-2 py-0.5 rounded text-[6.5px] font-black uppercase ${n.origin === 'MOTORISTA' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>{n.type.replace(/_/g, ' ')}</span>
+                      <p className="text-[8px] font-mono font-black text-slate-400 leading-none">{new Date(n.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
                    </div>
-                   <h5 className="text-[11px] font-black text-slate-800 uppercase leading-tight group-hover:text-blue-600 transition-colors">{n.title}</h5>
-                   <p className="text-[10px] text-slate-500 font-medium mt-1 leading-snug line-clamp-2">{n.description}</p>
-                   {n.summary?.os && (
-                     <div className="mt-4 p-3 bg-white rounded-2xl border border-slate-100 grid grid-cols-2 gap-3 shadow-inner">
-                        <div><p className="text-[7px] font-black text-slate-300 uppercase leading-none">OS</p><p className="text-[10px] font-black text-blue-600 mt-1 uppercase">{n.summary.os}</p></div>
-                        <div><p className="text-[7px] font-black text-slate-300 uppercase leading-none">Vínculo</p><p className="text-[9px] font-black text-slate-700 mt-1 uppercase truncate">{n.summary.motorista}</p></div>
-                     </div>
-                   )}
+                   <h5 className="text-[10px] font-black text-slate-800 uppercase leading-tight group-hover:text-blue-600 transition-colors">{n.title}</h5>
+                   <p className="text-[9px] text-slate-500 font-medium mt-1 leading-snug line-clamp-1">{n.description}</p>
                 </button>
               ))}
            </div>
