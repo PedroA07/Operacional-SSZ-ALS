@@ -1,7 +1,7 @@
 
 /**
- * ALS Image Compressor Utility v1.1
- * Otimizado para processamento de imagens externas (CORS)
+ * ALS Image Compressor Utility v1.2
+ * Otimizado para processamento resiliente de imagens em nuvem (Cloudflare R2)
  */
 
 interface CompressionOptions {
@@ -13,7 +13,7 @@ interface CompressionOptions {
 
 export const imageCompressor = {
   /**
-   * Comprime uma imagem (File ou Base64/URL) e retorna uma string Base64 otimizada
+   * Comprime uma imagem e retorna Base64
    */
   compress: async (source: File | string, options: CompressionOptions = {}): Promise<string> => {
     const {
@@ -23,71 +23,89 @@ export const imageCompressor = {
       mimeType = 'image/jpeg'
     } = options;
 
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      
-      // CRÍTICO: Permite que o Canvas manipule imagens do Cloudflare R2 sem erros de segurança (Tainted Canvas)
+    try {
+      let imageObjectUrl: string;
+
+      // Se for uma URL externa, tentamos baixar como Blob primeiro (mais robusto para Canvas)
       if (typeof source === 'string' && source.startsWith('http')) {
-        img.crossOrigin = "anonymous";
-      }
-
-      // Timeout de segurança: Se a imagem não carregar em 15s, rejeita para não travar o loop de lote
-      const timeout = setTimeout(() => {
-        img.onload = null;
-        img.onerror = null;
-        reject(new Error("Timeout ao carregar imagem para compressão"));
-      }, 15000);
-
-      img.onload = () => {
-        clearTimeout(timeout);
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error("Falha ao criar contexto de canvas"));
-          return;
-        }
-
         try {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL(mimeType, quality);
-          resolve(compressedBase64);
-        } catch (e) {
-          reject(new Error("Erro de CORS: O servidor de imagens (Cloudflare) não autorizou a leitura dos pixels."));
+          const response = await fetch(source, { mode: 'cors' });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          imageObjectUrl = URL.createObjectURL(blob);
+        } catch (fetchErr) {
+          console.error("Erro ao baixar imagem para compressão:", fetchErr);
+          throw new Error("CORS_BLOCK: O Cloudflare bloqueou o acesso aos pixels. Verifique as configurações de CORS no Bucket R2.");
         }
-      };
-
-      img.onerror = (err) => {
-        clearTimeout(timeout);
-        reject(new Error("Erro ao carregar recurso de imagem"));
-      };
-
-      if (typeof source === 'string') {
-        img.src = source;
+      } else if (typeof source === 'string') {
+        imageObjectUrl = source; // Já é base64
       } else {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          img.src = e.target?.result as string;
-        };
-        reader.readAsDataURL(source);
+        imageObjectUrl = URL.createObjectURL(source); // É um arquivo File
       }
-    });
+
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error("TIMEOUT: A imagem demorou demais para processar."));
+        }, 15000);
+
+        const cleanup = () => {
+          clearTimeout(timeout);
+          if (imageObjectUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(imageObjectUrl);
+          }
+        };
+
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            cleanup();
+            reject(new Error("CANVAS_ERROR: Falha ao criar contexto gráfico."));
+            return;
+          }
+
+          try {
+            ctx.drawImage(img, 0, 0, width, height);
+            const result = canvas.toDataURL(mimeType, quality);
+            cleanup();
+            resolve(result);
+          } catch (e) {
+            cleanup();
+            reject(new Error("SECURITY_ERROR: Não foi possível ler os pixels (CORS)."));
+          }
+        };
+
+        img.onerror = () => {
+          cleanup();
+          reject(new Error("LOAD_ERROR: O formato da imagem é inválido ou o link quebrou."));
+        };
+
+        img.src = imageObjectUrl;
+      });
+    } catch (err: any) {
+      throw err;
+    }
   }
 };

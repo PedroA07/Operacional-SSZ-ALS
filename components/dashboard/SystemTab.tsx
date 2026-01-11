@@ -20,6 +20,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
   const [optProgress, setOptProgress] = useState(0);
   const [optCurrent, setOptCurrent] = useState('');
   const [errorCount, setErrorCount] = useState(0);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -49,6 +50,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
     setIsOptimizing(true);
     setOptProgress(0);
     setErrorCount(0);
+    setLastError(null);
     
     try {
       setOptCurrent('Mapeando base de dados...');
@@ -74,9 +76,9 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
             const compressed = await imageCompressor.compress(s.photo, { maxWidth: 400, quality: 0.7 });
             const newUrl = await fileStorage.uploadStaffPhoto(compressed, s.id);
             await db.saveStaff({ ...s, photo: newUrl + '?v=_optimized' });
-          } catch (e) {
-            console.warn(`Falha no staff ${s.name}:`, e);
+          } catch (e: any) {
             setErrorCount(prev => prev + 1);
+            setLastError(e.message || "Erro desconhecido");
           }
         }
         updateProgress();
@@ -90,15 +92,15 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
             const compressed = await imageCompressor.compress(d.photo, { maxWidth: 400, quality: 0.7 });
             const newUrl = await fileStorage.uploadDriverProfile(compressed, d.id);
             await db.saveDriver({ ...d, photo: newUrl + '?v=_optimized' });
-          } catch (e) {
-            console.warn(`Falha no motorista ${d.name}:`, e);
+          } catch (e: any) {
             setErrorCount(prev => prev + 1);
+            setLastError(e.message || "Erro desconhecido");
           }
         }
         updateProgress();
       }
 
-      // 3. Otimizar Viagens (Fotos de Campo)
+      // 3. Otimizar Viagens
       for (const t of allTrips) {
         if (t.driver_docs && t.driver_docs.length > 0) {
           let tripChanged = false;
@@ -112,10 +114,10 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
                 const newUrl = await fileStorage.uploadTripPhoto(compressed, t.os, doc.id);
                 newDocs.push({ ...doc, url: newUrl + '?v=_optimized' });
                 tripChanged = true;
-              } catch (e) {
-                console.warn(`Falha na OS ${t.os}:`, e);
+              } catch (e: any) {
                 newDocs.push(doc);
                 setErrorCount(prev => prev + 1);
+                setLastError(e.message || "Erro desconhecido");
               }
             } else {
               newDocs.push(doc);
@@ -129,12 +131,16 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
         }
       }
 
-      setOptCurrent('Otimização concluída!');
-      alert(`Processo finalizado. Itens analisados: ${totalItems}. Falhas: ${errorCount}.`);
+      setOptCurrent('Análise concluída!');
+      if (errorCount === totalItems && totalItems > 0) {
+        alert("FALHA TOTAL: Nenhuma imagem pôde ser processada. O motivo provável é bloqueio de CORS no Cloudflare.");
+      } else {
+        alert(`Processo finalizado. Itens analisados: ${totalItems}. Falhas: ${errorCount}.`);
+      }
       await onRefresh();
     } catch (e) {
       console.error(e);
-      alert("Erro durante a otimização.");
+      alert("Erro crítico durante a otimização.");
     } finally {
       setIsOptimizing(false);
       setOptProgress(0);
@@ -170,14 +176,20 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
               <div>
                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Processamento em Lote Ativo</p>
                  <h4 className="text-white font-black text-lg mt-1">{optCurrent}</h4>
-                 {errorCount > 0 && <p className="text-[9px] text-red-400 font-bold uppercase mt-2">Falhas de Carregamento (CORS): {errorCount}</p>}
+                 {lastError && <p className="text-[9px] text-red-400 font-bold uppercase mt-2">Último Erro: {lastError}</p>}
               </div>
               <span className="text-2xl font-black text-white font-mono">{optProgress}%</span>
            </div>
            <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
               <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${optProgress}%` }}></div>
            </div>
-           <p className="text-[8px] text-slate-500 uppercase text-center font-bold">Não feche o navegador. O sistema está baixando cada imagem do Cloudflare para reduzir o tamanho.</p>
+           
+           {lastError?.includes('CORS') && (
+             <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
+                <p className="text-[10px] text-red-400 font-black uppercase">Diagnóstico: Bloqueio de Segurança (CORS)</p>
+                <p className="text-[9px] text-slate-400 mt-1">O Cloudflare R2 está recusando o acesso aos pixels das fotos. Para corrigir, acesse o painel da Cloudflare -> R2 -> Bucket -> Settings -> CORS Policy e adicione o domínio do seu portal na lista de origens permitidas.</p>
+             </div>
+           )}
         </div>
       )}
 
