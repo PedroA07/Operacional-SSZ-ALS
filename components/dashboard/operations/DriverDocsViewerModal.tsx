@@ -41,33 +41,29 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     setOcrProgress(0);
   }, [selectedDoc]);
 
-  // FUNÇÃO DE DOWNLOAD CORRIGIDA: Força o salvamento como arquivo
+  // ESTRATÉGIA DE DOWNLOAD CORRIGIDA: Converte para Blob local para forçar download
   const handleDownload = async () => {
     if (!selectedDoc) return;
     try {
       const response = await fetch(selectedDoc.url);
       const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
+      const localUrl = window.URL.createObjectURL(blob);
       
       const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `DOC_${trip.os}_${Date.now()}.jpg`;
-      link.style.display = 'none';
-      
+      link.href = localUrl;
+      link.download = `ALS_OS_${trip.os}_${Date.now()}.jpg`;
       document.body.appendChild(link);
       link.click();
       
-      // Limpeza
-      setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-      }, 100);
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(localUrl);
     } catch (e) {
-      // Fallback para download via nova aba caso o fetch falhe por CORS
+      // Fallback em caso de erro de CORS no fetch
       const link = document.createElement('a');
       link.href = selectedDoc.url;
       link.target = '_blank';
-      link.download = `DOC_${trip.os}.jpg`;
+      link.download = `ALS_OS_${trip.os}.jpg`;
       link.click();
     }
   };
@@ -80,7 +76,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
-      alert("Acesso à câmera negado.");
+      alert("Câmera indisponível.");
       setIsAddingMode('choice');
     }
   };
@@ -142,9 +138,8 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     try {
       const result = await textExtractionService.extractGeneralText(selectedDoc.url, (p) => setOcrProgress(p));
       setExtractedGeneralText(result);
-      if (!result) alert("Nenhum texto identificado.");
     } catch (e: any) {
-      alert(e.message || "Erro na extração de texto.");
+      alert("Erro no processamento da imagem.");
     } finally {
       setIsProcessing(false);
     }
@@ -157,9 +152,9 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     try {
       const result = await textExtractionService.extractContainer(selectedDoc.url, (p) => setOcrProgress(p));
       setExtractedContainer(result);
-      if (!result) alert("Padrão de container não encontrado.");
+      if (!result) alert("Padrão de container não localizado.");
     } catch (e: any) {
-      alert(e.message || "Erro ao processar container.");
+      alert("Erro ao extrair container.");
     } finally {
       setIsProcessing(false);
     }
@@ -174,7 +169,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       setExtractedNF(result);
       if (!result) alert("Chave NF-e não localizada.");
     } catch (e: any) {
-      alert(e.message || "Erro ao processar nota fiscal.");
+      alert("Erro ao extrair NF-e.");
     } finally {
       setIsProcessing(false);
     }
@@ -186,7 +181,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     else if (type === 'nf' && extractedNF) updatedTrip.nfKey = extractedNF.key;
     await db.saveTrip(updatedTrip, user);
     onSuccess();
-    alert("Dados vinculados com sucesso.");
+    alert("Informação vinculada com sucesso.");
   };
 
   const executeDelete = async () => {
@@ -266,7 +261,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
           {selectedDoc && isAddingMode === 'none' && (
             <div className="w-85 bg-white border-l border-slate-200 p-8 flex flex-col gap-8 shrink-0 overflow-y-auto custom-scrollbar">
                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-6">Ações de Texto</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-6">Processamento de Texto</p>
                   
                   {isProcessing ? (
                     <div className="space-y-4 py-10 text-center">
@@ -277,7 +272,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                     <div className="space-y-3">
                        <button onClick={handleExtractGeneralText} className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                          Processar Todo o Texto
+                          Extrair Todo o Texto
                        </button>
                        <div className="grid grid-cols-2 gap-2">
                           <button onClick={handleExtractContainer} className="py-3.5 bg-slate-900 text-white rounded-2xl text-[9px] font-black uppercase shadow-md hover:bg-slate-800 transition-all flex flex-col items-center justify-center gap-1.5">
@@ -303,7 +298,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                     <div className="mt-8 p-6 bg-blue-50 border border-blue-100 rounded-3xl space-y-4">
                        <p className="text-[8px] font-black text-blue-500 uppercase text-center">Container Identificado</p>
                        <p className="text-2xl font-mono font-black text-blue-700 text-center">{extractedContainer}</p>
-                       <button onClick={() => linkDataToTrip('container')} className="w-full py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase">Vincular Container</button>
+                       <button onClick={() => linkDataToTrip('container')} className="w-full py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase">Vincular à OS</button>
                     </div>
                   )}
 

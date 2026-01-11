@@ -4,11 +4,11 @@ import Tesseract from 'tesseract.js';
 
 export const ocrService = {
   /**
-   * Extrai texto localmente utilizando o motor Tesseract.js de forma simplificada
+   * Extrai texto localmente utilizando o motor Tesseract.js de forma resiliente
    */
   extractAllText: async (imageSource: string, onProgress?: (p: number) => void): Promise<string> => {
     try {
-      const result = await Tesseract.recognize(
+      const { data: { text } } = await Tesseract.recognize(
         imageSource,
         'por',
         {
@@ -20,10 +20,10 @@ export const ocrService = {
         }
       );
 
-      return result.data.text || '';
+      return text || '';
     } catch (error) {
-      console.error("Falha técnica no processamento de imagem:", error);
-      throw new Error("Não foi possível processar esta imagem. Verifique sua conexão ou tente outra foto.");
+      console.error("Falha OCR:", error);
+      throw new Error("O motor de captura falhou. Verifique se a imagem é nítida e tente novamente.");
     }
   }
 };
