@@ -341,7 +341,12 @@ const TripForm: React.FC<TripFormProps> = ({
               <div className="max-h-60 overflow-y-auto custom-scrollbar">
                 {drivers.filter(d => d.name.toUpperCase().includes(searches.driver.toUpperCase()) || d.plateHorse.toUpperCase().includes(searches.driver.toUpperCase())).map(d => (
                   <button key={d.id} type="button" onClick={() => {
-                    setFormData({...formData, driver: { id: d.id, name: d.name, plateHorse: d.plateHorse, plateTrailer: d.plateTrailer, cpf: d.cpf, status: d.status }});
+                    setFormData({
+                      ...formData, 
+                      driver: { 
+                        id: d.id, name: d.name, plateHorse: d.plateHorse, plateTrailer: d.plateTrailer, cpf: d.cpf, status: d.status, phone: d.phone 
+                      }
+                    });
                     setSearches({...searches, driver: d.name});
                     setDropdowns(d => ({ ...d, driver: false }));
                   }} className="w-full text-left p-4 hover:bg-blue-50 rounded-2xl flex justify-between items-center group">

@@ -174,7 +174,7 @@ export interface Trip {
   cva?: string; 
   customer: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
   destination?: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
-  driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string };
+  driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string; phone?: string };
   status: TripStatus;
   statusHistory: StatusHistoryEntry[];
   balancePayment: PaymentStatus;
