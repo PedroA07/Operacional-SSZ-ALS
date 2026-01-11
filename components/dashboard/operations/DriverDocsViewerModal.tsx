@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Trip, DriverCapturedDoc, User } from '../../../types';
 import { db } from '../../../utils/storage';
 import { textExtractionService, NFData } from '../../../utils/textExtractionService';
+import { imageCompressor } from '../../../utils/imageCompressor';
 import ImageViewer from '../../shared/ImageViewer';
 
 interface DriverDocsViewerModalProps {
@@ -41,7 +42,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     setOcrProgress(0);
   }, [selectedDoc]);
 
-  // ESTRATÉGIA DE DOWNLOAD CORRIGIDA: Converte para Blob local para forçar download
   const handleDownload = async () => {
     if (!selectedDoc) return;
     try {
@@ -55,11 +55,9 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       document.body.appendChild(link);
       link.click();
       
-      // Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(localUrl);
     } catch (e) {
-      // Fallback em caso de erro de CORS no fetch
       const link = document.createElement('a');
       link.href = selectedDoc.url;
       link.target = '_blank';
@@ -92,11 +90,11 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const results = await Promise.all(Array.from(files).map(file => {
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (ev) => resolve(ev.target?.result as string);
-          reader.readAsDataURL(file);
+      const results = await Promise.all(Array.from(files).map(async file => {
+        // COMPRIMIR CADA ARQUIVO ANTES DE SALVAR
+        return await imageCompressor.compress(file, {
+          maxWidth: 1600,
+          quality: 0.8
         });
       }));
       await saveNewDocs(results);
@@ -104,7 +102,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     e.target.value = '';
   };
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (!videoRef.current) return;
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
@@ -112,7 +110,13 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
-      saveNewDocs([canvas.toDataURL('image/jpeg', 0.9)]);
+      const raw = canvas.toDataURL('image/jpeg', 0.95);
+      // COMPRIMIR CAPTURA
+      const compressed = await imageCompressor.compress(raw, {
+        maxWidth: 1600,
+        quality: 0.8
+      });
+      saveNewDocs([compressed]);
       stopCamera();
     }
   };

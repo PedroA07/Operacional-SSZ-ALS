@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
@@ -41,7 +40,8 @@ export const db = {
       display_name: user.displayName, role: user.role, last_login: user.lastLogin,
       status: user.status || 'Ativo', driver_id: user.driverId, staff_id: user.staffId,
       position: user.position, is_first_login: user.isFirstLogin,
-      presence_status: user.presence_status || 'offline'
+      presence_status: user.presence_status || 'offline',
+      photo: user.photo
     });
     return !error;
   },
@@ -49,6 +49,14 @@ export const db = {
   getDrivers: async (): Promise<Driver[]> => {
     if (!supabase) return [];
     return await driverRepository.getAll(supabase);
+  },
+
+  // Método para manutenção: Busca TODOS os drivers sem limite
+  getAllDriversMaintenance: async (): Promise<Driver[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('drivers').select('*');
+    if (error) throw error;
+    return (data || []).map(d => driverRepository.mapFromDb(d));
   },
 
   getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
@@ -76,6 +84,14 @@ export const db = {
   getTrips: async (): Promise<Trip[]> => {
     if (!supabase) return [];
     return await tripRepository.getAll(supabase);
+  },
+
+  // Método para manutenção: Busca TODAS as viagens sem limite
+  getAllTripsMaintenance: async (): Promise<Trip[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('trips').select('*').order('date_time', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(d => tripRepository.mapFromDb(d));
   },
 
   saveTrip: async (trip: Trip, actingUser?: User) => {
@@ -293,14 +309,12 @@ export const db = {
     if (!supabase) return;
     const origin: NotificationOrigin = (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL';
     
-    // Ajustado para o seu banco: Não enviamos 'title' pois a coluna não existe.
-    // Concatenamos o título na mensagem para não perder a informação.
     await supabase.from('notifications').insert({
       user_id: user.id, 
       user_name: user.displayName, 
       type, 
       origin,
-      message: `${title}: ${description}`, // Guardamos o título dentro da mensagem
+      message: `${title}: ${description}`,
       os_ref: summary?.os || '',
       summary: summary || {}, 
       timestamp: new Date().toISOString()
@@ -309,22 +323,16 @@ export const db = {
 
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
-    // Busca otimizada com colunas REAIS do seu banco (Visto na imagem)
     const { data, error } = await supabase
       .from('notifications')
       .select('id, user_id, user_name, type, message, os_ref, timestamp, summary, origin')
       .order('timestamp', { ascending: false })
       .limit(50);
       
-    if (error) {
-      console.error("Erro Supabase Notificações:", error);
-      return []; 
-    }
+    if (error) return []; 
     
     return (data || []).map(n => {
-      // Prettify do tipo para servir como título na interface
       const displayTitle = n.type ? n.type.replace(/_/g, ' ').toUpperCase() : 'ALERTA DO SISTEMA';
-
       return {
         id: String(n.id), 
         title: displayTitle, 
@@ -339,22 +347,6 @@ export const db = {
     });
   },
 
-  getPreferences: (userId: string) => {
-    const key = `als_prefs_${userId}`;
-    const saved = localStorage.getItem(key);
-    try {
-      return saved ? JSON.parse(saved) : { visibleColumns: {} };
-    } catch { return { visibleColumns: {} }; }
-  },
-
-  savePreference: (userId: string, componentId: string, columns: string[]) => {
-    const key = `als_prefs_${userId}`;
-    const prefs = db.getPreferences(userId);
-    if (!prefs.visibleColumns) prefs.visibleColumns = {};
-    prefs.visibleColumns[componentId] = columns;
-    localStorage.setItem(key, JSON.stringify(prefs));
-  },
-
   updatePresence: async (userId: string, status: PresenceStatus) => {
     if (supabase) {
       await supabase.from('users').update({ 
@@ -362,6 +354,21 @@ export const db = {
         last_seen: new Date().toISOString() 
       }).eq('id', userId);
     }
+  },
+
+  // Adiciona suporte a preferências de UI (usado por SmartOperationTable)
+  getPreferences: (userId: string) => {
+    const key = `als_prefs_${userId}`;
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : { visibleColumns: {} };
+  },
+
+  // Salva preferência de colunas visíveis para um componente específico
+  savePreference: (userId: string, componentId: string, visibleColumns: string[]) => {
+    const key = `als_prefs_${userId}`;
+    const prefs = db.getPreferences(userId);
+    prefs.visibleColumns[componentId] = visibleColumns;
+    localStorage.setItem(key, JSON.stringify(prefs));
   },
 
   checkConnection: async (): Promise<boolean> => {

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Staff, User } from '../../../types';
 import { db } from '../../../utils/storage';
 import { maskPhone } from '../../../utils/masks';
+import { imageCompressor } from '../../../utils/imageCompressor';
 
 interface StaffModalProps {
   isOpen: boolean;
@@ -36,7 +37,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
         ...editingStaff, 
         password: linkedUser?.password || '',
         photo: editingStaff.photo || '',
-        // Garante que os campos corporativos não venham undefined
         emailCorp: editingStaff.emailCorp || '',
         phoneCorp: editingStaff.phoneCorp || '',
         registrationDate: editingStaff.registrationDate?.split('T')[0]
@@ -51,12 +51,20 @@ const StaffModal: React.FC<StaffModalProps> = ({
     }
   }, [editingStaff, isOpen, allUsers]);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setForm(prev => ({ ...prev, photo: reader.result as string }));
-      reader.readAsDataURL(file);
+      try {
+        // COMPRESSÃO AGRESSIVA PARA PERFIL: 400px e 70% qualidade
+        const compressed = await imageCompressor.compress(file, {
+          maxWidth: 400,
+          maxHeight: 400,
+          quality: 0.7
+        });
+        setForm(prev => ({ ...prev, photo: compressed }));
+      } catch (err) {
+        alert("Erro ao processar imagem de perfil.");
+      }
     }
   };
 
@@ -114,8 +122,8 @@ const StaffModal: React.FC<StaffModalProps> = ({
           <div className="flex flex-col md:flex-row gap-8">
             <div className="shrink-0 space-y-2 text-center">
               <label className={labelClass}>Foto</label>
-              <div onClick={() => photoRef.current?.click()} className="w-24 h-24 rounded-[2rem] bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden relative group mx-auto">
-                {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/></svg>}
+              <div onClick={() => photoRef.current?.click()} className="w-24 h-24 rounded-[2rem] bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden relative group mx-auto shadow-inner">
+                {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/></svg>}
               </div>
               <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
             </div>
@@ -186,7 +194,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
              </div>
           </div>
 
-          <button type="submit" disabled={isProcessing} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3">
+          <button type="submit" disabled={isProcessing} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
              {isProcessing ? 'Gravando...' : editingStaff ? 'Salvar Alterações' : 'Cadastrar Colaborador'}
           </button>
         </form>

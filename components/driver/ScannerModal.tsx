@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Trip, User, DriverCapturedDoc } from '../../types';
 import { db } from '../../utils/storage';
 import { fileStorage } from '../../utils/fileStorage';
+import { imageCompressor } from '../../utils/imageCompressor';
 
 interface ScannerModalProps {
   isOpen: boolean;
@@ -15,7 +16,6 @@ interface ScannerModalProps {
 
 const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess, trip, user, initialImages = [] }) => {
   const [step, setStep] = useState<'camera' | 'preview'>('camera');
-  const [capturedImages, setCapturedImages] = useState<DriverCapturedDoc[]>([]);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -49,7 +49,10 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
-    setCurrentImage(canvas.toDataURL('image/jpeg', 0.8));
+    
+    // Captura bruta do canvas
+    const rawImage = canvas.toDataURL('image/jpeg', 0.95);
+    setCurrentImage(rawImage);
     setStep('preview');
   };
 
@@ -57,11 +60,17 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     if (isSaving || !currentImage) return;
     setIsSaving(true);
     try {
+      // COMPRESSÃO ANTES DO UPLOAD
+      // Reduzimos para 1600px (perfeito para OCR e visualização) e qualidade 0.75
+      const compressedImage = await imageCompressor.compress(currentImage, {
+        maxWidth: 1600,
+        quality: 0.75
+      });
+
       const photoId = `img_${Date.now()}`;
       const osClean = trip.os.replace(/[^a-z0-9]/gi, '_');
       
-      // SALVA NA PASTA ESPECÍFICA DA VIAGEM NO R2
-      const publicUrl = await fileStorage.uploadTripPhoto(currentImage, osClean, photoId);
+      const publicUrl = await fileStorage.uploadTripPhoto(compressedImage, osClean, photoId);
       
       const newDoc: DriverCapturedDoc = { id: photoId, url: publicUrl, timestamp: new Date().toISOString() };
       const updatedTrip = { ...trip, driver_docs: [...(trip.driver_docs || []), newDoc] };
@@ -70,7 +79,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       await onSuccess();
       onClose();
     } catch (e) {
-      alert("Erro ao enviar foto.");
+      alert("Erro ao enviar foto comprimida.");
     } finally {
       setIsSaving(false);
     }
@@ -84,17 +93,19 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         <div className="flex-1 relative">
           <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
           <div className="absolute bottom-10 w-full flex justify-center">
-            <button onClick={capturePhoto} className="w-20 h-20 bg-white rounded-full border-4 border-blue-500"></button>
+            <button onClick={capturePhoto} className="w-20 h-20 bg-white rounded-full border-4 border-blue-500 shadow-2xl active:scale-90 transition-all"></button>
           </div>
-          <button onClick={onClose} className="absolute top-10 right-6 text-white text-xl">✕</button>
+          <button onClick={onClose} className="absolute top-10 right-6 text-white text-xl p-4 bg-black/20 rounded-full">✕</button>
         </div>
       ) : (
         <div className="flex-1 flex flex-col p-6 bg-slate-900">
-          <img src={currentImage!} className="flex-1 object-contain rounded-3xl" />
+          <div className="flex-1 relative rounded-3xl overflow-hidden shadow-2xl bg-black">
+             <img src={currentImage!} className="w-full h-full object-contain" alt="Preview" />
+          </div>
           <div className="grid grid-cols-2 gap-4 mt-6">
-            <button onClick={() => setStep('camera')} className="py-4 bg-white/10 text-white rounded-2xl">Refazer</button>
-            <button onClick={handleFinish} disabled={isSaving} className="py-4 bg-blue-600 text-white rounded-2xl font-black">
-              {isSaving ? 'Enviando...' : 'Confirmar Foto'}
+            <button onClick={() => setStep('camera')} className="py-5 bg-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest">Refazer</button>
+            <button onClick={handleFinish} disabled={isSaving} className="py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">
+              {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Confirmar & Enviar'}
             </button>
           </div>
         </div>

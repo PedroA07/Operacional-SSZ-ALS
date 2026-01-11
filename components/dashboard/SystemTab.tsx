@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
 import { db } from '../../utils/storage';
+import { imageCompressor } from '../../utils/imageCompressor';
+import { fileStorage } from '../../utils/fileStorage';
 
 interface SystemTabProps {
   onRefresh: () => Promise<void>;
@@ -13,6 +15,12 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+
+  // Estados do Otimizador
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optProgress, setOptProgress] = useState(0);
+  const [optTotal, setOptTotal] = useState(0);
+  const [optCurrent, setOptCurrent] = useState('');
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -63,6 +71,88 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
     }
   };
 
+  // FUNÇÃO MESTRE: Otimizar todas as imagens do banco
+  const runImageOptimization = async () => {
+    if (!confirm("Este processo irá comprimir todas as fotos de perfil e docs de campo que ainda não foram otimizados. Isso pode demorar alguns minutos. Continuar?")) return;
+    
+    setIsOptimizing(true);
+    setOptProgress(0);
+    
+    try {
+      // 1. Carregar todos os dados relevantes
+      setOptCurrent('Mapeando base de dados...');
+      const [allDrivers, allStaff, allTrips] = await Promise.all([
+        db.getAllDriversMaintenance(),
+        db.getStaff(),
+        db.getAllTripsMaintenance()
+      ]);
+
+      const totalItems = allDrivers.length + allStaff.length + allTrips.reduce((acc, t) => acc + (t.driver_docs?.length || 0), 0);
+      setOptTotal(totalItems);
+      let processedCount = 0;
+
+      // 2. Otimizar Staff (Fotos de Perfil)
+      for (const s of allStaff) {
+        if (s.photo && !s.photo.includes('_optimized')) {
+          setOptCurrent(`Comprimindo perfil: ${s.name}`);
+          const compressed = await imageCompressor.compress(s.photo, { maxWidth: 400, quality: 0.7 });
+          const newUrl = await fileStorage.uploadStaffPhoto(compressed, s.id);
+          await db.saveStaff({ ...s, photo: newUrl });
+        }
+        processedCount++;
+        setOptProgress(Math.round((processedCount / totalItems) * 100));
+      }
+
+      // 3. Otimizar Drivers (Fotos de Perfil)
+      for (const d of allDrivers) {
+        if (d.photo && !d.photo.includes('_optimized')) {
+          setOptCurrent(`Comprimindo perfil motorista: ${d.name}`);
+          const compressed = await imageCompressor.compress(d.photo, { maxWidth: 400, quality: 0.7 });
+          const newUrl = await fileStorage.uploadDriverProfile(compressed, d.id);
+          await db.saveDriver({ ...d, photo: newUrl });
+        }
+        processedCount++;
+        setOptProgress(Math.round((processedCount / totalItems) * 100));
+      }
+
+      // 4. Otimizar Viagens (Fotos de Campo)
+      for (const t of allTrips) {
+        if (t.driver_docs && t.driver_docs.length > 0) {
+          let tripChanged = false;
+          const newDocs = [];
+          
+          for (const doc of t.driver_docs) {
+            if (doc.url && !doc.url.includes('_optimized')) {
+              setOptCurrent(`Otimizando anexo OS ${t.os}...`);
+              const compressed = await imageCompressor.compress(doc.url, { maxWidth: 1600, quality: 0.75 });
+              const newUrl = await fileStorage.uploadTripPhoto(compressed, t.os, doc.id);
+              newDocs.push({ ...doc, url: newUrl });
+              tripChanged = true;
+            } else {
+              newDocs.push(doc);
+            }
+            processedCount++;
+            setOptProgress(Math.round((processedCount / totalItems) * 100));
+          }
+
+          if (tripChanged) {
+            await db.saveTrip({ ...t, driver_docs: newDocs });
+          }
+        }
+      }
+
+      setOptCurrent('Otimização concluída!');
+      alert(`Sucesso! ${totalItems} imagens foram analisadas e otimizadas.`);
+      await onRefresh();
+    } catch (e) {
+      console.error(e);
+      alert("Erro durante a otimização em lote.");
+    } finally {
+      setIsOptimizing(false);
+      setOptProgress(0);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -70,21 +160,47 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Manutenção de Dados</h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gerencie backups, restaurações e sincronização em nuvem</p>
         </div>
-        <button 
-          onClick={handleManualSync}
-          disabled={syncStatus === 'syncing'}
-          className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center gap-3 ${
-            syncStatus === 'syncing' ? 'bg-slate-100 text-slate-400' : 
-            syncStatus === 'success' ? 'bg-emerald-500 text-white' : 
-            'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          <svg className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {syncStatus === 'syncing' ? 'Sincronizando...' : syncStatus === 'success' ? 'Sincronizado!' : 'Forçar Sincronização'}
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={runImageOptimization}
+            disabled={isOptimizing}
+            className="px-6 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center gap-3 hover:bg-emerald-700 disabled:opacity-50"
+          >
+             <svg className={`w-4 h-4 ${isOptimizing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+             Otimizar Storage
+          </button>
+          <button 
+            onClick={handleManualSync}
+            disabled={syncStatus === 'syncing'}
+            className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center gap-3 ${
+              syncStatus === 'syncing' ? 'bg-slate-100 text-slate-400' : 
+              syncStatus === 'success' ? 'bg-blue-500 text-white' : 
+              'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            <svg className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {syncStatus === 'syncing' ? 'Sincronizando...' : syncStatus === 'success' ? 'Sincronizado!' : 'Forçar Sincronização'}
+          </button>
+        </div>
       </div>
+
+      {isOptimizing && (
+        <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 space-y-6">
+           <div className="flex justify-between items-end">
+              <div>
+                 <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Processamento em Lote Ativo</p>
+                 <h4 className="text-white font-black text-lg mt-1">{optCurrent}</h4>
+              </div>
+              <span className="text-2xl font-black text-white font-mono">{optProgress}%</span>
+           </div>
+           <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${optProgress}%` }}></div>
+           </div>
+           <p className="text-[8px] text-slate-500 uppercase text-center font-bold">Não feche o navegador até a conclusão do processo para evitar corrupção de dados.</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center space-y-2">
