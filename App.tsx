@@ -12,7 +12,6 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Logout centralizado (usado também pelo monitor de inatividade)
   const handleLogout = async () => {
     if (user) {
       try {
@@ -24,38 +23,36 @@ const App: React.FC = () => {
     setCurrentScreen(AppScreen.LOGIN);
   };
 
-  // Ativa o monitor de presença e inatividade (15 min)
   usePresenceMonitor(user, currentScreen, handleLogout);
 
-  // Inicialização de Sessão
   useEffect(() => {
     const initSession = async () => {
       try {
         const saved = sessionStorage.getItem('als_active_session');
         if (saved) {
           const sessionData: User = JSON.parse(saved);
-          const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 4000));
-          const usersFetch = db.getUsers();
           
-          try {
-            const allUsers = await Promise.race([usersFetch, timeout]) as User[];
-            const dbUser = allUsers.find(u => u.id === sessionData.id);
-
-            if (dbUser && dbUser.status !== 'Inativo') {
-              setUser(dbUser);
-              await db.updatePresence(dbUser.id, 'online');
-              setCurrentScreen(AppScreen.DASHBOARD);
-            } else {
-              sessionStorage.removeItem('als_active_session');
-              setCurrentScreen(AppScreen.LOGIN);
-            }
-          } catch (e) {
+          // Verifica se o usuário ainda é válido no banco (ignora para o master operacional_ssz)
+          if (sessionData.username === 'operacional_ssz') {
             setUser(sessionData);
             setCurrentScreen(AppScreen.DASHBOARD);
+            setIsInitializing(false);
+            return;
+          }
+
+          const users = await db.getUsers();
+          const dbUser = users.find(u => u.id === sessionData.id);
+
+          if (dbUser && dbUser.status !== 'Inativo') {
+            setUser(dbUser);
+            await db.updatePresence(dbUser.id, 'online');
+            setCurrentScreen(AppScreen.DASHBOARD);
+          } else {
+            sessionStorage.removeItem('als_active_session');
           }
         }
       } catch (e) {
-        sessionStorage.removeItem('als_active_session');
+        console.error("Session Init Error:", e);
       } finally {
         setIsInitializing(false);
       }
@@ -66,7 +63,9 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = async (userData: User) => {
     setUser(userData);
-    await db.updatePresence(userData.id, 'online');
+    if (userData.id !== 'admin-master') {
+      await db.updatePresence(userData.id, 'online');
+    }
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);
   };
@@ -74,34 +73,24 @@ const App: React.FC = () => {
   if (isInitializing) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
-        <div className="text-blue-600 font-black italic text-5xl animate-pulse tracking-tighter">ALS</div>
+        <div className="text-blue-600 font-black italic text-5xl animate-pulse">ALS</div>
         <div className="w-48 h-1 bg-white/5 rounded-full mt-8 overflow-hidden">
            <div className="h-full bg-blue-600 animate-[loading_2s_infinite]"></div>
         </div>
-        <style>{`
-          @keyframes loading {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-          }
-        `}</style>
       </div>
     );
   }
-
-  const renderMainContent = () => {
-    if (!user) return null;
-    if (user.role === 'driver' || user.role === 'motoboy') {
-      return <DriverPortal user={user} onLogout={handleLogout} />;
-    }
-    return <Dashboard user={user} onLogout={handleLogout} />;
-  };
 
   return (
     <div className="min-h-screen bg-[#020617]">
       {currentScreen === AppScreen.LOGIN ? (
         <LoginForm onLoginSuccess={handleLoginSuccess} />
+      ) : user?.role === 'driver' || user?.role === 'motoboy' ? (
+        <DriverPortal user={user} onLogout={handleLogout} />
+      ) : user ? (
+        <Dashboard user={user} onLogout={handleLogout} />
       ) : (
-        renderMainContent()
+        <LoginForm onLoginSuccess={handleLoginSuccess} />
       )}
     </div>
   );

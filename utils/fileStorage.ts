@@ -1,65 +1,59 @@
 
-import { supabase } from './storage';
-import { r2Service } from './r2Service';
-
 export const fileStorage = {
   /**
    * Retorna a URL pública. 
-   * Se já for uma URL (http) vinda do seu script de conversão, retorna ela direto.
+   * Se começar com http (R2), retorna direto.
    */
-  getPublicUrl: (path: string | undefined, bucket: 'drivers' | 'trips' = 'trips'): string => {
+  getPublicUrl: (path: string | undefined): string => {
     if (!path) return '';
-    
-    // Se o caminho já for uma URL completa (R2 ou Base64), não faz nada
-    if (path.startsWith('http') || path.startsWith('data:')) {
-      return path;
-    }
-    
-    // Fallback apenas para arquivos antigos que ainda estão no Supabase Storage
-    if (!supabase) return '';
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
+    if (path.startsWith('http') || path.startsWith('data:')) return path;
+    return `${process.env.R2_PUBLIC_DOMAIN}/${path}`;
   },
 
   /**
-   * Faz o upload para o R2 e já retorna a URL final para salvar no banco
+   * Upload centralizado para o R2 com definição de caminho organizada
    */
-  uploadFile: async (
-    file: File | string, 
-    folder: 'docs' | 'photos' | 'profiles', 
-    fileName: string,
-    bucket: 'drivers' | 'trips' = 'trips'
-  ): Promise<string> => {
+  upload: async (file: File | string, destinationPath: string): Promise<string> => {
     try {
-      // Envia para o R2 (usando sua API Route /api/upload)
-      const r2Url = await r2Service.upload(file, fileName, folder);
-      return r2Url; // Retorna a URL https://pub-...
-    } catch (error) {
-      console.error("Erro no R2, tentando Supabase como fallback:", error);
-      
-      // Fallback de segurança para o Supabase Storage
-      if (!supabase) throw new Error("Cloud Storage Indisponível.");
-      
-      const cleanFileName = fileName.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-      const path = `${folder}/${Date.now()}_${cleanFileName}`;
-      
-      let body: any;
-      if (typeof file === 'string' && file.startsWith('data:')) {
-        const parts = file.split(',');
-        const binaryString = window.atob(parts[1]);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-        body = bytes;
+      const formData = new FormData();
+      if (typeof file === 'string') {
+        const response = await fetch(file);
+        const blob = await response.blob();
+        formData.append('file', blob, 'upload.jpg');
       } else {
-        body = file;
+        formData.append('file', file);
       }
+      formData.append('path', destinationPath);
 
-      const { data, error: storageError } = await supabase.storage
-        .from(bucket)
-        .upload(path, body, { upsert: true });
-
-      if (storageError) throw storageError;
-      return data.path; 
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Erro no servidor de upload R2');
+      
+      const data = await res.json();
+      return data.url; 
+    } catch (e) {
+      console.error("[Storage Error]:", e);
+      throw e;
     }
+  },
+
+  // FUNÇÕES AUXILIARES DE ORGANIZAÇÃO (Utilizadas pelo resto do app)
+  
+  uploadUserPhoto: (file: File | string, userId: string) => 
+    fileStorage.upload(file, `users/photos/${userId}.jpg`),
+
+  uploadDriverProfile: (file: File | string, driverId: string) => 
+    fileStorage.upload(file, `drivers/${driverId}/profile.jpg`),
+
+  uploadDriverCNH: (file: File | string, driverId: string) => 
+    fileStorage.upload(file, `drivers/${driverId}/cnh.pdf`),
+
+  uploadTripDoc: (file: File | string, os: string, docType: string) => {
+    const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
+    return fileStorage.upload(file, `trips/${cleanOS}/documentos/${docType.toLowerCase()}.pdf`);
+  },
+
+  uploadTripPhoto: (file: File | string, os: string, photoId: string) => {
+    const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
+    return fileStorage.upload(file, `trips/${cleanOS}/fotos_campo/${photoId}.jpg`);
   }
 };
