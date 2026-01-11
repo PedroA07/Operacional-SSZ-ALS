@@ -207,7 +207,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
              title={`Painel Geral ALS`} 
              columns={columns} 
              data={filteredTrips} 
-             hideInternalSearch // Busca externa controlada pelo pai agora
+             hideInternalSearch
+             onRowClick={(t) => { setSelectedTrip(t); setIsTripModalOpen(true); }}
              defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
            />
         </div>

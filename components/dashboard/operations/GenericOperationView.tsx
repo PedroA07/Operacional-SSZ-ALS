@@ -244,7 +244,15 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       </div>
       
       <div className={localDensity === 'compact' ? 'table-compact' : ''}>
-        <SmartOperationTable userId={user.id} componentId={`op-trips-${categoryName}-${selectedFilterClient}`} title={`Cargas Filtradas: ${selectedFilterClient}`} columns={tripColumns} data={filteredTrips} defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} />
+        <SmartOperationTable 
+          userId={user.id} 
+          componentId={`op-trips-${categoryName}-${selectedFilterClient}`} 
+          title={`Cargas Filtradas: ${selectedFilterClient}`} 
+          columns={tripColumns} 
+          data={filteredTrips} 
+          onRowClick={(t) => { setSelectedTrip(t); setIsTripModalOpen(true); }}
+          defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'customer', 'actions']} 
+        />
       </div>
 
       {isStatusModalOpen && (

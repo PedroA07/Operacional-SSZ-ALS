@@ -100,10 +100,24 @@ export const getOperationTableColumns = (
            <p className="text-xs font-black text-blue-700">OS: {t.os}</p>
            <div className="flex flex-col gap-1">
               {(t.statusHistory || []).slice(0, 2).map((step, idx) => (
-                <div key={idx} className={`px-2 py-1 rounded text-[7.5px] font-black uppercase border ${getStatusStyle(step.status, idx === 0)}`}>
+                <div 
+                  key={idx} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openStatusEditor(t, step.status);
+                  }}
+                  className={`px-2 py-1 rounded text-[7.5px] font-black uppercase border cursor-pointer hover:scale-[1.02] transition-transform active:scale-95 ${getStatusStyle(step.status, idx === 0)}`}
+                  title="Clique para atualizar status"
+                >
                   {step.status} - {new Date(step.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
                 </div>
               ))}
+              <button 
+                onClick={(e) => { e.stopPropagation(); onOpenHistoryManager(t); }}
+                className="text-[7px] font-black text-slate-300 uppercase hover:text-blue-500 text-left pl-1 mt-0.5"
+              >
+                + Ver Histórico Completo
+              </button>
            </div>
         </div>
       )
@@ -114,7 +128,16 @@ export const getOperationTableColumns = (
       render: (t: Trip) => (
         <div className="flex flex-col">
            <span className="font-black text-slate-800 uppercase text-[10px]">{t.driver?.name}</span>
-           <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[8px] font-mono mt-1 w-fit">{t.driver?.plateHorse}</span>
+           <div className="flex items-center gap-2 mt-1">
+              <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase w-fit">{t.driver?.plateHorse}</span>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onLocateDriver(t.driver.id); }}
+                className="p-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                title="Localizar Motorista (GPS)"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </button>
+           </div>
         </div>
       )
     },
@@ -123,7 +146,7 @@ export const getOperationTableColumns = (
       label: '4. Equipamento',
       render: (t: Trip) => (
         <div className="flex flex-col">
-          <span className="font-black text-slate-800 text-[10px]">{t.container || '---'}</span>
+          <span className="font-black text-slate-800 text-[10px]">{t.container || 'A DEFINIR'}</span>
           <span className="text-[8px] font-bold text-slate-400 mt-1">{t.containerType || '40HC'}</span>
         </div>
       )
@@ -142,18 +165,20 @@ export const getOperationTableColumns = (
       key: 'actions', 
       label: '9. Opções', 
       render: (t: Trip) => (
-        <ActionMenu 
-          trip={t}
-          onEditTrip={onEditTrip}
-          onEditOC={onEditOC}
-          onEditMinuta={onEditMinuta}
-          onDeleteTrip={onDeleteTrip}
-          onViewDriverDocs={onViewDriverDocs}
-          handleFileUpload={handleFileUpload}
-          deleteDocument={deleteDocument}
-          onViewDoc={onViewDoc}
-          handlePrint={handlePrint}
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <ActionMenu 
+            trip={t}
+            onEditTrip={onEditTrip}
+            onEditOC={onEditOC}
+            onEditMinuta={onEditMinuta}
+            onDeleteTrip={onDeleteTrip}
+            onViewDriverDocs={onViewDriverDocs}
+            handleFileUpload={handleFileUpload}
+            deleteDocument={deleteDocument}
+            onViewDoc={onViewDoc}
+            handlePrint={handlePrint}
+          />
+        </div>
       ) 
     }
   ];
