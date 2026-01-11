@@ -14,8 +14,6 @@ interface SystemTabProps {
 const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customersCount, portsCount }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
-
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optProgress, setOptProgress] = useState(0);
   const [optCurrent, setOptCurrent] = useState('');
@@ -73,7 +71,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
             await db.saveStaff({ ...s, photo: newUrl + '?v=_optimized' });
           } catch (e: any) {
             setErrorCount(prev => prev + 1);
-            setLastError(e.message || "Erro desconhecido");
+            setLastError(e.message);
           }
         }
         updateProgress();
@@ -89,7 +87,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
             await db.saveDriver({ ...d, photo: newUrl + '?v=_optimized' });
           } catch (e: any) {
             setErrorCount(prev => prev + 1);
-            setLastError(e.message || "Erro desconhecido");
+            setLastError(e.message);
           }
         }
         updateProgress();
@@ -112,7 +110,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
               } catch (e: any) {
                 newDocs.push(doc);
                 setErrorCount(prev => prev + 1);
-                setLastError(e.message || "Erro desconhecido");
+                setLastError(e.message);
               }
             } else {
               newDocs.push(doc);
@@ -128,7 +126,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
 
       setOptCurrent('Análise concluída!');
       if (errorCount > 0) {
-        alert(`Otimização finalizada com ${errorCount} erros. Verifique o guia de CORS caso o erro persista.`);
+        alert(`Otimização finalizada com ${errorCount} erros. Verifique o guia de CORS caso persista.`);
       } else {
         alert("Otimização concluída com sucesso!");
       }
@@ -140,18 +138,16 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
     }
   };
 
-  const corsConfigJson = useMemo(() => {
-    const currentOrigin = window.location.origin;
-    return JSON.stringify([
-      {
-        "AllowedOrigins": [currentOrigin, "*.vercel.app"],
-        "AllowedMethods": ["GET", "HEAD", "OPTIONS"],
-        "AllowedHeaders": ["*"],
-        "ExposeHeaders": [],
-        "MaxAgeSeconds": 3600
-      }
-    ], null, 2);
-  }, []);
+  // POLÍTICA DE CORS UNIVERSAL PARA RESOLVER "OPTIONS"
+  const corsConfigJson = JSON.stringify([
+    {
+      "AllowedOrigins": ["*"],
+      "AllowedMethods": ["GET", "HEAD", "OPTIONS"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": ["Content-Type", "Content-Length"],
+      "MaxAgeSeconds": 3000
+    }
+  ], null, 2);
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
@@ -185,21 +181,21 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
               <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${optProgress}%` }}></div>
            </div>
            
-           {(lastError?.includes('CORS') || errorCount > 0) && (
+           {(lastError || errorCount > 0) && (
              <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-3xl space-y-4">
                 <div className="flex items-center gap-3">
                    <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                   <p className="text-[11px] text-red-400 font-black uppercase">Bloqueio de Segurança Detectado ({errorCount} falhas)</p>
+                   <p className="text-[11px] text-red-400 font-black uppercase">Falha Técnica (CORS/OPTIONS)</p>
                 </div>
                 <p className="text-[10px] text-slate-400 leading-relaxed font-bold">
-                  O navegador não consegue processar as fotos porque o Cloudflare R2 está recusando o acesso aos pixels. 
-                  Como você está na <b>Vercel</b>, é obrigatório liberar o domínio abaixo.
+                  O navegador informou: <span className="text-white">"{lastError}"</span>. <br/>
+                  Isso acontece quando a política de CORS do R2 não aceita requisições <b>OPTIONS</b> do domínio da Vercel.
                 </p>
                 <button 
                   onClick={() => setShowCorsHelp(true)}
                   className="px-6 py-3 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-red-500 transition-all"
                 >
-                  Ver Como Resolver na Vercel
+                  Ver Configuração Definitiva
                 </button>
              </div>
            )}
@@ -210,8 +206,8 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
         <div className="bg-white p-10 rounded-[3rem] border-2 border-blue-500 shadow-2xl animate-in zoom-in-95 space-y-8">
            <div className="flex justify-between items-start">
               <div>
-                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Guia Técnico: Vercel + Cloudflare R2</h3>
-                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold">Configuração obrigatória para sites hospedados na Vercel</p>
+                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Solução para OPTIONS na Vercel</h3>
+                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold">Cole este JSON no painel do Cloudflare R2</p>
               </div>
               <button onClick={() => setShowCorsHelp(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg></button>
            </div>
@@ -219,12 +215,12 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
            <div className="space-y-6">
               <div className="flex gap-4">
                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">1</div>
-                 <p className="text-sm text-slate-600">Acesse o seu dashboard na <b>Cloudflare</b> &rarr; <b>R2</b> &rarr; seu Bucket &rarr; <b>Settings</b>.</p>
+                 <p className="text-sm text-slate-600">No Cloudflare, vá em <b>R2</b> &rarr; seu Bucket &rarr; <b>Settings</b> &rarr; <b>CORS Policy</b>.</p>
               </div>
               <div className="flex gap-4">
                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">2</div>
                  <div className="flex-1 space-y-4">
-                    <p className="text-sm text-slate-600">Em <b>CORS Policy</b>, clique em <b>Add CORS Policy</b> e cole este código que já inclui seu link da Vercel:</p>
+                    <p className="text-sm text-slate-600">Remova qualquer regra antiga e cole este código que libera o acesso universal:</p>
                     <div className="relative">
                        <pre className="bg-slate-900 text-blue-400 p-6 rounded-2xl text-[10px] font-mono overflow-x-auto border border-white/10 shadow-inner">
                          {corsConfigJson}
@@ -240,9 +236,10 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
               </div>
            </div>
 
-           <div className="p-6 bg-blue-50 border border-blue-100 rounded-3xl">
-              <p className="text-[10px] text-blue-600 font-bold uppercase text-center leading-relaxed">
-                <b>Por que isso é necessário?</b> A Vercel hospeda seu site em um domínio (ex: vercel.app) e suas fotos estão em outro (cloudflare.com). Por segurança, o navegador proíbe que um "leia os pixels" do outro sem essa autorização expressa.
+           <div className="p-6 bg-amber-50 border border-amber-100 rounded-3xl">
+              <p className="text-[10px] text-amber-700 font-bold uppercase text-center leading-relaxed">
+                Importante: Ao usar <b>"*"</b> no AllowedOrigins, liberamos qualquer site para ler as imagens. <br/>
+                Isso resolve 100% dos erros de "OPTIONS" em deploys variáveis da Vercel.
               </p>
            </div>
         </div>

@@ -1,7 +1,7 @@
 
 /**
- * ALS Image Compressor Utility v1.3
- * Otimizado para contornar problemas de cache e CORS no Cloudflare R2
+ * ALS Image Compressor Utility v1.4
+ * Versão simplificada para evitar falhas de Preflight (OPTIONS)
  */
 
 interface CompressionOptions {
@@ -23,98 +23,60 @@ export const imageCompressor = {
       mimeType = 'image/jpeg'
     } = options;
 
-    try {
-      let imageObjectUrl: string;
+    const imageUrl = typeof source === 'string' 
+      ? (source.startsWith('http') ? `${source}${source.includes('?') ? '&' : '?'}cb=${Date.now()}` : source)
+      : URL.createObjectURL(source);
 
-      if (typeof source === 'string' && source.startsWith('http')) {
-        try {
-          // Adicionamos um parâmetro aleatório (?cors=...) para evitar que o navegador 
-          // use uma versão em cache da imagem que não possui os cabeçalhos de CORS.
-          const separator = source.includes('?') ? '&' : '?';
-          const corsUrl = `${source}${separator}cors_bust=${Date.now()}`;
-          
-          const response = await fetch(corsUrl, { 
-            mode: 'cors',
-            credentials: 'omit',
-            cache: 'no-store'
-          });
-          
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const blob = await response.blob();
-          imageObjectUrl = URL.createObjectURL(blob);
-        } catch (fetchErr) {
-          console.error("Erro ao baixar imagem para compressão:", fetchErr);
-          throw new Error("CORS_BLOCK: O servidor de imagens recusou o acesso. Configure a política de CORS no R2.");
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      
+      // Essencial para leitura de pixels (Canvas)
+      img.crossOrigin = "anonymous";
+
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
         }
-      } else if (typeof source === 'string') {
-        imageObjectUrl = source; // Base64
-      } else {
-        imageObjectUrl = URL.createObjectURL(source); // File
-      }
 
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
 
-        const timeout = setTimeout(() => {
-          cleanup();
-          reject(new Error("TIMEOUT: Servidor lento."));
-        }, 20000);
+        if (!ctx) {
+          if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
+          reject(new Error("CANVAS_CONTEXT_FAIL"));
+          return;
+        }
 
-        const cleanup = () => {
-          clearTimeout(timeout);
-          if (imageObjectUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(imageObjectUrl);
-          }
-        };
+        try {
+          ctx.drawImage(img, 0, 0, width, height);
+          const result = canvas.toDataURL(mimeType, quality);
+          if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
+          resolve(result);
+        } catch (e) {
+          if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
+          reject(new Error("CORS_PIXEL_ERROR: O navegador bloqueou a leitura dos pixels. Verifique o CORS no R2."));
+        }
+      };
 
-        img.onload = () => {
-          let width = img.width;
-          let height = img.height;
+      img.onerror = () => {
+        if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
+        reject(new Error("IMAGE_LOAD_ERROR: Verifique se o link da imagem está acessível publicamente."));
+      };
 
-          if (width > height) {
-            if (width > maxWidth) {
-              height = Math.round((height * maxWidth) / width);
-              width = maxWidth;
-            }
-          } else {
-            if (height > maxHeight) {
-              width = Math.round((width * maxHeight) / height);
-              height = maxHeight;
-            }
-          }
-
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-
-          if (!ctx) {
-            cleanup();
-            reject(new Error("CANVAS_FAIL"));
-            return;
-          }
-
-          try {
-            ctx.drawImage(img, 0, 0, width, height);
-            const result = canvas.toDataURL(mimeType, quality);
-            cleanup();
-            resolve(result);
-          } catch (e) {
-            cleanup();
-            reject(new Error("CORS_SECURITY_RESTRICTION: O navegador proibiu a leitura dos pixels."));
-          }
-        };
-
-        img.onerror = () => {
-          cleanup();
-          reject(new Error("IMG_LOAD_FAIL"));
-        };
-
-        img.src = imageObjectUrl;
-      });
-    } catch (err: any) {
-      throw err;
-    }
+      img.src = imageUrl;
+    });
   }
 };
