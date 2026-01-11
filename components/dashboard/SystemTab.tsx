@@ -133,7 +133,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
 
       setOptCurrent('Análise concluída!');
       if (errorCount === totalItems && totalItems > 0) {
-        alert("FALHA TOTAL: Nenhuma imagem pôde ser processada. O motivo provável é bloqueio de CORS no Cloudflare.");
+        alert("FALHA TOTAL: Nenhuma imagem pôde ser processada. Verifique o diagnóstico de CORS abaixo.");
       } else {
         alert(`Processo finalizado. Itens analisados: ${totalItems}. Falhas: ${errorCount}.`);
       }
@@ -176,7 +176,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
               <div>
                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Processamento em Lote Ativo</p>
                  <h4 className="text-white font-black text-lg mt-1">{optCurrent}</h4>
-                 {lastError && <p className="text-[9px] text-red-400 font-bold uppercase mt-2">Último Erro: {lastError}</p>}
+                 {lastError && <p className="text-[9px] text-red-400 font-bold uppercase mt-2">Falha: {lastError}</p>}
               </div>
               <span className="text-2xl font-black text-white font-mono">{optProgress}%</span>
            </div>
@@ -184,10 +184,12 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
               <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${optProgress}%` }}></div>
            </div>
            
-           {lastError?.includes('CORS') && (
+           {(lastError?.includes('CORS') || errorCount > 0) && (
              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
-                <p className="text-[10px] text-red-400 font-black uppercase">Diagnóstico: Bloqueio de Segurança (CORS)</p>
-                <p className="text-[9px] text-slate-400 mt-1">O Cloudflare R2 está recusando o acesso aos pixels das fotos. Para corrigir, acesse o painel da Cloudflare -> R2 -> Bucket -> Settings -> CORS Policy e adicione o domínio do seu portal na lista de origens permitidas.</p>
+                <p className="text-[10px] text-red-400 font-black uppercase">Diagnóstico: Bloqueio CORS Detectado</p>
+                <p className="text-[9px] text-slate-400 mt-1">
+                  O Cloudflare R2 está recusando o acesso aos pixels das fotos. Para corrigir, acesse o painel da Cloudflare &rarr; R2 &rarr; Bucket &rarr; Settings &rarr; CORS Policy e adicione o domínio do seu portal (incluindo https://) na lista de origens permitidas (Allowed Origins) com os métodos GET e HEAD liberados.
+                </p>
              </div>
            )}
         </div>
