@@ -36,17 +36,25 @@ export const DestinationColumn = (t: Trip, onEditScheduling: (t: Trip) => void) 
 
      {/* Detalhes do Agendamento */}
      {t.scheduling ? (
-       <div className="bg-emerald-600 p-2.5 rounded-xl text-white shadow-md flex items-center justify-between">
-          <div className="flex flex-col">
-             <span className="text-[7px] font-black uppercase opacity-70 tracking-widest">Horário Agendado</span>
-             <p className="text-[11px] font-black">
-               {new Date(t.scheduling.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
-               {t.scheduling.obs && <span className="ml-2 text-emerald-200">[{t.scheduling.obs.slice(0,10)}]</span>}
-             </p>
-          </div>
-          <svg className="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-          </svg>
+       <div className="group relative">
+         <div className="bg-emerald-600 p-2.5 rounded-xl text-white shadow-md flex items-center justify-between">
+            <div className="flex flex-col">
+               <span className="text-[7px] font-black uppercase opacity-70 tracking-widest">Horário Agendado</span>
+               <p className="text-[11px] font-black">
+                 {new Date(t.scheduling.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
+                 {t.scheduling.obs && <span className="ml-2 text-emerald-200">[{t.scheduling.obs.slice(0,10)}]</span>}
+               </p>
+            </div>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onEditScheduling(t); }}
+              className="w-7 h-7 bg-white/20 hover:bg-white/40 rounded-lg flex items-center justify-center transition-all"
+              title="Editar Agendamento"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/>
+              </svg>
+            </button>
+         </div>
        </div>
      ) : (
        <button 
