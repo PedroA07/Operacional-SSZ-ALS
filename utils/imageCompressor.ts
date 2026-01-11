@@ -1,7 +1,7 @@
 
 /**
- * ALS Image Compressor Utility v1.2
- * Otimizado para processamento resiliente de imagens em nuvem (Cloudflare R2)
+ * ALS Image Compressor Utility v1.3
+ * Otimizado para contornar problemas de cache e CORS no Cloudflare R2
  */
 
 interface CompressionOptions {
@@ -26,21 +26,30 @@ export const imageCompressor = {
     try {
       let imageObjectUrl: string;
 
-      // Se for uma URL externa, tentamos baixar como Blob primeiro (mais robusto para Canvas)
       if (typeof source === 'string' && source.startsWith('http')) {
         try {
-          const response = await fetch(source, { mode: 'cors' });
+          // Adicionamos um parâmetro aleatório (?cors=...) para evitar que o navegador 
+          // use uma versão em cache da imagem que não possui os cabeçalhos de CORS.
+          const separator = source.includes('?') ? '&' : '?';
+          const corsUrl = `${source}${separator}cors_bust=${Date.now()}`;
+          
+          const response = await fetch(corsUrl, { 
+            mode: 'cors',
+            credentials: 'omit',
+            cache: 'no-store'
+          });
+          
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
           imageObjectUrl = URL.createObjectURL(blob);
         } catch (fetchErr) {
           console.error("Erro ao baixar imagem para compressão:", fetchErr);
-          throw new Error("CORS_BLOCK: O Cloudflare bloqueou o acesso aos pixels. Verifique as configurações de CORS no Bucket R2.");
+          throw new Error("CORS_BLOCK: O servidor de imagens recusou o acesso. Configure a política de CORS no R2.");
         }
       } else if (typeof source === 'string') {
-        imageObjectUrl = source; // Já é base64
+        imageObjectUrl = source; // Base64
       } else {
-        imageObjectUrl = URL.createObjectURL(source); // É um arquivo File
+        imageObjectUrl = URL.createObjectURL(source); // File
       }
 
       return new Promise((resolve, reject) => {
@@ -49,8 +58,8 @@ export const imageCompressor = {
 
         const timeout = setTimeout(() => {
           cleanup();
-          reject(new Error("TIMEOUT: A imagem demorou demais para processar."));
-        }, 15000);
+          reject(new Error("TIMEOUT: Servidor lento."));
+        }, 20000);
 
         const cleanup = () => {
           clearTimeout(timeout);
@@ -82,7 +91,7 @@ export const imageCompressor = {
 
           if (!ctx) {
             cleanup();
-            reject(new Error("CANVAS_ERROR: Falha ao criar contexto gráfico."));
+            reject(new Error("CANVAS_FAIL"));
             return;
           }
 
@@ -93,13 +102,13 @@ export const imageCompressor = {
             resolve(result);
           } catch (e) {
             cleanup();
-            reject(new Error("SECURITY_ERROR: Não foi possível ler os pixels (CORS)."));
+            reject(new Error("CORS_SECURITY_RESTRICTION: O navegador proibiu a leitura dos pixels."));
           }
         };
 
         img.onerror = () => {
           cleanup();
-          reject(new Error("LOAD_ERROR: O formato da imagem é inválido ou o link quebrou."));
+          reject(new Error("IMG_LOAD_FAIL"));
         };
 
         img.src = imageObjectUrl;

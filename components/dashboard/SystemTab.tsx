@@ -21,6 +21,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
   const [optCurrent, setOptCurrent] = useState('');
   const [errorCount, setErrorCount] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [showCorsHelp, setShowCorsHelp] = useState(false);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -36,12 +37,6 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
       if (await db.importBackup(file)) { alert("Dados importados!"); await onRefresh(); }
       else alert("Falha na importação.");
     } catch (e) { alert("Erro crítico."); } finally { setIsImporting(false); e.target.value = ''; }
-  };
-
-  const handleManualSync = async () => {
-    setSyncStatus('syncing');
-    try { await onRefresh(); setSyncStatus('success'); setTimeout(() => setSyncStatus('idle'), 3000); }
-    catch (e) { setSyncStatus('error'); setTimeout(() => setSyncStatus('idle'), 5000); }
   };
 
   const runImageOptimization = async () => {
@@ -132,27 +127,35 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
       }
 
       setOptCurrent('Análise concluída!');
-      if (errorCount === totalItems && totalItems > 0) {
-        alert("FALHA TOTAL: Nenhuma imagem pôde ser processada. Verifique o diagnóstico de CORS abaixo.");
+      if (errorCount > 0) {
+        alert(`Otimização finalizada com ${errorCount} erros. Verifique o guia de CORS caso o erro persista.`);
       } else {
-        alert(`Processo finalizado. Itens analisados: ${totalItems}. Falhas: ${errorCount}.`);
+        alert("Otimização concluída com sucesso!");
       }
       await onRefresh();
     } catch (e) {
-      console.error(e);
       alert("Erro crítico durante a otimização.");
     } finally {
       setIsOptimizing(false);
-      setOptProgress(0);
     }
   };
 
+  const corsConfigJson = JSON.stringify([
+    {
+      "AllowedOrigins": ["*"],
+      "AllowedMethods": ["GET", "HEAD", "OPTIONS"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": [],
+      "MaxAgeSeconds": 3600
+    }
+  ], null, 2);
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Manutenção de Dados</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gerencie backups e otimização de imagens</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de nuvem e armazenamento</p>
         </div>
         <div className="flex gap-3">
           <button 
@@ -163,20 +166,15 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
              <svg className={`w-4 h-4 ${isOptimizing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
              Otimizar Storage
           </button>
-          <button onClick={handleManualSync} disabled={syncStatus === 'syncing'} className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase transition-all shadow-xl flex items-center gap-3 ${syncStatus === 'syncing' ? 'bg-slate-100 text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-            <svg className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            Sincronizar
-          </button>
         </div>
       </div>
 
       {isOptimizing && (
-        <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 space-y-6">
+        <div className="bg-slate-900 p-10 rounded-[3rem] shadow-2xl space-y-6">
            <div className="flex justify-between items-end">
               <div>
-                 <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Processamento em Lote Ativo</p>
+                 <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Atividade em Segundo Plano</p>
                  <h4 className="text-white font-black text-lg mt-1">{optCurrent}</h4>
-                 {lastError && <p className="text-[9px] text-red-400 font-bold uppercase mt-2">Falha: {lastError}</p>}
               </div>
               <span className="text-2xl font-black text-white font-mono">{optProgress}%</span>
            </div>
@@ -185,13 +183,70 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
            </div>
            
            {(lastError?.includes('CORS') || errorCount > 0) && (
-             <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
-                <p className="text-[10px] text-red-400 font-black uppercase">Diagnóstico: Bloqueio CORS Detectado</p>
-                <p className="text-[9px] text-slate-400 mt-1">
-                  O Cloudflare R2 está recusando o acesso aos pixels das fotos. Para corrigir, acesse o painel da Cloudflare &rarr; R2 &rarr; Bucket &rarr; Settings &rarr; CORS Policy e adicione o domínio do seu portal (incluindo https://) na lista de origens permitidas (Allowed Origins) com os métodos GET e HEAD liberados.
+             <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-3xl space-y-4">
+                <div className="flex items-center gap-3">
+                   <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                   <p className="text-[11px] text-red-400 font-black uppercase">Bloqueio de Segurança Detectado ({errorCount} falhas)</p>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-bold">
+                  O navegador não consegue processar as fotos porque o Cloudflare R2 está recusando o acesso aos pixels. 
+                  Isso só pode ser resolvido no Painel da Cloudflare.
                 </p>
+                <button 
+                  onClick={() => setShowCorsHelp(true)}
+                  className="px-6 py-3 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-red-500 transition-all"
+                >
+                  Ver Como Resolver Agora
+                </button>
              </div>
            )}
+        </div>
+      )}
+
+      {showCorsHelp && (
+        <div className="bg-white p-10 rounded-[3rem] border-2 border-blue-500 shadow-2xl animate-in zoom-in-95 space-y-8">
+           <div className="flex justify-between items-start">
+              <div>
+                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Guia Técnico: Configurar CORS no Cloudflare</h3>
+                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold">Passo a passo para liberar a otimização de imagens</p>
+              </div>
+              <button onClick={() => setShowCorsHelp(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg></button>
+           </div>
+
+           <div className="space-y-6">
+              <div className="flex gap-4">
+                 <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">1</div>
+                 <p className="text-sm text-slate-600">Acesse o seu dashboard na <b>Cloudflare</b>, clique em <b>R2</b> no menu lateral e selecione o seu Bucket.</p>
+              </div>
+              <div className="flex gap-4">
+                 <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">2</div>
+                 <p className="text-sm text-slate-600">Vá na aba <b>Settings</b> (Configurações) e procure a seção <b>CORS Policy</b>.</p>
+              </div>
+              <div className="flex gap-4">
+                 <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">3</div>
+                 <div className="flex-1 space-y-4">
+                    <p className="text-sm text-slate-600">Clique em <b>Add CORS Policy</b> e cole exatamente este código abaixo:</p>
+                    <div className="relative">
+                       <pre className="bg-slate-900 text-blue-400 p-6 rounded-2xl text-[10px] font-mono overflow-x-auto border border-white/10 shadow-inner">
+                         {corsConfigJson}
+                       </pre>
+                       <button 
+                         onClick={() => { navigator.clipboard.writeText(corsConfigJson); alert("Copiado!"); }}
+                         className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all"
+                       >
+                         Copiar Código
+                       </button>
+                    </div>
+                 </div>
+              </div>
+           </div>
+
+           <div className="p-6 bg-blue-50 border border-blue-100 rounded-3xl">
+              <p className="text-[10px] text-blue-600 font-bold uppercase text-center leading-relaxed">
+                Após salvar na Cloudflare, recarregue esta página e tente "Otimizar Storage" novamente. <br/>
+                O sistema agora usará um "Cache Buster" para forçar o reconhecimento da nova política.
+              </p>
+           </div>
         </div>
       )}
 
