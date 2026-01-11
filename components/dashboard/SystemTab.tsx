@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { db } from '../../utils/storage';
 import { imageCompressor } from '../../utils/imageCompressor';
 import { fileStorage } from '../../utils/fileStorage';
@@ -140,15 +140,18 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
     }
   };
 
-  const corsConfigJson = JSON.stringify([
-    {
-      "AllowedOrigins": ["*"],
-      "AllowedMethods": ["GET", "HEAD", "OPTIONS"],
-      "AllowedHeaders": ["*"],
-      "ExposeHeaders": [],
-      "MaxAgeSeconds": 3600
-    }
-  ], null, 2);
+  const corsConfigJson = useMemo(() => {
+    const currentOrigin = window.location.origin;
+    return JSON.stringify([
+      {
+        "AllowedOrigins": [currentOrigin, "*.vercel.app"],
+        "AllowedMethods": ["GET", "HEAD", "OPTIONS"],
+        "AllowedHeaders": ["*"],
+        "ExposeHeaders": [],
+        "MaxAgeSeconds": 3600
+      }
+    ], null, 2);
+  }, []);
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
@@ -190,13 +193,13 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
                 </div>
                 <p className="text-[10px] text-slate-400 leading-relaxed font-bold">
                   O navegador não consegue processar as fotos porque o Cloudflare R2 está recusando o acesso aos pixels. 
-                  Isso só pode ser resolvido no Painel da Cloudflare.
+                  Como você está na <b>Vercel</b>, é obrigatório liberar o domínio abaixo.
                 </p>
                 <button 
                   onClick={() => setShowCorsHelp(true)}
                   className="px-6 py-3 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-red-500 transition-all"
                 >
-                  Ver Como Resolver Agora
+                  Ver Como Resolver na Vercel
                 </button>
              </div>
            )}
@@ -207,8 +210,8 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
         <div className="bg-white p-10 rounded-[3rem] border-2 border-blue-500 shadow-2xl animate-in zoom-in-95 space-y-8">
            <div className="flex justify-between items-start">
               <div>
-                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Guia Técnico: Configurar CORS no Cloudflare</h3>
-                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold">Passo a passo para liberar a otimização de imagens</p>
+                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Guia Técnico: Vercel + Cloudflare R2</h3>
+                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold">Configuração obrigatória para sites hospedados na Vercel</p>
               </div>
               <button onClick={() => setShowCorsHelp(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg></button>
            </div>
@@ -216,16 +219,12 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
            <div className="space-y-6">
               <div className="flex gap-4">
                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">1</div>
-                 <p className="text-sm text-slate-600">Acesse o seu dashboard na <b>Cloudflare</b>, clique em <b>R2</b> no menu lateral e selecione o seu Bucket.</p>
+                 <p className="text-sm text-slate-600">Acesse o seu dashboard na <b>Cloudflare</b> &rarr; <b>R2</b> &rarr; seu Bucket &rarr; <b>Settings</b>.</p>
               </div>
               <div className="flex gap-4">
                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">2</div>
-                 <p className="text-sm text-slate-600">Vá na aba <b>Settings</b> (Configurações) e procure a seção <b>CORS Policy</b>.</p>
-              </div>
-              <div className="flex gap-4">
-                 <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">3</div>
                  <div className="flex-1 space-y-4">
-                    <p className="text-sm text-slate-600">Clique em <b>Add CORS Policy</b> e cole exatamente este código abaixo:</p>
+                    <p className="text-sm text-slate-600">Em <b>CORS Policy</b>, clique em <b>Add CORS Policy</b> e cole este código que já inclui seu link da Vercel:</p>
                     <div className="relative">
                        <pre className="bg-slate-900 text-blue-400 p-6 rounded-2xl text-[10px] font-mono overflow-x-auto border border-white/10 shadow-inner">
                          {corsConfigJson}
@@ -243,8 +242,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
 
            <div className="p-6 bg-blue-50 border border-blue-100 rounded-3xl">
               <p className="text-[10px] text-blue-600 font-bold uppercase text-center leading-relaxed">
-                Após salvar na Cloudflare, recarregue esta página e tente "Otimizar Storage" novamente. <br/>
-                O sistema agora usará um "Cache Buster" para forçar o reconhecimento da nova política.
+                <b>Por que isso é necessário?</b> A Vercel hospeda seu site em um domínio (ex: vercel.app) e suas fotos estão em outro (cloudflare.com). Por segurança, o navegador proíbe que um "leia os pixels" do outro sem essa autorização expressa.
               </p>
            </div>
         </div>
@@ -273,7 +271,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
         </div>
 
         <div className="bg-slate-900 p-10 rounded-[2.5rem] shadow-2xl flex flex-col items-center text-center space-y-6 relative overflow-hidden">
-          <div className="w-20 h-20 bg-white/10 text-blue-400 rounded-[2rem] flex items-center justify-center shadow-inner border border-white/5"><svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg></div>
+          <div className="w-20 h-20 bg-white/10 text-blue-400 rounded-[2rem] flex items-center justify-center shadow-inner border border-white/5"><svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M10 14l2 2m0 0l2-2m-2 2V2m0 12l-4-4m4 4l4-4" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
           <div><h3 className="text-lg font-black text-white uppercase">Restaurar Dados</h3><p className="text-xs text-slate-400 mt-2">Carrega backup para a nuvem.</p></div>
           <label className="w-full cursor-pointer">
             <div className={`py-5 border-2 border-dashed rounded-2xl text-[11px] font-black uppercase transition-all flex items-center justify-center ${isImporting ? 'bg-white/5 border-white/10 text-slate-500' : 'bg-blue-600 text-white border-blue-400'}`}>Selecionar Arquivo</div>
