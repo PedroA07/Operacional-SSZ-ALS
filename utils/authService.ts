@@ -6,9 +6,9 @@ import { ADMIN_CREDENTIALS } from '../constants';
 export const authService = {
   /**
    * Realiza o login consultando a tabela 'users' no Supabase.
-   * Busca pelo campo 'username' e valida a coluna 'password'.
+   * Valida também o acesso mestre definido em constantes.
    */
-  async login(username: string, password: string, retry = true): Promise<{ success: boolean; user?: User; error?: string; isDatabaseDown?: boolean }> {
+  async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string; isDatabaseDown?: boolean }> {
     const inputUser = username.trim().toLowerCase();
     const inputPass = password.trim();
     
@@ -16,39 +16,34 @@ export const authService = {
       return { success: false, error: 'Preencha usuário e senha.' };
     }
 
-    // Fallback de Emergência: Caso o banco esteja offline ou para configuração inicial
+    // 1. Verificação imediata do Administrador Mestre (Hardcoded)
     const isMaster = inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && inputPass === ADMIN_CREDENTIALS.password;
 
     if (!supabase) {
-      if (isMaster) {
-        return { success: true, user: this.getMasterUser() };
-      }
+      if (isMaster) return { success: true, user: this.getMasterUser() };
       return { success: false, error: 'Configuração de banco ausente.', isDatabaseDown: true };
     }
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); 
-
-      // Busca na tabela 'users' onde a coluna 'username' é igual ao input
+      // 2. Busca no banco de dados (users)
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('username', inputUser)
         .maybeSingle();
 
-      clearTimeout(timeoutId);
-
       if (error) throw error;
 
-      // Se não encontrar no banco, verifica se é o acesso mestre
+      // Se não houver no banco, mas for o mestre, deixa entrar
       if (!data) {
         if (isMaster) return { success: true, user: this.getMasterUser() };
-        return { success: false, error: 'Usuário não localizado.' };
+        return { success: false, error: 'Usuário não cadastrado.' };
       }
 
-      // Validação da coluna 'password' no banco
+      // 3. Validação de Senha do Banco
       if (data.password !== inputPass) {
+        // Fallback: se a senha do banco falhar mas for a senha master para o usuário master, libera
+        if (isMaster) return { success: true, user: this.getMasterUser() };
         return { success: false, error: 'Senha incorreta.' };
       }
 
@@ -70,34 +65,24 @@ export const authService = {
         isFirstLogin: data.is_first_login ?? data.isfirstlogin
       };
 
-      // Atualiza timestamp em background
+      // Atualiza timestamp sem travar o UI
       supabase.from('users').update({ last_login: user.lastLogin, presence_status: 'online' }).eq('id', user.id).then();
 
       return { success: true, user };
 
     } catch (err: any) {
       console.error("Auth Exception:", err);
-
-      // Tenta novamente uma vez se for erro de timeout (acordando o banco)
-      if (retry && (err.name === 'AbortError' || err.message?.includes('fetch'))) {
-        await new Promise(r => setTimeout(r, 1500));
-        return this.login(username, password, false);
-      }
-
-      // Se der erro de conexão mas for o master, permite entrar para manutenção
+      // Se o banco cair, o mestre operacional_ssz ainda consegue entrar
       if (isMaster) return { success: true, user: this.getMasterUser() };
 
       return { 
         success: false, 
-        error: 'Servidor ALS não respondeu. Tente novamente em instantes.',
+        error: 'Servidor ALS offline. Tente novamente em instantes.',
         isDatabaseDown: true 
       };
     }
   },
 
-  /**
-   * Retorna o objeto de usuário master estático
-   */
   getMasterUser(): User {
     return {
       id: 'admin-master',

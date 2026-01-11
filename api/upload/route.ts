@@ -1,13 +1,17 @@
+
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-// Singleton do S3 Client para evitar múltiplas instâncias em Serverless (Performance)
+// Singleton do S3 Client para performance
 let s3Client: S3Client | null = null;
 
 const getS3Client = () => {
   if (!s3Client) {
+    // Se o endpoint vier com o nome do bucket no final, limpamos para o S3Client não se confundir
+    const cleanEndpoint = process.env.R2_ENDPOINT?.split('.com')[0] + '.com';
+    
     s3Client = new S3Client({
       region: "auto",
-      endpoint: process.env.R2_ENDPOINT,
+      endpoint: cleanEndpoint,
       credentials: {
         accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
@@ -24,12 +28,13 @@ export async function POST(request: Request) {
     const folder = formData.get("folder") as string || "general";
     
     if (!file) {
-      return new Response(JSON.stringify({ error: "No file provided" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "Arquivo não fornecido" }), { status: 400 });
     }
 
-    // Fix: Replaced Node.js 'Buffer' with 'Uint8Array' for universal environment compatibility (e.g. Edge runtime support)
     const fileBytes = new Uint8Array(await file.arrayBuffer());
-    const fileName = `${folder}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+    // Remove espaços e caracteres especiais do nome do arquivo para evitar erros de URL
+    const safeFileName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+    const fileName = `${folder}/${Date.now()}_${safeFileName}`;
     
     const client = getS3Client();
     const command = new PutObjectCommand({
