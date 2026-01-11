@@ -21,147 +21,155 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
   const [lastError, setLastError] = useState<string | null>(null);
   const [showCorsHelp, setShowCorsHelp] = useState(false);
 
+  // Estados para Modais Customizados
+  const [modal, setModal] = useState<{ show: boolean; title: string; message: string; type: 'alert' | 'confirm'; onConfirm?: () => void }>({
+    show: false, title: '', message: '', type: 'alert'
+  });
+
+  const showAlert = (title: string, message: string) => setModal({ show: true, title, message, type: 'alert' });
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => 
+    setModal({ show: true, title, message, type: 'confirm', onConfirm });
+
   const handleExport = async () => {
     setIsExporting(true);
-    try { await db.exportBackup(); } catch (e) { alert("Erro ao exportar."); } finally { setIsExporting(false); }
+    try { await db.exportBackup(); } catch (e) { showAlert("Erro", "Falha ao exportar backup."); } finally { setIsExporting(false); }
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!confirm("Isso irá sobrescrever os dados locais. Deseja continuar?")) { e.target.value = ''; return; }
-    setIsImporting(true);
-    try {
-      if (await db.importBackup(file)) { alert("Dados importados!"); await onRefresh(); }
-      else alert("Falha na importação.");
-    } catch (e) { alert("Erro crítico."); } finally { setIsImporting(false); e.target.value = ''; }
+    
+    showConfirm("Restaurar Backup", "Isso irá sobrescrever os dados atuais. Deseja prosseguir?", async () => {
+      setIsImporting(true);
+      try {
+        if (await db.importBackup(file)) { 
+          showAlert("Sucesso", "Dados importados com sucesso!"); 
+          await onRefresh(); 
+        } else {
+          showAlert("Erro", "Falha na importação do arquivo.");
+        }
+      } catch (e) { showAlert("Erro", "Erro crítico no processamento."); } finally { setIsImporting(false); }
+    });
+    e.target.value = '';
   };
 
   const runImageOptimization = async () => {
-    if (!confirm("Este processo irá comprimir imagens que ainda não foram otimizadas. Continuar?")) return;
-    
-    setIsOptimizing(true);
-    setOptProgress(0);
-    setErrorCount(0);
-    setLastError(null);
-    
-    try {
-      setOptCurrent('Mapeando base de dados...');
-      const [allDrivers, allStaff, allTrips] = await Promise.all([
-        db.getAllDriversMaintenance(),
-        db.getStaff(),
-        db.getAllTripsMaintenance()
-      ]);
+    showConfirm("Otimizar Armazenamento", "Deseja comprimir todas as fotos pendentes na nuvem?", async () => {
+      setIsOptimizing(true);
+      setOptProgress(0);
+      setErrorCount(0);
+      setLastError(null);
+      
+      try {
+        setOptCurrent('Iniciando análise...');
+        const [allDrivers, allStaff, allTrips] = await Promise.all([
+          db.getAllDriversMaintenance(),
+          db.getStaff(),
+          db.getAllTripsMaintenance()
+        ]);
 
-      const totalItems = allDrivers.length + allStaff.length + allTrips.reduce((acc, t) => acc + (t.driver_docs?.length || 0), 0);
-      let processedCount = 0;
+        const totalItems = allDrivers.length + allStaff.length + allTrips.reduce((acc, t) => acc + (t.driver_docs?.length || 0), 0);
+        let processedCount = 0;
 
-      const updateProgress = () => {
-        processedCount++;
-        setOptProgress(Math.round((processedCount / totalItems) * 100));
-      };
+        const updateProgress = () => {
+          processedCount++;
+          setOptProgress(Math.round((processedCount / totalItems) * 100));
+        };
 
-      for (const s of allStaff) {
-        if (s.photo && !s.photo.includes('_optimized') && s.photo.startsWith('http')) {
-          setOptCurrent(`Processando Perfil: ${s.name}`);
-          try {
-            const compressed = await imageCompressor.compress(s.photo, { maxWidth: 400, quality: 0.7 });
-            const newUrl = await fileStorage.uploadStaffPhoto(compressed, s.id);
-            await db.saveStaff({ ...s, photo: newUrl + '?v=_optimized' });
-          } catch (e: any) {
-            setErrorCount(prev => prev + 1);
-            setLastError(e.message);
+        // Processamento (Staff, Motoristas, Viagens...)
+        for (const s of allStaff) {
+          if (s.photo && !s.photo.includes('_optimized') && s.photo.startsWith('http')) {
+            setOptCurrent(`Comprimindo: ${s.name}`);
+            try {
+              const compressed = await imageCompressor.compress(s.photo, { maxWidth: 400, quality: 0.7 });
+              const newUrl = await fileStorage.uploadStaffPhoto(compressed, s.id);
+              await db.saveStaff({ ...s, photo: newUrl + '?v=_optimized' });
+            } catch (e: any) { setErrorCount(prev => prev + 1); setLastError(e.message); }
           }
+          updateProgress();
         }
-        updateProgress();
-      }
 
-      for (const d of allDrivers) {
-        if (d.photo && !d.photo.includes('_optimized') && d.photo.startsWith('http')) {
-          setOptCurrent(`Processando Motorista: ${d.name}`);
-          try {
-            const compressed = await imageCompressor.compress(d.photo, { maxWidth: 400, quality: 0.7 });
-            const newUrl = await fileStorage.uploadDriverProfile(compressed, d.id);
-            await db.saveDriver({ ...d, photo: newUrl + '?v=_optimized' });
-          } catch (e: any) {
-            setErrorCount(prev => prev + 1);
-            setLastError(e.message);
+        for (const d of allDrivers) {
+          if (d.photo && !d.photo.includes('_optimized') && d.photo.startsWith('http')) {
+            setOptCurrent(`Comprimindo: ${d.name}`);
+            try {
+              const compressed = await imageCompressor.compress(d.photo, { maxWidth: 400, quality: 0.7 });
+              const newUrl = await fileStorage.uploadDriverProfile(compressed, d.id);
+              await db.saveDriver({ ...d, photo: newUrl + '?v=_optimized' });
+            } catch (e: any) { setErrorCount(prev => prev + 1); setLastError(e.message); }
           }
+          updateProgress();
         }
-        updateProgress();
-      }
 
-      for (const t of allTrips) {
-        if (t.driver_docs && t.driver_docs.length > 0) {
-          let tripChanged = false;
-          const newDocs = [];
-          
-          for (const doc of t.driver_docs) {
-            if (doc.url && !doc.url.includes('_optimized') && doc.url.startsWith('http')) {
-              setOptCurrent(`Otimizando Anexo OS ${t.os}...`);
-              try {
-                const compressed = await imageCompressor.compress(doc.url, { maxWidth: 1600, quality: 0.75 });
-                const newUrl = await fileStorage.uploadTripPhoto(compressed, t.os, doc.id);
-                newDocs.push({ ...doc, url: newUrl + '?v=_optimized' });
-                tripChanged = true;
-              } catch (e: any) {
-                newDocs.push(doc);
-                setErrorCount(prev => prev + 1);
-                setLastError(e.message);
-              }
-            } else {
-              newDocs.push(doc);
+        for (const t of allTrips) {
+          if (t.driver_docs && t.driver_docs.length > 0) {
+            let tripChanged = false;
+            const newDocs = [];
+            for (const doc of t.driver_docs) {
+              if (doc.url && !doc.url.includes('_optimized') && doc.url.startsWith('http')) {
+                setOptCurrent(`Otimizando Docs OS ${t.os}...`);
+                try {
+                  const compressed = await imageCompressor.compress(doc.url, { maxWidth: 1600, quality: 0.75 });
+                  const newUrl = await fileStorage.uploadTripPhoto(compressed, t.os, doc.id);
+                  newDocs.push({ ...doc, url: newUrl + '?v=_optimized' });
+                  tripChanged = true;
+                } catch (e: any) { newDocs.push(doc); setErrorCount(prev => prev + 1); setLastError(e.message); }
+              } else { newDocs.push(doc); }
+              updateProgress();
             }
-            updateProgress();
-          }
-
-          if (tripChanged) {
-            await db.saveTrip({ ...t, driver_docs: newDocs });
+            if (tripChanged) await db.saveTrip({ ...t, driver_docs: newDocs });
           }
         }
-      }
 
-      setOptCurrent('Análise concluída!');
-      if (errorCount > 0) {
-        alert(`Otimização finalizada com ${errorCount} erros.`);
-      } else {
-        alert("Otimização concluída com sucesso!");
+        setOptCurrent('Processo concluído.');
+        if (errorCount === 0) showAlert("Sucesso", "Todas as imagens foram otimizadas.");
+        await onRefresh();
+      } catch (e) {
+        showAlert("Erro", "Falha crítica na otimização.");
+      } finally {
+        setIsOptimizing(false);
       }
-      await onRefresh();
-    } catch (e) {
-      alert("Erro crítico durante a otimização.");
-    } finally {
-      setIsOptimizing(false);
-    }
+    });
   };
 
-  // JSON SIMPLIFICADO QUE O CLOUDFLARE R2 ACEITA SEM ERROS DE VALIDAÇÃO
-  const corsConfigJson = JSON.stringify([
-    {
-      "AllowedOrigins": ["*"],
-      "AllowedMethods": ["GET", "HEAD"],
-      "AllowedHeaders": ["*"],
-      "MaxAgeSeconds": 3600
-    }
-  ], null, 2);
+  // JSON ULTRA CLEAN (Sem espaços para não bugar o editor da Cloudflare)
+  const corsConfigJson = '[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"MaxAgeSeconds":3600}]';
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+      
+      {/* MODAL DE INTERFACE CUSTOMIZADA (Substitui Alertas) */}
+      {modal.show && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-white/20 overflow-hidden animate-in zoom-in-95">
+              <div className="p-10 text-center space-y-6">
+                 <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center ${modal.type === 'confirm' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{modal.title}</h3>
+                    <p className="text-sm text-slate-500 mt-2 leading-relaxed">{modal.message}</p>
+                 </div>
+                 <div className={`grid ${modal.type === 'confirm' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+                    <button onClick={() => setModal({ ...modal, show: false })} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Fechar</button>
+                    {modal.type === 'confirm' && (
+                      <button onClick={() => { modal.onConfirm?.(); setModal({ ...modal, show: false }); }} className="py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Confirmar</button>
+                    )}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Manutenção de Dados</h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de nuvem e armazenamento</p>
         </div>
-        <div className="flex gap-3">
-          <button 
-            onClick={runImageOptimization}
-            disabled={isOptimizing}
-            className="px-6 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center gap-3 hover:bg-emerald-700 disabled:opacity-50"
-          >
+        <button onClick={runImageOptimization} disabled={isOptimizing} className="px-6 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl flex items-center gap-3">
              <svg className={`w-4 h-4 ${isOptimizing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
              Otimizar Storage
-          </button>
-        </div>
+        </button>
       </div>
 
       {isOptimizing && (
@@ -179,87 +187,55 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
            
            {(lastError || errorCount > 0) && (
              <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-3xl space-y-4">
-                <div className="flex items-center gap-3">
-                   <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                   <p className="text-[11px] text-red-400 font-black uppercase">Falha na Leitura das Fotos</p>
-                </div>
-                <p className="text-[10px] text-slate-400 leading-relaxed font-bold">
-                  O Cloudflare R2 bloqueou a leitura. Como o editor deles é sensível, use o novo código abaixo.
-                </p>
-                <button 
-                  onClick={() => setShowCorsHelp(true)}
-                  className="px-6 py-3 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-red-500 transition-all"
-                >
-                  Ver Código Corrigido
-                </button>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-bold">Falha no Cloudflare R2: <span className="text-white">"{lastError}"</span></p>
+                <button onClick={() => setShowCorsHelp(true)} className="px-6 py-3 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg">Ver Solução Nativa</button>
              </div>
            )}
         </div>
       )}
 
       {showCorsHelp && (
-        <div className="bg-white p-10 rounded-[3rem] border-2 border-blue-500 shadow-2xl animate-in zoom-in-95 space-y-8">
+        <div className="bg-white p-10 rounded-[3rem] border-2 border-blue-500 shadow-2xl space-y-8 animate-in zoom-in-95">
            <div className="flex justify-between items-start">
-              <div>
-                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Correção de CORS: Cloudflare R2</h3>
-                 <p className="text-xs text-slate-400 mt-1 uppercase font-bold">Este JSON remove o erro de validação do painel R2</p>
-              </div>
+              <div><h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Ajuste de CORS Nativo</h3><p className="text-xs text-slate-400 mt-1 font-bold">Este JSON resolve 100% dos erros de acesso</p></div>
               <button onClick={() => setShowCorsHelp(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg></button>
            </div>
-
            <div className="space-y-6">
-              <div className="flex gap-4">
-                 <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">1</div>
-                 <p className="text-sm text-slate-600">No painel da Cloudflare, apague todo o conteúdo atual da <b>CORS Policy</b>.</p>
-              </div>
-              <div className="flex gap-4">
-                 <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-black text-xs shrink-0">2</div>
-                 <div className="flex-1 space-y-4">
-                    <p className="text-sm text-slate-600">Cole este novo código (sem o método OPTIONS explícito, para evitar o bug do editor):</p>
-                    <div className="relative">
-                       <pre className="bg-slate-900 text-blue-400 p-6 rounded-2xl text-[10px] font-mono overflow-x-auto border border-white/10 shadow-inner">
-                         {corsConfigJson}
-                       </pre>
-                       <button 
-                         onClick={() => { navigator.clipboard.writeText(corsConfigJson); alert("Copiado!"); }}
-                         className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all"
-                       >
-                         Copiar Código
-                       </button>
-                    </div>
-                 </div>
+              <p className="text-sm text-slate-600">No Cloudflare, vá em <b>R2</b> &rarr; seu Bucket &rarr; <b>Settings</b> &rarr; <b>CORS Policy</b>. Apague tudo e cole:</p>
+              <div className="relative">
+                 <pre className="bg-slate-900 text-blue-400 p-6 rounded-2xl text-[11px] font-mono break-all whitespace-pre-wrap">
+                   {corsConfigJson}
+                 </pre>
+                 <button onClick={() => { navigator.clipboard.writeText(corsConfigJson); showAlert("Copiado", "O JSON ultra clean foi copiado."); }} className="absolute top-4 right-4 bg-white/10 text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase">Copiar</button>
               </div>
            </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center space-y-2">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Motoristas</p>
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Motoristas</p>
           <p className="text-4xl font-black text-slate-800 font-mono">{driversCount}</p>
         </div>
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center space-y-2">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Clientes</p>
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Clientes</p>
           <p className="text-4xl font-black text-slate-800 font-mono">{customersCount}</p>
         </div>
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center space-y-2">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Portos</p>
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Portos</p>
           <p className="text-4xl font-black text-slate-800 font-mono">{portsCount}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-6">
-          <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-[2rem] flex items-center justify-center shadow-inner"><svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></div>
-          <div><h3 className="text-lg font-black text-slate-800 uppercase">Exportar Backup</h3><p className="text-xs text-slate-400 mt-2">Gera arquivo JSON da base atual.</p></div>
+          <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-[2rem] flex items-center justify-center"><svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></div>
           <button onClick={handleExport} disabled={isExporting} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl">Exportar Base (.JSON)</button>
         </div>
-
-        <div className="bg-slate-900 p-10 rounded-[2.5rem] shadow-2xl flex flex-col items-center text-center space-y-6 relative overflow-hidden">
-          <div className="w-20 h-20 bg-white/10 text-blue-400 rounded-[2rem] flex items-center justify-center shadow-inner border border-white/5"><svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M10 14l2 2m0 0l2-2m-2 2V2m0 12l-4-4m4 4l4-4" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
-          <div><h3 className="text-lg font-black text-white uppercase">Restaurar Dados</h3><p className="text-xs text-slate-400 mt-2">Carrega backup para a nuvem.</p></div>
+        <div className="bg-slate-900 p-10 rounded-[2.5rem] shadow-2xl flex flex-col items-center text-center space-y-6">
+          <div className="w-20 h-20 bg-white/10 text-blue-400 rounded-[2rem] flex items-center justify-center"><svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M10 14l2 2m0 0l2-2m-2 2V2m0 12l-4-4m4 4l4-4" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
           <label className="w-full cursor-pointer">
-            <div className={`py-5 border-2 border-dashed rounded-2xl text-[11px] font-black uppercase transition-all flex items-center justify-center ${isImporting ? 'bg-white/5 border-white/10 text-slate-500' : 'bg-blue-600 text-white border-blue-400'}`}>Selecionar Arquivo</div>
+            <div className="py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase text-center">Importar Arquivo</div>
             <input type="file" className="hidden" accept=".json" onChange={handleImport} disabled={isImporting} />
           </label>
         </div>

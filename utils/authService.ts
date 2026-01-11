@@ -6,7 +6,6 @@ import { ADMIN_CREDENTIALS } from '../constants';
 export const authService = {
   /**
    * Realiza o login consultando a tabela 'users' no Supabase.
-   * Valida também o acesso mestre definido em constantes.
    */
   async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string; isDatabaseDown?: boolean }> {
     const inputUser = username.trim().toLowerCase();
@@ -18,7 +17,6 @@ export const authService = {
 
     const nowISO = new Date().toISOString();
 
-    // 1. Verificação imediata do Administrador Mestre (Hardcoded)
     const isMaster = inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && inputPass === ADMIN_CREDENTIALS.password;
 
     if (!supabase) {
@@ -27,7 +25,6 @@ export const authService = {
     }
 
     try {
-      // 2. Busca no banco de dados (users)
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -36,15 +33,12 @@ export const authService = {
 
       if (error) throw error;
 
-      // Se não houver no banco, mas for o mestre, deixa entrar
       if (!data) {
         if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
         return { success: false, error: 'Usuário não cadastrado.' };
       }
 
-      // 3. Validação de Senha do Banco
       if (data.password !== inputPass) {
-        // Fallback: se a senha do banco falhar mas for a senha master para o usuário master, libera
         if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
         return { success: false, error: 'Senha incorreta.' };
       }
@@ -58,29 +52,29 @@ export const authService = {
         username: data.username,
         displayName: data.display_name || data.displayname || data.username,
         role: data.role,
-        lastLogin: nowISO, // FORÇA O TIMER A ZERAR NO FRONT
+        lastLogin: nowISO, // Reset do timer local
         photo: data.photo,
         position: data.position,
         driverId: data.driver_id || data.driverid,
         staffId: data.staff_id || data.staffid,
         status: data.status,
-        isFirstLogin: data.is_first_login ?? data.isfirstlogin
+        isFirstLogin: data.is_first_login ?? data.isfirstlogin,
+        lastSeen: nowISO // Reset do timer de presença lateral (OnlineStatus)
       };
 
-      // Atualiza timestamp no banco
-      supabase.from('users').update({ last_login: nowISO, presence_status: 'online' }).eq('id', user.id).then();
+      // Atualização atômica no servidor para zerar o OnlineStatus widget
+      await supabase.from('users').update({ 
+        last_login: nowISO, 
+        last_seen: nowISO, 
+        presence_status: 'online' 
+      }).eq('id', user.id);
 
       return { success: true, user };
 
     } catch (err: any) {
       console.error("Auth Exception:", err);
       if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
-
-      return { 
-        success: false, 
-        error: 'Servidor ALS offline. Tente novamente em instantes.',
-        isDatabaseDown: true 
-      };
+      return { success: false, error: 'Servidor ALS offline.', isDatabaseDown: true };
     }
   },
 
@@ -91,6 +85,7 @@ export const authService = {
       displayName: 'Operacional Master',
       role: 'admin',
       lastLogin: timestamp,
+      lastSeen: timestamp,
       status: 'Ativo',
       position: 'Administração SSZ',
       isFirstLogin: false
