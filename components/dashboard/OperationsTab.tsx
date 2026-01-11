@@ -19,6 +19,7 @@ import PreStackingForm from './forms/PreStackingForm';
 import VWStatusSelector from './operations/VWStatusSelector';
 import StatusHistoryManagerModal from './operations/StatusHistoryManagerModal';
 import TripModal from './operations/TripModal';
+import TripDetailsViewerModal from './operations/TripDetailsViewerModal';
 import CopyAllStatusesAction from './operations/CopyAllStatusesAction';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 
@@ -50,6 +51,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
+  const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
   
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
@@ -62,7 +64,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Data de hoje formatada para o input (YYYY-MM-DD)
   const today = new Date().toLocaleDateString('en-CA');
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
@@ -94,7 +95,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const filteredTrips = useMemo(() => {
     let result = [...trips];
 
-    // 1. Filtros de Status (Tabs)
     if (activeStatusTab === 'ativas') {
       const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
       result = result.filter(t => active.includes(t.status));
@@ -102,12 +102,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     else if (activeStatusTab === 'cancelada') result = result.filter(t => t.status === 'Viagem cancelada');
     else if (activeStatusTab === 'geral') result = result.filter(t => t.status !== 'Viagem cancelada');
 
-    // 2. Filtros Laterais
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
     
-    // 3. Filtro de Datas
     if (startDate || endDate) {
       result = result.filter(t => {
         const tripDate = t.dateTime.substring(0, 10);
@@ -117,7 +115,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       });
     }
 
-    // 4. Filtro de Texto (Global da Tela)
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(t => 
@@ -208,7 +205,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
              columns={columns} 
              data={filteredTrips} 
              hideInternalSearch
-             onRowClick={(t) => { setSelectedTrip(t); setIsTripModalOpen(true); }}
+             onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
              defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']} 
            />
         </div>
@@ -253,12 +250,45 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         <TripModal isOpen={isTripModalOpen} onClose={() => setIsTripModalOpen(false)} onSuccess={onRefresh} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} />
       )}
 
+      {isTripDetailsOpen && selectedTrip && (
+        <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} user={user} />
+      )}
+
       {isDriverDocsModalOpen && selectedTrip && (
         <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => setIsDriverDocsModalOpen(false)} trip={selectedTrip} user={user} onSuccess={onRefresh} />
       )}
 
       {isCategoryModalOpen && (
         <CategoryManagerModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} categories={categories} onSuccess={onRefresh} actingUser={user} />
+      )}
+
+      {isStatusModalOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">
+             <div className="text-center shrink-0">
+               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Inserção de Novo Status</p>
+               <p className="text-xl font-black text-slate-800 uppercase">OS: {selectedTrip.os}</p>
+             </div>
+             <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Próxima Etapa Operacional</label>
+                  <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
+                    {['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora Real do Evento</label>
+                  <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
+                </div>
+             </div>
+             <div className="grid gap-3 pt-4">
+                <button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 active:scale-95">
+                  {isSavingStatus ? 'Gravando...' : 'Confirmar Registro'}
+                </button>
+                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button>
+             </div>
+          </div>
+        </div>
       )}
 
       <style>{`

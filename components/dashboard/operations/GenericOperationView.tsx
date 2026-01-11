@@ -10,6 +10,7 @@ import DriverDocsViewerModal from './DriverDocsViewerModal';
 import DocumentViewerModal from './DocumentViewerModal';
 import StatusHistoryManagerModal from './StatusHistoryManagerModal';
 import TripModal from './TripModal';
+import TripDetailsViewerModal from './TripDetailsViewerModal';
 import DateRangeFilter from './DateRangeFilter';
 import OrdemColetaForm from '../forms/OrdemColetaForm';
 import PreStackingForm from '../forms/PreStackingForm';
@@ -39,6 +40,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
+  const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
   const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
   const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
   const [isOCFormOpen, setIsOCFormOpen] = useState(false);
@@ -55,7 +57,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Data de hoje formatada para o input (YYYY-MM-DD)
   const today = new Date().toLocaleDateString('en-CA');
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
@@ -129,10 +130,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
     if (startDate || endDate) {
       result = result.filter(t => {
-        // Normaliza para comparação de data YYYY-MM-DD
         const tripDate = t.dateTime ? t.dateTime.substring(0, 10) : "";
         if (!tripDate) return false;
-        
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
         return true;
@@ -250,20 +249,32 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           title={`Cargas Filtradas: ${selectedFilterClient}`} 
           columns={tripColumns} 
           data={filteredTrips} 
-          onRowClick={(t) => { setSelectedTrip(t); setIsTripModalOpen(true); }}
+          onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
           defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']} 
         />
       </div>
 
-      {isStatusModalOpen && (
+      {isTripDetailsOpen && selectedTrip && (
+        <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} user={user} />
+      )}
+
+      {isStatusModalOpen && selectedTrip && (
         <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">
-             <div className="text-center shrink-0"><p className="text-lg font-black text-blue-600 uppercase">OS: {selectedTrip?.os}</p></div>
+             <div className="text-center shrink-0">
+               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Inserção de Novo Status</p>
+               <p className="text-xl font-black text-slate-800 uppercase">OS: {selectedTrip.os}</p>
+             </div>
              <div className="space-y-4">
-                <div className="space-y-1"><label className={labelClass}>Novo Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
+                <div className="space-y-1"><label className={labelClass}>Novo Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
                 <div className="space-y-1"><label className={labelClass}>Data/Hora Evento</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
              </div>
-             <div className="grid gap-3 pt-4"><button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 active:scale-95">{isSavingStatus ? 'Gravando...' : 'Atualizar Posição'}</button><button onClick={() => setIsStatusModalOpen(false)} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button></div>
+             <div className="grid gap-3 pt-4">
+                <button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 active:scale-95">
+                  {isSavingStatus ? 'Gravando...' : 'Confirmar Registro'}
+                </button>
+                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button>
+             </div>
           </div>
         </div>
       )}
