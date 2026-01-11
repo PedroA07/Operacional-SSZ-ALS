@@ -9,6 +9,13 @@ export interface NFData {
 
 export const textExtractionService = {
   /**
+   * Extrai todo o texto contido na imagem sem filtros
+   */
+  extractGeneralText: async (imageUrl: string, onProgress?: (p: number) => void): Promise<string> => {
+    return await ocrService.extractAllText(imageUrl, onProgress);
+  },
+
+  /**
    * Extrai e valida IDs de Container (4 letras + 7 números)
    */
   extractContainer: async (imageUrl: string, onProgress?: (p: number) => void): Promise<string | null> => {
