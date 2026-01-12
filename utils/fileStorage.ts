@@ -28,11 +28,10 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Limpa o path de qualquer prefixo als-transportes se ele vier do banco com isso
+    // Limpa o path de qualquer prefixo als-transportes (case insensitive)
     let cleanPath = path.replace(/^\/+/, '');
-    if (cleanPath.startsWith('als-transportes/')) {
-      cleanPath = cleanPath.replace('als-transportes/', '');
-    }
+    cleanPath = cleanPath.replace(/^als-transportes\/?/i, '');
+    cleanPath = cleanPath.replace(/^\/+/, '');
     
     const cleanDomain = domain.replace(/\/$/, '');
     return domain ? `${prefix}${cleanDomain}/${cleanPath}` : cleanPath;
@@ -55,8 +54,11 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Garante que o path enviado não tenha barras duplas ou iniciais
-      const normalizedPath = destinationPath.replace(/^\/+/, '');
+      // Remove barra inicial e prefixo da empresa antes de enviar para a API
+      let normalizedPath = destinationPath.replace(/^\/+/, '');
+      normalizedPath = normalizedPath.replace(/^als-transportes\/?/i, '');
+      normalizedPath = normalizedPath.replace(/^\/+/, '');
+      
       formData.append('path', normalizedPath);
 
       const res = await fetch('/api/upload', { 

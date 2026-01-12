@@ -33,14 +33,16 @@ export default async function handler(request: Request) {
       });
     }
 
-    // NORMALIZAÇÃO RADICAL: 
+    // NORMALIZAÇÃO RADICAL E INSENSÍVEL A CASO:
     // 1. Remove barras iniciais
-    // 2. Remove qualquer menção acidental a 'als-transportes/' no início do path 
-    //    para garantir que 'trips/...' seja a raiz.
+    // 2. Remove qualquer menção a 'als-transportes/' no início (case-insensitive)
     let cleanKey = rawPath.replace(/^\/+/, '');
-    if (cleanKey.startsWith('als-transportes/')) {
-      cleanKey = cleanKey.replace('als-transportes/', '');
-    }
+    
+    // Remove "als-transportes/" ou "als-transportes" (com ou sem barra) do início da string
+    cleanKey = cleanKey.replace(/^als-transportes\/?/i, '');
+    
+    // Garante que não sobrou nenhuma barra no início após a remoção do prefixo
+    cleanKey = cleanKey.replace(/^\/+/, '');
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
@@ -65,11 +67,11 @@ export default async function handler(request: Request) {
       domain = `https://${domain}`;
     }
     
-    // O link final DEVE ser dominio/trips/... sem o prefixo da empresa
+    // URL Final: dominio/trips/... (ou drivers/..., etc)
     const publicUrl = `${domain}/${cleanKey}`;
 
-    console.log(`[R2 STORAGE] Arquivo gravado com Key: ${cleanKey}`);
-    console.log(`[R2 STORAGE] URL Gerada: ${publicUrl}`);
+    console.log(`[R2 UPLOAD] Key Final: ${cleanKey}`);
+    console.log(`[R2 UPLOAD] URL Gerada: ${publicUrl}`);
 
     return new Response(JSON.stringify({ 
       url: publicUrl, 
@@ -81,7 +83,9 @@ export default async function handler(request: Request) {
     });
   } catch (error: any) {
     console.error("[R2 Upload Error]:", error);
-    return new Response(JSON.stringify({ error: `Falha no R2: ${error.message}` }), { 
+    return new Response(JSON.stringify({ 
+      error: `Falha no R2: ${error.message}` 
+    }), { 
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
