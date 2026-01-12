@@ -15,7 +15,6 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
 
   const todayRaw = useMemo(() => trips.filter(t => t.dateTime.split('T')[0] === todayStr), [trips, todayStr]);
 
-  // Estatísticas para o Bloco
   const stats = useMemo(() => {
     const active = todayRaw.filter(t => t.status !== 'Viagem cancelada');
     const canceled = todayRaw.filter(t => t.status === 'Viagem cancelada').length;
@@ -34,7 +33,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     return { total: active.length, typeCounts, canceled, delays, completed };
   }, [todayRaw]);
 
-  // Filtros para a Lista Expandida
+  // Filtros para lista expandida
   const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type))).sort(), [todayRaw]);
   const allClients = useMemo(() => Array.from(new Set(todayRaw.map(t => t.customer.name))).sort(), [todayRaw]);
   const allDests = useMemo(() => Array.from(new Set(todayRaw.map(t => t.destination?.name || t.scheduling?.location).filter(Boolean))).sort(), [todayRaw]);
@@ -43,10 +42,6 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [selClients, setSelClients] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_today_clients') || '[]'));
   const [selDests, setSelDests] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_today_dests') || '[]'));
   
-  useEffect(() => { localStorage.setItem('filter_today_types', JSON.stringify(selTypes)); }, [selTypes]);
-  useEffect(() => { localStorage.setItem('filter_today_clients', JSON.stringify(selClients)); }, [selClients]);
-  useEffect(() => { localStorage.setItem('filter_today_dests', JSON.stringify(selDests)); }, [selDests]);
-
   const todayTrips = useMemo(() => {
     return todayRaw.filter(t => {
       if (t.status === 'Viagem cancelada') return false;
@@ -80,56 +75,50 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
         </div>
 
         <div className="mt-6 w-full space-y-4">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {Object.entries(stats.typeCounts).slice(0, 2).map(([type, c]) => (
-              <div key={type} className="flex justify-between items-center bg-slate-50/50 px-2 py-1 rounded-lg border border-slate-100/50">
-                <span className="text-[8px] font-bold text-slate-400 uppercase">{type.substring(0, 3)}</span>
+              <div key={type} className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 flex justify-between items-center">
+                <span className="text-[7.5px] font-black text-slate-400 uppercase truncate pr-1">{type}</span>
                 <span className="text-[10px] font-black text-slate-700">{c}</span>
               </div>
             ))}
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-red-50/50 p-2 rounded-xl border border-red-100/30 text-center">
+            <div className="text-center">
               <p className="text-[7px] font-black text-red-400 uppercase">Atraso</p>
-              <p className="text-sm font-black text-red-600">{stats.delays}</p>
+              <p className="text-sm font-black text-red-600 leading-none mt-1">{stats.delays}</p>
             </div>
-            <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100/30 text-center">
+            <div className="text-center">
               <p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p>
-              <p className="text-sm font-black text-emerald-600">{stats.completed}</p>
+              <p className="text-sm font-black text-emerald-600 leading-none mt-1">{stats.completed}</p>
             </div>
-            <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 text-center">
+            <div className="text-center">
               <p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p>
-              <p className="text-sm font-black text-slate-700">{stats.canceled}</p>
+              <p className="text-sm font-black text-slate-600 leading-none mt-1">{stats.canceled}</p>
             </div>
           </div>
         </div>
       </button>
 
       {isOpen && (
-        <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[60] animate-in slide-in-from-top-1 duration-300 max-h-[700px] flex flex-col overflow-hidden">
+        <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[60] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col overflow-hidden">
           <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 shrink-0 relative z-[100]">
              <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
              <MultiCheckboxFilter label="Destinos" options={allDests} selectedOptions={selDests} onChange={setSelDests} />
           </div>
-
-          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50/30 flex-1 min-h-[300px] relative z-10">
+          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50/30 flex-1 min-h-[300px]">
             {todayTrips.length > 0 ? todayTrips.map(trip => (
-              <div key={trip.id} className="p-5 bg-white border border-slate-100 rounded-3xl hover:border-blue-200 transition-all group shadow-sm">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-                    <span className="px-2 py-0.5 bg-slate-900 text-white rounded text-[7px] font-black uppercase tracking-widest">{trip.type}</span>
-                  </div>
-                  <span className="text-[9px] font-black text-slate-300">OS: {trip.os}</span>
+              <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl group shadow-sm">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-sm font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                  <span className="px-2 py-0.5 bg-slate-900 text-white rounded text-[7px] font-black uppercase">{trip.type}</span>
                 </div>
-                <p className="text-[10px] font-black text-slate-800 uppercase leading-none">{trip.driver.name}</p>
+                <p className="text-[10px] font-black text-slate-800 uppercase leading-none truncate">{trip.driver.name}</p>
                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 truncate">{trip.customer.name}</p>
               </div>
-            )) : (
-              <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem resultados</div>
-            )}
+            )) : <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem resultados</div>}
           </div>
         </div>
       )}

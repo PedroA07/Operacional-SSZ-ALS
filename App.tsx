@@ -14,15 +14,11 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     const oldId = user?.id;
-    // 1. Limpa o estado frontal imediatamente
     setUser(null);
     setCurrentScreen(AppScreen.LOGIN);
-    
-    // 2. Limpa o storage
     sessionStorage.removeItem('als_active_session');
     
-    // 3. Tenta avisar o banco (background)
-    if (oldId) {
+    if (oldId && oldId !== 'admin-master') {
       try {
         await db.updatePresence(oldId, 'offline');
       } catch (e) {}
@@ -38,6 +34,7 @@ const App: React.FC = () => {
         if (saved) {
           const sessionData: User = JSON.parse(saved);
           
+          // Se for o admin master, reconecta direto
           if (sessionData.username === 'operacional_ssz') {
             setUser(sessionData);
             setCurrentScreen(AppScreen.DASHBOARD);
@@ -45,6 +42,7 @@ const App: React.FC = () => {
             return;
           }
 
+          // Para outros usuários, valida no banco se ainda estão ativos
           const users = await db.getUsers();
           const dbUser = users.find(u => u.id === sessionData.id);
 

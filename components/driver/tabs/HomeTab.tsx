@@ -43,7 +43,18 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Seleciona a viagem ativa mais próxima
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const driverStats = useMemo(() => {
+    const todayTrips = trips.filter(t => t.dateTime.split('T')[0] === todayStr && t.status !== 'Viagem cancelada');
+    return {
+      total: todayTrips.length,
+      done: todayTrips.filter(t => t.status === 'Viagem concluída').length,
+      pending: todayTrips.filter(t => t.status !== 'Viagem concluída').length,
+    };
+  }, [trips, todayStr]);
+
   const activeTrip = useMemo(() => {
     const sorted = [...trips]
       .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
@@ -131,6 +142,22 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-24">
+      {/* SUMÁRIO DO MOTORISTA - ÍNDICES */}
+      <div className="grid grid-cols-3 gap-3">
+         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+            <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest">Total Hoje</p>
+            <p className="text-xl font-black text-white mt-1">{driverStats.total}</p>
+         </div>
+         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-center">
+            <p className="text-[7px] font-black text-emerald-400 uppercase tracking-widest">Concl.</p>
+            <p className="text-xl font-black text-emerald-400 mt-1">{driverStats.done}</p>
+         </div>
+         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-center">
+            <p className="text-[7px] font-black text-amber-400 uppercase tracking-widest">Pendente</p>
+            <p className="text-xl font-black text-amber-400 mt-1">{driverStats.pending}</p>
+         </div>
+      </div>
+
       <div className="flex justify-between items-center px-1">
         <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Programação em Curso</h2>
         <RefreshPageButton />
@@ -170,7 +197,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
           </div>
 
           <div className="p-8 space-y-7">
-            {/* Bloco de Agendamento (se houver) */}
             {activeTrip.scheduling && (
                <SchedulingInfo trip={activeTrip} />
             )}
