@@ -33,19 +33,15 @@ export default async function handler(request: Request) {
       });
     }
 
-    // REMOÇÃO CIRÚRGICA DO PREFIXO:
-    // Remove "als-transportes/" ou "als transportes/" APENAS se estiver no início da string
-    // O ^ indica o início da linha. O /i indica case-insensitive.
-    let cleanKey = rawPath
-      .replace(/^als[- ]transportes\//i, '') 
-      .replace(/^als[- ]transportes/i, '')
-      .replace(/\/+/g, '/') // Remove barras duplas residuais
-      .replace(/^\/+/, ''); // Remove barra inicial se sobrar
-    
-    // Se por algum motivo o path ficou vazio, usa o nome do arquivo
-    if (!cleanKey || cleanKey === '') {
-      cleanKey = file.name;
+    // GARANTE O PREFIXO als-transportes/
+    // Remove qualquer barra inicial duplicada e força o início correto
+    let cleanPath = rawPath.replace(/^\/+/, '');
+    if (!cleanPath.startsWith('als-transportes/')) {
+      cleanPath = `als-transportes/${cleanPath}`;
     }
+    
+    // Limpa barras duplas acidentais no meio do caminho
+    const finalKey = cleanPath.replace(/\/+/g, '/');
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
@@ -54,7 +50,7 @@ export default async function handler(request: Request) {
 
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: cleanKey, 
+      Key: finalKey, 
       Body: fileBytes,
       ContentType: contentType,
       CacheControl: "public, max-age=31536000",
@@ -66,11 +62,11 @@ export default async function handler(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
-    const publicUrl = `${domain}/${cleanKey}`;
+    const publicUrl = `${domain}/${finalKey}`;
 
     return new Response(JSON.stringify({ 
       url: publicUrl, 
-      path: cleanKey,
+      path: finalKey,
       success: true 
     }), {
       status: 200,

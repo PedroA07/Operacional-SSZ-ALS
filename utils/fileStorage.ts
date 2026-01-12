@@ -25,12 +25,12 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Limpeza cirúrgica no path para links de visualização
-    const cleanPath = path
-      .replace(/^als[- ]transportes\//i, '')
-      .replace(/^als[- ]transportes/i, '')
-      .replace(/\/+/g, '/')
-      .replace(/^\/+/, '');
+    // Garante que o path exibido/buscado contenha o prefixo da pasta
+    let cleanPath = path.replace(/^\/+/, '');
+    if (!cleanPath.startsWith('als-transportes/')) {
+      cleanPath = `als-transportes/${cleanPath}`;
+    }
+    cleanPath = cleanPath.replace(/\/+/g, '/');
     
     const cleanDomain = domain.replace(/\/$/, '');
     return domain ? `${prefix}${cleanDomain}/${cleanPath}` : cleanPath;
@@ -53,12 +53,12 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Limpeza cirúrgica: remove o prefixo als-transportes se ele existir no início
-      const normalizedPath = destinationPath
-        .replace(/^als[- ]transportes\//i, '')
-        .replace(/^als[- ]transportes/i, '')
-        .replace(/\/+/g, '/')
-        .replace(/^\/+/, '');
+      // ADICIONA O PREFIXO als-transportes/ NO FRONTEND PARA PADRONIZAR
+      let normalizedPath = destinationPath.replace(/^\/+/, '');
+      if (!normalizedPath.startsWith('als-transportes/')) {
+        normalizedPath = `als-transportes/${normalizedPath}`;
+      }
+      normalizedPath = normalizedPath.replace(/\/+/g, '/');
       
       formData.append('path', normalizedPath);
 

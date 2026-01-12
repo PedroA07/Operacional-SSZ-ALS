@@ -16,16 +16,15 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // Limpeza do folder para evitar subpastas als-transportes
-      const cleanFolder = folder
-        .replace(/als[- ]transportes\//gi, '')
-        .replace(/als[- ]transportes/gi, '')
-        .replace(/^\/+|\/+$/g, '');
+      // Garante que o folder esteja dentro de als-transportes/
+      let cleanFolder = folder.replace(/^\/+|\/+$/g, '');
+      if (!cleanFolder.startsWith('als-transportes')) {
+        cleanFolder = `als-transportes/${cleanFolder}`;
+      }
 
-      const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
+      const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : `als-transportes/${fileName}`;
       
-      // Corrigido para 'path' para bater com o que a API espera
-      formData.append('path', finalPath);
+      formData.append('path', finalPath.replace(/\/+/g, '/'));
 
       const res = await fetch('/api/upload', {
         method: 'POST',

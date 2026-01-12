@@ -27,18 +27,16 @@ export async function POST(request: Request) {
       });
     }
 
-    // REMOÇÃO CIRÚRGICA DO PREFIXO (Igual ao handler principal)
-    const cleanKey = rawPath
-      .replace(/^als[- ]transportes\//i, '')
-      .replace(/^als[- ]transportes/i, '')
-      .replace(/\/+/g, '/')
-      .replace(/^\/+/, '');
+    // FORÇA O PREFIXO als-transportes/
+    let cleanPath = rawPath.replace(/^\/+/, '');
+    if (!cleanPath.startsWith('als-transportes/')) {
+      cleanPath = `als-transportes/${cleanPath}`;
+    }
+    const finalKey = cleanPath.replace(/\/+/g, '/');
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
     
-    const finalKey = cleanKey || file.name;
-
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
       Key: finalKey,
