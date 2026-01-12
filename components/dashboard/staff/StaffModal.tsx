@@ -4,6 +4,7 @@ import { Staff, User } from '../../../types';
 import { db } from '../../../utils/storage';
 import { maskPhone } from '../../../utils/masks';
 import { imageCompressor } from '../../../utils/imageCompressor';
+import { usernameGenerator } from '../../../utils/usernameGenerator';
 
 interface StaffModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -42,20 +44,32 @@ const StaffModal: React.FC<StaffModalProps> = ({
         registrationDate: editingStaff.registrationDate?.split('T')[0]
       });
       setIsEditingPassword(false);
+      setSuggestions([]);
     } else {
       setForm({ 
         role: 'staff', name: '', position: '', username: '', password: '12345678', 
         emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '', registrationDate: new Date().toISOString().split('T')[0]
       });
       setIsEditingPassword(true);
+      setSuggestions([]);
     }
   }, [editingStaff, isOpen, allUsers]);
+
+  const handleNameChange = (val: string) => {
+    const name = val.toUpperCase();
+    setForm(prev => ({ ...prev, name }));
+    
+    // Só gera sugestões se for um novo cadastro
+    if (!editingStaff) {
+      const newsug = usernameGenerator.generateSuggestions(val);
+      setSuggestions(newsug);
+    }
+  };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        // COMPRESSÃO AGRESSIVA PARA PERFIL: 400px e 70% qualidade
         const compressed = await imageCompressor.compress(file, {
           maxWidth: 400,
           maxHeight: 400,
@@ -131,7 +145,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
             <div className="flex-1 space-y-5">
               <div className="space-y-1">
                 <label className={labelClass}>Nome Completo</label>
-                <input required className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                <input required className={inputClasses} value={form.name} onChange={e => handleNameChange(e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
@@ -152,7 +166,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
           <div className="grid grid-cols-2 gap-6">
              <div className="space-y-1">
                 <label className={labelClass}>Cargo / Função</label>
-                <input required className={inputClasses} value={form.position} onChange={e => setForm({...form, position: e.target.value})} />
+                <input required className={inputClasses} value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
              </div>
              <div className="space-y-1">
                 <label className={labelClass}>Nível de Acesso</label>
@@ -166,10 +180,32 @@ const StaffModal: React.FC<StaffModalProps> = ({
           <div className="p-8 bg-blue-50/50 rounded-[2.5rem] border border-blue-100 space-y-6">
              <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Acesso ao Portal</h4>
              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                   <label className={labelClass}>Usuário (Login)</label>
-                   <input required className={inputClasses} value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase()})} />
+                <div className="space-y-3">
+                   <div className="space-y-1">
+                      <label className={labelClass}>Usuário (Login)</label>
+                      <input required className={inputClasses} value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase()})} />
+                   </div>
+                   
+                   {/* SUGESTÕES DE USUÁRIO */}
+                   {!editingStaff && suggestions.length > 0 && (
+                     <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest ml-1">Sugestões baseadas no nome:</p>
+                        <div className="flex flex-wrap gap-1.5">
+                           {suggestions.map(sug => (
+                             <button 
+                               key={sug}
+                               type="button"
+                               onClick={() => setForm(prev => ({ ...prev, username: sug }))}
+                               className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all border ${form.username === sug ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-blue-600 border-blue-100 hover:bg-blue-50'}`}
+                             >
+                               {sug}
+                             </button>
+                           ))}
+                        </div>
+                     </div>
+                   )}
                 </div>
+
                 <div className="space-y-1">
                    <div className="flex justify-between items-center pr-1">
                       <label className={labelClass}>Senha</label>
@@ -185,7 +221,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
                    <label className={labelClass}>E-mail Corporativo</label>
-                   <input className={`${inputClasses} lowercase`} value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value})} />
+                   <input className={`${inputClasses} lowercase`} value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value.toLowerCase()})} />
                 </div>
                 <div className="space-y-1">
                    <label className={labelClass}>WhatsApp</label>
