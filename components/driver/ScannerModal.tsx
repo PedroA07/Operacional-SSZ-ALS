@@ -40,8 +40,8 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment', 
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         } 
       }).catch(async () => {
         return await navigator.mediaDevices.getUserMedia({ 
@@ -78,7 +78,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(videoRef.current, 0, 0);
-    const rawImage = canvas.toDataURL('image/jpeg', 0.92);
+    const rawImage = canvas.toDataURL('image/jpeg', 0.85);
     setCurrentImage(rawImage);
     setStep('preview');
     stopCamera();
@@ -88,9 +88,10 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     if (isSaving || !currentImage) return;
     setIsSaving(true);
     try {
+      // Compressão Otimizada: Reduz tamanho para ~150kb a 300kb
       const compressedImage = await imageCompressor.compress(currentImage, {
-        maxWidth: 1400, // Reduzido levemente para garantir upload em sinal fraco
-        quality: 0.7
+        maxWidth: 1200, 
+        quality: 0.6
       });
 
       const photoId = `img_${Date.now()}`;

@@ -1,7 +1,7 @@
 
 /**
- * ALS Image Compressor Utility v1.4
- * Versão simplificada para evitar falhas de Preflight (OPTIONS)
+ * ALS Image Compressor Utility v1.5
+ * Otimizado para economia de armazenamento e performance mobile.
  */
 
 interface CompressionOptions {
@@ -17,9 +17,9 @@ export const imageCompressor = {
    */
   compress: async (source: File | string, options: CompressionOptions = {}): Promise<string> => {
     const {
-      maxWidth = 1600,
-      maxHeight = 1600,
-      quality = 0.8,
+      maxWidth = 1200, // Reduzido de 1600 para 1200
+      maxHeight = 1200,
+      quality = 0.6, // Reduzido de 0.8 para 0.6
       mimeType = 'image/jpeg'
     } = options;
 
@@ -30,7 +30,6 @@ export const imageCompressor = {
     return new Promise((resolve, reject) => {
       const img = new Image();
       
-      // Essencial para leitura de pixels (Canvas)
       img.crossOrigin = "anonymous";
 
       img.onload = () => {
@@ -67,13 +66,13 @@ export const imageCompressor = {
           resolve(result);
         } catch (e) {
           if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
-          reject(new Error("CORS_PIXEL_ERROR: O navegador bloqueou a leitura dos pixels. Verifique o CORS no R2."));
+          reject(new Error("CORS_PIXEL_ERROR"));
         }
       };
 
       img.onerror = () => {
         if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
-        reject(new Error("IMAGE_LOAD_ERROR: Verifique se o link da imagem está acessível publicamente."));
+        reject(new Error("IMAGE_LOAD_ERROR"));
       };
 
       img.src = imageUrl;
