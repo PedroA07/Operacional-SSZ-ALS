@@ -20,8 +20,6 @@ export const fileStorage = {
 
   getPublicUrl: (path: string | undefined): string => {
     if (!path) return '';
-    
-    // Se já for uma URL completa do R2 e já tiver o prefixo, retorna
     if (path.startsWith('http') && path.includes('/als-transportes/')) return path;
     
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
@@ -29,24 +27,28 @@ export const fileStorage = {
 
     const prefix = domain.startsWith('http') ? '' : 'https://';
     const cleanDomain = domain.replace(/\/$/, '');
-    
-    // Limpa o path de barras duplicadas ou iniciais
     let cleanPath = path.trim().replace(/^\/+/, '');
     
-    // Se o path for apenas o nome do arquivo ou pasta/arquivo sem o als-transportes, adicionamos
     if (!cleanPath.toLowerCase().startsWith('als-transportes/')) {
-      // Remove 'als-transportes' sem barra se existir por erro e adiciona o correto
-      cleanPath = cleanPath.replace(/^als-transportes/i, '');
       cleanPath = `als-transportes/${cleanPath.replace(/^\/+/, '')}`;
     }
     
     return `${prefix}${cleanDomain}/${cleanPath}`;
   },
 
+  normalizeFolderName: (name: string): string => {
+    return name
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^A-Z0-9]/g, '_')     // Troca espaços e símbolos por underscore
+      .replace(/_+/g, '_')            // Remove underscores duplicados
+      .trim();
+  },
+
   upload: async (file: File | string, destinationPath: string): Promise<string> => {
     try {
       const formData = new FormData();
-      
       let fileToUpload: Blob;
 
       if (typeof file === 'string' && file.startsWith('data:')) {
@@ -60,7 +62,6 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Enviamos o path para a API (a API cuidará da Key e da URL de retorno)
       formData.append('path', destinationPath);
 
       const res = await fetch('/api/upload', { 
@@ -74,7 +75,6 @@ export const fileStorage = {
       }
       
       const data = await res.json();
-      // O backend agora retorna a URL já com /als-transportes/
       return data.url; 
     } catch (e: any) {
       console.error("[Storage Error]:", e);
@@ -82,8 +82,10 @@ export const fileStorage = {
     }
   },
 
-  uploadStaffPhoto: (file: File | string, staffId: string) => 
-    fileStorage.upload(file, `colaboradores/${staffId}/foto_perfil/perfil.jpg`),
+  uploadStaffPhoto: (file: File | string, staffName: string) => {
+    const normalizedName = fileStorage.normalizeFolderName(staffName);
+    return fileStorage.upload(file, `colaboradores/${normalizedName}/foto_perfil/perfil.jpg`);
+  },
 
   uploadDriverProfile: (file: File | string, driverId: string) => 
     fileStorage.upload(file, `drivers/${driverId}/foto_perfil/perfil.jpg`),

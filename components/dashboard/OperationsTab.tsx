@@ -16,12 +16,12 @@ import CategoryControl from './operations/CategoryControl';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import PreStackingForm from './forms/PreStackingForm';
-import VWStatusSelector from './operations/VWStatusSelector';
 import StatusHistoryManagerModal from './operations/StatusHistoryManagerModal';
 import TripModal from './operations/TripModal';
 import TripDetailsViewerModal from './operations/TripDetailsViewerModal';
 import CopyAllStatusesAction from './operations/CopyAllStatusesAction';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
+import { statusService } from '../../utils/statusService';
 
 interface OperationsTabProps {
   user: User;
@@ -81,11 +81,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     const now = new Date().toISOString();
     const eventTime = new Date(statusTime).toISOString();
     
-    // LÓGICA DE DETECÇÃO DE ATRASO
     if (tempStatus === 'Chegou no cliente') {
       const scheduledTime = new Date(selectedTrip.dateTime).getTime();
       const actualTime = new Date(eventTime).getTime();
-      
       if (actualTime > scheduledTime) {
         const diffMin = Math.round((actualTime - scheduledTime) / 60000);
         await db.addNotification(user, 'SYSTEM', 'ALERTA DE ATRASO', `A OS ${selectedTrip.os} chegou no cliente com ${diffMin} min de atraso.`, { os: selectedTrip.os, motorista: selectedTrip.driver.name });
@@ -108,9 +106,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
 
   const filteredTrips = useMemo(() => {
     let result = [...trips];
-
     if (activeStatusTab === 'ativas') {
-      const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
+      const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
       result = result.filter(t => active.includes(t.status));
     } else if (activeStatusTab === 'concluida') result = result.filter(t => t.status === 'Viagem concluída');
     else if (activeStatusTab === 'cancelada') result = result.filter(t => t.status === 'Viagem cancelada');
@@ -133,13 +130,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       const q = searchQuery.toLowerCase();
       result = result.filter(t => 
         t.os.toLowerCase().includes(q) || 
-        t.container?.toLowerCase().includes(q) || 
-        t.driver.name.toLowerCase().includes(q) || 
-        t.customer.name.toLowerCase().includes(q) ||
+        (t.container && t.container.toLowerCase().includes(q)) || 
+        (t.driver && t.driver.name.toLowerCase().includes(q)) || 
+        (t.customer && t.customer.name.toLowerCase().includes(q)) ||
         (t.booking && t.booking.toLowerCase().includes(q))
       );
     }
-
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery]);
 
@@ -169,6 +165,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       />
     );
   }
+
+  const currentStatusOptions = selectedTrip ? statusService.getOptions(selectedTrip) : [];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -252,21 +250,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         </div>
       )}
 
-      {isMinutaFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
-          <div className="p-6 bg-emerald-600 text-white flex justify-between items-center shrink-0">
-             <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-black italic">PS</div>
-                <h3 className="font-black text-sm uppercase tracking-widest">Minuta Pre-Stacking: {selectedTrip.os}</h3>
-             </div>
-             <button onClick={() => setIsMinutaFormOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-             </button>
-          </div>
-          <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaFormOpen(false); onRefresh(); }} initialOS={selectedTrip.os} />
-        </div>
-      )}
-
       {isTripModalOpen && (
         <TripModal isOpen={isTripModalOpen} onClose={() => setIsTripModalOpen(false)} onSuccess={onRefresh} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} />
       )}
@@ -294,7 +277,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Próxima Etapa Operacional</label>
                   <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                    {['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    {currentStatusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">

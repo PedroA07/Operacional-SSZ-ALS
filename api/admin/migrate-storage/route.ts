@@ -1,5 +1,6 @@
 
 import { S3Client, ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'edge';
 
@@ -14,32 +15,43 @@ const getS3Client = () => {
   });
 };
 
-/**
- * Endpoint de Migração Crítica:
- * Move arquivos de pastas raiz (trips/, drivers/, colaboradores/) 
- * para dentro da pasta pai als-transportes/
- */
+const getSupabase = () => createClient(
+  process.env.VITE_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
+
+const normalizeFolderName = (name: string): string => {
+  return name
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .trim();
+};
+
 export async function POST(request: Request) {
-  // Proteção simples contra execução acidental
   const migrationKey = request.headers.get("x-migration-key");
   if (migrationKey !== "als-master-2025") {
-    return new Response(JSON.stringify({ error: "Chave de migração inválida ou ausente." }), { status: 403 });
+    return new Response(JSON.stringify({ error: "Acesso Negado." }), { status: 403 });
   }
 
   const client = getS3Client();
+  const supabase = getSupabase();
   const bucketName = process.env.R2_BUCKET_NAME || "als-transportes";
   const targetPrefix = "als-transportes/";
 
   try {
-    let continuationToken: string | undefined = undefined;
-    let totalProcessed = 0;
-    let totalMoved = 0;
-    const log: string[] = [];
+    // 1. Carregar mapeamento de Staff ID -> Nome do Supabase
+    const { data: staffList } = await supabase.from('staff').select('id, name');
+    const staffMap = new Map();
+    (staffList || []).forEach(s => staffMap.set(s.id, normalizeFolderName(s.name)));
 
-    console.log(`[MIGRAÇÃO] Iniciando varredura no bucket: ${bucketName}`);
+    let continuationToken: string | undefined = undefined;
+    let totalMoved = 0;
+    const logs: string[] = [];
 
     do {
-      // 1. Listar objetos no bucket
       const listCommand = new ListObjectsV2Command({
         Bucket: bucketName,
         ContinuationToken: continuationToken,
@@ -47,69 +59,60 @@ export async function POST(request: Request) {
       });
 
       const listResponse = await client.send(listCommand);
-      
-      if (!listResponse.Contents || listResponse.Contents.length === 0) break;
+      if (!listResponse.Contents) break;
 
       for (const item of listResponse.Contents) {
         const sourceKey = item.Key;
-        if (!sourceKey) continue;
+        if (!sourceKey || sourceKey.startsWith(targetPrefix)) continue;
 
-        totalProcessed++;
+        let destinationKey = sourceKey;
 
-        // Pular se já estiver na pasta destino ou se for a própria pasta destino
-        if (sourceKey.startsWith(targetPrefix) || sourceKey === targetPrefix) {
-          continue;
+        // Regra especial: colaboradores/[id] -> colaboradores/[nome_normalizado]
+        if (sourceKey.startsWith('colaboradores/')) {
+          const parts = sourceKey.split('/');
+          const id = parts[1];
+          if (staffMap.has(id)) {
+            const name = staffMap.get(id);
+            parts[1] = name;
+            destinationKey = parts.join('/');
+          }
         }
 
-        const destinationKey = `${targetPrefix}${sourceKey}`;
+        // Adiciona prefixo pai
+        const finalDestKey = `${targetPrefix}${destinationKey}`;
 
         try {
-          // 2. Copiar objeto para o novo caminho
-          // Nota: CopySource deve ser bucket/key
+          // Copiar
           await client.send(new CopyObjectCommand({
             Bucket: bucketName,
             CopySource: `${bucketName}/${encodeURIComponent(sourceKey)}`,
-            Key: destinationKey,
+            Key: finalDestKey,
           }));
 
-          // 3. Deletar objeto original (apenas após o sucesso da cópia)
+          // Deletar original
           await client.send(new DeleteObjectCommand({
             Bucket: bucketName,
             Key: sourceKey,
           }));
 
           totalMoved++;
-          console.log(`[OK] Movido: ${sourceKey} -> ${destinationKey}`);
-        } catch (copyErr: any) {
-          console.error(`[ERRO] Falha ao mover ${sourceKey}:`, copyErr.message);
-          log.push(`Erro em ${sourceKey}: ${copyErr.message}`);
+          console.log(`[MIGRAÇÃO] Mover: ${sourceKey} -> ${finalDestKey}`);
+        } catch (err: any) {
+          logs.push(`Erro em ${sourceKey}: ${err.message}`);
         }
       }
 
       continuationToken = listResponse.NextContinuationToken;
     } while (continuationToken);
 
-    return new Response(JSON.stringify({
-      success: true,
-      summary: {
-        total_bucket_items: totalProcessed,
-        items_moved: totalMoved,
-        errors: log
-      },
-      message: "Migração de storage concluída. Verifique os logs para detalhes de erros individuais."
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(JSON.stringify({ 
+      success: true, 
+      moved: totalMoved, 
+      errors: logs,
+      message: "Migração R2 concluída: pastas movidas para o prefixo pai e colaboradores renomeados por nome."
+    }), { status: 200 });
 
   } catch (error: any) {
-    console.error("[MIGRAÇÃO] Erro Crítico:", error);
-    return new Response(JSON.stringify({ 
-      error: `Falha na migração: ${error.message}`,
-      stack: error.stack 
-    }), { 
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

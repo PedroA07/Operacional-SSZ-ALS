@@ -16,6 +16,7 @@ import OrdemColetaForm from '../forms/OrdemColetaForm';
 import PreStackingForm from '../forms/PreStackingForm';
 import DriverLocationModal from './DriverLocationModal';
 import CopyAllStatusesAction from './CopyAllStatusesAction';
+import { statusService } from '../../../utils/statusService';
 
 interface GenericOperationViewProps {
   user: User;
@@ -97,16 +98,13 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     }
   };
 
-  // Lógica de Filtro de Clientes Corrigida: Busca em Clientes + Trips
   const categoryCustomers = useMemo(() => {
     const normCategory = categoryName.toUpperCase();
-    
     const namesFromTrips = new Set(
       allTrips
         .filter(t => t.category?.toUpperCase() === normCategory)
         .map(t => t.customer.name.toUpperCase())
     );
-
     return customers
       .filter(c => {
         const hasOpInProfile = c.operations?.some(op => op.toUpperCase() === normCategory);
@@ -136,7 +134,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(t => t.os.toLowerCase().includes(q) || t.container?.toLowerCase().includes(q) || t.driver.name.toLowerCase().includes(q));
+      result = result.filter(t => t.os.toLowerCase().includes(q) || (t.container && t.container.toLowerCase().includes(q)) || (t.driver && t.driver.name.toLowerCase().includes(q)));
     }
 
     if (startDate || endDate) {
@@ -148,7 +146,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         return true;
       });
     }
-
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [allTrips, categoryName, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient]);
 
@@ -168,6 +165,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   ), [user]);
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
+
+  const currentStatusOptions = selectedTrip ? statusService.getOptions(selectedTrip) : [];
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20">
@@ -199,7 +198,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
            ))}
          </div>
          
-         <div className="flex-1 w-full max-w-md relative group">
+         <div className="flex-1 w-full max-md relative group">
             <input 
               type="text" 
               placeholder="BUSCAR OS, CONTAINER, MOTORISTA..."
@@ -251,7 +250,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                <p className="text-xl font-black text-slate-800 uppercase">OS: {selectedTrip.os}</p>
              </div>
              <div className="space-y-4">
-                <div className="space-y-1"><label className={labelClass}>Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
+                <div className="space-y-1"><label className={labelClass}>Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
+                  {currentStatusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select></div>
                 <div className="space-y-1"><label className={labelClass}>Data/Hora</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
              </div>
              <div className="grid gap-3 pt-4">

@@ -100,26 +100,26 @@ const StaffModal: React.FC<StaffModalProps> = ({
     setIsProcessing(true);
     try {
       const staffId = editingStaff?.id || `stf-${Date.now()}`;
+      const staffName = (form.name || '').toUpperCase();
       let finalPhotoUrl = form.photo || '';
 
-      // MUDANÇA CRÍTICA: Se a foto for um Base64 novo, faz o upload para o R2
       if (finalPhotoUrl.startsWith('data:')) {
         try {
-          finalPhotoUrl = await fileStorage.uploadStaffPhoto(finalPhotoUrl, staffId);
+          // Agora enviamos o NOME para o R2, não o ID
+          finalPhotoUrl = await fileStorage.uploadStaffPhoto(finalPhotoUrl, staffName);
         } catch (uploadErr) {
           console.error("Erro no upload da foto para R2:", uploadErr);
-          // Fallback silencioso ou aviso (aqui mantemos o processo, mas o R2 é mandatório para produção)
-          throw new Error("Não foi possível salvar a foto no servidor R2. Verifique sua conexão.");
+          throw new Error("Não foi possível salvar a foto no servidor R2.");
         }
       }
       
       const staffData: Staff = { 
         id: staffId,
-        name: (form.name || '').toUpperCase(),
+        name: staffName,
         position: (form.position || '').toUpperCase(),
         username: (form.username || '').toLowerCase(),
         role: (form.role as 'admin' | 'staff') || 'staff',
-        photo: finalPhotoUrl, // Agora é a URL do R2
+        photo: finalPhotoUrl,
         registrationDate: form.registrationDate ? new Date(form.registrationDate).toISOString() : new Date().toISOString(),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
@@ -148,7 +148,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
           <div>
             <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingStaff ? 'Editar Colaborador' : 'Novo Colaborador ALS'}</h3>
-            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Gestão de Perfil e Acessos (Storage R2)</p>
+            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Gestão de Perfil e Acessos (Storage R2 - Nomes)</p>
           </div>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 rounded-full transition-all shadow-sm">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
@@ -211,23 +211,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
                       <label className={labelClass}>Usuário (Login)</label>
                       <input required className={inputClasses} value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase()})} />
                    </div>
-                   {!editingStaff && suggestions.length > 0 && (
-                     <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
-                        <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest ml-1">Sugestões baseadas no nome:</p>
-                        <div className="flex flex-wrap gap-1.5">
-                           {suggestions.map(sug => (
-                             <button 
-                               key={sug}
-                               type="button"
-                               onClick={() => setForm(prev => ({ ...prev, username: sug }))}
-                               className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all border ${form.username === sug ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-blue-600 border-blue-100 hover:bg-blue-50'}`}
-                             >
-                               {sug}
-                             </button>
-                           ))}
-                        </div>
-                     </div>
-                   )}
                 </div>
 
                 <div className="space-y-1">
@@ -236,20 +219,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
                       {editingStaff && !isEditingPassword && <button type="button" onClick={() => setIsEditingPassword(true)} className="text-[8px] font-black text-blue-500 uppercase">Alterar</button>}
                    </div>
                    <input type="text" disabled={!isEditingPassword} required={isEditingPassword} className={`${inputClasses} font-mono`} value={isEditingPassword ? form.password : '••••••••'} onChange={e => setForm({...form, password: e.target.value})} />
-                </div>
-             </div>
-          </div>
-
-          <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-6">
-             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contatos ALS</h4>
-             <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                   <label className={labelClass}>E-mail Corporativo</label>
-                   <input className={`${inputClasses} lowercase`} value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value.toLowerCase()})} />
-                </div>
-                <div className="space-y-1">
-                   <label className={labelClass}>WhatsApp</label>
-                   <input className={inputClasses} value={form.phoneCorp} onChange={e => setForm({...form, phoneCorp: maskPhone(e.target.value)})} />
                 </div>
              </div>
           </div>
