@@ -4,6 +4,7 @@ import { Trip, DriverCapturedDoc, User } from '../../../types';
 import { db } from '../../../utils/storage';
 import { textExtractionService, NFData } from '../../../utils/textExtractionService';
 import { imageCompressor } from '../../../utils/imageCompressor';
+import { fileStorage } from '../../../utils/fileStorage';
 import ImageViewer from '../../shared/ImageViewer';
 
 interface DriverDocsViewerModalProps {
@@ -17,6 +18,7 @@ interface DriverDocsViewerModalProps {
 const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, onClose, trip, user, onSuccess }) => {
   const [docs, setDocs] = useState<DriverCapturedDoc[]>(trip.driver_docs || []);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [selectedDoc, setSelectedDoc] = useState<DriverCapturedDoc | null>(null);
   
@@ -90,14 +92,19 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const results = await Promise.all((Array.from(files) as File[]).map(async file => {
-        // COMPRESSÃO PADRÃO ALS (800px / 0.4)
-        return await imageCompressor.compress(file, {
-          maxWidth: 800,
-          quality: 0.4
-        });
-      }));
-      await saveNewDocs(results);
+      setIsUploading(true);
+      try {
+        const results = await Promise.all((Array.from(files) as File[]).map(async file => {
+          // COMPRESSÃO PADRÃO ALS (800px / 0.4)
+          return await imageCompressor.compress(file, {
+            maxWidth: 800,
+            quality: 0.4
+          });
+        }));
+        await saveNewDocs(results);
+      } finally {
+        setIsUploading(false);
+      }
     }
     e.target.value = '';
   };
@@ -111,22 +118,38 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
       const raw = canvas.toDataURL('image/jpeg', 0.95);
-      // COMPRESSÃO PADRÃO ALS (800px / 0.4)
-      const compressed = await imageCompressor.compress(raw, {
-        maxWidth: 800,
-        quality: 0.4
-      });
-      saveNewDocs([compressed]);
-      stopCamera();
+      
+      setIsUploading(true);
+      try {
+        // COMPRESSÃO PADRÃO ALS (800px / 0.4)
+        const compressed = await imageCompressor.compress(raw, {
+          maxWidth: 800,
+          quality: 0.4
+        });
+        await saveNewDocs([compressed]);
+        stopCamera();
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
-  const saveNewDocs = async (urls: string[]) => {
-    const newDocs: DriverCapturedDoc[] = urls.map((url, idx) => ({
-      id: `op-scan-${Date.now()}-${idx}`,
-      url: url,
-      timestamp: new Date().toISOString()
-    }));
+  const saveNewDocs = async (base64Images: string[]) => {
+    const osClean = trip.os.replace(/[^a-z0-9]/gi, '_');
+    const newDocs: DriverCapturedDoc[] = [];
+
+    for (let i = 0; i < base64Images.length; i++) {
+      const photoId = `op-scan-${Date.now()}-${i}`;
+      // ENVIANDO PARA O CLOUDFLARE R2
+      const publicUrl = await fileStorage.uploadTripPhoto(base64Images[i], osClean, photoId);
+      
+      newDocs.push({
+        id: photoId,
+        url: publicUrl,
+        timestamp: new Date().toISOString()
+      });
+    }
+
     const updatedDocs = [...docs, ...newDocs];
     setDocs(updatedDocs);
     if (newDocs.length === 1) setSelectedDoc(newDocs[0]);
@@ -231,7 +254,17 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
           </div>
 
           <div className="flex-1 bg-slate-100 p-8 flex items-center justify-center relative overflow-hidden">
-             {isAddingMode === 'choice' && (
+             {isUploading && (
+                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex flex-col items-center justify-center text-white space-y-6">
+                   <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                   <div className="text-center">
+                      <p className="text-sm font-black uppercase tracking-widest">Sincronizando com Cloudflare R2</p>
+                      <p className="text-[10px] text-blue-300 font-bold uppercase mt-1 animate-pulse">Comprimindo e enviando arquivo...</p>
+                   </div>
+                </div>
+             )}
+
+             {isAddingMode === 'choice' && !isUploading && (
                 <div className="flex gap-6 animate-in zoom-in-95">
                    <button onClick={startCamera} className="w-48 h-56 bg-white rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center justify-center gap-4 hover:border-blue-500 transition-all">
                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg></div>
@@ -245,7 +278,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                 </div>
              )}
 
-             {isAddingMode === 'camera' && (
+             {isAddingMode === 'camera' && !isUploading && (
                 <div className="w-full max-w-2xl bg-black rounded-3xl overflow-hidden shadow-2xl relative">
                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
                    <div className="absolute bottom-8 left-0 w-full flex justify-center gap-4">
@@ -257,7 +290,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
 
              {isAddingMode === 'none' && selectedDoc ? (
                <div className="w-full h-full rounded-3xl overflow-hidden bg-black"><ImageViewer url={selectedDoc.url} /></div>
-             ) : isAddingMode === 'none' && (
+             ) : isAddingMode === 'none' && !isUploading && (
                <div className="text-center text-slate-300 font-black uppercase tracking-widest">Selecione um arquivo lateral</div>
              )}
           </div>
