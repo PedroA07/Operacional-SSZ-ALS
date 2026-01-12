@@ -77,12 +77,26 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     setIsSavingStatus(true);
+    
     const now = new Date().toISOString();
+    const eventTime = new Date(statusTime).toISOString();
+    
+    // LÓGICA DE DETECÇÃO DE ATRASO
+    if (tempStatus === 'Chegou no cliente') {
+      const scheduledTime = new Date(selectedTrip.dateTime).getTime();
+      const actualTime = new Date(eventTime).getTime();
+      
+      if (actualTime > scheduledTime) {
+        const diffMin = Math.round((actualTime - scheduledTime) / 60000);
+        await db.addNotification(user, 'SYSTEM', 'ALERTA DE ATRASO', `A OS ${selectedTrip.os} chegou no cliente com ${diffMin} min de atraso.`, { os: selectedTrip.os, motorista: selectedTrip.driver.name });
+      }
+    }
+
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
-      statusTime: new Date(statusTime).toISOString(), 
-      statusHistory: [{ status: tempStatus, dateTime: new Date(statusTime).toISOString(), createdAt: now }, ...(selectedTrip.statusHistory || [])] 
+      statusTime: eventTime, 
+      statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: now }, ...(selectedTrip.statusHistory || [])] 
     };
     try {
       if (await db.saveTrip(updatedTrip, user)) {
