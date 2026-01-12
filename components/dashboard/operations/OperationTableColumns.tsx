@@ -41,7 +41,6 @@ export const getOperationTableColumns = (
       for (const file of filesArray) {
         let fileToUpload: File | string = file;
         
-        // COMPRESSÃO AUTOMÁTICA SE FOR IMAGEM (800px / 0.4)
         if (file.type.startsWith('image/')) {
           fileToUpload = await imageCompressor.compress(file, {
             maxWidth: 800,
@@ -58,7 +57,6 @@ export const getOperationTableColumns = (
       const file = filesArray[0];
       let fileToUpload: File | string = file;
 
-      // COMPRESSÃO AUTOMÁTICA EM ANEXOS ÚNICOS (EX: CVA OU OS CASO SEJA FOTO)
       if (file.type.startsWith('image/')) {
         fileToUpload = await imageCompressor.compress(file, {
           maxWidth: 800,
@@ -89,13 +87,22 @@ export const getOperationTableColumns = (
   };
 
   const deleteDocument = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO') => {
-    if (!confirm(`Remover anexo selecionado?`)) return;
+    if (!confirm(`Remover anexo selecionado permanentemente?`)) return;
+    
     const updatedTrip = { ...trip };
-    if (type === 'OS_PDF') updatedTrip.osDoc = undefined;
-    else if (type === 'AGENDAMENTO') updatedTrip.agendamentoDoc = undefined;
-    else if (type === 'CTE') updatedTrip.cteDoc = undefined;
-    else if (type === 'CVA') updatedTrip.cvaDoc = undefined;
-    else if (type === 'COMPLETO') updatedTrip.completoDoc = undefined;
+    let docToDelete: TripDocument | undefined;
+
+    if (type === 'OS_PDF') { docToDelete = trip.osDoc; updatedTrip.osDoc = undefined; }
+    else if (type === 'AGENDAMENTO') { docToDelete = trip.agendamentoDoc; updatedTrip.agendamentoDoc = undefined; }
+    else if (type === 'CTE') { docToDelete = trip.cteDoc; updatedTrip.cteDoc = undefined; }
+    else if (type === 'CVA') { docToDelete = trip.cvaDoc; updatedTrip.cvaDoc = undefined; }
+    else if (type === 'COMPLETO') { docToDelete = trip.completoDoc; updatedTrip.completoDoc = undefined; }
+
+    if (docToDelete?.url) {
+      // EXCLUSÃO FÍSICA NO R2
+      await fileStorage.deleteFile(docToDelete.url);
+    }
+
     await db.saveTrip(updatedTrip, actingUser);
     onRefreshData();
   };

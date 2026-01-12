@@ -95,7 +95,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       setIsUploading(true);
       try {
         const results = await Promise.all((Array.from(files) as File[]).map(async file => {
-          // COMPRESSÃO PADRÃO ALS (800px / 0.4)
           return await imageCompressor.compress(file, {
             maxWidth: 800,
             quality: 0.4
@@ -121,7 +120,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       
       setIsUploading(true);
       try {
-        // COMPRESSÃO PADRÃO ALS (800px / 0.4)
         const compressed = await imageCompressor.compress(raw, {
           maxWidth: 800,
           quality: 0.4
@@ -140,7 +138,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
 
     for (let i = 0; i < base64Images.length; i++) {
       const photoId = `op-scan-${Date.now()}-${i}`;
-      // ENVIANDO PARA O CLOUDFLARE R2
       const publicUrl = await fileStorage.uploadTripPhoto(base64Images[i], osClean, photoId);
       
       newDocs.push({
@@ -213,9 +210,19 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
 
   const executeDelete = async () => {
     if (!docToDelete) return;
+    
+    // 1. Localiza o documento para pegar a URL
+    const docObj = docs.find(d => d.id === docToDelete);
+    if (docObj) {
+      // 2. Remove do Cloudflare R2
+      await fileStorage.deleteFile(docObj.url);
+    }
+
+    // 3. Atualiza o banco de dados
     const updatedDocs = docs.filter(d => d.id !== docToDelete);
     setDocs(updatedDocs);
     await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
+    
     if (selectedDoc?.id === docToDelete) setSelectedDoc(null);
     setIsDeleteModalOpen(false);
     setDocToDelete(null);
@@ -289,7 +296,9 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
              )}
 
              {isAddingMode === 'none' && selectedDoc ? (
-               <div className="w-full h-full rounded-3xl overflow-hidden bg-black"><ImageViewer url={selectedDoc.url} /></div>
+               <div className="w-full h-full rounded-3xl overflow-hidden bg-black flex items-center justify-center">
+                  <ImageViewer url={selectedDoc.url} />
+               </div>
              ) : isAddingMode === 'none' && !isUploading && (
                <div className="text-center text-slate-300 font-black uppercase tracking-widest">Selecione um arquivo lateral</div>
              )}
@@ -366,10 +375,11 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       {isDeleteModalOpen && docToDelete && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 animate-in fade-in duration-300">
            <div className="bg-white w-full max-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
-              <h4 className="text-lg font-black uppercase text-slate-800">Apagar Documento?</h4>
+              <h4 className="text-lg font-black uppercase text-slate-800">Apagar Documento Permanentemente?</h4>
+              <p className="text-slate-500 text-xs">Isso removerá o arquivo físico do servidor Cloudflare.</p>
               <div className="grid grid-cols-2 gap-3">
                  <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Voltar</button>
-                 <button onClick={executeDelete} className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Excluir</button>
+                 <button onClick={executeDelete} className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Excluir Tudo</button>
               </div>
            </div>
         </div>

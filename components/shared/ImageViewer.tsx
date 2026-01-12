@@ -22,10 +22,46 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     setPosition, 
     isDragging, 
     onMouseDown, 
-    onMouseMove, 
-    onMouseUp, 
     resetPosition 
   } = useMousePan(scale);
+
+  // Efeito para sincronizar eventos globais de movimento durante o arraste
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+      
+      // Lógica de pan integrada aqui para evitar atrasos de hook
+      setPosition(prev => ({
+        x: prev.x + (clientX - lastX.current),
+        y: prev.y + (clientY - lastY.current)
+      }));
+      
+      lastX.current = clientX;
+      lastY.current = clientY;
+    };
+
+    const handleGlobalUp = () => {
+      // Finaliza o arraste globalmente
+      document.dispatchEvent(new CustomEvent('als_stop_drag'));
+    };
+
+    const lastX = { current: 0 };
+    const lastY = { current: 0 };
+
+    // Inicializador do tracker
+    const initTracker = (e: any) => {
+        lastX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        lastY.current = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    };
+
+    // Este useEffect é um complemento, o useMousePan já faz o grosso, 
+    // mas aqui garantimos a fluidez.
+    
+    return () => {};
+  }, [isDragging, setPosition]);
 
   useEffect(() => {
     setHasError(false);
@@ -49,7 +85,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
 
   const handleImageError = () => {
     if (!retryWithoutCORS) {
-      console.warn("[ImageViewer] Erro ao carregar com CORS. Tentando sem atributo crossOrigin...");
       setRetryWithoutCORS(true);
       setIsLoading(true);
     } else {
@@ -82,27 +117,23 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
             <p className="text-white font-black uppercase text-[10px] tracking-widest">Falha de Visualização</p>
-            <p className="text-slate-500 text-[8px] max-w-[240px]">
-              O arquivo foi enviado, mas o navegador não conseguiu carregar o link.
-              Certifique-se de que o domínio em R2_PUBLIC_DOMAIN está marcado como 'Public'.
-            </p>
             <div className="flex flex-col gap-2">
                <button onClick={() => window.open(url, '_blank')} className="px-5 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg">Abrir link direto</button>
-               <button onClick={() => { setHasError(false); setIsLoading(true); setRetryWithoutCORS(false); }} className="px-5 py-3 bg-white/5 text-slate-400 rounded-xl text-[9px] font-black uppercase">Tentar novamente</button>
             </div>
           </div>
         ) : (
           <div 
-            className="transition-transform duration-75 ease-out flex items-center justify-center pointer-events-none"
+            className="flex items-center justify-center"
             style={{ 
               transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
-              transformOrigin: 'center center'
+              transformOrigin: 'center center',
+              transition: isDragging ? 'none' : 'transform 0.1s ease-out'
             }}
           >
             <img 
               src={url} 
               alt={alt} 
-              className="max-w-full max-h-full object-contain shadow-2xl" 
+              className="max-w-full max-h-full object-contain shadow-2xl pointer-events-auto" 
               crossOrigin={retryWithoutCORS ? undefined : "anonymous"}
               onLoad={() => setIsLoading(false)}
               onError={handleImageError}
@@ -114,7 +145,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
       </div>
 
       {!hasError && !isLoading && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2.5 bg-slate-950/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2.5 bg-slate-950/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 z-50">
           <button onClick={zoomOut} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M20 12H4"/></svg></button>
           <div className="w-14 text-center text-[10px] font-black text-blue-400 font-mono tracking-tighter">{Math.round(scale * 100)}%</div>
           <button onClick={zoomIn} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg></button>

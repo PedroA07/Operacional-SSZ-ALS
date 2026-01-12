@@ -40,9 +40,9 @@ export const fileStorage = {
     return name
       .toUpperCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-      .replace(/[^A-Z0-9]/g, '_')     // Troca espaços e símbolos por underscore
-      .replace(/_+/g, '_')            // Remove underscores duplicados
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]/g, '_')
+      .replace(/_+/g, '_')
       .trim();
   },
 
@@ -79,6 +79,35 @@ export const fileStorage = {
     } catch (e: any) {
       console.error("[Storage Error]:", e);
       throw e;
+    }
+  },
+
+  /**
+   * Remove fisicamente o arquivo do Cloudflare R2
+   */
+  deleteFile: async (urlOrPath: string): Promise<boolean> => {
+    try {
+      if (!urlOrPath) return false;
+      
+      // Extrai apenas o path relativo do als-transportes se for uma URL completa
+      const cleanPath = urlOrPath.includes('/als-transportes/') 
+        ? `als-transportes/${urlOrPath.split('/als-transportes/')[1]}`
+        : urlOrPath;
+
+      const res = await fetch('/api/upload', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: cleanPath })
+      });
+
+      if (!res.ok) {
+        console.error("Falha ao deletar arquivo no R2");
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error("Erro na requisição de deleção R2:", e);
+      return false;
     }
   },
 
