@@ -16,6 +16,26 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
 
   const tomorrowRaw = useMemo(() => trips.filter(t => t.dateTime.split('T')[0] === tomStr), [trips, tomStr]);
 
+  // Estatísticas para o Bloco
+  const stats = useMemo(() => {
+    const active = tomorrowRaw.filter(t => t.status !== 'Viagem cancelada');
+    const canceled = tomorrowRaw.filter(t => t.status === 'Viagem cancelada').length;
+    const completed = tomorrowRaw.filter(t => t.status === 'Viagem concluída').length;
+    
+    const typeCounts: { [key: string]: number } = {};
+    active.forEach(t => {
+      typeCounts[t.type] = (typeCounts[t.type] || 0) + 1;
+    });
+
+    const delays = active.filter(t => {
+      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
+      return arrival && new Date(arrival.dateTime).getTime() > new Date(t.dateTime).getTime();
+    }).length;
+
+    return { total: active.length, typeCounts, canceled, delays, completed };
+  }, [tomorrowRaw]);
+
+  // Filtros
   const allTypes = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.type))).sort(), [tomorrowRaw]);
   const allClients = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.customer.name))).sort(), [tomorrowRaw]);
 
@@ -38,19 +58,45 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
     <div className="relative group">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full text-left bg-white p-6 rounded-[2.2rem] border transition-all duration-500 shadow-sm hover:shadow-xl relative z-[70] ${isOpen ? 'border-amber-500 ring-4 ring-amber-500/5 rounded-b-none' : 'border-slate-100'}`}
+        className={`w-full text-left bg-white p-7 rounded-[2.5rem] border transition-all duration-500 shadow-sm hover:shadow-xl relative z-[70] flex flex-col h-full ${isOpen ? 'border-amber-500 ring-4 ring-amber-500/5 rounded-b-none' : 'border-slate-100'}`}
       >
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start w-full">
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amanhã</p>
             <div className="flex items-baseline gap-2 mt-1">
-              <p className="text-4xl font-black text-slate-800 tracking-tighter">{tomorrowTrips.length}</p>
+              <p className="text-4xl font-black text-slate-800 tracking-tighter">{stats.total}</p>
             </div>
           </div>
           <div className={`p-4 rounded-2xl transition-all duration-500 ${isOpen ? 'bg-amber-500 text-white shadow-lg' : 'bg-amber-50 text-amber-600'}`}>
             <svg className={`w-6 h-6 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
+          </div>
+        </div>
+
+        <div className="mt-6 w-full space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(stats.typeCounts).slice(0, 2).map(([type, c]) => (
+              <div key={type} className="flex justify-between items-center bg-slate-50/50 px-2 py-1 rounded-lg border border-slate-100/50">
+                <span className="text-[8px] font-bold text-slate-400 uppercase">{type.substring(0, 3)}</span>
+                <span className="text-[10px] font-black text-slate-700">{c}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-red-50/50 p-2 rounded-xl border border-red-100/30 text-center">
+              <p className="text-[7px] font-black text-red-400 uppercase">Atraso</p>
+              <p className="text-sm font-black text-red-600">{stats.delays}</p>
+            </div>
+            <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100/30 text-center">
+              <p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p>
+              <p className="text-sm font-black text-emerald-600">{stats.completed}</p>
+            </div>
+            <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 text-center">
+              <p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p>
+              <p className="text-sm font-black text-slate-700">{stats.canceled}</p>
+            </div>
           </div>
         </div>
       </button>
