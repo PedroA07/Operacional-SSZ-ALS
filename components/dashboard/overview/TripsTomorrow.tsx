@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Trip } from '../../../types';
 import MultiCheckboxFilter from '../../shared/MultiCheckboxFilter';
 
@@ -19,9 +19,13 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
   const allTypes = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.type))).sort(), [tomorrowRaw]);
   const allClients = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.customer.name))).sort(), [tomorrowRaw]);
 
-  const [selTypes, setSelTypes] = useState<string[]>([]);
-  const [selClients, setSelClients] = useState<string[]>([]);
+  // Estados com persistência local
+  const [selTypes, setSelTypes] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_tom_types') || '[]'));
+  const [selClients, setSelClients] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_tom_clients') || '[]'));
   
+  useEffect(() => { localStorage.setItem('filter_tom_types', JSON.stringify(selTypes)); }, [selTypes]);
+  useEffect(() => { localStorage.setItem('filter_tom_clients', JSON.stringify(selClients)); }, [selClients]);
+
   const tomorrowTrips = useMemo(() => {
     return tomorrowRaw.filter(t => {
       if (t.status === 'Viagem cancelada') return false;
@@ -35,7 +39,7 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
     <div className="relative group">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full text-left bg-white p-6 rounded-[2.2rem] border transition-all duration-500 shadow-sm hover:shadow-xl ${isOpen ? 'border-amber-500 ring-4 ring-amber-500/5' : 'border-slate-100'}`}
+        className={`w-full text-left bg-white p-6 rounded-[2.2rem] border transition-all duration-500 shadow-sm hover:shadow-xl ${isOpen ? 'border-amber-500 ring-4 ring-amber-500/5 rounded-b-none' : 'border-slate-100'}`}
       >
         <div className="flex justify-between items-start">
           <div>
@@ -53,8 +57,8 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 animate-in slide-in-from-top-4 duration-500 max-h-[600px] flex flex-col">
-          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 shrink-0 relative z-[60] rounded-t-[2.5rem]">
+        <div className="absolute top-full left-0 right-0 mt-0 bg-white border border-t-0 border-amber-500 rounded-b-[2.5rem] shadow-2xl z-50 animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
+          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 shrink-0 relative z-[60]">
              <MultiCheckboxFilter label="Modalidades" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <MultiCheckboxFilter label="Filtrar Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
           </div>

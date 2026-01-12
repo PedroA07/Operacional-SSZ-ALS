@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Trip } from '../../../types';
 import MultiCheckboxFilter from '../../shared/MultiCheckboxFilter';
 
@@ -19,10 +19,15 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const allClients = useMemo(() => Array.from(new Set(todayRaw.map(t => t.customer.name))).sort(), [todayRaw]);
   const allDests = useMemo(() => Array.from(new Set(todayRaw.map(t => t.destination?.name || t.scheduling?.location).filter(Boolean))).sort(), [todayRaw]);
 
-  const [selTypes, setSelTypes] = useState<string[]>([]);
-  const [selClients, setSelClients] = useState<string[]>([]);
-  const [selDests, setSelDests] = useState<string[]>([]);
+  // Estados com persistência local
+  const [selTypes, setSelTypes] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_today_types') || '[]'));
+  const [selClients, setSelClients] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_today_clients') || '[]'));
+  const [selDests, setSelDests] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_today_dests') || '[]'));
   
+  useEffect(() => { localStorage.setItem('filter_today_types', JSON.stringify(selTypes)); }, [selTypes]);
+  useEffect(() => { localStorage.setItem('filter_today_clients', JSON.stringify(selClients)); }, [selClients]);
+  useEffect(() => { localStorage.setItem('filter_today_dests', JSON.stringify(selDests)); }, [selDests]);
+
   const todayTrips = useMemo(() => {
     return todayRaw.filter(t => {
       if (t.status === 'Viagem cancelada') return false;
@@ -38,7 +43,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     <div className="relative group">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full text-left bg-white p-6 rounded-[2.2rem] border transition-all duration-500 shadow-sm hover:shadow-xl ${isOpen ? 'border-blue-500 ring-4 ring-blue-500/5' : 'border-slate-100'}`}
+        className={`w-full text-left bg-white p-6 rounded-[2.2rem] border transition-all duration-500 shadow-sm hover:shadow-xl ${isOpen ? 'border-blue-500 ring-4 ring-blue-500/5 rounded-b-none' : 'border-slate-100'}`}
       >
         <div className="flex justify-between items-start">
           <div>
@@ -57,15 +62,13 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 animate-in slide-in-from-top-4 duration-500 max-h-[700px] flex flex-col">
-          {/* BARRA DE FILTROS - PERMITE OVERFLOW */}
-          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 shrink-0 relative z-[60] rounded-t-[2.5rem]">
+        <div className="absolute top-full left-0 right-0 mt-0 bg-white border border-t-0 border-blue-500 rounded-b-[2.5rem] shadow-2xl z-50 animate-in slide-in-from-top-1 duration-300 max-h-[700px] flex flex-col">
+          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 shrink-0 relative z-[60]">
              <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
              <MultiCheckboxFilter label="Destinos" options={allDests} selectedOptions={selDests} onChange={setSelDests} />
           </div>
 
-          {/* LISTA DE VIAGENS - O OVERFLOW-HIDDEN FICA AQUI */}
           <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50/30 flex-1 min-h-[300px] rounded-b-[2.5rem] relative z-10">
             {todayTrips.length > 0 ? todayTrips.map(trip => (
               <div key={trip.id} className="p-5 bg-white border border-slate-100 rounded-3xl hover:border-blue-200 transition-all group shadow-sm">

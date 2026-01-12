@@ -9,26 +9,33 @@ interface NotificationSettingsProps {
 }
 
 const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user, onUpdate }) => {
-  // Estado local para garantir que o toggle funcione visualmente na hora
-  const [localPrefs, setLocalPrefs] = useState<NotificationPreference>(user.notificationPrefs || {
-    newTrip: true,
-    statusUpdate: true,
-    paymentLiberated: true,
-    systemChanges: true,
-    newRegistrations: true
+  const [localPrefs, setLocalPrefs] = useState<NotificationPreference>(() => {
+    return user.notificationPrefs || {
+      newTrip: true,
+      statusUpdate: true,
+      paymentLiberated: true,
+      systemChanges: true,
+      newRegistrations: true
+    };
   });
 
   const toggle = async (key: keyof NotificationPreference) => {
     const nextPrefs = { ...localPrefs, [key]: !localPrefs[key] };
-    
-    // Atualiza interface imediatamente
     setLocalPrefs(nextPrefs);
     
-    // Sincroniza com o banco
     const updatedUser = { ...user, notificationPrefs: nextPrefs };
+    
+    // Sincroniza Banco
     await db.saveUser(updatedUser);
     
-    // Notifica o pai se necessário
+    // Sincroniza Sessão Ativa (Evita reset no refresh)
+    const sessionStr = sessionStorage.getItem('als_active_session');
+    if (sessionStr) {
+      const session = JSON.parse(sessionStr);
+      session.notificationPrefs = nextPrefs;
+      sessionStorage.setItem('als_active_session', JSON.stringify(session));
+    }
+    
     if (onUpdate) onUpdate(nextPrefs);
   };
 
