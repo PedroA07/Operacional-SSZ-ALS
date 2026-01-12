@@ -44,28 +44,28 @@ const MultiCheckboxFilter: React.FC<MultiCheckboxFilterProps> = ({ label, option
     : `${selectedOptions.length} SELEC.`;
 
   return (
-    <div className="relative flex-1 min-w-[120px]" ref={containerRef}>
+    <div className="relative flex-1 min-w-[110px]" ref={containerRef} style={{ zIndex: isOpen ? 100 : 10 }}>
       <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">{label}</p>
       <button 
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between px-3 py-2.5 bg-white border-2 rounded-xl transition-all text-[10px] font-black uppercase ${isOpen ? 'border-blue-500 ring-4 ring-blue-50' : 'border-slate-100 hover:border-slate-200'}`}
+        className={`w-full flex items-center justify-between px-3 py-2.5 bg-white border-2 rounded-xl transition-all text-[9px] font-black uppercase ${isOpen ? 'border-blue-500 ring-4 ring-blue-50' : 'border-slate-100 hover:border-slate-200'}`}
       >
         <span className={hasSelection && !isAllSelected ? 'text-blue-600' : 'text-slate-700'}>
           {displayText}
         </span>
-        <svg className={`w-3.5 h-3.5 text-slate-300 transition-transform ${isOpen ? 'rotate-180 text-blue-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`w-3 h-3 text-slate-300 transition-transform ${isOpen ? 'rotate-180 text-blue-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 z-[100] p-3 animate-in fade-in slide-in-from-top-2 duration-200 min-w-[200px]">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-3 animate-in fade-in slide-in-from-top-2 duration-200 min-w-[220px]">
           <div className="flex justify-between items-center px-1 mb-2 pb-2 border-b border-slate-50">
             <button type="button" onClick={() => toggleAll(true)} className="text-[8px] font-black text-blue-600 uppercase hover:underline">Marcar Todos</button>
             <button type="button" onClick={() => toggleAll(false)} className="text-[8px] font-black text-slate-400 uppercase hover:underline">Limpar</button>
           </div>
-          <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-0.5 pr-1">
+          <div className="max-h-56 overflow-y-auto custom-scrollbar space-y-0.5 pr-1">
             {options.map(opt => (
               <label key={opt} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors group">
                 <input 

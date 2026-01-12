@@ -57,16 +57,18 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-4 duration-500 max-h-[700px] flex flex-col">
-          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2">
+        <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 animate-in slide-in-from-top-4 duration-500 max-h-[700px] flex flex-col">
+          {/* BARRA DE FILTROS - PERMITE OVERFLOW */}
+          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 shrink-0 relative z-[60] rounded-t-[2.5rem]">
              <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
              <MultiCheckboxFilter label="Destinos" options={allDests} selectedOptions={selDests} onChange={setSelDests} />
           </div>
 
-          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50/30 flex-1 min-h-[300px]">
+          {/* LISTA DE VIAGENS - O OVERFLOW-HIDDEN FICA AQUI */}
+          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50/30 flex-1 min-h-[300px] rounded-b-[2.5rem] relative z-10">
             {todayTrips.length > 0 ? todayTrips.map(trip => (
-              <div key={trip.id} className="p-5 bg-white border border-slate-100 rounded-3xl hover:border-blue-200 transition-all group">
+              <div key={trip.id} className="p-5 bg-white border border-slate-100 rounded-3xl hover:border-blue-200 transition-all group shadow-sm">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
@@ -78,7 +80,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 truncate">{trip.customer.name}</p>
               </div>
             )) : (
-              <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem viagens</div>
+              <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem resultados</div>
             )}
           </div>
         </div>
