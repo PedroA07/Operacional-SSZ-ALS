@@ -24,24 +24,29 @@ export default async function handler(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const rawPath = formData.get("path") as string; 
+    const rawPath = (formData.get("path") as string) || ""; 
     
-    if (!file || !rawPath) {
-      return new Response(JSON.stringify({ error: "Arquivo ou caminho ausentes" }), { 
+    if (!file) {
+      return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    // LIMPEZA SEGMENTADA: 
-    // Divide o caminho por barras, remove o que for 'als-transportes' ou vazio, e junta de novo.
-    const cleanKey = rawPath
-      .split('/')
-      .filter(segment => {
-        const s = segment.toLowerCase().trim();
-        return s !== '' && s !== 'als-transportes' && s !== 'als transportes';
-      })
-      .join('/');
+    // LIMPEZA ABSOLUTA:
+    // 1. Remove "als-transportes/" ou "als transportes/" em qualquer lugar da string (case insensitive)
+    // 2. Remove barras duplas
+    // 3. Remove barra inicial
+    let cleanKey = rawPath
+      .replace(/als[- ]transportes\//gi, '')
+      .replace(/als[- ]transportes/gi, '')
+      .replace(/\/+/g, '/')
+      .replace(/^\/+/, '');
+    
+    // Se o path ficar vazio (ex: enviaram só o nome da empresa), usa o nome do arquivo original
+    if (!cleanKey || cleanKey === '') {
+      cleanKey = file.name;
+    }
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();

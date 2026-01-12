@@ -9,7 +9,6 @@ export const r2Service = {
       const formData = new FormData();
       
       if (typeof fileOrBase64 === 'string') {
-        // Converte Base64 para Blob para o upload
         const response = await fetch(fileOrBase64);
         const blob = await response.blob();
         formData.append('file', blob, fileName);
@@ -17,7 +16,16 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      formData.append('folder', folder);
+      // Limpeza do folder para evitar subpastas als-transportes
+      const cleanFolder = folder
+        .replace(/als[- ]transportes\//gi, '')
+        .replace(/als[- ]transportes/gi, '')
+        .replace(/^\/+|\/+$/g, '');
+
+      const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
+      
+      // Corrigido para 'path' para bater com o que a API espera
+      formData.append('path', finalPath);
 
       const res = await fetch('/api/upload', {
         method: 'POST',
@@ -30,7 +38,7 @@ export const r2Service = {
       }
 
       const data = await res.json();
-      return data.url; // Retorna a URL pública final
+      return data.url;
     } catch (e) {
       console.error("[r2Service] Erro:", e);
       throw e;

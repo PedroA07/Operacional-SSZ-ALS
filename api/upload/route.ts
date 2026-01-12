@@ -18,30 +18,28 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const rawPath = formData.get("path") as string; 
+    const rawPath = (formData.get("path") as string) || ""; 
     
-    if (!file || !rawPath) {
-      return new Response(JSON.stringify({ error: "Arquivo ou destino ausente" }), { 
+    if (!file) {
+      return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
-    // LIMPEZA SEGMENTADA IGUAL AO HANDLER PRINCIPAL
+    // LIMPEZA ABSOLUTA (Igual ao handler principal)
     const cleanKey = rawPath
-      .split('/')
-      .filter(segment => {
-        const s = segment.toLowerCase().trim();
-        return s !== '' && s !== 'als-transportes' && s !== 'als transportes';
-      })
-      .join('/');
+      .replace(/als[- ]transportes\//gi, '')
+      .replace(/als[- ]transportes/gi, '')
+      .replace(/\/+/g, '/')
+      .replace(/^\/+/, '');
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
     
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: cleanKey,
+      Key: cleanKey || file.name,
       Body: fileBytes,
       ContentType: file.type || 'image/jpeg',
     });
@@ -52,9 +50,9 @@ export async function POST(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
 
-    const publicUrl = `${domain}/${cleanKey}`;
+    const publicUrl = `${domain}/${cleanKey || file.name}`;
 
-    return new Response(JSON.stringify({ url: publicUrl, path: cleanKey }), {
+    return new Response(JSON.stringify({ url: publicUrl, path: cleanKey || file.name }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

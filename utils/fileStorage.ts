@@ -25,14 +25,12 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Limpeza segmentada no path para links de visualização
+    // Limpeza absoluta para visualização
     const cleanPath = path
-      .split('/')
-      .filter(s => {
-        const low = s.toLowerCase().trim();
-        return low !== '' && low !== 'als-transportes' && low !== 'als transportes';
-      })
-      .join('/');
+      .replace(/als[- ]transportes\//gi, '')
+      .replace(/als[- ]transportes/gi, '')
+      .replace(/\/+/g, '/')
+      .replace(/^\/+/, '');
     
     const cleanDomain = domain.replace(/\/$/, '');
     return domain ? `${prefix}${cleanDomain}/${cleanPath}` : cleanPath;
@@ -55,14 +53,12 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Limpeza segmentada antes de enviar
+      // Limpeza absoluta no envio
       const normalizedPath = destinationPath
-        .split('/')
-        .filter(s => {
-          const low = s.toLowerCase().trim();
-          return low !== '' && low !== 'als-transportes' && low !== 'als transportes';
-        })
-        .join('/');
+        .replace(/als[- ]transportes\//gi, '')
+        .replace(/als[- ]transportes/gi, '')
+        .replace(/\/+/g, '/')
+        .replace(/^\/+/, '');
       
       formData.append('path', normalizedPath);
 
