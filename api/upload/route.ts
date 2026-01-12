@@ -27,19 +27,21 @@ export async function POST(request: Request) {
       });
     }
 
-    // LIMPEZA ABSOLUTA (Igual ao handler principal)
+    // REMOÇÃO CIRÚRGICA DO PREFIXO (Igual ao handler principal)
     const cleanKey = rawPath
-      .replace(/als[- ]transportes\//gi, '')
-      .replace(/als[- ]transportes/gi, '')
+      .replace(/^als[- ]transportes\//i, '')
+      .replace(/^als[- ]transportes/i, '')
       .replace(/\/+/g, '/')
       .replace(/^\/+/, '');
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
     
+    const finalKey = cleanKey || file.name;
+
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: cleanKey || file.name,
+      Key: finalKey,
       Body: fileBytes,
       ContentType: file.type || 'image/jpeg',
     });
@@ -50,9 +52,9 @@ export async function POST(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
 
-    const publicUrl = `${domain}/${cleanKey || file.name}`;
+    const publicUrl = `${domain}/${finalKey}`;
 
-    return new Response(JSON.stringify({ url: publicUrl, path: cleanKey || file.name }), {
+    return new Response(JSON.stringify({ url: publicUrl, path: finalKey }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

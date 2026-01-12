@@ -33,17 +33,16 @@ export default async function handler(request: Request) {
       });
     }
 
-    // LIMPEZA ABSOLUTA:
-    // 1. Remove "als-transportes/" ou "als transportes/" em qualquer lugar da string (case insensitive)
-    // 2. Remove barras duplas
-    // 3. Remove barra inicial
+    // REMOÇÃO CIRÚRGICA DO PREFIXO:
+    // Remove "als-transportes/" ou "als transportes/" APENAS se estiver no início da string
+    // O ^ indica o início da linha. O /i indica case-insensitive.
     let cleanKey = rawPath
-      .replace(/als[- ]transportes\//gi, '')
-      .replace(/als[- ]transportes/gi, '')
-      .replace(/\/+/g, '/')
-      .replace(/^\/+/, '');
+      .replace(/^als[- ]transportes\//i, '') 
+      .replace(/^als[- ]transportes/i, '')
+      .replace(/\/+/g, '/') // Remove barras duplas residuais
+      .replace(/^\/+/, ''); // Remove barra inicial se sobrar
     
-    // Se o path ficar vazio (ex: enviaram só o nome da empresa), usa o nome do arquivo original
+    // Se por algum motivo o path ficou vazio, usa o nome do arquivo
     if (!cleanKey || cleanKey === '') {
       cleanKey = file.name;
     }
