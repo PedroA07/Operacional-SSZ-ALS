@@ -24,24 +24,30 @@ export const fileStorage = {
   getPublicUrl: (path: string | undefined): string => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    // Se for apenas o path, tenta buscar o domínio das variáveis de ambiente
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
-    return domain ? `${prefix}${domain}/${path}` : path;
+    const url = domain ? `${prefix}${domain}/${path}` : path;
+    return url;
   },
 
   upload: async (file: File | string, destinationPath: string): Promise<string> => {
     try {
       const formData = new FormData();
       
+      let fileToUpload: Blob;
+      let mimeType = 'image/jpeg';
+
       if (typeof file === 'string' && file.startsWith('data:')) {
-        const blob = fileStorage.dataURLtoBlob(file);
+        fileToUpload = fileStorage.dataURLtoBlob(file);
+        mimeType = fileToUpload.type;
         const fileName = destinationPath.split('/').pop() || 'upload.jpg';
-        formData.append('file', blob, fileName);
+        formData.append('file', fileToUpload, fileName);
       } else if (file instanceof File) {
+        fileToUpload = file;
+        mimeType = file.type;
         formData.append('file', file);
       } else {
-        throw new Error("Formato inválido.");
+        throw new Error("Formato de arquivo inválido.");
       }
       
       formData.append('path', destinationPath);
@@ -59,6 +65,7 @@ export const fileStorage = {
       const data = await res.json();
       if (!data.url) throw new Error("URL não retornada pelo servidor.");
       
+      console.log(`[R2 Debug] Upload sucesso: ${data.url}`);
       return data.url; 
     } catch (e: any) {
       console.error("[Storage Error]:", e);

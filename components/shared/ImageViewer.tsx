@@ -12,8 +12,9 @@ interface ImageViewerProps {
 const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", className = "" }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [rotation, setRotation] = useState(0);
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Hooks Modulares
   const { scale, setScale, resetZoom, zoomIn, zoomOut } = useMouseZoom({ containerRef });
   const { 
     position, 
@@ -25,26 +26,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     resetPosition 
   } = useMousePan(scale);
 
-  // Resetar ao mudar de URL
   useEffect(() => {
-    handleReset();
+    setHasError(false);
+    setIsLoading(true);
+    resetZoom();
+    resetPosition();
+    setRotation(0);
   }, [url]);
-
-  // Efeito para registrar eventos globais de mouse durante o arraste
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-      window.addEventListener('touchmove', onMouseMove);
-      window.addEventListener('touchend', onMouseUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      window.removeEventListener('touchmove', onMouseMove);
-      window.removeEventListener('touchend', onMouseUp);
-    };
-  }, [isDragging, onMouseMove, onMouseUp]);
 
   const handleRotate = () => {
     setRotation(prev => (prev + 90) % 360);
@@ -68,32 +56,52 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
         onMouseDown={onMouseDown}
         onTouchStart={onMouseDown}
       >
-        <div 
-          className="transition-transform duration-75 ease-out flex items-center justify-center pointer-events-none"
-          style={{ 
-            transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
-            transformOrigin: 'center center'
-          }}
-        >
-          <img 
-            src={url} 
-            alt={alt} 
-            className="max-w-full max-h-full object-contain shadow-2xl" 
-            onDoubleClick={handleReset} 
-            draggable={false} 
-          />
-        </div>
+        {isLoading && !hasError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50 z-10">
+            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-[8px] font-black text-blue-400 uppercase mt-4 tracking-widest">Carregando da Nuvem...</p>
+          </div>
+        )}
+
+        {hasError ? (
+          <div className="flex flex-col items-center justify-center text-center p-10 space-y-4">
+            <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <p className="text-white font-black uppercase text-[10px] tracking-widest">Erro ao carregar imagem</p>
+            <p className="text-slate-500 text-[8px] max-w-[200px]">A URL pode estar expirada ou o acesso público do R2 não foi configurado.</p>
+            <button onClick={() => window.open(url, '_blank')} className="px-4 py-2 bg-white/5 text-blue-400 rounded-xl text-[8px] font-black uppercase">Abrir link direto</button>
+          </div>
+        ) : (
+          <div 
+            className="transition-transform duration-75 ease-out flex items-center justify-center pointer-events-none"
+            style={{ 
+              transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
+              transformOrigin: 'center center'
+            }}
+          >
+            <img 
+              src={url} 
+              alt={alt} 
+              className="max-w-full max-h-full object-contain shadow-2xl" 
+              onLoad={() => setIsLoading(false)}
+              onError={() => { setHasError(true); setIsLoading(false); }}
+              onDoubleClick={handleReset} 
+              draggable={false} 
+            />
+          </div>
+        )}
       </div>
 
-      {/* CONTROLES FLUTUANTES - SEM BOTÃO DE IA */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2.5 bg-slate-950/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100">
-        <button onClick={zoomOut} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M20 12H4"/></svg></button>
-        <div className="w-14 text-center text-[10px] font-black text-blue-400 font-mono tracking-tighter">{Math.round(scale * 100)}%</div>
-        <button onClick={zoomIn} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg></button>
-        <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
-        <button onClick={handleRotate} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors" title="Girar 90º"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
-        <button onClick={handleReset} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors" title="Redefinir"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
-      </div>
+      {!hasError && !isLoading && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2.5 bg-slate-950/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100">
+          <button onClick={zoomOut} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M20 12H4"/></svg></button>
+          <div className="w-14 text-center text-[10px] font-black text-blue-400 font-mono tracking-tighter">{Math.round(scale * 100)}%</div>
+          <button onClick={zoomIn} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg></button>
+          <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
+          <button onClick={handleRotate} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors" title="Girar 90º"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
+        </div>
+      )}
     </div>
   );
 };
