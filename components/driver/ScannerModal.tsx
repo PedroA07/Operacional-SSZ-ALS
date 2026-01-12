@@ -51,7 +51,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       }
     } catch (err: any) { 
       console.error("Camera access error:", err);
-      setCameraError("Câmera bloqueada ou indisponível.");
+      setCameraError("Acesso à câmera negado ou não encontrado. Verifique as configurações do celular.");
     }
   }, []);
 
@@ -74,8 +74,9 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(videoRef.current, 0, 0);
-    // Captura em qualidade média para processamento rápido
-    const rawImage = canvas.toDataURL('image/jpeg', 0.8);
+    
+    // Captura inicial rápida
+    const rawImage = canvas.toDataURL('image/jpeg', 0.7);
     setCurrentImage(rawImage);
     setStep('preview');
     stopCamera();
@@ -85,18 +86,22 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     if (isSaving || !currentImage) return;
     setIsSaving(true);
     try {
-      // Compressão Agressiva: ~100kb por foto. Ideal para armazenamento e rede móvel.
+      // 1. Compressão Extrema (800px, 0.4 qualidade)
       const compressedImage = await imageCompressor.compress(currentImage, {
-        maxWidth: 1000, 
-        quality: 0.5
+        maxWidth: 800, 
+        quality: 0.4
       });
 
       const photoId = `img_${Date.now()}`;
       const osClean = trip.os.replace(/[^a-z0-9]/gi, '_');
       
-      // Realiza o upload para o servidor (R2)
+      // 2. Upload para Cloudflare R2 via API Edge
       const publicUrl = await fileStorage.uploadTripPhoto(compressedImage, osClean, photoId);
       
+      if (!publicUrl || publicUrl.includes('undefined')) {
+        throw new Error("O servidor retornou uma URL inválida. Verifique as variáveis R2_PUBLIC_DOMAIN.");
+      }
+
       const newDoc: DriverCapturedDoc = { 
         id: photoId, 
         url: publicUrl, 
@@ -108,13 +113,14 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         driver_docs: [...(trip.driver_docs || []), newDoc] 
       };
       
-      // Salva a referência (URL) no banco de dados Supabase
+      // 3. Salva apenas o LINK no Supabase
       await db.saveTrip(updatedTrip, user);
+      
       await onSuccess();
       onClose();
     } catch (e: any) {
-      console.error("Upload process failure:", e);
-      alert(`Falha no envio: ${e.message}`);
+      console.error("Critical Upload Error:", e);
+      alert(`Falha no envio: ${e.message}\n\nO sistema não conseguiu salvar no Cloudflare R2.`);
     } finally {
       setIsSaving(false);
     }
@@ -132,7 +138,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
               </div>
               <p className="text-white font-bold text-sm uppercase leading-relaxed">{cameraError}</p>
-              <button onClick={startCamera} className="px-8 py-4 bg-white text-black rounded-2xl text-[10px] font-black uppercase">Tentar Novamente</button>
+              <button onClick={startCamera} className="px-8 py-4 bg-white text-black rounded-2xl text-[10px] font-black uppercase">Tentar Abrir Câmera</button>
             </div>
           ) : (
             <>
@@ -153,16 +159,23 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         <div className="flex-1 flex flex-col p-6 bg-slate-950">
           <div className="flex-1 relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-black border border-white/5">
              <img src={currentImage!} className="w-full h-full object-contain" alt="Preview" />
+             {isSaving && (
+               <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white space-y-4">
+                  <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Enviando p/ Nuvem...</p>
+               </div>
+             )}
           </div>
           <div className="grid grid-cols-2 gap-4 mt-8 pb-6">
             <button 
+              disabled={isSaving}
               onClick={() => {
                 if (initialImages.length > 0) onClose();
                 else { setStep('camera'); startCamera(); }
               }} 
-              className="py-6 bg-white/5 text-slate-400 rounded-3xl text-[11px] font-black uppercase tracking-widest border border-white/5 active:bg-white/10"
+              className="py-6 bg-white/5 text-slate-400 rounded-3xl text-[11px] font-black uppercase tracking-widest border border-white/5 active:bg-white/10 disabled:opacity-20"
             >
-              Tirar Outra
+              Refazer Foto
             </button>
             <button 
               onClick={handleFinish} 
@@ -173,7 +186,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
                 <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
                 <>
-                  <span>Enviar Foto</span>
+                  <span>Enviar Agora</span>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>
                 </>
               )}

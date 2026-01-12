@@ -1,7 +1,7 @@
 
 /**
- * ALS Image Compressor Utility v1.5
- * Otimizado para economia de armazenamento e performance mobile.
+ * ALS Image Compressor Utility v1.6
+ * Otimizado para economia extrema de armazenamento (R2) e rede móvel.
  */
 
 interface CompressionOptions {
@@ -13,13 +13,13 @@ interface CompressionOptions {
 
 export const imageCompressor = {
   /**
-   * Comprime uma imagem e retorna Base64
+   * Comprime uma imagem para JPEG leve e retorna Base64
    */
   compress: async (source: File | string, options: CompressionOptions = {}): Promise<string> => {
     const {
-      maxWidth = 1200, // Reduzido de 1600 para 1200
-      maxHeight = 1200,
-      quality = 0.6, // Reduzido de 0.8 para 0.6
+      maxWidth = 800, // Reduzido drasticamente para 800px (Suficiente para leitura de documentos)
+      maxHeight = 800,
+      quality = 0.4, // Qualidade 0.4 gera arquivos extremamente leves (~60kb)
       mimeType = 'image/jpeg'
     } = options;
 
@@ -29,13 +29,13 @@ export const imageCompressor = {
 
     return new Promise((resolve, reject) => {
       const img = new Image();
-      
       img.crossOrigin = "anonymous";
 
       img.onload = () => {
         let width = img.width;
         let height = img.height;
 
+        // Redimensionamento Proporcional
         if (width > height) {
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
@@ -55,24 +55,30 @@ export const imageCompressor = {
 
         if (!ctx) {
           if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
-          reject(new Error("CANVAS_CONTEXT_FAIL"));
+          reject(new Error("Erro ao criar contexto de processamento de imagem."));
           return;
         }
 
         try {
+          // Aplica fundo branco para JPEGs (evita transparência preta)
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, width, height);
+          
           ctx.drawImage(img, 0, 0, width, height);
+          
           const result = canvas.toDataURL(mimeType, quality);
+          
           if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
           resolve(result);
         } catch (e) {
           if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
-          reject(new Error("CORS_PIXEL_ERROR"));
+          reject(new Error("Falha no processamento de pixels (CORS)."));
         }
       };
 
       img.onerror = () => {
         if (typeof source !== 'string') URL.revokeObjectURL(imageUrl);
-        reject(new Error("IMAGE_LOAD_ERROR"));
+        reject(new Error("Não foi possível carregar a imagem para compressão."));
       };
 
       img.src = imageUrl;
