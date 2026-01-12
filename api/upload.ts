@@ -33,29 +33,17 @@ export default async function handler(request: Request) {
       });
     }
 
-    // PURIFICAÇÃO DO CAMINHO (BACKEND):
-    // Removemos qualquer tentativa de criar a pasta 'als-transportes' dentro do bucket.
-    let finalKey = rawPath.replace(/\/+/g, '/').replace(/^\/+/, '').trim();
-    
-    // Loop para remover múltiplas ocorrências (caso existam)
-    let shouldCheck = true;
-    while (shouldCheck) {
-      const lowerKey = finalKey.toLowerCase();
-      if (lowerKey.startsWith('als-transportes/')) {
-        finalKey = finalKey.substring(16); // Remove "als-transportes/"
-      } else if (lowerKey.startsWith('als transportes/')) {
-        finalKey = finalKey.substring(16); // Remove "als transportes/"
-      } else if (lowerKey.startsWith('als-transportes')) {
-        finalKey = finalKey.substring(15);
-      } else {
-        shouldCheck = false;
-      }
-      finalKey = finalKey.replace(/^\/+/, ''); // Remove barras residuais no início
+    // PURIFICAÇÃO AGRESSIVA DO CAMINHO (BACKEND):
+    // Remove "als-transportes/" ou "als transportes/" do início da string (case-insensitive).
+    // O sinal '+' garante que remova mesmo se houver repetições por erro.
+    let finalKey = rawPath.trim()
+      .replace(/^(als[- ]transportes\/)+/i, '') 
+      .replace(/^\/+/, '')                     // Remove barras iniciais residuais
+      .replace(/\/+/g, '/');                    // Normaliza barras duplas no meio
+
+    if (!finalKey) {
+      finalKey = file.name || `upload_${Date.now()}.jpg`;
     }
-    
-    // Garante que o caminho final não esteja vazio e não tenha barras duplicadas
-    if (!finalKey) finalKey = file.name || `upload_${Date.now()}.jpg`;
-    finalKey = finalKey.replace(/\/+/g, '/');
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();

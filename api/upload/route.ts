@@ -27,19 +27,14 @@ export async function POST(request: Request) {
       });
     }
 
-    // LIMPEZA RIGOROSA DO CAMINHO
-    let finalKey = rawPath.replace(/\/+/g, '/').replace(/^\/+/, '').trim();
-    let shouldCheck = true;
-    while (shouldCheck) {
-      const lowerKey = finalKey.toLowerCase();
-      if (lowerKey.startsWith('als-transportes/')) {
-        finalKey = finalKey.substring(16);
-      } else if (lowerKey.startsWith('als transportes/')) {
-        finalKey = finalKey.substring(16);
-      } else {
-        shouldCheck = false;
-      }
-      finalKey = finalKey.replace(/^\/+/, '');
+    // LIMPEZA DO CAMINHO:
+    let finalKey = rawPath.trim()
+      .replace(/^(als[- ]transportes\/)+/i, '')
+      .replace(/^\/+/, '')
+      .replace(/\/+/g, '/');
+
+    if (!finalKey) {
+      finalKey = file.name || `upload_${Date.now()}.jpg`;
     }
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());

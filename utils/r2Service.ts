@@ -16,17 +16,15 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // O backend cuidará de salvar na raiz correta.
-      // Removemos agressivamente qualquer prefixo 'als-transportes/' para evitar duplicidade.
-      let cleanFolder = folder.replace(/\/+/g, '/').replace(/^\/+|\/+$/g, '').trim();
-      while (cleanFolder.toLowerCase().startsWith('als-transportes/') || cleanFolder.toLowerCase().startsWith('als transportes/')) {
-        cleanFolder = cleanFolder.substring(16);
-      }
-      cleanFolder = cleanFolder.replace(/^\/+/, '');
+      // Remove qualquer menção a als-transportes no folder via RegEx
+      let cleanFolder = folder.trim()
+        .replace(/^(als[- ]transportes\/)+/i, '')
+        .replace(/^\/+|\/+$/g, '')
+        .replace(/\/+/g, '/');
 
       const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       
-      formData.append('path', finalPath.replace(/\/+/g, '/').replace(/^\/+/, ''));
+      formData.append('path', finalPath);
 
       const res = await fetch('/api/upload', {
         method: 'POST',

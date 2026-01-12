@@ -25,14 +25,11 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Limpeza total: No R2 atualizado, não usamos mais o prefixo 'als-transportes/' dentro do bucket.
-    let cleanPath = path.replace(/\/+/g, '/').replace(/^\/+/, '');
-    
-    // Remove qualquer prefixo legado que ainda possa estar no banco para gerar a URL correta
-    while (cleanPath.toLowerCase().startsWith('als-transportes/') || cleanPath.toLowerCase().startsWith('als transportes/')) {
-      cleanPath = cleanPath.substring(16);
-    }
-    cleanPath = cleanPath.replace(/^\/+/, '');
+    // Remove qualquer prefixo legado 'als-transportes/' para gerar a URL correta na raiz
+    let cleanPath = path.trim()
+      .replace(/^(als[- ]transportes\/)+/i, '')
+      .replace(/^\/+/, '')
+      .replace(/\/+/g, '/');
     
     const cleanDomain = domain.replace(/\/$/, '');
     return domain ? `${prefix}${cleanDomain}/${cleanPath}` : cleanPath;
@@ -55,11 +52,11 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Envia o caminho limpo. O backend garantirá que nada de 'als-transportes/' seja inserido.
-      let normalizedPath = destinationPath.replace(/\/+/g, '/').replace(/^\/+/, '');
-      while (normalizedPath.toLowerCase().startsWith('als-transportes/')) {
-        normalizedPath = normalizedPath.substring(16);
-      }
+      // Limpa o path antes de enviar para garantir que o backend receba apenas o caminho relativo
+      const normalizedPath = destinationPath.trim()
+        .replace(/^(als[- ]transportes\/)+/i, '')
+        .replace(/^\/+/, '')
+        .replace(/\/+/g, '/');
       
       formData.append('path', normalizedPath);
 
