@@ -1,9 +1,9 @@
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, PreStacking, Port, Category } from '../../../types';
-import SmartOperationTable from './SmartOperationTable';
 import { db } from '../../../utils/storage';
 import { getOperationTableColumns } from './OperationTableColumns';
+import SmartOperationTable from './SmartOperationTable';
 import OperationRegisterAction from './OperationRegisterAction';
 import SchedulingEditModal from './SchedulingEditModal';
 import DriverDocsViewerModal from './DriverDocsViewerModal';
@@ -98,10 +98,26 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     }
   };
 
+  // LÓGICA CORRIGIDA: Filtra clientes que pertecem à categoria no banco OU que possuem viagens nela
   const categoryCustomers = useMemo(() => {
-    const names = new Set(allTrips.filter(t => t.category === categoryName).map(t => t.customer.name));
+    const normCategory = categoryName.toUpperCase();
+    
+    // Nomes de clientes que já possuem alguma viagem nesta categoria
+    const namesFromTrips = new Set(
+      allTrips
+        .filter(t => t.category?.toUpperCase() === normCategory)
+        .map(t => t.customer.name.toUpperCase())
+    );
+
     return customers
-      .filter(c => names.has(c.name))
+      .filter(c => {
+        // Verifica se o cliente tem a categoria em sua lista de operações no banco
+        const hasOpInProfile = c.operations?.some(op => op.toUpperCase() === normCategory);
+        // Ou se ele já tem histórico de carga nessa categoria
+        const hasActiveHistory = namesFromTrips.has(c.name.toUpperCase());
+        
+        return hasOpInProfile || hasActiveHistory;
+      })
       .filter(c => c.name.toUpperCase().includes(clientSearchText.toUpperCase()))
       .sort((a,b) => a.name.localeCompare(b.name));
   }, [allTrips, categoryName, customers, clientSearchText]);

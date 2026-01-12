@@ -6,7 +6,7 @@ import { timeUtils } from '../../utils/timeUtils';
 
 interface OnlineStatusProps {
   staffList: Staff[];
-  currentUser: User; // Adicionado prop para referência direta
+  currentUser: User;
 }
 
 const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) => {
@@ -42,21 +42,21 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) =
   }, [fetchStatus]);
 
   const getStatusInfo = (user: User, isSelf: boolean) => {
-    // Se for o próprio usuário, ele está sempre online enquanto a aba estiver aberta
-    if (isSelf) return { key: 'online', color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online' };
+    // Se for o próprio usuário, ele está sempre Ativo enquanto a aba estiver aberta
+    if (isSelf) return { key: 'online', color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Ativo' };
     
-    if (!user.lastSeen) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Off' };
+    if (!user.lastSeen) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
     
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
 
-    // Outros usuários: se não houver sinal nos últimos 5 minutos, assume offline
-    if (diffSeconds > 300) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Off' };
+    // Outros usuários: se não houver sinal nos últimos 5 minutos, assume Desconectado
+    if (diffSeconds > 300) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
 
     switch (user.presence_status) {
-      case 'online': return { key: 'online', color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Online' };
+      case 'online': return { key: 'online', color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Ativo' };
       case 'away': return { key: 'away', color: 'bg-amber-500', text: 'text-amber-400', label: 'Ausente' };
-      default: return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Off' };
+      default: return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
     }
   };
 
@@ -66,7 +66,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) =
       const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
       const info = u ? getStatusInfo(u, isSelf) : getStatusInfo({} as User, isSelf);
       
-      // Se for eu, usa o lastLogin da prop (soberano). Se não, usa o do banco.
       const loginTimestamp = isSelf ? currentUser.lastLogin : u?.lastLogin;
       const displayTime = (loginTimestamp && info.key !== 'offline') ? timeUtils.calculateDuration(loginTimestamp) : '00:00:00';
 
@@ -84,7 +83,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) =
     return counts;
   }, [staffWithStatus]);
 
-  const totalActive = stats.online + stats.away;
+  const totalActive = stats.online;
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -103,9 +102,9 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) =
         <div className="absolute bottom-full left-0 mb-4 w-full bg-[#0a0f1e] border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-6 duration-500 z-[200]">
           <div className="p-6 bg-[#0f172a] border-b border-white/5">
              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-emerald-500/5 p-3 rounded-2xl text-center"><p className="text-[7px] font-black text-emerald-500 uppercase mb-1">On</p><p className="text-xl font-black text-emerald-400 leading-none">{stats.online}</p></div>
+                <div className="bg-emerald-500/5 p-3 rounded-2xl text-center"><p className="text-[7px] font-black text-emerald-500 uppercase mb-1">Ativo</p><p className="text-xl font-black text-emerald-400 leading-none">{stats.online}</p></div>
                 <div className="bg-amber-500/5 p-3 rounded-2xl text-center"><p className="text-[7px] font-black text-amber-500 uppercase mb-1">Aus</p><p className="text-xl font-black text-amber-400 leading-none">{stats.away}</p></div>
-                <div className="bg-slate-500/5 p-3 rounded-2xl text-center"><p className="text-[7px] font-black text-slate-500 uppercase mb-1">Off</p><p className="text-xl font-black text-slate-400 leading-none">{stats.offline}</p></div>
+                <div className="bg-slate-500/5 p-3 rounded-2xl text-center"><p className="text-[7px] font-black text-slate-500 uppercase mb-1">Descon</p><p className="text-xl font-black text-slate-400 leading-none">{stats.offline}</p></div>
              </div>
           </div>
           <div className="max-h-[350px] overflow-y-auto custom-scrollbar p-4 space-y-2.5">

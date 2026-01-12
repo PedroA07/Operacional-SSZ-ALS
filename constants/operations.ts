@@ -18,7 +18,7 @@ export const DEFAULT_OPERATIONS: OperationDefinition[] = [
   },
   {
     id: 'op-industria',
-    category: 'Industria',
+    category: 'Indústria',
     clients: [
       { name: 'Diageo', hasDedicatedPage: false }
     ]
