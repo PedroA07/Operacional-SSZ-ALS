@@ -34,7 +34,7 @@ export default async function handler(request: Request) {
       });
     }
 
-    // Gravação estrita na pasta solicitada
+    // Limpeza da Key para gravação física
     const finalKey = rawPath
       .replace(/^als-transportes\//i, '') 
       .replace(/^als-transportes/i, '')
@@ -58,12 +58,12 @@ export default async function handler(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
-    // NOVA ESTRATÉGIA: Forçamos o bucket na URL de retorno para evitar 404
+    // ATRIBUIÇÃO DIRETA: Forçamos a pasta als-transportes na URL de visualização
     const publicUrl = `${domain}/als-transportes/${finalKey}`;
 
     return new Response(JSON.stringify({ 
       url: publicUrl, 
-      path: finalKey,
+      path: `als-transportes/${finalKey}`, // Retorna o path completo para o banco
       success: true 
     }), {
       status: 200,

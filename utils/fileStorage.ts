@@ -20,22 +20,27 @@ export const fileStorage = {
 
   getPublicUrl: (path: string | undefined): string => {
     if (!path) return '';
-    // Se já for uma URL completa, retorna ela
-    if (path.startsWith('http')) return path;
+    
+    // Se já for uma URL completa do R2 e já tiver o prefixo, retorna
+    if (path.startsWith('http') && path.includes('/als-transportes/')) return path;
     
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
+    if (!domain) return path;
+
     const prefix = domain.startsWith('http') ? '' : 'https://';
     const cleanDomain = domain.replace(/\/$/, '');
     
-    // FORÇA O PREFIXO DO BUCKET NA URL
-    let finalPath = path.trim().replace(/^\/+/, '');
+    // Limpa o path de barras duplicadas ou iniciais
+    let cleanPath = path.trim().replace(/^\/+/, '');
     
-    // Se o path NÃO começar com 'als-transportes/', nós adicionamos
-    if (!finalPath.toLowerCase().startsWith('als-transportes/')) {
-      finalPath = `als-transportes/${finalPath}`;
+    // Se o path for apenas o nome do arquivo ou pasta/arquivo sem o als-transportes, adicionamos
+    if (!cleanPath.toLowerCase().startsWith('als-transportes/')) {
+      // Remove 'als-transportes' sem barra se existir por erro e adiciona o correto
+      cleanPath = cleanPath.replace(/^als-transportes/i, '');
+      cleanPath = `als-transportes/${cleanPath.replace(/^\/+/, '')}`;
     }
     
-    return domain ? `${prefix}${cleanDomain}/${finalPath}` : finalPath;
+    return `${prefix}${cleanDomain}/${cleanPath}`;
   },
 
   upload: async (file: File | string, destinationPath: string): Promise<string> => {
@@ -55,14 +60,8 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Enviamos o path limpo, o backend cuidará de incluir o bucket na URL de retorno
-      const normalizedPath = destinationPath.trim()
-        .replace(/^als-transportes\//i, '')
-        .replace(/^als-transportes/i, '')
-        .replace(/^\/+/, '')
-        .replace(/\/+/g, '/');
-      
-      formData.append('path', normalizedPath);
+      // Enviamos o path para a API (a API cuidará da Key e da URL de retorno)
+      formData.append('path', destinationPath);
 
       const res = await fetch('/api/upload', { 
         method: 'POST', 
@@ -75,9 +74,7 @@ export const fileStorage = {
       }
       
       const data = await res.json();
-      if (!data.url) throw new Error("URL não retornada pelo servidor.");
-      
-      // Retorna a URL já contendo o prefixo do bucket (vinda do backend)
+      // O backend agora retorna a URL já com /als-transportes/
       return data.url; 
     } catch (e: any) {
       console.error("[Storage Error]:", e);

@@ -50,10 +50,13 @@ export async function POST(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
 
-    // URL com prefixo forçado do bucket
+    // ATRIBUIÇÃO DIRETA: Forçamos a pasta als-transportes na URL de visualização
     const publicUrl = `${domain}/als-transportes/${finalKey}`;
 
-    return new Response(JSON.stringify({ url: publicUrl, path: finalKey }), {
+    return new Response(JSON.stringify({ 
+      url: publicUrl, 
+      path: `als-transportes/${finalKey}` 
+    }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

@@ -16,13 +16,12 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // LIMPEZA OBRIGATÓRIA: Garante que a pasta não contenha o nome do bucket
+      // Limpeza preventiva da pasta
       const cleanFolder = folder
         .replace(/^als-transportes\//i, '')
         .replace(/^als-transportes/i, '')
         .replace(/^\/+|\/+$/g, '');
 
-      // A Key (path) começa diretamente pela pasta funcional
       const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       
       formData.append('path', finalPath);
@@ -38,6 +37,7 @@ export const r2Service = {
       }
 
       const data = await res.json();
+      // O backend já está configurado para retornar a URL com /als-transportes/
       return data.url;
     } catch (e) {
       console.error("[r2Service] Erro:", e);
