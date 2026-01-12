@@ -40,13 +40,9 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment', 
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 1024 },
+          height: { ideal: 768 }
         } 
-      }).catch(async () => {
-        return await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
-        });
       });
 
       if (videoRef.current) {
@@ -55,7 +51,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       }
     } catch (err: any) { 
       console.error("Camera access error:", err);
-      setCameraError("Não foi possível acessar a câmera. Verifique as permissões do seu navegador.");
+      setCameraError("Câmera bloqueada ou indisponível.");
     }
   }, []);
 
@@ -78,7 +74,8 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(videoRef.current, 0, 0);
-    const rawImage = canvas.toDataURL('image/jpeg', 0.85);
+    // Captura em qualidade média para processamento rápido
+    const rawImage = canvas.toDataURL('image/jpeg', 0.8);
     setCurrentImage(rawImage);
     setStep('preview');
     stopCamera();
@@ -88,15 +85,16 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     if (isSaving || !currentImage) return;
     setIsSaving(true);
     try {
-      // Compressão Otimizada: Reduz tamanho para ~150kb a 300kb
+      // Compressão Agressiva: ~100kb por foto. Ideal para armazenamento e rede móvel.
       const compressedImage = await imageCompressor.compress(currentImage, {
-        maxWidth: 1200, 
-        quality: 0.6
+        maxWidth: 1000, 
+        quality: 0.5
       });
 
       const photoId = `img_${Date.now()}`;
       const osClean = trip.os.replace(/[^a-z0-9]/gi, '_');
       
+      // Realiza o upload para o servidor (R2)
       const publicUrl = await fileStorage.uploadTripPhoto(compressedImage, osClean, photoId);
       
       const newDoc: DriverCapturedDoc = { 
@@ -110,12 +108,13 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         driver_docs: [...(trip.driver_docs || []), newDoc] 
       };
       
+      // Salva a referência (URL) no banco de dados Supabase
       await db.saveTrip(updatedTrip, user);
       await onSuccess();
       onClose();
     } catch (e: any) {
       console.error("Upload process failure:", e);
-      alert(`Erro no envio: ${e.message || "Verifique sua conexão ou tente uma foto menor."}`);
+      alert(`Falha no envio: ${e.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -163,7 +162,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
               }} 
               className="py-6 bg-white/5 text-slate-400 rounded-3xl text-[11px] font-black uppercase tracking-widest border border-white/5 active:bg-white/10"
             >
-              {initialImages.length > 0 ? 'Cancelar' : 'Tirar Outra'}
+              Tirar Outra
             </button>
             <button 
               onClick={handleFinish} 

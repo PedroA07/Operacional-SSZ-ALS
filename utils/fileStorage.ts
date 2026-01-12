@@ -1,29 +1,33 @@
 
 export const fileStorage = {
   /**
-   * Converte uma string Base64 em um objeto Blob de forma síncrona.
-   * Mais robusto que fetch(dataUrl) em dispositivos móveis.
+   * Converte uma string Base64 em um objeto Blob de forma robusta.
    */
   dataURLtoBlob: (dataurl: string) => {
-    const arr = dataurl.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) throw new Error("Invalid Data URL");
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
+    try {
+      const arr = dataurl.split(',');
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    } catch (e) {
+      console.error("Erro ao converter base64 para blob", e);
+      throw new Error("Falha ao processar dados da imagem.");
     }
-    return new Blob([u8arr], { type: mime });
   },
 
   getPublicUrl: (path: string | undefined): string => {
     if (!path) return '';
-    if (path.startsWith('http') || path.startsWith('data:')) return path;
-    // Fallback seguro se as variáveis de ambiente não estiverem no cliente
+    if (path.startsWith('http')) return path;
+    // Se for apenas o path, tenta buscar o domínio das variáveis de ambiente
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
-    return domain ? `${domain}/${path}` : path;
+    const prefix = domain.startsWith('http') ? '' : 'https://';
+    return domain ? `${prefix}${domain}/${path}` : path;
   },
 
   upload: async (file: File | string, destinationPath: string): Promise<string> => {
@@ -37,39 +41,27 @@ export const fileStorage = {
       } else if (file instanceof File) {
         formData.append('file', file);
       } else {
-        throw new Error("Formato de arquivo inválido para upload.");
+        throw new Error("Formato inválido.");
       }
       
       formData.append('path', destinationPath);
 
-      // Timeout de 30 segundos para uploads em conexões lentas
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
       const res = await fetch('/api/upload', { 
         method: 'POST', 
-        body: formData,
-        signal: controller.signal
+        body: formData
       });
       
-      clearTimeout(timeoutId);
-
       if (!res.ok) {
-        let errorMessage = 'Erro desconhecido no servidor';
-        try {
-          const errData = await res.json();
-          errorMessage = errData.error || errorMessage;
-        } catch (e) {
-          errorMessage = `Erro HTTP ${res.status}`;
-        }
-        throw new Error(errorMessage);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro HTTP ${res.status}`);
       }
       
       const data = await res.json();
+      if (!data.url) throw new Error("URL não retornada pelo servidor.");
+      
       return data.url; 
     } catch (e: any) {
       console.error("[Storage Error]:", e);
-      if (e.name === 'AbortError') throw new Error("O envio demorou muito. Verifique sua conexão 4G/5G.");
       throw e;
     }
   },
