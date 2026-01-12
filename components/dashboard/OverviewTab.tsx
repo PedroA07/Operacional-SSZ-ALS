@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Trip, Driver } from '../../types';
 import TripsToday from './overview/TripsToday';
 import TripsTomorrow from './overview/TripsTomorrow';
@@ -17,26 +17,22 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers }) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       
-      {/* KPI GRID - LINHA SUPERIOR */}
+      {/* GRID DE KPIs SUPERIOR - 4 BLOCOS PRINCIPAIS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <TripsToday trips={trips} />
         <TripsTomorrow trips={trips} />
-        <TripsThisMonth trips={trips} />
-        <DelayedTrips trips={trips} />
-      </div>
-
-      {/* AGENDA SEMANAL FIXA (SEM DROPDOWN) */}
-      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-           <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
-           <h3 className="text-sm font-black uppercase tracking-[0.3em] text-indigo-900">Agenda Semanal Detalhada</h3>
-        </div>
         <TripsThisWeek trips={trips} />
+        <TripsThisMonth trips={trips} />
       </div>
 
-      {/* Grid de Status de Frota */}
-      <div className="grid grid-cols-1">
-        <DriverStatusCards trips={trips} drivers={drivers} />
+      {/* MONITOR DE ATRAZOS CRÍTICO */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+         <div className="lg:col-span-1">
+            <DelayedTrips trips={trips} />
+         </div>
+         <div className="lg:col-span-2">
+            <DriverStatusCards trips={trips} drivers={drivers} />
+         </div>
       </div>
     </div>
   );
