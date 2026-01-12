@@ -31,8 +31,21 @@ const StaffModal: React.FC<StaffModalProps> = ({
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
+  
+  // Ref para controlar se já inicializamos o formulário para a sessão atual do modal
+  const lastInitializedId = useRef<string | null | undefined>(undefined);
 
+  // Inicializa o formulário apenas quando o modal abre ou o alvo da edição muda
   useEffect(() => {
+    if (!isOpen) {
+      lastInitializedId.current = undefined;
+      return;
+    }
+
+    // Só re-inicializa se o ID do staff mudar (ou se mudar de "novo" para "editando")
+    const currentTargetId = editingStaff?.id || 'new';
+    if (lastInitializedId.current === currentTargetId) return;
+
     if (editingStaff) {
       const linkedUser = allUsers.find(u => u.staffId === editingStaff.id);
       setForm({ 
@@ -53,6 +66,8 @@ const StaffModal: React.FC<StaffModalProps> = ({
       setIsEditingPassword(true);
       setSuggestions([]);
     }
+
+    lastInitializedId.current = currentTargetId;
   }, [editingStaff, isOpen, allUsers]);
 
   const handleNameChange = (val: string) => {
