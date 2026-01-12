@@ -1,8 +1,5 @@
 
 export const fileStorage = {
-  /**
-   * Converte uma string Base64 em um objeto Blob de forma robusta.
-   */
   dataURLtoBlob: (dataurl: string) => {
     try {
       const arr = dataurl.split(',');
@@ -28,10 +25,14 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Limpa o path de qualquer prefixo als-transportes (case insensitive)
-    let cleanPath = path.replace(/^\/+/, '');
-    cleanPath = cleanPath.replace(/^als-transportes\/?/i, '');
-    cleanPath = cleanPath.replace(/^\/+/, '');
+    // Limpeza segmentada no path para links de visualização
+    const cleanPath = path
+      .split('/')
+      .filter(s => {
+        const low = s.toLowerCase().trim();
+        return low !== '' && low !== 'als-transportes' && low !== 'als transportes';
+      })
+      .join('/');
     
     const cleanDomain = domain.replace(/\/$/, '');
     return domain ? `${prefix}${cleanDomain}/${cleanPath}` : cleanPath;
@@ -54,10 +55,14 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Remove barra inicial e prefixo da empresa antes de enviar para a API
-      let normalizedPath = destinationPath.replace(/^\/+/, '');
-      normalizedPath = normalizedPath.replace(/^als-transportes\/?/i, '');
-      normalizedPath = normalizedPath.replace(/^\/+/, '');
+      // Limpeza segmentada antes de enviar
+      const normalizedPath = destinationPath
+        .split('/')
+        .filter(s => {
+          const low = s.toLowerCase().trim();
+          return low !== '' && low !== 'als-transportes' && low !== 'als transportes';
+        })
+        .join('/');
       
       formData.append('path', normalizedPath);
 

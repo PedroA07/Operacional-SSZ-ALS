@@ -33,16 +33,15 @@ export default async function handler(request: Request) {
       });
     }
 
-    // NORMALIZAÇÃO RADICAL E INSENSÍVEL A CASO:
-    // 1. Remove barras iniciais
-    // 2. Remove qualquer menção a 'als-transportes/' no início (case-insensitive)
-    let cleanKey = rawPath.replace(/^\/+/, '');
-    
-    // Remove "als-transportes/" ou "als-transportes" (com ou sem barra) do início da string
-    cleanKey = cleanKey.replace(/^als-transportes\/?/i, '');
-    
-    // Garante que não sobrou nenhuma barra no início após a remoção do prefixo
-    cleanKey = cleanKey.replace(/^\/+/, '');
+    // LIMPEZA SEGMENTADA: 
+    // Divide o caminho por barras, remove o que for 'als-transportes' ou vazio, e junta de novo.
+    const cleanKey = rawPath
+      .split('/')
+      .filter(segment => {
+        const s = segment.toLowerCase().trim();
+        return s !== '' && s !== 'als-transportes' && s !== 'als transportes';
+      })
+      .join('/');
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
@@ -59,19 +58,11 @@ export default async function handler(request: Request) {
 
     await client.send(command);
 
-    // Montagem da URL Pública
     let domain = process.env.R2_PUBLIC_DOMAIN || "";
     domain = domain.trim().replace(/\/$/, "");
+    if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
-    if (domain && !domain.startsWith('http')) {
-      domain = `https://${domain}`;
-    }
-    
-    // URL Final: dominio/trips/... (ou drivers/..., etc)
     const publicUrl = `${domain}/${cleanKey}`;
-
-    console.log(`[R2 UPLOAD] Key Final: ${cleanKey}`);
-    console.log(`[R2 UPLOAD] URL Gerada: ${publicUrl}`);
 
     return new Response(JSON.stringify({ 
       url: publicUrl, 
@@ -82,10 +73,8 @@ export default async function handler(request: Request) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    console.error("[R2 Upload Error]:", error);
-    return new Response(JSON.stringify({ 
-      error: `Falha no R2: ${error.message}` 
-    }), { 
+    console.error("[R2 Error]:", error);
+    return new Response(JSON.stringify({ error: `Erro R2: ${error.message}` }), { 
       status: 500,
       headers: { "Content-Type": "application/json" }
     });

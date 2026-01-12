@@ -18,35 +18,48 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const path = formData.get("path") as string; 
+    const rawPath = formData.get("path") as string; 
     
-    if (!file || !path) {
-      return new Response(JSON.stringify({ error: "Arquivo ou destino (path) ausente" }), { 
+    if (!file || !rawPath) {
+      return new Response(JSON.stringify({ error: "Arquivo ou destino ausente" }), { 
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
+
+    // LIMPEZA SEGMENTADA IGUAL AO HANDLER PRINCIPAL
+    const cleanKey = rawPath
+      .split('/')
+      .filter(segment => {
+        const s = segment.toLowerCase().trim();
+        return s !== '' && s !== 'als-transportes' && s !== 'als transportes';
+      })
+      .join('/');
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
     
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: path,
+      Key: cleanKey,
       Body: fileBytes,
       ContentType: file.type || 'image/jpeg',
     });
 
     await client.send(command);
 
-    const publicUrl = `${process.env.R2_PUBLIC_DOMAIN}/${path}`;
+    let domain = process.env.R2_PUBLIC_DOMAIN || "";
+    domain = domain.trim().replace(/\/$/, "");
+    if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
 
-    return new Response(JSON.stringify({ url: publicUrl, path: path }), {
+    const publicUrl = `${domain}/${cleanKey}`;
+
+    return new Response(JSON.stringify({ url: publicUrl, path: cleanKey }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    console.error("[R2 Upload Error]:", error);
+    console.error("[R2 Route Error]:", error);
     return new Response(JSON.stringify({ error: `Falha no S3: ${error.message}` }), { 
       status: 500,
       headers: { "Content-Type": "application/json" }
