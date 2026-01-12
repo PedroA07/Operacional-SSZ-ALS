@@ -25,10 +25,11 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Garante que o path exibido/buscado contenha o prefixo da pasta correta
+    // Agora o path é limpo e não força o prefixo 'als-transportes/'
+    // que estava causando o aninhamento duplo.
     let cleanPath = path.replace(/^\/+/, '');
-    if (!cleanPath.toLowerCase().startsWith('als-transportes/')) {
-      cleanPath = `als-transportes/${cleanPath}`;
+    if (cleanPath.toLowerCase().startsWith('als-transportes/')) {
+      cleanPath = cleanPath.substring(16);
     }
     cleanPath = cleanPath.replace(/\/+/g, '/');
     
@@ -53,8 +54,7 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Enviamos o path como ele é definido nas funções específicas (ex: trips/OS/...).
-      // O Backend cuidará de garantir que ele entre na pasta 'als-transportes/'
+      // Envia o caminho limpo. O backend removerá qualquer prefixo duplicado.
       const normalizedPath = destinationPath.replace(/^\/+/, '').replace(/\/+/g, '/');
       
       formData.append('path', normalizedPath);

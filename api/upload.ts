@@ -33,18 +33,18 @@ export default async function handler(request: Request) {
       });
     }
 
-    // LÓGICA DE PREFIXO ÚNICO (IDEMPOTENTE)
-    // 1. Limpa barras e espaços extras
-    let cleanPath = rawPath.replace(/^\/+/, '').trim();
+    // LIMPEZA DO CAMINHO:
+    // Remove qualquer prefixo 'als-transportes/' que possa ter vindo do frontend ou de tentativas anteriores
+    // e garante que o arquivo seja salvo na raiz do bucket com o caminho relativo correto.
+    let finalKey = rawPath.replace(/^\/+/, '').trim();
     
-    // 2. Remove o prefixo se ele já existir (para evitar als-transportes/als-transportes/)
-    // Usamos um loop simples para limpar múltiplos prefixos se existirem por erro prévio
-    while (cleanPath.toLowerCase().startsWith('als-transportes/') || cleanPath.toLowerCase().startsWith('als transportes/')) {
-        cleanPath = cleanPath.substring(cleanPath.indexOf('/') + 1);
+    // Remove "als-transportes/" do início se existir, pois o bucket já é a raiz
+    if (finalKey.toLowerCase().startsWith('als-transportes/')) {
+      finalKey = finalKey.substring(16);
     }
     
-    // 3. Monta a chave final garantindo a pasta als-transportes na raiz do bucket
-    const finalKey = `als-transportes/${cleanPath}`.replace(/\/+/g, '/');
+    // Remove barras duplas
+    finalKey = finalKey.replace(/\/+/g, '/');
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
@@ -65,6 +65,7 @@ export default async function handler(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
+    // A URL pública agora aponta corretamente para o arquivo na raiz do bucket
     const publicUrl = `${domain}/${finalKey}`;
 
     return new Response(JSON.stringify({ 

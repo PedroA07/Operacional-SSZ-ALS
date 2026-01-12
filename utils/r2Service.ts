@@ -16,9 +16,12 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // O backend adicionará 'als-transportes/' automaticamente.
-      // Enviamos apenas o folder relativo solicitado.
+      // O backend cuidará de salvar na raiz correta.
+      // Removemos qualquer prefixo 'als-transportes/' para evitar duplicidade.
       let cleanFolder = folder.replace(/^\/+|\/+$/g, '').trim();
+      if (cleanFolder.toLowerCase().startsWith('als-transportes/')) {
+        cleanFolder = cleanFolder.substring(16);
+      }
 
       const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       

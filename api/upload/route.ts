@@ -27,12 +27,11 @@ export async function POST(request: Request) {
       });
     }
 
-    // LÓGICA DE PREFIXO ÚNICO (Igual ao handler principal)
-    let cleanPath = rawPath.replace(/^\/+/, '').trim();
-    while (cleanPath.toLowerCase().startsWith('als-transportes/') || cleanPath.toLowerCase().startsWith('als transportes/')) {
-        cleanPath = cleanPath.substring(cleanPath.indexOf('/') + 1);
+    let finalKey = rawPath.replace(/^\/+/, '').trim();
+    if (finalKey.toLowerCase().startsWith('als-transportes/')) {
+      finalKey = finalKey.substring(16);
     }
-    const finalKey = `als-transportes/${cleanPath}`.replace(/\/+/g, '/');
+    finalKey = finalKey.replace(/\/+/g, '/');
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
