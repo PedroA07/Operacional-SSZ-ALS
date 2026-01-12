@@ -25,7 +25,7 @@ export default async function handler(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const rawPath = (formData.get("path") as string) || ""; 
-    const bucketName = process.env.R2_BUCKET_NAME || "";
+    const bucketName = process.env.R2_BUCKET_NAME; // "als-transportes"
     
     if (!file) {
       return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
@@ -34,33 +34,19 @@ export default async function handler(request: Request) {
       });
     }
 
-    // LIMPEZA ABSOLUTA DA KEY (CHAVE DO OBJETO)
-    // 1. Remove qualquer barra inicial que impediria o Regex de funcionar
-    let finalKey = rawPath.trim().replace(/^\/+/, '');
-    
-    // 2. Remove o nome do bucket ou 'als-transportes' do início se existir
-    if (bucketName) {
-      const bucketPattern = new RegExp(`^${bucketName}/?`, 'i');
-      finalKey = finalKey.replace(bucketPattern, '');
-    }
-    
-    // 3. Remove variação manual 'als-transportes' por segurança extra
-    finalKey = finalKey.replace(/^(als[- ]transportes\/)+/i, '');
-
-    // 4. Limpeza final de barras residuais e normalização
-    finalKey = finalKey
+    // ATRIBUIÇÃO DIRETA E ESTREITA: 
+    // Remove o nome do bucket e barras iniciais do path recebido.
+    // A Key deve começar OBRIGATORIAMENTE pela pasta (ex: trips/...)
+    const finalKey = rawPath
+      .replace(/^als-transportes\//i, '') 
+      .replace(/^als-transportes/i, '')
       .replace(/^\/+/, '')
       .replace(/\/+/g, '/');
 
-    // Fallback para nome do arquivo caso a chave fique vazia
-    if (!finalKey) {
-      finalKey = file.name || `upload_${Date.now()}.jpg`;
-    }
-    
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
     
-    // AQUI: Bucket recebe o nome correto, Key recebe APENAS o caminho interno
+    // COMANDO S3: O nome do bucket vai apenas em Bucket, e o caminho relativo apenas em Key.
     const command = new PutObjectCommand({
       Bucket: bucketName,
       Key: finalKey, 
@@ -75,7 +61,6 @@ export default async function handler(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
-    // A URL pública agora é montada sem a pasta als-transportes
     const publicUrl = `${domain}/${finalKey}`;
 
     return new Response(JSON.stringify({ 

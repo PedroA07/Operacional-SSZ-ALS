@@ -16,16 +16,15 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // Expulsa qualquer menção a als-transportes do início do folder
-      let cleanFolder = folder.trim()
-        .replace(/^\/+/, '')
-        .replace(/^(als[- ]transportes\/)+/i, '')
-        .replace(/^\/+|\/+$/g, '')
-        .replace(/\/+/g, '/');
+      // LIMPEZA OBRIGATÓRIA: Garante que a pasta não contenha o nome do bucket
+      const cleanFolder = folder
+        .replace(/^als-transportes\//i, '')
+        .replace(/^als-transportes/i, '')
+        .replace(/^\/+|\/+$/g, '');
 
+      // A Key (path) começa diretamente pela pasta funcional
       const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       
-      // Enviamos apenas o path relativo à raiz do bucket
       formData.append('path', finalPath);
 
       const res = await fetch('/api/upload', {

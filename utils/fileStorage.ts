@@ -25,10 +25,10 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Limpeza rigorosa para exibição e geração de URL
-    let cleanPath = path.trim()
-      .replace(/^\/+/, '')
-      .replace(/^(als[-_ ]transportes\/)+/i, '')
+    // Limpeza rigorosa para garantir que a URL gerada bata com o local físico na raiz do bucket
+    const cleanPath = path.trim()
+      .replace(/^als-transportes\//i, '')
+      .replace(/^als-transportes/i, '')
       .replace(/^\/+/, '')
       .replace(/\/+/g, '/');
     
@@ -53,10 +53,10 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Limpa o path ANTES do envio para a API: remove barra e nome do bucket
+      // LIMPEZA ANTES DO ENVIO: Remove 'als-transportes/' do path
       const normalizedPath = destinationPath.trim()
-        .replace(/^\/+/, '')
-        .replace(/^(als[-_ ]transportes\/)+/i, '')
+        .replace(/^als-transportes\//i, '')
+        .replace(/^als-transportes/i, '')
         .replace(/^\/+/, '')
         .replace(/\/+/g, '/');
       

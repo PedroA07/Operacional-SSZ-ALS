@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const rawPath = (formData.get("path") as string) || ""; 
-    const bucketName = process.env.R2_BUCKET_NAME || "";
+    const bucketName = process.env.R2_BUCKET_NAME;
     
     if (!file) {
       return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
@@ -28,20 +28,12 @@ export async function POST(request: Request) {
       });
     }
 
-    // LIMPEZA ABSOLUTA
-    let finalKey = rawPath.trim().replace(/^\/+/, '');
-    
-    if (bucketName) {
-      const bucketPattern = new RegExp(`^${bucketName}/?`, 'i');
-      finalKey = finalKey.replace(bucketPattern, '');
-    }
-    
-    finalKey = finalKey.replace(/^(als[- ]transportes\/)+/i, '');
-    finalKey = finalKey.replace(/^\/+/, '').replace(/\/+/g, '/');
-
-    if (!finalKey) {
-      finalKey = file.name || `upload_${Date.now()}.jpg`;
-    }
+    // ATRIBUIÇÃO DIRETA E ESTREITA
+    const finalKey = rawPath
+      .replace(/^als-transportes\//i, '')
+      .replace(/^als-transportes/i, '')
+      .replace(/^\/+/, '')
+      .replace(/\/+/g, '/');
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
