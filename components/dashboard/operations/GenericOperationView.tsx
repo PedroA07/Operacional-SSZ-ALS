@@ -62,7 +62,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [endDate, setEndDate] = useState(today);
   
   const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
-  
   const [clientSearchText, setClientSearchText] = useState('');
   const [localDensity, setLocalDensity] = useState<'compact' | 'comfortable'>(initialDensity || 'compact');
 
@@ -98,11 +97,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     }
   };
 
-  // LÓGICA CORRIGIDA: Filtra clientes que pertecem à categoria no banco OU que possuem viagens nela
+  // Lógica de Filtro de Clientes Corrigida: Busca em Clientes + Trips
   const categoryCustomers = useMemo(() => {
     const normCategory = categoryName.toUpperCase();
     
-    // Nomes de clientes que já possuem alguma viagem nesta categoria
     const namesFromTrips = new Set(
       allTrips
         .filter(t => t.category?.toUpperCase() === normCategory)
@@ -111,11 +109,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
     return customers
       .filter(c => {
-        // Verifica se o cliente tem a categoria em sua lista de operações no banco
         const hasOpInProfile = c.operations?.some(op => op.toUpperCase() === normCategory);
-        // Ou se ele já tem histórico de carga nessa categoria
         const hasActiveHistory = namesFromTrips.has(c.name.toUpperCase());
-        
         return hasOpInProfile || hasActiveHistory;
       })
       .filter(c => c.name.toUpperCase().includes(clientSearchText.toUpperCase()))
@@ -127,7 +122,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       if (!t.category) return false;
       const matchCategory = t.category.toUpperCase() === categoryName.toUpperCase();
       if (selectedFilterClient !== 'TODOS') {
-         return matchCategory && (t.customer?.name === selectedFilterClient || t.subCategory === selectedFilterClient);
+         return matchCategory && (t.customer?.name === selectedFilterClient);
       }
       return matchCategory;
     });
@@ -181,10 +176,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
           <div className={`w-16 h-16 ${selectedFilterClient === 'TODOS' ? 'bg-slate-900' : 'bg-blue-600'} rounded-[2rem] flex items-center justify-center text-white font-black shadow-2xl shrink-0 transition-colors`}>{categoryName.substring(0, 2).toUpperCase()}</div>
           <div>
             <div className="flex items-center gap-3">
-              <button onClick={() => onNavigate({ type: 'list', categoryName })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
+              <button onClick={() => onNavigate({ type: 'list', categoryName })} className="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-50 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
               <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">{categoryName}</h1>
             </div>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1 ml-11">{selectedFilterClient === 'TODOS' ? 'Visão Consolidada da Categoria' : `Monitorando: ${selectedFilterClient}`}</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1 ml-11">{selectedFilterClient === 'TODOS' ? 'Visão Consolidada' : `Filtrando: ${selectedFilterClient}`}</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -200,52 +195,29 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       <div className="flex flex-col lg:flex-row justify-between items-center gap-6 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
          <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
            {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
-             <button 
-               key={tab} 
-               onClick={() => setActiveStatusTab(tab as any)} 
-               className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}
-             >
-               {tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}
-             </button>
+             <button key={tab} onClick={() => setActiveStatusTab(tab as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>{tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}</button>
            ))}
          </div>
          
-         <div className="flex-1 w-full max-w-md">
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="BUSCAR OS, CONTAINER, MOTORISTA..."
-                className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-              <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>
-            </div>
+         <div className="flex-1 w-full max-w-md relative group">
+            <input 
+              type="text" 
+              placeholder="BUSCAR OS, CONTAINER, MOTORISTA..."
+              className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>
          </div>
 
-         <DateRangeFilter 
-            startDate={startDate} 
-            onStartDateChange={setStartDate} 
-            endDate={endDate} 
-            onEndDateChange={setEndDate} 
-            onClear={() => { setStartDate(''); setEndDate(''); }} 
-         />
+         <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
       </div>
 
       <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-5">
          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-            <div>
-               <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Filtrar por Cliente desta Categoria</h3>
-               <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">Selecione para restringir a lista de monitoramento</p>
-            </div>
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Clientes Habilitados</h3>
             <div className="relative w-full md:w-64">
-               <input 
-                 type="text" 
-                 placeholder="BUSCAR CLIENTE..." 
-                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all"
-                 value={clientSearchText}
-                 onChange={e => setClientSearchText(e.target.value)}
-               />
+               <input type="text" placeholder="BUSCAR CLIENTE..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all" value={clientSearchText} onChange={e => setClientSearchText(e.target.value)} />
                <svg className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>
             </div>
          </div>
@@ -262,7 +234,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         <SmartOperationTable 
           userId={user.id} 
           componentId={`op-trips-${categoryName}-${selectedFilterClient}`} 
-          title={`Cargas Filtradas: ${selectedFilterClient}`} 
+          title={`${categoryName} Monitoramento`} 
           columns={tripColumns} 
           data={filteredTrips} 
           onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
@@ -270,25 +242,20 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         />
       </div>
 
-      {isTripDetailsOpen && selectedTrip && (
-        <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} user={user} />
-      )}
-
+      {isTripDetailsOpen && selectedTrip && <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} user={user} />}
       {isStatusModalOpen && selectedTrip && (
         <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">
-             <div className="text-center shrink-0">
-               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Inserção de Novo Status</p>
+             <div className="text-center">
+               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Registro de Status</p>
                <p className="text-xl font-black text-slate-800 uppercase">OS: {selectedTrip.os}</p>
              </div>
              <div className="space-y-4">
-                <div className="space-y-1"><label className={labelClass}>Novo Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
-                <div className="space-y-1"><label className={labelClass}>Data/Hora Evento</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
+                <div className="space-y-1"><label className={labelClass}>Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>{['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
+                <div className="space-y-1"><label className={labelClass}>Data/Hora</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
              </div>
              <div className="grid gap-3 pt-4">
-                <button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 active:scale-95">
-                  {isSavingStatus ? 'Gravando...' : 'Confirmar Registro'}
-                </button>
+                <button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700">Confirmar Registro</button>
                 <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button>
              </div>
           </div>
@@ -302,30 +269,26 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       {isDriverDocsModalOpen && selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => setIsDriverDocsModalOpen(false)} trip={selectedTrip} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />}
       
       {isOCFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3300] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[3300] bg-white animate-in slide-in-from-bottom duration-500 flex flex-col">
           <div className="p-6 bg-blue-600 text-white flex justify-between items-center shrink-0">
              <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-black italic">OC</div>
-                <h3 className="font-black text-sm uppercase tracking-widest">Edição de Ordem de Coleta: {selectedTrip.os}</h3>
+                <h3 className="font-black text-sm uppercase tracking-widest">Ordem de Coleta: {selectedTrip.os}</h3>
              </div>
-             <button onClick={() => setIsOCFormOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-             </button>
+             <button onClick={() => setIsOCFormOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
           </div>
           <OrdemColetaForm drivers={drivers} customers={customers} ports={preStackingUnits as any} onClose={() => { setIsOCFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} initialData={selectedTrip.ocFormData} />
         </div>
       )}
 
       {isMinutaFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3300] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[3300] bg-white animate-in slide-in-from-bottom duration-500 flex flex-col">
           <div className="p-6 bg-emerald-600 text-white flex justify-between items-center shrink-0">
              <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-black italic">PS</div>
-                <h3 className="font-black text-sm uppercase tracking-widest">Minuta Pre-Stacking: {selectedTrip.os}</h3>
+                <h3 className="font-black text-sm uppercase tracking-widest">Pré-Stacking: {selectedTrip.os}</h3>
              </div>
-             <button onClick={() => setIsMinutaFormOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-             </button>
+             <button onClick={() => setIsMinutaFormOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
           </div>
           <PreStackingForm drivers={drivers} customers={customers} ports={preStackingUnits as any} onClose={() => { setIsMinutaFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} initialOS={selectedTrip.os} />
         </div>
@@ -335,7 +298,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
       <style>{`
         .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; }
-        .table-compact table th { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; }
       `}</style>
     </div>
   );
