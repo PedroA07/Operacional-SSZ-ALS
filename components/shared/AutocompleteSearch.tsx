@@ -1,15 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { maskCNPJ, maskCPF } from '../../utils/masks';
-
-interface AutocompleteItem {
-  id: string;
-  mainText: string;    // Razão Social ou Nome
-  subText?: string;     // Nome Fantasia
-  document?: string;    // CNPJ ou CPF
-  location?: string;    // Cidade - UF
-  originalData: any;
-}
+import { AutocompleteItem } from '../../utils/searchService';
 
 interface AutocompleteSearchProps {
   label: string;
@@ -60,36 +51,37 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
           item.mainText.toLowerCase().includes(searchNorm) ||
           item.subText?.toLowerCase().includes(searchNorm) ||
           item.document?.replace(/\D/g, '').includes(searchNorm) ||
-          item.location?.toLowerCase().includes(searchNorm)
+          item.location?.toLowerCase().includes(searchNorm) ||
+          item.details?.plateHorse?.toLowerCase().includes(searchNorm)
         );
       })
-      .slice(0, 8); // Limita para performance e estética
+      .slice(0, 6);
 
     setResults(filtered);
     setIsOpen(true);
   };
 
   const handleSelectItem = (item: AutocompleteItem) => {
-    setQuery(item.subText || item.mainText);
+    setQuery(item.type === 'DRIVER' ? item.mainText : (item.subText || item.mainText));
     onSelect(item.originalData);
     setIsOpen(false);
   };
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 block">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       
       <div className="relative group">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors">
-          {icon || <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>}
+        <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors">
+          {icon || <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>}
         </div>
         
         <input
           type="text"
           placeholder={placeholder}
-          className="w-full pl-11 pr-4 py-3.5 rounded-2xl border-2 border-slate-50 bg-white text-[11px] font-bold uppercase focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm placeholder:text-slate-300"
+          className="w-full pl-12 pr-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-[12px] font-bold uppercase focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm placeholder:text-slate-300"
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => query.length > 0 && setIsOpen(true)}
@@ -97,41 +89,59 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
       </div>
 
       {isOpen && results.length > 0 && (
-        <div className="absolute z-[100] w-full mt-2 bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="max-h-72 overflow-y-auto custom-scrollbar p-2 space-y-1">
+        <div className="absolute z-[100] w-full mt-3 bg-white rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.18)] border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-3 space-y-2">
             {results.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => handleSelectItem(item)}
-                className="w-full text-left p-4 rounded-2xl hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group flex flex-col"
+                className="w-full text-left p-5 rounded-[1.8rem] hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group flex flex-col gap-3"
               >
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-[11px] font-black text-slate-800 uppercase leading-tight group-hover:text-blue-700">
-                    {item.mainText}
-                  </span>
-                  {item.document && (
-                    <span className="text-[8px] font-mono font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                      {item.document.length > 11 ? maskCNPJ(item.document) : maskCPF(item.document)}
+                {/* Cabeçalho do Item */}
+                <div className="flex justify-between items-start w-full">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[12px] font-black text-slate-900 uppercase leading-none block truncate group-hover:text-blue-600 transition-colors">
+                      {item.mainText}
                     </span>
-                  )}
+                    {item.type !== 'DRIVER' && item.subText && (
+                      <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 block">
+                        FAN: {item.subText}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end shrink-0 ml-4">
+                    <span className="text-[9px] font-mono font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                      {item.document}
+                    </span>
+                  </div>
                 </div>
                 
-                <div className="flex items-center justify-between mt-1">
-                   <p className="text-[9px] font-bold text-slate-500 uppercase italic">
-                     {item.subText && item.subText !== item.mainText ? `FAN: ${item.subText}` : ''}
-                   </p>
-                   {item.location && (
-                     <div className="flex items-center gap-1.5">
-                        <div className="w-1 h-1 rounded-full bg-slate-300 group-hover:bg-blue-400"></div>
-                        <span className="text-[8px] font-black text-slate-400 uppercase group-hover:text-blue-500">
-                          {item.location}
-                        </span>
-                     </div>
-                   )}
-                </div>
+                {/* Layout Condicional para Motorista */}
+                {item.type === 'DRIVER' ? (
+                  <div className="grid grid-cols-2 gap-2 w-full pt-2 border-t border-slate-100/50">
+                    <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/30 flex flex-col">
+                       <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest mb-1">Equipamento</span>
+                       <span className="text-[10px] font-mono font-bold text-blue-700">{item.details?.plateHorse} / {item.details?.plateTrailer}</span>
+                    </div>
+                    <div className="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100/30 flex flex-col">
+                       <span className="text-[7px] font-black text-emerald-400 uppercase tracking-widest mb-1">Contato Direto</span>
+                       <span className="text-[10px] font-mono font-bold text-emerald-700">{item.location}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 pt-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500/40"></div>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-tight">
+                      {item.location}
+                    </span>
+                  </div>
+                )}
               </button>
             ))}
+          </div>
+          <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-center">
+             <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">ALS Inteligência de Dados</p>
           </div>
         </div>
       )}

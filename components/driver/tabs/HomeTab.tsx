@@ -124,18 +124,22 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const fileList = Array.from(files) as File[];
-      const readPromises = fileList.map(file => {
-        return new Promise<string>((resolve) => {
+      const results: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const dataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (ev) => resolve(ev.target?.result as string);
           reader.readAsDataURL(file);
         });
-      });
-
-      const results = await Promise.all(readPromises);
-      setScannerInitialImages(results);
-      setIsScannerOpen(true);
+        results.push(dataUrl);
+      }
+      
+      // Abre o modal de preview com a primeira imagem selecionada
+      if (results.length > 0) {
+        setScannerInitialImages(results);
+        setIsScannerOpen(true);
+      }
     }
     e.target.value = '';
   };
@@ -183,7 +187,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
           <div className="px-8 py-8 bg-blue-600/10 border-y border-white/10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div className="space-y-1">
-              <span className="text-[9px] font-black text-blue-400 uppercase tracking-[0.3em] block">Container Alocado</span>
+              <span className="text-[9px] font-black text-blue-400 uppercase tracking-0.3em block">Container Alocado</span>
               <p className="text-5xl font-mono font-black text-white leading-none tracking-tight">
                 {activeTrip.container || 'A DEFINIR'}
               </p>
@@ -222,11 +226,11 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               </button>
               <button onClick={() => fileInputRef.current?.click()} className="py-5 bg-slate-800 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active:scale-95 transition-all border border-white/10 shadow-lg">
                   <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="3"/></svg>
-                  <span className="text-[7px] font-black uppercase text-slate-400 tracking-widest">Anexar</span>
+                  <span className="text-[7px] font-black uppercase text-slate-400 tracking-widest">Galeria</span>
               </button>
               <button onClick={() => setIsGalleryOpen(true)} className="py-5 bg-slate-800 rounded-[1.8rem] flex flex-col items-center justify-center gap-2 active:scale-95 transition-all border border-white/10 shadow-lg relative">
                   <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="3"/></svg>
-                  <span className="text-[7px] font-black uppercase text-slate-400 tracking-widest">Ver Fotos</span>
+                  <span className="text-[7px] font-black uppercase text-slate-400 tracking-widest">Histórico</span>
                   {activeTrip.driver_docs && activeTrip.driver_docs.length > 0 && (
                     <span className="absolute top-2 right-2 w-4 h-4 bg-emerald-500 rounded-full text-[8px] font-black flex items-center justify-center text-white">{activeTrip.driver_docs.length}</span>
                   )}
