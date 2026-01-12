@@ -27,11 +27,12 @@ export async function POST(request: Request) {
       });
     }
 
-    let finalKey = rawPath.replace(/^\/+/, '').trim();
-    if (finalKey.toLowerCase().startsWith('als-transportes/')) {
-      finalKey = finalKey.substring(16);
+    // LIMPEZA AGRESSIVA DO CAMINHO
+    let finalKey = rawPath.replace(/\/+/g, '/').replace(/^\/+/, '').trim();
+    while (finalKey.toLowerCase().startsWith('als-transportes/') || finalKey.toLowerCase().startsWith('als transportes/')) {
+      finalKey = finalKey.replace(/^(als[- ]transportes\/)/i, '');
     }
-    finalKey = finalKey.replace(/\/+/g, '/');
+    finalKey = finalKey.replace(/^\/+/, '');
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();

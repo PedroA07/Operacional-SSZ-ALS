@@ -33,18 +33,19 @@ export default async function handler(request: Request) {
       });
     }
 
-    // LIMPEZA DO CAMINHO:
-    // Remove qualquer prefixo 'als-transportes/' que possa ter vindo do frontend ou de tentativas anteriores
-    // e garante que o arquivo seja salvo na raiz do bucket com o caminho relativo correto.
-    let finalKey = rawPath.replace(/^\/+/, '').trim();
+    // LIMPEZA AGRESSIVA DO CAMINHO:
+    // 1. Remove barras duplas e espaços
+    let finalKey = rawPath.replace(/\/+/g, '/').replace(/^\/+/, '').trim();
     
-    // Remove "als-transportes/" do início se existir, pois o bucket já é a raiz
-    if (finalKey.toLowerCase().startsWith('als-transportes/')) {
-      finalKey = finalKey.substring(16);
+    // 2. Remove TODAS as ocorrências de "als-transportes/" ou "als transportes/" do início da string.
+    // Isso evita als-transportes/als-transportes/trips/... 
+    // Usamos um loop para garantir que mesmo se estiver triplicado por erro, seja removido.
+    while (finalKey.toLowerCase().startsWith('als-transportes/') || finalKey.toLowerCase().startsWith('als transportes/')) {
+      finalKey = finalKey.replace(/^(als[- ]transportes\/)/i, '');
     }
     
-    // Remove barras duplas
-    finalKey = finalKey.replace(/\/+/g, '/');
+    // 3. Garante que o caminho final não comece com barra
+    finalKey = finalKey.replace(/^\/+/, '');
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();

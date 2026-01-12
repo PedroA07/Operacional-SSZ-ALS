@@ -25,13 +25,12 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Agora o path é limpo e não força o prefixo 'als-transportes/'
-    // que estava causando o aninhamento duplo.
-    let cleanPath = path.replace(/^\/+/, '');
-    if (cleanPath.toLowerCase().startsWith('als-transportes/')) {
-      cleanPath = cleanPath.substring(16);
+    // Limpeza rigorosa do path para evitar als-transportes/als-transportes/
+    let cleanPath = path.replace(/\/+/g, '/').replace(/^\/+/, '');
+    while (cleanPath.toLowerCase().startsWith('als-transportes/') || cleanPath.toLowerCase().startsWith('als transportes/')) {
+      cleanPath = cleanPath.replace(/^(als[- ]transportes\/)/i, '');
     }
-    cleanPath = cleanPath.replace(/\/+/g, '/');
+    cleanPath = cleanPath.replace(/^\/+/, '');
     
     const cleanDomain = domain.replace(/\/$/, '');
     return domain ? `${prefix}${cleanDomain}/${cleanPath}` : cleanPath;
@@ -54,8 +53,8 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Envia o caminho limpo. O backend removerá qualquer prefixo duplicado.
-      const normalizedPath = destinationPath.replace(/^\/+/, '').replace(/\/+/g, '/');
+      // Envia o caminho sem barras extras. O backend garantirá a remoção de prefixos redundantes.
+      const normalizedPath = destinationPath.replace(/\/+/g, '/').replace(/^\/+/, '');
       
       formData.append('path', normalizedPath);
 
