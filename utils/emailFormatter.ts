@@ -8,6 +8,7 @@ export const emailFormatter = {
    * Inclui todo o histórico de status e a PREVISÃO inteligente.
    */
   toCompactRichText: (trip: Trip, allTrips: Trip[] = []): string => {
+    const now = new Date();
     const history = [...(trip.statusHistory || [])].sort(
       (a, b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime()
     );
@@ -37,7 +38,13 @@ export const emailFormatter = {
               </div>
               
               <table style="width: 100%; border-collapse: collapse;">
-                ${history.map((entry, idx) => `
+                ${history.map((entry, idx) => {
+                  // Se o status for Pendente, usa a data atual da cópia
+                  const displayDate = entry.status === 'Pendente' 
+                    ? now 
+                    : new Date(entry.dateTime);
+
+                  return `
                   <tr>
                     <td style="padding: 6px 0; width: 14px; vertical-align: top;">
                       <div style="width: 8px; height: 8px; border-radius: 50%; background-color: ${idx === 0 ? mainColor : '#cbd5e1'}; margin-top: 4px; border: 2px solid #fff; box-shadow: 0 0 0 1px ${idx === 0 ? mainColor : '#e2e8f0'};"></div>
@@ -46,7 +53,7 @@ export const emailFormatter = {
                       ${entry.status}
                     </td>
                     <td style="padding: 4px 0; font-size: 10px; color: #94a3b8; text-align: right; font-family: 'Courier New', Courier, monospace; font-weight: bold;">
-                      ${new Date(entry.dateTime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      ${displayDate.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </td>
                   </tr>
                   ${(idx === 0 && prediction) ? `
@@ -61,7 +68,7 @@ export const emailFormatter = {
                       </td>
                     </tr>
                   ` : ''}
-                `).join('')}
+                `}).join('')}
               </table>
             </td>
           </tr>
@@ -100,6 +107,7 @@ export const emailFormatter = {
    * Texto simples para fallback
    */
   toPlainText: (trip: Trip, allTrips: Trip[] = []): string => {
+    const now = new Date();
     const history = [...(trip.statusHistory || [])].sort(
       (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
     );
@@ -109,7 +117,10 @@ export const emailFormatter = {
     let text = `OS: ${trip.os} | CLIENTE: ${trip.customer.name}\n` +
       `EQUIPAMENTO: ${trip.container || 'A DEFINIR'} | MOTORISTA: ${trip.driver.name}\n` +
       `HISTÓRICO:\n` +
-      history.map(h => `- ${h.status.toUpperCase()}: ${new Date(h.dateTime).toLocaleString('pt-BR')}`).join('\n');
+      history.map(h => {
+        const displayDate = h.status === 'Pendente' ? now : new Date(h.dateTime);
+        return `- ${h.status.toUpperCase()}: ${displayDate.toLocaleString('pt-BR')}`;
+      }).join('\n');
 
     if (pred) {
       text += `\n>> ${pred.label.toUpperCase()}: ${pred.time}`;
