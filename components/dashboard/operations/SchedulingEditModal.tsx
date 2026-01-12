@@ -24,6 +24,7 @@ const SchedulingEditModal: React.FC<SchedulingEditModalProps> = ({
     locationId: '',
     obs: ''
   });
+  const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -36,6 +37,7 @@ const SchedulingEditModal: React.FC<SchedulingEditModalProps> = ({
         locationId: trip.scheduling?.locationId || trip.destination?.id || '',
         obs: trip.scheduling?.obs || ''
       });
+      setSearchTerm('');
     }
   }, [trip, isOpen]);
 
@@ -74,6 +76,11 @@ const SchedulingEditModal: React.FC<SchedulingEditModalProps> = ({
   };
 
   if (!isOpen || !trip) return null;
+
+  const filteredUnits = preStackingUnits.filter(u =>
+    (u.legalName || u.name || '').toUpperCase().includes(searchTerm.toUpperCase()) ||
+    (u.city || '').toUpperCase().includes(searchTerm.toUpperCase())
+  );
 
   const selectedUnit = preStackingUnits.find(u => u.id === formData.locationId);
 
@@ -122,8 +129,18 @@ const SchedulingEditModal: React.FC<SchedulingEditModalProps> = ({
 
             {isDropdownOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 z-[100] overflow-hidden animate-in slide-in-from-top-2">
+                <div className="p-4 bg-slate-50 border-b border-slate-100">
+                  <input 
+                    type="text" 
+                    autoFocus
+                    placeholder="DIGITE PARA BUSCAR TERMINAL..." 
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+                </div>
                 <div className="max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                  {preStackingUnits.map(unit => (
+                  {filteredUnits.map(unit => (
                     <button 
                       key={unit.id}
                       type="button"
@@ -144,8 +161,8 @@ const SchedulingEditModal: React.FC<SchedulingEditModalProps> = ({
                       </div>
                     </button>
                   ))}
-                  {preStackingUnits.length === 0 && (
-                    <div className="p-10 text-center text-[10px] font-bold text-slate-300 uppercase italic">Nenhum local cadastrado no sistema</div>
+                  {filteredUnits.length === 0 && (
+                    <div className="p-10 text-center text-[10px] font-bold text-slate-300 uppercase italic">Nenhum local localizado com este termo</div>
                   )}
                 </div>
               </div>
