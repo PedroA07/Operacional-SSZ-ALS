@@ -28,17 +28,16 @@ export async function POST(request: Request) {
       });
     }
 
-    // LIMPEZA SUPREMA
-    let finalKey = rawPath.trim();
-    if (bucketName && finalKey.toLowerCase().startsWith(bucketName.toLowerCase())) {
-      finalKey = finalKey.substring(bucketName.length);
+    // LIMPEZA ABSOLUTA
+    let finalKey = rawPath.trim().replace(/^\/+/, '');
+    
+    if (bucketName) {
+      const bucketPattern = new RegExp(`^${bucketName}/?`, 'i');
+      finalKey = finalKey.replace(bucketPattern, '');
     }
     
-    finalKey = finalKey
-      .replace(/^(als[- ]transportes\/)+/i, '')
-      .replace(/^(als[- ]transportes)+/i, '')
-      .replace(/^\/+/, '')
-      .replace(/\/+/g, '/');
+    finalKey = finalKey.replace(/^(als[- ]transportes\/)+/i, '');
+    finalKey = finalKey.replace(/^\/+/, '').replace(/\/+/g, '/');
 
     if (!finalKey) {
       finalKey = file.name || `upload_${Date.now()}.jpg`;

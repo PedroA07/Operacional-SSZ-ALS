@@ -16,15 +16,16 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // Limpeza agressiva no folder no frontend para remover 'als-transportes'
+      // Expulsa qualquer menção a als-transportes do início do folder
       let cleanFolder = folder.trim()
-        .replace(/^(als[-_]transportes\/)+/i, '')
+        .replace(/^\/+/, '')
+        .replace(/^(als[- ]transportes\/)+/i, '')
         .replace(/^\/+|\/+$/g, '')
         .replace(/\/+/g, '/');
 
       const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       
-      // Garante que enviamos apenas o path relativo
+      // Enviamos apenas o path relativo à raiz do bucket
       formData.append('path', finalPath);
 
       const res = await fetch('/api/upload', {
