@@ -25,7 +25,7 @@ export default async function handler(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const rawPath = (formData.get("path") as string) || ""; 
-    const bucketName = process.env.R2_BUCKET_NAME || "";
+    const bucketName = process.env.R2_BUCKET_NAME || "als-transportes";
     
     if (!file) {
       return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
@@ -34,22 +34,19 @@ export default async function handler(request: Request) {
       });
     }
 
-    // LIMPEZA SUPREMA DA CHAVE (KEY):
-    // 1. Remove o nome do bucket do início (caso venha no path por erro de config)
-    // 2. Remove 'als-transportes' de qualquer forma no início
+    // LIMPEZA DEFINITIVA DA KEY
+    // Remove o nome do bucket do início da string (Key) para não criar pasta com o nome do bucket
     let finalKey = rawPath.trim();
     
-    if (bucketName && finalKey.toLowerCase().startsWith(bucketName.toLowerCase())) {
-      finalKey = finalKey.substring(bucketName.length);
-    }
+    // Regex para remover o nome do bucket ou 'als-transportes' do início, seguido ou não de barra
+    const bucketCleanupRegex = new RegExp(`^(${bucketName}|als[-_]transportes)\/?`, 'i');
+    finalKey = finalKey.replace(bucketCleanupRegex, '');
 
+    // Limpeza de barras iniciais e duplas
     finalKey = finalKey
-      .replace(/^(als[- ]transportes\/)+/i, '') // Remove o nome indesejado no início
-      .replace(/^(als[- ]transportes)+/i, '')   // Remove sem a barra também
-      .replace(/^\/+/, '')                     // Remove barras iniciais residuais
-      .replace(/\/+/g, '/');                    // Normaliza barras duplas no meio
+      .replace(/^\/+/, '')
+      .replace(/\/+/g, '/');
 
-    // Se o path ficou vazio após a limpeza, usa o nome do arquivo na raiz
     if (!finalKey) {
       finalKey = file.name || `upload_${Date.now()}.jpg`;
     }
@@ -59,7 +56,7 @@ export default async function handler(request: Request) {
     
     const command = new PutObjectCommand({
       Bucket: bucketName,
-      Key: finalKey, 
+      Key: finalKey, // A Key agora é estritamente o caminho interno
       Body: fileBytes,
       ContentType: file.type || 'image/jpeg',
       CacheControl: "public, max-age=31536000",
