@@ -1,20 +1,17 @@
+
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-let s3Client: S3Client | null = null;
+export const runtime = 'edge';
 
 const getS3Client = () => {
-  if (!s3Client) {
-    const cleanEndpoint = process.env.R2_ENDPOINT?.split('.com')[0] + '.com';
-    s3Client = new S3Client({
-      region: "auto",
-      endpoint: cleanEndpoint,
-      credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
-      },
-    });
-  }
-  return s3Client;
+  return new S3Client({
+    region: "auto",
+    endpoint: process.env.R2_ENDPOINT,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+    },
+  });
 };
 
 export async function POST(request: Request) {
@@ -37,7 +34,7 @@ export async function POST(request: Request) {
       Bucket: process.env.R2_BUCKET_NAME,
       Key: path,
       Body: fileBytes,
-      ContentType: file.type,
+      ContentType: file.type || 'image/jpeg',
     });
 
     await client.send(command);
@@ -50,7 +47,7 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("[R2 Upload Error]:", error);
-    return new Response(JSON.stringify({ error: error.message }), { 
+    return new Response(JSON.stringify({ error: `Falha no S3: ${error.message}` }), { 
       status: 500,
       headers: { "Content-Type": "application/json" }
     });

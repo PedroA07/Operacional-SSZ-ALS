@@ -316,17 +316,18 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
             <div className="space-y-1"><label className={labelClass}>Lacre</label><input className={inputClasses} value={formData.seal} onChange={e => handleInputChange('seal', e.target.value)} placeholder="LACRE OFICIAL" /></div>
           </div>
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <label className={labelClass}>Padrão de Carga</label>
-              <select className={selectClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
-                <option value="CARGA GERAL">CARGA GERAL</option>
-                <option value="CARGO PREMIUM">CARGO PREMIUM</option>
-                <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
-                <option value="REEFER">REEFER</option>
-                <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
-              </select>
-            </div>
+            <div className="space-y-1"><label className={labelClass}>Genset (Opcional)</label><input className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} placeholder="Nº GENSET" /></div>
             <div className="space-y-1"><label className={labelClass}>Armador / Agência</label><input className={`${inputClasses} bg-blue-50/30 border-blue-100`} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Padrão de Carga</label>
+            <select className={selectClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
+              <option value="CARGA GERAL">CARGA GERAL</option>
+              <option value="CARGO PREMIUM">CARGO PREMIUM</option>
+              <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
+              <option value="REEFER">REEFER</option>
+              <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
+            </select>
           </div>
         </div>
 

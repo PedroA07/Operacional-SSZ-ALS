@@ -23,7 +23,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Inicializa com imagem da galeria se fornecida
   useEffect(() => {
     if (isOpen && initialImages.length > 0) {
       setCurrentImage(initialImages[0]);
@@ -38,7 +37,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const startCamera = useCallback(async () => {
     setCameraError(null);
     try {
-      // Tenta primeiro alta resolução
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment', 
@@ -46,7 +44,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
           height: { ideal: 1080 }
         } 
       }).catch(async () => {
-        // Fallback para resolução padrão se falhar
         return await navigator.mediaDevices.getUserMedia({ 
           video: { facingMode: 'environment' } 
         });
@@ -76,16 +73,11 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
     const canvas = canvasRef.current;
-    
-    // Mantém proporção da câmera
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
-    
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
     ctx.drawImage(videoRef.current, 0, 0);
-    
     const rawImage = canvas.toDataURL('image/jpeg', 0.92);
     setCurrentImage(rawImage);
     setStep('preview');
@@ -96,10 +88,9 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     if (isSaving || !currentImage) return;
     setIsSaving(true);
     try {
-      // Compressão para garantir upload rápido em 4G/5G
       const compressedImage = await imageCompressor.compress(currentImage, {
-        maxWidth: 1600,
-        quality: 0.75
+        maxWidth: 1400, // Reduzido levemente para garantir upload em sinal fraco
+        quality: 0.7
       });
 
       const photoId = `img_${Date.now()}`;
@@ -121,8 +112,9 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       await db.saveTrip(updatedTrip, user);
       await onSuccess();
       onClose();
-    } catch (e) {
-      alert("Erro ao enviar imagem. Verifique sua conexão.");
+    } catch (e: any) {
+      console.error("Upload process failure:", e);
+      alert(`Erro no envio: ${e.message || "Verifique sua conexão ou tente uma foto menor."}`);
     } finally {
       setIsSaving(false);
     }
@@ -136,7 +128,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         <div className="flex-1 relative bg-black flex flex-col items-center justify-center">
           {cameraError ? (
             <div className="p-10 text-center space-y-6">
-              <div className="w-20 h-20 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto">
+              <div className="w-20 h-20 bg-red-50/10 text-red-500 rounded-full flex items-center justify-center mx-auto">
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
               </div>
               <p className="text-white font-bold text-sm uppercase leading-relaxed">{cameraError}</p>
@@ -152,7 +144,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
                 <button onClick={capturePhoto} className="w-24 h-24 bg-white rounded-full border-[6px] border-blue-600 shadow-2xl active:scale-90 transition-all flex items-center justify-center">
                    <div className="w-16 h-16 rounded-full bg-blue-600/10 border-2 border-blue-600/20"></div>
                 </button>
-                <div className="w-14 h-14 opacity-0"></div> {/* Spacer balance */}
+                <div className="w-14 h-14 opacity-0"></div>
               </div>
             </>
           )}
