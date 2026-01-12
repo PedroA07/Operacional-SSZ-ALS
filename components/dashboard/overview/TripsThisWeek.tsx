@@ -25,6 +25,7 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
 
     const active = weekTrips.filter(t => t.status !== 'Viagem cancelada');
     const canceled = weekTrips.filter(t => t.status === 'Viagem cancelada').length;
+    const completed = weekTrips.filter(t => t.status === 'Viagem concluída').length;
     
     const typeCounts: { [key: string]: number } = {};
     active.forEach(t => {
@@ -36,7 +37,7 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
       return arrival && new Date(arrival.dateTime).getTime() > new Date(t.dateTime).getTime();
     }).length;
 
-    return { total: active.length, typeCounts, canceled, delays };
+    return { total: active.length, typeCounts, canceled, delays, completed };
   }, [trips]);
 
   return (
@@ -46,6 +47,7 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
       typeCounts={stats.typeCounts}
       delays={stats.delays}
       canceled={stats.canceled}
+      completed={stats.completed}
       variantColor="indigo"
     />
   );

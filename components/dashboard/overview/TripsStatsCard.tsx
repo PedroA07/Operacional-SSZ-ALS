@@ -7,10 +7,11 @@ interface TripsStatsCardProps {
   typeCounts: { [key: string]: number };
   delays: number;
   canceled: number;
+  completed: number;
   variantColor: 'indigo' | 'slate';
 }
 
-const TripsStatsCard: React.FC<TripsStatsCardProps> = ({ title, count, typeCounts, delays, canceled, variantColor }) => {
+const TripsStatsCard: React.FC<TripsStatsCardProps> = ({ title, count, typeCounts, delays, canceled, completed, variantColor }) => {
   const isIndigo = variantColor === 'indigo';
   
   return (
@@ -40,14 +41,18 @@ const TripsStatsCard: React.FC<TripsStatsCardProps> = ({ title, count, typeCount
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-red-50/50 p-3 rounded-2xl border border-red-100/50">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-red-50/50 p-2.5 rounded-2xl border border-red-100/50 text-center">
              <p className="text-[7px] font-black text-red-400 uppercase tracking-tighter">Atrasos</p>
-             <p className="text-xl font-black text-red-600">{delays}</p>
+             <p className="text-lg font-black text-red-600">{delays}</p>
           </div>
-          <div className="bg-slate-100/50 p-3 rounded-2xl border border-slate-200/50">
-             <p className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">Cancelados</p>
-             <p className="text-xl font-black text-slate-700">{canceled}</p>
+          <div className="bg-emerald-50/50 p-2.5 rounded-2xl border border-emerald-100/50 text-center">
+             <p className="text-[7px] font-black text-emerald-400 uppercase tracking-tighter">Concl.</p>
+             <p className="text-lg font-black text-emerald-600">{completed}</p>
+          </div>
+          <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100 text-center">
+             <p className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">Canc.</p>
+             <p className="text-lg font-black text-slate-700">{canceled}</p>
           </div>
         </div>
       </div>
