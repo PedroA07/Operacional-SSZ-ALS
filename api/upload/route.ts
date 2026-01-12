@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const rawPath = (formData.get("path") as string) || ""; 
-    const bucketName = process.env.R2_BUCKET_NAME;
+    const bucketName = process.env.R2_BUCKET_NAME || "als-transportes";
     
     if (!file) {
       return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
@@ -28,7 +28,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // ATRIBUIÇÃO DIRETA E ESTREITA
     const finalKey = rawPath
       .replace(/^als-transportes\//i, '')
       .replace(/^als-transportes/i, '')
@@ -51,7 +50,8 @@ export async function POST(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
 
-    const publicUrl = `${domain}/${finalKey}`;
+    // URL com prefixo forçado do bucket
+    const publicUrl = `${domain}/als-transportes/${finalKey}`;
 
     return new Response(JSON.stringify({ url: publicUrl, path: finalKey }), {
       status: 200,

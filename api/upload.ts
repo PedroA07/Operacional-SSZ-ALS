@@ -25,7 +25,7 @@ export default async function handler(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const rawPath = (formData.get("path") as string) || ""; 
-    const bucketName = process.env.R2_BUCKET_NAME; // "als-transportes"
+    const bucketName = process.env.R2_BUCKET_NAME || "als-transportes";
     
     if (!file) {
       return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
@@ -34,9 +34,7 @@ export default async function handler(request: Request) {
       });
     }
 
-    // ATRIBUIÇÃO DIRETA E ESTREITA: 
-    // Remove o nome do bucket e barras iniciais do path recebido.
-    // A Key deve começar OBRIGATORIAMENTE pela pasta (ex: trips/...)
+    // Gravação estrita na pasta solicitada
     const finalKey = rawPath
       .replace(/^als-transportes\//i, '') 
       .replace(/^als-transportes/i, '')
@@ -46,7 +44,6 @@ export default async function handler(request: Request) {
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
     
-    // COMANDO S3: O nome do bucket vai apenas em Bucket, e o caminho relativo apenas em Key.
     const command = new PutObjectCommand({
       Bucket: bucketName,
       Key: finalKey, 
@@ -61,7 +58,8 @@ export default async function handler(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
-    const publicUrl = `${domain}/${finalKey}`;
+    // NOVA ESTRATÉGIA: Forçamos o bucket na URL de retorno para evitar 404
+    const publicUrl = `${domain}/als-transportes/${finalKey}`;
 
     return new Response(JSON.stringify({ 
       url: publicUrl, 

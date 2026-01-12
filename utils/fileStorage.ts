@@ -20,20 +20,22 @@ export const fileStorage = {
 
   getPublicUrl: (path: string | undefined): string => {
     if (!path) return '';
+    // Se já for uma URL completa, retorna ela
     if (path.startsWith('http')) return path;
     
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
-    
-    // Limpeza rigorosa para garantir que a URL gerada bata com o local físico na raiz do bucket
-    const cleanPath = path.trim()
-      .replace(/^als-transportes\//i, '')
-      .replace(/^als-transportes/i, '')
-      .replace(/^\/+/, '')
-      .replace(/\/+/g, '/');
-    
     const cleanDomain = domain.replace(/\/$/, '');
-    return domain ? `${prefix}${cleanDomain}/${cleanPath}` : cleanPath;
+    
+    // FORÇA O PREFIXO DO BUCKET NA URL
+    let finalPath = path.trim().replace(/^\/+/, '');
+    
+    // Se o path NÃO começar com 'als-transportes/', nós adicionamos
+    if (!finalPath.toLowerCase().startsWith('als-transportes/')) {
+      finalPath = `als-transportes/${finalPath}`;
+    }
+    
+    return domain ? `${prefix}${cleanDomain}/${finalPath}` : finalPath;
   },
 
   upload: async (file: File | string, destinationPath: string): Promise<string> => {
@@ -53,7 +55,7 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // LIMPEZA ANTES DO ENVIO: Remove 'als-transportes/' do path
+      // Enviamos o path limpo, o backend cuidará de incluir o bucket na URL de retorno
       const normalizedPath = destinationPath.trim()
         .replace(/^als-transportes\//i, '')
         .replace(/^als-transportes/i, '')
@@ -75,6 +77,7 @@ export const fileStorage = {
       const data = await res.json();
       if (!data.url) throw new Error("URL não retornada pelo servidor.");
       
+      // Retorna a URL já contendo o prefixo do bucket (vinda do backend)
       return data.url; 
     } catch (e: any) {
       console.error("[Storage Error]:", e);
