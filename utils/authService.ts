@@ -4,9 +4,6 @@ import { User } from '../types';
 import { ADMIN_CREDENTIALS } from '../constants';
 
 export const authService = {
-  /**
-   * Realiza o login consultando a tabela 'users' no Supabase.
-   */
   async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string; isDatabaseDown?: boolean }> {
     const inputUser = username.trim().toLowerCase();
     const inputPass = password.trim();
@@ -15,9 +12,7 @@ export const authService = {
       return { success: false, error: 'Preencha usuário e senha.' };
     }
 
-    // TIMESTAMP ÚNICO: Gerado no momento exato do login para ser distribuído para todos os objetos
     const nowISO = new Date().toISOString();
-
     const isMaster = inputUser === ADMIN_CREDENTIALS.username.toLowerCase() && inputPass === ADMIN_CREDENTIALS.password;
 
     if (!supabase) {
@@ -26,54 +21,43 @@ export const authService = {
     }
 
     try {
+      // Tenta primeiro no banco para logs e persistência
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('username', inputUser)
         .maybeSingle();
 
+      if (isMaster) {
+        const master = this.getMasterUser(nowISO);
+        // Se o master existe no banco, atualiza presença, se não, entra como virtual
+        if (data) await supabase.from('users').update({ last_login: nowISO, presence_status: 'online' }).eq('username', inputUser);
+        return { success: true, user: master };
+      }
+
       if (error) throw error;
-
-      if (!data) {
-        if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
-        return { success: false, error: 'Usuário não cadastrado.' };
-      }
-
-      if (data.password !== inputPass) {
-        if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
-        return { success: false, error: 'Senha incorreta.' };
-      }
-
-      if (data.status === 'Inativo') {
-        return { success: false, error: 'Este acesso está desativado.' };
-      }
+      if (!data) return { success: false, error: 'Usuário não cadastrado.' };
+      if (data.password !== inputPass) return { success: false, error: 'Senha incorreta.' };
+      if (data.status === 'Inativo') return { success: false, error: 'Acesso desativado.' };
 
       const user: User = {
         id: data.id,
         username: data.username,
-        displayName: data.display_name || data.displayname || data.username,
+        displayName: data.display_name || data.username,
         role: data.role,
-        lastLogin: nowISO, // Alinhado com o banco
+        lastLogin: nowISO,
         photo: data.photo,
         position: data.position,
-        driverId: data.driver_id || data.driverid,
-        staffId: data.staff_id || data.staffid,
+        driverId: data.driver_id,
+        staffId: data.staff_id,
         status: data.status,
-        isFirstLogin: data.is_first_login ?? data.isfirstlogin,
-        lastSeen: nowISO // Alinhado com o banco
+        isFirstLogin: data.is_first_login
       };
 
-      // Atualização imediata no Banco
-      await supabase.from('users').update({ 
-        last_login: nowISO, 
-        last_seen: nowISO, 
-        presence_status: 'online' 
-      }).eq('id', user.id);
-
+      await supabase.from('users').update({ last_login: nowISO, presence_status: 'online' }).eq('id', user.id);
       return { success: true, user };
 
     } catch (err: any) {
-      console.error("Auth Exception:", err);
       if (isMaster) return { success: true, user: this.getMasterUser(nowISO) };
       return { success: false, error: 'Servidor ALS offline.', isDatabaseDown: true };
     }
@@ -88,7 +72,7 @@ export const authService = {
       lastLogin: timestamp,
       lastSeen: timestamp,
       status: 'Ativo',
-      position: 'Administração SSZ',
+      position: 'Gestão Geral SSZ',
       isFirstLogin: false
     };
   }
