@@ -14,9 +14,8 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     const oldId = user?.id;
-    const oldUsername = user?.username;
     
-    // Limpa estados locais e persistência de sessão
+    // Limpa estados locais
     setUser(null);
     setCurrentScreen(AppScreen.LOGIN);
     sessionStorage.removeItem('als_active_session');
@@ -27,7 +26,7 @@ const App: React.FC = () => {
       } catch (e) {}
     }
 
-    // Força o recarregamento completo da página para garantir limpeza total
+    // RECARREGAMENTO TOTAL DO NAVEGADOR
     window.location.reload();
   };
 
@@ -40,7 +39,6 @@ const App: React.FC = () => {
         if (saved) {
           const sessionData: User = JSON.parse(saved);
           
-          // Se for o admin master, reconecta direto
           if (sessionData.username === 'operacional_ssz') {
             setUser(sessionData);
             setCurrentScreen(AppScreen.DASHBOARD);
@@ -48,7 +46,6 @@ const App: React.FC = () => {
             return;
           }
 
-          // Para outros usuários, valida no banco se ainda estão ativos
           const users = await db.getUsers();
           const dbUser = users.find(u => u.id === sessionData.id);
 

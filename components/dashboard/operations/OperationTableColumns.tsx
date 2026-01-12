@@ -6,7 +6,6 @@ import { fileStorage } from '../../../utils/fileStorage';
 import { imageCompressor } from '../../../utils/imageCompressor';
 import ActionMenu from './ActionMenu';
 
-// Novos componentes de coluna modulares
 import { DriverColumn } from './columns/DriverColumn';
 import { EquipmentColumn } from './columns/EquipmentColumn';
 import { ShipBookingColumn } from './columns/ShipBookingColumn';
@@ -42,7 +41,7 @@ export const getOperationTableColumns = (
       for (const file of filesArray) {
         let fileToUpload: File | string = file;
         
-        // Se for imagem, reduz a qualidade antes do upload
+        // COMPRESSÃO AUTOMÁTICA SE FOR IMAGEM (800px / 0.4)
         if (file.type.startsWith('image/')) {
           fileToUpload = await imageCompressor.compress(file, {
             maxWidth: 800,
@@ -59,7 +58,7 @@ export const getOperationTableColumns = (
       const file = filesArray[0];
       let fileToUpload: File | string = file;
 
-      // Compressão para anexos individuais de imagem (ex: foto de CVA)
+      // COMPRESSÃO AUTOMÁTICA EM ANEXOS ÚNICOS (EX: CVA OU OS CASO SEJA FOTO)
       if (file.type.startsWith('image/')) {
         fileToUpload = await imageCompressor.compress(file, {
           maxWidth: 800,
