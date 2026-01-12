@@ -45,20 +45,38 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-4 duration-500 max-h-[400px] flex flex-col">
-          <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Próximas Viagens</span>
+        <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-4 duration-500 max-h-[500px] flex flex-col">
+          <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Cargas Agendadas Amanhã</span>
             <span className="px-2 py-0.5 bg-amber-100 text-amber-600 rounded text-[7px] font-black uppercase mr-4">{tomorrowTrips.length} Cargas</span>
           </div>
-          <div className="overflow-y-auto custom-scrollbar p-4 space-y-2">
+          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3">
             {tomorrowTrips.length > 0 ? tomorrowTrips.map(trip => (
-              <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-2xl hover:border-amber-200 transition-all">
-                <p className="text-[10px] font-black text-slate-800 uppercase truncate">{trip.driver.name}</p>
-                <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{trip.customer.name}</p>
+              <div key={trip.id} className="p-5 bg-white border border-slate-100 rounded-3xl hover:border-amber-200 transition-all group">
+                <div className="flex justify-between items-start mb-3">
+                   <span className="text-sm font-black text-amber-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                   <span className="text-[9px] font-black text-slate-300">OS: {trip.os}</span>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-slate-800 uppercase leading-none">{trip.driver.name}</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase truncate">{trip.customer.name}</p>
+                  
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-50">
+                      <div>
+                        <p className="text-[7px] font-black text-slate-300 uppercase">Container / BK</p>
+                        <p className="text-[9px] font-mono font-black text-slate-700">{trip.container || '---'}</p>
+                        <p className="text-[8px] font-bold text-amber-600">{trip.booking || '---'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[7px] font-black text-slate-300 uppercase">Destino</p>
+                        <p className="text-[9px] font-black text-slate-700 uppercase truncate">{trip.destination?.name || trip.scheduling?.location || 'A DEFINIR'}</p>
+                      </div>
+                   </div>
+                </div>
               </div>
             )) : (
               <div className="py-12 text-center">
-                <p className="text-[9px] font-black text-slate-300 uppercase italic">Nada agendado para amanhã</p>
+                <p className="text-[9px] font-black text-slate-300 uppercase italic">Nada para amanhã com estes filtros</p>
               </div>
             )}
           </div>
