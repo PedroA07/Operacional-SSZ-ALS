@@ -151,8 +151,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     user,
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
-    (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); }
-  ), [user, onRefresh, onDeleteTrip]);
+    (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
+    drivers // Passando drivers aqui
+  ), [user, onRefresh, onDeleteTrip, drivers]);
 
   if (activeView.type !== 'list') {
     return (

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Trip, TripStatus, TripDocument, User, DriverCapturedDoc } from '../../../types';
+import { Trip, TripStatus, TripDocument, User, DriverCapturedDoc, Driver } from '../../../types';
 import { db } from '../../../utils/storage';
 import { fileStorage } from '../../../utils/fileStorage';
 import ActionMenu from './ActionMenu';
@@ -25,7 +25,8 @@ export const getOperationTableColumns = (
   actingUser: User,
   onLocateDriver: (driverId: string) => void,
   onViewDriverDocs: (t: Trip) => void,
-  onOpenHistoryManager: (t: Trip) => void 
+  onOpenHistoryManager: (t: Trip) => void,
+  allDrivers: Driver[] = []
 ) => {
   
   const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO' | 'BATCH', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,7 +104,7 @@ export const getOperationTableColumns = (
     { 
       key: 'driver', 
       label: '3. Motorista / Identificação', 
-      render: (t: Trip) => DriverColumn(t, onLocateDriver)
+      render: (t: Trip) => DriverColumn(t, onLocateDriver, allDrivers)
     },
     {
       key: 'equipment',

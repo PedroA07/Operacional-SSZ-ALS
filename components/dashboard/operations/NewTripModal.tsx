@@ -134,7 +134,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
             <label className={labelBlueClass}>Motorista</label>
             <select required className={selectClass} onChange={e => {
               const d = drivers.find(drv => drv.id === e.target.value);
-              if (d) setForm({...form, driver: { id: d.id, name: d.name, plateHorse: d.plateHorse, plateTrailer: d.plateTrailer, status: 'Pronto', cpf: d.cpf }});
+              if (d) setForm({...form, driver: { id: d.id, name: d.name, plateHorse: d.plateHorse, plateTrailer: d.plateTrailer, status: 'Pronto', cpf: d.cpf, phone: d.phone }});
             }}>
               <option value="">Selecione o motorista...</option>
               {drivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.plateHorse})</option>)}
