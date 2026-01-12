@@ -24,15 +24,24 @@ export default async function handler(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const path = formData.get("path") as string; 
+    const rawPath = formData.get("path") as string; 
     
-    if (!file || !path) {
-      return new Response(JSON.stringify({ error: "Dados do arquivo ausentes" }), { 
+    if (!file || !rawPath) {
+      return new Response(JSON.stringify({ error: "Arquivo ou caminho ausentes" }), { 
         status: 400,
         headers: { "Content-Type": "application/json" }
       });
     }
 
+    // NORMALIZAÇÃO RADICAL: 
+    // 1. Remove barras iniciais
+    // 2. Remove qualquer menção acidental a 'als-transportes/' no início do path 
+    //    para garantir que 'trips/...' seja a raiz.
+    let cleanKey = rawPath.replace(/^\/+/, '');
+    if (cleanKey.startsWith('als-transportes/')) {
+      cleanKey = cleanKey.replace('als-transportes/', '');
+    }
+    
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
     
@@ -40,7 +49,7 @@ export default async function handler(request: Request) {
 
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: path,
+      Key: cleanKey, 
       Body: fileBytes,
       ContentType: contentType,
       CacheControl: "public, max-age=31536000",
@@ -48,21 +57,23 @@ export default async function handler(request: Request) {
 
     await client.send(command);
 
-    // Limpeza rigorosa do domínio
+    // Montagem da URL Pública
     let domain = process.env.R2_PUBLIC_DOMAIN || "";
-    domain = domain.trim().replace(/\/$/, ""); // Remove barra final se houver
+    domain = domain.trim().replace(/\/$/, "");
     
     if (domain && !domain.startsWith('http')) {
       domain = `https://${domain}`;
     }
     
-    // Limpeza do path (garante que não comece com barra para evitar // na URL)
-    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
-    const publicUrl = `${domain}/${cleanPath}`;
+    // O link final DEVE ser dominio/trips/... sem o prefixo da empresa
+    const publicUrl = `${domain}/${cleanKey}`;
+
+    console.log(`[R2 STORAGE] Arquivo gravado com Key: ${cleanKey}`);
+    console.log(`[R2 STORAGE] URL Gerada: ${publicUrl}`);
 
     return new Response(JSON.stringify({ 
       url: publicUrl, 
-      path: path,
+      path: cleanKey,
       success: true 
     }), {
       status: 200,

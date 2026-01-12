@@ -24,9 +24,18 @@ export const fileStorage = {
   getPublicUrl: (path: string | undefined): string => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
+    
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
-    return domain ? `${prefix}${domain}/${path}` : path;
+    
+    // Limpa o path de qualquer prefixo als-transportes se ele vier do banco com isso
+    let cleanPath = path.replace(/^\/+/, '');
+    if (cleanPath.startsWith('als-transportes/')) {
+      cleanPath = cleanPath.replace('als-transportes/', '');
+    }
+    
+    const cleanDomain = domain.replace(/\/$/, '');
+    return domain ? `${prefix}${cleanDomain}/${cleanPath}` : cleanPath;
   },
 
   upload: async (file: File | string, destinationPath: string): Promise<string> => {
@@ -46,7 +55,9 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      formData.append('path', destinationPath);
+      // Garante que o path enviado não tenha barras duplas ou iniciais
+      const normalizedPath = destinationPath.replace(/^\/+/, '');
+      formData.append('path', normalizedPath);
 
       const res = await fetch('/api/upload', { 
         method: 'POST', 
@@ -61,7 +72,6 @@ export const fileStorage = {
       const data = await res.json();
       if (!data.url) throw new Error("URL não retornada pelo servidor.");
       
-      console.log(`[R2 SUCCESS] Arquivo salvo em: ${data.url}`);
       return data.url; 
     } catch (e: any) {
       console.error("[Storage Error]:", e);
