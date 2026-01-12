@@ -27,9 +27,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // LIMPEZA DO CAMINHO:
+    // LIMPEZA ABSOLUTA
     let finalKey = rawPath.trim()
       .replace(/^(als[- ]transportes\/)+/i, '')
+      .replace(/^(als[- ]transportes)+/i, '')
       .replace(/^\/+/, '')
       .replace(/\/+/g, '/');
 

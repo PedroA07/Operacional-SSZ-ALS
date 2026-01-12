@@ -16,15 +16,16 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // Remove qualquer menção a als-transportes no folder via RegEx
+      // Expulsa o termo als-transportes do folder
       let cleanFolder = folder.trim()
         .replace(/^(als[- ]transportes\/)+/i, '')
+        .replace(/^(als[- ]transportes)+/i, '')
         .replace(/^\/+|\/+$/g, '')
         .replace(/\/+/g, '/');
 
       const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       
-      formData.append('path', finalPath);
+      formData.append('path', finalPath.replace(/^\/+/, ''));
 
       const res = await fetch('/api/upload', {
         method: 'POST',

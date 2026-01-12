@@ -25,9 +25,10 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Remove qualquer prefixo legado 'als-transportes/' para gerar a URL correta na raiz
+    // Remove qualquer menção a als-transportes da URL pública final
     let cleanPath = path.trim()
       .replace(/^(als[- ]transportes\/)+/i, '')
+      .replace(/^(als[- ]transportes)+/i, '')
       .replace(/^\/+/, '')
       .replace(/\/+/g, '/');
     
@@ -52,9 +53,10 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Limpa o path antes de enviar para garantir que o backend receba apenas o caminho relativo
+      // Limpa o path ANTES do envio para a API
       const normalizedPath = destinationPath.trim()
         .replace(/^(als[- ]transportes\/)+/i, '')
+        .replace(/^(als[- ]transportes)+/i, '')
         .replace(/^\/+/, '')
         .replace(/\/+/g, '/');
       

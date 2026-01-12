@@ -33,13 +33,13 @@ export default async function handler(request: Request) {
       });
     }
 
-    // PURIFICAÇÃO AGRESSIVA DO CAMINHO (BACKEND):
-    // Remove "als-transportes/" ou "als transportes/" do início da string (case-insensitive).
-    // O sinal '+' garante que remova mesmo se houver repetições por erro.
+    // LIMPEZA ABSOLUTA: Remove 'als-transportes' e variações do INÍCIO do path
+    // Isso evita a criação da pasta als-transportes/ dentro do bucket.
     let finalKey = rawPath.trim()
-      .replace(/^(als[- ]transportes\/)+/i, '') 
+      .replace(/^(als[- ]transportes\/)+/i, '') // Remove prefixos no início
+      .replace(/^(als[- ]transportes)+/i, '')   // Remove termo solto no início
       .replace(/^\/+/, '')                     // Remove barras iniciais residuais
-      .replace(/\/+/g, '/');                    // Normaliza barras duplas no meio
+      .replace(/\/+/g, '/');                    // Normaliza barras duplas
 
     if (!finalKey) {
       finalKey = file.name || `upload_${Date.now()}.jpg`;
@@ -62,6 +62,7 @@ export default async function handler(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
+    // URL gerada agora aponta para a raiz limpa
     const publicUrl = `${domain}/${finalKey}`;
 
     return new Response(JSON.stringify({ 
