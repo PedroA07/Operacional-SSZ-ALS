@@ -27,11 +27,12 @@ export async function POST(request: Request) {
       });
     }
 
-    // LÓGICA IDEMPOTENTE:
-    let relativePath = rawPath.replace(/^\/+/, '');
-    relativePath = relativePath.replace(/^als[- ]transportes\//i, '');
-    
-    const finalKey = `als-transportes/${relativePath}`.replace(/\/+/g, '/');
+    // LÓGICA DE PREFIXO ÚNICO (Igual ao handler principal)
+    let cleanPath = rawPath.replace(/^\/+/, '').trim();
+    while (cleanPath.toLowerCase().startsWith('als-transportes/') || cleanPath.toLowerCase().startsWith('als transportes/')) {
+        cleanPath = cleanPath.substring(cleanPath.indexOf('/') + 1);
+    }
+    const finalKey = `als-transportes/${cleanPath}`.replace(/\/+/g, '/');
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();

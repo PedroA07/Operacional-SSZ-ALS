@@ -25,9 +25,9 @@ export const fileStorage = {
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
     
-    // Normaliza o path para garantir que a URL final esteja correta
+    // Garante que o path exibido/buscado contenha o prefixo da pasta correta
     let cleanPath = path.replace(/^\/+/, '');
-    if (!cleanPath.startsWith('als-transportes/')) {
+    if (!cleanPath.toLowerCase().startsWith('als-transportes/')) {
       cleanPath = `als-transportes/${cleanPath}`;
     }
     cleanPath = cleanPath.replace(/\/+/g, '/');
@@ -53,9 +53,9 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      // Enviamos o path relativo. O Backend cuidará de garantir o prefixo 'als-transportes/'
-      let normalizedPath = destinationPath.replace(/^\/+/, '');
-      normalizedPath = normalizedPath.replace(/\/+/g, '/');
+      // Enviamos o path como ele é definido nas funções específicas (ex: trips/OS/...).
+      // O Backend cuidará de garantir que ele entre na pasta 'als-transportes/'
+      const normalizedPath = destinationPath.replace(/^\/+/, '').replace(/\/+/g, '/');
       
       formData.append('path', normalizedPath);
 

@@ -16,9 +16,9 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // Remove redundâncias de prefixo no frontend
-      let cleanFolder = folder.replace(/^\/+|\/+$/g, '');
-      cleanFolder = cleanFolder.replace(/^als[- ]transportes\//i, '');
+      // O backend adicionará 'als-transportes/' automaticamente.
+      // Enviamos apenas o folder relativo solicitado.
+      let cleanFolder = folder.replace(/^\/+|\/+$/g, '').trim();
 
       const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       

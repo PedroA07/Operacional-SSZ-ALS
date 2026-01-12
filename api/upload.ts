@@ -33,14 +33,18 @@ export default async function handler(request: Request) {
       });
     }
 
-    // LÓGICA IDEMPOTENTE:
-    // 1. Remove barras iniciais
-    // 2. Remove o prefixo se ele já estiver lá (evita als-transportes/als-transportes/)
-    // 3. Adiciona o prefixo como única raiz
-    let relativePath = rawPath.replace(/^\/+/, '');
-    relativePath = relativePath.replace(/^als[- ]transportes\//i, '');
+    // LÓGICA DE PREFIXO ÚNICO (IDEMPOTENTE)
+    // 1. Limpa barras e espaços extras
+    let cleanPath = rawPath.replace(/^\/+/, '').trim();
     
-    const finalKey = `als-transportes/${relativePath}`.replace(/\/+/g, '/');
+    // 2. Remove o prefixo se ele já existir (para evitar als-transportes/als-transportes/)
+    // Usamos um loop simples para limpar múltiplos prefixos se existirem por erro prévio
+    while (cleanPath.toLowerCase().startsWith('als-transportes/') || cleanPath.toLowerCase().startsWith('als transportes/')) {
+        cleanPath = cleanPath.substring(cleanPath.indexOf('/') + 1);
+    }
+    
+    // 3. Monta a chave final garantindo a pasta als-transportes na raiz do bucket
+    const finalKey = `als-transportes/${cleanPath}`.replace(/\/+/g, '/');
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
