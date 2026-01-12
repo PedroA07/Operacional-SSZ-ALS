@@ -19,9 +19,10 @@ export const r2Service = {
       // O backend cuidará de salvar na raiz correta.
       // Removemos agressivamente qualquer prefixo 'als-transportes/' para evitar duplicidade.
       let cleanFolder = folder.replace(/\/+/g, '/').replace(/^\/+|\/+$/g, '').trim();
-      while (cleanFolder.toLowerCase().startsWith('als-transportes/') || cleanFolder.toLowerCase().startsWith('als-transportes')) {
-        cleanFolder = cleanFolder.replace(/^(als[- ]transportes\/?)/i, '');
+      while (cleanFolder.toLowerCase().startsWith('als-transportes/') || cleanFolder.toLowerCase().startsWith('als transportes/')) {
+        cleanFolder = cleanFolder.substring(16);
       }
+      cleanFolder = cleanFolder.replace(/^\/+/, '');
 
       const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       

@@ -27,12 +27,20 @@ export async function POST(request: Request) {
       });
     }
 
-    // LIMPEZA AGRESSIVA DO CAMINHO
+    // LIMPEZA RIGOROSA DO CAMINHO
     let finalKey = rawPath.replace(/\/+/g, '/').replace(/^\/+/, '').trim();
-    while (finalKey.toLowerCase().startsWith('als-transportes/') || finalKey.toLowerCase().startsWith('als transportes/')) {
-      finalKey = finalKey.replace(/^(als[- ]transportes\/)/i, '');
+    let shouldCheck = true;
+    while (shouldCheck) {
+      const lowerKey = finalKey.toLowerCase();
+      if (lowerKey.startsWith('als-transportes/')) {
+        finalKey = finalKey.substring(16);
+      } else if (lowerKey.startsWith('als transportes/')) {
+        finalKey = finalKey.substring(16);
+      } else {
+        shouldCheck = false;
+      }
+      finalKey = finalKey.replace(/^\/+/, '');
     }
-    finalKey = finalKey.replace(/^\/+/, '');
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();

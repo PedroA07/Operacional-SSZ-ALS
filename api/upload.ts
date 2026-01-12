@@ -33,30 +33,38 @@ export default async function handler(request: Request) {
       });
     }
 
-    // LIMPEZA AGRESSIVA DO CAMINHO:
-    // 1. Remove barras duplas e espaços
+    // PURIFICAÇÃO DO CAMINHO (BACKEND):
+    // Removemos qualquer tentativa de criar a pasta 'als-transportes' dentro do bucket.
     let finalKey = rawPath.replace(/\/+/g, '/').replace(/^\/+/, '').trim();
     
-    // 2. Remove TODAS as ocorrências de "als-transportes/" ou "als transportes/" do início da string.
-    // Isso evita als-transportes/als-transportes/trips/... 
-    // Usamos um loop para garantir que mesmo se estiver triplicado por erro, seja removido.
-    while (finalKey.toLowerCase().startsWith('als-transportes/') || finalKey.toLowerCase().startsWith('als transportes/')) {
-      finalKey = finalKey.replace(/^(als[- ]transportes\/)/i, '');
+    // Loop para remover múltiplas ocorrências (caso existam)
+    let shouldCheck = true;
+    while (shouldCheck) {
+      const lowerKey = finalKey.toLowerCase();
+      if (lowerKey.startsWith('als-transportes/')) {
+        finalKey = finalKey.substring(16); // Remove "als-transportes/"
+      } else if (lowerKey.startsWith('als transportes/')) {
+        finalKey = finalKey.substring(16); // Remove "als transportes/"
+      } else if (lowerKey.startsWith('als-transportes')) {
+        finalKey = finalKey.substring(15);
+      } else {
+        shouldCheck = false;
+      }
+      finalKey = finalKey.replace(/^\/+/, ''); // Remove barras residuais no início
     }
     
-    // 3. Garante que o caminho final não comece com barra
-    finalKey = finalKey.replace(/^\/+/, '');
+    // Garante que o caminho final não esteja vazio e não tenha barras duplicadas
+    if (!finalKey) finalKey = file.name || `upload_${Date.now()}.jpg`;
+    finalKey = finalKey.replace(/\/+/g, '/');
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
     
-    const contentType = file.type || 'image/jpeg';
-
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
       Key: finalKey, 
       Body: fileBytes,
-      ContentType: contentType,
+      ContentType: file.type || 'image/jpeg',
       CacheControl: "public, max-age=31536000",
     });
 
@@ -66,7 +74,6 @@ export default async function handler(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
-    // A URL pública agora aponta corretamente para o arquivo na raiz do bucket
     const publicUrl = `${domain}/${finalKey}`;
 
     return new Response(JSON.stringify({ 
