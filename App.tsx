@@ -14,6 +14,9 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     const oldId = user?.id;
+    const oldUsername = user?.username;
+    
+    // Limpa estados locais e persistência de sessão
     setUser(null);
     setCurrentScreen(AppScreen.LOGIN);
     sessionStorage.removeItem('als_active_session');
@@ -23,6 +26,9 @@ const App: React.FC = () => {
         await db.updatePresence(oldId, 'offline');
       } catch (e) {}
     }
+
+    // Força o recarregamento completo da página para garantir limpeza total
+    window.location.reload();
   };
 
   usePresenceMonitor(user, currentScreen, handleLogout);
