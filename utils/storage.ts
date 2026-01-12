@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
@@ -51,7 +52,6 @@ export const db = {
     return await driverRepository.getAll(supabase);
   },
 
-  // Método para manutenção: Busca TODOS os drivers sem limite
   getAllDriversMaintenance: async (): Promise<Driver[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('drivers').select('*');
@@ -86,7 +86,6 @@ export const db = {
     return await tripRepository.getAll(supabase);
   },
 
-  // Método para manutenção: Busca TODAS as viagens sem limite
   getAllTripsMaintenance: async (): Promise<Trip[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('trips').select('*').order('date_time', { ascending: false });
@@ -196,15 +195,50 @@ export const db = {
 
   saveStaff: async (staff: Staff, password?: string) => {
     if (!supabase) return false;
+    
+    // 1. Salva os dados na tabela de colaboradores
     const success = await staffRepository.save(supabase, staff);
-    if (success && password) {
-      await supabase.from('users').update({ password }).eq('staff_id', staff.id);
+    
+    if (success) {
+      // 2. Garante que o usuário de login exista ou seja atualizado
+      // Se não passou password (edição), buscamos a senha atual do usuário
+      let finalPassword = password;
+      
+      if (!finalPassword) {
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('password')
+          .eq('staff_id', staff.id)
+          .maybeSingle();
+        
+        if (existingUser) {
+          finalPassword = existingUser.password;
+        }
+      }
+
+      // Se temos uma senha (seja nova ou recuperada), fazemos o upsert
+      if (finalPassword) {
+        await supabase.from('users').upsert({
+          id: `u-staff-${staff.id}`, // ID previsível para o usuário vinculado ao staff
+          username: staff.username.toLowerCase(),
+          password: finalPassword,
+          display_name: staff.name,
+          role: staff.role,
+          staff_id: staff.id,
+          status: staff.status,
+          position: staff.position,
+          photo: staff.photo
+        });
+      }
     }
+    
     return success;
   },
 
   deleteStaff: async (id: string) => {
     if (!supabase) return false;
+    // Deleta o usuário vinculado primeiro por causa de constraints
+    await supabase.from('users').delete().eq('staff_id', id);
     return await staffRepository.delete(supabase, id);
   },
 
@@ -356,14 +390,12 @@ export const db = {
     }
   },
 
-  // Adiciona suporte a preferências de UI (usado por SmartOperationTable)
   getPreferences: (userId: string) => {
     const key = `als_prefs_${userId}`;
     const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : { visibleColumns: {} };
   },
 
-  // Salva preferência de colunas visíveis para um componente específico
   savePreference: (userId: string, componentId: string, visibleColumns: string[]) => {
     const key = `als_prefs_${userId}`;
     const prefs = db.getPreferences(userId);
