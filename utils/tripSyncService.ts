@@ -14,8 +14,8 @@ export const tripSyncService = {
    */
   hasChanges: (existing: Trip, currentForm: any, driverId: string, customerId: string): boolean => {
     const diffs = [
-      existing.driver.id !== driverId,
-      existing.customer.id !== customerId,
+      existing.driver?.id !== driverId,
+      existing.customer?.id !== customerId,
       (existing.container || '').toUpperCase() !== (currentForm.container || '').toUpperCase(),
       (existing.booking || '').toUpperCase() !== (currentForm.booking || '').toUpperCase(),
       (existing.ship || '').toUpperCase() !== (currentForm.ship || '').toUpperCase(),
@@ -31,10 +31,11 @@ export const tripSyncService = {
 
   mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port): Partial<Trip> => {
     const now = new Date().toISOString();
+    const scheduledTime = formData.horarioAgendado ? new Date(formData.horarioAgendado).toISOString() : now;
     
-    // Se temos um destino (terminado pela Minuta), criamos o objeto de agendamento automático
+    // Se temos um destino (terminado pela Minuta ou Form), criamos o objeto de agendamento automático
     const scheduling: TripScheduling | undefined = destination ? {
-       dateTime: formData.horarioAgendado || now,
+       dateTime: scheduledTime,
        location: destination.name,
        locationId: destination.id
     } : undefined;
@@ -43,11 +44,11 @@ export const tripSyncService = {
       os: formData.os,
       booking: formData.booking,
       ship: formData.ship,
-      dateTime: formData.horarioAgendado || now,
+      dateTime: scheduledTime,
       isLate: false,
       type: (formData.tipoOperacao || 'EXPORTAÇÃO').toUpperCase() as any,
       containerType: formData.tipo || '40HC',
-      category: category,
+      category: category || 'Geral',
       container: formData.container,
       tara: formData.tara,
       seal: formData.seal,
@@ -73,7 +74,8 @@ export const tripSyncService = {
         plateHorse: driver.plateHorse,
         plateTrailer: driver.plateTrailer,
         status: 'Pronto',
-        cpf: driver.cpf
+        cpf: driver.cpf,
+        phone: driver.phone
       },
       status: 'Pendente',
       statusHistory: [{ status: 'Pendente', dateTime: now, createdAt: now }],
@@ -91,7 +93,8 @@ export const tripSyncService = {
       id: existingId || `trip-sync-${Date.now()}`
     } as Trip;
     
-    await db.saveTrip(finalTrip, actingUser);
+    const success = await db.saveTrip(finalTrip, actingUser);
+    if (!success) throw new Error("Erro ao salvar viagem no repositório");
     return finalTrip;
   }
 };

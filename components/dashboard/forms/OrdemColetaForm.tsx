@@ -5,6 +5,8 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
 import OrdemColetaTemplate from './OrdemColetaTemplate';
+import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import { searchService } from '../../../utils/searchService';
 import { maskSeal } from '../../../utils/masks';
 import { lookupCarrierByContainer } from '../../../utils/carrierService';
 import { osCategoryService } from '../../../utils/osCategoryService';
@@ -27,13 +29,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  const [remetenteSearch, setRemetenteSearch] = useState('');
-  const [showRemetenteResults, setShowRemetenteResults] = useState(false);
-  const [destinatarioSearch, setDestinatarioSearch] = useState('');
-  const [showDestinatarioResults, setShowDestinatarioResults] = useState(false);
-  const [driverSearch, setDriverSearch] = useState('');
-  const [showDriverResults, setShowDriverResults] = useState(false);
-
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
   const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
@@ -58,7 +53,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     embarcador: '',
     horarioAgendado: new Date().toISOString().slice(0, 16),
     obs: '',
-    category: '', // Vínculo Manual ou Detectado
+    category: '', 
     displayDate: new Date().toLocaleDateString('pt-BR')
   });
 
@@ -71,13 +66,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       setCategories(c);
       
       if (initialData) {
-        const d = drivers.find(drv => drv.id === initialData.driverId);
-        if (d) setDriverSearch(d.name);
-        const cust = customers.find(c => c.id === initialData.remetenteId);
-        if (cust) setRemetenteSearch(cust.legalName || cust.name);
-        const p = ports.find(pt => pt.id === initialData.destinatarioId);
-        if (p) setDestinatarioSearch(p.legalName || p.name);
-        
         const detected = initialData.category || osCategoryService.detectCategoryFromOS(initialData.os);
         setFormData(prev => ({ ...prev, category: detected || '' }));
       }
@@ -108,21 +96,17 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     
     setFormData(prev => {
       let next = { ...prev, [field]: upValue };
-
       if (field === 'os') {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
         if (detected) next.category = detected;
       }
-
       if (field === 'container') {
         const carrier = lookupCarrierByContainer(upValue);
         next.agencia = carrier ? carrier.name : prev.agencia;
       }
-
       if (field === 'seal') {
         next.seal = maskSeal(upValue);
       }
-
       return next;
     });
   };
@@ -132,14 +116,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
 
   const startWorkflow = async (mode: 'download' | 'print') => {
-    if (!formData.os || !selectedDriver || !selectedRemetente) {
+    if (!formData.os || !formData.driverId || !formData.remetenteId) {
       alert("Preencha OS, Motorista e Cliente para prosseguir.");
       return;
     }
-
     setPendingAction(mode);
     
-    // Se já temos um tripId vindo da prop, usamos ele. Caso contrário, tentamos localizar pela OS.
     let existing = null;
     if (tripId) {
       const trips = await db.getTrips();
@@ -149,7 +131,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     }
     
     if (existing) {
-      const hasChanges = tripSyncService.hasChanges(existing, formData, selectedDriver.id, selectedRemetente.id);
+      const hasChanges = tripSyncService.hasChanges(existing, formData, formData.driverId, formData.remetenteId);
       if (hasChanges) {
         setExistingTrip(existing);
         setShowSyncModal(true);
@@ -168,7 +150,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     setShowSyncModal(false);
     
     try {
-      // CHAMA A REGRA DE NEGÓCIO CENTRALIZADA
       await ocRules.processOCWorkflow(
         formData, 
         selectedDriver, 
@@ -178,7 +159,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         targetTripId || tripId
       );
 
-      // GERAR PDF
+      window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));
       const element = captureRef.current;
@@ -192,13 +174,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       const fileName = `OC - ${selectedDriver.name} - ${formData.os}`;
 
       if (pendingAction === 'print') {
-        const blob = pdf.output('blob');
-        const url = URL.createObjectURL(blob);
-        const win = window.open(url, '_blank');
-        if (win) {
-          win.document.title = fileName;
-          win.onload = () => { win.focus(); win.print(); };
-        }
+        pdf.autoPrint();
+        const blobUrl = pdf.output('bloburl');
+        window.open(blobUrl, '_blank');
       } else {
         pdf.save(`${fileName}.pdf`);
       }
@@ -212,20 +190,10 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     }
   };
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const selectClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm cursor-pointer";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
-
-  const filteredCustomers = customers.filter(c => 
-    (c.name && c.name.toUpperCase().includes(remetenteSearch)) || 
-    (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
-  );
-
-  const filteredPorts = ports.filter(p => 
-    (p.name && p.name.toUpperCase().includes(destinatarioSearch)) || 
-    (p.legalName && p.legalName.toUpperCase().includes(destinatarioSearch))
-  );
+  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
@@ -261,7 +229,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       )}
 
       <div className="w-full lg:w-[520px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
-        
         <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 shadow-sm space-y-4">
            <div className="space-y-1">
               <label className={labelBlueClass}>Identificação da Viagem (OS)</label>
@@ -307,65 +274,25 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
            </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4">
-          <div className="relative">
-            <label className={labelBlueClass}>1. Remetente (Cliente)</label>
-            <input 
-              type="text" 
-              placeholder="BUSCAR RAZÃO OU FANTASIA..." 
-              className={inputClasses} 
-              value={remetenteSearch} 
-              onFocus={() => setShowRemetenteResults(true)} 
-              onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} 
-            />
-            {showRemetenteResults && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
-                {filteredCustomers.map(c => (
-                  <button 
-                    key={c.id} 
-                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
-                    onClick={() => { 
-                      setFormData({...formData, remetenteId: c.id}); 
-                      setRemetenteSearch(c.legalName || c.name); 
-                      setShowRemetenteResults(false); 
-                    }}
-                  >
-                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* BUSCA AVANÇADA DE CLIENTE */}
+        <AutocompleteSearch 
+          label="1. Remetente (Cliente)"
+          placeholder="Razão, Fantasia, CNPJ ou Cidade..."
+          data={customers}
+          onSelect={(c) => setFormData({...formData, remetenteId: c.id})}
+          mapToAutocomplete={searchService.mapCustomer}
+          initialValue={selectedRemetente ? (selectedRemetente.legalName || selectedRemetente.name) : ''}
+        />
 
-          <div className="relative">
-            <label className={labelBlueClass}>2. Destinatário (Local Destino)</label>
-            <input 
-              type="text" 
-              placeholder="BUSCAR DESTINO..." 
-              className={inputClasses} 
-              value={destinatarioSearch} 
-              onFocus={() => setShowDestinatarioResults(true)} 
-              onChange={e => setDestinatarioSearch(e.target.value.toUpperCase())} 
-            />
-            {showDestinatarioResults && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500">
-                {filteredPorts.map(p => (
-                  <button 
-                    key={p.id} 
-                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" 
-                    onClick={() => { 
-                      setFormData({...formData, destinatarioId: p.id}); 
-                      setDestinatarioSearch(p.legalName || p.name); 
-                      setShowDestinatarioResults(false); 
-                    }}
-                  >
-                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{p.legalName || p.name}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* BUSCA AVANÇADA DE DESTINO */}
+        <AutocompleteSearch 
+          label="2. Destinatário (Local Destino)"
+          placeholder="Nome do Porto ou Terminal..."
+          data={ports}
+          onSelect={(p) => setFormData({...formData, destinatarioId: p.id})}
+          mapToAutocomplete={searchService.mapPort}
+          initialValue={selectedDestinatario ? (selectedDestinatario.legalName || selectedDestinatario.name) : ''}
+        />
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
           <p className={labelClass}>3. Dados do Equipamento</p>
@@ -413,17 +340,16 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           </div>
         </div>
 
-        <div className="relative">
-          <label className={labelBlueClass}>5. Motorista Alocado</label>
-          <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
-          {showDriverResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
-              {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => (
-                <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name}</button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* BUSCA AVANÇADA DE MOTORISTA */}
+        <AutocompleteSearch 
+          label="5. Motorista Alocado"
+          placeholder="Nome, Placa ou CPF..."
+          data={drivers}
+          onSelect={(d) => setFormData({...formData, driverId: d.id})}
+          mapToAutocomplete={searchService.mapDriver}
+          initialValue={selectedDriver ? selectedDriver.name : ''}
+          icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>}
+        />
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
            <div className="space-y-1">
