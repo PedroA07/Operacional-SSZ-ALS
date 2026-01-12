@@ -33,15 +33,14 @@ export default async function handler(request: Request) {
       });
     }
 
-    // GARANTE O PREFIXO als-transportes/
-    // Remove qualquer barra inicial duplicada e força o início correto
-    let cleanPath = rawPath.replace(/^\/+/, '');
-    if (!cleanPath.startsWith('als-transportes/')) {
-      cleanPath = `als-transportes/${cleanPath}`;
-    }
+    // LÓGICA IDEMPOTENTE:
+    // 1. Remove barras iniciais
+    // 2. Remove o prefixo se ele já estiver lá (evita als-transportes/als-transportes/)
+    // 3. Adiciona o prefixo como única raiz
+    let relativePath = rawPath.replace(/^\/+/, '');
+    relativePath = relativePath.replace(/^als[- ]transportes\//i, '');
     
-    // Limpa barras duplas acidentais no meio do caminho
-    const finalKey = cleanPath.replace(/\/+/g, '/');
+    const finalKey = `als-transportes/${relativePath}`.replace(/\/+/g, '/');
     
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();

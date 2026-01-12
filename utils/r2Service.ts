@@ -16,13 +16,11 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // Garante que o folder esteja dentro de als-transportes/
+      // Remove redundâncias de prefixo no frontend
       let cleanFolder = folder.replace(/^\/+|\/+$/g, '');
-      if (!cleanFolder.startsWith('als-transportes')) {
-        cleanFolder = `als-transportes/${cleanFolder}`;
-      }
+      cleanFolder = cleanFolder.replace(/^als[- ]transportes\//i, '');
 
-      const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : `als-transportes/${fileName}`;
+      const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       
       formData.append('path', finalPath.replace(/\/+/g, '/'));
 
