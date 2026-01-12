@@ -26,8 +26,7 @@ export const fileStorage = {
     if (path.startsWith('http')) return path;
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     const prefix = domain.startsWith('http') ? '' : 'https://';
-    const url = domain ? `${prefix}${domain}/${path}` : path;
-    return url;
+    return domain ? `${prefix}${domain}/${path}` : path;
   },
 
   upload: async (file: File | string, destinationPath: string): Promise<string> => {
@@ -35,16 +34,13 @@ export const fileStorage = {
       const formData = new FormData();
       
       let fileToUpload: Blob;
-      let mimeType = 'image/jpeg';
 
       if (typeof file === 'string' && file.startsWith('data:')) {
         fileToUpload = fileStorage.dataURLtoBlob(file);
-        mimeType = fileToUpload.type;
         const fileName = destinationPath.split('/').pop() || 'upload.jpg';
         formData.append('file', fileToUpload, fileName);
       } else if (file instanceof File) {
         fileToUpload = file;
-        mimeType = file.type;
         formData.append('file', file);
       } else {
         throw new Error("Formato de arquivo inválido.");
@@ -65,7 +61,7 @@ export const fileStorage = {
       const data = await res.json();
       if (!data.url) throw new Error("URL não retornada pelo servidor.");
       
-      console.log(`[R2 Debug] Upload sucesso: ${data.url}`);
+      console.log(`[R2 SUCCESS] Arquivo salvo em: ${data.url}`);
       return data.url; 
     } catch (e: any) {
       console.error("[Storage Error]:", e);

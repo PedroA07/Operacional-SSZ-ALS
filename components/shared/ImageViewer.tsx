@@ -14,6 +14,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   const [rotation, setRotation] = useState(0);
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [retryWithoutCORS, setRetryWithoutCORS] = useState(false);
   
   const { scale, setScale, resetZoom, zoomIn, zoomOut } = useMouseZoom({ containerRef });
   const { 
@@ -29,6 +30,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   useEffect(() => {
     setHasError(false);
     setIsLoading(true);
+    setRetryWithoutCORS(false);
     resetZoom();
     resetPosition();
     setRotation(0);
@@ -45,6 +47,17 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     setRotation(0);
   };
 
+  const handleImageError = () => {
+    if (!retryWithoutCORS) {
+      console.warn("[ImageViewer] Erro ao carregar com CORS. Tentando sem atributo crossOrigin...");
+      setRetryWithoutCORS(true);
+      setIsLoading(true);
+    } else {
+      setHasError(true);
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -59,7 +72,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
         {isLoading && !hasError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50 z-10">
             <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-[8px] font-black text-blue-400 uppercase mt-4 tracking-widest">Carregando da Nuvem...</p>
+            <p className="text-[8px] font-black text-blue-400 uppercase mt-4 tracking-widest">Acessando R2...</p>
           </div>
         )}
 
@@ -68,9 +81,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
             <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
-            <p className="text-white font-black uppercase text-[10px] tracking-widest">Erro ao carregar imagem</p>
-            <p className="text-slate-500 text-[8px] max-w-[200px]">A URL pode estar expirada ou o acesso público do R2 não foi configurado.</p>
-            <button onClick={() => window.open(url, '_blank')} className="px-4 py-2 bg-white/5 text-blue-400 rounded-xl text-[8px] font-black uppercase">Abrir link direto</button>
+            <p className="text-white font-black uppercase text-[10px] tracking-widest">Falha de Visualização</p>
+            <p className="text-slate-500 text-[8px] max-w-[240px]">
+              O arquivo foi enviado, mas o navegador não conseguiu carregar o link.
+              Certifique-se de que o domínio em R2_PUBLIC_DOMAIN está marcado como 'Public'.
+            </p>
+            <div className="flex flex-col gap-2">
+               <button onClick={() => window.open(url, '_blank')} className="px-5 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg">Abrir link direto</button>
+               <button onClick={() => { setHasError(false); setIsLoading(true); setRetryWithoutCORS(false); }} className="px-5 py-3 bg-white/5 text-slate-400 rounded-xl text-[9px] font-black uppercase">Tentar novamente</button>
+            </div>
           </div>
         ) : (
           <div 
@@ -84,8 +103,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
               src={url} 
               alt={alt} 
               className="max-w-full max-h-full object-contain shadow-2xl" 
+              crossOrigin={retryWithoutCORS ? undefined : "anonymous"}
               onLoad={() => setIsLoading(false)}
-              onError={() => { setHasError(true); setIsLoading(false); }}
+              onError={handleImageError}
               onDoubleClick={handleReset} 
               draggable={false} 
             />

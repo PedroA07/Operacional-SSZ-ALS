@@ -36,7 +36,6 @@ export default async function handler(request: Request) {
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
     
-    // Define o MIME type corretamente. Se não vier do arquivo, assume jpeg.
     const contentType = file.type || 'image/jpeg';
 
     const command = new PutObjectCommand({
@@ -44,17 +43,22 @@ export default async function handler(request: Request) {
       Key: path,
       Body: fileBytes,
       ContentType: contentType,
-      CacheControl: "public, max-age=31536000", // Cache de 1 ano para performance
+      CacheControl: "public, max-age=31536000",
     });
 
     await client.send(command);
 
+    // Limpeza rigorosa do domínio
     let domain = process.env.R2_PUBLIC_DOMAIN || "";
+    domain = domain.trim().replace(/\/$/, ""); // Remove barra final se houver
+    
     if (domain && !domain.startsWith('http')) {
       domain = `https://${domain}`;
     }
     
-    const publicUrl = `${domain.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+    // Limpeza do path (garante que não comece com barra para evitar // na URL)
+    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+    const publicUrl = `${domain}/${cleanPath}`;
 
     return new Response(JSON.stringify({ 
       url: publicUrl, 
