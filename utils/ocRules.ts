@@ -12,7 +12,7 @@ export const ocRules = {
   /**
    * Processa todo o workflow operacional disparado pela criação de uma OC
    */
-  async processOCWorkflow(formData: any, driver: Driver, customer: Customer, user: User, destination?: Port) {
+  async processOCWorkflow(formData: any, driver: Driver, customer: Customer, user: User, destination?: Port, existingTripId?: string) {
     try {
       // 1. Detectar Categoria baseada no padrão da OS (ALC ou SP) ou usar a manual do formulário
       const detectedCategory = formData.category || osCategoryService.detectCategoryFromOS(formData.os) || 'Geral';
@@ -20,8 +20,8 @@ export const ocRules = {
       // 2. Sincronizar Vínculos via vinculoService (Cria categoria se não existir)
       await vinculoService.syncVinculo(detectedCategory, driver, customer, user);
 
-      // 3. Verificar se já existe uma viagem com esta OS
-      const existingTrip = await tripSyncService.findExistingTrip(formData.os);
+      // 3. Verificar se já existe uma viagem com esta OS (caso o ID não tenha sido passado)
+      const targetId = existingTripId || (await tripSyncService.findExistingTrip(formData.os))?.id;
 
       // 4. Mapear dados do formulário para o modelo de Viagem (Trip)
       const tripData = tripSyncService.mapOCtoTrip(
@@ -33,14 +33,14 @@ export const ocRules = {
       );
 
       // 5. Salvar no Banco de Dados (Upsert)
-      const finalTrip = await tripSyncService.sync(tripData, existingTrip?.id);
+      const finalTrip = await tripSyncService.sync(tripData, targetId, user);
 
       // 6. Registrar Notificação no Sistema
       await db.addNotification(
         user, 
         'OC_GENERATED', 
         `OC Digital: OS ${formData.os}`, 
-        `Viagem alocada para ${driver.name}. Documento gerado por ${user.displayName}.`,
+        `Viagem atualizada para ${driver.name}. Registro sincronizado por ${user.displayName}.`,
         { 
           os: formData.os, 
           motorista: driver.name, 
@@ -52,7 +52,7 @@ export const ocRules = {
       return { success: true, trip: finalTrip };
     } catch (error) {
       console.error("Erro na regra de negócio OC -> Viagem:", error);
-      return { success: false, error };
+      throw error;
     }
   }
 };

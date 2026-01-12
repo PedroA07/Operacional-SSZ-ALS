@@ -1,5 +1,6 @@
 
-import { Trip, Driver, Customer, Port, TripScheduling } from '../types';
+// Added User to imports to resolve line 87 type error
+import { Trip, Driver, Customer, Port, TripScheduling, User } from '../types';
 import { db } from './storage';
 
 export const tripSyncService = {
@@ -84,13 +85,13 @@ export const tripSyncService = {
     };
   },
 
-  sync: async (tripData: Partial<Trip>, existingId?: string) => {
+  sync: async (tripData: Partial<Trip>, existingId?: string, actingUser?: User) => {
     const finalTrip = {
       ...tripData,
       id: existingId || `trip-sync-${Date.now()}`
     } as Trip;
     
-    await db.saveTrip(finalTrip);
+    await db.saveTrip(finalTrip, actingUser);
     return finalTrip;
   }
 };

@@ -18,9 +18,10 @@ interface OrdemColetaFormProps {
   ports: Port[];
   onClose: () => void;
   initialData?: any; 
+  tripId?: string;
 }
 
-const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, ports, onClose, initialData }) => {
+const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, ports, onClose, initialData, tripId }) => {
   const [isExporting, setIsExporting] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -137,7 +138,15 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     }
 
     setPendingAction(mode);
-    const existing = await tripSyncService.findExistingTrip(formData.os);
+    
+    // Se já temos um tripId vindo da prop, usamos ele. Caso contrário, tentamos localizar pela OS.
+    let existing = null;
+    if (tripId) {
+      const trips = await db.getTrips();
+      existing = trips.find(t => t.id === tripId) || null;
+    } else {
+      existing = await tripSyncService.findExistingTrip(formData.os);
+    }
     
     if (existing) {
       const hasChanges = tripSyncService.hasChanges(existing, formData, selectedDriver.id, selectedRemetente.id);
@@ -145,27 +154,28 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         setExistingTrip(existing);
         setShowSyncModal(true);
       } else {
-        await executeWorkflow();
+        await executeWorkflow(existing.id);
       }
     } else {
       await executeWorkflow();
     }
   };
 
-  const executeWorkflow = async () => {
+  const executeWorkflow = async (targetTripId?: string) => {
     if (!currentUser || !selectedDriver || !selectedRemetente) return;
     
     setIsExporting(true);
     setShowSyncModal(false);
     
     try {
-      // CHAMA A REGRA DE NEGÓCIO CENTRALIZADA (Cria a viagem em Operações)
+      // CHAMA A REGRA DE NEGÓCIO CENTRALIZADA
       await ocRules.processOCWorkflow(
         formData, 
         selectedDriver, 
         selectedRemetente, 
         currentUser, 
-        selectedDestinatario
+        selectedDestinatario,
+        targetTripId || tripId
       );
 
       // GERAR PDF
@@ -195,7 +205,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       
     } catch (e) { 
       console.error(e); 
-      alert("Falha ao gerar documento.");
+      alert("Falha ao processar operação no servidor.");
     } finally { 
       setIsExporting(false); 
       setPendingAction(null);
@@ -238,13 +248,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
                  </div>
                  <div>
-                    <h3 className="text-xl font-black uppercase tracking-tight">Vincular Alterações ao Painel?</h3>
-                    <p className="text-[10px] font-black uppercase opacity-80 mt-1">Os dados desta OC são diferentes da viagem registrada. Deseja atualizar o dashboard?</p>
+                    <h3 className="text-xl font-black uppercase tracking-tight">Sincronizar com Operações?</h3>
+                    <p className="text-[10px] font-black uppercase opacity-80 mt-1">Os dados desta OC são diferentes da viagem registrada no painel. Deseja atualizar o dashboard?</p>
                  </div>
               </div>
               <div className="p-10 flex gap-4 bg-slate-50 border-t border-slate-100">
-                 <button onClick={() => setShowSyncModal(false)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Manter Atual</button>
-                 <button onClick={() => executeWorkflow()} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Atualizar e Prosseguir</button>
+                 <button onClick={() => setShowSyncModal(false)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Ignorar Sincronismo</button>
+                 <button onClick={() => executeWorkflow(existingTrip.id)} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Atualizar Painel e Imprimir</button>
               </div>
            </div>
         </div>
@@ -423,11 +433,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-           <button disabled={isExporting} onClick={() => startWorkflow('print')} className="py-5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-             Imprimir OC
+           <button disabled={isExporting} onClick={() => startWorkflow('print')} className="py-5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-2 active:scale-95">
+             {isExporting ? 'Gravando...' : 'Imprimir OC'}
            </button>
-           <button disabled={isExporting} onClick={() => startWorkflow('download')} className="py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-2">
-             Baixar PDF
+           <button disabled={isExporting} onClick={() => startWorkflow('download')} className="py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-2 active:scale-95">
+             {isExporting ? 'Gravando...' : 'Baixar PDF'}
            </button>
         </div>
       </div>

@@ -241,7 +241,14 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
              </button>
           </div>
-          <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); onRefresh(); }} initialData={selectedTrip.ocFormData} />
+          <OrdemColetaForm 
+            drivers={drivers} 
+            customers={customers} 
+            ports={ports} 
+            onClose={() => { setIsOCFormOpen(false); onRefresh(); }} 
+            initialData={selectedTrip.ocFormData} 
+            tripId={selectedTrip.id}
+          />
         </div>
       )}
 
