@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Trip, DriverCapturedDoc, User } from '../../../types';
 import { db } from '../../../utils/storage';
@@ -89,12 +90,11 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      // Added explicit type cast to File[] to fix 'unknown' type error in map
       const results = await Promise.all((Array.from(files) as File[]).map(async file => {
-        // COMPRIMIR CADA ARQUIVO ANTES DE SALVAR
+        // COMPRESSÃO PADRÃO ALS (800px / 0.4)
         return await imageCompressor.compress(file, {
-          maxWidth: 1600,
-          quality: 0.8
+          maxWidth: 800,
+          quality: 0.4
         });
       }));
       await saveNewDocs(results);
@@ -111,10 +111,10 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
       const raw = canvas.toDataURL('image/jpeg', 0.95);
-      // COMPRIMIR CAPTURA
+      // COMPRESSÃO PADRÃO ALS (800px / 0.4)
       const compressed = await imageCompressor.compress(raw, {
-        maxWidth: 1600,
-        quality: 0.8
+        maxWidth: 800,
+        quality: 0.4
       });
       saveNewDocs([compressed]);
       stopCamera();
@@ -332,7 +332,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
 
       {isDeleteModalOpen && docToDelete && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
+           <div className="bg-white w-full max-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
               <h4 className="text-lg font-black uppercase text-slate-800">Apagar Documento?</h4>
               <div className="grid grid-cols-2 gap-3">
                  <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Voltar</button>

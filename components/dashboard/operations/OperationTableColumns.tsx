@@ -3,6 +3,7 @@ import React from 'react';
 import { Trip, TripStatus, TripDocument, User, DriverCapturedDoc, Driver } from '../../../types';
 import { db } from '../../../utils/storage';
 import { fileStorage } from '../../../utils/fileStorage';
+import { imageCompressor } from '../../../utils/imageCompressor';
 import ActionMenu from './ActionMenu';
 
 // Novos componentes de coluna modulares
@@ -39,15 +40,35 @@ export const getOperationTableColumns = (
     if (type === 'BATCH') {
       const newDocs: DriverCapturedDoc[] = [];
       for (const file of filesArray) {
+        let fileToUpload: File | string = file;
+        
+        // Se for imagem, reduz a qualidade antes do upload
+        if (file.type.startsWith('image/')) {
+          fileToUpload = await imageCompressor.compress(file, {
+            maxWidth: 800,
+            quality: 0.4
+          });
+        }
+
         const photoId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        const url = await fileStorage.uploadTripPhoto(file, trip.os, photoId);
+        const url = await fileStorage.uploadTripPhoto(fileToUpload, trip.os, photoId);
         newDocs.push({ id: photoId, url, timestamp: new Date().toISOString() });
       }
       updatedTrip.driver_docs = [...(updatedTrip.driver_docs || []), ...newDocs];
     } else {
       const file = filesArray[0];
+      let fileToUpload: File | string = file;
+
+      // Compressão para anexos individuais de imagem (ex: foto de CVA)
+      if (file.type.startsWith('image/')) {
+        fileToUpload = await imageCompressor.compress(file, {
+          maxWidth: 800,
+          quality: 0.4
+        });
+      }
+
       const docTypeLabel = type.replace('_PDF', '').toLowerCase();
-      const url = await fileStorage.uploadTripDoc(file, trip.os, docTypeLabel);
+      const url = await fileStorage.uploadTripDoc(fileToUpload, trip.os, docTypeLabel);
       
       const doc: TripDocument = { 
         id: `${docTypeLabel}-${Date.now()}`, 
