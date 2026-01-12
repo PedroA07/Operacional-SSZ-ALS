@@ -10,30 +10,29 @@ interface TripsTodayProps {
 const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  // Opções únicas
-  const allTypes = useMemo(() => Array.from(new Set(trips.map(t => t.type))).sort(), [trips]);
-  const allClients = useMemo(() => Array.from(new Set(trips.map(t => t.customer.name))).sort(), [trips]);
-  const allDests = useMemo(() => Array.from(new Set(trips.map(t => t.destination?.name || t.scheduling?.location).filter(Boolean))).sort(), [trips]);
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-  // Estados dos filtros
-  const [selTypes, setSelTypes] = useState<string[]>(allTypes);
-  const [selClients, setSelClients] = useState<string[]>(allClients);
-  const [selDests, setSelDests] = useState<string[]>(allDests);
+  const todayRaw = useMemo(() => trips.filter(t => t.dateTime.split('T')[0] === todayStr), [trips, todayStr]);
+
+  const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type))).sort(), [todayRaw]);
+  const allClients = useMemo(() => Array.from(new Set(todayRaw.map(t => t.customer.name))).sort(), [todayRaw]);
+  const allDests = useMemo(() => Array.from(new Set(todayRaw.map(t => t.destination?.name || t.scheduling?.location).filter(Boolean))).sort(), [todayRaw]);
+
+  const [selTypes, setSelTypes] = useState<string[]>([]);
+  const [selClients, setSelClients] = useState<string[]>([]);
+  const [selDests, setSelDests] = useState<string[]>([]);
   
   const todayTrips = useMemo(() => {
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    
-    return trips.filter(t => {
-      const tripDate = t.dateTime.split('T')[0];
-      const matchDate = tripDate === todayStr && t.status !== 'Viagem cancelada';
-      const matchType = selTypes.includes(t.type);
-      const matchClient = selClients.includes(t.customer.name);
+    return todayRaw.filter(t => {
+      if (t.status === 'Viagem cancelada') return false;
+      const matchType = selTypes.length === 0 || selTypes.includes(t.type);
+      const matchClient = selClients.length === 0 || selClients.includes(t.customer.name);
       const dName = t.destination?.name || t.scheduling?.location || '';
-      const matchDest = !dName || selDests.includes(dName);
-      return matchDate && matchType && matchClient && matchDest;
+      const matchDest = selDests.length === 0 || (dName && selDests.includes(dName));
+      return matchType && matchClient && matchDest;
     }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [trips, selTypes, selClients, selDests]);
+  }, [todayRaw, selTypes, selClients, selDests]);
 
   return (
     <div className="relative group">
@@ -59,16 +58,13 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
 
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-4 duration-500 max-h-[700px] flex flex-col">
-          {/* FILTROS COM CHECKBOXES */}
-          <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-1 gap-3">
-             <div className="grid grid-cols-2 gap-2">
-                <MultiCheckboxFilter label="Modalidades" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
-                <MultiCheckboxFilter label="Destinos" options={allDests} selectedOptions={selDests} onChange={setSelDests} />
-             </div>
-             <MultiCheckboxFilter label="Filtrar Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
+          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2">
+             <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
+             <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
+             <MultiCheckboxFilter label="Destinos" options={allDests} selectedOptions={selDests} onChange={setSelDests} />
           </div>
 
-          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50/30 flex-1">
+          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50/30 flex-1 min-h-[300px]">
             {todayTrips.length > 0 ? todayTrips.map(trip => (
               <div key={trip.id} className="p-5 bg-white border border-slate-100 rounded-3xl hover:border-blue-200 transition-all group">
                 <div className="flex justify-between items-start mb-3">
@@ -78,28 +74,11 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
                   </div>
                   <span className="text-[9px] font-black text-slate-300">OS: {trip.os}</span>
                 </div>
-                <div className="space-y-2">
-                   <p className="text-[10px] font-black text-slate-800 uppercase">{trip.driver.name}</p>
-                   <p className="text-[8px] font-bold text-slate-400 uppercase truncate">{trip.customer.name}</p>
-                   <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-50">
-                      <div>
-                        <p className="text-[7px] font-black text-slate-300 uppercase">Container</p>
-                        <p className="text-[9px] font-mono font-black text-slate-700">{trip.container || '---'}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[7px] font-black text-slate-300 uppercase">Destino</p>
-                        <p className="text-[9px] font-black text-slate-700 uppercase truncate">{trip.destination?.name || trip.scheduling?.location || '---'}</p>
-                      </div>
-                   </div>
-                   {trip.scheduling && (
-                     <div className="mt-2 p-3 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
-                        <p className="text-[10px] font-black text-emerald-800 uppercase leading-none">Agenda: {new Date(trip.scheduling.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
-                     </div>
-                   )}
-                </div>
+                <p className="text-[10px] font-black text-slate-800 uppercase leading-none">{trip.driver.name}</p>
+                <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 truncate">{trip.customer.name}</p>
               </div>
             )) : (
-              <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Nenhum resultado filtrado</div>
+              <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem viagens</div>
             )}
           </div>
         </div>

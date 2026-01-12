@@ -10,25 +10,26 @@ interface TripsTomorrowProps {
 const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  const allTypes = useMemo(() => Array.from(new Set(trips.map(t => t.type))).sort(), [trips]);
-  const allClients = useMemo(() => Array.from(new Set(trips.map(t => t.customer.name))).sort(), [trips]);
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const tomStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-  const [selTypes, setSelTypes] = useState<string[]>(allTypes);
-  const [selClients, setSelClients] = useState<string[]>(allClients);
+  const tomorrowRaw = useMemo(() => trips.filter(t => t.dateTime.split('T')[0] === tomStr), [trips, tomStr]);
+
+  const allTypes = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.type))).sort(), [tomorrowRaw]);
+  const allClients = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.customer.name))).sort(), [tomorrowRaw]);
+
+  const [selTypes, setSelTypes] = useState<string[]>([]);
+  const [selClients, setSelClients] = useState<string[]>([]);
   
   const tomorrowTrips = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    const tomStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-    return trips.filter(t => {
-      const tripDate = t.dateTime.split('T')[0];
-      const matchDate = tripDate === tomStr && t.status !== 'Viagem cancelada';
-      const matchType = selTypes.includes(t.type);
-      const matchClient = selClients.includes(t.customer.name);
-      return matchDate && matchType && matchClient;
+    return tomorrowRaw.filter(t => {
+      if (t.status === 'Viagem cancelada') return false;
+      const matchType = selTypes.length === 0 || selTypes.includes(t.type);
+      const matchClient = selClients.length === 0 || selClients.includes(t.customer.name);
+      return matchType && matchClient;
     }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [trips, selTypes, selClients]);
+  }, [tomorrowRaw, selTypes, selClients]);
 
   return (
     <div className="relative group">
@@ -53,12 +54,12 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
 
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-4 duration-500 max-h-[600px] flex flex-col">
-          <div className="p-4 bg-slate-50 border-b border-slate-100 space-y-3">
-             <MultiCheckboxFilter label="Filtrar Modalidades" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
+          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2">
+             <MultiCheckboxFilter label="Modalidades" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <MultiCheckboxFilter label="Filtrar Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
           </div>
 
-          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 flex-1">
+          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 flex-1 bg-slate-50/30 min-h-[250px]">
             {tomorrowTrips.length > 0 ? tomorrowTrips.map(trip => (
               <div key={trip.id} className="p-5 bg-white border border-slate-100 rounded-3xl hover:border-amber-200 transition-all group">
                 <span className="text-sm font-black text-amber-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
@@ -66,7 +67,7 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{trip.customer.name}</p>
               </div>
             )) : (
-              <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Vazio</div>
+              <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem dados</div>
             )}
           </div>
         </div>
