@@ -5,6 +5,7 @@ import { db } from '../../../utils/storage';
 import { maskPhone } from '../../../utils/masks';
 import { imageCompressor } from '../../../utils/imageCompressor';
 import { usernameGenerator } from '../../../utils/usernameGenerator';
+import { fileStorage } from '../../../utils/fileStorage';
 
 interface StaffModalProps {
   isOpen: boolean;
@@ -32,17 +33,14 @@ const StaffModal: React.FC<StaffModalProps> = ({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
   
-  // Ref para controlar se já inicializamos o formulário para a sessão atual do modal
   const lastInitializedId = useRef<string | null | undefined>(undefined);
 
-  // Inicializa o formulário apenas quando o modal abre ou o alvo da edição muda
   useEffect(() => {
     if (!isOpen) {
       lastInitializedId.current = undefined;
       return;
     }
 
-    // Só re-inicializa se o ID do staff mudar (ou se mudar de "novo" para "editando")
     const currentTargetId = editingStaff?.id || 'new';
     if (lastInitializedId.current === currentTargetId) return;
 
@@ -73,8 +71,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
   const handleNameChange = (val: string) => {
     const name = val.toUpperCase();
     setForm(prev => ({ ...prev, name }));
-    
-    // Só gera sugestões se for um novo cadastro
     if (!editingStaff) {
       const newsug = usernameGenerator.generateSuggestions(val);
       setSuggestions(newsug);
@@ -104,6 +100,18 @@ const StaffModal: React.FC<StaffModalProps> = ({
     setIsProcessing(true);
     try {
       const staffId = editingStaff?.id || `stf-${Date.now()}`;
+      let finalPhotoUrl = form.photo || '';
+
+      // MUDANÇA CRÍTICA: Se a foto for um Base64 novo, faz o upload para o R2
+      if (finalPhotoUrl.startsWith('data:')) {
+        try {
+          finalPhotoUrl = await fileStorage.uploadStaffPhoto(finalPhotoUrl, staffId);
+        } catch (uploadErr) {
+          console.error("Erro no upload da foto para R2:", uploadErr);
+          // Fallback silencioso ou aviso (aqui mantemos o processo, mas o R2 é mandatório para produção)
+          throw new Error("Não foi possível salvar a foto no servidor R2. Verifique sua conexão.");
+        }
+      }
       
       const staffData: Staff = { 
         id: staffId,
@@ -111,7 +119,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
         position: (form.position || '').toUpperCase(),
         username: (form.username || '').toLowerCase(),
         role: (form.role as 'admin' | 'staff') || 'staff',
-        photo: form.photo || '',
+        photo: finalPhotoUrl, // Agora é a URL do R2
         registrationDate: form.registrationDate ? new Date(form.registrationDate).toISOString() : new Date().toISOString(),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
@@ -140,7 +148,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
           <div>
             <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingStaff ? 'Editar Colaborador' : 'Novo Colaborador ALS'}</h3>
-            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Gestão de Perfil e Acessos</p>
+            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Gestão de Perfil e Acessos (Storage R2)</p>
           </div>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 rounded-full transition-all shadow-sm">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
@@ -150,9 +158,12 @@ const StaffModal: React.FC<StaffModalProps> = ({
         <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
           <div className="flex flex-col md:flex-row gap-8">
             <div className="shrink-0 space-y-2 text-center">
-              <label className={labelClass}>Foto</label>
+              <label className={labelClass}>Foto de Perfil</label>
               <div onClick={() => photoRef.current?.click()} className="w-24 h-24 rounded-[2rem] bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden relative group mx-auto shadow-inner">
                 {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/></svg>}
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                   <span className="text-[8px] text-white font-black uppercase">Trocar</span>
+                </div>
               </div>
               <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
             </div>
@@ -200,8 +211,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
                       <label className={labelClass}>Usuário (Login)</label>
                       <input required className={inputClasses} value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase()})} />
                    </div>
-                   
-                   {/* SUGESTÕES DE USUÁRIO */}
                    {!editingStaff && suggestions.length > 0 && (
                      <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
                         <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest ml-1">Sugestões baseadas no nome:</p>
@@ -246,7 +255,12 @@ const StaffModal: React.FC<StaffModalProps> = ({
           </div>
 
           <button type="submit" disabled={isProcessing} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
-             {isProcessing ? 'Gravando...' : editingStaff ? 'Salvar Alterações' : 'Cadastrar Colaborador'}
+             {isProcessing ? (
+               <>
+                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                 Sincronizando Dados...
+               </>
+             ) : editingStaff ? 'Salvar Alterações' : 'Cadastrar Colaborador'}
           </button>
         </form>
       </div>
