@@ -25,6 +25,7 @@ export default async function handler(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const rawPath = (formData.get("path") as string) || ""; 
+    const bucketName = process.env.R2_BUCKET_NAME || "";
     
     if (!file) {
       return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
@@ -33,14 +34,22 @@ export default async function handler(request: Request) {
       });
     }
 
-    // LIMPEZA ABSOLUTA: Remove 'als-transportes' e variações do INÍCIO do path
-    // Isso evita a criação da pasta als-transportes/ dentro do bucket.
-    let finalKey = rawPath.trim()
-      .replace(/^(als[- ]transportes\/)+/i, '') // Remove prefixos no início
-      .replace(/^(als[- ]transportes)+/i, '')   // Remove termo solto no início
-      .replace(/^\/+/, '')                     // Remove barras iniciais residuais
-      .replace(/\/+/g, '/');                    // Normaliza barras duplas
+    // LIMPEZA SUPREMA DA CHAVE (KEY):
+    // 1. Remove o nome do bucket do início (caso venha no path por erro de config)
+    // 2. Remove 'als-transportes' de qualquer forma no início
+    let finalKey = rawPath.trim();
+    
+    if (bucketName && finalKey.toLowerCase().startsWith(bucketName.toLowerCase())) {
+      finalKey = finalKey.substring(bucketName.length);
+    }
 
+    finalKey = finalKey
+      .replace(/^(als[- ]transportes\/)+/i, '') // Remove o nome indesejado no início
+      .replace(/^(als[- ]transportes)+/i, '')   // Remove sem a barra também
+      .replace(/^\/+/, '')                     // Remove barras iniciais residuais
+      .replace(/\/+/g, '/');                    // Normaliza barras duplas no meio
+
+    // Se o path ficou vazio após a limpeza, usa o nome do arquivo na raiz
     if (!finalKey) {
       finalKey = file.name || `upload_${Date.now()}.jpg`;
     }
@@ -49,7 +58,7 @@ export default async function handler(request: Request) {
     const client = getS3Client();
     
     const command = new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
+      Bucket: bucketName,
       Key: finalKey, 
       Body: fileBytes,
       ContentType: file.type || 'image/jpeg',
@@ -62,7 +71,6 @@ export default async function handler(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
-    // URL gerada agora aponta para a raiz limpa
     const publicUrl = `${domain}/${finalKey}`;
 
     return new Response(JSON.stringify({ 

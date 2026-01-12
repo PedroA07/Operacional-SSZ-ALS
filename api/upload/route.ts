@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const rawPath = (formData.get("path") as string) || ""; 
+    const bucketName = process.env.R2_BUCKET_NAME || "";
     
     if (!file) {
       return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
@@ -27,8 +28,13 @@ export async function POST(request: Request) {
       });
     }
 
-    // LIMPEZA ABSOLUTA
-    let finalKey = rawPath.trim()
+    // LIMPEZA SUPREMA
+    let finalKey = rawPath.trim();
+    if (bucketName && finalKey.toLowerCase().startsWith(bucketName.toLowerCase())) {
+      finalKey = finalKey.substring(bucketName.length);
+    }
+    
+    finalKey = finalKey
       .replace(/^(als[- ]transportes\/)+/i, '')
       .replace(/^(als[- ]transportes)+/i, '')
       .replace(/^\/+/, '')
@@ -42,7 +48,7 @@ export async function POST(request: Request) {
     const client = getS3Client();
     
     const command = new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
+      Bucket: bucketName,
       Key: finalKey,
       Body: fileBytes,
       ContentType: file.type || 'image/jpeg',

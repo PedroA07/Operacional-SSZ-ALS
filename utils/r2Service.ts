@@ -16,7 +16,7 @@ export const r2Service = {
         formData.append('file', fileOrBase64);
       }
       
-      // Expulsa o termo als-transportes do folder
+      // Limpa rigorosamente o folder para não incluir o nome do bucket como diretório
       let cleanFolder = folder.trim()
         .replace(/^(als[- ]transportes\/)+/i, '')
         .replace(/^(als[- ]transportes)+/i, '')
@@ -25,7 +25,7 @@ export const r2Service = {
 
       const finalPath = cleanFolder ? `${cleanFolder}/${fileName}` : fileName;
       
-      formData.append('path', finalPath.replace(/^\/+/, ''));
+      formData.append('path', finalPath);
 
       const res = await fetch('/api/upload', {
         method: 'POST',
