@@ -2,18 +2,26 @@
 import { Trip, StatusHistoryEntry } from '../types';
 import { predictionService } from './predictionService';
 
+export interface ReportOverride {
+  history: StatusHistoryEntry[];
+  prediction: { label: string; time: string } | null;
+}
+
 export const emailFormatter = {
   /**
-   * Gera uma versão em HTML compacto para uma única viagem.
-   * Agora aceita um 'predictionOverride' opcional.
+   * Gera o HTML de uma viagem individual usando dados reais ou substituídos (overrides)
    */
-  toCompactRichText: (trip: Trip, allTrips: Trip[] = [], predictionOverride?: string): string => {
-    const history = [...(trip.statusHistory || [])]
-      .filter(entry => entry.status !== 'Pendente')
-      .sort((a, b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime());
+  toCompactRichText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride): string => {
+    // Usa o histórico do override ou o original filtrado
+    const history = override 
+      ? [...override.history].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+      : [...(trip.statusHistory || [])]
+          .filter(entry => entry.status !== 'Pendente')
+          .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
-    const prediction = predictionOverride 
-      ? { label: 'Previsão', time: predictionOverride } 
+    // Usa a previsão do override ou a calculada
+    const prediction = override 
+      ? override.prediction 
       : predictionService.getNextStatusPrediction(trip, allTrips);
 
     const mainColor = '#2563eb';
@@ -74,10 +82,7 @@ export const emailFormatter = {
     `;
   },
 
-  /**
-   * Gera o relatório completo separado por grupos.
-   */
-  allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], predictionOverrides: Record<string, string> = {}): string => {
+  allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], overrides: Record<string, ReportOverride> = {}): string => {
     if (trips.length === 0) return "";
     
     const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
@@ -89,42 +94,41 @@ export const emailFormatter = {
         <div style="margin-top: 20px; margin-bottom: 10px; padding: 8px 16px; background-color: ${color}; border-radius: 8px;">
           <span style="color: #ffffff; font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">${title} (${group.length})</span>
         </div>
-        ${group.map(t => emailFormatter.toCompactRichText(t, allContextTrips, predictionOverrides[t.id])).join('')}
+        ${group.map(t => emailFormatter.toCompactRichText(t, allContextTrips, overrides[t.id])).join('')}
       `;
     };
 
     return `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; padding: 20px; background-color: #fcfcfc;">
         <div style="margin-bottom: 24px; border-bottom: 4px solid #2563eb; padding-bottom: 12px;">
-          <h2 style="margin: 0; font-size: 18px; color: #2563eb; text-transform: uppercase;">Posições Operacionais ALS</h2>
-          <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: bold;">EXTRAÍDO EM ${new Date().toLocaleString('pt-BR')}</p>
+          <h2 style="margin: 0; font-size: 18px; color: #2563eb; text-transform: uppercase;">Relatório Operacional ALS</h2>
+          <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: bold;">POSIÇÕES EM ${new Date().toLocaleString('pt-BR')}</p>
         </div>
         
-        ${renderGroup('Cargas em Trânsito / Ativas', activeTrips, '#2563eb')}
+        ${renderGroup('Cargas em Trânsito', activeTrips, '#2563eb')}
         ${renderGroup('Cargas Finalizadas', finishedTrips, '#059669')}
 
         <div style="margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-          <strong>ALS Transportes SSZ</strong> • Monitoramento em Tempo Real
+          <strong>ALS Transportes SSZ</strong> • Monitoramento Realtime
         </div>
       </div>
     `;
   },
 
-  toPlainText: (trip: Trip, allTrips: Trip[] = [], predictionOverride?: string): string => {
-    const history = [...(trip.statusHistory || [])]
-      .filter(h => h.status !== 'Pendente')
-      .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+  toPlainText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride): string => {
+    const history = override 
+      ? override.history 
+      : [...(trip.statusHistory || [])].filter(h => h.status !== 'Pendente');
 
-    const pred = predictionOverride 
-      ? { label: 'PREVISÃO', time: predictionOverride }
-      : predictionService.getNextStatusPrediction(trip, allTrips);
+    const pred = override ? override.prediction : predictionService.getNextStatusPrediction(trip, allTrips);
 
     let text = `OS: ${trip.os} | CLIENTE: ${trip.customer.name}\n` +
-      `EQUIPAMENTO: ${trip.container || 'A DEFINIR'} | MOTORISTA: ${trip.driver.name}\n` +
-      `STATUS: ${trip.status.toUpperCase()}\n`;
+      `EQUIPAMENTO: ${trip.container || 'A DEFINIR'}\n` +
+      `MOTORISTA: ${trip.driver.name}\n` +
+      `ÚLTIMO STATUS: ${trip.status.toUpperCase()}\n`;
 
     if (pred) {
-      text += `>> ${pred.label.toUpperCase()}: ${pred.time}\n`;
+      text += `PREVISÃO: ${pred.label.toUpperCase()} -> ${pred.time}\n`;
     }
 
     return text + `--------------------------\n`;

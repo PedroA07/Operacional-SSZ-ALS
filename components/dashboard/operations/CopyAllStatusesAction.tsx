@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Trip } from '../../../types';
-import { emailFormatter } from '../../../utils/emailFormatter';
+import React, { useState, useEffect } from 'react';
+import { Trip, StatusHistoryEntry } from '../../../types';
+import { emailFormatter, ReportOverride } from '../../../utils/emailFormatter';
 import { predictionService } from '../../../utils/predictionService';
 
 interface CopyAllStatusesActionProps {
@@ -12,30 +12,56 @@ interface CopyAllStatusesActionProps {
 const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, allTrips }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [editedPredictions, setEditedPredictions] = useState<Record<string, string>>({});
+  
+  // Estado que guarda as edições feitas no modal para o relatório
+  const [reportOverrides, setReportOverrides] = useState<Record<string, ReportOverride>>({});
 
-  // Inicializa previsões sugeridas quando o modal abre
+  // Ao abrir o modal, inicializa os dados de override com os valores atuais do sistema
   useEffect(() => {
     if (isPreviewOpen) {
-      const initial: Record<string, string> = {};
+      const initialOverrides: Record<string, ReportOverride> = {};
+      
       trips.forEach(t => {
         const pred = predictionService.getNextStatusPrediction(t, allTrips);
-        initial[t.id] = pred ? pred.time : '';
+        const history = [...(t.statusHistory || [])]
+          .filter(h => h.status !== 'Pendente')
+          .map(h => ({ ...h })); // Clona para evitar mutação
+
+        initialOverrides[t.id] = {
+          history,
+          prediction: pred ? { label: pred.label, time: pred.time } : null
+        };
       });
-      setEditedPredictions(initial);
+      
+      setReportOverrides(initialOverrides);
     }
   }, [isPreviewOpen, trips, allTrips]);
 
-  const handlePredictionChange = (tripId: string, val: string) => {
-    setEditedPredictions(prev => ({ ...prev, [tripId]: val }));
+  const handleHistoryTimeChange = (tripId: string, entryIdx: number, val: string) => {
+    setReportOverrides(prev => {
+      const tripOverride = { ...prev[tripId] };
+      const newHistory = [...tripOverride.history];
+      newHistory[entryIdx] = { ...newHistory[entryIdx], dateTime: val };
+      return { ...prev, [tripId]: { ...tripOverride, history: newHistory } };
+    });
+  };
+
+  const handlePredictionChange = (tripId: string, field: 'label' | 'time', val: string) => {
+    setReportOverrides(prev => {
+      const tripOverride = { ...prev[tripId] };
+      const newPred = tripOverride.prediction 
+        ? { ...tripOverride.prediction, [field]: val }
+        : { label: field === 'label' ? val : 'Previsão', time: field === 'time' ? val : '---' };
+      return { ...prev, [tripId]: { ...tripOverride, prediction: newPred } };
+    });
   };
 
   const handleCopy = async () => {
     if (trips.length === 0) return;
 
     try {
-      const html = emailFormatter.allTripsToRichText(trips, allTrips, editedPredictions);
-      const plain = trips.map(t => emailFormatter.toPlainText(t, allTrips, editedPredictions[t.id])).join('\n');
+      const html = emailFormatter.allTripsToRichText(trips, allTrips, reportOverrides);
+      const plain = trips.map(t => emailFormatter.toPlainText(t, allTrips, reportOverrides[t.id])).join('\n');
 
       const blobHtml = new Blob([html], { type: 'text/html' });
       const blobPlain = new Blob([plain], { type: 'text/plain' });
@@ -76,15 +102,15 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
 
       {isPreviewOpen && (
         <div className="fixed inset-0 z-[4000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-7xl h-[90vh] rounded-[3.5rem] shadow-2xl flex flex-col border border-white/20 overflow-hidden animate-in zoom-in-95">
+          <div className="bg-white w-full max-w-7xl h-[92vh] rounded-[3.5rem] shadow-2xl flex flex-col border border-white/20 overflow-hidden animate-in zoom-in-95">
             
             {/* Header */}
             <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                <div className="flex items-center gap-6">
                   <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center font-black italic text-xl shadow-lg">ALS</div>
                   <div>
-                    <h3 className="text-xl font-black uppercase tracking-tight">Revisão de Status Operacional</h3>
-                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-1">Ajuste as previsões antes de compartilhar o relatório</p>
+                    <h3 className="text-xl font-black uppercase tracking-tight leading-none">Revisão do Relatório Operacional</h3>
+                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-2">Ajuste os horários de cada status para o envio final</p>
                   </div>
                </div>
                <button onClick={() => setIsPreviewOpen(false)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
@@ -95,33 +121,63 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
             {/* Conteúdo em Duas Colunas */}
             <div className="flex-1 overflow-hidden flex bg-slate-50">
                
-               {/* Coluna 1: Em Andamento */}
+               {/* Coluna 1: Em Andamento / Ativas */}
                <div className="flex-1 flex flex-col border-r border-slate-200">
                   <div className="p-6 bg-blue-600/5 border-b border-blue-100 flex items-center justify-between">
-                     <span className="text-[11px] font-black text-blue-700 uppercase tracking-widest">Em Andamento ({activeTrips.length})</span>
+                     <span className="text-[11px] font-black text-blue-700 uppercase tracking-widest">Viagens em Curso ({activeTrips.length})</span>
                   </div>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
-                     {activeTrips.map(t => (
-                       <div key={t.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                          <div className="flex justify-between items-start">
-                             <div>
-                                <p className="text-[12px] font-black text-slate-800 uppercase">OS: {t.os}</p>
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{t.customer.name}</p>
-                             </div>
-                             <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-lg text-[8px] font-black uppercase border border-blue-100">{t.status}</span>
-                          </div>
-                          <div className="pt-3 border-t border-slate-50">
-                             <label className="text-[8px] font-black text-blue-500 uppercase tracking-widest mb-1.5 block">Previsão da Próxima Etapa</label>
-                             <input 
-                               type="text"
-                               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 outline-none focus:border-blue-500 transition-all"
-                               placeholder="Ex: 14:30h / Aguardando janela..."
-                               value={editedPredictions[t.id] || ''}
-                               onChange={(e) => handlePredictionChange(t.id, e.target.value)}
-                             />
-                          </div>
-                       </div>
-                     ))}
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                     {activeTrips.map(t => {
+                       const ovr = reportOverrides[t.id];
+                       return (
+                        <div key={t.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-5">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-[13px] font-black text-slate-800 uppercase">OS: {t.os}</p>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 truncate max-w-[200px]">{t.customer.name}</p>
+                                </div>
+                                <span className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[8px] font-black uppercase border border-blue-100">{t.status}</span>
+                            </div>
+
+                            {/* Seção: Edição de Histórico (Status Passados) */}
+                            <div className="space-y-3 pt-3 border-t border-slate-50">
+                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Histórico de Eventos Realizados</label>
+                                {ovr?.history.map((entry, idx) => (
+                                    <div key={idx} className="flex items-center gap-3 bg-slate-50/50 p-2 rounded-xl border border-slate-100">
+                                        <span className="text-[9px] font-black text-slate-500 uppercase flex-1 truncate">{entry.status}</span>
+                                        <input 
+                                            type="datetime-local"
+                                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+                                            value={entry.dateTime.slice(0, 16)}
+                                            onChange={(e) => handleHistoryTimeChange(t.id, idx, e.target.value)}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Seção: Edição de Previsão (Status Futuro) */}
+                            <div className="p-4 bg-blue-600/5 rounded-2xl border border-blue-100 space-y-3">
+                                <label className="text-[8px] font-black text-blue-500 uppercase tracking-widest block px-1">🚀 Próxima Etapa (Previsão)</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input 
+                                        type="text"
+                                        placeholder="Título (ex: Chegada)"
+                                        className="w-full px-3 py-2 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={ovr?.prediction?.label || ''}
+                                        onChange={(e) => handlePredictionChange(t.id, 'label', e.target.value)}
+                                    />
+                                    <input 
+                                        type="text"
+                                        placeholder="Horário (ex: 14:30h)"
+                                        className="w-full px-3 py-2 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={ovr?.prediction?.time || ''}
+                                        onChange={(e) => handlePredictionChange(t.id, 'time', e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                       );
+                     })}
                      {activeTrips.length === 0 && <p className="text-center py-20 text-slate-300 font-bold uppercase text-[10px]">Sem viagens ativas</p>}
                   </div>
                </div>
@@ -129,18 +185,18 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                {/* Coluna 2: Finalizadas */}
                <div className="flex-1 flex flex-col">
                   <div className="p-6 bg-emerald-600/5 border-b border-emerald-100 flex items-center justify-between">
-                     <span className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">Finalizadas ({finishedTrips.length})</span>
+                     <span className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">Finalizadas Hoje ({finishedTrips.length})</span>
                   </div>
                   <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
                      {finishedTrips.map(t => (
                        <div key={t.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm opacity-80 group">
                           <div className="flex justify-between items-center">
                              <div>
-                                <p className="text-[11px] font-black text-slate-700 uppercase">OS: {t.os}</p>
-                                <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{t.customer.name}</p>
+                                <p className="text-[11px] font-black text-slate-700 uppercase leading-none">OS: {t.os}</p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase mt-1.5">{t.customer.name}</p>
                              </div>
                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black text-emerald-600 uppercase">✓ CONCLUÍDA</span>
+                                <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">✓ CONCLUÍDA</span>
                              </div>
                           </div>
                        </div>
@@ -153,7 +209,10 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
 
             {/* Footer de Ação */}
             <footer className="p-8 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
-               <p className="text-[10px] font-bold text-slate-400 uppercase max-w-md">O texto formatado incluirá os nomes dos clientes, placas e todo o histórico cronológico de cada viagem.</p>
+               <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">O relatório gerado incluirá histórico completo e as previsões ajustadas.</p>
+               </div>
                <div className="flex gap-4">
                   <button onClick={() => setIsPreviewOpen(false)} className="px-8 py-5 bg-slate-100 text-slate-500 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 active:scale-95 transition-all">Cancelar</button>
                   <button 
