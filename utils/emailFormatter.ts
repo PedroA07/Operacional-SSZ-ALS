@@ -5,13 +5,13 @@ import { predictionService } from './predictionService';
 export const emailFormatter = {
   /**
    * Gera uma versão em HTML compacto para ser colado em e-mails.
-   * Inclui todo o histórico de status e a PREVISÃO inteligente.
+   * Inclui todo o histórico de status (exceto Pendente) e a PREVISÃO inteligente.
    */
   toCompactRichText: (trip: Trip, allTrips: Trip[] = []): string => {
-    const now = new Date();
-    const history = [...(trip.statusHistory || [])].sort(
-      (a, b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime()
-    );
+    // Filtra o status "Pendente" e ordena do mais recente para o mais antigo
+    const history = [...(trip.statusHistory || [])]
+      .filter(entry => entry.status !== 'Pendente')
+      .sort((a, b) => new Date(b.createdAt || b.dateTime).getTime() - new Date(a.createdAt || a.dateTime).getTime());
 
     const prediction = predictionService.getNextStatusPrediction(trip, allTrips);
 
@@ -38,11 +38,8 @@ export const emailFormatter = {
               </div>
               
               <table style="width: 100%; border-collapse: collapse;">
-                ${history.map((entry, idx) => {
-                  // Se o status for Pendente, usa a data atual da cópia
-                  const displayDate = entry.status === 'Pendente' 
-                    ? now 
-                    : new Date(entry.dateTime);
+                ${history.length > 0 ? history.map((entry, idx) => {
+                  const displayDate = new Date(entry.dateTime);
 
                   return `
                   <tr>
@@ -68,7 +65,7 @@ export const emailFormatter = {
                       </td>
                     </tr>
                   ` : ''}
-                `}).join('')}
+                `}).join('') : `<tr><td colspan="3" style="font-size: 11px; color: #94a3b8; text-align: center; padding: 20px;">Aguardando início operacional.</td></tr>`}
               </table>
             </td>
           </tr>
@@ -107,20 +104,20 @@ export const emailFormatter = {
    * Texto simples para fallback
    */
   toPlainText: (trip: Trip, allTrips: Trip[] = []): string => {
-    const now = new Date();
-    const history = [...(trip.statusHistory || [])].sort(
-      (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
-    );
+    // Filtra o status "Pendente"
+    const history = [...(trip.statusHistory || [])]
+      .filter(h => h.status !== 'Pendente')
+      .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
     const pred = predictionService.getNextStatusPrediction(trip, allTrips);
 
     let text = `OS: ${trip.os} | CLIENTE: ${trip.customer.name}\n` +
       `EQUIPAMENTO: ${trip.container || 'A DEFINIR'} | MOTORISTA: ${trip.driver.name}\n` +
       `HISTÓRICO:\n` +
-      history.map(h => {
-        const displayDate = h.status === 'Pendente' ? now : new Date(h.dateTime);
+      (history.length > 0 ? history.map(h => {
+        const displayDate = new Date(h.dateTime);
         return `- ${h.status.toUpperCase()}: ${displayDate.toLocaleString('pt-BR')}`;
-      }).join('\n');
+      }).join('\n') : '- AGUARDANDO INÍCIO OPERACIONAL');
 
     if (pred) {
       text += `\n>> ${pred.label.toUpperCase()}: ${pred.time}`;
