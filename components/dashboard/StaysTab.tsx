@@ -4,10 +4,11 @@ import { Trip, Category, StatusHistoryEntry, User } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import * as XLSX from 'xlsx';
 import { stayImporter } from '../../utils/stayImporter';
+import { stayCalculations } from '../../utils/stayCalculations';
 import { db } from '../../utils/storage';
 
 interface StaysTabProps {
-  trips: Trip[]; // Mantido para compatibilidade de interface, mas ignorado na listagem principal
+  trips: Trip[];
   categories: Category[];
   userId: string;
 }
@@ -18,46 +19,21 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
   const [importedStays, setImportedStays] = useState<Trip[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Calcula categorias únicas baseadas APENAS no arquivo importado
   const availableCategories = useMemo(() => {
     const cats = Array.from(new Set(importedStays.map(t => t.category).filter(Boolean)));
     return ['GERAL', ...cats.sort()];
   }, [importedStays]);
 
-  // Filtra os dados importados pela categoria selecionada
   const filteredData = useMemo(() => {
     if (activeCategory === 'GERAL') return importedStays;
     return importedStays.filter(t => t.category === activeCategory);
   }, [importedStays, activeCategory]);
 
-  const getStatusTime = (history: StatusHistoryEntry[], statusName: string): string => {
-    const entry = history?.find(h => h.status === statusName);
-    if (!entry) return '---';
-    const date = new Date(entry.dateTime);
-    return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  };
-
-  const handleExportXLSX = () => {
-    if (filteredData.length === 0) {
-      alert("Não há dados para exportar. Importe um arquivo primeiro.");
-      return;
+  const handleClear = () => {
+    if (confirm("Deseja limpar todos os dados importados desta tela?")) {
+      setImportedStays([]);
+      setActiveCategory('GERAL');
     }
-
-    const data = filteredData.map(t => ({
-      'MODALIDADE + OS': `${t.type} - ${t.os}`,
-      'LOCAL ATENDIMENTO': t.scheduling?.location || '---',
-      'MOTORISTA': t.driver.name,
-      'NAVIO': t.ship || '---',
-      'CONTAINER': t.container || '---',
-      'PREVISÃO INÍCIO': new Date(t.dateTime).toLocaleString('pt-BR'),
-      'CHEGADA LOCAL': getStatusTime(t.statusHistory, 'Chegou no cliente'),
-      'SAÍDA LOCAL': getStatusTime(t.statusHistory, 'Saiu do cliente')
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Estadias " + activeCategory);
-    XLSX.writeFile(wb, `ALS_ESTADIAS_${activeCategory.toUpperCase()}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,23 +44,11 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
     try {
       const session = sessionStorage.getItem('als_active_session');
       const user: User = session ? JSON.parse(session) : { id: userId, displayName: 'Operacional' };
-      
       const result = await stayImporter.processExcelAndReturn(file, user);
-      
       setImportedStays(result.data);
       setActiveCategory('GERAL');
-
-      await db.addNotification(
-        user, 
-        'SYSTEM', 
-        'Relatório de Estadias', 
-        `Processado arquivo com ${result.data.length} registros para análise.`,
-        { os: 'ESTADIAS' }
-      );
-      
     } catch (err) {
-      console.error(err);
-      alert("Falha ao processar arquivo. Verifique se o formato das colunas está idêntico ao padrão.");
+      alert("Erro ao importar. Verifique o padrão do arquivo.");
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -94,93 +58,142 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
   const columns = [
     { 
       key: 'os_info', 
-      label: '1. Tipo de Programação + OS', 
+      label: 'Tipo / OS', 
       render: (t: Trip) => (
-        <div className="flex flex-col">
-          <span className="text-[7px] font-black text-blue-600 uppercase tracking-tighter">{t.type}</span>
-          <span className="font-black text-slate-900 text-[11px]">{t.os}</span>
+        <div className="flex flex-col min-w-[100px]">
+          <span className="text-[7px] font-black text-blue-600 uppercase leading-none">{t.type}</span>
+          <span className="font-black text-slate-900 text-[10px] mt-0.5">{t.os}</span>
         </div>
       )
     },
     { 
       key: 'local', 
-      label: 'Local Atendimento', 
+      label: 'Atendimento', 
       render: (t: Trip) => (
-        <span className="text-[10px] font-bold text-slate-700 uppercase">
+        <span className="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[150px] block">
           {t.scheduling?.location || '---'}
         </span>
       )
     },
-    { key: 'driver', label: 'Motorista', render: (t: Trip) => <span className="font-bold text-[10px] uppercase text-slate-600">{t.driver.name}</span> },
-    { key: 'ship', label: 'Navio', render: (t: Trip) => <span className="font-bold text-[10px] uppercase text-blue-600">{t.ship || '---'}</span> },
-    { key: 'container', label: 'Container', render: (t: Trip) => <span className="font-mono font-black text-[10px] text-slate-800">{t.container || '---'}</span> },
+    { 
+      key: 'resource', 
+      label: 'Recurso / Equipamento', 
+      render: (t: Trip) => (
+        <div className="flex flex-col min-w-[130px]">
+          <span className="font-bold text-[9px] uppercase text-slate-500 truncate">{t.driver.name}</span>
+          <div className="flex gap-2 mt-0.5">
+            <span className="text-[8px] font-black text-blue-500">{t.container || '---'}</span>
+            <span className="text-[8px] font-bold text-slate-400 italic truncate">{t.ship || ''}</span>
+          </div>
+        </div>
+      )
+    },
     { 
       key: 'scheduled', 
-      label: 'Previsão Início', 
+      label: 'Previsão', 
       render: (t: Trip) => (
-        <div className="flex flex-col">
-          <span className="font-black text-slate-700 text-[10px]">{new Date(t.dateTime).toLocaleDateString('pt-BR')}</span>
+        <div className="flex flex-col items-center min-w-[70px]">
+          <span className="font-black text-slate-700 text-[10px]">{new Date(t.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
           <span className="text-blue-500 font-bold text-[9px]">{new Date(t.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
         </div>
       )
     },
     { 
-      key: 'arrival', 
-      label: 'Dt Chegada Local', 
-      render: (t: Trip) => (
-        <span className="font-black text-emerald-600 text-[10px]">{getStatusTime(t.statusHistory, 'Chegou no cliente')}</span>
-      )
+      key: 'io_times', 
+      label: 'Janela (Entrada / Saída)', 
+      render: (t: Trip) => {
+        const inEntry = t.statusHistory.find(h => h.status === 'Chegou no cliente');
+        const outEntry = t.statusHistory.find(h => h.status === 'Saiu do cliente');
+        return (
+          <div className="flex items-center gap-2 min-w-[140px] bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+             <div className="flex flex-col text-center flex-1">
+                <span className="text-[6px] font-black text-slate-400 uppercase">Chegada</span>
+                <span className="text-[9px] font-black text-emerald-600">
+                  {inEntry ? new Date(inEntry.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '--:--'}
+                </span>
+             </div>
+             <div className="w-[1px] h-6 bg-slate-200"></div>
+             <div className="flex flex-col text-center flex-1">
+                <span className="text-[6px] font-black text-slate-400 uppercase">Saída</span>
+                <span className="text-[9px] font-black text-red-600">
+                  {outEntry ? new Date(outEntry.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '--:--'}
+                </span>
+             </div>
+          </div>
+        );
+      }
     },
     { 
-      key: 'departure', 
-      label: 'Dt Saída Local', 
-      render: (t: Trip) => (
-        <span className="font-black text-red-600 text-[10px]">{getStatusTime(t.statusHistory, 'Saiu do cliente')}</span>
-      )
+      key: 'on_time', 
+      label: 'Prazo', 
+      render: (t: Trip) => {
+        const { onTime, diffMinutes } = stayCalculations.isArrivedOnTime(t.dateTime, t.statusHistory);
+        if (!t.statusHistory.some(h => h.status === 'Chegou no cliente')) return <span className="text-[8px] text-slate-300 italic">---</span>;
+        return (
+          <div className="flex flex-col items-center">
+            <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase ${onTime ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              {onTime ? 'OK' : 'ATRASO'}
+            </span>
+            {!onTime && <span className="text-[7px] font-bold text-red-400 mt-0.5">+{diffMinutes}m</span>}
+          </div>
+        );
+      }
+    },
+    { 
+      key: 'stay_duration', 
+      label: 'Estadia', 
+      render: (t: Trip) => {
+        const details = stayCalculations.getStayDetails(t.dateTime, t.statusHistory);
+        return (
+          <div className="flex flex-col items-center min-w-[60px]">
+            <span className={`text-[10px] font-black ${details.isExceeded ? 'text-red-600' : 'text-slate-700'}`}>
+              {details.text}
+            </span>
+            {details.isExceeded && (
+              <span className="text-[7px] bg-red-600 text-white px-1 rounded font-black uppercase mt-0.5 animate-pulse">Excedido</span>
+            )}
+          </div>
+        );
+      }
     }
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
-            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Relatório de Estadias</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1">Dados extraídos exclusivamente da planilha importada</p>
+            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Análise de Estadias</h2>
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Conformidade de Janelas e Permanência</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
             <button 
               onClick={() => fileInputRef.current?.click()}
               disabled={isImporting}
-              className="px-8 py-5 bg-slate-900 text-white rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center gap-4 active:scale-95 disabled:opacity-50"
+              className="px-5 py-3.5 bg-slate-900 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
             >
-              {isImporting ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-              )}
-              {isImporting ? 'Processando Arquivo...' : 'Importar Novo Arquivo'}
+              {isImporting ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>}
+              Importar
             </button>
             {importedStays.length > 0 && (
               <button 
-                onClick={handleExportXLSX}
-                className="px-8 py-5 bg-emerald-600 text-white rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-4 active:scale-95"
+                onClick={handleClear}
+                className="px-5 py-3.5 bg-red-50 text-red-600 border border-red-100 rounded-2xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all active:scale-95"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Exportar ({activeCategory})
+                Limpar Lista
               </button>
             )}
           </div>
         </div>
 
         {importedStays.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 mt-10 border-t border-slate-100 pt-10">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 mt-6 border-t border-slate-50 pt-6">
              {availableCategories.map(cat => (
                <button 
                  key={cat} 
                  onClick={() => setActiveCategory(cat)}
-                 className={`px-10 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all border ${activeCategory === cat ? 'bg-slate-900 text-white border-slate-900 shadow-xl' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-white'}`}
+                 className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all border ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-white'}`}
                >
                  {cat}
                </button>
@@ -190,21 +203,25 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
       </div>
 
       {importedStays.length > 0 ? (
-        <SmartOperationTable 
-          userId={userId}
-          componentId={`stays-import-${activeCategory}`}
-          title={`Análise de Permanência - ${activeCategory}`}
-          data={filteredData}
-          columns={columns}
-        />
+        <div className="stay-table-compact">
+          <SmartOperationTable 
+            userId={userId}
+            componentId={`stays-v3-${activeCategory}`}
+            title={`Monitoramento ${activeCategory}`}
+            data={filteredData}
+            columns={columns}
+          />
+        </div>
       ) : (
-        <div className="bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 py-32 text-center">
-           <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm mb-6">
-              <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-           </div>
-           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Aguardando importação de dados para visualização</p>
+        <div className="bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 py-24 text-center">
+           <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Aguardando planilha de estadias...</p>
         </div>
       )}
+
+      <style>{`
+        .stay-table-compact table td { padding: 0.75rem 0.5rem !important; }
+        .stay-table-compact table th { padding: 0.75rem 0.5rem !important; }
+      `}</style>
     </div>
   );
 };
