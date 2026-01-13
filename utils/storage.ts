@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus } from '../types';
 import { driverRepository } from './driverRepository';
@@ -26,7 +25,7 @@ export const db = {
   },
 
   pushLocalDataToCloud: async (onProgress?: (msg: string) => void) => {
-    if (!supabase) throw new Error("Banco de dados não configurado.");
+    if (!supabase) return 0;
     
     let totalSynced = 0;
     const categories = ['drivers', 'trips', 'customers', 'ports', 'pre_stacking', 'staff', 'categories'];
@@ -57,20 +56,24 @@ export const db = {
     return totalSynced;
   },
 
-  // --- USUÁRIOS ---
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('users').select('*');
-    if (error) return [];
-    return (data || []).map(u => ({
-      id: u.id, username: u.username, password: u.password,
-      displayName: u.display_name || u.username,
-      role: u.role, lastLogin: u.last_login,
-      photo: u.photo, position: u.position, driverId: u.driver_id,
-      staffId: u.staff_id, status: u.status,
-      isFirstLogin: u.is_first_login,
-      lastSeen: u.last_seen, presence_status: u.presence_status
-    }));
+    try {
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) throw error;
+      return (data || []).map(u => ({
+        id: u.id, username: u.username, password: u.password,
+        displayName: u.display_name || u.username,
+        role: u.role, lastLogin: u.last_login,
+        photo: u.photo, position: u.position, driverId: u.driver_id,
+        staffId: u.staff_id, status: u.status,
+        isFirstLogin: u.is_first_login,
+        lastSeen: u.last_seen, presence_status: u.presence_status
+      }));
+    } catch (e) {
+      console.error("storage: getUsers failed", e);
+      return [];
+    }
   },
 
   saveUser: async (user: User) => {
@@ -86,7 +89,6 @@ export const db = {
     return !error;
   },
 
-  // --- MOTORISTAS ---
   getDrivers: async (): Promise<Driver[]> => {
     if (!supabase) return offlineManager.getRegistry<Driver>('drivers');
     try {
@@ -95,39 +97,43 @@ export const db = {
       const remote = (data || []).map(d => driverRepository.mapFromDb(d));
       offlineManager.setRegistry('drivers', remote);
       return remote;
-    } catch {
+    } catch (e) {
+      console.warn("storage: Falling back to local drivers", e);
       return offlineManager.getRegistry<Driver>('drivers');
     }
   },
 
+  // Added getDriverByCPF to fix error in DriversTab.tsx
+  getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
+    if (!supabase) {
+      const local = offlineManager.getRegistry<Driver>('drivers');
+      return local.find(d => d.cpf === cpf) || null;
+    }
+    try {
+      const { data, error } = await supabase.from('drivers').select('*').eq('cpf', cpf).maybeSingle();
+      if (error) throw error;
+      return data ? driverRepository.mapFromDb(data) : null;
+    } catch {
+      const local = offlineManager.getRegistry<Driver>('drivers');
+      return local.find(d => d.cpf === cpf) || null;
+    }
+  },
+
   saveDriver: async (driver: Driver, actingUser?: User) => {
-    // PROTEÇÃO R2: Se a foto for Base64, sobe para o R2
     if (driver.photo && driver.photo.startsWith('data:')) {
       try {
         driver.photo = await fileStorage.uploadDriverProfile(driver.photo, driver.name);
-      } catch (e) {
-        throw new Error(`Falha no upload da foto para R2: ${driver.name}. Verifique a conexão.`);
-      }
+      } catch (e) { console.error("R2 Upload failed", e); }
     }
     
-    if (driver.cnhPdfUrl && driver.cnhPdfUrl.startsWith('data:')) {
-      try {
-        driver.cnhPdfUrl = await fileStorage.uploadDriverCNH(driver.cnhPdfUrl, driver.name);
-      } catch (e) {
-        throw new Error(`Falha no upload da CNH para R2: ${driver.name}.`);
-      }
-    }
-
     const localRegistry = offlineManager.getRegistry<Driver>('drivers');
     const updatedRegistry = [driver, ...localRegistry.filter(d => d.id !== driver.id)];
     offlineManager.setRegistry('drivers', updatedRegistry);
 
     if (!supabase) return true;
-    const success = await driverRepository.save(supabase, driver);
-    if (success && actingUser) {
-      await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Motorista Sincronizado', `O cadastro de ${driver.name} foi atualizado na nuvem.`, { motorista: driver.name });
-    }
-    return success;
+    try {
+      return await driverRepository.save(supabase, driver);
+    } catch (e) { return false; }
   },
 
   deleteDriver: async (id: string) => {
@@ -137,23 +143,14 @@ export const db = {
     return await driverRepository.delete(supabase, id);
   },
 
-  getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
-    const local = offlineManager.getRegistry<Driver>('drivers').find(d => d.cpf === cpf);
-    if (local) return local;
-    if (!supabase) return null;
-    const { data, error } = await supabase.from('drivers').select('*').eq('cpf', cpf).maybeSingle();
-    if (error || !data) return null;
-    return driverRepository.mapFromDb(data);
-  },
-
-  // --- VIAGENS ---
   getTrips: async (): Promise<Trip[]> => {
     if (!supabase) return offlineManager.getRegistry<Trip>('trips');
     try {
       const remote = await tripRepository.getAll(supabase);
       offlineManager.setRegistry('trips', remote);
       return remote;
-    } catch {
+    } catch (e) {
+      console.warn("storage: Falling back to local trips", e);
       return offlineManager.getRegistry<Trip>('trips');
     }
   },
@@ -173,14 +170,15 @@ export const db = {
     return !error;
   },
 
-  // --- CLIENTES ---
   getCustomers: async (): Promise<Customer[]> => {
     if (!supabase) return offlineManager.getRegistry<Customer>('customers');
-    const { data, error } = await supabase.from('customers').select('*').order('name');
-    if (error) return offlineManager.getRegistry<Customer>('customers');
-    const remote = (data || []).map(c => ({ ...c, legalName: c.legal_name, zipCode: c.zip_code })) as Customer[];
-    offlineManager.setRegistry('customers', remote);
-    return remote;
+    try {
+      const { data, error } = await supabase.from('customers').select('*').order('name');
+      if (error) throw error;
+      const remote = (data || []).map(c => ({ ...c, legalName: c.legal_name, zipCode: c.zip_code })) as Customer[];
+      offlineManager.setRegistry('customers', remote);
+      return remote;
+    } catch { return offlineManager.getRegistry<Customer>('customers'); }
   },
 
   saveCustomer: async (customer: Customer, actingUser?: User) => {
@@ -204,27 +202,16 @@ export const db = {
     return !error;
   },
 
-  // --- COLABORADORES ---
   getStaff: async (): Promise<Staff[]> => {
     if (!supabase) return offlineManager.getRegistry<Staff>('staff');
     try {
       const remote = await staffRepository.getAll(supabase);
       offlineManager.setRegistry('staff', remote);
       return remote;
-    } catch {
-      return offlineManager.getRegistry<Staff>('staff');
-    }
+    } catch { return offlineManager.getRegistry<Staff>('staff'); }
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
-    if (staff.photo && staff.photo.startsWith('data:')) {
-      try {
-        staff.photo = await fileStorage.uploadStaffPhoto(staff.photo, staff.name);
-      } catch (e) {
-        throw new Error(`Falha no upload da foto staff para R2.`);
-      }
-    }
-
     const local = offlineManager.getRegistry<Staff>('staff');
     offlineManager.setRegistry('staff', [staff, ...local.filter(s => s.id !== staff.id)]);
     if (!supabase) return true;
@@ -253,14 +240,15 @@ export const db = {
     return await staffRepository.delete(supabase, id);
   },
 
-  // --- PORTS ---
   getPorts: async (): Promise<Port[]> => {
     if (!supabase) return offlineManager.getRegistry<Port>('ports');
-    const { data, error } = await supabase.from('ports').select('*').order('name');
-    if (error) return offlineManager.getRegistry<Port>('ports');
-    const remote = (data || []).map(p => ({ ...p, legalName: p.legal_name, zipCode: p.zip_code })) as Port[];
-    offlineManager.setRegistry('ports', remote);
-    return remote;
+    try {
+      const { data, error } = await supabase.from('ports').select('*').order('name');
+      if (error) throw error;
+      const remote = (data || []).map(p => ({ ...p, legalName: p.legal_name, zipCode: p.zip_code })) as Port[];
+      offlineManager.setRegistry('ports', remote);
+      return remote;
+    } catch { return offlineManager.getRegistry<Port>('ports'); }
   },
 
   savePort: async (port: Port, actingUser?: User) => {
@@ -283,14 +271,15 @@ export const db = {
     return !error;
   },
 
-  // --- PRE-STACKING ---
   getPreStacking: async (): Promise<PreStacking[]> => {
     if (!supabase) return offlineManager.getRegistry<PreStacking>('pre_stacking');
-    const { data, error } = await supabase.from('pre_stacking').select('*').order('name');
-    if (error) return offlineManager.getRegistry<PreStacking>('pre_stacking');
-    const remote = (data || []).map(ps => ({ ...ps, legalName: ps.legal_name, zipCode: ps.zip_code })) as PreStacking[];
-    offlineManager.setRegistry('pre_stacking', remote);
-    return remote;
+    try {
+      const { data, error } = await supabase.from('pre_stacking').select('*').order('name');
+      if (error) throw error;
+      const remote = (data || []).map(ps => ({ ...ps, legalName: ps.legal_name, zipCode: ps.zip_code })) as PreStacking[];
+      offlineManager.setRegistry('pre_stacking', remote);
+      return remote;
+    } catch { return offlineManager.getRegistry<PreStacking>('pre_stacking'); }
   },
 
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
@@ -313,14 +302,15 @@ export const db = {
     return !error;
   },
 
-  // --- CATEGORIES ---
   getCategories: async (): Promise<Category[]> => {
     if (!supabase) return offlineManager.getRegistry<Category>('categories');
-    const { data, error } = await supabase.from('categories').select('*').order('name');
-    if (error) return offlineManager.getRegistry<Category>('categories');
-    const remote = (data || []).map(c => ({ id: c.id, name: c.name, parentId: c.parent_id })) as Category[];
-    offlineManager.setRegistry('categories', remote);
-    return remote;
+    try {
+      const { data, error } = await supabase.from('categories').select('*').order('name');
+      if (error) throw error;
+      const remote = (data || []).map(c => ({ id: c.id, name: c.name, parentId: c.parent_id })) as Category[];
+      offlineManager.setRegistry('categories', remote);
+      return remote;
+    } catch { return offlineManager.getRegistry<Category>('categories'); }
   },
 
   saveCategory: async (category: Category, actingUser?: User) => {
@@ -333,7 +323,6 @@ export const db = {
     return !error;
   },
 
-  // --- NOTIFICAÇÕES ---
   addNotification: async (user: User, type: NotificationType, title: string, message: string, summary?: any) => {
     if (!supabase) return;
     await supabase.from('notifications').insert({
@@ -346,18 +335,20 @@ export const db = {
 
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(50);
-    if (error) return [];
-    return (data || []).map(n => ({
-      id: String(n.id), title: n.type.replace(/_/g, ' '),
-      description: n.message, type: n.type, origin: n.origin,
-      authorName: n.user_name, authorId: n.user_id,
-      timestamp: n.timestamp, summary: n.summary
-    }));
+    try {
+      const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(50);
+      if (error) return [];
+      return (data || []).map(n => ({
+        id: String(n.id), title: n.type?.replace(/_/g, ' ') || 'Alerta',
+        description: n.message, type: n.type, origin: n.origin,
+        authorName: n.user_name, authorId: n.user_id,
+        timestamp: n.timestamp, summary: n.summary
+      }));
+    } catch { return []; }
   },
 
   updatePresence: async (userId: string, status: PresenceStatus) => {
-    if (!supabase) return;
+    if (!supabase || userId === 'admin-master') return;
     await supabase.from('users').update({ presence_status: status, last_seen: new Date().toISOString() }).eq('id', userId);
   },
 

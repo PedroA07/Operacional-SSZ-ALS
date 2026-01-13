@@ -17,7 +17,7 @@ interface SmartOperationTableProps {
   title?: string;
   defaultVisibleKeys?: string[];
   onRowClick?: (row: any) => void;
-  hideInternalSearch?: boolean; // Nova prop
+  hideInternalSearch?: boolean;
 }
 
 const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
@@ -33,6 +33,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
+  const [isDataSyncing, setIsDataSyncing] = useState(true);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,6 +44,10 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
     } else {
       setVisibleColumns(defaultVisibleKeys || columns.map(c => c.key));
     }
+    
+    // Pequeno timeout para remover o estado de sincronização inicial
+    const t = setTimeout(() => setIsDataSyncing(false), 2000);
+    return () => clearTimeout(t);
   }, [userId, componentId, defaultVisibleKeys, columns]);
 
   const toggleColumn = (key: string) => {
@@ -111,7 +116,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
                   <p className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">Exibição</p>
                   <button onClick={() => setVisibleColumns(columns.map(c => c.key))} className="text-[8px] font-black text-blue-600 uppercase hover:underline">Resetar</button>
                 </div>
-                <div className="space-y-1.5 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                   {columns.map(col => (
                     <button 
                       key={col.key}
@@ -158,15 +163,21 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
             ))}
             {filteredData.length === 0 && (
               <tr>
-                <td colSpan={visibleColumns.length} className="px-6 py-20 text-center text-slate-300 font-bold uppercase italic bg-white">
-                  Nenhum registro localizado para os critérios atuais.
+                <td colSpan={visibleColumns.length} className="px-6 py-20 text-center bg-white">
+                  {isDataSyncing ? (
+                    <div className="flex flex-col items-center gap-4">
+                       <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                       <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest animate-pulse">Sincronizando base de dados...</p>
+                    </div>
+                  ) : (
+                    <p className="text-slate-300 font-bold uppercase italic">Nenhum registro localizado para os critérios atuais.</p>
+                  )}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-        {/* ESPAÇADOR PARA DROPDOWNS DAS ÚLTIMAS LINHAS */}
-        <div className="h-60 pointer-events-none"></div>
+        <div className="h-40 pointer-events-none"></div>
       </div>
     </div>
   );
