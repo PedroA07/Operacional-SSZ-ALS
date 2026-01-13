@@ -162,7 +162,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
-    drivers // Passando drivers aqui
+    drivers 
   ), [user, drivers]);
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
@@ -242,7 +242,15 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         />
       </div>
 
-      {isTripDetailsOpen && selectedTrip && <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} user={user} />}
+      {isTripDetailsOpen && selectedTrip && (
+        <TripDetailsViewerModal 
+          isOpen={isTripDetailsOpen} 
+          onClose={() => setIsTripDetailsOpen(false)} 
+          trip={selectedTrip} 
+          user={user} 
+          onManageHistory={() => setIsHistoryModalOpen(true)}
+        />
+      )}
       {isStatusModalOpen && selectedTrip && (
         <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">

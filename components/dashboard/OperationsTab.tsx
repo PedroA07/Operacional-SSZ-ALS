@@ -152,7 +152,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
-    drivers // Passando drivers aqui
+    drivers 
   ), [user, onRefresh, onDeleteTrip, drivers]);
 
   if (activeView.type !== 'list') {
@@ -256,7 +256,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       )}
 
       {isTripDetailsOpen && selectedTrip && (
-        <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} user={user} />
+        <TripDetailsViewerModal 
+          isOpen={isTripDetailsOpen} 
+          onClose={() => setIsTripDetailsOpen(false)} 
+          trip={selectedTrip} 
+          user={user} 
+          onManageHistory={() => setIsHistoryModalOpen(true)}
+        />
       )}
 
       {isDriverDocsModalOpen && selectedTrip && (

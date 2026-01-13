@@ -9,9 +9,10 @@ interface TripDetailsViewerModalProps {
   onClose: () => void;
   trip: Trip;
   user: User;
+  onManageHistory?: () => void;
 }
 
-const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen, onClose, trip, user }) => {
+const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen, onClose, trip, user, onManageHistory }) => {
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
   const [docPreview, setDocPreview] = useState<{ url: string; title: string } | null>(null);
 
@@ -167,9 +168,22 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
 
           {/* BARRA LATERAL: TIMELINE COMPACTA */}
           <div className="w-64 bg-slate-50 border-l border-slate-200 flex flex-col shrink-0">
-             <div className="p-5 bg-white border-b border-slate-200">
-                <h4 className="text-[9px] font-black text-slate-800 uppercase tracking-widest">Linha do Tempo</h4>
-                <p className="text-[7px] text-slate-400 font-bold uppercase mt-0.5">Histórico Real da OS</p>
+             <div className="p-5 bg-white border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <h4 className="text-[9px] font-black text-slate-800 uppercase tracking-widest">Linha do Tempo</h4>
+                  <p className="text-[7px] text-slate-400 font-bold uppercase mt-0.5">Histórico Real</p>
+                </div>
+                {onManageHistory && (
+                  <button 
+                    onClick={onManageHistory}
+                    className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm group"
+                    title="Editar Histórico"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/>
+                    </svg>
+                  </button>
+                )}
              </div>
              <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4">
                 {(trip.statusHistory || []).map((step, idx) => (
