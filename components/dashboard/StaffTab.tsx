@@ -4,6 +4,7 @@ import { Staff, User } from '../../types';
 import { db } from '../../utils/storage';
 import StaffModal from './staff/StaffModal';
 import { maskPhone } from '../../utils/masks';
+import PhotoViewerModal from '../shared/PhotoViewerModal';
 
 interface StaffTabProps {
   staffList: Staff[];
@@ -28,6 +29,9 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // Estado para visualização de foto
+  const [viewerData, setViewerData] = useState<{url: string, name: string} | null>(null);
+
   const [users, setUsers] = useState<User[]>([]);
   const [showPasswordsList, setShowPasswordsList] = useState<Record<string, boolean>>({});
 
@@ -103,9 +107,12 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
             <div key={s.id} className={`bg-white rounded-[2.5rem] p-8 border ${s.status === 'Inativo' ? 'border-red-100' : 'border-slate-200'} shadow-sm hover:shadow-xl transition-all flex flex-col`}>
               <div className="flex items-center gap-6">
                  <div className="relative">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shadow-inner">
+                    <button 
+                      onClick={() => s.photo && setViewerData({ url: s.photo, name: s.name })}
+                      className={`w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shadow-inner transition-transform ${s.photo ? 'hover:scale-105 active:scale-95' : 'cursor-default'}`}
+                    >
                         {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <span className="font-black text-slate-300 italic text-[10px]">ALS</span>}
-                    </div>
+                    </button>
                     <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${s.status === 'Ativo' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
                  </div>
                  <div className="flex-1 min-w-0">
@@ -189,6 +196,13 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         editingStaff={selectedStaff}
         currentUser={currentUser}
         allUsers={users}
+      />
+
+      <PhotoViewerModal 
+        isOpen={!!viewerData}
+        url={viewerData?.url || ''}
+        title={viewerData?.name || ''}
+        onClose={() => setViewerData(null)}
       />
 
       {isDeleteModalOpen && itemToDelete && (

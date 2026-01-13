@@ -6,6 +6,8 @@ import { maskPhone } from '../../../utils/masks';
 import { imageCompressor } from '../../../utils/imageCompressor';
 import { usernameGenerator } from '../../../utils/usernameGenerator';
 import { fileStorage } from '../../../utils/fileStorage';
+import ImageCropperModal from '../../shared/ImageCropperModal';
+import PhotoViewerModal from '../../shared/PhotoViewerModal';
 
 interface StaffModalProps {
   isOpen: boolean;
@@ -30,9 +32,13 @@ const StaffModal: React.FC<StaffModalProps> = ({
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const photoRef = useRef<HTMLInputElement>(null);
   
+  // Estados para novas funcionalidades de foto
+  const [tempPhotoSrc, setTempPhotoSrc] = useState<string | null>(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+
+  const photoRef = useRef<HTMLInputElement>(null);
   const lastInitializedId = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
@@ -55,42 +61,32 @@ const StaffModal: React.FC<StaffModalProps> = ({
         registrationDate: editingStaff.registrationDate?.split('T')[0]
       });
       setIsEditingPassword(false);
-      setSuggestions([]);
     } else {
       setForm({ 
         role: 'staff', name: '', position: '', username: '', password: '12345678', 
         emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '', registrationDate: new Date().toISOString().split('T')[0]
       });
       setIsEditingPassword(true);
-      setSuggestions([]);
     }
 
     lastInitializedId.current = currentTargetId;
   }, [editingStaff, isOpen, allUsers]);
 
-  const handleNameChange = (val: string) => {
-    const name = val.toUpperCase();
-    setForm(prev => ({ ...prev, name }));
-    if (!editingStaff) {
-      const newsug = usernameGenerator.generateSuggestions(val);
-      setSuggestions(newsug);
-    }
-  };
-
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      try {
-        const compressed = await imageCompressor.compress(file, {
-          maxWidth: 400,
-          maxHeight: 400,
-          quality: 0.7
-        });
-        setForm(prev => ({ ...prev, photo: compressed }));
-      } catch (err) {
-        alert("Erro ao processar imagem de perfil.");
-      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setTempPhotoSrc(reader.result as string);
+        setIsCropperOpen(true);
+      };
+      reader.readAsDataURL(file);
     }
+    e.target.value = '';
+  };
+
+  const handleCroppedImage = (croppedBase64: string) => {
+    setForm(prev => ({ ...prev, photo: croppedBase64 }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,13 +100,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
       let finalPhotoUrl = form.photo || '';
 
       if (finalPhotoUrl.startsWith('data:')) {
-        try {
-          // Agora enviamos o NOME para o R2, não o ID
-          finalPhotoUrl = await fileStorage.uploadStaffPhoto(finalPhotoUrl, staffName);
-        } catch (uploadErr) {
-          console.error("Erro no upload da foto para R2:", uploadErr);
-          throw new Error("Não foi possível salvar a foto no servidor R2.");
-        }
+        finalPhotoUrl = await fileStorage.uploadStaffPhoto(finalPhotoUrl, staffName);
       }
       
       const staffData: Staff = { 
@@ -143,97 +133,143 @@ const StaffModal: React.FC<StaffModalProps> = ({
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 block";
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95 duration-500 flex flex-col h-[90vh]">
-        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-          <div>
-            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingStaff ? 'Editar Colaborador' : 'Novo Colaborador ALS'}</h3>
-            <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Gestão de Perfil e Acessos (Storage R2 - Nomes)</p>
+    <>
+      <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95 duration-500 flex flex-col h-[90vh]">
+          <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+            <div>
+              <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingStaff ? 'Editar Colaborador' : 'Novo Colaborador ALS'}</h3>
+              <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Ficha de Identificação Individual</p>
+            </div>
+            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 rounded-full transition-all shadow-sm">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+            </button>
           </div>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 rounded-full transition-all shadow-sm">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
-          </button>
-        </div>
 
-        <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-          <div className="flex flex-col md:flex-row gap-8">
-            <div className="shrink-0 space-y-2 text-center">
-              <label className={labelClass}>Foto de Perfil</label>
-              <div onClick={() => photoRef.current?.click()} className="w-24 h-24 rounded-[2rem] bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden relative group mx-auto shadow-inner">
-                {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/></svg>}
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                   <span className="text-[8px] text-white font-black uppercase">Trocar</span>
+          <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
+            <div className="flex flex-col md:flex-row gap-8">
+              <div className="shrink-0 space-y-2 text-center">
+                <label className={labelClass}>Foto de Perfil</label>
+                <div className="relative group mx-auto w-28 h-28">
+                  <div 
+                    onClick={() => photoRef.current?.click()} 
+                    className="w-full h-full rounded-[2rem] bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden relative shadow-inner"
+                  >
+                    {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/></svg>}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[8px] text-white font-black uppercase">Alterar</span>
+                    </div>
+                  </div>
+                  
+                  {form.photo && (
+                    <button 
+                      type="button"
+                      onClick={() => setIsViewerOpen(true)}
+                      className="absolute -top-2 -right-2 w-8 h-8 bg-white border border-slate-200 rounded-xl shadow-lg flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition-all z-10"
+                      title="Visualizar em tamanho real"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </button>
+                  )}
+                </div>
+                <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={handlePhotoFileSelect} />
+                <p className="text-[7px] text-slate-400 font-bold uppercase">Formato: JPG/PNG</p>
+              </div>
+
+              <div className="flex-1 space-y-5">
+                <div className="space-y-1">
+                  <label className={labelClass}>Nome Completo</label>
+                  <input 
+                    required 
+                    className={inputClasses} 
+                    value={form.name} 
+                    onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} 
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Admissão</label>
+                    <input type="date" required className={inputClasses} value={form.registrationDate} onChange={e => setForm({...form, registrationDate: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelClass}>Status</label>
+                    <select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}>
+                      <option value="Ativo">ATIVO / LIBERADO</option>
+                      <option value="Inativo">INATIVO / BLOQUEADO</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
             </div>
 
-            <div className="flex-1 space-y-5">
+            <div className="grid grid-cols-2 gap-6">
               <div className="space-y-1">
-                <label className={labelClass}>Nome Completo</label>
-                <input required className={inputClasses} value={form.name} onChange={e => handleNameChange(e.target.value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-1">
-                    <label className={labelClass}>Data de Admissão</label>
-                    <input type="date" required className={inputClasses} value={form.registrationDate} onChange={e => setForm({...form, registrationDate: e.target.value})} />
-                 </div>
-                 <div className="space-y-1">
-                    <label className={labelClass}>Status Colaborador</label>
-                    <select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}>
-                       <option value="Ativo">ATIVO / LIBERADO</option>
-                       <option value="Inativo">INATIVO / BLOQUEADO</option>
-                    </select>
-                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-             <div className="space-y-1">
                 <label className={labelClass}>Cargo / Função</label>
                 <input required className={inputClasses} value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} />
-             </div>
-             <div className="space-y-1">
-                <label className={labelClass}>Nível de Acesso</label>
-                <select className={inputClasses} value={form.role} onChange={e => setForm({...form, role: e.target.value as any})}>
-                   <option value="staff">OPERACIONAL (PADRÃO)</option>
-                   <option value="admin">ADMINISTRADOR (DIRETORIA)</option>
-                </select>
-             </div>
-          </div>
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>E-mail Corporativo</label>
+                <input type="email" className={inputClasses} value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value.toLowerCase()})} placeholder="usuario@als.com.br" />
+              </div>
+            </div>
 
-          <div className="p-8 bg-blue-50/50 rounded-[2.5rem] border border-blue-100 space-y-6">
-             <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Acesso ao Portal</h4>
-             <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-3">
-                   <div className="space-y-1">
-                      <label className={labelClass}>Usuário (Login)</label>
-                      <input required className={inputClasses} value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase()})} />
-                   </div>
-                </div>
-
+            <div className="p-8 bg-blue-50/50 rounded-[2.5rem] border border-blue-100 space-y-6">
+              <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Credenciais de Acesso</h4>
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                   <div className="flex justify-between items-center pr-1">
-                      <label className={labelClass}>Senha</label>
-                      {editingStaff && !isEditingPassword && <button type="button" onClick={() => setIsEditingPassword(true)} className="text-[8px] font-black text-blue-500 uppercase">Alterar</button>}
-                   </div>
-                   <input type="text" disabled={!isEditingPassword} required={isEditingPassword} className={`${inputClasses} font-mono`} value={isEditingPassword ? form.password : '••••••••'} onChange={e => setForm({...form, password: e.target.value})} />
+                  <label className={labelClass}>Usuário (Login)</label>
+                  <input required className={inputClasses} value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase()})} />
                 </div>
-             </div>
-          </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center pr-1">
+                    <label className={labelClass}>Senha</label>
+                    {editingStaff && !isEditingPassword && (
+                      <button type="button" onClick={() => setIsEditingPassword(true)} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Trocar</button>
+                    )}
+                  </div>
+                  <input 
+                    type="text" 
+                    disabled={!isEditingPassword} 
+                    required={isEditingPassword} 
+                    className={`${inputClasses} font-mono`} 
+                    value={isEditingPassword ? form.password : '••••••••'} 
+                    onChange={e => setForm({...form, password: e.target.value})} 
+                  />
+                </div>
+              </div>
+            </div>
 
-          <button type="submit" disabled={isProcessing} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
-             {isProcessing ? (
-               <>
-                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                 Sincronizando Dados...
-               </>
-             ) : editingStaff ? 'Salvar Alterações' : 'Cadastrar Colaborador'}
-          </button>
-        </form>
+            <button type="submit" disabled={isProcessing} className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
+              {isProcessing ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Sincronizando...
+                </>
+              ) : editingStaff ? 'Salvar Alterações' : 'Criar Colaborador'}
+            </button>
+          </form>
+        </div>
       </div>
-    </div>
+
+      {/* Modais Auxiliares */}
+      {isCropperOpen && tempPhotoSrc && (
+        <ImageCropperModal 
+          isOpen={isCropperOpen}
+          imageSrc={tempPhotoSrc}
+          onClose={() => { setIsCropperOpen(false); setTempPhotoSrc(null); }}
+          onCrop={handleCroppedImage}
+        />
+      )}
+
+      {isViewerOpen && form.photo && (
+        <PhotoViewerModal 
+          isOpen={isViewerOpen}
+          url={form.photo}
+          title={form.name || 'Visualizar Foto'}
+          onClose={() => setIsViewerOpen(false)}
+        />
+      )}
+    </>
   );
 };
 
