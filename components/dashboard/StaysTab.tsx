@@ -1,8 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
-import { Trip, Category, StatusHistoryEntry } from '../../types';
+import React, { useState, useMemo, useRef } from 'react';
+import { Trip, Category, StatusHistoryEntry, User } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import * as XLSX from 'xlsx';
+import { stayImporter } from '../../utils/stayImporter';
+import { db } from '../../utils/storage';
 
 interface StaysTabProps {
   trips: Trip[];
@@ -12,10 +14,15 @@ interface StaysTabProps {
 
 const StaysTab: React.FC<StaysTabProps> = ({ trips, categories, userId }) => {
   const [activeCategory, setActiveCategory] = useState<string>('Aliança');
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const availableCategories = useMemo(() => {
     const cats = Array.from(new Set(trips.map(t => t.category).filter(Boolean)));
-    return cats.length > 0 ? cats : ['Aliança', 'Mercosul', 'Indústria'];
+    // Garante que Aliança e Mercosul apareçam mesmo sem dados
+    const baseCats = ['Aliança', 'Mercosul', 'Indústria'];
+    const combined = Array.from(new Set([...baseCats, ...cats]));
+    return combined;
   }, [trips]);
 
   const filteredTrips = useMemo(() => {
@@ -46,6 +53,38 @@ const StaysTab: React.FC<StaysTabProps> = ({ trips, categories, userId }) => {
     XLSX.utils.book_append_sheet(wb, ws, "Estadias " + activeCategory);
     
     XLSX.writeFile(wb, `ALS_ESTADIAS_${activeCategory.toUpperCase()}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const session = sessionStorage.getItem('als_active_session');
+      const user: User = session ? JSON.parse(session) : { id: userId, displayName: 'Sistema' };
+      
+      const result = await stayImporter.processExcel(file, activeCategory, user);
+      
+      await db.addNotification(
+        user, 
+        'SYSTEM', 
+        'Importação de Estadias', 
+        `Concluída para ${activeCategory}: ${result.added} adicionados, ${result.skipped} duplicados ignorados.`,
+        { os: 'IMPORT' }
+      );
+
+      // Força refresh dos dados no Dashboard.tsx
+      window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+      
+      alert(`Importação Concluída!\n\nRegistros Novos: ${result.added}\nJá existiam (Ignorados): ${result.skipped}`);
+    } catch (err) {
+      console.error(err);
+      alert("Falha ao processar arquivo. Verifique se o formato está correto.");
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const columns = [
@@ -108,13 +147,28 @@ const StaysTab: React.FC<StaysTabProps> = ({ trips, categories, userId }) => {
             <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Relatório de Estadias</h2>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1">Análise de Permanência em Terminais e Clientes</p>
           </div>
-          <button 
-            onClick={handleExportXLSX}
-            className="px-8 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-3 active:scale-95"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            Exportar Estadias (.XLSX)
-          </button>
+          <div className="flex gap-3">
+            <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+              className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center gap-3 active:scale-95 disabled:opacity-50"
+            >
+              {isImporting ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              )}
+              {isImporting ? 'Processando...' : 'Importar Planilha'}
+            </button>
+            <button 
+              onClick={handleExportXLSX}
+              className="px-6 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-3 active:scale-95"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              Exportar (.XLSX)
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 mt-8 border-t border-slate-100 pt-8">
