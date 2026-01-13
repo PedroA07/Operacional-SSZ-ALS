@@ -4,6 +4,7 @@ import { Trip, TripStatus, TripDocument, User, DriverCapturedDoc, Driver } from 
 import { db } from '../../../utils/storage';
 import { fileStorage } from '../../../utils/fileStorage';
 import ActionMenu from './ActionMenu';
+import FinanceAction from './FinanceAction';
 
 // Novos componentes de coluna modulares
 import { DriverColumn } from './columns/DriverColumn';
@@ -130,16 +131,7 @@ export const getOperationTableColumns = (
       key: 'finance',
       label: '8. Financeiro',
       render: (t: Trip) => (
-        <div className="flex flex-col gap-2 min-w-[80px]">
-           <div className="flex items-center gap-3">
-              <span className="text-[8px] font-black text-slate-400 uppercase w-6">70%</span>
-              <div className={`w-2.5 h-2.5 rounded-full ${t.advancePayment?.status === 'PAGO' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : t.advancePayment?.status === 'LIBERAR' ? 'bg-blue-500' : 'bg-slate-200'}`} title={`Adiantamento: ${t.advancePayment?.status}`}></div>
-           </div>
-           <div className="flex items-center gap-3">
-              <span className="text-[8px] font-black text-slate-400 uppercase w-6">30%</span>
-              <div className={`w-2.5 h-2.5 rounded-full ${t.balancePayment?.status === 'PAGO' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : t.balancePayment?.status === 'LIBERAR' ? 'bg-blue-500' : 'bg-slate-200'}`} title={`Saldo: ${t.balancePayment?.status}`}></div>
-           </div>
-        </div>
+        <FinanceAction trip={t} user={actingUser} onRefresh={onRefreshData} />
       )
     },
     { 
