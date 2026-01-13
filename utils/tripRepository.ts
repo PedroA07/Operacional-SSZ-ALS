@@ -46,13 +46,13 @@ export const tripRepository = {
       return val; 
     };
 
-    // Mapeamento flexível para aceitar camelCase ou snake_case do banco
+    // Mapeamento ultra-flexível para aceitar variações de nomes de colunas no Supabase
     return {
       id: d.id,
-      os: d.os || d.OS || 'SEM OS',
+      os: d.os || d.OS || d.os_number || 'SEM OS',
       booking: d.booking || d.Booking || '',
       ship: d.ship || d.Ship || '',
-      dateTime: d.date_time || d.dateTime || d.date || new Date().toISOString(),
+      dateTime: d.date_time || d.dateTime || d.date || d.created_at || new Date().toISOString(),
       statusTime: d.status_time || d.statusTime || d.date_time || d.dateTime,
       isLate: d.is_late ?? d.isLate ?? false,
       type: d.type || d.Type || 'EXPORTAÇÃO',
@@ -85,7 +85,6 @@ export const tripRepository = {
     };
   },
 
-  // Added save method to fix error in storage.ts
   async save(supabase: SupabaseClient, trip: Trip) {
     const payload = this.mapToDb(trip);
     const { error } = await supabase.from('trips').upsert(payload);
@@ -94,17 +93,19 @@ export const tripRepository = {
   },
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
-    // Aumentado o limite para garantir que dados antigos também apareçam
+    // Consulta simplificada sem ORDER para evitar quebra por nome de coluna
     const { data, error } = await supabase
       .from('trips')
       .select('*')
-      .order('date_time', { ascending: false })
-      .limit(500);
+      .limit(1000);
 
     if (error) {
-      console.error("Erro Supabase Trips:", error);
+      console.error("Erro crítico ao buscar Trips no Supabase:", error);
       throw error;
     }
-    return (data || []).map(d => this.mapFromDb(d));
+    
+    // Ordenação feita com segurança no frontend
+    const mapped = (data || []).map(d => this.mapFromDb(d));
+    return mapped.sort((a, b) => b.dateTime.localeCompare(a.dateTime));
   }
 };
