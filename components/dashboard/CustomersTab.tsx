@@ -50,14 +50,21 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     }
   }, [form.zipCode]);
 
-  // Busca automática por CNPJ quando atingir 14 dígitos (apenas se for novo cadastro ou alteração de CNPJ existente)
+  // Busca automática por CNPJ quando atingir 14 dígitos
   useEffect(() => {
     const cnpj = form.cnpj?.replace(/\D/g, '');
     if (cnpj && cnpj.length === 14) {
+      // Verifica duplicidade antes de buscar na API
+      const exists = customers.find(c => c.cnpj.replace(/\D/g, '') === cnpj);
+      if (exists && exists.id !== editingId) {
+        alert(`Atenção: O CNPJ ${maskCNPJ(cnpj)} já está cadastrado para o cliente "${exists.legalName || exists.name}".`);
+        return;
+      }
+      
+      // Se for edição e o CNPJ for o mesmo do original, não busca automaticamente
       const original = customers.find(c => c.id === editingId);
       if (editingId && original && original.cnpj.replace(/\D/g, '') === cnpj) return;
       
-      // Chamada automática
       handleCnpjLookup(cnpj, true);
     }
   }, [form.cnpj]);
@@ -70,7 +77,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
         const data = await response.json();
         setForm(prev => ({
           ...prev,
-          address: data.street || prev.address || '',
+          address: (data.street || prev.address || '').toUpperCase(),
           neighborhood: (data.neighborhood || prev.neighborhood || '').toUpperCase(),
           city: (data.city || prev.city || '').toUpperCase(),
           state: (data.state || prev.state || '').toUpperCase()
@@ -91,9 +98,16 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
       return;
     }
 
+    // Verificação de duplicidade manual (clique na lupa)
+    const exists = customers.find(c => c.cnpj.replace(/\D/g, '') === targetCnpj);
+    if (exists && exists.id !== editingId) {
+      alert(`Este CNPJ já está cadastrado para o cliente: ${exists.legalName || exists.name}`);
+      return;
+    }
+
     setIsCnpjLoading(true);
     try {
-      // Usando BrasilAPI que é gratuita e não exige token para consultas básicas
+      // Usando BrasilAPI (resiliente e gratuita)
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${targetCnpj}`);
       
       if (response.ok) {
@@ -103,20 +117,21 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
           ...prev,
           name: (data.nome_fantasia || data.razao_social || '').toUpperCase(),
           legalName: (data.razao_social || '').toUpperCase(),
-          address: data.logradouro ? `${data.logradouro}${data.numero ? ', ' + data.numero : ''}` : prev.address,
+          address: data.logradouro ? `${data.logradouro}${data.numero ? ', ' + data.numero : ''}`.toUpperCase() : prev.address,
           neighborhood: (data.bairro || prev.neighborhood || '').toUpperCase(),
           city: (data.municipio || prev.city || '').toUpperCase(),
           state: (data.uf || prev.state || '').toUpperCase(),
           zipCode: data.cep ? maskCEP(data.cep) : prev.zipCode
         }));
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Erro API CNPJ:", errorData);
-        if (!isAuto) alert(errorData.message || "CNPJ não encontrado ou erro na consulta.");
+        if (!isAuto) {
+          const errData = await response.json().catch(() => ({}));
+          alert(errData.message || "CNPJ não localizado na base da Receita Federal.");
+        }
       }
     } catch (e) {
-      console.error("Falha crítica ao buscar CNPJ:", e);
-      if (!isAuto) alert("Não foi possível conectar ao serviço de busca de CNPJ. Verifique sua internet.");
+      console.error("Erro na busca de CNPJ:", e);
+      if (!isAuto) alert("Erro ao conectar com o serviço de busca de CNPJ.");
     } finally {
       setIsCnpjLoading(false);
     }
