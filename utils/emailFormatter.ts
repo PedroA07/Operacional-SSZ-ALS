@@ -9,17 +9,30 @@ export interface ReportOverride {
 
 export const emailFormatter = {
   /**
+   * Formata data no padrão DD/MM/AAAA HH:MM
+   */
+  formatFullDate: (isoString: string): string => {
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleString('pt-BR', { 
+        day: '2-digit', month: '2-digit', year: 'numeric', 
+        hour: '2-digit', minute: '2-digit' 
+      });
+    } catch (e) {
+      return isoString;
+    }
+  },
+
+  /**
    * Gera o HTML de uma viagem individual usando dados reais ou substituídos (overrides)
    */
   toCompactRichText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride, showCustomer: boolean = true): string => {
-    // Usa o histórico do override ou o original filtrado
     const history = override 
       ? [...override.history].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
       : [...(trip.statusHistory || [])]
           .filter(entry => entry.status !== 'Pendente')
           .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
-    // Usa a previsão do override ou a calculada
     const prediction = override 
       ? override.prediction 
       : predictionService.getNextStatusPrediction(trip, allTrips);
@@ -48,12 +61,6 @@ export const emailFormatter = {
               
               <table style="width: 100%; border-collapse: collapse;">
                 ${history.length > 0 ? history.map((entry, idx) => {
-                  const displayDate = new Date(entry.dateTime);
-                  // Formato solicitado: DD/MM/AAAA HH:MM
-                  const formattedDate = displayDate.toLocaleString('pt-BR', { 
-                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' 
-                  });
-
                   return `
                   <tr>
                     <td style="padding: 4px 0; width: 12px; vertical-align: top;">
@@ -63,7 +70,7 @@ export const emailFormatter = {
                       ${entry.status}
                     </td>
                     <td style="padding: 2px 0; font-size: 9px; color: #94a3b8; text-align: right; font-family: 'Courier New', Courier, monospace;">
-                      ${formattedDate}
+                      ${emailFormatter.formatFullDate(entry.dateTime)}
                     </td>
                   </tr>
                   ${(idx === 0 && prediction) ? `
@@ -78,7 +85,7 @@ export const emailFormatter = {
                       </td>
                     </tr>
                   ` : ''}
-                `}).join('') : `<tr><td colspan="3" style="font-size: 10px; color: #94a3b8; text-align: center; padding: 10px;">Aguardando início.</td></tr>`}
+                `}).join('') : `<tr><td colspan="3" style="font-size: 10px; color: #94a3b8; text-align: center; padding: 10px;">Aguardando início operacional.</td></tr>`}
               </table>
             </td>
           </tr>
@@ -107,7 +114,7 @@ export const emailFormatter = {
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; padding: 20px; background-color: #fcfcfc;">
         <div style="margin-bottom: 24px; border-bottom: 4px solid #2563eb; padding-bottom: 12px;">
           <h2 style="margin: 0; font-size: 18px; color: #2563eb; text-transform: uppercase;">Relatório Operacional ALS</h2>
-          <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: bold;">POSIÇÕES EM ${new Date().toLocaleString('pt-BR')}</p>
+          <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: bold;">POSIÇÕES EXTRAÍDAS EM ${emailFormatter.formatFullDate(new Date().toISOString())}</p>
         </div>
         
         ${renderGroup('Cargas em Trânsito', activeTrips, '#2563eb')}
@@ -130,7 +137,7 @@ export const emailFormatter = {
     let text = `OS: ${trip.os}${showCustomer ? ` | CLIENTE: ${trip.customer.name}` : ''}\n` +
       `EQUIPAMENTO: ${trip.container || 'A DEFINIR'}\n` +
       `MOTORISTA: ${trip.driver.name}\n` +
-      `ÚLTIMO STATUS: ${trip.status.toUpperCase()}\n`;
+      `STATUS ATUAL: ${trip.status.toUpperCase()}\n`;
 
     if (pred) {
       text += `PREVISÃO: ${pred.label.toUpperCase()} -> ${pred.time}\n`;
