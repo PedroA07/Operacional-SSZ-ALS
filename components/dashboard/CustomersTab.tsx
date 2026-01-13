@@ -50,15 +50,15 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     }
   }, [form.zipCode]);
 
-  // Busca automática por CNPJ quando atingir 14 dígitos
+  // Busca automática por CNPJ quando atingir 14 dígitos (apenas se for novo cadastro ou alteração de CNPJ existente)
   useEffect(() => {
     const cnpj = form.cnpj?.replace(/\D/g, '');
     if (cnpj && cnpj.length === 14) {
-      // Se for edição e o CNPJ for o mesmo do original, não busca automaticamente para evitar sobreposição indesejada
       const original = customers.find(c => c.id === editingId);
       if (editingId && original && original.cnpj.replace(/\D/g, '') === cnpj) return;
       
-      handleCnpjLookup(cnpj);
+      // Chamada automática
+      handleCnpjLookup(cnpj, true);
     }
   }, [form.cnpj]);
 
@@ -83,18 +83,22 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     }
   };
 
-  const handleCnpjLookup = async (cnpj?: string) => {
-    const targetCnpj = cnpj || form.cnpj?.replace(/\D/g, '');
+  const handleCnpjLookup = async (cnpjInput?: string, isAuto = false) => {
+    const targetCnpj = cnpjInput || form.cnpj?.replace(/\D/g, '');
+    
     if (!targetCnpj || targetCnpj.length !== 14) {
-      if (!cnpj) alert("Digite um CNPJ válido de 14 dígitos.");
+      if (!isAuto) alert("Digite um CNPJ válido com 14 números.");
       return;
     }
 
     setIsCnpjLoading(true);
     try {
+      // Usando BrasilAPI que é gratuita e não exige token para consultas básicas
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${targetCnpj}`);
+      
       if (response.ok) {
         const data = await response.json();
+        
         setForm(prev => ({
           ...prev,
           name: (data.nome_fantasia || data.razao_social || '').toUpperCase(),
@@ -106,11 +110,13 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
           zipCode: data.cep ? maskCEP(data.cep) : prev.zipCode
         }));
       } else {
-        if (!cnpj) alert("CNPJ não encontrado na base de dados nacional.");
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Erro API CNPJ:", errorData);
+        if (!isAuto) alert(errorData.message || "CNPJ não encontrado ou erro na consulta.");
       }
     } catch (e) {
-      console.warn("Falha no CNPJ");
-      if (!cnpj) alert("Erro ao consultar o serviço de CNPJ.");
+      console.error("Falha crítica ao buscar CNPJ:", e);
+      if (!isAuto) alert("Não foi possível conectar ao serviço de busca de CNPJ. Verifique sua internet.");
     } finally {
       setIsCnpjLoading(false);
     }
