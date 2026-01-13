@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Driver, OperationDefinition, User, Customer } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
 import { db } from '../../utils/storage';
+import { fileStorage } from '../../utils/fileStorage';
 import { driverAuthService } from '../../utils/driverAuthService';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -39,7 +40,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   const [isExporting, setIsExporting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
 
-  // Estados de busca profunda
   const [deepSearchCPF, setDeepSearchCPF] = useState('');
   const [isDeepSearching, setIsDeepSearching] = useState(false);
   const [deepSearchResult, setDeepSearchResult] = useState<Driver | null>(null);
@@ -60,7 +60,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cnhInputRef = useRef<HTMLInputElement>(null);
+  const cnhFileInputRef = useRef<HTMLInputElement>(null);
   
   const initialForm: Partial<Driver> = {
     photo: '', name: '', cpf: '', rg: '', cnh: '',
@@ -107,20 +107,17 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
     setDeepSearchResult(null);
     try {
       const found = await db.getDriverByCPF(deepSearchCPF);
-      if (found) {
-        setDeepSearchResult(found);
-      } else {
-        alert("Nenhum motorista encontrado com este CPF no banco de dados ALS.");
-      }
+      if (found) setDeepSearchResult(found);
+      else alert("Nenhum motorista encontrado.");
     } catch (e) {
-      alert("Falha na consulta ao servidor.");
+      alert("Falha na consulta.");
     } finally {
       setIsDeepSearching(false);
     }
   };
 
   const checkCPFExistence = async (cpf: string) => {
-    if (editingId) return; // Não verifica em edição
+    if (editingId) return;
     if (cpf.replace(/\D/g, '').length === 11) {
       const found = await db.getDriverByCPF(cpf);
       setDuplicateAlert(found || null);
@@ -146,6 +143,15 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
     }
   };
 
+  const handleCnhUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setForm(prev => ({ ...prev, cnhPdfUrl: reader.result as string }));
+      reader.readAsDataURL(file);
+    }
+  };
+
   const addOperation = () => {
     if (!tempCategory || !tempClient) return;
     const exists = form.operations?.some(op => op.category === tempCategory && op.client === tempClient);
@@ -167,66 +173,38 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
     e.preventDefault();
     if (isSaving) return;
     if (duplicateAlert && !editingId) {
-      alert("Este CPF já possui cadastro. Use a busca para localizar o registro existente.");
+      alert("Este CPF já possui cadastro.");
       return;
     }
+    
     setIsSaving(true);
     try {
       const drvId = editingId || `drv-${Date.now()}`;
-      const original = drivers.find(d => d.id === drvId);
-      const statusChanged = original && original.status !== form.status;
-      const statusDate = statusChanged ? new Date().toISOString() : (form.statusLastChangeDate || new Date().toISOString());
+      let finalPhoto = form.photo || '';
+      let finalCnh = form.cnhPdfUrl || '';
 
-      const { password } = await driverAuthService.syncUserRecord(drvId, form, form.generatedPassword);
+      // UPLOAD PARA R2 SE FOR BASE64 (NOVO ARQUIVO)
+      if (finalPhoto.startsWith('data:')) {
+        finalPhoto = await fileStorage.uploadDriverProfile(finalPhoto, drvId);
+      }
+      if (finalCnh.startsWith('data:')) {
+        finalCnh = await fileStorage.uploadDriverCNH(finalCnh, drvId);
+      }
+
+      const updatedForm = { ...form, photo: finalPhoto, cnhPdfUrl: finalCnh };
+      const { password } = await driverAuthService.syncUserRecord(drvId, updatedForm, form.generatedPassword);
       
       await onSaveDriver({ 
-        ...form, 
+        ...updatedForm, 
         id: drvId,
-        generatedPassword: password,
-        statusLastChangeDate: statusDate
+        generatedPassword: password
       }, editingId);
       
       setIsModalOpen(false);
     } catch (err: any) {
-      alert(`FALHA AO SALVAR: ${err.message}`);
+      alert(`ERRO: ${err.message}`);
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const downloadDriverPDF = async () => {
-    if (!selectedDriver) return;
-    setIsExporting(true);
-    
-    try {
-      const element = document.getElementById(`driver-profile-card-${selectedDriver.id}`);
-      if (!element) return;
-
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      pdf.save(`Ficha - ${selectedDriver.name}.pdf`);
-    } catch (error) {
-      alert("Falha ao gerar o PDF.");
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const openPasswordModal = (driverId: string) => {
-    setPasswordTargetId(driverId);
-    setNewPasswordValue('');
-    setIsPasswordModalOpen(true);
-  };
-
-  const handleUpdatePassword = async () => {
-    if (passwordTargetId && newPasswordValue.length >= 4) {
-      await driverAuthService.updatePassword(passwordTargetId, newPasswordValue);
-      setIsPasswordModalOpen(false);
-      loadUsers();
-    } else {
-      alert("A senha deve ter no mínimo 4 caracteres.");
     }
   };
 
@@ -236,45 +214,16 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
       d.cpf.includes(searchQuery) ||
       d.plateHorse.toLowerCase().includes(searchQuery.toLowerCase())
     );
-
-    if (statusFilter !== 'todos') {
-      result = result.filter(d => d.status === statusFilter);
-    }
-
-    result.sort((a, b) => {
-      if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
-      if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
-      if (sortBy === 'recent') return (b.registrationDate || '').localeCompare(a.registrationDate || '');
-      return 0;
-    });
-
+    if (statusFilter !== 'todos') result = result.filter(d => d.status === statusFilter);
+    result.sort((a, b) => sortBy === 'name_asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
     return result;
   }, [drivers, searchQuery, sortBy, statusFilter]);
-
-  const filteredCustomersForOps = useMemo(() => {
-    if (!tempCategory) return [];
-    return customers.filter(c => 
-      c.operations?.some(op => op.toUpperCase() === tempCategory.toUpperCase())
-    );
-  }, [customers, tempCategory]);
-
-  const VisibilityToggle = ({ id, label }: { id: keyof typeof visibility, label: string }) => (
-    <label className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-50 transition-all group">
-      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${visibility[id] ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
-        {visibility[id] && <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>}
-      </div>
-      <input type="checkbox" className="hidden" checked={visibility[id]} onChange={() => setVisibility(v => ({ ...v, [id]: !v[id] }))} />
-      <span className="text-[10px] font-black uppercase text-slate-500 group-hover:text-slate-800 transition-colors">{label}</span>
-    </label>
-  );
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1";
 
   return (
     <div className="max-w-full mx-auto space-y-6">
-      
-      {/* SEÇÃO DE BUSCA E CONSULTA PROFUNDA */}
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <div className="flex-1 w-full">
           <ListFilters 
@@ -287,553 +236,145 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
             placeholder="BUSCAR MOTORISTA, CPF OU PLACA..."
           />
         </div>
-        
-        <div className="w-full lg:w-auto flex flex-col md:flex-row gap-4">
-           <div className="bg-slate-900 p-4 rounded-[2rem] border border-white/5 shadow-xl flex items-center gap-3">
-              <input 
-                type="text" 
-                placeholder="CONSULTAR CPF..." 
-                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-blue-400 outline-none w-40"
-                value={deepSearchCPF}
-                onChange={e => setDeepSearchCPF(maskCPF(e.target.value))}
-              />
-              <button 
-                onClick={handleDeepSearch}
-                disabled={isDeepSearching || deepSearchCPF.length < 14}
-                className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all disabled:opacity-30 shrink-0"
-                title="Consultar no Banco ALS"
-              >
-                {isDeepSearching ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>}
-              </button>
-           </div>
-           <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-500 transition-all shadow-xl active:scale-95 shrink-0 h-[68px]">Novo Motorista</button>
-        </div>
+        <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-500 transition-all shadow-xl h-[68px] shrink-0">Novo Motorista</button>
       </div>
 
-      {/* RESULTADO DA BUSCA PROFUNDA (OVERLAY RÁPIDO) */}
-      {deepSearchResult && (
-        <div className="bg-blue-600/10 border border-blue-500/30 p-6 rounded-[2.5rem] flex items-center justify-between animate-in slide-in-from-top-4">
-           <div className="flex items-center gap-6">
-              <div className="w-16 h-16 rounded-2xl bg-white/10 overflow-hidden shrink-0 border border-white/10">
-                 {deepSearchResult.photo ? <img src={deepSearchResult.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-blue-400 italic">ALS</div>}
-              </div>
-              <div>
-                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none mb-1">Registro Localizado no Banco</p>
-                 <h4 className="text-xl font-black text-white uppercase">{deepSearchResult.name}</h4>
-                 <div className="flex gap-4 mt-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">CPF: {deepSearchResult.cpf}</span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">STATUS: {deepSearchResult.status}</span>
-                 </div>
-              </div>
-           </div>
-           <div className="flex gap-3">
-              <button onClick={() => setDeepSearchResult(null)} className="px-5 py-3 text-slate-400 font-black uppercase text-[9px]">Ocultar</button>
-              <button onClick={() => { handleOpenModal(deepSearchResult); setDeepSearchResult(null); }} className="px-6 py-3 bg-white text-blue-600 rounded-xl font-black uppercase text-[9px] shadow-lg hover:scale-105 transition-all">Abrir Ficha de Cadastro</button>
-           </div>
-        </div>
-      )}
-
-      {/* TABELA DE MOTORISTAS */}
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[1400px]">
+          <table className="w-full text-left text-xs min-w-[1400px]">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
                 <th className="px-6 py-5">Identificação / Beneficiário</th>
                 <th className="px-6 py-5">Documentação</th>
-                <th className="px-6 py-5">Vínculos Operacionais</th>
-                <th className="px-6 py-5">Equipamento (Placa/Ano)</th>
-                <th className="px-6 py-5">Contatos / WhatsApp</th>
-                <th className="px-6 py-5">Portal (Login / Senha)</th>
-                <th className="px-6 py-5">Status / Vínculo</th>
+                <th className="px-6 py-5">Equipamento</th>
+                <th className="px-6 py-5">Portal</th>
+                <th className="px-6 py-5">Status</th>
                 <th className="px-6 py-5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredDrivers.map(d => {
-                const linkedUser = users.find(u => u.driverId === d.id);
-                const isThirdParty = d.beneficiaryCnpj && d.beneficiaryCnpj.replace(/\D/g, '') !== d.cpf.replace(/\D/g, '');
-                const beneficiaryKey = isThirdParty ? d.beneficiaryCnpj.replace(/\D/g, '').slice(-4) : null;
-
-                return (
-                  <tr key={d.id} className="hover:bg-slate-50/50 align-top transition-colors">
-                    <td className="px-6 py-4 max-w-[240px]">
-                      <div className="flex items-start gap-3">
-                         <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 mt-1">
-                           {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-300 text-[8px]">ALS</div>}
-                         </div>
-                         <div>
-                            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight mb-2">{d.name}</p>
-                            <div className="bg-blue-50/50 p-2 rounded-xl border border-blue-100/50 space-y-0.5">
-                               <p className="text-[7px] font-black text-blue-500 uppercase leading-none">Beneficiário:</p>
-                               <p className="text-[10px] font-bold text-slate-600 uppercase truncate">{d.beneficiaryName || d.name}</p>
-                               <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{d.beneficiaryCnpj || d.cpf} | {d.paymentPreference || 'PIX'}</p>
-                            </div>
-                         </div>
+              {filteredDrivers.map(d => (
+                <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-100 border overflow-hidden">
+                        {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-[8px] text-slate-300">ALS</div>}
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="space-y-1 mt-1">
-                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CPF: <span className="font-mono text-slate-800 font-bold">{d.cpf}</span></p>
-                          <p className="text-[9px] font-black text-slate-500 uppercase leading-none">RG: <span className="font-mono text-slate-800 font-bold">{d.rg || '---'}</span></p>
-                          <div className="flex items-center justify-between gap-4">
-                             <p className="text-[9px] font-black text-slate-500 uppercase leading-none">CNH: <span className="font-mono text-slate-800 font-bold">{d.cnh || '---'}</span></p>
-                             {d.cnhPdfUrl && (
-                               <button 
-                                 onClick={() => handleViewCnh(d.cnhPdfUrl!)} 
-                                 className="flex items-center gap-1.5 px-2 py-1 bg-red-50 text-red-600 rounded-lg border border-red-100 hover:bg-red-600 hover:text-white transition-all group/pdf shadow-sm"
-                               >
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeWidth="2.5"/></svg>
-                                  <span className="text-[7px] font-black uppercase">Ver PDF</span>
-                               </button>
-                             )}
-                          </div>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4 max-w-[200px]">
-                       <div className="flex flex-wrap gap-1 mt-1">
-                          {d.operations && d.operations.length > 0 ? d.operations.map((op, i) => (
-                             <span key={i} className="px-2 py-1 bg-blue-600 text-white rounded-lg text-[7px] font-black uppercase tracking-tighter">
-                                {op.category} › {op.client}
-                             </span>
-                          )) : <span className="text-[9px] text-slate-300 font-bold italic uppercase tracking-widest">Sem Vínculos</span>}
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="mt-1 space-y-3">
-                          <div>
-                             <p className="text-[7px] font-black text-slate-300 uppercase mb-1">Cavalo</p>
-                             <div className="flex items-center gap-2">
-                                <span className="bg-slate-900 text-white px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateHorse}</span>
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{d.yearHorse || '---'}</span>
-                             </div>
-                          </div>
-                          <div>
-                             <p className="text-[7px] font-black text-slate-300 uppercase mb-1">Carreta</p>
-                             <div className="flex items-center gap-2">
-                                <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md font-mono text-[10px] font-bold">{d.plateTrailer}</span>
-                                <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter">{d.yearTrailer || '---'}</span>
-                             </div>
-                          </div>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="mt-1 space-y-1">
-                          <p className="text-blue-600 font-black text-[11px] leading-none">{d.phone}</p>
-                          <p className="text-[9px] text-slate-400 font-bold lowercase truncate max-w-[150px]">{d.email || '---'}</p>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-100 space-y-1.5 mt-1">
-                          <div className="flex justify-between items-center gap-4">
-                             <span className="text-[8px] font-black uppercase text-blue-400">Login:</span>
-                             <span className="text-slate-800 font-mono font-bold text-[10px]">{d.cpf.replace(/\D/g, '')}</span>
-                          </div>
-                          <div className="flex justify-between items-center gap-4">
-                             <span className="text-[8px] font-black uppercase text-blue-400">Senha:</span>
-                             <span className="text-emerald-600 font-mono font-black text-[10px]">{linkedUser?.password || d.generatedPassword || '---'}</span>
-                          </div>
-                          {beneficiaryKey && (
-                            <div className="flex justify-between items-center gap-2 pt-1 border-t border-blue-100/50">
-                               <span className="text-[7px] font-black uppercase text-blue-500 whitespace-nowrap">Chave Benf:</span>
-                               <span className="text-blue-700 font-mono font-black text-[9px]">{beneficiaryKey}</span>
-                            </div>
-                          )}
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="mt-1 flex flex-col gap-1.5">
-                          <span className={`w-fit px-2.5 py-1 rounded-full text-[8px] font-black uppercase border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                             {d.status}
-                          </span>
-                          <p className="text-[9px] font-black text-slate-400 uppercase">{d.driverType}</p>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
-                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha do Portal"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Dossiê Digital"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar Cadastro"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => { setItemToDelete(d); setIsDeleteModalOpen(true); }} className="p-2 text-slate-300 hover:text-red-500" title="Excluir Motorista"><Icons.Excluir /></button>
-                    </td>
-                  </tr>
-                );
-              })}
+                      <div>
+                        <p className="font-black text-slate-800 uppercase">{d.name}</p>
+                        <p className="text-[8px] text-slate-400 uppercase">{d.beneficiaryName || 'Favorecido Próprio'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-[9px] font-black text-slate-500">CPF: <span className="text-slate-800">{d.cpf}</span></p>
+                    {d.cnhPdfUrl && (
+                      <button onClick={() => handleViewCnh(d.cnhPdfUrl!)} className="mt-1 flex items-center gap-1.5 text-red-600 font-black text-[8px] uppercase">
+                        <Icons.Formularios /> Ver CNH PDF
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="bg-slate-900 text-white px-2 py-0.5 rounded text-[10px] font-mono">{d.plateHorse}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="bg-blue-50 px-2 py-1 rounded text-[9px] font-black text-blue-600">
+                      ID: {d.cpf.replace(/\D/g,'')}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                      {d.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-1">
+                      <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-400 hover:text-blue-600"><Icons.Formularios /></button>
+                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-400 hover:text-blue-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => { setItemToDelete(d); setIsDeleteModalOpen(true); }} className="p-2 text-slate-400 hover:text-red-500"><Icons.Excluir /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* MODAL CADASTRO / EDIÇÃO */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-transparent backdrop-blur-xl">
-          <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh] animate-in zoom-in-95 duration-500">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-black text-slate-800 text-lg uppercase">{editingId ? 'Editar Cadastro' : 'Novo Motorista'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[95vh] animate-in zoom-in-95">
+            <div className="p-8 border-b bg-slate-50 flex justify-between items-center">
+              <h3 className="font-black text-slate-800 text-lg uppercase">{editingId ? 'Editar Motorista' : 'Novo Motorista'}</h3>
+              <button onClick={() => setIsModalOpen(false)}><Icons.Excluir /></button>
             </div>
             <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-              
-              {/* ALERTA DE DUPLICIDADE (DINÂMICO) */}
-              {duplicateAlert && (
-                <div className="p-6 bg-amber-50 border border-amber-200 rounded-3xl flex items-center justify-between gap-4 animate-in slide-in-from-top-4">
-                   <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
-                         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
-                      </div>
-                      <div>
-                         <p className="text-[11px] font-black text-amber-800 uppercase tracking-tight">CPF Já cadastrado no sistema</p>
-                         <p className="text-[9px] font-bold text-amber-600 uppercase mt-1">Este documento pertence a: {duplicateAlert.name} ({duplicateAlert.status})</p>
-                      </div>
-                   </div>
-                   <button 
-                     type="button"
-                     onClick={() => handleOpenModal(duplicateAlert)}
-                     className="px-6 py-2.5 bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-amber-700 transition-all"
-                   >
-                     Abrir Ficha Existente
-                   </button>
-                </div>
-              )}
-
               <div className="grid grid-cols-12 gap-8">
-                 <div className="col-span-3">
-                    <label className={labelClass}>Foto do Motorista</label>
-                    <div onClick={() => fileInputRef.current?.click()} className="aspect-[3/4] rounded-3xl bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden group">
-                       {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : (
-                         <>
-                           <svg className="w-8 h-8 text-slate-300 mb-2 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2"/></svg>
-                           <span className="text-[8px] font-black text-slate-400 uppercase">Anexar Imagem</span>
-                         </>
-                       )}
+                <div className="col-span-3 space-y-6">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Foto de Perfil</label>
+                    <div onClick={() => fileInputRef.current?.click()} className="aspect-[3/4] rounded-3xl bg-slate-100 border-2 border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden group">
+                      {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : <div className="text-center p-4"><p className="text-[8px] font-black text-slate-400 uppercase">Anexar Foto</p></div>}
                     </div>
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
-                 </div>
+                  </div>
 
-                 <div className="col-span-9 space-y-5">
+                  <div className="space-y-1">
+                    <label className={labelClass}>CNH Digitalizada (PDF)</label>
+                    <div onClick={() => cnhFileInputRef.current?.click()} className="py-4 rounded-2xl bg-red-50 border-2 border-dashed border-red-200 flex items-center justify-center cursor-pointer hover:bg-red-100 transition-all group">
+                       <span className="text-[8px] font-black text-red-600 uppercase">{form.cnhPdfUrl ? 'PDF Carregado ✓' : 'Anexar CNH PDF'}</span>
+                    </div>
+                    <input type="file" ref={cnhFileInputRef} className="hidden" accept="application/pdf" onChange={handleCnhUpload} />
+                  </div>
+                </div>
+
+                <div className="col-span-9 space-y-6">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Nome Completo</label>
+                    <input required className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-1">
-                       <label className={labelClass}>Nome Completo</label>
-                       <input required className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-black uppercase text-xl focus:border-blue-500 outline-none" value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} />
+                      <label className={labelClass}>CPF</label>
+                      <input required className={inputClasses} value={form.cpf} onChange={e => {
+                        const val = maskCPF(e.target.value);
+                        setForm({...form, cpf: val});
+                        checkCPFExistence(val);
+                      }} />
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                       <div className="space-y-1">
-                          <label className={labelClass}>CPF</label>
-                          <input 
-                            required 
-                            className={`${inputClasses} ${duplicateAlert && !editingId ? 'border-amber-500 bg-amber-50' : ''}`} 
-                            value={form.cpf} 
-                            onChange={e => {
-                              const val = maskCPF(e.target.value);
-                              setForm({...form, cpf: val});
-                              checkCPFExistence(val);
-                            }} 
-                          />
-                       </div>
-                       <div className="space-y-1"><label className={labelClass}>RG</label><input className={inputClasses} value={form.rg} onChange={e => setForm({...form, rg: maskRG(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className={labelClass}>Registro CNH</label><input className={inputClasses} value={form.cnh} onChange={e => setForm({...form, cnh: e.target.value.toUpperCase()})} /></div>
-                    </div>
+                    <div className="space-y-1"><label className={labelClass}>Registro CNH</label><input className={inputClasses} value={form.cnh} onChange={e => setForm({...form, cnh: e.target.value.toUpperCase()})} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Celular</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1"><label className={labelClass}>Placa Cavalo</label><input required className={inputClasses} value={form.plateHorse} onChange={e => setForm({...form, plateHorse: maskPlate(e.target.value)})} /></div>
+                    <div className="space-y-1"><label className={labelClass}>Placa Carreta</label><input required className={inputClasses} value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: maskPlate(e.target.value)})} /></div>
+                  </div>
+                  
+                  <div className="p-6 bg-slate-900 rounded-3xl text-white">
+                    <h4 className="text-[10px] font-black text-blue-400 uppercase mb-4">Dados de Pagamento</h4>
                     <div className="grid grid-cols-2 gap-4">
-                       <div className="space-y-1"><label className={labelClass}>Telefone Celular</label><input required className={inputClasses} value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className={labelClass}>E-mail</label><input className={`${inputClasses} lowercase`} value={form.email} onChange={e => setForm({...form, email: e.target.value.toLowerCase()})} /></div>
+                      <div className="space-y-1"><label className="text-[8px] opacity-60">Beneficiário</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-2 text-xs" value={form.beneficiaryName} onChange={e => setForm({...form, beneficiaryName: e.target.value.toUpperCase()})} /></div>
+                      <div className="space-y-1"><label className="text-[8px] opacity-60">CPF/CNPJ Chave</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-2 text-xs" value={form.beneficiaryCnpj} onChange={e => setForm({...form, beneficiaryCnpj: e.target.value})} /></div>
                     </div>
-                 </div>
+                  </div>
+                </div>
               </div>
-
-              {/* VÍNCULOS OPERACIONAIS */}
-              <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-white/5 space-y-6">
-                 <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Gestão de Vínculos Operacionais</h4>
-                 </div>
-                 <div className="grid grid-cols-12 gap-4">
-                    <div className="col-span-5">
-                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Categoria Master</label>
-                       <select 
-                         value={tempCategory}
-                         onChange={(e) => {
-                            setTempCategory(e.target.value);
-                            setTempClient('Geral');
-                         }}
-                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500"
-                       >
-                          {availableOps.map(op => <option key={op.id} value={op.category} className="bg-slate-900">{op.category}</option>)}
-                       </select>
-                    </div>
-                    <div className="col-span-5">
-                       <label className="text-[8px] font-black text-slate-500 uppercase mb-1 block">Cliente Vinculado</label>
-                       <select 
-                         value={tempClient}
-                         onChange={(e) => setTempClient(e.target.value)}
-                         className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold uppercase outline-none focus:border-blue-500"
-                       >
-                          <option value="Geral" className="bg-slate-900">Geral / Todos da Categoria</option>
-                          {filteredCustomersForOps.map((c) => (
-                             <option key={c.id} value={c.name} className="bg-slate-900">
-                               {c.name} ({c.city})
-                             </option>
-                          ))}
-                       </select>
-                    </div>
-                    <div className="col-span-2 flex items-end">
-                       <button 
-                         type="button" 
-                         onClick={addOperation}
-                         className="w-full py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-500 transition-all shadow-lg"
-                       >
-                          Adicionar
-                       </button>
-                    </div>
-                 </div>
-                 <div className="flex flex-wrap gap-2 pt-2">
-                    {form.operations?.map((op, i) => (
-                       <div key={i} className="group flex items-center gap-2 px-3 py-2 bg-white/10 rounded-xl border border-white/5">
-                          <span className="text-[9px] font-black text-white uppercase">{op.category} › {op.client}</span>
-                          <button type="button" onClick={() => removeOperation(i)} className="text-slate-500 hover:text-red-400"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
-                       </div>
-                    ))}
-                 </div>
-              </div>
-
-              <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white shadow-2xl">
-                 <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-6">Informações do Veículo</h4>
-                 <div className="grid grid-cols-2 gap-8">
-                    <div className="grid grid-cols-3 gap-3">
-                       <div className="col-span-2 space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Placa Cavalo</label><input required className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" value={form.plateHorse} onChange={e => setForm({...form, plateHorse: maskPlate(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" maxLength={4} value={form.yearHorse} onChange={e => setForm({...form, yearHorse: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                       <div className="col-span-2 space-y-1"><label className="text-[8px] font-black uppercase opacity-60">Placa Carreta</label><input required className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: maskPlate(e.target.value)})} /></div>
-                       <div className="space-y-1"><label className={labelClass}>Ano</label><input className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white font-black uppercase focus:bg-white/20 outline-none" maxLength={4} value={form.yearTrailer} onChange={e => setForm({...form, yearTrailer: e.target.value.replace(/\D/g,'')})} placeholder="2024" /></div>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 space-y-6">
-                 <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Módulo Financeiro (Beneficiário)</h4>
-                    <button type="button" onClick={() => setForm({...form, beneficiaryName: form.name, beneficiaryCnpj: form.cpf, beneficiaryPhone: form.phone})} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Copiar dados do motorista</button>
-                 </div>
-                 <div className="grid grid-cols-12 gap-5">
-                    <div className="col-span-3 space-y-1">
-                       <label className={labelClass}>Preferência Pagamento</label>
-                       <select className={inputClasses} value={form.paymentPreference} onChange={e => setForm({...form, paymentPreference: e.target.value as any})}>
-                          <option value="PIX">PIX (INSTANTÂNEO)</option>
-                          <option value="TED">TED (TRANSFERÊNCIA)</option>
-                       </select>
-                    </div>
-                    <div className="col-span-6 space-y-1">
-                       <label className={labelClass}>Nome Completo Favorecido</label>
-                       <input className={inputClasses} value={form.beneficiaryName} onChange={e => setForm({...form, beneficiaryName: e.target.value.toUpperCase()})} />
-                    </div>
-                    <div className="col-span-3 space-y-1">
-                       <label className={labelClass}>CPF / CNPJ Beneficiário</label>
-                       <input className={inputClasses} value={form.beneficiaryCnpj} onChange={e => setForm({...form, beneficiaryCnpj: e.target.value})} />
-                    </div>
-                    <div className="col-span-4 space-y-1">
-                       <label className={labelClass}>Telefone para Comprovante</label>
-                       <input className={inputClasses} value={form.beneficiaryPhone} onChange={e => setForm({...form, beneficiaryPhone: maskPhone(e.target.value)})} />
-                    </div>
-                    <div className="col-span-8 space-y-1">
-                       <label className={labelClass}>E-mail / Chave PIX</label>
-                       <input className={`${inputClasses} lowercase`} value={form.beneficiaryEmail} onChange={e => setForm({...form, beneficiaryEmail: e.target.value})} />
-                    </div>
-                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-8">
-                 <div className="p-8 bg-emerald-50 rounded-[2.5rem] border border-emerald-100 space-y-5">
-                    <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Comunicação WhatsApp</h4>
-                    <div className="space-y-1"><label className={labelClass}>Nome do Grupo</label><input className={inputClasses} value={form.whatsappGroupName} onChange={e => setForm({...form, whatsappGroupName: e.target.value.toUpperCase()})} placeholder="EX: OPERAÇÃO ALS - SANTOS" /></div>
-                    <div className="space-y-1"><label className={labelClass}>Link de Convite</label><input className={`${inputClasses} lowercase`} value={form.whatsappGroupLink} onChange={e => setForm({...form, whatsappGroupLink: e.target.value})} placeholder="https://chat.whatsapp.com/..." /></div>
-                 </div>
-                 <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-5">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Configurações de Status</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="space-y-1"><label className={labelClass}>Tipo de Vínculo</label><select className={inputClasses} value={form.driverType} onChange={e => setForm({...form, driverType: e.target.value as any})}><option value="Externo">Terceiro / Externo</option><option value="Frota">Frota ALS</option><option value="Motoboy">Motoboy</option></select></div>
-                       <div className="space-y-1"><label className={labelClass}>Status Sistema</label><select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}><option value="Ativo">Ativo / Liberado</option><option value="Inativo">Inativo / Bloqueado</option></select></div>
-                    </div>
-                    <div className="pt-2">
-                       <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-[0.98] disabled:opacity-50">
-                          {isSaving ? 'Gravando Dados...' : 'Finalizar Cadastro'}
-                       </button>
-                    </div>
-                 </div>
-              </div>
+              <button type="submit" disabled={isSaving} className="w-full py-6 bg-blue-600 text-white rounded-3xl font-black uppercase text-xs shadow-xl active:scale-95 disabled:opacity-50">
+                {isSaving ? 'Enviando Arquivos e Gravando...' : 'Salvar Cadastro'}
+              </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL VISUALIZAÇÃO CNH PDF */}
+      {/* MODAL PDF CNH */}
       {isCnhModalOpen && currentCnhUrl && (
-        <div className="fixed inset-0 z-[1000] bg-transparent flex flex-col animate-in fade-in duration-300">
-           <div className="h-20 bg-slate-900/95 flex items-center justify-between px-8 shrink-0 border-b border-white/5 shadow-2xl">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black text-red-500 uppercase tracking-widest leading-none">Documento Original Digitalizado</p>
-                <p className="text-sm font-bold text-white uppercase truncate mt-1">Habilitação do Motorista (CNH)</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => window.open(currentCnhUrl, '_blank')}
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all active:scale-95"
-                >
-                  Abrir em Nova Guia
-                </button>
-                <button 
-                  onClick={() => setIsCnhModalOpen(false)}
-                  className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors"
-                >
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
-                </button>
-              </div>
-           </div>
-           <div className="flex-1 bg-slate-800/40 p-6 flex items-center justify-center overflow-hidden">
-              <iframe 
-                src={`${currentCnhUrl}#toolbar=0&navpanes=0&scrollbar=1`} 
-                className="w-full max-w-5xl h-full rounded-[2rem] shadow-2xl border-none bg-white" 
-                title="CNH PDF Viewer" 
-              />
-           </div>
-        </div>
-      )}
-
-      {/* MODAL REDEFINIR SENHA */}
-      {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-transparent">
-           <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 text-center space-y-6">
-                 <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                 </div>
-                 <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Redefinir Senha</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Acesso ao portal do motorista</p>
-                 </div>
-                 <div className="space-y-1 text-left">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nova Senha Operacional</label>
-                    <input 
-                       type="text" autoFocus
-                       className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-mono font-black text-blue-600 text-center text-lg outline-none focus:border-emerald-500 transition-all"
-                       placeholder="••••"
-                       value={newPasswordValue}
-                       onChange={e => setNewPasswordValue(e.target.value)}
-                    />
-                 </div>
-                 <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => setIsPasswordModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
-                    <button onClick={handleUpdatePassword} className="py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-emerald-600 transition-all">Salvar Senha</button>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* MODAL DE VISUALIZAÇÃO DE DOSSIÊ (VIEW PROFILE) */}
-      {isPreviewModalOpen && selectedDriver && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-transparent animate-in fade-in duration-300">
-           <div className="bg-slate-100 w-full max-w-[1400px] h-full rounded-[4rem] shadow-2xl overflow-hidden flex animate-in zoom-in-95 border border-white/10">
-              
-              {/* Painel Lateral de Controle e Info Rápida */}
-              <div className="w-96 bg-white border-r border-slate-200 flex flex-col shrink-0">
-                 <div className="p-10 border-b border-slate-100">
-                    <div className="w-20 h-20 bg-blue-600 text-white rounded-3xl flex items-center justify-center font-black italic text-2xl shadow-xl mb-6 shadow-blue-600/20">ALS</div>
-                    <h3 className="text-xl font-black uppercase tracking-tighter text-slate-800">Dossiê Digital</h3>
-                    <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest depth-tight">Ficha de Conferência Unificada</p>
-                 </div>
-                 
-                 <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
-                    <div className="space-y-3">
-                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Filtros do Documento</p>
-                       <VisibilityToggle id="driverInfo" label="Dados Pessoais" />
-                       <VisibilityToggle id="contacts" label="Contatos e Endereço" />
-                       <VisibilityToggle id="equipment" label="Dados do Conjunto" />
-                       <VisibilityToggle id="beneficiary" label="Dados Financeiros" />
-                       <VisibilityToggle id="whatsapp" label="Comunicação Interna" />
-                       <VisibilityToggle id="portal" label="Acesso ao Motorista" />
-                    </div>
-
-                    <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100 space-y-3">
-                       <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Informação Técnica</p>
-                       <p className="text-[10px] text-blue-900/70 leading-relaxed">Este dossiê é gerado em tempo real. Qualquer alteração no cadastro refletirá imediatamente nesta ficha.</p>
-                    </div>
-                 </div>
-
-                 <div className="p-10 border-t border-slate-100 space-y-4 bg-slate-50/50">
-                    <button 
-                       onClick={downloadDriverPDF}
-                       disabled={isExporting}
-                       className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
-                    >
-                       {isExporting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : (
-                         <>
-                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                           Gerar Documento PDF
-                         </>
-                       )}
-                    </button>
-                    <button onClick={() => setIsPreviewModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all active:scale-95">Fechar Visualização</button>
-                 </div>
-              </div>
-
-              {/* Área do Documento (Ficha e CNH) */}
-              <div className="flex-1 overflow-auto bg-slate-200/50 p-12 flex flex-col items-center gap-12 custom-scrollbar">
-                 <div className="origin-top transform scale-90 xl:scale-100 shadow-[0_40px_100px_rgba(0,0,0,0.1)] rounded-sm overflow-hidden bg-white shrink-0">
-                    <DriverProfileTemplate driver={selectedDriver} visibility={visibility} />
-                 </div>
-
-                 {/* ANEXO CNH PDF INTEGRADO NO DOSSIÊ */}
-                 {selectedDriver.cnhPdfUrl && (
-                   <div className="w-full max-w-[794px] h-[1123px] bg-white shadow-2xl rounded-xl overflow-hidden flex flex-col shrink-0 animate-in slide-in-from-bottom-10 duration-700">
-                      <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
-                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
-                               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeWidth="2.5"/></svg>
-                            </div>
-                            <div>
-                               <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Anexo Vinculado</p>
-                               <h4 className="text-sm font-black uppercase">Documento CNH Digitalizado</h4>
-                            </div>
-                         </div>
-                         <button 
-                           onClick={() => window.open(selectedDriver.cnhPdfUrl, '_blank')}
-                           className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-[9px] font-black uppercase transition-all"
-                         >
-                           Imprimir CNH
-                         </button>
-                      </div>
-                      <div className="flex-1 bg-slate-100 relative">
-                         <iframe 
-                           src={`${selectedDriver.cnhPdfUrl}#toolbar=0&navpanes=0`} 
-                           className="w-full h-full border-none"
-                           title="Dossie CNH Attachment"
-                         />
-                      </div>
-                   </div>
-                 )}
-              </div>
-           </div>
-        </div>
-      )}
-
-      {isDeleteModalOpen && itemToDelete && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 text-center space-y-6">
-                 <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
-                 </div>
-                 <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase">Excluir Motorista</h3>
-                    <p className="text-xs text-slate-400 mt-2">Deseja remover permanentemente este cadastro?</p>
-                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
-                       <p className="text-sm font-black text-slate-700 uppercase">{itemToDelete.name}</p>
-                       <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Placa: {itemToDelete.plateHorse}</p>
-                    </div>
-                 </div>
-                 <div className="grid grid-cols-2 gap-3 pt-4">
-                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
-                    <button onClick={executeDelete} className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-red-700 transition-all">Sim, Excluir</button>
-                 </div>
-              </div>
-           </div>
+        <div className="fixed inset-0 z-[1000] bg-slate-950/90 flex flex-col p-8">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-white font-black uppercase text-sm">Visualizar CNH</h3>
+            <button onClick={() => setIsCnhModalOpen(false)} className="text-white bg-red-600 px-4 py-2 rounded-xl text-[10px] font-black">Fechar</button>
+          </div>
+          <iframe src={currentCnhUrl} className="flex-1 rounded-3xl bg-white" />
         </div>
       )}
     </div>

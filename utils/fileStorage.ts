@@ -20,18 +20,14 @@ export const fileStorage = {
 
   getPublicUrl: (path: string | undefined): string => {
     if (!path) return '';
-    if (path.startsWith('http') && path.includes('/als-transportes/')) return path;
+    if (path.startsWith('http')) return path;
     
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
     if (!domain) return path;
 
     const prefix = domain.startsWith('http') ? '' : 'https://';
     const cleanDomain = domain.replace(/\/$/, '');
-    let cleanPath = path.trim().replace(/^\/+/, '');
-    
-    if (!cleanPath.toLowerCase().startsWith('als-transportes/')) {
-      cleanPath = `als-transportes/${cleanPath.replace(/^\/+/, '')}`;
-    }
+    const cleanPath = path.trim().replace(/^\/+/, '');
     
     return `${prefix}${cleanDomain}/${cleanPath}`;
   },
@@ -53,7 +49,8 @@ export const fileStorage = {
 
       if (typeof file === 'string' && file.startsWith('data:')) {
         fileToUpload = fileStorage.dataURLtoBlob(file);
-        const fileName = destinationPath.split('/').pop() || 'upload.jpg';
+        const extension = fileToUpload.type === 'application/pdf' ? 'pdf' : 'jpg';
+        const fileName = `${Date.now()}.${extension}`;
         formData.append('file', fileToUpload, fileName);
       } else if (file instanceof File) {
         fileToUpload = file;
@@ -84,23 +81,23 @@ export const fileStorage = {
 
   uploadStaffPhoto: (file: File | string, staffName: string) => {
     const normalizedName = fileStorage.normalizeFolderName(staffName);
-    return fileStorage.upload(file, `colaboradores/${normalizedName}/foto_perfil/perfil.jpg`);
+    return fileStorage.upload(file, `als-transportes/colaboradores/${normalizedName}/foto_perfil/perfil.jpg`);
   },
 
   uploadDriverProfile: (file: File | string, driverId: string) => 
-    fileStorage.upload(file, `drivers/${driverId}/foto_perfil/perfil.jpg`),
+    fileStorage.upload(file, `als-transportes/drivers/${driverId}/foto_perfil/perfil.jpg`),
 
   uploadDriverCNH: (file: File | string, driverId: string) => 
-    fileStorage.upload(file, `drivers/${driverId}/cnh/cnh.pdf`),
+    fileStorage.upload(file, `als-transportes/drivers/${driverId}/cnh/cnh.pdf`),
 
   uploadTripDoc: (file: File | string, os: string, docType: string) => {
     const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
     const type = docType.toLowerCase().replace('_pdf', '');
-    return fileStorage.upload(file, `trips/${cleanOS}/documentos/${type}.pdf`);
+    return fileStorage.upload(file, `als-transportes/trips/${cleanOS}/documentos/${type}.pdf`);
   },
 
   uploadTripPhoto: (file: File | string, os: string, photoId: string) => {
     const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
-    return fileStorage.upload(file, `trips/${cleanOS}/fotos_campo/${photoId}.jpg`);
+    return fileStorage.upload(file, `als-transportes/trips/${cleanOS}/fotos_campo/${photoId}.jpg`);
   }
 };
