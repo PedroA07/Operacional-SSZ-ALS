@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PreStacking } from '../../types';
 import { maskCEP, maskCNPJ } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
@@ -18,9 +18,16 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name_asc');
-  const [isCepLoading, setIsCepLoading] = useState(false);
   const [isCnpjLoading, setIsCnpjLoading] = useState(false);
   
+  // Impede buscas repetidas para o mesmo CNPJ nesta sessão
+  const lastSearchedCnpj = useRef<string>('');
+
+  // Estado para o Modal de Avisos/Erros
+  const [infoModal, setInfoModal] = useState<{ show: boolean; title: string; message: string; type: 'warning' | 'error' }>({
+    show: false, title: '', message: '', type: 'warning'
+  });
+
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [selectedMapAddress, setSelectedMapAddress] = useState('');
   const [selectedMapTitle, setSelectedMapTitle] = useState('');
@@ -38,6 +45,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
 
   const [form, setForm] = useState<Partial<PreStacking>>(initialForm);
 
+  // Busca automática por CEP
   useEffect(() => {
     const cep = form.zipCode?.replace(/\D/g, '');
     if (cep && cep.length === 8) {
@@ -45,53 +53,106 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
     }
   }, [form.zipCode]);
 
+  // Busca automática por CNPJ (Gatilho aos 14 dígitos)
   useEffect(() => {
     const cnpj = form.cnpj?.replace(/\D/g, '');
-    if (cnpj && cnpj.length === 14 && !editingId) {
-      handleCnpjLookup(cnpj);
+    if (cnpj && cnpj.length === 14) {
+      if (lastSearchedCnpj.current === cnpj) return;
+
+      // 1. Verificação de Duplicidade Local
+      const duplicate = preStacking.find(p => p.cnpj.replace(/\D/g, '') === cnpj);
+      if (duplicate && duplicate.id !== editingId) {
+        setInfoModal({
+          show: true,
+          title: "Unidade já Cadastrada",
+          message: `O CNPJ ${maskCNPJ(cnpj)} já pertence à unidade "${duplicate.legalName || duplicate.name}".`,
+          type: "warning"
+        });
+        lastSearchedCnpj.current = cnpj;
+        return;
+      }
+
+      handleCnpjLookup(cnpj, true);
+    } else if (cnpj && cnpj.length < 14) {
+      lastSearchedCnpj.current = '';
     }
-  }, [form.cnpj, editingId]);
+  }, [form.cnpj, editingId, preStacking]);
 
   const handleCepLookup = async (cep: string) => {
-    setIsCepLoading(true);
     try {
       const response = await fetch(`https://brasilapi.com.br/api/cep/v1/${cep}`);
       if (response.ok) {
         const data = await response.json();
         setForm(prev => ({
           ...prev,
-          address: data.street || prev.address || '',
+          address: (data.street || prev.address || '').toUpperCase(),
           neighborhood: (data.neighborhood || prev.neighborhood || '').toUpperCase(),
           city: (data.city || prev.city || '').toUpperCase(),
           state: (data.state || prev.state || '').toUpperCase()
         }));
       }
     } catch (e) {
-      console.warn("CEP Lookup Error");
-    } finally {
-      setIsCepLoading(false);
+      console.warn("Falha no CEP");
     }
   };
 
-  const handleCnpjLookup = async (cnpj: string) => {
+  const handleCnpjLookup = async (cnpjInput?: string, isAuto = false) => {
+    const targetCnpj = cnpjInput || form.cnpj?.replace(/\D/g, '');
+    
+    if (!targetCnpj || targetCnpj.length !== 14) {
+      if (!isAuto) {
+        setInfoModal({
+          show: true,
+          title: "CNPJ Incompleto",
+          message: "Preencha os 14 números do CNPJ para realizar a consulta.",
+          type: "warning"
+        });
+      }
+      return;
+    }
+
+    lastSearchedCnpj.current = targetCnpj;
     setIsCnpjLoading(true);
+
     try {
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      // API Robusta (Minha Receita)
+      const response = await fetch(`https://minhareceita.org/${targetCnpj}`);
+      
       if (response.ok) {
         const data = await response.json();
+        
         setForm(prev => ({
           ...prev,
           name: (data.nome_fantasia || data.razao_social || '').toUpperCase(),
           legalName: (data.razao_social || '').toUpperCase(),
-          address: data.logradouro ? `${data.logradouro}${data.numero ? ', ' + data.numero : ''}` : prev.address,
-          neighborhood: (data.bairro || prev.neighborhood || '').toUpperCase(),
-          city: (data.municipio || prev.city || '').toUpperCase(),
-          state: (data.uf || prev.state || '').toUpperCase(),
+          address: `${data.logradouro || ''}${data.numero ? ', ' + data.numero : ''}`.trim().toUpperCase(),
+          neighborhood: (data.bairro || '').toUpperCase(),
+          city: (data.municipio || '').toUpperCase(),
+          state: (data.uf || '').toUpperCase(),
           zipCode: data.cep ? maskCEP(data.cep) : prev.zipCode
         }));
+      } else {
+        if (!isAuto) {
+          const status = response.status;
+          setInfoModal({
+            show: true,
+            title: status === 429 ? "Limite de Consultas" : "Não Localizado",
+            message: status === 429 
+              ? "Muitas tentativas em pouco tempo. Aguarde 1 minuto ou preencha manualmente." 
+              : "Não encontramos dados para este CNPJ na Receita Federal.",
+            type: "error"
+          });
+        }
       }
     } catch (e) {
-      console.warn("CNPJ Lookup Error");
+      if (!isAuto) {
+        setInfoModal({
+          show: true,
+          title: "Instabilidade",
+          message: "Ocorreu um erro ao conectar com o serviço de busca. Tente preencher manualmente.",
+          type: "error"
+        });
+      }
     } finally {
       setIsCnpjLoading(false);
     }
@@ -100,6 +161,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
   const handleOpenModal = (item?: PreStacking) => {
     setForm(item || initialForm);
     setEditingId(item?.id);
+    lastSearchedCnpj.current = item?.cnpj?.replace(/\D/g, '') || '';
     setIsModalOpen(true);
   };
 
@@ -147,8 +209,9 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
     return result;
   }, [preStacking, searchQuery, sortBy]);
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
-  const labelClass = "text-[9px] font-black text-slate-400 uppercase ml-1";
+  const inputClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50 placeholder:text-slate-300";
+  const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
+  const labelBlueClass = "text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 ml-1 block";
 
   return (
     <div className="max-w-full mx-auto space-y-6 animate-in fade-in duration-500">
@@ -180,15 +243,15 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-8 py-4">
-                    <p className="font-black text-slate-800 uppercase text-[11px]">{p.legalName || p.name}</p>
-                    {p.legalName && p.name !== p.legalName && <p className="text-[9px] text-slate-400 font-bold mt-1">FANTASIA: {p.name}</p>}
+                    <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{p.legalName || p.name}</p>
+                    {p.legalName && p.name !== p.legalName && <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">FANTASIA: {p.name}</p>}
                   </td>
                   <td className="px-8 py-4 font-mono font-bold text-slate-500">{maskCNPJ(p.cnpj)}</td>
                   <td className="px-8 py-4">
-                    <p className="text-slate-500 font-bold text-[9px]">{p.address}</p>
-                    <p className="text-slate-400 font-black text-[10px] mt-1">{p.city} - {p.state}</p>
+                    <p className="text-slate-500 font-bold uppercase text-[9px]">{p.address}</p>
+                    <p className="text-slate-400 font-black uppercase text-[10px] mt-1">{p.city} - {p.state}</p>
                   </td>
-                  <td className="px-8 py-4 text-right space-x-1">
+                  <td className="px-8 py-4 text-right space-x-1 whitespace-nowrap">
                     <button onClick={() => handleOpenMap(p)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors" title="Ver no Mapa"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg></button>
                     <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                     {onDeletePreStacking && <button onClick={() => confirmDelete(p)} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Icons.Excluir /></button>}
@@ -199,6 +262,28 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
           </table>
         </div>
       </div>
+
+      {/* MODAL DE AVISO / ERRO */}
+      {infoModal.show && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
+              <div className="p-10 text-center space-y-6">
+                 <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto shadow-inner ${infoModal.type === 'warning' ? 'bg-amber-50 text-amber-500' : 'bg-red-50 text-red-500'}`}>
+                    {infoModal.type === 'warning' ? (
+                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
+                    ) : (
+                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2.5"/></svg>
+                    )}
+                 </div>
+                 <div>
+                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight leading-tight">{infoModal.title}</h3>
+                    <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed">{infoModal.message}</p>
+                 </div>
+                 <button onClick={() => setInfoModal({...infoModal, show: false})} className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-600 transition-all active:scale-95">Ciente / Continuar</button>
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* MODAL DE MAPA */}
       {isMapModalOpen && (
@@ -252,21 +337,54 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 h-[85vh] flex flex-col">
+          <div className="bg-white w-full max-w-3xl rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 h-[90vh] flex flex-col">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-              <h3 className="font-black text-slate-700 text-sm uppercase tracking-widest">{editingId ? 'Editar Cadastro' : 'Novo Cadastro'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
+               <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-lg font-black italic">ALS</div>
+                 <div>
+                    <h3 className="font-black text-slate-800 text-sm uppercase tracking-[0.2em]">{editingId ? 'Editar Cadastro' : 'Novo Pré-Stacking ALS'}</h3>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Base de Dados de Terminais de Carga</p>
+                 </div>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 bg-white border border-slate-200 text-slate-300 hover:text-red-400 rounded-full flex items-center justify-center transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
             </div>
-            <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
-              <div className="space-y-1"><label className={labelClass}>CNPJ</label><input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" /></div>
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto flex-1 custom-scrollbar bg-[#fcfdfe]">
+              <div className="space-y-1">
+                <label className={labelBlueClass}>Cadastro Nacional da Pessoa Jurídica (CNPJ)</label>
+                <div className="relative group">
+                  <input 
+                    required 
+                    type="text" 
+                    className={`${inputClasses} pr-16 text-lg border-blue-50 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10`} 
+                    value={form.cnpj} 
+                    onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} 
+                    placeholder="00.000.000/0000-00" 
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => handleCnpjLookup()}
+                    disabled={isCnpjLoading}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-xl hover:bg-blue-700 transition-all active:scale-90 disabled:opacity-50"
+                    title="Consultar Dados na Receita"
+                  >
+                    {isCnpjLoading ? (
+                      <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>
+                    )}
+                  </button>
+                </div>
+                <p className="text-[8px] font-bold text-slate-400 uppercase mt-2 ml-1 italic">* Digite os 14 números para preenchimento automático.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1"><label className={labelClass}>Razão Social</label><input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} /></div>
                 <div className="space-y-1"><label className={labelClass}>Nome Fantasia</label><input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} /></div>
               </div>
 
-              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Endereço Unidade</label>
-                <div className="space-y-4">
+              <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-6">
+                <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest block">Localização da Unidade</label>
+                <div className="space-y-5">
                   <div className="space-y-1">
                     <label className={labelClass}>Logradouro e Número</label>
                     <input required type="text" className={inputClasses} value={form.address} onChange={e => setForm({...form, address: e.target.value.toUpperCase()})} placeholder="EX: RUA EXEMPLO, 123" />
@@ -275,7 +393,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
                     <label className={labelClass}>Bairro</label>
                     <input required type="text" className={inputClasses} value={form.neighborhood} onChange={e => setForm({...form, neighborhood: e.target.value.toUpperCase()})} placeholder="BAIRRO" />
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-6">
                     <div className="space-y-1"><label className={labelClass}>CEP</label><input required type="text" className={inputClasses} value={form.zipCode} onChange={e => setForm({...form, zipCode: maskCEP(e.target.value)})} /></div>
                     <div className="space-y-1"><label className={labelClass}>Cidade</label><input required type="text" className={inputClasses} value={form.city} onChange={e => setForm({...form, city: e.target.value.toUpperCase()})} /></div>
                     <div className="space-y-1"><label className={labelClass}>UF</label><input required type="text" className={inputClasses} value={form.state} onChange={e => setForm({...form, state: e.target.value.toUpperCase()})} /></div>
@@ -283,7 +401,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
                 </div>
               </div>
               
-              <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all mt-4">Salvar Unidade</button>
+              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-blue-600 transition-all mt-6 active:scale-[0.98]">Salvar Unidade</button>
             </form>
           </div>
         </div>
