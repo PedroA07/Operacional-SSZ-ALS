@@ -5,6 +5,7 @@ import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
 import { offlineManager } from './offlineManager';
+import { fileStorage } from './fileStorage';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
@@ -26,7 +27,7 @@ export const db = {
 
   /**
    * FUNÇÃO CRÍTICA: Varre o cache local e empurra tudo para o banco de dados.
-   * Resolve o problema de "está no site mas não no banco".
+   * Modificado para usar as funções de salvamento do db (que tratam R2) em vez do repo direto.
    */
   pushLocalDataToCloud: async (onProgress?: (msg: string) => void) => {
     if (!supabase) throw new Error("Banco de dados não configurado.");
@@ -42,32 +43,14 @@ export const db = {
         for (const item of localItems) {
           try {
             let success = false;
-            // Mapeia para o repositório correto
-            if (cat === 'drivers') success = await driverRepository.save(supabase, item);
-            else if (cat === 'trips') success = await tripRepository.save(supabase, item);
-            else if (cat === 'customers') {
-              const { error } = await supabase.from('customers').upsert({
-                id: item.id, name: item.name, legal_name: item.legalName,
-                cnpj: item.cnpj, address: item.address, neighborhood: item.neighborhood,
-                zip_code: item.zipCode, city: item.city, state: item.state,
-                operations: item.operations || []
-              });
-              success = !error;
-            } else if (cat === 'ports' || cat === 'pre_stacking') {
-              const table = cat === 'ports' ? 'ports' : 'pre_stacking';
-              const { error } = await supabase.from(table).upsert({
-                id: item.id, name: item.name, legal_name: item.legalName,
-                cnpj: item.cnpj, address: item.address, neighborhood: item.neighborhood,
-                zip_code: item.zipCode, city: item.city, state: item.state
-              });
-              success = !error;
-            } else if (cat === 'staff') success = await staffRepository.save(supabase, item);
-            else if (cat === 'categories') {
-              const { error } = await supabase.from('categories').upsert({
-                id: item.id, name: item.name, parent_id: item.parentId
-              });
-              success = !error;
-            }
+            // Chama os métodos de salvamento do db para garantir que Base64 -> R2 aconteça
+            if (cat === 'drivers') success = await db.saveDriver(item);
+            else if (cat === 'trips') success = await db.saveTrip(item);
+            else if (cat === 'customers') success = await db.saveCustomer(item);
+            else if (cat === 'ports') success = await db.savePort(item);
+            else if (cat === 'pre_stacking') success = await db.savePreStacking(item);
+            else if (cat === 'staff') success = await db.saveStaff(item);
+            else if (cat === 'categories') success = await db.saveCategory(item);
 
             if (success) totalSynced++;
           } catch (e) {
@@ -121,6 +104,25 @@ export const db = {
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
+    // PROTEÇÃO R2: Se a foto for Base64, sobe para o R2 antes de qualquer coisa
+    if (driver.photo && driver.photo.startsWith('data:')) {
+      try {
+        driver.photo = await fileStorage.uploadDriverProfile(driver.photo, driver.name);
+      } catch (e) {
+        console.error("Falha ao subir foto do motorista para R2:", e);
+      }
+    }
+    
+    // PROTEÇÃO R2: Se tiver CNH em Base64
+    if (driver.cnhPdfUrl && driver.cnhPdfUrl.startsWith('data:')) {
+      try {
+        driver.cnhPdfUrl = await fileStorage.uploadDriverCNH(driver.cnhPdfUrl, driver.name);
+      } catch (e) {
+        console.error("Falha ao subir CNH do motorista para R2:", e);
+      }
+    }
+
+    // Salva no cache local (sempre atualizado com URLs do R2 se o upload acima deu certo)
     const localRegistry = offlineManager.getRegistry<Driver>('drivers');
     const updatedRegistry = [driver, ...localRegistry.filter(d => d.id !== driver.id)];
     offlineManager.setRegistry('drivers', updatedRegistry);
@@ -133,7 +135,7 @@ export const db = {
       }
       return success;
     } catch {
-      return true; // Salvo localmente
+      return true; // Mantém no cache local para tentativa futura
     }
   },
 
@@ -224,6 +226,15 @@ export const db = {
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
+    // PROTEÇÃO R2: Foto do staff
+    if (staff.photo && staff.photo.startsWith('data:')) {
+      try {
+        staff.photo = await fileStorage.uploadStaffPhoto(staff.photo, staff.name);
+      } catch (e) {
+        console.error("Falha ao subir foto do staff para R2:", e);
+      }
+    }
+
     const local = offlineManager.getRegistry<Staff>('staff');
     offlineManager.setRegistry('staff', [staff, ...local.filter(s => s.id !== staff.id)]);
     if (!supabase) return true;
