@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Trip } from '../types';
 
@@ -40,72 +41,62 @@ export const tripRepository = {
   mapFromDb: (d: any): Trip => {
     const safeParse = (val: any, fallback: any) => {
       if (!val) return fallback;
-      if (typeof val === 'string') { 
-        try { return JSON.parse(val); } catch { return fallback; } 
-      }
+      if (typeof val === 'string') { try { return JSON.parse(val); } catch { return fallback; } }
       return val; 
     };
 
-    // Mapeamento ultra-flexível para aceitar variações de nomes de colunas no Supabase
     return {
       id: d.id,
-      os: d.os || d.OS || d.os_number || 'SEM OS',
-      booking: d.booking || d.Booking || '',
-      ship: d.ship || d.Ship || '',
-      dateTime: d.date_time || d.dateTime || d.date || d.created_at || new Date().toISOString(),
-      statusTime: d.status_time || d.statusTime || d.date_time || d.dateTime,
-      isLate: d.is_late ?? d.isLate ?? false,
-      type: d.type || d.Type || 'EXPORTAÇÃO',
-      containerType: d.container_type || d.containerType || '40HC',
-      category: d.category || d.Category || 'Geral',
-      subCategory: d.sub_category || d.subCategory || '',
-      container: d.container || d.Container || '',
-      tara: d.tara || d.Tara || '',
-      seal: d.seal || d.Seal || '',
-      cva: d.cva || d.CVA || '',
-      customer: safeParse(d.customer || d.Customer, { name: '---' }),
-      destination: safeParse(d.destination || d.Destination, null),
-      driver: safeParse(d.driver || d.Driver, { name: '---' }),
-      status: d.status || d.Status || 'Pendente',
-      statusHistory: safeParse(d.status_history || d.statusHistory, []),
-      advancePayment: safeParse(d.advance_payment || d.advancePayment, { status: 'BLOQUEADO' }),
-      balancePayment: safeParse(d.balance_payment || d.balancePayment, { status: 'AGUARDANDO_DOCS' }),
-      osDoc: d.os_doc || d.osDoc,
-      agendamentoDoc: d.agendamento_doc || d.agendamentoDoc,
-      completoDoc: d.completo_doc || d.completoDoc,
-      freightContractDoc: d.freight_contract_doc || d.freightContractDoc,
-      cteDoc: d.cte_doc || d.cteDoc,
-      cvaDoc: d.cva_doc || d.cvaDoc,
-      nfDoc: d.nf_doc || d.nfDoc,
-      nfKey: d.nf_key || d.nfKey,
-      ocFormData: safeParse(d.oc_form_data || d.ocFormData, null),
-      preStackingFormData: safeParse(d.pre_stacking_form_data || d.preStackingFormData, null),
-      scheduling: safeParse(d.scheduling || d.Scheduling, undefined),
-      driver_docs: safeParse(d.driver_docs || d.driverDocs, []) 
+      os: d.os || 'SEM OS',
+      booking: d.booking || '',
+      ship: d.ship || '',
+      dateTime: d.date_time,
+      statusTime: d.status_time || d.date_time,
+      isLate: d.is_late ?? false,
+      type: d.type || 'EXPORTAÇÃO',
+      containerType: d.container_type || '40HC',
+      category: d.category || 'Geral',
+      subCategory: d.sub_category || '',
+      container: d.container || '',
+      tara: d.tara || '',
+      seal: d.seal || '',
+      cva: d.cva || '',
+      customer: safeParse(d.customer, { name: '---' }),
+      destination: safeParse(d.destination, null),
+      driver: safeParse(d.driver, { name: '---' }),
+      status: d.status || 'Pendente',
+      statusHistory: safeParse(d.status_history, []),
+      advancePayment: safeParse(d.advance_payment, { status: 'BLOQUEADO' }),
+      balancePayment: safeParse(d.balance_payment, { status: 'AGUARDANDO_DOCS' }),
+      osDoc: d.os_doc,
+      agendamentoDoc: d.agendamento_doc,
+      completoDoc: d.completo_doc,
+      freightContractDoc: d.freight_contract_doc,
+      cteDoc: d.cte_doc,
+      cvaDoc: d.cva_doc,
+      nfDoc: d.nf_doc,
+      nfKey: d.nf_key,
+      ocFormData: safeParse(d.oc_form_data, null),
+      preStackingFormData: safeParse(d.pre_stacking_form_data, null),
+      scheduling: safeParse(d.scheduling, undefined),
+      driver_docs: safeParse(d.driver_docs, []) 
     };
   },
 
-  async save(supabase: SupabaseClient, trip: Trip) {
-    const payload = this.mapToDb(trip);
-    const { error } = await supabase.from('trips').upsert(payload);
-    if (error) throw error;
-    return true;
-  },
-
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
-    // Consulta simplificada sem ORDER para evitar quebra por nome de coluna
+    // BUSCA OTIMIZADA: Agora usa o índice de data e limita a 100 registros
     const { data, error } = await supabase
       .from('trips')
       .select('*')
-      .limit(1000);
+      .order('date_time', { ascending: false })
+      .limit(100);
 
-    if (error) {
-      console.error("Erro crítico ao buscar Trips no Supabase:", error);
-      throw error;
-    }
-    
-    // Ordenação feita com segurança no frontend
-    const mapped = (data || []).map(d => this.mapFromDb(d));
-    return mapped.sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+    if (error) throw error;
+    return (data || []).map(d => this.mapFromDb(d));
+  },
+
+  async save(supabase: SupabaseClient, trip: Trip) {
+    const { error } = await supabase.from('trips').upsert(this.mapToDb(trip));
+    return !error;
   }
 };

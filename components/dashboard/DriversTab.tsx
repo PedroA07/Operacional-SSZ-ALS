@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Driver, OperationDefinition, User, Customer } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
@@ -175,21 +174,31 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
     setIsSaving(true);
     try {
       const drvId = editingId || `drv-${Date.now()}`;
-      
+      const driverName = (form.name || '').toUpperCase();
+      let finalPhotoUrl = form.photo || '';
+
+      // Upload da foto para R2 organizado por NOME
+      if (finalPhotoUrl.startsWith('data:')) {
+        finalPhotoUrl = await fileStorage.uploadDriverProfile(finalPhotoUrl, driverName);
+      }
+
       const original = drivers.find(d => d.id === drvId);
       const statusChanged = original && original.status !== form.status;
       const statusDate = statusChanged ? new Date().toISOString() : (form.statusLastChangeDate || new Date().toISOString());
 
-      // O salvamento agora é direto. db.saveDriver tratará o Base64 se houver.
       const payload = { 
         ...form, 
         id: drvId,
+        photo: finalPhotoUrl,
         statusLastChangeDate: statusDate
       };
 
-      // Nota: o syncUserRecord ainda gera credenciais baseadas no objeto.
-      // O db.saveDriver fará o upload para R2 internamente.
-      await onSaveDriver(payload, editingId);
+      const { password } = await driverAuthService.syncUserRecord(drvId, payload as Driver, form.generatedPassword);
+      
+      await onSaveDriver({ 
+        ...payload,
+        generatedPassword: password,
+      }, editingId);
       
       setIsModalOpen(false);
     } catch (err: any) {
@@ -455,7 +464,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                        </div>
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap space-x-1">
-                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha do Portal"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => openPasswordModal(d.id)} className="p-2 text-slate-300 hover:text-emerald-500" title="Redefinir Senha do Portal"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2.5"/></svg></button>
                       <button onClick={() => handleOpenPreview(d)} className="p-2 text-slate-300 hover:text-blue-600" title="Visualizar Dossiê Digital"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/></svg></button>
                       <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-400" title="Editar Cadastro"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                       <button onClick={() => { setItemToDelete(d); setIsDeleteModalOpen(true); }} className="p-2 text-slate-300 hover:text-red-500" title="Excluir Motorista"><Icons.Excluir /></button>
@@ -790,7 +799,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                       <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
                          <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
-                               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0112.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeWidth="2.5"/></svg>
+                               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeWidth="2.5"/></svg>
                             </div>
                             <div>
                                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Anexo Vinculado</p>

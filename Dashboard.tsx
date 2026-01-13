@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
@@ -60,8 +61,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setIsSyncing(true);
     
     try {
-      console.log("ALS: Iniciando sincronização com banco de dados...");
-      
       const responses = await Promise.allSettled([
         db.getDrivers(),
         db.getCustomers(),
@@ -77,19 +76,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[2].status === 'fulfilled') setPorts(responses[2].value);
       if (responses[3].status === 'fulfilled') setPreStacking(responses[3].value);
       if (responses[4].status === 'fulfilled') setStaffList(responses[4].value);
-      
-      if (responses[5].status === 'fulfilled') {
-        const fetchedTrips = responses[5].value;
-        console.log(`ALS: ${fetchedTrips.length} viagens recebidas da nuvem.`);
-        setTrips(fetchedTrips);
-      } else {
-        console.error("ALS: Erro ao carregar viagens:", responses[5].reason);
-      }
-
+      if (responses[5].status === 'fulfilled') setTrips(responses[5].value);
       if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
 
     } catch (e) {
-      console.error("Erro fatal na sincronização ALS:", e);
+      console.error("Erro na sincronização ALS:", e);
     } finally {
       setIsLoadingInitial(false);
       setIsSyncing(false);
@@ -208,6 +199,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           </div>
         </nav>
         <div className="p-5 border-t border-slate-800/50 bg-[#0f172a] space-y-4">
+           {/* AJUSTE AQUI: Passamos o objeto user para sincronia do timer lateral */}
            {sidebarState === 'open' && <OnlineStatus staffList={staffList} currentUser={user} />}
            <button onClick={onLogout} className="w-full text-[9px] text-red-500 font-black uppercase hover:bg-red-500/10 py-4 rounded-2xl flex items-center justify-center gap-3 border border-red-900/20 active:scale-95 transition-all duration-300">
              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2.5"/></svg>
