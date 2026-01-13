@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { db } from '../../utils/storage';
 import FeedbackModal from '../shared/FeedbackModal';
@@ -220,7 +219,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
                   onClick={handleFixMedia}
                   className="mt-8 w-full py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all active:scale-95"
                 >
-                  Migrar Base64 -> R2
+                  Migrar Base64 → R2
                 </button>
               )}
            </div>
