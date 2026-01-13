@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Trip, StatusHistoryEntry, TripStatus } from '../../../types';
 import { emailFormatter, ReportOverride } from '../../../utils/emailFormatter';
 import { predictionService } from '../../../utils/predictionService';
+import { statusService } from '../../../utils/statusService';
 
 interface CopyAllStatusesActionProps {
   trips: Trip[];      
@@ -23,7 +24,9 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
       const initialOverrides: Record<string, ReportOverride> = {};
       
       trips.forEach(t => {
+        // Previsão automática preenchida pela engine ALS
         const pred = predictionService.getNextStatusPrediction(t, allTrips);
+        
         const history = [...(t.statusHistory || [])]
           .filter(h => h.status !== 'Pendente')
           .map(h => ({ ...h })) // Clona para evitar mutação
@@ -31,7 +34,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
 
         initialOverrides[t.id] = {
           history,
-          prediction: pred ? { label: pred.label, time: pred.time } : null
+          prediction: pred ? { label: pred.label, time: pred.time } : { label: 'Previsão de Chegada', time: 'A DEFINIR' }
         };
       });
       
@@ -67,7 +70,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
       const newDate = new Date(lastDate.getTime() + 15 * 60000); // +15 min do último
       
       const newEntry: StatusHistoryEntry = {
-        status: 'Nova Etapa' as TripStatus,
+        status: 'Em Viagem' as TripStatus,
         dateTime: newDate.toISOString(),
         createdAt: new Date().toISOString()
       };
@@ -104,6 +107,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
     if (trips.length === 0) return;
 
     try {
+      // Correção: Passando o estado showCustomer para o formatador
       const html = emailFormatter.allTripsToRichText(trips, allTrips, reportOverrides, showCustomer);
       const plain = trips.map(t => emailFormatter.toPlainText(t, allTrips, reportOverrides[t.id], showCustomer)).join('\n');
 
@@ -146,7 +150,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
 
       {isPreviewOpen && (
         <div className="fixed inset-0 z-[4000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-7xl h-[94vh] rounded-[3.5rem] shadow-2xl flex flex-col border border-white/20 overflow-hidden animate-in zoom-in-95">
+          <div className="bg-white w-full max-w-7xl h-[94vh] rounded-[3.5rem] shadow-2xl flex flex-col border border-white/20 overflow-hidden animate-in zoom-in-95 duration-500">
             
             {/* Header com Configurações */}
             <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
@@ -159,12 +163,12 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                </div>
                <div className="flex items-center gap-4">
                   <div className="flex items-center gap-3 bg-white/5 px-5 py-2.5 rounded-2xl border border-white/10">
-                     <span className="text-[10px] font-black uppercase text-slate-400">Ocultar Cliente</span>
+                     <span className="text-[10px] font-black uppercase text-slate-400">Exibir Cliente</span>
                      <button 
                        onClick={() => setShowCustomer(!showCustomer)}
-                       className={`w-11 h-6.5 rounded-full transition-all relative ${!showCustomer ? 'bg-blue-600' : 'bg-slate-700'}`}
+                       className={`w-11 h-6.5 rounded-full transition-all relative ${showCustomer ? 'bg-blue-600' : 'bg-slate-700'}`}
                      >
-                       <div className={`absolute top-1 w-4.5 h-4.5 bg-white rounded-full transition-all ${!showCustomer ? 'left-5.5' : 'left-1'}`}></div>
+                       <div className={`absolute top-1 w-4.5 h-4.5 bg-white rounded-full transition-all ${showCustomer ? 'left-5.5' : 'left-1'}`}></div>
                      </button>
                   </div>
                   <button onClick={() => setIsPreviewOpen(false)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
@@ -184,28 +188,33 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                   <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                      {activeTrips.map(t => {
                        const ovr = reportOverrides[t.id];
+                       const statusOptions = statusService.getOptions(t);
+
                        return (
                         <div key={t.id} className="bg-white p-7 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6 relative group/card">
                             
-                            {/* Destaque do Recurso: OS + CONTAINER + MOTORISTA */}
+                            {/* Destaque do Recurso: OS + CONTAINER + MOTORISTA (NOME COMPLETO) */}
                             <div className="bg-slate-900 rounded-[1.8rem] p-5 text-white flex justify-between items-center shadow-lg">
-                               <div className="min-w-0">
+                               <div className="min-w-0 flex-1">
                                   <p className="text-[8px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Identificação ALS</p>
                                   <div className="flex items-center gap-3">
                                      <h4 className="text-xl font-black uppercase">OS: {t.os}</h4>
                                      <span className="text-sm font-mono font-black text-blue-100 bg-blue-500/20 px-2.5 py-1 rounded-lg border border-blue-500/30">{t.container || 'A DEFINIR'}</span>
                                   </div>
+                                  <p className="text-[10px] font-black uppercase text-slate-200 mt-2 truncate">
+                                    Motorista: <span className="text-blue-400">{t.driver.name}</span>
+                                  </p>
                                </div>
-                               <div className="text-right">
-                                  <p className="text-[8px] font-black text-slate-500 uppercase">Recurso Alocado</p>
-                                  <p className="text-[11px] font-black uppercase text-slate-200 mt-1 truncate max-w-[140px]">{t.driver.name.split(' ')[0]}</p>
+                               <div className="text-right shrink-0">
+                                  <p className="text-[8px] font-black text-slate-500 uppercase">Localidade</p>
+                                  <p className="text-[11px] font-black uppercase text-slate-200 mt-1">{t.customer.city}</p>
                                </div>
                             </div>
 
-                            {/* Edição de Histórico (Passado) */}
+                            {/* Edição de Histórico (Passado) - AGORA COM SELETOR */}
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center px-1">
-                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cronologia de Eventos</label>
+                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Linha do Tempo (Cronologia)</label>
                                    <button 
                                       onClick={() => addHistoryEntry(t.id)}
                                       className="text-[9px] font-black text-blue-600 uppercase hover:underline"
@@ -214,12 +223,15 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                                 <div className="space-y-2">
                                   {ovr?.history.map((entry, idx) => (
                                       <div key={idx} className="flex items-center gap-2 group">
-                                          <input 
-                                              type="text"
-                                              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 uppercase outline-none focus:border-blue-500"
+                                          <select 
+                                              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-slate-700 uppercase outline-none focus:border-blue-500 cursor-pointer"
                                               value={entry.status}
                                               onChange={(e) => handleHistoryLabelChange(t.id, idx, e.target.value)}
-                                          />
+                                          >
+                                              {statusOptions.map(opt => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                              ))}
+                                          </select>
                                           <input 
                                               type="datetime-local"
                                               className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-600 outline-none focus:border-blue-500"
@@ -242,7 +254,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                                 <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest block px-1">🚀 Próxima Etapa (Previsão de Entrega)</label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                       <span className="text-[7px] font-black text-slate-400 uppercase ml-2">Título</span>
+                                       <span className="text-[7px] font-black text-slate-400 uppercase ml-2">Título da Previsão</span>
                                        <input 
                                            type="text"
                                            placeholder="Ex: Chegada"
@@ -289,6 +301,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                                    <span className="text-[10px] font-mono font-bold text-slate-400">{t.container}</span>
                                 </div>
                                 {showCustomer && <p className="text-[8px] font-bold text-slate-400 uppercase mt-1.5">{t.customer.name}</p>}
+                                <p className="text-[9px] font-black text-slate-400 uppercase mt-1">Mot: {t.driver.name}</p>
                              </div>
                              <div className="flex items-center gap-2">
                                 <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 flex items-center gap-2">
@@ -315,7 +328,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                   <button onClick={() => setIsPreviewOpen(false)} className="px-8 py-5 bg-slate-100 text-slate-500 rounded-3xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 active:scale-95 transition-all">Descartar</button>
                   <button 
                     onClick={handleCopy}
-                    className={`px-12 py-5 rounded-3xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-4 shadow-2xl active:scale-95 ${isCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                    className={`px-12 py-5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-4 shadow-2xl active:scale-95 ${isCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                   >
                     {isCopied ? (
                       <>
