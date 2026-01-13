@@ -58,9 +58,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   
-  const today = new Date().toLocaleDateString('en-CA');
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  // MODIFICAÇÃO: Inicia vazio para mostrar todos os dados por padrão
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   
   const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
   const [clientSearchText, setClientSearchText] = useState('');
@@ -102,8 +102,8 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     const normCategory = categoryName.toUpperCase();
     const namesFromTrips = new Set(
       allTrips
-        .filter(t => t.category?.toUpperCase() === normCategory)
-        .map(t => t.customer.name.toUpperCase())
+        .filter(t => t.category && t.category.toUpperCase() === normCategory)
+        .map(t => t.customer && t.customer.name.toUpperCase())
     );
     return customers
       .filter(c => {
@@ -134,19 +134,19 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(t => t.os.toLowerCase().includes(q) || (t.container && t.container.toLowerCase().includes(q)) || (t.driver && t.driver.name.toLowerCase().includes(q)));
+      result = result.filter(t => (t.os && t.os.toLowerCase().includes(q)) || (t.container && t.container.toLowerCase().includes(q)) || (t.driver && t.driver.name.toLowerCase().includes(q)));
     }
 
     if (startDate || endDate) {
       result = result.filter(t => {
-        const tripDate = t.dateTime ? t.dateTime.substring(0, 10) : "";
-        if (!tripDate) return false;
+        if (!t.dateTime) return false;
+        const tripDate = t.dateTime.substring(0, 10);
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
         return true;
       });
     }
-    return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+    return result.sort((a, b) => (a.dateTime || '').localeCompare(b.dateTime || ''));
   }, [allTrips, categoryName, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient]);
 
   const tripColumns = useMemo(() => getOperationTableColumns(
@@ -162,7 +162,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
-    drivers // Passando drivers aqui
+    drivers
   ), [user, drivers]);
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";

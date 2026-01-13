@@ -14,6 +14,7 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isFixingMedia, setIsFixingMedia] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   
   const [feedback, setFeedback] = useState<{ show: boolean; title: string; message: string; type: any; onConfirm?: () => void }>({
@@ -41,6 +42,53 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
       });
     } finally {
       setIsSyncing(false);
+      setSyncMessage('');
+    }
+  };
+
+  const handleFixMedia = async () => {
+    setIsFixingMedia(true);
+    setSyncMessage('Buscando cadastros com fotos pesadas...');
+    try {
+      const drivers = await db.getDrivers();
+      const staff = await db.getStaff();
+      
+      const toFixDrivers = drivers.filter(d => d.photo?.startsWith('data:') || d.cnhPdfUrl?.startsWith('data:'));
+      const toFixStaff = staff.filter(s => s.photo?.startsWith('data:'));
+      
+      const total = toFixDrivers.length + toFixStaff.length;
+      
+      if (total === 0) {
+        setFeedback({ show: true, title: "Banco de Dados Otimizado", message: "Não foram encontrados cadastros usando Base64. Todas as fotos já são links do R2.", type: 'success' });
+        return;
+      }
+
+      let fixed = 0;
+      
+      for (const d of toFixDrivers) {
+        setSyncMessage(`Processando motorista: ${d.name}...`);
+        // O método saveDriver já contém a lógica de converter Base64 -> R2
+        await db.saveDriver(d);
+        fixed++;
+      }
+
+      for (const s of toFixStaff) {
+        setSyncMessage(`Processando colaborador: ${s.name}...`);
+        await db.saveStaff(s);
+        fixed++;
+      }
+
+      setFeedback({
+        show: true,
+        title: "Otimização Concluída",
+        message: `${fixed} cadastros foram migrados de Base64 para Cloudflare R2 com sucesso.`,
+        type: 'success'
+      });
+      await onRefresh();
+    } catch (e: any) {
+      setFeedback({ show: true, title: "Erro na Otimização", message: "Falha ao enviar arquivos para o R2. Verifique suas credenciais.", type: 'error' });
+    } finally {
+      setIsFixingMedia(false);
       setSyncMessage('');
     }
   };
@@ -125,38 +173,58 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
         </div>
       </div>
 
-      {/* NOVO CARD: SINCRONIZAÇÃO DE CONTINGÊNCIA */}
-      <div className="bg-slate-900 p-10 rounded-[3rem] border border-white/10 shadow-2xl space-y-8 relative overflow-hidden group">
-         <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-            <svg className="w-24 h-24 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-         </div>
-         <div className="relative z-10">
-            <h3 className="text-xl font-black text-white uppercase tracking-tight">Sincronização de Contingência</h3>
-            <p className="text-sm text-slate-400 mt-2 max-w-xl">
-              Use esta ferramenta se você criou registros que aparecem no site, mas não constam no banco de dados Supabase. 
-              O sistema irá varrer sua memória local e forçar o envio para a nuvem.
-            </p>
-            
-            {isSyncing ? (
-              <div className="mt-8 space-y-4">
-                 <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-xs font-black text-blue-400 uppercase tracking-widest">{syncMessage}</span>
-                 </div>
-                 <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 animate-[loading_2s_infinite]"></div>
-                 </div>
-              </div>
-            ) : (
-              <button 
-                onClick={handleForceSync}
-                className="mt-8 px-10 py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-500 transition-all active:scale-95 flex items-center gap-3"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                Empurrar Dados Locais para Nuvem
-              </button>
-            )}
-         </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* CARD: SINCRONIZAÇÃO DE CONTINGÊNCIA */}
+        <div className="bg-slate-900 p-10 rounded-[3rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+           <div className="relative z-10">
+              <h3 className="text-lg font-black text-white uppercase tracking-tight">Sync de Contingência</h3>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Empurra cadastros "presos" no seu navegador para o banco.
+              </p>
+              
+              {isSyncing ? (
+                <div className="mt-8 space-y-3">
+                   <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-[9px] font-black text-blue-400 uppercase">{syncMessage}</span>
+                   </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={handleForceSync}
+                  className="mt-8 w-full py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-500 transition-all active:scale-95"
+                >
+                  Subir Dados Locais
+                </button>
+              )}
+           </div>
+        </div>
+
+        {/* CARD: OTIMIZAÇÃO DE MÍDIA (R2) */}
+        <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm relative overflow-hidden group">
+           <div className="relative z-10">
+              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Otimização de Fotos</h3>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Migra fotos Base64 do banco para o Cloudflare R2.
+              </p>
+              
+              {isFixingMedia ? (
+                <div className="mt-8 space-y-3">
+                   <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-[9px] font-black text-emerald-500 uppercase">{syncMessage}</span>
+                   </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={handleFixMedia}
+                  className="mt-8 w-full py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all active:scale-95"
+                >
+                  Migrar Base64 -> R2
+                </button>
+              )}
+           </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

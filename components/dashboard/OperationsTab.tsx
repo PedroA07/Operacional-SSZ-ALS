@@ -64,9 +64,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   
-  const today = new Date().toLocaleDateString('en-CA');
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  // MODIFICAÇÃO: Inicia sem filtro de data para mostrar todos os registros carregados
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   
   const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
   
@@ -81,15 +81,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     const now = new Date().toISOString();
     const eventTime = new Date(statusTime).toISOString();
     
-    if (tempStatus === 'Chegou no cliente') {
-      const scheduledTime = new Date(selectedTrip.dateTime).getTime();
-      const actualTime = new Date(eventTime).getTime();
-      if (actualTime > scheduledTime) {
-        const diffMin = Math.round((actualTime - scheduledTime) / 60000);
-        await db.addNotification(user, 'SYSTEM', 'ALERTA DE ATRASO', `A OS ${selectedTrip.os} chegou no cliente com ${diffMin} min de atraso.`, { os: selectedTrip.os, motorista: selectedTrip.driver.name });
-      }
-    }
-
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
@@ -106,19 +97,24 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
 
   const filteredTrips = useMemo(() => {
     let result = [...trips];
+    
+    // Filtro de Aba de Status
     if (activeStatusTab === 'ativas') {
-      const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
+      const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
       result = result.filter(t => active.includes(t.status));
     } else if (activeStatusTab === 'concluida') result = result.filter(t => t.status === 'Viagem concluída');
     else if (activeStatusTab === 'cancelada') result = result.filter(t => t.status === 'Viagem cancelada');
     else if (activeStatusTab === 'geral') result = result.filter(t => t.status !== 'Viagem cancelada');
 
-    if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
-    if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
-    if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
+    // Filtros por colunas
+    if (filterTypes.length > 0) result = result.filter(t => t.type && filterTypes.includes(t.type.toUpperCase()));
+    if (filterClientNames.length > 0) result = result.filter(t => t.customer && filterClientNames.includes(t.customer.name));
+    if (filterDriverNames.length > 0) result = result.filter(t => t.driver && filterDriverNames.includes(t.driver.name));
     
+    // Filtro de Data com Proteção (Travas de segurança)
     if (startDate || endDate) {
       result = result.filter(t => {
+        if (!t.dateTime) return false;
         const tripDate = t.dateTime.substring(0, 10);
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
@@ -126,17 +122,18 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       });
     }
 
+    // Busca Textual Geral
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(t => 
-        t.os.toLowerCase().includes(q) || 
+        (t.os && t.os.toLowerCase().includes(q)) || 
         (t.container && t.container.toLowerCase().includes(q)) || 
         (t.driver && t.driver.name.toLowerCase().includes(q)) || 
         (t.customer && t.customer.name.toLowerCase().includes(q)) ||
         (t.booking && t.booking.toLowerCase().includes(q))
       );
     }
-    return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+    return result.sort((a, b) => (a.dateTime || '').localeCompare(b.dateTime || ''));
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery]);
 
   const columns = useMemo(() => getOperationTableColumns(
@@ -152,7 +149,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
-    drivers // Passando drivers aqui
+    drivers
   ), [user, onRefresh, onDeleteTrip, drivers]);
 
   if (activeView.type !== 'list') {

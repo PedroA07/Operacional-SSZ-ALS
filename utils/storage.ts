@@ -25,10 +25,6 @@ export const db = {
     } catch { return false; }
   },
 
-  /**
-   * FUNÇÃO CRÍTICA: Varre o cache local e empurra tudo para o banco de dados.
-   * Modificado para usar as funções de salvamento do db (que tratam R2) em vez do repo direto.
-   */
   pushLocalDataToCloud: async (onProgress?: (msg: string) => void) => {
     if (!supabase) throw new Error("Banco de dados não configurado.");
     
@@ -43,7 +39,6 @@ export const db = {
         for (const item of localItems) {
           try {
             let success = false;
-            // Chama os métodos de salvamento do db para garantir que Base64 -> R2 aconteça
             if (cat === 'drivers') success = await db.saveDriver(item);
             else if (cat === 'trips') success = await db.saveTrip(item);
             else if (cat === 'customers') success = await db.saveCustomer(item);
@@ -95,7 +90,9 @@ export const db = {
   getDrivers: async (): Promise<Driver[]> => {
     if (!supabase) return offlineManager.getRegistry<Driver>('drivers');
     try {
-      const remote = await driverRepository.getAll(supabase);
+      const { data, error } = await supabase.from('drivers').select('*').order('name');
+      if (error) throw error;
+      const remote = (data || []).map(d => driverRepository.mapFromDb(d));
       offlineManager.setRegistry('drivers', remote);
       return remote;
     } catch {
@@ -104,39 +101,33 @@ export const db = {
   },
 
   saveDriver: async (driver: Driver, actingUser?: User) => {
-    // PROTEÇÃO R2: Se a foto for Base64, sobe para o R2 antes de qualquer coisa
+    // PROTEÇÃO R2: Se a foto for Base64, sobe para o R2
     if (driver.photo && driver.photo.startsWith('data:')) {
       try {
         driver.photo = await fileStorage.uploadDriverProfile(driver.photo, driver.name);
       } catch (e) {
-        console.error("Falha ao subir foto do motorista para R2:", e);
+        throw new Error(`Falha no upload da foto para R2: ${driver.name}. Verifique a conexão.`);
       }
     }
     
-    // PROTEÇÃO R2: Se tiver CNH em Base64
     if (driver.cnhPdfUrl && driver.cnhPdfUrl.startsWith('data:')) {
       try {
         driver.cnhPdfUrl = await fileStorage.uploadDriverCNH(driver.cnhPdfUrl, driver.name);
       } catch (e) {
-        console.error("Falha ao subir CNH do motorista para R2:", e);
+        throw new Error(`Falha no upload da CNH para R2: ${driver.name}.`);
       }
     }
 
-    // Salva no cache local (sempre atualizado com URLs do R2 se o upload acima deu certo)
     const localRegistry = offlineManager.getRegistry<Driver>('drivers');
     const updatedRegistry = [driver, ...localRegistry.filter(d => d.id !== driver.id)];
     offlineManager.setRegistry('drivers', updatedRegistry);
 
     if (!supabase) return true;
-    try {
-      const success = await driverRepository.save(supabase, driver);
-      if (success && actingUser) {
-        await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Motorista Atualizado', `O cadastro de ${driver.name} foi sincronizado.`, { motorista: driver.name });
-      }
-      return success;
-    } catch {
-      return true; // Mantém no cache local para tentativa futura
+    const success = await driverRepository.save(supabase, driver);
+    if (success && actingUser) {
+      await db.addNotification(actingUser, 'DRIVER_UPDATED', 'Motorista Sincronizado', `O cadastro de ${driver.name} foi atualizado na nuvem.`, { motorista: driver.name });
     }
+    return success;
   },
 
   deleteDriver: async (id: string) => {
@@ -226,12 +217,11 @@ export const db = {
   },
 
   saveStaff: async (staff: Staff, password?: string) => {
-    // PROTEÇÃO R2: Foto do staff
     if (staff.photo && staff.photo.startsWith('data:')) {
       try {
         staff.photo = await fileStorage.uploadStaffPhoto(staff.photo, staff.name);
       } catch (e) {
-        console.error("Falha ao subir foto do staff para R2:", e);
+        throw new Error(`Falha no upload da foto staff para R2.`);
       }
     }
 
