@@ -41,7 +41,7 @@ export type NotificationType =
   | 'STATUS_UPDATED' 
   | 'PAYMENT_LIBERATED' 
   | 'DRIVER_CREATED' 
-  | 'DRIVER_UPDATED'
+  | 'DRIVER_UPDATED' 
   | 'CUSTOMER_CREATED'
   | 'CUSTOMER_UPDATED'
   | 'PORT_CREATED'
@@ -94,7 +94,8 @@ export enum DashboardTab {
   COLABORADORES = 'COLABORADORES',
   PORTOS = 'PORTOS',
   PRE_STACKING = 'PRE_STACKING',
-  DOCUMENTOS = 'DOCUMENTOS'
+  DOCUMENTOS = 'DOCUMENTOS',
+  ESTADIAS = 'ESTADIAS'
 }
 
 export type TripStatus = 
