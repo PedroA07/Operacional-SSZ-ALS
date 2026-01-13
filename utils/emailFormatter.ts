@@ -11,7 +11,7 @@ export const emailFormatter = {
   /**
    * Gera o HTML de uma viagem individual usando dados reais ou substituídos (overrides)
    */
-  toCompactRichText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride): string => {
+  toCompactRichText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride, showCustomer: boolean = true): string => {
     // Usa o histórico do override ou o original filtrado
     const history = override 
       ? [...override.history].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
@@ -36,7 +36,7 @@ export const emailFormatter = {
           <tr style="background-color: #f8fafc;">
             <td style="padding: 10px 16px; border-bottom: 1px solid ${borderColor};">
               <span style="font-weight: 900; color: ${mainColor}; font-size: 13px;">OS: ${trip.os}</span>
-              <span style="color: ${subTextColor}; font-size: 10px; margin-left: 8px; font-weight: bold; text-transform: uppercase;">| ${trip.customer.name}</span>
+              ${showCustomer ? `<span style="color: ${subTextColor}; font-size: 10px; margin-left: 8px; font-weight: bold; text-transform: uppercase;">| ${trip.customer.name}</span>` : ''}
             </td>
           </tr>
           <tr>
@@ -49,6 +49,11 @@ export const emailFormatter = {
               <table style="width: 100%; border-collapse: collapse;">
                 ${history.length > 0 ? history.map((entry, idx) => {
                   const displayDate = new Date(entry.dateTime);
+                  // Formato solicitado: DD/MM/AAAA HH:MM
+                  const formattedDate = displayDate.toLocaleString('pt-BR', { 
+                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+                  });
+
                   return `
                   <tr>
                     <td style="padding: 4px 0; width: 12px; vertical-align: top;">
@@ -58,7 +63,7 @@ export const emailFormatter = {
                       ${entry.status}
                     </td>
                     <td style="padding: 2px 0; font-size: 9px; color: #94a3b8; text-align: right; font-family: 'Courier New', Courier, monospace;">
-                      ${displayDate.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      ${formattedDate}
                     </td>
                   </tr>
                   ${(idx === 0 && prediction) ? `
@@ -82,7 +87,7 @@ export const emailFormatter = {
     `;
   },
 
-  allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], overrides: Record<string, ReportOverride> = {}): string => {
+  allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], overrides: Record<string, ReportOverride> = {}, showCustomer: boolean = true): string => {
     if (trips.length === 0) return "";
     
     const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
@@ -94,7 +99,7 @@ export const emailFormatter = {
         <div style="margin-top: 20px; margin-bottom: 10px; padding: 8px 16px; background-color: ${color}; border-radius: 8px;">
           <span style="color: #ffffff; font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">${title} (${group.length})</span>
         </div>
-        ${group.map(t => emailFormatter.toCompactRichText(t, allContextTrips, overrides[t.id])).join('')}
+        ${group.map(t => emailFormatter.toCompactRichText(t, allContextTrips, overrides[t.id], showCustomer)).join('')}
       `;
     };
 
@@ -115,14 +120,14 @@ export const emailFormatter = {
     `;
   },
 
-  toPlainText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride): string => {
+  toPlainText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride, showCustomer: boolean = true): string => {
     const history = override 
       ? override.history 
       : [...(trip.statusHistory || [])].filter(h => h.status !== 'Pendente');
 
     const pred = override ? override.prediction : predictionService.getNextStatusPrediction(trip, allTrips);
 
-    let text = `OS: ${trip.os} | CLIENTE: ${trip.customer.name}\n` +
+    let text = `OS: ${trip.os}${showCustomer ? ` | CLIENTE: ${trip.customer.name}` : ''}\n` +
       `EQUIPAMENTO: ${trip.container || 'A DEFINIR'}\n` +
       `MOTORISTA: ${trip.driver.name}\n` +
       `ÚLTIMO STATUS: ${trip.status.toUpperCase()}\n`;
