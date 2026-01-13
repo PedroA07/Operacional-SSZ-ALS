@@ -34,6 +34,18 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
     return importedStays.filter(t => t.category === activeCategory);
   }, [importedStays, activeCategory]);
 
+  const formatDateTimeFull = (isoString: string | undefined) => {
+    if (!isoString) return '--/--/---- --:--';
+    const d = new Date(isoString);
+    return d.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const handleClear = () => {
     if (confirm("Deseja limpar todos os dados importados desta tela?")) {
       setImportedStays([]);
@@ -93,7 +105,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
           history.push({ status: editingStatus, dateTime: isoTime, createdAt: now });
         }
 
-        // Ordena para que o último evento seja o status principal
         const sorted = [...history].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
         
         const updatedTrip = {
@@ -103,7 +114,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
           statusHistory: history
         };
 
-        // Salva no DB silenciosamente para persistência
         const session = sessionStorage.getItem('als_active_session');
         const user: User = session ? JSON.parse(session) : { id: userId, displayName: 'Operacional' };
         db.saveTrip(updatedTrip, user);
@@ -155,9 +165,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
       key: 'scheduled', 
       label: 'Previsão', 
       render: (t: Trip) => (
-        <div className="flex flex-col items-center min-w-[70px]">
-          <span className="font-black text-slate-700 text-[10px]">{new Date(t.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'})}</span>
-          <span className="text-blue-500 font-bold text-[9px]">{new Date(t.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+        <div className="flex flex-col items-start min-w-[100px]">
+          <span className="font-black text-slate-700 text-[9px] uppercase">{formatDateTimeFull(t.dateTime)}</span>
         </div>
       )
     },
@@ -173,12 +182,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
              <div className="flex flex-col">
                 <span className="text-[6px] font-black text-slate-400 uppercase">{status === 'Chegou no cliente' ? 'Entrada' : 'Saída'}</span>
                 <span className={`text-[9px] font-black ${colorClass}`}>
-                  {entry ? (
-                    <>
-                      {new Date(entry.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}
-                      <span className="ml-1 opacity-80">{new Date(entry.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-                    </>
-                  ) : '--/-- --:--'}
+                  {entry ? formatDateTimeFull(entry.dateTime) : '--/--/---- --:--'}
                 </span>
              </div>
              <button 
@@ -192,7 +196,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
         );
 
         return (
-          <div className="flex flex-col gap-2 min-w-[170px] bg-slate-50 p-2 rounded-xl border border-slate-100 shadow-inner">
+          <div className="flex flex-col gap-2 min-w-[190px] bg-slate-50 p-2 rounded-xl border border-slate-100 shadow-inner">
              {renderTime(inEntry, 'Chegou no cliente', 'text-emerald-600')}
              <div className="w-full h-[1px] bg-slate-200/50"></div>
              {renderTime(outEntry, 'Saiu do cliente', 'text-red-600')}
@@ -218,16 +222,16 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
     },
     { 
       key: 'stay_duration', 
-      label: 'Estadia', 
+      label: 'Estadia (>8h)', 
       render: (t: Trip) => {
         const details = stayCalculations.getStayDetails(t.dateTime, t.statusHistory);
         return (
-          <div className="flex flex-col items-center min-w-[60px]">
-            <span className={`text-[10px] font-black ${details.isExceeded ? 'text-red-600' : 'text-slate-700'}`}>
+          <div className="flex flex-col items-center min-w-[70px]">
+            <span className={`text-[10px] font-black ${details.isExceeded ? 'text-red-600' : 'text-slate-400'}`}>
               {details.text}
             </span>
             {details.isExceeded && (
-              <span className="text-[7px] bg-red-600 text-white px-1 rounded font-black uppercase mt-0.5 animate-pulse">Excedido</span>
+              <span className="text-[6px] bg-red-100 text-red-600 px-1 rounded font-black uppercase mt-0.5">Cobrável</span>
             )}
           </div>
         );
@@ -241,7 +245,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Análise de Estadias</h2>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Conformidade de Janelas e Permanência</p>
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Permanência excedente a 8 horas de carregamento</p>
           </div>
           <div className="flex gap-2">
             <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
@@ -283,8 +287,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
         <div className="stay-table-compact">
           <SmartOperationTable 
             userId={userId}
-            componentId={`stays-v3-${activeCategory}`}
-            title={`Monitoramento ${activeCategory}`}
+            componentId={`stays-v3-final-${activeCategory}`}
+            title={`Monitoramento de Estadias - ${activeCategory}`}
             data={filteredData}
             columns={columns}
           />
@@ -332,8 +336,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
       )}
 
       <style>{`
-        .stay-table-compact table td { padding: 0.75rem 0.5rem !important; }
-        .stay-table-compact table th { padding: 0.75rem 0.5rem !important; }
+        .stay-table-compact table td { padding: 0.75rem 0.6rem !important; }
+        .stay-table-compact table th { padding: 0.75rem 0.6rem !important; }
       `}</style>
     </div>
   );

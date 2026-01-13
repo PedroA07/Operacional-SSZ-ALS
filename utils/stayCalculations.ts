@@ -20,8 +20,7 @@ export const stayCalculations = {
   },
 
   /**
-   * Calcula a duração total da estadia (Saída - Chegada)
-   * E verifica se a saída foi 8h após a previsão
+   * Calcula o tempo de estadia que excedeu as 8 horas (Saída - Chegada - 8h)
    */
   getStayDetails: (scheduledStr: string, history: StatusHistoryEntry[]) => {
     const arrival = history.find(h => h.status === 'Chegou no cliente');
@@ -31,19 +30,25 @@ export const stayCalculations = {
 
     const start = new Date(arrival.dateTime).getTime();
     const end = new Date(departure.dateTime).getTime();
-    const sched = new Date(scheduledStr).getTime();
 
-    const diffMs = end - start;
-    const hours = Math.floor(diffMs / 3600000);
-    const minutes = Math.floor((diffMs % 3600000) / 60000);
+    const totalStayMs = end - start;
+    const limit8hMs = 8 * 3600000;
 
-    // Regra: Saída > Previsão + 8 horas
-    const limit8h = sched + (8 * 3600000);
-    const isExceeded = end > limit8h;
+    if (totalStayMs <= limit8hMs) {
+      return {
+        hours: 0,
+        isExceeded: false,
+        text: '---'
+      };
+    }
+
+    const exceededMs = totalStayMs - limit8hMs;
+    const hours = Math.floor(exceededMs / 3600000);
+    const minutes = Math.floor((exceededMs % 3600000) / 60000);
 
     return {
       hours: hours + (minutes / 60),
-      isExceeded,
+      isExceeded: true,
       text: `${hours}h ${minutes}m`
     };
   }
