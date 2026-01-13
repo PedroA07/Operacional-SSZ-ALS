@@ -5,19 +5,21 @@ export const useMousePan = (scale: number) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const startPos = useRef({ x: 0, y: 0 });
-  const currentPos = useRef({ x: 0, y: 0 });
 
   const onMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    setIsDragging(true);
+    // Previne comportamento nativo de drag de imagem do navegador
+    if (e.cancelable) e.preventDefault();
     
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     
+    // O ponto de partida deve considerar a posição atual para evitar "pulos"
     startPos.current = {
-      x: clientX - currentPos.current.x,
-      y: clientY - currentPos.current.y
+      x: clientX - position.x,
+      y: clientY - position.y
     };
-  }, []);
+    setIsDragging(true);
+  }, [position]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -26,11 +28,10 @@ export const useMousePan = (scale: number) => {
       const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
       const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
 
-      const nextX = clientX - startPos.current.x;
-      const nextY = clientY - startPos.current.y;
-
-      currentPos.current = { x: nextX, y: nextY };
-      setPosition({ x: nextX, y: nextY });
+      setPosition({
+        x: clientX - startPos.current.x,
+        y: clientY - startPos.current.y
+      });
     };
 
     const onMouseUp = () => {
@@ -39,7 +40,7 @@ export const useMousePan = (scale: number) => {
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
-    window.addEventListener('touchmove', onMouseMove);
+    window.addEventListener('touchmove', onMouseMove, { passive: false });
     window.addEventListener('touchend', onMouseUp);
 
     return () => {
@@ -51,9 +52,7 @@ export const useMousePan = (scale: number) => {
   }, [isDragging]);
 
   const resetPosition = () => {
-    const zero = { x: 0, y: 0 };
-    currentPos.current = zero;
-    setPosition(zero);
+    setPosition({ x: 0, y: 0 });
   };
 
   return {

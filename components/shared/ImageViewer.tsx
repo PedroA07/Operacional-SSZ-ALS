@@ -14,59 +14,18 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   const [rotation, setRotation] = useState(0);
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [retryWithoutCORS, setRetryWithoutCORS] = useState(false);
   
-  const { scale, setScale, resetZoom, zoomIn, zoomOut } = useMouseZoom({ containerRef });
+  const { scale, resetZoom, zoomIn, zoomOut } = useMouseZoom({ containerRef });
   const { 
     position, 
-    setPosition, 
     isDragging, 
     onMouseDown, 
     resetPosition 
   } = useMousePan(scale);
 
-  // Efeito para sincronizar eventos globais de movimento durante o arraste
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
-      const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-      const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-      
-      // Lógica de pan integrada aqui para evitar atrasos de hook
-      setPosition(prev => ({
-        x: prev.x + (clientX - lastX.current),
-        y: prev.y + (clientY - lastY.current)
-      }));
-      
-      lastX.current = clientX;
-      lastY.current = clientY;
-    };
-
-    const handleGlobalUp = () => {
-      // Finaliza o arraste globalmente
-      document.dispatchEvent(new CustomEvent('als_stop_drag'));
-    };
-
-    const lastX = { current: 0 };
-    const lastY = { current: 0 };
-
-    // Inicializador do tracker
-    const initTracker = (e: any) => {
-        lastX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        lastY.current = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    };
-
-    // Este useEffect é um complemento, o useMousePan já faz o grosso, 
-    // mas aqui garantimos a fluidez.
-    
-    return () => {};
-  }, [isDragging, setPosition]);
-
   useEffect(() => {
     setHasError(false);
     setIsLoading(true);
-    setRetryWithoutCORS(false);
     resetZoom();
     resetPosition();
     setRotation(0);
@@ -77,27 +36,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     resetPosition();
   };
 
-  const handleReset = () => {
-    resetZoom();
-    resetPosition();
-    setRotation(0);
-  };
-
-  const handleImageError = () => {
-    if (!retryWithoutCORS) {
-      setRetryWithoutCORS(true);
-      setIsLoading(true);
-    } else {
-      setHasError(true);
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div 
       ref={containerRef}
       className={`relative w-full h-full flex flex-col bg-slate-950 rounded-[2.5rem] overflow-hidden group select-none shadow-inner border border-white/5 ${className}`}
-      style={{ cursor: isDragging ? 'grabbing' : (scale > 1 ? 'move' : 'default') }}
+      style={{ cursor: isDragging ? 'grabbing' : (scale > 1 ? 'grab' : 'default') }}
     >
       <div 
         className="flex-1 relative overflow-hidden flex items-center justify-center p-4 touch-none"
@@ -107,19 +50,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
         {isLoading && !hasError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50 z-10">
             <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-[8px] font-black text-blue-400 uppercase mt-4 tracking-widest">Acessando R2...</p>
           </div>
         )}
 
         {hasError ? (
-          <div className="flex flex-col items-center justify-center text-center p-10 space-y-4">
-            <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-            </div>
-            <p className="text-white font-black uppercase text-[10px] tracking-widest">Falha de Visualização</p>
-            <div className="flex flex-col gap-2">
-               <button onClick={() => window.open(url, '_blank')} className="px-5 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg">Abrir link direto</button>
-            </div>
+          <div className="text-center p-10">
+            <p className="text-white font-black uppercase text-[10px]">Falha ao carregar arquivo</p>
+            <button onClick={() => window.open(url, '_blank')} className="mt-4 px-5 py-2 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase">Abrir link direto</button>
           </div>
         ) : (
           <div 
@@ -127,17 +64,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
             style={{ 
               transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
               transformOrigin: 'center center',
-              transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+              transition: isDragging ? 'none' : 'transform 0.15s ease-out'
             }}
           >
             <img 
               src={url} 
               alt={alt} 
               className="max-w-full max-h-full object-contain shadow-2xl pointer-events-auto" 
-              crossOrigin={retryWithoutCORS ? undefined : "anonymous"}
               onLoad={() => setIsLoading(false)}
-              onError={handleImageError}
-              onDoubleClick={handleReset} 
+              onError={() => { setHasError(true); setIsLoading(false); }}
               draggable={false} 
             />
           </div>
@@ -145,12 +80,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
       </div>
 
       {!hasError && !isLoading && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2.5 bg-slate-950/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 z-50">
-          <button onClick={zoomOut} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M20 12H4"/></svg></button>
-          <div className="w-14 text-center text-[10px] font-black text-blue-400 font-mono tracking-tighter">{Math.round(scale * 100)}%</div>
-          <button onClick={zoomIn} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg></button>
-          <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
-          <button onClick={handleRotate} className="p-3 text-white hover:bg-white/10 rounded-xl transition-colors" title="Girar 90º"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-slate-950/90 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl transition-all opacity-0 group-hover:opacity-100 z-50">
+          <button onClick={zoomOut} className="p-2 text-white hover:bg-white/10 rounded-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M20 12H4"/></svg></button>
+          <div className="w-12 text-center text-[10px] font-black text-blue-400 font-mono">{Math.round(scale * 100)}%</div>
+          <button onClick={zoomIn} className="p-2 text-white hover:bg-white/10 rounded-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg></button>
+          <div className="w-[1px] h-4 bg-white/10 mx-1"></div>
+          <button onClick={handleRotate} className="p-2 text-white hover:bg-white/10 rounded-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
         </div>
       )}
     </div>

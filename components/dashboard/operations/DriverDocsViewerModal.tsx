@@ -28,6 +28,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
+  const [isDeletingPhysical, setIsDeletingPhysical] = useState(false);
 
   const [isAddingMode, setIsAddingMode] = useState<'none' | 'choice' | 'camera'>('none');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -209,23 +210,29 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   };
 
   const executeDelete = async () => {
-    if (!docToDelete) return;
+    if (!docToDelete || isDeletingPhysical) return;
     
-    // 1. Localiza o documento para pegar a URL
-    const docObj = docs.find(d => d.id === docToDelete);
-    if (docObj) {
-      // 2. Remove do Cloudflare R2
-      await fileStorage.deleteFile(docObj.url);
-    }
+    setIsDeletingPhysical(true);
+    try {
+      const docObj = docs.find(d => d.id === docToDelete);
+      if (docObj) {
+        // Tenta remover do R2. Se falhar (link quebrado), prossegue com a limpeza no DB
+        await fileStorage.deleteFile(docObj.url).catch(() => console.warn("Arquivo já não existia no R2"));
+      }
 
-    // 3. Atualiza o banco de dados
-    const updatedDocs = docs.filter(d => d.id !== docToDelete);
-    setDocs(updatedDocs);
-    await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
-    
-    if (selectedDoc?.id === docToDelete) setSelectedDoc(null);
-    setIsDeleteModalOpen(false);
-    setDocToDelete(null);
+      const updatedDocs = docs.filter(d => d.id !== docToDelete);
+      await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
+      
+      setDocs(updatedDocs);
+      if (selectedDoc?.id === docToDelete) setSelectedDoc(null);
+      setIsDeleteModalOpen(false);
+      setDocToDelete(null);
+      onSuccess();
+    } catch (e) {
+      alert("Falha ao sincronizar exclusão com o servidor.");
+    } finally {
+      setIsDeletingPhysical(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -362,7 +369,11 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     Salvar no Dispositivo
                   </button>
-                  <button onClick={() => { setDocToDelete(selectedDoc.id); setIsDeleteModalOpen(true); }} className="w-full py-4 bg-red-50 text-red-600 border border-red-100 rounded-2xl text-[9px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
+                  <button 
+                    disabled={isDeletingPhysical}
+                    onClick={() => { setDocToDelete(selectedDoc.id); setIsDeleteModalOpen(true); }} 
+                    className="w-full py-4 bg-red-50 text-red-600 border border-red-100 rounded-2xl text-[9px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-30"
+                  >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     Remover do Dossiê
                   </button>
@@ -374,12 +385,18 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
 
       {isDeleteModalOpen && docToDelete && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 animate-in fade-in duration-300">
-           <div className="bg-white w-full max-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
-              <h4 className="text-lg font-black uppercase text-slate-800">Apagar Documento Permanentemente?</h4>
-              <p className="text-slate-500 text-xs">Isso removerá o arquivo físico do servidor Cloudflare.</p>
+           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
+              <h4 className="text-lg font-black uppercase text-slate-800">Apagar Permanentemente?</h4>
+              <p className="text-slate-500 text-xs">Isso removerá o arquivo físico do servidor Cloudflare R2 e o link do banco de dados.</p>
               <div className="grid grid-cols-2 gap-3">
                  <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Voltar</button>
-                 <button onClick={executeDelete} className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Excluir Tudo</button>
+                 <button 
+                  disabled={isDeletingPhysical}
+                  onClick={executeDelete} 
+                  className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg disabled:opacity-30"
+                 >
+                    {isDeletingPhysical ? 'Excluindo...' : 'Excluir Tudo'}
+                 </button>
               </div>
            </div>
         </div>

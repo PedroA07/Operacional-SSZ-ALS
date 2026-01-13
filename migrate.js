@@ -1,11 +1,12 @@
 const { createClient } = require('@supabase/supabase-js');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 require('dotenv').config();
 
+// Configurações extraídas do ambiente
 const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const r2Client = new S3Client({
   region: 'auto',
-  endpoint: process.env.R2_ENDPOINT?.split('.com')[0] + '.com',
+  endpoint: process.env.R2_ENDPOINT.split('.com')[0] + '.com',
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
@@ -14,151 +15,97 @@ const r2Client = new S3Client({
 
 const BUCKET_R2 = process.env.R2_BUCKET_NAME;
 const DOMAIN_R2 = process.env.R2_PUBLIC_DOMAIN;
+const PARENT_FOLDER = 'als-transportes/';
 
-async function uploadToR2(buffer, destPath, contentType) {
+/**
+ * Normaliza nomes para uso em pastas (Sem acentos, espaços -> underscores)
+ */
+const normalizeName = (name) => {
+  if (!name) return 'SEM_NOME';
+  return name
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .trim();
+};
+
+/**
+ * Função para baixar um arquivo e retornar buffer
+ */
+async function getBufferFromUrl(url) {
   try {
-    await r2Client.send(new PutObjectCommand({
-      Bucket: BUCKET_R2,
-      Key: destPath,
-      Body: buffer,
-      ContentType: contentType,
-    }));
-    return `${DOMAIN_R2}/${destPath}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
   } catch (e) {
-    console.error(`  [X] Falha upload R2: ${destPath}`, e.message);
     return null;
   }
 }
 
-async function getFileBuffer(source, supabaseBucket) {
-  if (!source) return null;
-  if (source.startsWith('data:')) {
-    const parts = source.split(',');
-    const mime = parts[0].split(':')[1].split(';')[0];
-    return { data: Buffer.from(parts[1], 'base64'), mime };
-  }
-  
-  // Se for um link do R2 antigo ou Supabase, tenta baixar
-  const downloadUrl = source.startsWith('http') ? source : null;
-  
-  try {
-    if (downloadUrl) {
-      const resp = await fetch(downloadUrl);
-      if (!resp.ok) return null;
-      const arrayBuffer = await resp.arrayBuffer();
-      return { 
-        data: Buffer.from(arrayBuffer), 
-        mime: downloadUrl.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg' 
-      };
-    } else {
-      // É um path do Supabase Storage
-      const cleanPath = source.replace(`${supabaseBucket}/`, '');
-      const { data, error } = await supabase.storage.from(supabaseBucket).download(cleanPath);
-      if (error) return null;
-      return { 
-        data: Buffer.from(await data.arrayBuffer()), 
-        mime: cleanPath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg' 
-      };
-    }
-  } catch (e) { return null; }
-}
+async function startMigration() {
+  console.log('🚀 Iniciando Migração: ID -> NOME (Drivers)');
 
-async function start() {
-  console.log("🚀 INICIANDO REORGANIZAÇÃO COMPLETA DE PASTAS NO R2");
-
-  // 1. COLABORADORES (ANTIGA PASTA DOCUMENTOS/ OU USERS/)
-  console.log("\n--- Organizando: colaboradores/[id]/foto_perfil/ ---");
-  const { data: staff } = await supabase.from('staff').select('id, photo, name');
-  for (const s of (staff || [])) {
-    if (s.photo) {
-      const res = await getFileBuffer(s.photo, 'drivers'); 
-      if (res) {
-        const newPath = `colaboradores/${s.id}/foto_perfil/perfil.jpg`;
-        const url = await uploadToR2(res.data, newPath, res.mime);
-        if (url) {
-          await supabase.from('staff').update({ photo: url }).eq('id', s.id);
-          // Atualiza também na tabela de usuários para sincronismo
-          await supabase.from('users').update({ photo: url }).eq('staff_id', s.id);
-          console.log(`  [OK] Colaborador ${s.name} organizado.`);
-        }
-      }
-    }
+  // 1. Buscar todos os motoristas
+  const { data: drivers, error } = await supabase.from('drivers').select('id, name, photo, cnh_pdf_url');
+  if (error) {
+    console.error('Erro ao buscar motoristas:', error);
+    process.exit(1);
   }
 
-  // 2. MOTORISTAS (drivers/[id]/foto_perfil/ e drivers/[id]/cnh/)
-  console.log("\n--- Organizando: drivers/[id]/ ---");
-  const { data: drivers } = await supabase.from('drivers').select('id, photo, cnh_pdf_url, name');
-  for (const d of (drivers || [])) {
-    // Foto de Perfil
-    if (d.photo) {
-      const res = await getFileBuffer(d.photo, 'drivers');
-      if (res) {
-        const newPath = `drivers/${d.id}/foto_perfil/perfil.jpg`;
-        const url = await uploadToR2(res.data, newPath, res.mime);
-        if (url) await supabase.from('drivers').update({ photo: url }).eq('id', d.id);
-      }
-    }
-    // CNH PDF
-    if (d.cnh_pdf_url) {
-      const res = await getFileBuffer(d.cnh_pdf_url, 'drivers');
-      if (res) {
-        const newPath = `drivers/${d.id}/cnh/cnh.pdf`;
-        const url = await uploadToR2(res.data, newPath, 'application/pdf');
-        if (url) await supabase.from('drivers').update({ cnh_pdf_url: url }).eq('id', d.id);
-      }
-    }
-    console.log(`  [OK] Motorista ${d.name} organizado.`);
-  }
-
-  // 3. VIAGENS (trips/[os]/documentos/ e trips/[os]/fotos_campo/)
-  console.log("\n--- Organizando: trips/[os]/ ---");
-  const { data: trips } = await supabase.from('trips').select('*');
-  for (const t of (trips || [])) {
+  for (const driver of drivers) {
+    const normalizedName = normalizeName(driver.name);
     const updates = {};
-    const osClean = (t.os || 'sem_os').replace(/[^a-z0-9]/gi, '_');
-    
-    // PDFs de Documentos (CTE, OS, etc)
-    const docFields = ['os_doc', 'cte_doc', 'agendamento_doc', 'completo_doc', 'cva_doc', 'nf_doc', 'freight_contract_doc'];
-    for (const field of docFields) {
-      if (t[field] && t[field].url) {
-        const res = await getFileBuffer(t[field].url, 'trips');
-        if (res) {
-          const type = field.replace('_doc', '').replace('freight_contract', 'contrato'); 
-          const newPath = `trips/${osClean}/documentos/${type}.pdf`;
-          const url = await uploadToR2(res.data, newPath, 'application/pdf');
-          if (url) updates[field] = { ...t[field], url };
-        }
+    let hasChanges = false;
+
+    console.log(`\n--- Processando: ${driver.name} ---`);
+
+    // Migrar Foto de Perfil
+    if (driver.photo && driver.photo.includes('/drivers/') && !driver.photo.includes(normalizedName)) {
+      const buffer = await getBufferFromUrl(driver.photo);
+      if (buffer) {
+        const newPath = `${PARENT_FOLDER}drivers/${normalizedName}/foto_perfil/perfil.jpg`;
+        await r2Client.send(new PutObjectCommand({
+          Bucket: BUCKET_R2,
+          Key: newPath,
+          Body: buffer,
+          ContentType: 'image/jpeg'
+        }));
+        updates.photo = `${DOMAIN_R2}/${newPath}`;
+        hasChanges = true;
+        console.log(`  [OK] Foto movida para: ${newPath}`);
       }
     }
 
-    // Fotos de Campo (array driver_docs)
-    if (t.driver_docs && Array.isArray(t.driver_docs)) {
-      const newDocs = [];
-      for (const img of t.driver_docs) {
-        const res = await getFileBuffer(img.url, 'trips');
-        if (res) {
-          const photoId = img.id || `img_${Date.now()}`;
-          const newPath = `trips/${osClean}/fotos_campo/${photoId}.jpg`;
-          const url = await uploadToR2(res.data, newPath, 'image/jpeg');
-          if (url) newDocs.push({ ...img, url });
-          else newDocs.push(img);
-        } else {
-          newDocs.push(img);
-        }
+    // Migrar CNH PDF
+    if (driver.cnh_pdf_url && driver.cnh_pdf_url.includes('/drivers/') && !driver.cnh_pdf_url.includes(normalizedName)) {
+      const buffer = await getBufferFromUrl(driver.cnh_pdf_url);
+      if (buffer) {
+        const newPath = `${PARENT_FOLDER}drivers/${normalizedName}/cnh/cnh.pdf`;
+        await r2Client.send(new PutObjectCommand({
+          Bucket: BUCKET_R2,
+          Key: newPath,
+          Body: buffer,
+          ContentType: 'application/pdf'
+        }));
+        updates.cnh_pdf_url = `${DOMAIN_R2}/${newPath}`;
+        hasChanges = true;
+        console.log(`  [OK] CNH movida para: ${newPath}`);
       }
-      updates.driver_docs = newDocs;
     }
 
-    if (Object.keys(updates).length > 0) {
-      await supabase.from('trips').update(updates).eq('id', t.id);
-      console.log(`  [OK] OS ${t.os} reorganizada.`);
+    if (hasChanges) {
+      const { error: upError } = await supabase.from('drivers').update(updates).eq('id', driver.id);
+      if (upError) console.error(`  [X] Erro ao atualizar DB para ${driver.name}`);
+      else console.log(`  [✓] Banco de dados atualizado.`);
+    } else {
+      console.log(`  [!] Nenhuma migração necessária ou arquivos já organizados.`);
     }
   }
 
-  console.log("\n✅ REORGANIZAÇÃO CONCLUÍDA! AGORA TUDO ESTÁ EM PASTAS ESPECÍFICAS.");
+  console.log('\n✅ Migração concluída!');
 }
 
-start().catch(err => {
-  console.error("❌ ERRO CRÍTICO NA REORGANIZAÇÃO:", err);
-  process.exit(1);
-});
+startMigration().catch(console.error);

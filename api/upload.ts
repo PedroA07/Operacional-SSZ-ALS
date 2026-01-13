@@ -20,13 +20,13 @@ export default async function handler(request: Request) {
   const client = getS3Client();
   const bucketName = process.env.R2_BUCKET_NAME || "als-transportes";
 
-  // LÓGICA DE EXCLUSÃO (DELETE)
+  // LÓGICA DE EXCLUSÃO FÍSICA NO CLOUDFLARE R2
   if (request.method === 'DELETE') {
     try {
       const { path } = await request.json();
-      if (!path) return new Response(JSON.stringify({ error: "Caminho ausente" }), { status: 400 });
+      if (!path) return new Response(JSON.stringify({ error: "Caminho (Key) ausente" }), { status: 400 });
 
-      // Limpa o path para garantir que seja apenas a Key do R2
+      // Extrai apenas a chave do R2, removendo domínio e prefixos duplicados
       const finalKey = path
         .replace(/.*\/als-transportes\//, '')
         .replace(/^als-transportes\//, '')
@@ -38,9 +38,12 @@ export default async function handler(request: Request) {
       });
 
       await client.send(command);
-      return new Response(JSON.stringify({ success: true, message: "Arquivo removido do R2" }), { status: 200 });
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: `Arquivo ${finalKey} removido fisicamente do R2` 
+      }), { status: 200 });
     } catch (error: any) {
-      return new Response(JSON.stringify({ error: `Erro ao deletar: ${error.message}` }), { status: 500 });
+      return new Response(JSON.stringify({ error: `Erro na remoção R2: ${error.message}` }), { status: 500 });
     }
   }
 
@@ -52,17 +55,17 @@ export default async function handler(request: Request) {
       const rawPath = (formData.get("path") as string) || ""; 
       
       if (!file) {
-        return new Response(JSON.stringify({ error: "Arquivo ausente" }), { 
-          status: 400,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response(JSON.stringify({ error: "Arquivo ausente" }), { status: 400 });
       }
 
-      const finalKey = rawPath
+      // Força a organização dentro da pasta als-transportes/
+      let finalKey = rawPath
         .replace(/^als-transportes\//i, '') 
         .replace(/^als-transportes/i, '')
         .replace(/^\/+/, '')
         .replace(/\/+/g, '/');
+      
+      finalKey = `als-transportes/${finalKey}`;
 
       const fileBytes = new Uint8Array(await file.arrayBuffer());
       
@@ -80,22 +83,18 @@ export default async function handler(request: Request) {
       domain = domain.trim().replace(/\/$/, "");
       if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
       
-      const publicUrl = `${domain}/als-transportes/${finalKey}`;
+      const publicUrl = `${domain}/${finalKey}`;
 
       return new Response(JSON.stringify({ 
         url: publicUrl, 
-        path: `als-transportes/${finalKey}`,
+        path: finalKey,
         success: true 
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
     } catch (error: any) {
-      console.error("[R2 Error]:", error);
-      return new Response(JSON.stringify({ error: `Erro R2: ${error.message}` }), { 
-        status: 500,
-        headers: { "Content-Type": "application/json" }
-      });
+      return new Response(JSON.stringify({ error: `Erro R2: ${error.message}` }), { status: 500 });
     }
   }
 

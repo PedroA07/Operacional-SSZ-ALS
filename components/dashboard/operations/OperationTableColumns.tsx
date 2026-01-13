@@ -100,7 +100,7 @@ export const getOperationTableColumns = (
 
     if (docToDelete?.url) {
       // EXCLUSÃO FÍSICA NO R2
-      await fileStorage.deleteFile(docToDelete.url);
+      await fileStorage.deleteFile(docToDelete.url).catch(() => console.warn("Doc já removido no R2"));
     }
 
     await db.saveTrip(updatedTrip, actingUser);
