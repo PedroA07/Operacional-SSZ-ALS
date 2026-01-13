@@ -42,6 +42,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
 
   const [form, setForm] = useState<Partial<Customer>>(initialForm);
 
+  // Busca automática por CEP
   useEffect(() => {
     const cep = form.zipCode?.replace(/\D/g, '');
     if (cep && cep.length === 8) {
@@ -49,12 +50,17 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     }
   }, [form.zipCode]);
 
+  // Busca automática por CNPJ quando atingir 14 dígitos
   useEffect(() => {
     const cnpj = form.cnpj?.replace(/\D/g, '');
-    if (cnpj && cnpj.length === 14 && !editingId) {
+    if (cnpj && cnpj.length === 14) {
+      // Se for edição e o CNPJ for o mesmo do original, não busca automaticamente para evitar sobreposição indesejada
+      const original = customers.find(c => c.id === editingId);
+      if (editingId && original && original.cnpj.replace(/\D/g, '') === cnpj) return;
+      
       handleCnpjLookup(cnpj);
     }
-  }, [form.cnpj, editingId]);
+  }, [form.cnpj]);
 
   const handleCepLookup = async (cep: string) => {
     setIsCepLoading(true);
@@ -77,10 +83,16 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     }
   };
 
-  const handleCnpjLookup = async (cnpj: string) => {
+  const handleCnpjLookup = async (cnpj?: string) => {
+    const targetCnpj = cnpj || form.cnpj?.replace(/\D/g, '');
+    if (!targetCnpj || targetCnpj.length !== 14) {
+      if (!cnpj) alert("Digite um CNPJ válido de 14 dígitos.");
+      return;
+    }
+
     setIsCnpjLoading(true);
     try {
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${targetCnpj}`);
       if (response.ok) {
         const data = await response.json();
         setForm(prev => ({
@@ -93,9 +105,12 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
           state: (data.uf || prev.state || '').toUpperCase(),
           zipCode: data.cep ? maskCEP(data.cep) : prev.zipCode
         }));
+      } else {
+        if (!cnpj) alert("CNPJ não encontrado na base de dados nacional.");
       }
     } catch (e) {
       console.warn("Falha no CNPJ");
+      if (!cnpj) alert("Erro ao consultar o serviço de CNPJ.");
     } finally {
       setIsCnpjLoading(false);
     }
@@ -274,7 +289,33 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
               <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-red-400 transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
             </div>
             <form onSubmit={handleSubmit} className="p-8 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNPJ</label><input required type="text" className={inputClasses} value={form.cnpj} onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} placeholder="00.000.000/0000-00" /></div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">CNPJ</label>
+                <div className="relative">
+                  <input 
+                    required 
+                    type="text" 
+                    className={`${inputClasses} pr-14`} 
+                    value={form.cnpj} 
+                    onChange={e => setForm({...form, cnpj: maskCNPJ(e.target.value)})} 
+                    placeholder="00.000.000/0000-00" 
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => handleCnpjLookup()}
+                    disabled={isCnpjLoading}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-blue-700 transition-all active:scale-90 disabled:opacity-50"
+                    title="Consultar CNPJ"
+                  >
+                    {isCnpjLoading ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1"><label className="text-[9px] font-black text-blue-600 uppercase ml-1">Razão Social</label><input required type="text" className={inputClasses} value={form.legalName} onChange={e => setForm({...form, legalName: e.target.value.toUpperCase()})} /></div>
                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nome Fantasia</label><input required type="text" className={inputClasses} value={form.name} onChange={e => setForm({...form, name: e.target.value.toUpperCase()})} /></div>
