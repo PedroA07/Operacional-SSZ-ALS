@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Trip, Category, StatusHistoryEntry, User } from '../../types';
+import { Trip, Category, StatusHistoryEntry, User, TripStatus } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import * as XLSX from 'xlsx';
 import { stayImporter } from '../../utils/stayImporter';
@@ -18,6 +18,11 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
   const [isImporting, setIsImporting] = useState(false);
   const [importedStays, setImportedStays] = useState<Trip[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Estados para edição de tempo
+  const [editingTripId, setEditingTripId] = useState<string | null>(null);
+  const [editingStatus, setEditingStatus] = useState<TripStatus | null>(null);
+  const [tempTime, setTempTime] = useState('');
 
   const availableCategories = useMemo(() => {
     const cats = Array.from(new Set(importedStays.map(t => t.category).filter(Boolean)));
@@ -53,6 +58,64 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const openTimeEditor = (trip: Trip, status: TripStatus) => {
+    const entry = trip.statusHistory.find(h => h.status === status);
+    setEditingTripId(trip.id);
+    setEditingStatus(status);
+    
+    if (entry) {
+      const date = new Date(entry.dateTime);
+      const tzOffset = date.getTimezoneOffset() * 60000;
+      setTempTime(new Date(date.getTime() - tzOffset).toISOString().slice(0, 16));
+    } else {
+      const now = new Date();
+      const tzOffset = now.getTimezoneOffset() * 60000;
+      setTempTime(new Date(Date.now() - tzOffset).toISOString().slice(0, 16));
+    }
+  };
+
+  const handleSaveTime = async () => {
+    if (!editingTripId || !editingStatus || !tempTime) return;
+
+    const isoTime = new Date(tempTime).toISOString();
+    const now = new Date().toISOString();
+
+    const updatedList = importedStays.map(t => {
+      if (t.id === editingTripId) {
+        const history = [...(t.statusHistory || [])];
+        const existingIdx = history.findIndex(h => h.status === editingStatus);
+        
+        if (existingIdx >= 0) {
+          history[existingIdx] = { ...history[existingIdx], dateTime: isoTime };
+        } else {
+          history.push({ status: editingStatus, dateTime: isoTime, createdAt: now });
+        }
+
+        // Ordena para que o último evento seja o status principal
+        const sorted = [...history].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+        
+        const updatedTrip = {
+          ...t,
+          status: sorted[0].status,
+          statusTime: sorted[0].dateTime,
+          statusHistory: history
+        };
+
+        // Salva no DB silenciosamente para persistência
+        const session = sessionStorage.getItem('als_active_session');
+        const user: User = session ? JSON.parse(session) : { id: userId, displayName: 'Operacional' };
+        db.saveTrip(updatedTrip, user);
+
+        return updatedTrip;
+      }
+      return t;
+    });
+
+    setImportedStays(updatedList);
+    setEditingTripId(null);
+    setEditingStatus(null);
   };
 
   const columns = [
@@ -93,7 +156,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
       label: 'Previsão', 
       render: (t: Trip) => (
         <div className="flex flex-col items-center min-w-[70px]">
-          <span className="font-black text-slate-700 text-[10px]">{new Date(t.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
+          <span className="font-black text-slate-700 text-[10px]">{new Date(t.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'})}</span>
           <span className="text-blue-500 font-bold text-[9px]">{new Date(t.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
         </div>
       )
@@ -104,21 +167,35 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
       render: (t: Trip) => {
         const inEntry = t.statusHistory.find(h => h.status === 'Chegou no cliente');
         const outEntry = t.statusHistory.find(h => h.status === 'Saiu do cliente');
+        
+        const renderTime = (entry: StatusHistoryEntry | undefined, status: TripStatus, colorClass: string) => (
+          <div className="flex items-center justify-between gap-3 group/row">
+             <div className="flex flex-col">
+                <span className="text-[6px] font-black text-slate-400 uppercase">{status === 'Chegou no cliente' ? 'Entrada' : 'Saída'}</span>
+                <span className={`text-[9px] font-black ${colorClass}`}>
+                  {entry ? (
+                    <>
+                      {new Date(entry.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}
+                      <span className="ml-1 opacity-80">{new Date(entry.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                    </>
+                  ) : '--/-- --:--'}
+                </span>
+             </div>
+             <button 
+               onClick={(e) => { e.stopPropagation(); openTimeEditor(t, status); }}
+               className="p-1.5 rounded-lg bg-white border border-slate-100 text-slate-300 hover:text-blue-600 hover:border-blue-200 transition-all opacity-0 group-hover/row:opacity-100 shadow-sm"
+               title={`Editar ${status}`}
+             >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg>
+             </button>
+          </div>
+        );
+
         return (
-          <div className="flex items-center gap-2 min-w-[140px] bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-             <div className="flex flex-col text-center flex-1">
-                <span className="text-[6px] font-black text-slate-400 uppercase">Chegada</span>
-                <span className="text-[9px] font-black text-emerald-600">
-                  {inEntry ? new Date(inEntry.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '--:--'}
-                </span>
-             </div>
-             <div className="w-[1px] h-6 bg-slate-200"></div>
-             <div className="flex flex-col text-center flex-1">
-                <span className="text-[6px] font-black text-slate-400 uppercase">Saída</span>
-                <span className="text-[9px] font-black text-red-600">
-                  {outEntry ? new Date(outEntry.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '--:--'}
-                </span>
-             </div>
+          <div className="flex flex-col gap-2 min-w-[170px] bg-slate-50 p-2 rounded-xl border border-slate-100 shadow-inner">
+             {renderTime(inEntry, 'Chegou no cliente', 'text-emerald-600')}
+             <div className="w-full h-[1px] bg-slate-200/50"></div>
+             {renderTime(outEntry, 'Saiu do cliente', 'text-red-600')}
           </div>
         );
       }
@@ -215,6 +292,42 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId }) => {
       ) : (
         <div className="bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 py-24 text-center">
            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Aguardando planilha de estadias...</p>
+        </div>
+      )}
+
+      {/* Modal para Ajuste de Tempo Manual */}
+      {editingTripId && editingStatus && (
+        <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">
+              <div className="text-center">
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Ajuste Manual de Janela</p>
+                <p className="text-xl font-black text-slate-800 uppercase">
+                  {editingStatus === 'Chegou no cliente' ? 'Horário de Entrada' : 'Horário de Saída'}
+                </p>
+                <p className="text-[8px] font-black text-slate-400 uppercase mt-1">OS: {importedStays.find(s => s.id === editingTripId)?.os}</p>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nova Data e Hora</label>
+                   <input 
+                     type="datetime-local" 
+                     className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black text-slate-800 text-sm outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner" 
+                     value={tempTime} 
+                     onChange={e => setTempTime(e.target.value)} 
+                   />
+                </div>
+              </div>
+
+              <div className="grid gap-3 pt-4">
+                <button onClick={handleSaveTime} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 active:scale-95 transition-all">
+                  Confirmar Alteração
+                </button>
+                <button onClick={() => { setEditingTripId(null); setEditingStatus(null); }} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3 hover:text-slate-600">
+                  Cancelar
+                </button>
+              </div>
+           </div>
         </div>
       )}
 
