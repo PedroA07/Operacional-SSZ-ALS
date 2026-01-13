@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Trip, DriverCapturedDoc, User } from '../../../types';
 import { db } from '../../../utils/storage';
 import { textExtractionService, NFData } from '../../../utils/textExtractionService';
 import { imageCompressor } from '../../../utils/imageCompressor';
-import { fileStorage } from '../../../utils/fileStorage';
 import ImageViewer from '../../shared/ImageViewer';
 
 interface DriverDocsViewerModalProps {
@@ -18,7 +16,6 @@ interface DriverDocsViewerModalProps {
 const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, onClose, trip, user, onSuccess }) => {
   const [docs, setDocs] = useState<DriverCapturedDoc[]>(trip.driver_docs || []);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [isUploading, setIsUploading] = useState<boolean>(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [selectedDoc, setSelectedDoc] = useState<DriverCapturedDoc | null>(null);
   
@@ -28,7 +25,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
-  const [isDeletingPhysical, setIsDeletingPhysical] = useState(false);
 
   const [isAddingMode, setIsAddingMode] = useState<'none' | 'choice' | 'camera'>('none');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -93,18 +89,15 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      setIsUploading(true);
-      try {
-        const results = await Promise.all((Array.from(files) as File[]).map(async file => {
-          return await imageCompressor.compress(file, {
-            maxWidth: 800,
-            quality: 0.4
-          });
-        }));
-        await saveNewDocs(results);
-      } finally {
-        setIsUploading(false);
-      }
+      // Added explicit type cast to File[] to fix 'unknown' type error in map
+      const results = await Promise.all((Array.from(files) as File[]).map(async file => {
+        // COMPRIMIR CADA ARQUIVO ANTES DE SALVAR
+        return await imageCompressor.compress(file, {
+          maxWidth: 1600,
+          quality: 0.8
+        });
+      }));
+      await saveNewDocs(results);
     }
     e.target.value = '';
   };
@@ -118,36 +111,22 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
       const raw = canvas.toDataURL('image/jpeg', 0.95);
-      
-      setIsUploading(true);
-      try {
-        const compressed = await imageCompressor.compress(raw, {
-          maxWidth: 800,
-          quality: 0.4
-        });
-        await saveNewDocs([compressed]);
-        stopCamera();
-      } finally {
-        setIsUploading(false);
-      }
+      // COMPRIMIR CAPTURA
+      const compressed = await imageCompressor.compress(raw, {
+        maxWidth: 1600,
+        quality: 0.8
+      });
+      saveNewDocs([compressed]);
+      stopCamera();
     }
   };
 
-  const saveNewDocs = async (base64Images: string[]) => {
-    const osClean = trip.os.replace(/[^a-z0-9]/gi, '_');
-    const newDocs: DriverCapturedDoc[] = [];
-
-    for (let i = 0; i < base64Images.length; i++) {
-      const photoId = `op-scan-${Date.now()}-${i}`;
-      const publicUrl = await fileStorage.uploadTripPhoto(base64Images[i], osClean, photoId);
-      
-      newDocs.push({
-        id: photoId,
-        url: publicUrl,
-        timestamp: new Date().toISOString()
-      });
-    }
-
+  const saveNewDocs = async (urls: string[]) => {
+    const newDocs: DriverCapturedDoc[] = urls.map((url, idx) => ({
+      id: `op-scan-${Date.now()}-${idx}`,
+      url: url,
+      timestamp: new Date().toISOString()
+    }));
     const updatedDocs = [...docs, ...newDocs];
     setDocs(updatedDocs);
     if (newDocs.length === 1) setSelectedDoc(newDocs[0]);
@@ -210,29 +189,13 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   };
 
   const executeDelete = async () => {
-    if (!docToDelete || isDeletingPhysical) return;
-    
-    setIsDeletingPhysical(true);
-    try {
-      const docObj = docs.find(d => d.id === docToDelete);
-      if (docObj) {
-        // Tenta remover do R2. Se falhar (link quebrado), prossegue com a limpeza no DB
-        await fileStorage.deleteFile(docObj.url).catch(() => console.warn("Arquivo já não existia no R2"));
-      }
-
-      const updatedDocs = docs.filter(d => d.id !== docToDelete);
-      await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
-      
-      setDocs(updatedDocs);
-      if (selectedDoc?.id === docToDelete) setSelectedDoc(null);
-      setIsDeleteModalOpen(false);
-      setDocToDelete(null);
-      onSuccess();
-    } catch (e) {
-      alert("Falha ao sincronizar exclusão com o servidor.");
-    } finally {
-      setIsDeletingPhysical(false);
-    }
+    if (!docToDelete) return;
+    const updatedDocs = docs.filter(d => d.id !== docToDelete);
+    setDocs(updatedDocs);
+    await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
+    if (selectedDoc?.id === docToDelete) setSelectedDoc(null);
+    setIsDeleteModalOpen(false);
+    setDocToDelete(null);
   };
 
   if (!isOpen) return null;
@@ -268,17 +231,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
           </div>
 
           <div className="flex-1 bg-slate-100 p-8 flex items-center justify-center relative overflow-hidden">
-             {isUploading && (
-                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex flex-col items-center justify-center text-white space-y-6">
-                   <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                   <div className="text-center">
-                      <p className="text-sm font-black uppercase tracking-widest">Sincronizando com Cloudflare R2</p>
-                      <p className="text-[10px] text-blue-300 font-bold uppercase mt-1 animate-pulse">Comprimindo e enviando arquivo...</p>
-                   </div>
-                </div>
-             )}
-
-             {isAddingMode === 'choice' && !isUploading && (
+             {isAddingMode === 'choice' && (
                 <div className="flex gap-6 animate-in zoom-in-95">
                    <button onClick={startCamera} className="w-48 h-56 bg-white rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center justify-center gap-4 hover:border-blue-500 transition-all">
                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg></div>
@@ -292,7 +245,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                 </div>
              )}
 
-             {isAddingMode === 'camera' && !isUploading && (
+             {isAddingMode === 'camera' && (
                 <div className="w-full max-w-2xl bg-black rounded-3xl overflow-hidden shadow-2xl relative">
                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
                    <div className="absolute bottom-8 left-0 w-full flex justify-center gap-4">
@@ -303,10 +256,8 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
              )}
 
              {isAddingMode === 'none' && selectedDoc ? (
-               <div className="w-full h-full rounded-3xl overflow-hidden bg-black flex items-center justify-center">
-                  <ImageViewer url={selectedDoc.url} />
-               </div>
-             ) : isAddingMode === 'none' && !isUploading && (
+               <div className="w-full h-full rounded-3xl overflow-hidden bg-black"><ImageViewer url={selectedDoc.url} /></div>
+             ) : isAddingMode === 'none' && (
                <div className="text-center text-slate-300 font-black uppercase tracking-widest">Selecione um arquivo lateral</div>
              )}
           </div>
@@ -369,11 +320,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     Salvar no Dispositivo
                   </button>
-                  <button 
-                    disabled={isDeletingPhysical}
-                    onClick={() => { setDocToDelete(selectedDoc.id); setIsDeleteModalOpen(true); }} 
-                    className="w-full py-4 bg-red-50 text-red-600 border border-red-100 rounded-2xl text-[9px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-30"
-                  >
+                  <button onClick={() => { setDocToDelete(selectedDoc.id); setIsDeleteModalOpen(true); }} className="w-full py-4 bg-red-50 text-red-600 border border-red-100 rounded-2xl text-[9px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     Remover do Dossiê
                   </button>
@@ -386,17 +333,10 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       {isDeleteModalOpen && docToDelete && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
-              <h4 className="text-lg font-black uppercase text-slate-800">Apagar Permanentemente?</h4>
-              <p className="text-slate-500 text-xs">Isso removerá o arquivo físico do servidor Cloudflare R2 e o link do banco de dados.</p>
+              <h4 className="text-lg font-black uppercase text-slate-800">Apagar Documento?</h4>
               <div className="grid grid-cols-2 gap-3">
                  <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Voltar</button>
-                 <button 
-                  disabled={isDeletingPhysical}
-                  onClick={executeDelete} 
-                  className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg disabled:opacity-30"
-                 >
-                    {isDeletingPhysical ? 'Excluindo...' : 'Excluir Tudo'}
-                 </button>
+                 <button onClick={executeDelete} className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Excluir</button>
               </div>
            </div>
         </div>

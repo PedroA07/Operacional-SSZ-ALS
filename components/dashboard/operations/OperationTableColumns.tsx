@@ -3,9 +3,9 @@ import React from 'react';
 import { Trip, TripStatus, TripDocument, User, DriverCapturedDoc, Driver } from '../../../types';
 import { db } from '../../../utils/storage';
 import { fileStorage } from '../../../utils/fileStorage';
-import { imageCompressor } from '../../../utils/imageCompressor';
 import ActionMenu from './ActionMenu';
 
+// Novos componentes de coluna modulares
 import { DriverColumn } from './columns/DriverColumn';
 import { EquipmentColumn } from './columns/EquipmentColumn';
 import { ShipBookingColumn } from './columns/ShipBookingColumn';
@@ -39,33 +39,15 @@ export const getOperationTableColumns = (
     if (type === 'BATCH') {
       const newDocs: DriverCapturedDoc[] = [];
       for (const file of filesArray) {
-        let fileToUpload: File | string = file;
-        
-        if (file.type.startsWith('image/')) {
-          fileToUpload = await imageCompressor.compress(file, {
-            maxWidth: 800,
-            quality: 0.4
-          });
-        }
-
         const photoId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        const url = await fileStorage.uploadTripPhoto(fileToUpload, trip.os, photoId);
+        const url = await fileStorage.uploadTripPhoto(file, trip.os, photoId);
         newDocs.push({ id: photoId, url, timestamp: new Date().toISOString() });
       }
       updatedTrip.driver_docs = [...(updatedTrip.driver_docs || []), ...newDocs];
     } else {
       const file = filesArray[0];
-      let fileToUpload: File | string = file;
-
-      if (file.type.startsWith('image/')) {
-        fileToUpload = await imageCompressor.compress(file, {
-          maxWidth: 800,
-          quality: 0.4
-        });
-      }
-
       const docTypeLabel = type.replace('_PDF', '').toLowerCase();
-      const url = await fileStorage.uploadTripDoc(fileToUpload, trip.os, docTypeLabel);
+      const url = await fileStorage.uploadTripDoc(file, trip.os, docTypeLabel);
       
       const doc: TripDocument = { 
         id: `${docTypeLabel}-${Date.now()}`, 
@@ -87,22 +69,13 @@ export const getOperationTableColumns = (
   };
 
   const deleteDocument = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO') => {
-    if (!confirm(`Remover anexo selecionado permanentemente?`)) return;
-    
+    if (!confirm(`Remover anexo selecionado?`)) return;
     const updatedTrip = { ...trip };
-    let docToDelete: TripDocument | undefined;
-
-    if (type === 'OS_PDF') { docToDelete = trip.osDoc; updatedTrip.osDoc = undefined; }
-    else if (type === 'AGENDAMENTO') { docToDelete = trip.agendamentoDoc; updatedTrip.agendamentoDoc = undefined; }
-    else if (type === 'CTE') { docToDelete = trip.cteDoc; updatedTrip.cteDoc = undefined; }
-    else if (type === 'CVA') { docToDelete = trip.cvaDoc; updatedTrip.cvaDoc = undefined; }
-    else if (type === 'COMPLETO') { docToDelete = trip.completoDoc; updatedTrip.completoDoc = undefined; }
-
-    if (docToDelete?.url) {
-      // EXCLUSÃO FÍSICA NO R2
-      await fileStorage.deleteFile(docToDelete.url).catch(() => console.warn("Doc já removido no R2"));
-    }
-
+    if (type === 'OS_PDF') updatedTrip.osDoc = undefined;
+    else if (type === 'AGENDAMENTO') updatedTrip.agendamentoDoc = undefined;
+    else if (type === 'CTE') updatedTrip.cteDoc = undefined;
+    else if (type === 'CVA') updatedTrip.cvaDoc = undefined;
+    else if (type === 'COMPLETO') updatedTrip.completoDoc = undefined;
     await db.saveTrip(updatedTrip, actingUser);
     onRefreshData();
   };

@@ -1,3 +1,4 @@
+
 export const fileStorage = {
   dataURLtoBlob: (dataurl: string) => {
     try {
@@ -17,37 +18,31 @@ export const fileStorage = {
     }
   },
 
-  /**
-   * Remove fisicamente o arquivo do Cloudflare R2 antes de limpar a referência no Supabase
-   */
-  deleteFile: async (urlOrPath: string): Promise<boolean> => {
-    try {
-      if (!urlOrPath) return false;
-      
-      const cleanPath = urlOrPath.includes('/als-transportes/') 
-        ? `als-transportes/${urlOrPath.split('/als-transportes/')[1]}`
-        : urlOrPath;
+  getPublicUrl: (path: string | undefined): string => {
+    if (!path) return '';
+    if (path.startsWith('http') && path.includes('/als-transportes/')) return path;
+    
+    const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
+    if (!domain) return path;
 
-      const res = await fetch('/api/upload', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: cleanPath })
-      });
-
-      return res.ok;
-    } catch (e) {
-      console.error("Erro na requisição de deleção R2:", e);
-      return false;
+    const prefix = domain.startsWith('http') ? '' : 'https://';
+    const cleanDomain = domain.replace(/\/$/, '');
+    let cleanPath = path.trim().replace(/^\/+/, '');
+    
+    if (!cleanPath.toLowerCase().startsWith('als-transportes/')) {
+      cleanPath = `als-transportes/${cleanPath.replace(/^\/+/, '')}`;
     }
+    
+    return `${prefix}${cleanDomain}/${cleanPath}`;
   },
 
   normalizeFolderName: (name: string): string => {
     return name
       .toUpperCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^A-Z0-9]/g, '_')
-      .replace(/_+/g, '_')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^A-Z0-9]/g, '_')     // Troca espaços e símbolos por underscore
+      .replace(/_+/g, '_')            // Remove underscores duplicados
       .trim();
   },
 
@@ -67,11 +62,7 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      const cleanPath = destinationPath.toLowerCase().startsWith('als-transportes/') 
-        ? destinationPath 
-        : `als-transportes/${destinationPath.replace(/^\/+/, '')}`;
-
-      formData.append('path', cleanPath);
+      formData.append('path', destinationPath);
 
       const res = await fetch('/api/upload', { 
         method: 'POST', 
@@ -96,21 +87,16 @@ export const fileStorage = {
     return fileStorage.upload(file, `colaboradores/${normalizedName}/foto_perfil/perfil.jpg`);
   },
 
-  // MOTORISTAS: Agora usando o Nome para organizar pastas
-  uploadDriverProfile: (file: File | string, driverName: string) => {
-    const normalizedName = fileStorage.normalizeFolderName(driverName);
-    return fileStorage.upload(file, `drivers/${normalizedName}/foto_perfil/perfil.jpg`);
-  },
+  uploadDriverProfile: (file: File | string, driverId: string) => 
+    fileStorage.upload(file, `drivers/${driverId}/foto_perfil/perfil.jpg`),
 
-  uploadDriverCNH: (file: File | string, driverName: string) => {
-    const normalizedName = fileStorage.normalizeFolderName(driverName);
-    return fileStorage.upload(file, `drivers/${normalizedName}/cnh/cnh.pdf`);
-  },
+  uploadDriverCNH: (file: File | string, driverId: string) => 
+    fileStorage.upload(file, `drivers/${driverId}/cnh/cnh.pdf`),
 
   uploadTripDoc: (file: File | string, os: string, docType: string) => {
     const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
-    const extension = (typeof file === 'string' && file.startsWith('data:image')) ? 'jpg' : 'pdf';
-    return fileStorage.upload(file, `trips/${cleanOS}/documentos/${docType}.${extension}`);
+    const type = docType.toLowerCase().replace('_pdf', '');
+    return fileStorage.upload(file, `trips/${cleanOS}/documentos/${type}.pdf`);
   },
 
   uploadTripPhoto: (file: File | string, os: string, photoId: string) => {

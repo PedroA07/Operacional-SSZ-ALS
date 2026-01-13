@@ -30,15 +30,17 @@ export async function POST(request: Request) {
     trips_updated: 0
   };
 
-  const domain = (process.env.R2_PUBLIC_DOMAIN || "").replace(/\/$/, "");
-
   try {
-    // 1. STAFF
+    // 1. STAFF (COLABORADORES) - Nova lógica: Pasta por Nome
     const { data: staff } = await supabase.from('staff').select('id, name, photo');
     for (const s of (staff || [])) {
       if (s.photo) {
         const normalized = normalizeFolderName(s.name);
-        const newPhotoUrl = `${domain}/als-transportes/colaboradores/${normalized}/foto_perfil/perfil.jpg`;
+        // Gera a nova URL baseada no nome
+        const domain = process.env.R2_PUBLIC_DOMAIN || "";
+        const cleanDomain = domain.replace(/\/$/, "");
+        const newPhotoUrl = `${cleanDomain}/als-transportes/colaboradores/${normalized}/foto_perfil/perfil.jpg`;
+        
         if (s.photo !== newPhotoUrl) {
           await supabase.from('staff').update({ photo: newPhotoUrl }).eq('id', s.id);
           await supabase.from('users').update({ photo: newPhotoUrl }).eq('staff_id', s.id);
@@ -47,13 +49,20 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. MOTORISTAS (CORRIGIDO: Mudar de ID para NOME no link do DB)
-    const { data: drivers } = await supabase.from('drivers').select('id, name, photo, cnh_pdf_url');
+    // 2. MOTORISTAS (Continua por ID, mas garante o prefixo pai)
+    const { data: drivers } = await supabase.from('drivers').select('id, photo, cnh_pdf_url');
     for (const d of (drivers || [])) {
-      const normalizedName = normalizeFolderName(d.name);
-      
-      const newPhoto = d.photo ? `${domain}/als-transportes/drivers/${normalizedName}/foto_perfil/perfil.jpg` : null;
-      const newCnh = d.cnh_pdf_url ? `${domain}/als-transportes/drivers/${normalizedName}/cnh/cnh.pdf` : null;
+      const fixUrl = (url: string) => {
+        if (!url || url.includes('/als-transportes/')) return url;
+        const domain = process.env.R2_PUBLIC_DOMAIN || "";
+        const cleanDomain = domain.replace(/\/$/, "");
+        // Extrai o path após o domínio antigo ou relativo
+        const path = url.split('/').slice(-3).join('/'); // ex: drivers/id/foto.jpg
+        return `${cleanDomain}/als-transportes/${path}`;
+      };
+
+      const newPhoto = fixUrl(d.photo);
+      const newCnh = fixUrl(d.cnh_pdf_url);
 
       if (newPhoto !== d.photo || newCnh !== d.cnh_pdf_url) {
         await supabase.from('drivers').update({ photo: newPhoto, cnh_pdf_url: newCnh }).eq('id', d.id);
@@ -61,9 +70,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. TRIPS
-    const { data: trips } = await supabase.from('trips').select('id, os_doc, cte_doc, completo_doc');
+    // 3. TRIPS (Garante o prefixo pai nos documentos)
+    const { data: trips } = await supabase.from('trips').select('id, os_doc, cte_doc, completo_doc, driver_docs');
     for (const t of (trips || [])) {
+      const domain = process.env.R2_PUBLIC_DOMAIN || "";
+      const cleanDomain = domain.replace(/\/$/, "");
       let updated = false;
       const updatePayload: any = {};
 
@@ -71,7 +82,7 @@ export async function POST(request: Request) {
         if (doc && doc.url && !doc.url.includes('/als-transportes/')) {
           const path = doc.url.split('trips/')[1];
           if (path) {
-            doc.url = `${domain}/als-transportes/trips/${path}`;
+            doc.url = `${cleanDomain}/als-transportes/trips/${path}`;
             return true;
           }
         }
@@ -91,7 +102,7 @@ export async function POST(request: Request) {
     return new Response(JSON.stringify({
       success: true,
       summary: results,
-      message: "Storage reorganizado por NOMES e prefixo pai."
+      message: "Banco de dados sincronizado com o novo padrão de storage (Colaboradores por Nome e Prefixo Pai)."
     }), { status: 200 });
 
   } catch (err: any) {

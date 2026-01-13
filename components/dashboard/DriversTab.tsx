@@ -1,9 +1,9 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Driver, OperationDefinition, User, Customer } from '../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
 import { db } from '../../utils/storage';
 import { driverAuthService } from '../../utils/driverAuthService';
-import { fileStorage } from '../../utils/fileStorage';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import DriverProfileTemplate from './forms/DriverProfileTemplate';
@@ -170,34 +170,20 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
       alert("Este CPF já possui cadastro. Use a busca para localizar o registro existente.");
       return;
     }
-    
     setIsSaving(true);
     try {
       const drvId = editingId || `drv-${Date.now()}`;
-      const driverName = (form.name || '').toUpperCase();
-      let finalPhotoUrl = form.photo || '';
-
-      // Upload da foto para R2 organizado por NOME
-      if (finalPhotoUrl.startsWith('data:')) {
-        finalPhotoUrl = await fileStorage.uploadDriverProfile(finalPhotoUrl, driverName);
-      }
-
       const original = drivers.find(d => d.id === drvId);
       const statusChanged = original && original.status !== form.status;
       const statusDate = statusChanged ? new Date().toISOString() : (form.statusLastChangeDate || new Date().toISOString());
 
-      const payload = { 
-        ...form, 
-        id: drvId,
-        photo: finalPhotoUrl,
-        statusLastChangeDate: statusDate
-      };
-
-      const { password } = await driverAuthService.syncUserRecord(drvId, payload as Driver, form.generatedPassword);
+      const { password } = await driverAuthService.syncUserRecord(drvId, form, form.generatedPassword);
       
       await onSaveDriver({ 
-        ...payload,
+        ...form, 
+        id: drvId,
         generatedPassword: password,
+        statusLastChangeDate: statusDate
       }, editingId);
       
       setIsModalOpen(false);
@@ -515,7 +501,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                     <div onClick={() => fileInputRef.current?.click()} className="aspect-[3/4] rounded-3xl bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-all overflow-hidden group">
                        {form.photo ? <img src={form.photo} className="w-full h-full object-cover" /> : (
                          <>
-                           <svg className="w-8 h-8 text-slate-300 mb-2 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2"/></svg>
+                           <svg className="w-8 h-8 text-slate-300 mb-2 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeWidth="2"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2"/></svg>
                            <span className="text-[8px] font-black text-slate-400 uppercase">Anexar Imagem</span>
                          </>
                        )}
