@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Trip, Category, User, TripStatus, StaySession } from '../../types';
+import { Trip, Category, User, StaySession } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { stayImporter } from '../../utils/stayImporter';
 import { stayCalculations } from '../../utils/stayCalculations';
@@ -20,7 +20,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const [sessionTrips, setSessionTrips] = useState<Trip[]>([]);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   
-  // Form de Nova Estadia
   const [newSessionForm, setNewSessionForm] = useState({
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
@@ -69,13 +68,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
     setIsImporting(true);
     try {
-      const session = sessionStorage.getItem('als_active_session');
-      const user: User = session ? JSON.parse(session) : { id: userId, displayName: 'Operacional' };
+      const sessionData = sessionStorage.getItem('als_active_session');
+      const user: User = sessionData ? JSON.parse(sessionData) : { id: userId, displayName: 'Operacional' };
       
       const result = await stayImporter.processExcelAndReturn(file, user, selectedSession.id);
+      alert(`Importação concluída: ${result.added} registros adicionados.`);
       await loadSessionTrips(selectedSession.id);
-    } catch (err) {
-      alert("Erro ao importar planilha.");
+    } catch (err: any) {
+      alert(err.message || "Erro ao importar planilha. Verifique as colunas.");
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -150,7 +150,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
-      {/* HEADER E FILTRO DE ABAS */}
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
@@ -178,7 +177,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       </div>
 
-      {/* GRID DE PASTAS (SESSÕES) */}
       {!selectedSession ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
            {filteredSessions.map(session => (
@@ -203,11 +201,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                 </div>
              </button>
            ))}
-           {filteredSessions.length === 0 && (
-             <div className="col-span-full py-20 text-center text-slate-300 font-black uppercase text-[10px] border-2 border-dashed border-slate-100 rounded-[3rem]">
-                Nenhuma pasta de estadia localizada nesta categoria
-             </div>
-           )}
         </div>
       ) : (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
@@ -245,7 +238,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       )}
 
-      {/* MODAL: NOVA ESTADIA (CRIAR PASTA) */}
       {isCreatingSession && (
         <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -290,10 +282,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
            </div>
         </div>
       )}
-
-      <style>{`
-        .stay-table-compact table td { padding: 0.75rem 0.6rem !important; }
-      `}</style>
+      <style>{` .stay-table-compact table td { padding: 0.75rem 0.6rem !important; } `}</style>
     </div>
   );
 };
