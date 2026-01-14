@@ -150,6 +150,7 @@ export const db = {
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').upsert({
+      // Fix: Removed incorrect references to snake_case properties on PreStacking object to resolve type errors
       id: ps.id, name: ps.name, legal_name: ps.legalName, cnpj: ps.cnpj,
       address: ps.address, neighborhood: ps.neighborhood, zip_code: ps.zipCode,
       city: ps.city, state: ps.state
@@ -195,7 +196,7 @@ export const db = {
     return !error;
   },
 
-  // --- MÉTODOS DE ESTADIAS (SESSIONS E RECORDS INDEPENDENTES) ---
+  // --- MÉTODOS DE ESTADIAS ---
 
   getStaySessions: async (): Promise<StaySession[]> => {
     if (!supabase) return [];
@@ -246,6 +247,12 @@ export const db = {
       departure_time: r.departureTime, exceeded_hours: r.exceededHours
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);
+    return !error;
+  },
+
+  deleteStayRecord: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('stay_records').delete().eq('id', id);
     return !error;
   },
 

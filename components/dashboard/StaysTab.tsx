@@ -138,6 +138,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setEditingRecord(null);
   };
 
+  const handleDeleteRecord = async (record: StayRecord) => {
+    if (!confirm(`Remover permanentemente a OS ${record.os} desta pasta?`)) return;
+    const success = await db.deleteStayRecord(record.id);
+    if (success && selectedSession) {
+      await loadSessionRecords(selectedSession.id);
+    }
+  };
+
   const formatSessionLabel = (startDate: string, endDate: string) => {
     if (!startDate || !endDate) return "DATA INVÁLIDA";
     const months = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
@@ -161,6 +169,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <span className="text-[7px] font-black text-blue-600 uppercase leading-none">{r.type}</span>
         <span className="font-black text-slate-900 text-[10px] mt-0.5">{r.os}</span>
       </div>
+    )},
+    { key: 'location', label: 'Atendimento', render: (r: StayRecord) => (
+      <span className="text-[9px] font-black uppercase text-slate-600 leading-tight block max-w-[120px] truncate">{r.location}</span>
     )},
     { key: 'resource', label: 'Motorista / Navio / Container', render: (r: StayRecord) => (
       <div className="flex flex-col">
@@ -186,6 +197,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <button 
           onClick={(e) => { e.stopPropagation(); handleOpenEditRecord(r); }}
           className="p-1.5 bg-slate-50 text-slate-400 hover:bg-blue-600 hover:text-white rounded-lg transition-all opacity-0 group-hover:opacity-100"
+          title="Editar Horários"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg>
         </button>
@@ -210,7 +222,16 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
           {text !== '---' && <span className="text-[6px] bg-red-100 text-red-600 px-1 rounded font-black uppercase mt-0.5">Cobrável</span>}
         </div>
       );
-    }}
+    }},
+    { key: 'actions', label: 'Remover', render: (r: StayRecord) => (
+      <button 
+        onClick={(e) => { e.stopPropagation(); handleDeleteRecord(r); }}
+        className="p-2 text-slate-300 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"
+        title="Remover Registro"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+      </button>
+    )}
   ];
 
   const availableCategories = useMemo(() => {
