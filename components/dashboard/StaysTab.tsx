@@ -79,8 +79,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   };
 
   /**
-   * Formata o rótulo de forma literal (string split) para evitar erros de fuso horário
-   * Resultado: JANEIRO 2026 01 A 10
+   * Formata o rótulo de forma literal via string para evitar erros de fuso horário.
+   * Padrão: [MÊS] [ANO] [DIA] A [DIA]
    */
   const formatSessionLabel = (startDate: string, endDate: string) => {
     if (!startDate || !endDate) return "DATA INVÁLIDA";
@@ -98,7 +98,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     const dayS = sParts[2];
     const dayE = eParts[2];
 
-    // Se mudou de mês, mostra formato reduzido para não confundir
+    // Se as datas forem de meses diferentes, mostra formato especial
     if (sParts[1] !== eParts[1]) {
        return `${dayS}/${sParts[1]} A ${dayE}/${eParts[1]} ${year}`;
     }
@@ -106,11 +106,48 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     return `${monthName} ${year} ${dayS} A ${dayE}`;
   };
 
-  const formatDisplayDate = (isoString: string) => {
+  const formatDisplayDateTime = (isoString: string) => {
     if (!isoString) return '---';
     const d = new Date(isoString);
     return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
+
+  const recordColumns = [
+    { key: 'os', label: 'Tipo / OS', render: (r: StayRecord) => (
+      <div className="flex flex-col">
+        <span className="text-[7px] font-black text-blue-600 uppercase leading-none">{r.type}</span>
+        <span className="font-black text-slate-900 text-[10px] mt-0.5">{r.os}</span>
+      </div>
+    )},
+    { key: 'location', label: 'Atendimento', render: (r: StayRecord) => (
+      <span className="font-bold text-[9px] uppercase text-slate-700 leading-tight">{r.location}</span>
+    )},
+    { key: 'resource', label: 'Motorista / Navio / Container', render: (r: StayRecord) => (
+      <div className="flex flex-col">
+        <span className="font-black text-[9px] uppercase text-slate-700 truncate">{r.driverName}</span>
+        <div className="flex gap-2 items-center mt-0.5">
+           <span className="text-[8px] font-bold text-slate-400 uppercase">{r.ship || '---'}</span>
+           <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+           <span className="text-[10px] font-mono font-black text-blue-600">{r.container}</span>
+        </div>
+      </div>
+    )},
+    { key: 'previsao', label: 'Previsão', render: (r: StayRecord) => (
+      <span className="text-[9px] font-black text-blue-500 uppercase">{formatDisplayDateTime(r.scheduledStart)}</span>
+    )},
+    { key: 'times', label: 'Entrada / Saída', render: (r: StayRecord) => (
+      <div className="flex flex-col gap-0.5 text-[8px] font-bold">
+        <div className="flex justify-between gap-3"><span className="text-slate-400">ENT:</span> <span className="text-emerald-600">{formatDisplayDateTime(r.arrivalTime)}</span></div>
+        <div className="flex justify-between gap-3"><span className="text-slate-400">SAI:</span> <span className="text-red-600">{formatDisplayDateTime(r.departureTime)}</span></div>
+      </div>
+    )},
+    { key: 'stay', label: 'Estadia (>8h)', render: (r: StayRecord) => (
+      <div className="flex flex-col items-center">
+        <span className={`text-[10px] font-black ${r.exceededHours !== '---' ? 'text-red-600' : 'text-slate-400'}`}>{r.exceededHours}</span>
+        {r.exceededHours !== '---' && <span className="text-[6px] bg-red-100 text-red-600 px-1 rounded font-black uppercase mt-0.5">Cobrável</span>}
+      </div>
+    )}
+  ];
 
   const availableCategories = useMemo(() => {
     const cats = Array.from(new Set(sessions.map(s => s.category)));
@@ -122,43 +159,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     return sessions.filter(s => s.category === activeCategory);
   }, [sessions, activeCategory]);
 
-  const recordColumns = [
-    { key: 'os', label: '1. Tipo / OS', render: (r: StayRecord) => (
-      <div className="flex flex-col">
-        <span className="text-[7px] font-black text-blue-600 uppercase leading-none">{r.type}</span>
-        <span className="font-black text-slate-900 text-[10px] mt-0.5">{r.os}</span>
-      </div>
-    )},
-    { key: 'location', label: '2. Local / Previsão', render: (r: StayRecord) => (
-      <div className="flex flex-col">
-        <span className="font-bold text-[9px] uppercase text-slate-800 leading-tight">{r.location}</span>
-        <span className="text-[8px] font-black text-blue-500 uppercase mt-0.5">PREV: {formatDisplayDate(r.scheduledStart)}</span>
-      </div>
-    )},
-    { key: 'resource', label: '3. Recurso / Navio / Unidade', render: (r: StayRecord) => (
-      <div className="flex flex-col">
-        <span className="font-black text-[9px] uppercase text-slate-700 truncate">{r.driverName}</span>
-        <div className="flex gap-2 items-center mt-0.5">
-           <span className="text-[8px] font-bold text-slate-400 uppercase">{r.ship}</span>
-           <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-           <span className="text-[10px] font-mono font-black text-blue-600">{r.container}</span>
-        </div>
-      </div>
-    )},
-    { key: 'times', label: '4. Entrada / Saída', render: (r: StayRecord) => (
-      <div className="flex flex-col gap-0.5 text-[8px] font-bold">
-        <div className="flex justify-between gap-3"><span className="text-slate-400">ENT:</span> <span className="text-emerald-600">{formatDisplayDate(r.arrivalTime)}</span></div>
-        <div className="flex justify-between gap-3"><span className="text-slate-400">SAI:</span> <span className="text-red-600">{formatDisplayDate(r.departureTime)}</span></div>
-      </div>
-    )},
-    { key: 'stay', label: 'Estadia (>8h)', render: (r: StayRecord) => (
-      <div className="flex flex-col items-center">
-        <span className={`text-[10px] font-black ${r.exceededHours !== '---' ? 'text-red-600' : 'text-slate-400'}`}>{r.exceededHours}</span>
-        {r.exceededHours !== '---' && <span className="text-[6px] bg-red-100 text-red-600 px-1 rounded font-black uppercase mt-0.5">Cobrável</span>}
-      </div>
-    )}
-  ];
-
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       
@@ -166,7 +166,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Arquivos de Estadias</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de histórico independente das operações diárias</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Histórico consolidado via planilha de campo</p>
           </div>
           <button 
             onClick={() => setIsCreatingSession(true)}
@@ -235,7 +235,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                   className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2"
                 >
                   {isImporting ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5"/></svg>}
-                  Importar Planilha
+                  Importar Planilha XLSX
                 </button>
                 <button onClick={() => { if(confirm('Excluir pasta e todos os registros nela contidos?')) { db.deleteStaySession(selectedSession.id); setSelectedSession(null); loadSessions(); } }} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
               </div>
@@ -245,7 +245,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
              <SmartOperationTable 
                userId={userId}
                componentId={`stays-records-${selectedSession.id}`}
-               title={`Dossiê de Estadias`}
+               title={`Dossiê de Estadias do Período`}
                data={sessionRecords}
                columns={recordColumns}
              />
@@ -261,7 +261,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeWidth="2.5"/></svg>
                  </div>
                  <h3 className="text-xl font-black uppercase tracking-tight">Nova Pasta de Estadia</h3>
-                 <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mt-1">Configure o período e vínculo para importação</p>
+                 <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mt-1">Configure o período e vínculo</p>
               </div>
               
               <form onSubmit={handleCreateSession} className="p-10 space-y-6">
@@ -297,7 +297,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
            </div>
         </div>
       )}
-      <style>{` .stay-table-compact table td { padding: 0.75rem 0.6rem !important; } `}</style>
+      <style>{` .stay-table-compact table td { padding: 0.75rem 0.6rem !important; font-size: 9px !important; } `}</style>
     </div>
   );
 };

@@ -50,7 +50,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#020617] px-4 relative overflow-hidden">
-      {/* Animated Background Elements */}
+      {/* Elementos Visuais de Fundo */}
       <div className="absolute top-[-10%] left-[-10%] w-[70%] h-[70%] bg-blue-600/10 blur-[150px] rounded-full animate-pulse"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] bg-indigo-600/10 blur-[150px] rounded-full animate-pulse" style={{ animationDelay: '2s' }}></div>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
@@ -58,7 +58,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       <div className="w-full max-w-[480px] z-10 animate-in fade-in zoom-in-95 duration-1000">
         <div className="bg-slate-900/40 backdrop-blur-3xl p-10 md:p-16 rounded-[4rem] shadow-[0_40px_120px_rgba(0,0,0,0.6)] border border-white/10 flex flex-col items-center relative overflow-hidden">
           
-          {/* Top decorative bar */}
+          {/* Barra decorativa superior */}
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50"></div>
 
           <div className="flex flex-col items-center mb-14">
@@ -76,7 +76,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
           <form className="w-full space-y-8" onSubmit={handleSubmit}>
             <div className="space-y-2.5">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-5">Identificação Digital</label>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-5">Identificação Operacional</label>
               <div className="relative group">
                 <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -137,11 +137,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
               {isLoading ? (
                 <>
                    <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                   <span className="text-[11px] tracking-widest">Sincronizando...</span>
+                   <span className="text-[11px] tracking-widest">Autenticando...</span>
                 </>
               ) : (
                 <>
-                  <span>Autenticar</span>
+                  <span>Acessar</span>
                   <svg className="w-5 h-5 group-hover:translate-x-2 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </>
               )}
@@ -152,7 +152,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
              <div className="px-6 py-2.5 bg-white/5 rounded-full border border-white/5 flex items-center gap-3">
                 <div className={`w-2 h-2 rounded-full ${dbOnline === true ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-slate-600 animate-pulse'}`}></div>
                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                  Terminal {dbOnline === true ? 'Online' : 'Reconectando...'}
+                  Gateway {dbOnline === true ? 'Online' : 'Reconectando...'}
                 </span>
              </div>
           </div>
@@ -161,7 +161,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       
       <div className="absolute bottom-12 flex flex-col items-center gap-4">
          <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.8em] select-none text-center">
-           ALS Logística — Operacional v{APP_CONFIG.version}
+           ALS Logística — Portal Operacional v{APP_CONFIG.version}
          </p>
          <div className="h-1 w-48 bg-white/5 rounded-full overflow-hidden">
             <div className="h-full bg-blue-600/40 w-1/3 animate-[loading_5s_infinite] ease-in-out"></div>

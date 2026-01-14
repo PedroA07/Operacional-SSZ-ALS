@@ -17,10 +17,19 @@ export const stayImporter = {
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           const rows: any[] = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
           
-          // Filtra linhas que possuem OS na coluna B
+          // Filtra linhas que possuem dado na coluna B (Nº Programação)
           const dataRows = rows.slice(1).filter(row => row && row[1]); 
           
           const records: StayRecord[] = [];
+
+          const formatDateForce = (val: any) => {
+            if (!val) return '';
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return '';
+            // Corrige o fuso horário para manter o dia visual do Excel
+            const userTimezoneOffset = d.getTimezoneOffset() * 60000;
+            return new Date(d.getTime() + userTimezoneOffset).toISOString();
+          };
 
           for (const row of dataRows) {
             const type = String(row[0] || '').toUpperCase().trim();
@@ -30,21 +39,12 @@ export const stayImporter = {
             const ship = String(row[4] || '').toUpperCase().trim();
             const container = String(row[5] || '').toUpperCase().trim();
             
-            // Função interna para tratar data do Excel sem perder o dia pelo fuso horário
-            const formatDateForce = (val: any) => {
-               if (!val) return '';
-               const d = new Date(val);
-               if (isNaN(d.getTime())) return '';
-               // Adicionamos o offset para garantir que a data lida seja a data visual do Excel
-               const userTimezoneOffset = d.getTimezoneOffset() * 60000;
-               return new Date(d.getTime() + userTimezoneOffset).toISOString();
-            };
-
+            // Datas (G:6, H:7, I:8)
             const scheduledStart = formatDateForce(row[6]);
             const arrivalTime = formatDateForce(row[7]);
             const departureTime = formatDateForce(row[8]);
 
-            // Cálculo de estadias (> 8h)
+            // Cálculo de estadia (> 8h)
             let exceededText = '---';
             if (arrivalTime && departureTime) {
                const start = new Date(arrivalTime).getTime();
@@ -78,7 +78,7 @@ export const stayImporter = {
 
           resolve(records);
         } catch (err) {
-          reject(new Error("Formato de planilha inválido ou erro na leitura."));
+          reject(new Error("Erro ao ler planilha. Verifique se o arquivo está no padrão correto."));
         }
       };
       reader.onerror = (err) => reject(err);
