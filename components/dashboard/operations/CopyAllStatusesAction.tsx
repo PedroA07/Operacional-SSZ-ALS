@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Trip, StatusHistoryEntry, TripStatus } from '../../../types';
 import { emailFormatter, ReportOverride } from '../../../utils/emailFormatter';
 import { predictionService } from '../../../utils/predictionService';
@@ -16,25 +16,26 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
   const [showCustomer, setShowCustomer] = useState(true);
   
   const [reportOverrides, setReportOverrides] = useState<Record<string, ReportOverride>>({});
+  
+  const isInitialized = useRef(false);
 
   useEffect(() => {
     if (isPreviewOpen) {
+      if (isInitialized.current) return;
+
       const initialOverrides: Record<string, ReportOverride> = {};
       
       trips.forEach(t => {
         const pred = predictionService.getNextStatusPrediction(t, allTrips);
         
-        // Organiza histórico cronologicamente (do mais antigo ao mais novo para a edição)
         const history = [...(t.statusHistory || [])]
           .filter(h => h.status !== 'Pendente')
           .map(h => ({ ...h }))
           .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
-        // Previsão com Data e Hora (Engine ALS)
         let finalPredLabel = pred?.label || 'Previsão de Chegada';
         let finalPredTime = pred?.time || '';
 
-        // Garante que a previsão tenha data e hora completas
         if (finalPredTime && !finalPredTime.includes('/')) {
            const d = new Date();
            finalPredTime = `${d.toLocaleDateString('pt-BR')} ${finalPredTime}`;
@@ -51,34 +52,48 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
       });
       
       setReportOverrides(initialOverrides);
+      isInitialized.current = true;
+    } else {
+      isInitialized.current = false;
+      setReportOverrides({});
     }
   }, [isPreviewOpen, trips, allTrips]);
 
   const handleHistoryTimeChange = (tripId: string, entryIdx: number, val: string) => {
     setReportOverrides(prev => {
-      const tripOverride = { ...prev[tripId] };
-      const newHistory = [...tripOverride.history];
+      const current = prev[tripId];
+      if (!current) return prev;
+      const newHistory = [...current.history];
       newHistory[entryIdx] = { ...newHistory[entryIdx], dateTime: val };
-      return { ...prev, [tripId]: { ...tripOverride, history: newHistory } };
+      return { ...prev, [tripId]: { ...current, history: newHistory } };
     });
   };
 
   const handleHistoryLabelChange = (tripId: string, entryIdx: number, val: string) => {
     setReportOverrides(prev => {
-      const tripOverride = { ...prev[tripId] };
-      const newHistory = [...tripOverride.history];
+      const current = prev[tripId];
+      if (!current) return prev;
+      const newHistory = [...current.history];
       newHistory[entryIdx] = { ...newHistory[entryIdx], status: val as TripStatus };
-      return { ...prev, [tripId]: { ...tripOverride, history: newHistory } };
+      return { ...prev, [tripId]: { ...current, history: newHistory } };
     });
   };
 
   const handlePredictionChange = (tripId: string, field: 'label' | 'time', val: string) => {
     setReportOverrides(prev => {
-      const tripOverride = { ...prev[tripId] };
-      const newPred = tripOverride.prediction 
-        ? { ...tripOverride.prediction, [field]: val }
-        : { label: field === 'label' ? val : 'Previsão', time: field === 'time' ? val : '' };
-      return { ...prev, [tripId]: { ...tripOverride, prediction: newPred } };
+      const current = prev[tripId];
+      if (!current) return prev;
+      
+      return {
+        ...prev,
+        [tripId]: {
+          ...current,
+          prediction: {
+            label: field === 'label' ? val : (current.prediction?.label || ''),
+            time: field === 'time' ? val : (current.prediction?.time || '')
+          }
+        }
+      };
     });
   };
 
@@ -86,7 +101,6 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
     if (trips.length === 0) return;
 
     try {
-      // Sincroniza estado showCustomer com o motor de formatação
       const html = emailFormatter.allTripsToRichText(trips, allTrips, reportOverrides, showCustomer);
       const plain = trips.map(t => emailFormatter.toPlainText(t, allTrips, reportOverrides[t.id], showCustomer)).join('\n');
 
@@ -136,7 +150,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                   <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center font-black italic text-xl shadow-lg">ALS</div>
                   <div>
                     <h3 className="text-xl font-black uppercase tracking-tight leading-none">Revisão do Relatório Operacional</h3>
-                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-2">Layout em Duas Colunas (Andamento vs Concluídas)</p>
+                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-2">Design Espelhado (Andamento vs Concluído)</p>
                   </div>
                </div>
                <div className="flex items-center gap-4">
@@ -146,7 +160,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                        onClick={() => setShowCustomer(!showCustomer)}
                        className={`w-11 h-6.5 rounded-full transition-all relative ${showCustomer ? 'bg-blue-600' : 'bg-slate-700'}`}
                      >
-                       <div className={`absolute top-1 w-4.5 h-4.5 bg-white rounded-full transition-all ${showCustomer ? 'left-5.5' : 'left-1'}`}></div>
+                       <div className={`absolute top-1 w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-all ${showCustomer ? 'left-5.5' : 'left-1'}`}></div>
                      </button>
                   </div>
                   <button onClick={() => setIsPreviewOpen(false)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
@@ -171,15 +185,15 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                             <div className="bg-slate-900 rounded-[1.8rem] p-5 text-white shadow-lg">
                                <div className="flex items-center gap-3">
                                   <h4 className="text-xl font-black uppercase">OS: {t.os}</h4>
-                                  <span className="text-sm font-mono font-black text-blue-100 bg-blue-500/20 px-2.5 py-1 rounded-lg border border-blue-500/30">{t.container || 'A DEFINIR'}</span>
+                                  <span className="text-sm font-mono font-black text-blue-100 bg-blue-500/20 px-2.5 py-1 rounded-lg border border-blue-500/30">{t.container || 'S/ EQUIP.'}</span>
                                </div>
                                <p className="text-[10px] font-black uppercase text-slate-200 mt-2">
-                                 Motorista: <span className="text-blue-400">{t.driver.name}</span>
+                                 Motorista: <span className="text-blue-400">${t.driver.name}</span>
                                </p>
                             </div>
 
                             <div className="space-y-3">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Histórico Cronológico (Data + Hora)</label>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Histórico de Posições (Cópia Cronológica)</label>
                                 <div className="space-y-2">
                                   {ovr?.history.map((entry, idx) => (
                                       <div key={idx} className="flex items-center gap-2 group">
@@ -191,7 +205,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                                               {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                           </select>
                                           <input 
-                                              type="datetime-local"
+                                              type="datetime-local" 
                                               className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-600 outline-none focus:border-blue-500"
                                               value={entry.dateTime.slice(0, 16)}
                                               onChange={(e) => handleHistoryTimeChange(t.id, idx, e.target.value)}
@@ -202,10 +216,22 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                             </div>
 
                             <div className="p-5 bg-blue-600/5 rounded-3xl border border-blue-100 space-y-4">
-                                <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest block px-1">🚀 Próxima Previsão (Data + Hora)</label>
+                                <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest block px-1">🚀 Próxima Previsão (Exibida no Relatório)</label>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <input type="text" placeholder="Título" className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none" value={ovr?.prediction?.label || ''} onChange={(e) => handlePredictionChange(t.id, 'label', e.target.value)} />
-                                    <input type="text" placeholder="DD/MM/AAAA HH:MM" className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none" value={ovr?.prediction?.time || ''} onChange={(e) => handlePredictionChange(t.id, 'time', e.target.value)} />
+                                    <input 
+                                      type="text" 
+                                      placeholder="Título" 
+                                      className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none focus:ring-4 focus:ring-blue-500/10" 
+                                      value={ovr?.prediction?.label || ''} 
+                                      onChange={(e) => handlePredictionChange(t.id, 'label', e.target.value)} 
+                                    />
+                                    <input 
+                                      type="text" 
+                                      placeholder="DD/MM/AAAA HH:MM" 
+                                      className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none focus:ring-4 focus:ring-blue-500/10" 
+                                      value={ovr?.prediction?.time || ''} 
+                                      onChange={(e) => handlePredictionChange(t.id, 'time', e.target.value)} 
+                                    />
                                 </div>
                             </div>
                             {showCustomer && <p className="text-[8px] font-bold text-slate-300 uppercase absolute top-4 right-8 italic truncate max-w-[150px]">{t.customer.name}</p>}
@@ -222,13 +248,13 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                   </div>
                   <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
                      {finishedTrips.map(t => (
-                       <div key={t.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm opacity-80">
+                       <div key={t.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm opacity-80 relative">
                           <div className="flex justify-between items-center">
                              <div>
                                 <p className="text-[12px] font-black text-slate-800 uppercase">OS: {t.os}</p>
-                                <p className="text-[9px] font-mono font-bold text-slate-400 mt-1">{t.container}</p>
+                                <p className="text-[9px] font-mono font-bold text-slate-400 mt-1">{t.container || 'SEM EQUIP.'}</p>
                                 {showCustomer && <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 italic">{t.customer.name}</p>}
-                                <p className="text-[9px] font-black text-slate-400 uppercase mt-1">MOT: {t.driver.name}</p>
+                                <p className="text-[9px] font-black text-slate-400 uppercase mt-1">MOT: ${t.driver.name}</p>
                              </div>
                              <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 flex items-center gap-2">✓ Concluída</span>
                           </div>
@@ -239,7 +265,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
             </div>
 
             <footer className="p-8 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
-               <p className="text-[10px] font-bold text-slate-400 uppercase max-w-md">O relatório será gerado em layout de duas colunas, formatando todos os eventos com data e hora completa.</p>
+               <p className="text-[10px] font-bold text-slate-400 uppercase max-w-md">O relatório copiado terá design Premium e layout de duas colunas igual a este painel.</p>
                <div className="flex gap-4">
                   <button onClick={() => setIsPreviewOpen(false)} className="px-8 py-5 bg-slate-100 text-slate-500 rounded-3xl text-[11px] font-black uppercase hover:bg-slate-200 transition-all">Descartar</button>
                   <button onClick={handleCopy} className={`px-12 py-5 rounded-3xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-4 shadow-2xl active:scale-95 ${isCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>

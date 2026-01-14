@@ -8,9 +8,6 @@ export interface ReportOverride {
 }
 
 export const emailFormatter = {
-  /**
-   * Formata data no padrão DD/MM/AAAA HH:MM
-   */
   formatFullDate: (isoString: string): string => {
     try {
       const d = new Date(isoString);
@@ -25,65 +22,72 @@ export const emailFormatter = {
   },
 
   /**
-   * Gera um card individual estilo "Premium Review" sem localidade
+   * Gera o HTML de um card individual de viagem
    */
-  toCompactRichText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride, showCustomer: boolean = true): string => {
-    // Organiza histórico por data (mais recente primeiro para o relatório)
+  renderTripCard: (trip: Trip, allTrips: Trip[], override?: ReportOverride, showCustomer: boolean = true): string => {
     const history = override 
-      ? [...override.history].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+      ? [...override.history].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
       : [...(trip.statusHistory || [])]
           .filter(entry => entry.status !== 'Pendente')
-          .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+          .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
     const prediction = override 
       ? override.prediction 
       : predictionService.getNextStatusPrediction(trip, allTrips);
 
-    const mainColor = '#2563eb';
-    const darkBg = '#0f172a';
-    const borderColor = '#e2e8f0';
-    const textColor = '#1e293b';
-    const subTextColor = '#64748b';
+    const isFinished = trip.status === 'Viagem concluída';
+    const mainColor = isFinished ? '#059669' : '#2563eb';
+    const headerBg = '#0f172a';
 
     return `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: ${textColor}; border: 1px solid ${borderColor}; border-radius: 16px; margin-bottom: 12px; overflow: hidden; background-color: #ffffff; width: 100%; max-width: 320px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-        <!-- Cabeçalho Estilo Dashboard -->
-        <div style="background-color: ${darkBg}; padding: 12px; border-bottom: 1px solid ${borderColor};">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <span style="color: #60a5fa; font-size: 8px; font-weight: 900; text-transform: uppercase;">OS:</span>
-            <span style="color: #ffffff; font-size: 13px; font-weight: 900;">${trip.os}</span>
+      <div style="margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <!-- Header do Card -->
+        <div style="background-color: ${headerBg}; padding: 12px; color: #ffffff;">
+          <table style="width: 100%;">
+            <tr>
+              <td>
+                <span style="font-size: 8px; font-weight: 900; color: #60a5fa; text-transform: uppercase; display: block; margin-bottom: 2px;">ORDEM DE SERVIÇO</span>
+                <span style="font-size: 14px; font-weight: 900; letter-spacing: -0.5px;">${trip.os}</span>
+              </td>
+              <td style="text-align: right; vertical-align: top;">
+                <span style="background-color: ${mainColor}; color: #ffffff; padding: 2px 6px; border-radius: 6px; font-size: 9px; font-weight: 900; text-transform: uppercase;">
+                  ${trip.container || 'S/ EQUIP.'}
+                </span>
+              </td>
+            </tr>
+          </table>
+          <div style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+            <span style="font-size: 9px; font-weight: bold; color: #94a3b8; text-transform: uppercase;">MOT: <span style="color: #ffffff;">${trip.driver.name}</span></span>
+            ${showCustomer ? `
+              <div style="font-size: 8px; font-weight: 900; color: #64748b; text-transform: uppercase; margin-top: 2px;">
+                CLIENTE: ${trip.customer.name}
+              </div>
+            ` : ''}
           </div>
-          <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
-             <span style="color: #ffffff; background-color: #3b82f6; padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 10px; font-weight: 900;">${trip.container || 'A DEFINIR'}</span>
-          </div>
-          <div style="font-size: 9px; color: #cbd5e1; font-weight: bold; text-transform: uppercase;">
-            MOT: <span style="color: #60a5fa;">${trip.driver.name}</span>
-          </div>
-          ${showCustomer ? `<div style="margin-top: 4px; font-size: 7px; color: #64748b; font-weight: 900; text-transform: uppercase;">CLIENTE: ${trip.customer.name}</div>` : ''}
         </div>
 
-        <!-- Histórico e Previsão com Data e Hora -->
+        <!-- Conteúdo / Cronologia -->
         <div style="padding: 12px; background-color: #ffffff;">
           <table style="width: 100%; border-collapse: collapse;">
             ${history.map((entry, idx) => `
               <tr>
-                <td style="width: 8px; vertical-align: middle;">
-                  <div style="width: 5px; height: 5px; border-radius: 50%; background-color: ${idx === 0 ? mainColor : '#cbd5e1'};"></div>
+                <td style="width: 10px; vertical-align: middle;">
+                  <div style="width: 4px; height: 4px; border-radius: 50%; background-color: ${idx === history.length - 1 ? mainColor : '#cbd5e1'};"></div>
                 </td>
-                <td style="padding: 2px 8px; font-size: 10px; font-weight: ${idx === 0 ? '900' : 'bold'}; color: ${idx === 0 ? textColor : subTextColor}; text-transform: uppercase;">
+                <td style="padding: 3px 8px; font-size: 10px; font-weight: ${idx === history.length - 1 ? '900' : 'bold'}; color: ${idx === history.length - 1 ? '#1e293b' : '#64748b'}; text-transform: uppercase;">
                   ${entry.status}
                 </td>
-                <td style="padding: 2px 0; font-size: 8px; color: #94a3b8; text-align: right; font-family: monospace;">
-                  ${emailFormatter.formatFullDate(entry.dateTime)}
+                <td style="padding: 3px 0; font-size: 8px; color: #94a3b8; text-align: right; font-family: monospace;">
+                  ${new Date(entry.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </td>
               </tr>
             `).join('')}
             
-            ${prediction ? `
+            ${!isFinished && prediction ? `
               <tr>
-                <td colspan="3" style="padding-top: 8px;">
-                  <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 6px; border-radius: 8px;">
-                    <span style="font-size: 8px; font-weight: 900; color: #0369a1; text-transform: uppercase; display: block; margin-bottom: 2px;">🚀 PRÓXIMA ETAPA</span>
+                <td colspan="3" style="padding-top: 10px;">
+                  <div style="background-color: #eff6ff; border: 1px dashed #bfdbfe; padding: 8px; border-radius: 10px; text-align: center;">
+                    <span style="font-size: 8px; font-weight: 900; color: #3b82f6; text-transform: uppercase; display: block; margin-bottom: 2px;">🚀 PRÓXIMA ATUALIZAÇÃO</span>
                     <span style="font-size: 9px; font-weight: 900; color: #1e40af; text-transform: uppercase;">
                       ${prediction.label}: ${prediction.time}
                     </span>
@@ -97,6 +101,9 @@ export const emailFormatter = {
     `;
   },
 
+  /**
+   * Gera o HTML completo em duas colunas
+   */
   allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], overrides: Record<string, ReportOverride> = {}, showCustomer: boolean = true): string => {
     if (trips.length === 0) return "";
     
@@ -104,46 +111,67 @@ export const emailFormatter = {
     const finishedTrips = trips.filter(t => t.status === 'Viagem concluída');
 
     return `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; padding: 20px; background-color: #fcfcfc;">
-        <div style="margin-bottom: 20px; border-bottom: 4px solid #2563eb; padding-bottom: 12px;">
-          <h2 style="margin: 0; font-size: 20px; color: #2563eb; text-transform: uppercase; font-weight: 900;">Relatório Operacional ALS</h2>
-          <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: bold;">EMISSÃO: ${emailFormatter.formatFullDate(new Date().toISOString())}</p>
-        </div>
-        
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <!-- COLUNA: EM ANDAMENTO -->
-            <td style="width: 50%; vertical-align: top; padding-right: 15px;">
-              <div style="margin-bottom: 15px; padding: 8px 12px; background-color: #2563eb; border-radius: 8px;">
-                <span style="color: #ffffff; font-weight: 900; font-size: 11px; text-transform: uppercase;">EM ANDAMENTO (${activeTrips.length})</span>
-              </div>
-              ${activeTrips.map(t => emailFormatter.toCompactRichText(t, allContextTrips, overrides[t.id], showCustomer)).join('')}
-              ${activeTrips.length === 0 ? '<p style="font-size: 10px; color: #94a3b8; font-style: italic; text-align: center; padding: 20px;">Nenhuma carga ativa.</p>' : ''}
-            </td>
+      <div style="background-color: #f8fafc; padding: 20px; font-family: sans-serif;">
+        <div style="max-width: 800px; margin: 0 auto; background-color: #ffffff; border-radius: 24px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Cabeçalho ALS -->
+          <div style="border-bottom: 4px solid #2563eb; padding-bottom: 15px; margin-bottom: 25px;">
+            <table style="width: 100%;">
+              <tr>
+                <td>
+                  <h2 style="margin: 0; font-size: 22px; color: #1e293b; text-transform: uppercase; font-weight: 900;">Relatório Operacional ALS</h2>
+                  <p style="margin: 5px 0 0 0; font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+                    Santos/SP • Emissão: ${emailFormatter.formatFullDate(new Date().toISOString())}
+                  </p>
+                </td>
+                <td style="text-align: right; vertical-align: middle;">
+                   <div style="background-color: #2563eb; color: #ffffff; padding: 10px 15px; border-radius: 12px; font-weight: 900; font-style: italic; display: inline-block;">ALS</div>
+                </td>
+              </tr>
+            </table>
+          </div>
 
-            <!-- COLUNA: CONCLUÍDAS -->
-            <td style="width: 50%; vertical-align: top; padding-left: 15px; border-left: 1px solid #e2e8f0;">
-              <div style="margin-bottom: 15px; padding: 8px 12px; background-color: #059669; border-radius: 8px;">
-                <span style="color: #ffffff; font-weight: 900; font-size: 11px; text-transform: uppercase;">CONCLUÍDAS (${finishedTrips.length})</span>
-              </div>
-              ${finishedTrips.map(t => emailFormatter.toCompactRichText(t, allContextTrips, overrides[t.id], showCustomer)).join('')}
-              ${finishedTrips.length === 0 ? '<p style="font-size: 10px; color: #94a3b8; font-style: italic; text-align: center; padding: 20px;">Sem conclusões hoje.</p>' : ''}
-            </td>
-          </tr>
-        </table>
+          <!-- Tabela de Duas Colunas -->
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <!-- Coluna: Em Andamento -->
+              <td style="width: 50%; vertical-align: top; padding-right: 15px;">
+                <div style="background-color: #2563eb; color: #ffffff; padding: 8px 12px; border-radius: 10px; margin-bottom: 15px;">
+                  <span style="font-size: 11px; font-weight: 900; text-transform: uppercase;">EM CURSO (${activeTrips.length})</span>
+                </div>
+                ${activeTrips.map(t => emailFormatter.renderTripCard(t, allContextTrips, overrides[t.id], showCustomer)).join('')}
+                ${activeTrips.length === 0 ? '<div style="text-align: center; color: #94a3b8; font-size: 10px; padding: 20px;">Nenhuma viagem ativa.</div>' : ''}
+              </td>
 
-        <div style="margin-top: 30px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-          <strong>ALS Transportes SSZ</strong> • Monitoramento Realtime
+              <!-- Coluna: Concluídas -->
+              <td style="width: 50%; vertical-align: top; padding-left: 15px; border-left: 1px solid #f1f5f9;">
+                <div style="background-color: #059669; color: #ffffff; padding: 8px 12px; border-radius: 10px; margin-bottom: 15px;">
+                  <span style="font-size: 11px; font-weight: 900; text-transform: uppercase;">CONCLUÍDAS (${finishedTrips.length})</span>
+                </div>
+                ${finishedTrips.map(t => emailFormatter.renderTripCard(t, allContextTrips, overrides[t.id], showCustomer)).join('')}
+                ${finishedTrips.length === 0 ? '<div style="text-align: center; color: #94a3b8; font-size: 10px; padding: 20px;">Sem conclusões hoje.</div>' : ''}
+              </td>
+            </tr>
+          </table>
+
+          <div style="margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 20px; text-align: center;">
+            <p style="margin: 0; font-size: 9px; color: #94a3b8; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">
+              ALS Transportes • Santos/SP • Real-time Monitoring
+            </p>
+          </div>
         </div>
       </div>
     `;
   },
 
+  /**
+   * Formato texto puro (para WhatsApp sem suporte a HTML)
+   */
   toPlainText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride, showCustomer: boolean = true): string => {
     const history = override ? override.history : [...(trip.statusHistory || [])].filter(h => h.status !== 'Pendente');
     const pred = override ? override.prediction : predictionService.getNextStatusPrediction(trip, allTrips);
 
-    let text = `OS: ${trip.os}${showCustomer ? ` | CLIENTE: ${trip.customer.name}` : ''}\n` +
+    let text = `*OS: ${trip.os}*${showCustomer ? ` | CLIENTE: ${trip.customer.name}` : ''}\n` +
       `CONTAINER: ${trip.container || 'A DEFINIR'}\n` +
       `MOTORISTA: ${trip.driver.name}\n` +
       `STATUS: ${trip.status.toUpperCase()}\n`;

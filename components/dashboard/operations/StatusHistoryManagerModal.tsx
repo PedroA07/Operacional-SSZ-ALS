@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Trip, StatusHistoryEntry, User, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
@@ -25,7 +24,8 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
 
   const handleCopyToEmail = async () => {
     try {
-      const html = emailFormatter.toCompactRichText(trip, allTrips);
+      // Fix: replace non-existent toCompactRichText with renderTripCard to resolve TypeScript error on line 28
+      const html = emailFormatter.renderTripCard(trip, allTrips);
       const plain = emailFormatter.toPlainText(trip, allTrips);
 
       const blobHtml = new Blob([html], { type: 'text/html' });
