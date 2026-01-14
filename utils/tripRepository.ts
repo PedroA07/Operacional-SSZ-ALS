@@ -25,6 +25,7 @@ export const tripRepository = {
     driver: trip.driver, 
     status: trip.status || 'Pendente',
     status_history: trip.statusHistory || [], 
+    // Fix: removed incorrect access to snake_case properties on Trip object to resolve type errors
     os_doc: trip.osDoc || null,
     agendamento_doc: trip.agendamentoDoc || null,
     completo_doc: trip.completoDoc || null,
@@ -109,7 +110,10 @@ export const tripRepository = {
   },
 
   async save(supabase: SupabaseClient, trip: Trip) {
-    const { error } = await supabase.from('trips').upsert(this.mapToDb(trip));
-    return !error;
+    // Forçamos a reordenação correta no payload de saída
+    const payload = this.mapToDb(trip);
+    const { error } = await supabase.from('trips').upsert(payload);
+    if (error) throw error;
+    return true;
   }
 };

@@ -17,6 +17,7 @@ interface DriverDocsViewerModalProps {
 const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, onClose, trip, user, onSuccess }) => {
   const [docs, setDocs] = useState<DriverCapturedDoc[]>(trip.driver_docs || []);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isMoving, setIsMoving] = useState<boolean>(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [selectedDoc, setSelectedDoc] = useState<DriverCapturedDoc | null>(null);
   
@@ -31,9 +32,12 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Sincroniza estado local com prop quando o modal abre ou a trip muda externamente
   useEffect(() => {
-    setDocs(trip.driver_docs || []);
-  }, [trip.driver_docs]);
+    if (isOpen && !isMoving) {
+      setDocs(trip.driver_docs || []);
+    }
+  }, [trip.driver_docs, isOpen, isMoving]);
 
   useEffect(() => {
     setExtractedContainer(null);
@@ -90,13 +94,20 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const results = await Promise.all((Array.from(files) as File[]).map(async file => {
-        return await imageCompressor.compress(file, {
-          maxWidth: 1600,
-          quality: 0.8
-        });
-      }));
-      await saveNewDocs(results);
+      setIsProcessing(true);
+      try {
+        const results = await Promise.all((Array.from(files) as File[]).map(async file => {
+          return await imageCompressor.compress(file, {
+            maxWidth: 1600,
+            quality: 0.8
+          });
+        }));
+        await saveNewDocs(results);
+      } catch (err) {
+        alert("Falha ao processar arquivos.");
+      } finally {
+        setIsProcessing(false);
+      }
     }
     e.target.value = '';
   };
@@ -125,7 +136,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       url: url,
       timestamp: new Date().toISOString()
     }));
-    // Novas fotos entram no início por padrão
     const updatedDocs = [...newDocs, ...docs];
     setDocs(updatedDocs);
     if (newDocs.length === 1) setSelectedDoc(newDocs[0]);
@@ -134,17 +144,35 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     onSuccess();
   };
 
-  const handleMovePhoto = async (index: number, direction: 'up' | 'down') => {
-    const newDocs = [...docs];
-    const targetIdx = direction === 'up' ? index - 1 : index + 1;
-    
-    if (targetIdx < 0 || targetIdx >= newDocs.length) return;
+  const handleMovePhoto = async (e: React.MouseEvent, index: number, direction: 'up' | 'down') => {
+    e.stopPropagation(); // Impede seleção da foto ao clicar nos botões de mover
+    if (isMoving) return;
 
-    [newDocs[index], newDocs[targetIdx]] = [newDocs[targetIdx], newDocs[index]];
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= docs.length) return;
+
+    setIsMoving(true);
+    const newDocs = [...docs];
+    
+    // Swap de posições
+    const temp = newDocs[index];
+    newDocs[index] = newDocs[targetIdx];
+    newDocs[targetIdx] = temp;
     
     setDocs(newDocs);
-    await db.saveTrip({ ...trip, driver_docs: newDocs }, user);
-    onSuccess();
+
+    try {
+      // Salva a nova ordem no banco de dados de forma explícita
+      await db.saveTrip({ ...trip, driver_docs: newDocs }, user);
+      onSuccess();
+    } catch (err) {
+      console.error("Falha ao reordenar fotos:", err);
+      alert("Erro ao persistir nova ordem no servidor.");
+      // Opcional: Reverter estado local em caso de erro
+      setDocs(trip.driver_docs || []);
+    } finally {
+      setIsMoving(false);
+    }
   };
 
   const handleExtractGeneralText = async () => {
@@ -208,6 +236,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     if (selectedDoc?.id === docToDelete) setSelectedDoc(null);
     setIsDeleteModalOpen(false);
     setDocToDelete(null);
+    onSuccess();
   };
 
   if (!isOpen) return null;
@@ -226,9 +255,17 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
               <h3 className="text-xl font-black uppercase">OS {trip.os} › {trip.driver.name}</h3>
             </div>
           </div>
-          <button onClick={onClose} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
-          </button>
+          <div className="flex items-center gap-4">
+            {isMoving && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/20">
+                 <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                 <span className="text-[8px] font-black uppercase tracking-widest">Salvando Ordem...</span>
+              </div>
+            )}
+            <button onClick={onClose} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-hidden flex">
@@ -244,13 +281,13 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                   onClick={() => { setSelectedDoc(doc); setIsAddingMode('none'); }} 
                   className={`w-full aspect-video rounded-xl overflow-hidden border-2 transition-all relative ${selectedDoc?.id === doc.id ? 'border-blue-600 shadow-md scale-[1.02]' : 'border-transparent opacity-70 group-hover/thumb:opacity-100'}`}
                  >
-                    <img src={doc.url} className="w-full h-full object-cover" />
+                    <img src={doc.url} className="w-full h-full object-cover" loading="lazy" />
                     <div className="absolute top-1 left-1 bg-black/60 text-white text-[7px] px-1.5 rounded font-black">#{idx + 1}</div>
                  </button>
-                 <div className="flex gap-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity justify-center">
-                    <button onClick={() => handleMovePhoto(idx, 'up')} disabled={idx === 0} className="p-1 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-blue-600 disabled:opacity-20"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M5 15l7-7 7 7"/></svg></button>
-                    <button onClick={() => handleMovePhoto(idx, 'down')} disabled={idx === docs.length - 1} className="p-1 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-blue-600 disabled:opacity-20"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 9l-7 7-7-7"/></svg></button>
-                    <button onClick={() => { setDocToDelete(doc.id); setIsDeleteModalOpen(true); }} className="p-1 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-red-500"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                 <div className={`flex gap-1 transition-opacity justify-center ${isMoving ? 'opacity-20 pointer-events-none' : 'opacity-0 group-hover/thumb:opacity-100'}`}>
+                    <button onClick={(e) => handleMovePhoto(e, idx, 'up')} disabled={idx === 0} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 hover:border-blue-200 shadow-sm disabled:opacity-20"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M5 15l7-7 7 7"/></svg></button>
+                    <button onClick={(e) => handleMovePhoto(e, idx, 'down')} disabled={idx === docs.length - 1} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 hover:border-blue-200 shadow-sm disabled:opacity-20"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 9l-7 7-7-7"/></svg></button>
+                    <button onClick={(e) => { e.stopPropagation(); setDocToDelete(doc.id); setIsDeleteModalOpen(true); }} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-red-500 hover:border-red-200 shadow-sm"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
                  </div>
                </div>
              ))}
@@ -296,7 +333,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                   {isProcessing ? (
                     <div className="space-y-4 py-10 text-center">
                        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                       <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Extraindo: {Math.round(ocrProgress * 100)}%</p>
+                       <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Processando: {Math.round(ocrProgress * 100)}%</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
