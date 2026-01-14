@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Category, StaySession, StayRecord } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
@@ -61,7 +62,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       setIsSettingsOpen(false);
       await loadSessions();
       
-      // Recalcula registros existentes com as novas regras
       const updatedRecords = sessionRecords.map(r => ({
         ...r,
         exceededHours: calculateStayExceeded(r.arrivalTime, r.departureTime, selectedSession)
@@ -72,7 +72,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       setFeedback({
         isOpen: true,
         title: "Regras Atualizadas",
-        message: "As configurações de cobrança e arredondamento foram salvas e aplicadas à pasta.",
+        message: "As configurações de cobrança e arredondamento foram salvas e aplicadas.",
         type: "success"
       });
     } catch (e) {
@@ -98,24 +98,20 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       
       const success = await db.saveStaySession(newSession);
       if (success) {
-        setFeedback({ isOpen: true, title: "Pasta Criada", message: "A pasta de monitoramento foi registrada com sucesso.", type: "success" });
+        setFeedback({ isOpen: true, title: "Pasta Criada", message: "A pasta de monitoramento foi registrada.", type: "success" });
         setIsCreatingSession(false);
         await loadSessions();
-      } else {
-        setFeedback({ isOpen: true, title: "Erro", message: "Não foi possível criar a pasta no servidor.", type: "error" });
       }
     } catch (err) {
-      setFeedback({ isOpen: true, title: "Erro Crítico", message: "Falha na comunicação.", type: "error" });
+      setFeedback({ isOpen: true, title: "Erro", message: "Falha na comunicação.", type: "error" });
     }
   };
 
-  // LÓGICA DE ARREDONDAMENTO CORRIGIDA (TS Fix: isNaN)
+  // LÓGICA DE ARREDONDAMENTO
   const calculateExceededHoursDecimal = (arrivalTime: string, departureTime: string, session: StaySession): number => {
     if (!arrivalTime || !departureTime) return 0;
     const start = new Date(arrivalTime).getTime();
     const end = new Date(departureTime).getTime();
-    
-    // Fix: iSNan -> isNaN
     if (isNaN(start) || isNaN(end) || end <= start) return 0;
 
     const totalStayMs = end - start;
@@ -129,12 +125,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     const remainingMinutes = totalMinutes % 60;
     const roundUpTrigger = session.roundUpMinutes || 30;
 
-    // Se passar do gatilho, vira 1h cheia a mais
     if (remainingMinutes >= roundUpTrigger) {
       return wholeHours + 1;
     }
-    
-    // Caso contrário, retorna apenas as horas cheias (arredondamento comercial para baixo se não atingir gatilho)
     return wholeHours;
   };
 
@@ -154,13 +147,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const { unique, duplicateCount, duplicateList } = stayValidator.filterDuplicates(records, sessionRecords);
 
       if (unique.length === 0) {
-        setFeedback({
-          isOpen: true,
-          title: "Nenhum Item Novo",
-          message: "Todas as OS desta planilha já existem nesta pasta e foram ignoradas.",
-          type: "warning",
-          details: duplicateList
-        });
+        setFeedback({ isOpen: true, title: "Nenhum Item Novo", message: "Itens duplicados ignorados.", type: "warning", details: duplicateList });
         return;
       }
 
@@ -170,22 +157,21 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       }));
 
       await db.saveStayRecords(processed);
-      
-      setFeedback({
-        isOpen: true,
-        title: "Importação Concluída",
-        message: `${processed.length} novas OS adicionadas. ${duplicateCount > 0 ? `${duplicateCount} duplicatas ignoradas.` : ''}`,
-        type: duplicateCount > 0 ? "warning" : "success",
-        details: duplicateCount > 0 ? duplicateList : []
-      });
-
+      setFeedback({ isOpen: true, title: "Importação Concluída", message: `${processed.length} registros novos.`, type: "success" });
       await loadSessionRecords(selectedSession.id);
     } catch (err: any) {
-      setFeedback({ isOpen: true, title: "Falha na Planilha", message: err.message || "Erro ao ler o arquivo.", type: "error" });
+      setFeedback({ isOpen: true, title: "Falha", message: "Erro ao ler arquivo.", type: "error" });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleOpenEditRecord = (r: StayRecord) => {
+    setEditingRecord(r);
+    const arrival = r.arrivalTime ? new Date(r.arrivalTime).toISOString().slice(0, 16) : '';
+    const departure = r.departureTime ? new Date(r.departureTime).toISOString().slice(0, 16) : '';
+    setEditForm({ arrival, departure });
   };
 
   const handleSaveRecordEdit = async () => {
@@ -201,13 +187,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     await db.saveStayRecords([updatedRecord]);
     await loadSessionRecords(selectedSession.id);
     setEditingRecord(null);
-  };
-
-  const handleOpenEditRecord = (r: StayRecord) => {
-    setEditingRecord(r);
-    const arrival = r.arrivalTime ? new Date(r.arrivalTime).toISOString().slice(0, 16) : '';
-    const departure = r.departureTime ? new Date(r.departureTime).toISOString().slice(0, 16) : '';
-    setEditForm({ arrival, departure });
   };
 
   const formatFullDateTime = (iso: string) => {
@@ -227,8 +206,11 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <span className="font-black text-slate-900 text-[10px] mt-0.5">{r.os}</span>
       </div>
     )},
+    { key: 'location', label: 'Atendimento', render: (r: StayRecord) => (
+      <span className="text-[9px] font-black uppercase text-slate-600 leading-tight block whitespace-normal min-w-[120px]">{r.location}</span>
+    )},
     { key: 'resource', label: 'Motorista / Navio / Container', render: (r: StayRecord) => (
-      <div className="flex flex-col min-w-[200px]">
+      <div className="flex flex-col min-w-[180px]">
         <span className="font-black text-[10px] uppercase text-slate-700 whitespace-normal leading-tight">{r.driverName}</span>
         <div className="flex gap-2 items-center mt-1">
            <span className="text-[8px] font-bold text-slate-400 uppercase">{r.ship || '---'}</span>
@@ -237,17 +219,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       </div>
     )},
-    { key: 'location', label: 'Atendimento', render: (r: StayRecord) => (
-      <span className="text-[9px] font-black uppercase text-slate-600 leading-tight block max-w-[120px] truncate">{r.location}</span>
-    )},
-    { key: 'times', label: 'Horários Realizados (Entrada / Saída)', render: (r: StayRecord) => (
-      <div className="flex flex-col gap-1.5 min-w-[160px]">
-        <div className="flex items-center justify-between gap-3 bg-emerald-50 px-2.5 py-1.5 rounded border border-emerald-100">
-           <span className="text-[7px] font-black text-emerald-600 uppercase">Entrada:</span>
+    { key: 'times', label: 'Horários Realizados', render: (r: StayRecord) => (
+      <div className="flex flex-col gap-1.5 w-[145px]">
+        <div className="flex items-center justify-between gap-2 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
+           <span className="text-[7px] font-black text-emerald-600 uppercase">E:</span>
            <span className="text-[9px] font-black text-emerald-700">{formatFullDateTime(r.arrivalTime)}</span>
         </div>
-        <div className="flex items-center justify-between gap-3 bg-red-50 px-2.5 py-1.5 rounded border border-red-100">
-           <span className="text-[7px] font-black text-red-600 uppercase">Saída:</span>
+        <div className="flex items-center justify-between gap-2 bg-red-50 px-2 py-1 rounded border border-red-100">
+           <span className="text-[7px] font-black text-red-600 uppercase">S:</span>
            <span className="text-[9px] font-black text-red-700">{formatFullDateTime(r.departureTime)}</span>
         </div>
       </div>
@@ -257,7 +236,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       return (
         <div className="flex flex-col items-center">
           <span className={`text-[10px] font-black ${text !== '---' ? 'text-red-600' : 'text-slate-400'}`}>{text}</span>
-          {text !== '---' && <span className="text-[6px] bg-red-100 text-red-600 px-1 rounded font-black uppercase mt-0.5 shadow-sm">Cobrável</span>}
+          {text !== '---' && <span className="text-[6px] bg-red-100 text-red-600 px-1 rounded font-black uppercase mt-0.5">Cobrável</span>}
         </div>
       );
     }},
@@ -274,15 +253,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }},
     { key: 'actions', label: 'Opções', render: (r: StayRecord) => (
       <div className="flex gap-1 justify-end">
-        <button onClick={(e) => { e.stopPropagation(); handleOpenEditRecord(r); }} className="p-2 text-slate-300 hover:text-blue-500 transition-all hover:bg-blue-50 rounded-lg" title="Editar Horários"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg></button>
-        <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir OS '+r.os+'?')) { db.deleteStayRecord(r.id); loadSessionRecords(selectedSession!.id); } }} className="p-2 text-slate-300 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg" title="Remover"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+        <button onClick={(e) => { e.stopPropagation(); handleOpenEditRecord(r); }} className="p-2 text-slate-300 hover:text-blue-500 transition-all hover:bg-blue-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg></button>
+        <button onClick={(e) => { e.stopPropagation(); if(confirm('Excluir?')) { db.deleteStayRecord(r.id); loadSessionRecords(selectedSession!.id); } }} className="p-2 text-slate-300 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
       </div>
     )}
   ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-      
       <StayFeedbackModal 
         isOpen={feedback.isOpen}
         title={feedback.title}
@@ -292,30 +270,17 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         onClose={() => setFeedback({ ...feedback, isOpen: false })}
       />
 
-      {/* DASHBOARD HEADER */}
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Relatórios de Estadias</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de custos e controle de permanência</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de custos e permanência</p>
           </div>
-          <button 
-            onClick={() => setIsCreatingSession(true)} 
-            className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95"
-          >
-            Nova Pasta de Estadia
-          </button>
+          <button onClick={() => setIsCreatingSession(true)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95">Nova Pasta</button>
         </div>
-
         <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 border-t border-slate-50 pt-6">
            {['GERAL', ...Array.from(new Set(sessions.map(s => s.category))).sort()].map(cat => (
-             <button 
-               key={cat} 
-               onClick={() => setActiveCategory(cat)} 
-               className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all border ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-white'}`}
-             >
-               {cat}
-             </button>
+             <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all border ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-white'}`}>{cat}</button>
            ))}
         </div>
       </div>
@@ -326,9 +291,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
              <button key={session.id} onClick={() => handleOpenSession(session)} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-xl transition-all group text-left relative overflow-hidden">
                 <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-10 group-hover:bg-blue-600 group-hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" strokeWidth="2.5"/></svg></div>
                 <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">{session.category}</p>
-                <h4 className="text-xl font-black text-slate-900 uppercase leading-tight mb-8">
-                  {new Date(session.startDate).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})} A {new Date(session.endDate).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}
-                </h4>
+                <h4 className="text-xl font-black text-slate-900 uppercase leading-tight mb-8">{new Date(session.startDate).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})} A {new Date(session.endDate).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</h4>
                 <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6">
                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">R$ {session.costPerHour}/H • {session.gracePeriodHours}H FREE</span>
                    <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
@@ -340,25 +303,18 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center justify-between">
               <div className="flex items-center gap-6">
-                 <button onClick={() => setSelectedSession(null)} className="p-3 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all shadow-sm"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3"/></svg></button>
-                 <div>
-                    <h3 className="text-sm font-black uppercase text-slate-800">Pasta: {selectedSession.category}</h3>
-                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Período Selecionado</p>
-                 </div>
+                 <button onClick={() => setSelectedSession(null)} className="p-3 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3"/></svg></button>
+                 <div><h3 className="text-sm font-black uppercase text-slate-800">Pasta: {selectedSession.category}</h3></div>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setIsSettingsOpen(true)} className="px-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg flex items-center gap-2" title="Configurar Regras">
+                <button onClick={() => setIsSettingsOpen(true)} className="px-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg>
-                  <span className="text-[10px] font-black uppercase pr-1">Configurar Cobrança</span>
+                  <span className="text-[10px] font-black uppercase">Regras de Cobrança</span>
                 </button>
                 <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
-                <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2">
-                  {isImporting ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5"/></svg>}
-                  Importar Planilha
-                </button>
+                <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2">Importar XLSX</button>
               </div>
            </div>
-
            <div className="stay-table-compact">
              <SmartOperationTable 
                userId={userId}
@@ -371,7 +327,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       )}
 
-      {/* MODAL CONFIGURAÇÃO DE COBRANÇA */}
       {isSettingsOpen && selectedSession && (
         <div className="fixed inset-0 z-[3500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -380,7 +335,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                 <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">Pasta: {selectedSession.category}</p>
              </div>
              <form onSubmit={handleSaveSettings} className="p-10 space-y-8">
-                {/* IDENTIFICADOR: CUSTO */}
                 <div className="space-y-2">
                    <div className="flex items-center gap-2 mb-1">
                       <div className="w-7 h-7 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center shadow-sm">
@@ -390,8 +344,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                    </div>
                    <input type="number" step="0.01" required className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 text-lg" value={selectedSession.costPerHour || 0} onChange={e => setSelectedSession({...selectedSession, costPerHour: Number(e.target.value)})} />
                 </div>
-
-                {/* IDENTIFICADOR: CARENCIA */}
                 <div className="space-y-2">
                    <div className="flex items-center gap-2 mb-1">
                       <div className="w-7 h-7 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center shadow-sm">
@@ -404,8 +356,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                      <span className="text-[11px] font-black text-slate-400 uppercase">Horas</span>
                    </div>
                 </div>
-
-                {/* IDENTIFICADOR: ARREDONDAMENTO */}
                 <div className="space-y-2">
                    <div className="flex items-center gap-2 mb-1">
                       <div className="w-7 h-7 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center shadow-sm">
@@ -417,11 +367,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                      <input type="number" required min="0" max="59" className="flex-1 px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={selectedSession.roundUpMinutes || 0} onChange={e => setSelectedSession({...selectedSession, roundUpMinutes: Number(e.target.value)})} />
                      <span className="text-[11px] font-black text-slate-400 uppercase">Minutos</span>
                    </div>
-                   <p className="text-[8px] text-slate-400 italic font-medium">Ex: Se definido 30 min, uma estadia de 8h 35m será cobrada como 1h cheia excedente.</p>
                 </div>
-
                 <div className="grid gap-3 pt-4">
-                  <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Salvar Configurações</button>
+                  <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Salvar</button>
                   <button type="button" onClick={() => setIsSettingsOpen(false)} className="w-full py-2 text-[10px] font-black text-slate-400 uppercase">Voltar</button>
                 </div>
              </form>
@@ -432,16 +380,10 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       {editingRecord && (
         <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-            <h3 className="text-lg font-black uppercase text-slate-800 text-center leading-tight">Ajustar Horários Realizados</h3>
+            <h3 className="text-lg font-black uppercase text-slate-800 text-center leading-tight">Ajustar Horários</h3>
             <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Chegada Real</label>
-                <input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.arrival} onChange={e => setEditForm({...editForm, arrival: e.target.value})} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Saída Real</label>
-                <input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.departure} onChange={e => setEditForm({...editForm, departure: e.target.value})} />
-              </div>
+              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Chegada Real</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.arrival} onChange={e => setEditForm({...editForm, arrival: e.target.value})} /></div>
+              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Saída Real</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.departure} onChange={e => setEditForm({...editForm, departure: e.target.value})} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-4">
               <button onClick={() => setEditingRecord(null)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Cancelar</button>
@@ -451,38 +393,25 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       )}
 
-      {/* Modal Nova Pasta */}
       {isCreatingSession && (
         <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
            <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-10 bg-slate-900 text-white text-center">
-                 <h3 className="text-xl font-black uppercase tracking-tight">Nova Pasta de Estadia</h3>
-                 <p className="text-[9px] font-bold text-blue-400 uppercase mt-1 tracking-widest">Defina o período para os cálculos</p>
-              </div>
+              <div className="p-10 bg-slate-900 text-white text-center"><h3 className="text-xl font-black uppercase tracking-tight">Nova Pasta de Estadia</h3></div>
               <form onSubmit={handleCreateSession} className="p-10 space-y-6">
                 <div className="space-y-1">
-                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Vínculo Operacional</label>
+                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Vínculo</label>
                    <select required className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={newSessionForm.category} onChange={e => setNewSessionForm({...newSessionForm, category: e.target.value})}>
                      <option value="">Selecione...</option>
                      {globalCategories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                    </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Início</label>
-                    <input type="date" required className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold" value={newSessionForm.startDate} onChange={e => setNewSessionForm({...newSessionForm, startDate: e.target.value})} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Fim</label>
-                    <input type="date" required className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold" value={newSessionForm.endDate} onChange={e => setNewSessionForm({...newSessionForm, endDate: e.target.value})} />
-                  </div>
+                  <input type="date" required className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold" value={newSessionForm.startDate} onChange={e => setNewSessionForm({...newSessionForm, startDate: e.target.value})} />
+                  <input type="date" required className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold" value={newSessionForm.endDate} onChange={e => setNewSessionForm({...newSessionForm, endDate: e.target.value})} />
                 </div>
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Custo por Hora (R$)</label>
-                   <input type="number" step="0.01" required className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" placeholder="R$ 0,00" value={newSessionForm.costPerHour} onChange={e => setNewSessionForm({...newSessionForm, costPerHour: Number(e.target.value)})} />
-                </div>
+                <input type="number" step="0.01" required className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" placeholder="Custo por Hora (R$)" value={newSessionForm.costPerHour} onChange={e => setNewSessionForm({...newSessionForm, costPerHour: Number(e.target.value)})} />
                 <div className="grid gap-3 pt-6">
-                   <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Criar Pasta de Monitoramento</button>
+                   <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Criar Pasta</button>
                    <button type="button" onClick={() => setIsCreatingSession(false)} className="w-full py-3 text-[10px] font-black text-slate-400 uppercase">Cancelar</button>
                 </div>
               </form>
