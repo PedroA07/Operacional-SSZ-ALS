@@ -34,6 +34,7 @@ export interface StaySession {
   createdBy: string;
   gracePeriodHours?: number; // Ex: 8h
   roundUpMinutes?: number;   // Ex: 30m
+  costPerHour?: number;      // Ex: R$ 40,00
 }
 
 export interface StayRecord {
@@ -73,7 +74,7 @@ export type NotificationType =
   | 'PORT_CREATED'
   | 'PORT_UPDATED' 
   | 'PRESTACKING_CREATED'
-  | 'PRESTACKING_UPDATED'
+  | 'PRESTACKING_UPDATED' 
   | 'CATEGORY_CREATED'
   | 'SYSTEM' 
   | 'DELETED'

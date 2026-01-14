@@ -25,7 +25,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const [newSessionForm, setNewSessionForm] = useState({
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
-    category: ''
+    category: '',
+    costPerHour: 40
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,19 +48,35 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     await loadSessionRecords(session.id);
   };
 
-  const calculateStayExceeded = (arrivalTime: string, departureTime: string, session: StaySession): string => {
-    if (!arrivalTime || !departureTime) return '---';
+  const calculateExceededHoursDecimal = (arrivalTime: string, departureTime: string, session: StaySession): number => {
+    if (!arrivalTime || !departureTime) return 0;
     const start = new Date(arrivalTime).getTime();
     const end = new Date(departureTime).getTime();
-    if (isNaN(start) || isNaN(end) || end <= start) return '---';
+    if (isNaN(start) || isNaN(end) || end <= start) return 0;
     const totalStayMs = end - start;
     const graceMs = (session.gracePeriodHours || 8) * 3600000;
     const roundUpTrigger = session.roundUpMinutes || 30;
-    if (totalStayMs <= graceMs) return '---';
+    if (totalStayMs <= graceMs) return 0;
+    
     const exceededMs = totalStayMs - graceMs;
+    const wholeHours = Math.floor(exceededMs / 3600000);
+    const minutes = Math.floor((exceededMs % 3600000) / 60000);
+    
+    if (minutes >= roundUpTrigger) {
+      return wholeHours + 1;
+    }
+    return wholeHours + (minutes / 60);
+  };
+
+  const calculateStayExceeded = (arrivalTime: string, departureTime: string, session: StaySession): string => {
+    const decimal = calculateExceededHoursDecimal(arrivalTime, departureTime, session);
+    if (decimal === 0) return '---';
+    
+    const exceededMs = (new Date(departureTime).getTime() - new Date(arrivalTime).getTime()) - ((session.gracePeriodHours || 8) * 3600000);
     let hours = Math.floor(exceededMs / 3600000);
     const minutes = Math.floor((exceededMs % 3600000) / 60000);
-    if (minutes >= roundUpTrigger) {
+    
+    if (minutes >= (session.roundUpMinutes || 30)) {
       hours += 1;
       return `${hours}h 00m`;
     }
@@ -76,7 +93,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       createdAt: new Date().toISOString(),
       createdBy: userId,
       gracePeriodHours: 8,
-      roundUpMinutes: 30
+      roundUpMinutes: 30,
+      costPerHour: newSessionForm.costPerHour
     };
     await db.saveStaySession(session);
     await loadSessions();
@@ -223,6 +241,20 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       );
     }},
+    { key: 'totalCost', label: 'Custo Total', render: (r: StayRecord) => {
+      if (!selectedSession) return '---';
+      const hours = calculateExceededHoursDecimal(r.arrivalTime, r.departureTime, selectedSession);
+      const total = hours * (selectedSession.costPerHour || 0);
+      if (total === 0) return <span className="text-slate-300 font-bold">---</span>;
+      return (
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] font-black text-emerald-700">
+            {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </span>
+          <span className="text-[6px] text-slate-400 font-bold uppercase">Base: {hours.toFixed(2)}h</span>
+        </div>
+      );
+    }},
     { key: 'actions', label: 'Remover', render: (r: StayRecord) => (
       <button 
         onClick={(e) => { e.stopPropagation(); handleDeleteRecord(r); }}
@@ -291,7 +323,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                 </h4>
                 <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6">
                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
-                     {session.gracePeriodHours}H CARENÇA • {session.roundUpMinutes}M ARRED.
+                     R$ {session.costPerHour}/H • {session.gracePeriodHours}H FREE
                    </span>
                    <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
                 </div>
@@ -374,6 +406,17 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
              </div>
              <form onSubmit={handleSaveSettings} className="p-10 space-y-8">
                 <div className="space-y-2">
+                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Custo por Hora (R$)</label>
+                   <input 
+                     type="number" 
+                     step="0.01"
+                     required 
+                     className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800"
+                     value={selectedSession.costPerHour || 0}
+                     onChange={e => setSelectedSession({...selectedSession, costPerHour: Number(e.target.value)})}
+                   />
+                </div>
+                <div className="space-y-2">
                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Horas de Carença (Free-time)</label>
                    <div className="flex items-center gap-4">
                       <input 
@@ -445,6 +488,17 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data Fim</label>
                     <input type="date" required className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold" value={newSessionForm.endDate} onChange={e => setNewSessionForm({...newSessionForm, endDate: e.target.value})} />
                   </div>
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Custo por Hora (R$)</label>
+                   <input 
+                     type="number" 
+                     step="0.01"
+                     required 
+                     className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800"
+                     value={newSessionForm.costPerHour}
+                     onChange={e => setNewSessionForm({...newSessionForm, costPerHour: Number(e.target.value)})}
+                   />
                 </div>
                 <div className="grid gap-3 pt-6">
                    <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Criar Pasta</button>

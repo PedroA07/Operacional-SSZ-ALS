@@ -19,7 +19,7 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY)
   : null;
 
 export const db = {
-  // ... (métodos existentes preservados)
+  // ... (outros métodos)
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('users').select('*');
@@ -150,7 +150,6 @@ export const db = {
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').upsert({
-      // Fix: Removed incorrect references to snake_case properties on PreStacking object to resolve type errors
       id: ps.id, name: ps.name, legal_name: ps.legalName, cnpj: ps.cnpj,
       address: ps.address, neighborhood: ps.neighborhood, zip_code: ps.zipCode,
       city: ps.city, state: ps.state
@@ -206,7 +205,8 @@ export const db = {
       id: s.id, category: s.category, startDate: s.start_date, endDate: s.end_date,
       createdAt: s.created_at, createdBy: s.created_by,
       gracePeriodHours: Number(s.grace_period_hours || 8),
-      roundUpMinutes: Number(s.round_up_minutes || 30)
+      roundUpMinutes: Number(s.round_up_minutes || 30),
+      costPerHour: Number(s.cost_per_hour || 0)
     }));
   },
 
@@ -216,7 +216,8 @@ export const db = {
       id: session.id, category: session.category, start_date: session.startDate,
       end_date: session.endDate, created_at: session.createdAt, created_by: session.createdBy,
       grace_period_hours: session.gracePeriodHours,
-      round_up_minutes: session.roundUpMinutes
+      round_up_minutes: session.roundUpMinutes,
+      cost_per_hour: session.costPerHour
     });
     return !error;
   },
@@ -234,7 +235,7 @@ export const db = {
       id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
       driverName: r.driver_name, ship: r.ship, container: r.container,
       scheduledStart: r.scheduled_start, arrivalTime: r.arrival_time,
-      departureTime: r.departure_time, exceededHours: r.exceeded_hours
+      departureTime: r.departure_time, exceeded_hours: r.exceeded_hours
     }));
   },
 
