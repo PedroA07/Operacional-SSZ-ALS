@@ -19,7 +19,6 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY)
   : null;
 
 export const db = {
-  // ... (outros métodos)
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('users').select('*');
@@ -235,7 +234,7 @@ export const db = {
       id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
       driverName: r.driver_name, ship: r.ship, container: r.container,
       scheduledStart: r.scheduled_start, arrivalTime: r.arrival_time,
-      departureTime: r.departure_time, exceeded_hours: r.exceeded_hours
+      departureTime: r.departure_time, exceededHours: r.exceeded_hours // Fixed mapping to match StayRecord interface
     }));
   },
 
@@ -257,7 +256,6 @@ export const db = {
     return !error;
   },
 
-  // --- NOTIFICAÇÕES E PRESENÇA ---
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: any) => {
     if (!supabase) return;
     const origin: NotificationOrigin = (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL';
