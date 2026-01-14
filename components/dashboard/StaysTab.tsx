@@ -68,7 +68,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     try {
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
       await db.saveStayRecords(records);
-      alert(`Sucesso: ${records.length} registros de estadias importados.`);
+      alert(`Sucesso: ${records.length} registros importados.`);
       await loadSessionRecords(selectedSession.id);
     } catch (err: any) {
       alert(err.message || "Erro ao processar planilha.");
@@ -79,30 +79,37 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   };
 
   /**
-   * Formata o rótulo exatamente como solicitado: [MÊS] [ANO] [DIA] A [DIA]
+   * Formata o rótulo de forma literal (string split) para evitar erros de fuso horário
+   * Resultado: JANEIRO 2026 01 A 10
    */
   const formatSessionLabel = (startDate: string, endDate: string) => {
+    if (!startDate || !endDate) return "DATA INVÁLIDA";
     const months = [
       'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
       'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'
     ];
 
-    // startDate e endDate vêm como YYYY-MM-DD
-    const startParts = startDate.split('-'); 
-    const endParts = endDate.split('-');     
+    const sParts = startDate.split('-'); // [2026, 01, 01]
+    const eParts = endDate.split('-'); 
 
-    const year = startParts[0];
-    const monthIndex = parseInt(startParts[1], 10) - 1;
-    const monthName = months[monthIndex] || 'MÊS';
-    const dayStart = startParts[2];
-    const dayEnd = endParts[2];
+    const year = sParts[0];
+    const monthIdx = parseInt(sParts[1], 10) - 1;
+    const monthName = months[monthIdx] || 'MÊS';
+    const dayS = sParts[2];
+    const dayE = eParts[2];
 
-    // Caso o intervalo mude de mês, mostramos o formato DD/MM A DD/MM para não haver erro de interpretação
-    if (startParts[1] !== endParts[1]) {
-       return `${dayStart}/${startParts[1]} A ${dayEnd}/${endParts[1]} ${year}`;
+    // Se mudou de mês, mostra formato reduzido para não confundir
+    if (sParts[1] !== eParts[1]) {
+       return `${dayS}/${sParts[1]} A ${dayE}/${eParts[1]} ${year}`;
     }
 
-    return `${monthName} ${year} ${dayStart} A ${dayEnd}`;
+    return `${monthName} ${year} ${dayS} A ${dayE}`;
+  };
+
+  const formatDisplayDate = (isoString: string) => {
+    if (!isoString) return '---';
+    const d = new Date(isoString);
+    return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   const availableCategories = useMemo(() => {
@@ -116,23 +123,32 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   }, [sessions, activeCategory]);
 
   const recordColumns = [
-    { key: 'os', label: 'Tipo / OS', render: (r: StayRecord) => (
+    { key: 'os', label: '1. Tipo / OS', render: (r: StayRecord) => (
       <div className="flex flex-col">
         <span className="text-[7px] font-black text-blue-600 uppercase leading-none">{r.type}</span>
         <span className="font-black text-slate-900 text-[10px] mt-0.5">{r.os}</span>
       </div>
     )},
-    { key: 'details', label: 'Recurso / Local', render: (r: StayRecord) => (
+    { key: 'location', label: '2. Local / Previsão', render: (r: StayRecord) => (
       <div className="flex flex-col">
-        <span className="font-bold text-[9px] uppercase text-slate-500 truncate">{r.driverName}</span>
-        <span className="text-[8px] font-black text-blue-500 uppercase truncate">{r.location}</span>
+        <span className="font-bold text-[9px] uppercase text-slate-800 leading-tight">{r.location}</span>
+        <span className="text-[8px] font-black text-blue-500 uppercase mt-0.5">PREV: {formatDisplayDate(r.scheduledStart)}</span>
       </div>
     )},
-    { key: 'equipment', label: 'Equipamento', render: (r: StayRecord) => <span className="font-mono font-black text-[10px] text-slate-700">{r.container}</span> },
-    { key: 'times', label: 'Entrada / Saída', render: (r: StayRecord) => (
+    { key: 'resource', label: '3. Recurso / Navio / Unidade', render: (r: StayRecord) => (
+      <div className="flex flex-col">
+        <span className="font-black text-[9px] uppercase text-slate-700 truncate">{r.driverName}</span>
+        <div className="flex gap-2 items-center mt-0.5">
+           <span className="text-[8px] font-bold text-slate-400 uppercase">{r.ship}</span>
+           <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+           <span className="text-[10px] font-mono font-black text-blue-600">{r.container}</span>
+        </div>
+      </div>
+    )},
+    { key: 'times', label: '4. Entrada / Saída', render: (r: StayRecord) => (
       <div className="flex flex-col gap-0.5 text-[8px] font-bold">
-        <div className="flex justify-between gap-3"><span className="text-slate-400">ENT:</span> <span className="text-emerald-600">{r.arrivalTime ? new Date(r.arrivalTime).toLocaleString('pt-BR') : '---'}</span></div>
-        <div className="flex justify-between gap-3"><span className="text-slate-400">SAI:</span> <span className="text-red-600">{r.departureTime ? new Date(r.departureTime).toLocaleString('pt-BR') : '---'}</span></div>
+        <div className="flex justify-between gap-3"><span className="text-slate-400">ENT:</span> <span className="text-emerald-600">{formatDisplayDate(r.arrivalTime)}</span></div>
+        <div className="flex justify-between gap-3"><span className="text-slate-400">SAI:</span> <span className="text-red-600">{formatDisplayDate(r.departureTime)}</span></div>
       </div>
     )},
     { key: 'stay', label: 'Estadia (>8h)', render: (r: StayRecord) => (
@@ -212,7 +228,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                  </div>
               </div>
               <div className="flex gap-3">
-                <input type="file" handleFileImport={handleFileImport} ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
+                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
                 <button 
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isImporting}

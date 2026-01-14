@@ -17,7 +17,7 @@ export const stayImporter = {
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           const rows: any[] = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
           
-          // Filtra linhas que possuem número de programação na coluna B (index 1)
+          // Filtra linhas que possuem OS na coluna B
           const dataRows = rows.slice(1).filter(row => row && row[1]); 
           
           const records: StayRecord[] = [];
@@ -30,10 +30,19 @@ export const stayImporter = {
             const ship = String(row[4] || '').toUpperCase().trim();
             const container = String(row[5] || '').toUpperCase().trim();
             
-            // Datas (Colunas G, H, I -> Índices 6, 7, 8)
-            const scheduledStart = row[6] ? new Date(row[6]).toISOString() : '';
-            const arrivalTime = row[7] ? new Date(row[7]).toISOString() : '';
-            const departureTime = row[8] ? new Date(row[8]).toISOString() : '';
+            // Função interna para tratar data do Excel sem perder o dia pelo fuso horário
+            const formatDateForce = (val: any) => {
+               if (!val) return '';
+               const d = new Date(val);
+               if (isNaN(d.getTime())) return '';
+               // Adicionamos o offset para garantir que a data lida seja a data visual do Excel
+               const userTimezoneOffset = d.getTimezoneOffset() * 60000;
+               return new Date(d.getTime() + userTimezoneOffset).toISOString();
+            };
+
+            const scheduledStart = formatDateForce(row[6]);
+            const arrivalTime = formatDateForce(row[7]);
+            const departureTime = formatDateForce(row[8]);
 
             // Cálculo de estadias (> 8h)
             let exceededText = '---';
