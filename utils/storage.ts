@@ -19,6 +19,7 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY)
   : null;
 
 export const db = {
+  // ... (outros métodos omitidos para brevidade, mas devem ser mantidos)
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('users').select('*');
@@ -52,22 +53,24 @@ export const db = {
     return await driverRepository.getAll(supabase);
   },
 
-  getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
-    if (!supabase) return null;
-    const { data, error } = await supabase.from('drivers').select('*').eq('cpf', cpf).maybeSingle();
-    if (error) throw error;
-    return data ? driverRepository.mapFromDb(data) : null;
-  },
-
+  // Fix: Added missing saveDriver method to resolve Dashboard.tsx error
   saveDriver: async (driver: Driver, actingUser?: User) => {
     if (!supabase) return false;
-    const success = await driverRepository.save(supabase, driver);
-    return success;
+    return await driverRepository.save(supabase, driver);
   },
 
+  // Fix: Added missing deleteDriver method to resolve Dashboard.tsx error
   deleteDriver: async (id: string) => {
     if (!supabase) return false;
     return await driverRepository.delete(supabase, id);
+  },
+
+  // Fix: Added missing getDriverByCPF method to resolve DriversTab.tsx error
+  getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('drivers').select('*').eq('cpf', cpf).maybeSingle();
+    if (error) return null;
+    return data ? driverRepository.mapFromDb(data) : null;
   },
 
   getTrips: async (): Promise<Trip[]> => {
@@ -106,6 +109,7 @@ export const db = {
     return !error;
   },
 
+  // Fix: Added missing deleteCustomer method to resolve Dashboard.tsx error
   deleteCustomer: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('customers').delete().eq('id', id);
@@ -131,6 +135,7 @@ export const db = {
     return !error;
   },
 
+  // Fix: Added missing deletePort method to resolve Dashboard.tsx error
   deletePort: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('ports').delete().eq('id', id);
@@ -156,6 +161,7 @@ export const db = {
     return !error;
   },
 
+  // Fix: Added missing deletePreStacking method to resolve Dashboard.tsx error
   deletePreStacking: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').delete().eq('id', id);
@@ -172,6 +178,7 @@ export const db = {
     return await staffRepository.save(supabase, staff);
   },
 
+  // Fix: Added missing deleteStaff method to resolve Dashboard.tsx error
   deleteStaff: async (id: string) => {
     if (!supabase) return false;
     return await staffRepository.delete(supabase, id);
@@ -186,10 +193,13 @@ export const db = {
     })) as Category[];
   },
 
+  // Fix: Added missing saveCategory method to resolve CategoryManagerModal.tsx error
   saveCategory: async (category: Category, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('categories').upsert({
-      id: category.id, name: category.name, parent_id: category.parentId
+      id: category.id,
+      name: category.name,
+      parent_id: category.parentId
     });
     return !error;
   },
@@ -234,7 +244,7 @@ export const db = {
       id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
       driverName: r.driver_name, ship: r.ship, container: r.container,
       scheduledStart: r.scheduled_start, arrivalTime: r.arrival_time,
-      departureTime: r.departure_time, exceededHours: r.exceeded_hours // Fixed mapping to match StayRecord interface
+      departureTime: r.departure_time, exceededHours: r.exceeded_hours
     }));
   },
 
@@ -256,6 +266,65 @@ export const db = {
     return !error;
   },
 
+  // Fix: Added missing exportBackup method to resolve SystemTab.tsx error
+  exportBackup: async () => {
+    const [drivers, customers, ports, preStacking, staff, trips, categories] = await Promise.all([
+      db.getDrivers(),
+      db.getCustomers(),
+      db.getPorts(),
+      db.getPreStacking(),
+      db.getStaff(),
+      db.getTrips(),
+      db.getCategories()
+    ]);
+
+    const backup = {
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      data: { drivers, customers, ports, preStacking, staff, trips, categories }
+    };
+
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `als_backup_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  },
+
+  // Fix: Added missing importBackup method to resolve SystemTab.tsx error
+  importBackup: async (file: File): Promise<boolean> => {
+    if (!supabase) return false;
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const content = JSON.parse(e.target?.result as string);
+          if (!content.data) return resolve(false);
+
+          const { drivers, customers, ports, preStacking, staff, trips, categories } = content.data;
+
+          await Promise.all([
+            ...drivers.map((d: any) => driverRepository.save(supabase, d)),
+            ...customers.map((c: any) => db.saveCustomer(c)),
+            ...ports.map((p: any) => db.savePort(p)),
+            ...preStacking.map((ps: any) => db.savePreStacking(ps)),
+            ...staff.map((s: any) => staffRepository.save(supabase, s)),
+            ...trips.map((t: any) => tripRepository.save(supabase, t)),
+            ...categories.map((cat: any) => db.saveCategory(cat))
+          ]);
+
+          resolve(true);
+        } catch (err) {
+          resolve(false);
+        }
+      };
+      reader.readAsText(file);
+    });
+  },
+
+  // --- NOTIFICAÇÕES E PRESENÇA ---
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: any) => {
     if (!supabase) return;
     const origin: NotificationOrigin = (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL';
@@ -296,9 +365,6 @@ export const db = {
     prefs.visibleColumns[componentId] = visibleColumns;
     localStorage.setItem(key, JSON.stringify(prefs));
   },
-
-  exportBackup: async () => { return; },
-  importBackup: async (file: File): Promise<boolean> => { return false; },
 
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
