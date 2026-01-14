@@ -25,6 +25,15 @@ export interface User {
   presence_status?: PresenceStatus;
 }
 
+export interface StaySession {
+  id: string;
+  category: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  createdBy: string;
+}
+
 export interface NotificationPreference {
   newTrip: boolean;
   statusUpdate: boolean;
@@ -43,7 +52,7 @@ export type NotificationType =
   | 'DRIVER_CREATED' 
   | 'DRIVER_UPDATED' 
   | 'CUSTOMER_CREATED'
-  | 'CUSTOMER_UPDATED'
+  | 'CUSTOMER_UPDATED' 
   | 'PORT_CREATED'
   | 'PORT_UPDATED'
   | 'PRESTACKING_CREATED'
@@ -119,8 +128,8 @@ export type TripStatus =
 
 export interface StatusHistoryEntry {
   status: TripStatus;
-  dateTime: string; // Horário Operacional (informado pelo usuário)
-  createdAt: string; // Horário de Registro (real do sistema)
+  dateTime: string; 
+  createdAt: string; 
 }
 
 export interface PaymentStatus {
@@ -193,6 +202,7 @@ export interface Trip {
   preStackingFormData?: any;
   scheduling?: TripScheduling;
   driver_docs?: DriverCapturedDoc[];
+  stay_session_id?: string;
 }
 
 export interface Driver {

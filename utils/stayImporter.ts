@@ -5,9 +5,9 @@ import { db } from './storage';
 
 export const stayImporter = {
   /**
-   * Processa o Excel e retorna a lista estruturada de objetos Trip para visualização imediata
+   * Processa o Excel e retorna a lista estruturada vinculada a uma sessão específica
    */
-  processExcelAndReturn: async (file: File, user: User): Promise<{ data: Trip[]; added: number; skipped: number }> => {
+  processExcelAndReturn: async (file: File, user: User, sessionId: string): Promise<{ data: Trip[]; added: number; skipped: number }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -16,16 +16,16 @@ export const stayImporter = {
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           
-          // Header 1 pula a linha 1 do Excel
           const rows: any[] = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-          const dataRows = rows.slice(1).filter(row => row && row[1]); // Filtra se tiver OS na col 2
-          
-          const existingTrips = await db.getTrips();
-          const existingOSs = new Set(existingTrips.map(t => t.os.toUpperCase().trim()));
+          const dataRows = rows.slice(1).filter(row => row && row[1]); 
           
           const finalTrips: Trip[] = [];
           let added = 0;
-          let skipped = 0;
+
+          // Busca a sessão para herdar o vínculo
+          const sessions = await db.getStaySessions();
+          const session = sessions.find(s => s.id === sessionId);
+          const category = session?.category || 'INDÚSTRIA';
 
           for (const row of dataRows) {
             const type = String(row[0] || '').toUpperCase().trim();
@@ -38,11 +38,6 @@ export const stayImporter = {
             const arrivalTime = row[7];
             const departureTime = row[8];
 
-            // Detecção Automática de Categoria baseada no padrão da OS (Aliança, Mercosul)
-            let category = 'INDÚSTRIA';
-            if (os.includes('ALC')) category = 'ALIANÇA';
-            else if (os.includes('SP')) category = 'MERCOSUL';
-
             const statusHistory: StatusHistoryEntry[] = [];
             const now = new Date().toISOString();
             
@@ -54,13 +49,13 @@ export const stayImporter = {
             else if (arrivalTime) currentStatus = 'Chegou no cliente';
 
             const tripObj: Trip = {
-              id: `stay-${Date.now()}-${added}`,
+              id: `stay-${sessionId}-${os}-${Date.now()}`,
               os,
               booking: '',
               ship,
               dateTime: scheduledStart ? new Date(scheduledStart).toISOString() : new Date().toISOString(),
               isLate: false,
-              type: type as any,
+              type: (type as any) || 'COLETA',
               category,
               container,
               customer: { id: 'import', name: location, city: 'IMPORT', state: 'SP' },
@@ -69,6 +64,7 @@ export const stayImporter = {
               statusHistory,
               advancePayment: { status: 'BLOQUEADO' },
               balancePayment: { status: 'AGUARDANDO_DOCS' },
+              stay_session_id: sessionId, // VÍNCULO CRÍTICO COM A PASTA
               scheduling: {
                 dateTime: scheduledStart ? new Date(scheduledStart).toISOString() : new Date().toISOString(),
                 location: location
@@ -76,17 +72,11 @@ export const stayImporter = {
             };
 
             finalTrips.push(tripObj);
-
-            // Tenta salvar no banco de dados se não existir, para persistência de longo prazo
-            if (!existingOSs.has(os)) {
-              await db.saveTrip(tripObj, user);
-              added++;
-            } else {
-              skipped++;
-            }
+            await db.saveTrip(tripObj, user);
+            added++;
           }
 
-          resolve({ data: finalTrips, added, skipped });
+          resolve({ data: finalTrips, added, skipped: 0 });
         } catch (err) {
           reject(err);
         }

@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus } from '../types';
+import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus, StaySession } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
@@ -52,17 +52,14 @@ export const db = {
     return await driverRepository.getAll(supabase);
   },
 
-  getAllDriversMaintenance: async (): Promise<Driver[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('drivers').select('*');
-    if (error) throw error;
-    return (data || []).map(d => driverRepository.mapFromDb(d));
-  },
-
+  // FIX: Added missing getDriverByCPF method
   getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
     if (!supabase) return null;
-    const cleanCPF = cpf.replace(/\D/g, '');
-    const { data, error } = await supabase.from('drivers').select('*').or(`cpf.eq.${cleanCPF},cpf.eq.${cpf}`).maybeSingle();
+    const { data, error } = await supabase
+      .from('drivers')
+      .select('*')
+      .eq('cpf', cpf)
+      .maybeSingle();
     if (error) throw error;
     return data ? driverRepository.mapFromDb(data) : null;
   },
@@ -86,9 +83,13 @@ export const db = {
     return await tripRepository.getAll(supabase);
   },
 
-  getAllTripsMaintenance: async (): Promise<Trip[]> => {
+  getTripsBySession: async (sessionId: string): Promise<Trip[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('trips').select('*').order('date_time', { ascending: false });
+    const { data, error } = await supabase
+      .from('trips')
+      .select('*')
+      .eq('stay_session_id', sessionId)
+      .order('date_time', { ascending: false });
     if (error) throw error;
     return (data || []).map(d => tripRepository.mapFromDb(d));
   },
@@ -195,131 +196,27 @@ export const db = {
 
   saveStaff: async (staff: Staff, password?: string) => {
     if (!supabase) return false;
-    
-    // 1. Salva os dados na tabela de colaboradores
     const success = await staffRepository.save(supabase, staff);
-    
-    if (success) {
-      // 2. Garante que o usuário de login exista ou seja atualizado
-      // Se não passou password (edição), buscamos a senha atual do usuário
-      let finalPassword = password;
-      
-      if (!finalPassword) {
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('password')
-          .eq('staff_id', staff.id)
-          .maybeSingle();
-        
-        if (existingUser) {
-          finalPassword = existingUser.password;
-        }
-      }
-
-      // Se temos uma senha (seja nova ou recuperada), fazemos o upsert
-      if (finalPassword) {
-        await supabase.from('users').upsert({
-          id: `u-staff-${staff.id}`, // ID previsível para o usuário vinculado ao staff
-          username: staff.username.toLowerCase(),
-          password: finalPassword,
-          display_name: staff.name,
-          role: staff.role,
-          staff_id: staff.id,
-          status: staff.status,
-          position: staff.position,
-          photo: staff.photo
-        });
-      }
+    if (success && password) {
+      await supabase.from('users').upsert({
+        id: `u-staff-${staff.id}`,
+        username: staff.username.toLowerCase(),
+        password: password,
+        display_name: staff.name,
+        role: staff.role,
+        staff_id: staff.id,
+        status: staff.status,
+        position: staff.position,
+        photo: staff.photo
+      });
     }
-    
     return success;
   },
 
   deleteStaff: async (id: string) => {
     if (!supabase) return false;
-    // Deleta o usuário vinculado primeiro por causa de constraints
     await supabase.from('users').delete().eq('staff_id', id);
     return await staffRepository.delete(supabase, id);
-  },
-
-  exportBackup: async () => {
-    if (!supabase) return;
-    try {
-      const [drivers, customers, ports, prestacking, staff, trips, categories, users] = await Promise.all([
-        db.getDrivers(),
-        db.getCustomers(),
-        db.getPorts(),
-        db.getPreStacking(),
-        db.getStaff(),
-        db.getTrips(),
-        db.getCategories(),
-        db.getUsers()
-      ]);
-
-      const data = {
-        drivers,
-        customers,
-        ports,
-        prestacking,
-        staff,
-        trips,
-        categories,
-        users,
-        exportedAt: new Date().toISOString()
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ALS_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error("Backup failed", e);
-      throw e;
-    }
-  },
-
-  importBackup: async (file: File): Promise<boolean> => {
-    if (!supabase) return false;
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      
-      const promises = [];
-      
-      if (data.drivers) {
-        for (const d of data.drivers) promises.push(db.saveDriver(d));
-      }
-      if (data.customers) {
-        for (const c of data.customers) promises.push(db.saveCustomer(c));
-      }
-      if (data.ports) {
-        for (const p of data.ports) promises.push(db.savePort(p));
-      }
-      if (data.prestacking) {
-        for (const ps of data.prestacking) promises.push(db.savePreStacking(ps));
-      }
-      if (data.staff) {
-        for (const s of data.staff) promises.push(db.saveStaff(s));
-      }
-      if (data.trips) {
-        for (const t of data.trips) promises.push(db.saveTrip(t));
-      }
-      if (data.categories) {
-        for (const cat of data.categories) promises.push(db.saveCategory(cat));
-      }
-      if (data.users) {
-        for (const u of data.users) promises.push(db.saveUser(u));
-      }
-
-      await Promise.allSettled(promises);
-      return true;
-    } catch (e) {
-      console.error("Import failed", e);
-      return false;
-    }
   },
 
   getCategories: async (): Promise<Category[]> => {
@@ -339,19 +236,41 @@ export const db = {
     return !error;
   },
 
+  getStaySessions: async (): Promise<StaySession[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('stay_sessions')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(s => ({
+      id: s.id, category: s.category, startDate: s.start_date, endDate: s.end_date,
+      createdAt: s.created_at, createdBy: s.created_by
+    }));
+  },
+
+  saveStaySession: async (session: StaySession) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('stay_sessions').upsert({
+      id: session.id, category: session.category, start_date: session.startDate,
+      end_date: session.endDate, created_at: session.createdAt, created_by: session.createdBy
+    });
+    return !error;
+  },
+
+  deleteStaySession: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('stay_sessions').delete().eq('id', id);
+    return !error;
+  },
+
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: any) => {
     if (!supabase) return;
     const origin: NotificationOrigin = (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL';
-    
     await supabase.from('notifications').insert({
-      user_id: user.id, 
-      user_name: user.displayName, 
-      type, 
-      origin,
-      message: `${title}: ${description}`,
-      os_ref: summary?.os || '',
-      summary: summary || {}, 
-      timestamp: new Date().toISOString()
+      user_id: user.id, user_name: user.displayName, type, origin,
+      message: `${title}: ${description}`, os_ref: summary?.os || '',
+      summary: summary || {}, timestamp: new Date().toISOString()
     });
   },
 
@@ -362,31 +281,18 @@ export const db = {
       .select('id, user_id, user_name, type, message, os_ref, timestamp, summary, origin')
       .order('timestamp', { ascending: false })
       .limit(50);
-      
     if (error) return []; 
-    
-    return (data || []).map(n => {
-      const displayTitle = n.type ? n.type.replace(/_/g, ' ').toUpperCase() : 'ALERTA DO SISTEMA';
-      return {
-        id: String(n.id), 
-        title: displayTitle, 
-        description: n.message || '',
-        type: n.type as NotificationType, 
-        origin: n.origin as NotificationOrigin,
-        authorName: n.user_name || 'Sistema', 
-        authorId: n.user_id || 'system', 
-        timestamp: n.timestamp || new Date().toISOString(),
-        summary: { ...(n.summary || {}), os: n.os_ref }
-      };
-    });
+    return (data || []).map(n => ({
+      id: String(n.id), title: n.type ? n.type.replace(/_/g, ' ').toUpperCase() : 'ALERTA', 
+      description: n.message || '', type: n.type as NotificationType, origin: n.origin as NotificationOrigin,
+      authorName: n.user_name || 'Sistema', authorId: n.user_id || 'system', 
+      timestamp: n.timestamp || new Date().toISOString(), summary: { ...(n.summary || {}), os: n.os_ref }
+    }));
   },
 
   updatePresence: async (userId: string, status: PresenceStatus) => {
     if (supabase) {
-      await supabase.from('users').update({ 
-        presence_status: status, 
-        last_seen: new Date().toISOString() 
-      }).eq('id', userId);
+      await supabase.from('users').update({ presence_status: status, last_seen: new Date().toISOString() }).eq('id', userId);
     }
   },
 
@@ -403,13 +309,80 @@ export const db = {
     localStorage.setItem(key, JSON.stringify(prefs));
   },
 
+  // FIX: Added missing exportBackup method
+  exportBackup: async () => {
+    if (!supabase) return;
+    try {
+      const [drivers, customers, ports, preStacking, staff, trips, categories, sessions, users] = await Promise.all([
+        db.getDrivers(),
+        db.getCustomers(),
+        db.getPorts(),
+        db.getPreStacking(),
+        db.getStaff(),
+        db.getTrips(),
+        db.getCategories(),
+        db.getStaySessions(),
+        db.getUsers()
+      ]);
+
+      const backupData = {
+        drivers,
+        customers,
+        ports,
+        preStacking,
+        staff,
+        trips,
+        categories,
+        staySessions: sessions,
+        users,
+        exportedAt: new Date().toISOString(),
+        version: '6.8.0'
+      };
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `als_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Export Error:", e);
+      throw e;
+    }
+  },
+
+  // FIX: Added missing importBackup method
+  importBackup: async (file: File): Promise<boolean> => {
+    if (!supabase) return false;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      // Perform sequence of imports
+      if (data.drivers) for (const d of data.drivers) await driverRepository.save(supabase, d);
+      if (data.customers) for (const c of data.customers) await db.saveCustomer(c);
+      if (data.ports) for (const p of data.ports) await db.savePort(p);
+      if (data.preStacking) for (const ps of data.preStacking) await db.savePreStacking(ps);
+      if (data.staff) for (const s of data.staff) await staffRepository.save(supabase, s);
+      if (data.trips) for (const t of data.trips) await tripRepository.save(supabase, t);
+      if (data.categories) for (const cat of data.categories) await db.saveCategory(cat);
+      if (data.staySessions) for (const ss of data.staySessions) await db.saveStaySession(ss);
+      if (data.users) for (const u of data.users) await db.saveUser(u);
+      
+      return true;
+    } catch (e) {
+      console.error("Import Error:", e);
+      return false;
+    }
+  },
+
   checkConnection: async (): Promise<boolean> => {
     if (!supabase) return false;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); 
-      const { error } = await supabase.from('users').select('id').limit(1).abortSignal(controller.signal);
-      clearTimeout(timeoutId);
+      const { error } = await supabase.from('users').select('id').limit(1);
       return !error;
     } catch { return false; }
   }
