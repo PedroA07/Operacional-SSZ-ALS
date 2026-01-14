@@ -34,6 +34,21 @@ export interface StaySession {
   createdBy: string;
 }
 
+export interface StayRecord {
+  id: string;
+  sessionId: string;
+  type: string;
+  os: string;
+  location: string;
+  driverName: string;
+  ship: string;
+  container: string;
+  scheduledStart: string;
+  arrivalTime: string;
+  departureTime: string;
+  exceededHours: string;
+}
+
 export interface NotificationPreference {
   newTrip: boolean;
   statusUpdate: boolean;
