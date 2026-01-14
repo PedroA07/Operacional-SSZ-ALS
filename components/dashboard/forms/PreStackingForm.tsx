@@ -81,7 +81,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
 
     const loadUnits = async () => {
       const [units, pList] = await Promise.all([db.getPreStacking(), db.getPorts()]);
-      // Combina Portos e Pré-stacking para a lista de terminais
       setPreStackingList([...units, ...pList]);
     };
     loadUnits();
@@ -163,7 +162,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     setShowSyncModal(false);
 
     try {
-      // 1. Gera os Barcodes no template oculto antes da captura
       setTimeout(generateBarcodes, 100);
 
       if (currentUser) {
@@ -180,13 +178,13 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
       if (!element) throw new Error("Referência de captura não encontrada");
 
       const canvas = await html2canvas(element, { 
-        scale: 2.5, 
+        scale: 3, // Aumentado para 3.0 para máxima fidelidade
         useCORS: true, 
         backgroundColor: "#ffffff",
         logging: false
       });
       
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       
@@ -224,7 +222,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
-      {/* Template Oculto para Captura */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
           <PreStackingTemplate 
@@ -236,7 +233,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         </div>
       </div>
 
-      {/* Modal de Sincronização */}
       {showSyncModal && existingTrip && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95">
@@ -257,7 +253,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         </div>
       )}
 
-      {/* Coluna de Controles */}
       <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar shrink-0">
         
         <div className="bg-blue-50 p-6 rounded-[2.2rem] border border-blue-100 shadow-sm space-y-4">
@@ -296,7 +291,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
           </div>
         </div>
 
-        {/* SELETOR DE TERMINAL SOFT PREMIUM */}
         <div className="relative" ref={dropdownRef}>
             <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-3 ml-1 block">Local de Entrega (Pre-Stacking)</label>
             
@@ -367,7 +361,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         </div>
       </div>
 
-      {/* Área de Preview */}
       <div className="flex-1 bg-slate-200 flex justify-center items-start overflow-auto p-12 custom-scrollbar relative">
         <div className="origin-top transform scale-[0.7] xl:scale-[0.85] shadow-[0_40px_100px_rgba(0,0,0,0.15)] rounded-sm overflow-hidden bg-white">
           <PreStackingTemplate 
@@ -382,8 +375,8 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
           <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-white space-y-6">
              <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
              <div className="text-center">
-                <p className="text-sm font-black uppercase tracking-widest">Processando Documento Digital</p>
-                <p className="text-[10px] text-blue-200 uppercase mt-2 animate-pulse">Capturando template e gerando PDF...</p>
+                <p className="text-sm font-black uppercase tracking-widest">Processando Documento HD</p>
+                <p className="text-[10px] text-blue-200 uppercase mt-2 animate-pulse">Renderizando layout em alta definição...</p>
              </div>
           </div>
         )}

@@ -166,8 +166,14 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       const element = captureRef.current;
       if (!element) return;
       
-      const canvas = await html2canvas(element, { scale: 2.5, useCORS: true, backgroundColor: "#ffffff" });
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const canvas = await html2canvas(element, { 
+        scale: 3, // Aumentado para 3.0 para máxima nitidez em impressão
+        useCORS: true, 
+        backgroundColor: "#ffffff",
+        logging: false
+      });
+      
+      const imgData = canvas.toDataURL('image/jpeg', 1.0); // Qualidade máxima para o PDF
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       

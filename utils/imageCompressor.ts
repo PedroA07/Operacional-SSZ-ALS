@@ -1,7 +1,7 @@
 
 /**
- * ALS Image Compressor Utility v1.6
- * Otimizado para economia extrema de armazenamento (R2) e rede móvel.
+ * ALS Image Compressor Utility v1.7
+ * Otimizado para alta legibilidade de documentos com equilíbrio de armazenamento.
  */
 
 interface CompressionOptions {
@@ -13,13 +13,13 @@ interface CompressionOptions {
 
 export const imageCompressor = {
   /**
-   * Comprime uma imagem para JPEG leve e retorna Base64
+   * Comprime uma imagem para JPEG de alta fidelidade e retorna Base64
    */
   compress: async (source: File | string, options: CompressionOptions = {}): Promise<string> => {
     const {
-      maxWidth = 800, // Reduzido drasticamente para 800px (Suficiente para leitura de documentos)
-      maxHeight = 800,
-      quality = 0.4, // Qualidade 0.4 gera arquivos extremamente leves (~60kb)
+      maxWidth = 1600, // Aumentado para 1600px (HD) para garantir leitura de letras pequenas
+      maxHeight = 1600,
+      quality = 0.75, // Qualidade 0.75 é o ponto ideal entre nitidez e tamanho (~150kb)
       mimeType = 'image/jpeg'
     } = options;
 
@@ -35,7 +35,7 @@ export const imageCompressor = {
         let width = img.width;
         let height = img.height;
 
-        // Redimensionamento Proporcional
+        // Redimensionamento Proporcional Inteligente
         if (width > height) {
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
@@ -63,6 +63,10 @@ export const imageCompressor = {
           // Aplica fundo branco para JPEGs (evita transparência preta)
           ctx.fillStyle = "#FFFFFF";
           ctx.fillRect(0, 0, width, height);
+          
+          // Desenho com suavização de imagem ativa
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           
           ctx.drawImage(img, 0, 0, width, height);
           

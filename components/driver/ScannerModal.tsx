@@ -40,8 +40,8 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment', 
-          width: { ideal: 1024 },
-          height: { ideal: 768 }
+          width: { ideal: 1920 }, // Buscando Full HD
+          height: { ideal: 1080 }
         } 
       });
 
@@ -73,10 +73,15 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     canvas.height = videoRef.current.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    
+    // Configurações de alta qualidade para o canvas de captura
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    
     ctx.drawImage(videoRef.current, 0, 0);
     
-    // Captura inicial rápida
-    const rawImage = canvas.toDataURL('image/jpeg', 0.7);
+    // Captura inicial de alta fidelidade
+    const rawImage = canvas.toDataURL('image/jpeg', 0.9);
     setCurrentImage(rawImage);
     setStep('preview');
     stopCamera();
@@ -86,20 +91,19 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
     if (isSaving || !currentImage) return;
     setIsSaving(true);
     try {
-      // 1. Compressão Extrema (800px, 0.4 qualidade)
+      // Compressão HD para garantir leitura por OCR e operadores
       const compressedImage = await imageCompressor.compress(currentImage, {
-        maxWidth: 800, 
-        quality: 0.4
+        maxWidth: 1600, 
+        quality: 0.75
       });
 
       const photoId = `img_${Date.now()}`;
       const osClean = trip.os.replace(/[^a-z0-9]/gi, '_');
       
-      // 2. Upload para Cloudflare R2 via API Edge
       const publicUrl = await fileStorage.uploadTripPhoto(compressedImage, osClean, photoId);
       
       if (!publicUrl || publicUrl.includes('undefined')) {
-        throw new Error("O servidor retornou uma URL inválida. Verifique as variáveis R2_PUBLIC_DOMAIN.");
+        throw new Error("O servidor retornou uma URL inválida.");
       }
 
       const newDoc: DriverCapturedDoc = { 
@@ -113,14 +117,13 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
         driver_docs: [...(trip.driver_docs || []), newDoc] 
       };
       
-      // 3. Salva apenas o LINK no Supabase
       await db.saveTrip(updatedTrip, user);
       
       await onSuccess();
       onClose();
     } catch (e: any) {
       console.error("Critical Upload Error:", e);
-      alert(`Falha no envio: ${e.message}\n\nO sistema não conseguiu salvar no Cloudflare R2.`);
+      alert(`Falha no envio: ${e.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -162,7 +165,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSuccess,
              {isSaving && (
                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white space-y-4">
                   <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Enviando p/ Nuvem...</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Otimizando Foto HD...</p>
                </div>
              )}
           </div>
