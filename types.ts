@@ -32,6 +32,8 @@ export interface StaySession {
   endDate: string;
   createdAt: string;
   createdBy: string;
+  gracePeriodHours?: number; // Ex: 8h
+  roundUpMinutes?: number;   // Ex: 30m
 }
 
 export interface StayRecord {
@@ -69,7 +71,7 @@ export type NotificationType =
   | 'CUSTOMER_CREATED'
   | 'CUSTOMER_UPDATED' 
   | 'PORT_CREATED'
-  | 'PORT_UPDATED'
+  | 'PORT_UPDATED' 
   | 'PRESTACKING_CREATED'
   | 'PRESTACKING_UPDATED'
   | 'CATEGORY_CREATED'
@@ -302,7 +304,7 @@ export interface Staff {
   statusSince: string; 
   photo?: string; 
   lastLogin?: string; 
-  emailCorp?: string; 
+ emailCorp?: string; 
   phoneCorp?: string; 
 }
 

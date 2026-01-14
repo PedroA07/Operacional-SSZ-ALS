@@ -20,7 +20,6 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY)
 
 export const db = {
   // ... (métodos existentes preservados)
-
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('users').select('*');
@@ -204,7 +203,9 @@ export const db = {
     if (error) throw error;
     return (data || []).map(s => ({
       id: s.id, category: s.category, startDate: s.start_date, endDate: s.end_date,
-      createdAt: s.created_at, createdBy: s.created_by
+      createdAt: s.created_at, createdBy: s.created_by,
+      gracePeriodHours: Number(s.grace_period_hours || 8),
+      roundUpMinutes: Number(s.round_up_minutes || 30)
     }));
   },
 
@@ -212,7 +213,9 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('stay_sessions').upsert({
       id: session.id, category: session.category, start_date: session.startDate,
-      end_date: session.endDate, created_at: session.createdAt, created_by: session.createdBy
+      end_date: session.endDate, created_at: session.createdAt, created_by: session.createdBy,
+      grace_period_hours: session.gracePeriodHours,
+      round_up_minutes: session.roundUpMinutes
     });
     return !error;
   },
@@ -247,7 +250,6 @@ export const db = {
   },
 
   // --- NOTIFICAÇÕES E PRESENÇA ---
-
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: any) => {
     if (!supabase) return;
     const origin: NotificationOrigin = (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL';
@@ -289,9 +291,7 @@ export const db = {
     localStorage.setItem(key, JSON.stringify(prefs));
   },
 
-  // Fix: satisfy return type requirement for async function
   exportBackup: async () => { return; },
-  // Fix: satisfy return type requirement for Promise<boolean>
   importBackup: async (file: File): Promise<boolean> => { return false; },
 
   checkConnection: async (): Promise<boolean> => {
