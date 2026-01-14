@@ -240,7 +240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onRefresh={() => loadAllData(false)}
              />
            )}
-           {activeTab === DashboardTab.ESTADIAS && <StaysTab trips={trips} categories={categories} userId={user.id} />}
+           {activeTab === DashboardTab.ESTADIAS && <StaysTab categories={categories} userId={user.id} />}
            {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(false); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.MOTORISTAS && (

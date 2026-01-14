@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus, StaySession, StayRecord } from '../types';
 import { driverRepository } from './driverRepository';
@@ -228,7 +229,7 @@ export const db = {
     return (data || []).map(r => ({
       id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
       driverName: r.driver_name, ship: r.ship, container: r.container,
-      scheduledStart: r.scheduled_start, arrival_time: r.arrival_time,
+      scheduledStart: r.scheduled_start, arrivalTime: r.arrival_time,
       departureTime: r.departure_time, exceededHours: r.exceeded_hours
     }));
   },
