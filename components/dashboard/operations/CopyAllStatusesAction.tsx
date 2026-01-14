@@ -32,9 +32,23 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
           .map(h => ({ ...h })) // Clona para evitar mutação
           .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
+        // Se não houver previsão calculada, cria uma padrão com data/hora
+        let finalPredLabel = pred?.label || 'Previsão de Chegada';
+        let finalPredTime = pred?.time || '';
+
+        // Se a previsão calculada não contiver a data (apenas hora), adicionamos a data de hoje
+        if (finalPredTime && !finalPredTime.includes('/')) {
+           const d = new Date();
+           finalPredTime = `${d.toLocaleDateString('pt-BR')} ${finalPredTime}`;
+        } else if (!finalPredTime) {
+           const d = new Date();
+           d.setHours(d.getHours() + 2);
+           finalPredTime = emailFormatter.formatFullDate(d.toISOString());
+        }
+
         initialOverrides[t.id] = {
           history,
-          prediction: pred ? { label: pred.label, time: pred.time } : { label: 'Previsão de Chegada', time: 'A DEFINIR' }
+          prediction: { label: finalPredLabel, time: finalPredTime }
         };
       });
       
@@ -67,7 +81,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
         ? new Date(tripOverride.history[tripOverride.history.length - 1].dateTime)
         : new Date();
       
-      const newDate = new Date(lastDate.getTime() + 15 * 60000); // +15 min do último
+      const newDate = new Date(lastDate.getTime() + 15 * 60000); 
       
       const newEntry: StatusHistoryEntry = {
         status: 'Em Viagem' as TripStatus,
@@ -98,7 +112,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
       const tripOverride = { ...prev[tripId] };
       const newPred = tripOverride.prediction 
         ? { ...tripOverride.prediction, [field]: val }
-        : { label: field === 'label' ? val : 'Previsão', time: field === 'time' ? val : '---' };
+        : { label: field === 'label' ? val : 'Previsão', time: field === 'time' ? val : '' };
       return { ...prev, [tripId]: { ...tripOverride, prediction: newPred } };
     });
   };
@@ -107,7 +121,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
     if (trips.length === 0) return;
 
     try {
-      // Correção: Passando o estado showCustomer para o formatador
+      // Sincronização rigorosa do parâmetro showCustomer com o motor de formatação
       const html = emailFormatter.allTripsToRichText(trips, allTrips, reportOverrides, showCustomer);
       const plain = trips.map(t => emailFormatter.toPlainText(t, allTrips, reportOverrides[t.id], showCustomer)).join('\n');
 
@@ -158,7 +172,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                   <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center font-black italic text-xl shadow-lg">ALS</div>
                   <div>
                     <h3 className="text-xl font-black uppercase tracking-tight leading-none">Revisão do Relatório Operacional</h3>
-                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-2">Personalize eventos e previsões antes do envio</p>
+                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-2">Ajuste os eventos e previsões (Data + Hora)</p>
                   </div>
                </div>
                <div className="flex items-center gap-4">
@@ -193,10 +207,10 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                        return (
                         <div key={t.id} className="bg-white p-7 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6 relative group/card">
                             
-                            {/* Destaque do Recurso: OS + CONTAINER + MOTORISTA (NOME COMPLETO) */}
+                            {/* Destaque do Recurso: OS + CONTAINER + MOTORISTA */}
                             <div className="bg-slate-900 rounded-[1.8rem] p-5 text-white flex justify-between items-center shadow-lg">
                                <div className="min-w-0 flex-1">
-                                  <p className="text-[8px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Identificação ALS</p>
+                                  <p className="text-[8px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Recurso ALS</p>
                                   <div className="flex items-center gap-3">
                                      <h4 className="text-xl font-black uppercase">OS: {t.os}</h4>
                                      <span className="text-sm font-mono font-black text-blue-100 bg-blue-500/20 px-2.5 py-1 rounded-lg border border-blue-500/30">{t.container || 'A DEFINIR'}</span>
@@ -205,16 +219,12 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                                     Motorista: <span className="text-blue-400">{t.driver.name}</span>
                                   </p>
                                </div>
-                               <div className="text-right shrink-0">
-                                  <p className="text-[8px] font-black text-slate-500 uppercase">Localidade</p>
-                                  <p className="text-[11px] font-black uppercase text-slate-200 mt-1">{t.customer.city}</p>
-                               </div>
                             </div>
 
-                            {/* Edição de Histórico (Passado) - AGORA COM SELETOR */}
+                            {/* Edição de Histórico (Passado) */}
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center px-1">
-                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Linha do Tempo (Cronologia)</label>
+                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Linha do Tempo</label>
                                    <button 
                                       onClick={() => addHistoryEntry(t.id)}
                                       className="text-[9px] font-black text-blue-600 uppercase hover:underline"
@@ -264,10 +274,10 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                                        />
                                     </div>
                                     <div className="space-y-1.5">
-                                       <span className="text-[7px] font-black text-slate-400 uppercase ml-2">Horário</span>
+                                       <span className="text-[7px] font-black text-slate-400 uppercase ml-2">Data e Hora (DD/MM/AAAA HH:MM)</span>
                                        <input 
                                            type="text"
-                                           placeholder="Ex: 14:30h"
+                                           placeholder="Ex: 25/12/2025 14:30"
                                            className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none focus:ring-4 focus:ring-blue-500/10"
                                            value={ovr?.prediction?.time || ''}
                                            onChange={(e) => handlePredictionChange(t.id, 'time', e.target.value)}
