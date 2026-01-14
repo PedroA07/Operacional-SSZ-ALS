@@ -37,36 +37,43 @@ export const getOperationTableColumns = (
     const updatedTrip = { ...trip };
     const filesArray = Array.from(files) as File[];
 
-    if (type === 'BATCH') {
-      const newDocs: DriverCapturedDoc[] = [];
-      for (const file of filesArray) {
-        const photoId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        const url = await fileStorage.uploadTripPhoto(file, trip.os, photoId);
-        newDocs.push({ id: photoId, url, timestamp: new Date().toISOString() });
-      }
-      updatedTrip.driver_docs = [...(updatedTrip.driver_docs || []), ...newDocs];
-    } else {
-      const file = filesArray[0];
-      const docTypeLabel = type.replace('_PDF', '').toLowerCase();
-      const url = await fileStorage.uploadTripDoc(file, trip.os, docTypeLabel);
-      
-      const doc: TripDocument = { 
-        id: `${docTypeLabel}-${Date.now()}`, 
-        type: type as any, 
-        url: url, 
-        fileName: `${docTypeLabel.toUpperCase()} - ${trip.os}`, 
-        uploadDate: new Date().toISOString() 
-      };
+    try {
+      if (type === 'BATCH') {
+        const newDocs: DriverCapturedDoc[] = [];
+        for (const file of filesArray) {
+          const photoId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+          // Upload real para o R2
+          const url = await fileStorage.uploadTripPhoto(file, trip.os, photoId);
+          newDocs.push({ id: photoId, url, timestamp: new Date().toISOString() });
+        }
+        updatedTrip.driver_docs = [...(updatedTrip.driver_docs || []), ...newDocs];
+      } else {
+        const file = filesArray[0];
+        const docTypeLabel = type.replace('_PDF', '').toLowerCase();
+        // Upload real para o R2
+        const url = await fileStorage.uploadTripDoc(file, trip.os, docTypeLabel);
+        
+        const doc: TripDocument = { 
+          id: `${docTypeLabel}-${Date.now()}`, 
+          type: type as any, 
+          url: url, 
+          fileName: `${docTypeLabel.toUpperCase()} - ${trip.os}`, 
+          uploadDate: new Date().toISOString() 
+        };
 
-      if (type === 'OS_PDF') updatedTrip.osDoc = doc;
-      else if (type === 'AGENDAMENTO') updatedTrip.agendamentoDoc = doc;
-      else if (type === 'CTE') updatedTrip.cteDoc = doc;
-      else if (type === 'CVA') updatedTrip.cvaDoc = doc;
-      else if (type === 'COMPLETO') updatedTrip.completoDoc = doc;
+        if (type === 'OS_PDF') updatedTrip.osDoc = doc;
+        else if (type === 'AGENDAMENTO') updatedTrip.agendamentoDoc = doc;
+        else if (type === 'CTE') updatedTrip.cteDoc = doc;
+        else if (type === 'CVA') updatedTrip.cvaDoc = doc;
+        else if (type === 'COMPLETO') updatedTrip.completoDoc = doc;
+      }
+      
+      await db.saveTrip(updatedTrip, actingUser);
+      onRefreshData();
+    } catch (err) {
+      console.error("Falha no upload de documento:", err);
+      alert("Falha ao subir arquivo para o R2. Verifique sua conexão.");
     }
-    
-    await db.saveTrip(updatedTrip, actingUser);
-    onRefreshData();
   };
 
   const deleteDocument = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO') => {

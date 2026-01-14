@@ -18,9 +18,6 @@ export const fileStorage = {
     }
   },
 
-  /**
-   * Obtém a URL pública corrigindo automaticamente caminhos legados que perderam o prefixo do bucket.
-   */
   getPublicUrl: (url: string | undefined): string => {
     if (!url) return '';
     if (!url.startsWith('http')) return url;
@@ -30,10 +27,7 @@ export const fileStorage = {
 
     const cleanDomain = domain.replace(/\/$/, "").replace(/^https?:\/\//, "");
     
-    // Se a URL pertence ao nosso domínio R2 mas NÃO contém o prefixo als-transportes
-    // (comum em fotos antigas anteriores a 12/01)
     if (url.includes(cleanDomain) && !url.includes('/als-transportes/')) {
-      // Injeta o prefixo als-transportes logo após o domínio para buscar no diretório correto do R2
       const parts = url.split(cleanDomain);
       return `${parts[0]}${cleanDomain}/als-transportes${parts[1]}`;
     }
@@ -65,10 +59,9 @@ export const fileStorage = {
         fileToUpload = file;
         formData.append('file', file);
       } else {
-        throw new Error("Formato de arquivo inválido.");
+        throw new Error("Formato de arquivo inválido para upload.");
       }
       
-      // O path enviado deve conter o bucket para que a API saiba onde gravar
       const finalPath = destinationPath.startsWith('als-transportes/') 
         ? destinationPath 
         : `als-transportes/${destinationPath.replace(/^\/+/, '')}`;
@@ -82,13 +75,15 @@ export const fileStorage = {
       
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Erro HTTP ${res.status}`);
+        throw new Error(errData.error || `Erro R2 HTTP ${res.status}`);
       }
       
       const data = await res.json();
+      if (!data.url) throw new Error("A API de upload não retornou uma URL válida.");
+      
       return data.url; 
     } catch (e: any) {
-      console.error("[Storage Error]:", e);
+      console.error("[Storage Upload Error]:", e);
       throw e;
     }
   },

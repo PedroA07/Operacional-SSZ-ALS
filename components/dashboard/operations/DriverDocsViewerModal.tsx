@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Trip, DriverCapturedDoc, User } from '../../../types';
 import { db } from '../../../utils/storage';
+import { fileStorage } from '../../../utils/fileStorage';
 import { textExtractionService, NFData } from '../../../utils/textExtractionService';
 import { imageCompressor } from '../../../utils/imageCompressor';
 import ImageViewer from '../../shared/ImageViewer';
@@ -123,18 +124,41 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     }
   };
 
-  const saveNewDocs = async (urls: string[]) => {
-    const newDocs: DriverCapturedDoc[] = urls.map((url, idx) => ({
-      id: `op-scan-${Date.now()}-${idx}`,
-      url: url,
-      timestamp: new Date().toISOString()
-    }));
-    const updatedDocs = [...newDocs, ...docs];
-    setDocs(updatedDocs);
-    if (newDocs.length === 1) setSelectedDoc(newDocs[0]);
-    setIsAddingMode('none');
-    await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
-    onSuccess();
+  /**
+   * ESTA É A FUNÇÃO CRÍTICA: 
+   * Ela recebe as strings Base64 do compressor e as envia para o R2 antes de salvar no Supabase.
+   */
+  const saveNewDocs = async (base64Strings: string[]) => {
+    setIsProcessing(true);
+    try {
+      const uploadedDocs: DriverCapturedDoc[] = [];
+      
+      for (const base64 of base64Strings) {
+        const photoId = `op-scan-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        // Envia para o R2 e obtém a URL real
+        const publicUrl = await fileStorage.uploadTripPhoto(base64, trip.os, photoId);
+        
+        uploadedDocs.push({
+          id: photoId,
+          url: publicUrl,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const updatedDocs = [...uploadedDocs, ...docs];
+      setDocs(updatedDocs);
+      if (uploadedDocs.length === 1) setSelectedDoc(uploadedDocs[0]);
+      setIsAddingMode('none');
+      
+      // Salva no banco com URLs do R2
+      await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
+      onSuccess();
+    } catch (err) {
+      console.error("Erro ao subir fotos para R2:", err);
+      alert("Erro ao enviar arquivos para o servidor de armazenamento (R2).");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleMovePhoto = async (e: React.MouseEvent, index: number, direction: 'up' | 'down') => {
@@ -239,15 +263,15 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="2"/></svg>
             </div>
             <div>
-              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Dossiê de Campo (Reordenável)</p>
+              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Dossiê de Campo (R2 Storage)</p>
               <h3 className="text-xl font-black uppercase">OS {trip.os} › {trip.driver.name}</h3>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {isMoving && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/20">
-                 <div className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
-                 <span className="text-[8px] font-black uppercase tracking-widest">Salvando Ordem...</span>
+            {(isMoving || isProcessing) && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/20">
+                 <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                 <span className="text-[8px] font-black uppercase tracking-widest">{isProcessing ? 'Enviando p/ Nuvem...' : 'Salvando Ordem...'}</span>
               </div>
             )}
             <button onClick={onClose} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
@@ -272,7 +296,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                     <img src={doc.url} className="w-full h-full object-cover" loading="lazy" />
                     <div className="absolute top-1 left-1 bg-black/60 text-white text-[7px] px-1.5 rounded font-black">#{idx + 1}</div>
                  </button>
-                 <div className={`flex gap-1 transition-opacity justify-center ${isMoving ? 'opacity-20 pointer-events-none' : 'opacity-0 group-hover/thumb:opacity-100'}`}>
+                 <div className={`flex gap-1 transition-opacity justify-center ${isMoving || isProcessing ? 'opacity-20 pointer-events-none' : 'opacity-0 group-hover/thumb:opacity-100'}`}>
                     <button onClick={(e) => handleMovePhoto(e, idx, 'up')} disabled={idx === 0} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 hover:border-blue-200 shadow-sm disabled:opacity-20"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M5 15l7-7 7 7"/></svg></button>
                     <button onClick={(e) => handleMovePhoto(e, idx, 'down')} disabled={idx === docs.length - 1} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 hover:border-blue-200 shadow-sm disabled:opacity-20"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 9l-7 7-7-7"/></svg></button>
                     <button onClick={(e) => { e.stopPropagation(); setDocToDelete(doc.id); setIsDeleteModalOpen(true); }} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-red-500 hover:border-red-200 shadow-sm"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
