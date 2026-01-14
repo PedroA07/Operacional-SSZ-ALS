@@ -18,27 +18,35 @@ export const fileStorage = {
     }
   },
 
-  getPublicUrl: (path: string | undefined): string => {
-    if (!path) return '';
-    if (path.startsWith('http')) return path;
+  /**
+   * Obtém a URL pública corrigindo automaticamente caminhos que perderam o prefixo do bucket.
+   */
+  getPublicUrl: (url: string | undefined): string => {
+    if (!url) return '';
+    if (!url.startsWith('http')) return url;
     
     const domain = (import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '';
-    if (!domain) return path;
+    if (!domain) return url;
 
-    const prefix = domain.startsWith('http') ? '' : 'https://';
-    const cleanDomain = domain.replace(/\/$/, '');
-    const cleanPath = path.trim().replace(/^\/+/, '');
+    const cleanDomain = domain.replace(/\/$/, "").replace(/^https?:\/\//, "");
     
-    return `${prefix}${cleanDomain}/${cleanPath}`;
+    // Se a URL pertence ao nosso domínio R2 mas NÃO contém o prefixo als-transportes
+    // (comum em fotos antigas anteriores a 12/01)
+    if (url.includes(cleanDomain) && !url.includes('/als-transportes/')) {
+      // Injeta o prefixo als-transportes logo após o domínio
+      return url.replace(cleanDomain, `${cleanDomain}/als-transportes`);
+    }
+    
+    return url;
   },
 
   normalizeFolderName: (name: string): string => {
     return name
       .toUpperCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-      .replace(/[^A-Z0-9]/g, '_')     // Troca espaços e símbolos por underscore
-      .replace(/_+/g, '_')            // Remove underscores duplicados
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]/g, '_')
+      .replace(/_+/g, '_')
       .trim();
   },
 

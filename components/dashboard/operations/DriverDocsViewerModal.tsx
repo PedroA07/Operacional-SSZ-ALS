@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Trip, DriverCapturedDoc, User } from '../../../types';
 import { db } from '../../../utils/storage';
@@ -89,9 +90,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      // Added explicit type cast to File[] to fix 'unknown' type error in map
       const results = await Promise.all((Array.from(files) as File[]).map(async file => {
-        // COMPRIMIR CADA ARQUIVO ANTES DE SALVAR
         return await imageCompressor.compress(file, {
           maxWidth: 1600,
           quality: 0.8
@@ -111,7 +110,6 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
       const raw = canvas.toDataURL('image/jpeg', 0.95);
-      // COMPRIMIR CAPTURA
       const compressed = await imageCompressor.compress(raw, {
         maxWidth: 1600,
         quality: 0.8
@@ -127,11 +125,25 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       url: url,
       timestamp: new Date().toISOString()
     }));
-    const updatedDocs = [...docs, ...newDocs];
+    // Novas fotos entram no início por padrão
+    const updatedDocs = [...newDocs, ...docs];
     setDocs(updatedDocs);
     if (newDocs.length === 1) setSelectedDoc(newDocs[0]);
     setIsAddingMode('none');
     await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
+    onSuccess();
+  };
+
+  const handleMovePhoto = async (index: number, direction: 'up' | 'down') => {
+    const newDocs = [...docs];
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    
+    if (targetIdx < 0 || targetIdx >= newDocs.length) return;
+
+    [newDocs[index], newDocs[targetIdx]] = [newDocs[targetIdx], newDocs[index]];
+    
+    setDocs(newDocs);
+    await db.saveTrip({ ...trip, driver_docs: newDocs }, user);
     onSuccess();
   };
 
@@ -210,7 +222,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" strokeWidth="2"/></svg>
             </div>
             <div>
-              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Dossiê de Campo</p>
+              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Dossiê de Campo (Reordenável)</p>
               <h3 className="text-xl font-black uppercase">OS {trip.os} › {trip.driver.name}</h3>
             </div>
           </div>
@@ -220,13 +232,27 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
         </div>
 
         <div className="flex-1 overflow-hidden flex">
-          <div className="w-48 bg-slate-50 border-r border-slate-200 overflow-y-auto custom-scrollbar p-4 space-y-4 shrink-0">
-             <button onClick={() => setIsAddingMode('choice')} className="w-full aspect-video rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-2 hover:border-blue-500 hover:bg-blue-50 transition-all group">
+          <div className="w-56 bg-slate-50 border-r border-slate-200 overflow-y-auto custom-scrollbar p-4 space-y-4 shrink-0">
+             <button onClick={() => setIsAddingMode('choice')} className="w-full aspect-video rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-2 hover:border-blue-500 hover:bg-blue-50 transition-all group mb-4">
                 <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg></div>
-                <span className="text-[8px] font-black text-slate-400 uppercase">Novo</span>
+                <span className="text-[8px] font-black text-slate-400 uppercase">Novo Arquivo</span>
              </button>
-             {docs.slice().reverse().map(doc => (
-               <button key={doc.id} onClick={() => { setSelectedDoc(doc); setIsAddingMode('none'); }} className={`w-full aspect-video rounded-xl overflow-hidden border-2 transition-all ${selectedDoc?.id === doc.id ? 'border-blue-600 scale-105 shadow-md' : 'border-transparent opacity-60'}`}><img src={doc.url} className="w-full h-full object-cover" /></button>
+             
+             {docs.map((doc, idx) => (
+               <div key={doc.id} className="space-y-1 group/thumb">
+                 <button 
+                  onClick={() => { setSelectedDoc(doc); setIsAddingMode('none'); }} 
+                  className={`w-full aspect-video rounded-xl overflow-hidden border-2 transition-all relative ${selectedDoc?.id === doc.id ? 'border-blue-600 shadow-md scale-[1.02]' : 'border-transparent opacity-70 group-hover/thumb:opacity-100'}`}
+                 >
+                    <img src={doc.url} className="w-full h-full object-cover" />
+                    <div className="absolute top-1 left-1 bg-black/60 text-white text-[7px] px-1.5 rounded font-black">#{idx + 1}</div>
+                 </button>
+                 <div className="flex gap-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity justify-center">
+                    <button onClick={() => handleMovePhoto(idx, 'up')} disabled={idx === 0} className="p-1 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-blue-600 disabled:opacity-20"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M5 15l7-7 7 7"/></svg></button>
+                    <button onClick={() => handleMovePhoto(idx, 'down')} disabled={idx === docs.length - 1} className="p-1 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-blue-600 disabled:opacity-20"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 9l-7 7-7-7"/></svg></button>
+                    <button onClick={() => { setDocToDelete(doc.id); setIsDeleteModalOpen(true); }} className="p-1 bg-white border border-slate-200 rounded-md text-slate-400 hover:text-red-500"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                 </div>
+               </div>
              ))}
           </div>
 
@@ -258,14 +284,14 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
              {isAddingMode === 'none' && selectedDoc ? (
                <div className="w-full h-full rounded-3xl overflow-hidden bg-black"><ImageViewer url={selectedDoc.url} /></div>
              ) : isAddingMode === 'none' && (
-               <div className="text-center text-slate-300 font-black uppercase tracking-widest">Selecione um arquivo lateral</div>
+               <div className="text-center text-slate-300 font-black uppercase tracking-widest">Selecione um arquivo lateral para visualizar</div>
              )}
           </div>
 
           {selectedDoc && isAddingMode === 'none' && (
             <div className="w-85 bg-white border-l border-slate-200 p-8 flex flex-col gap-8 shrink-0 overflow-y-auto custom-scrollbar">
                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-6">Processamento de Texto</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-6">IA: Processamento de Imagem</p>
                   
                   {isProcessing ? (
                     <div className="space-y-4 py-10 text-center">
@@ -318,11 +344,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                <div className="mt-auto space-y-3 pt-6 border-t border-slate-100">
                   <button onClick={handleDownload} className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl text-[9px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Salvar no Dispositivo
-                  </button>
-                  <button onClick={() => { setDocToDelete(selectedDoc.id); setIsDeleteModalOpen(true); }} className="w-full py-4 bg-red-50 text-red-600 border border-red-100 rounded-2xl text-[9px] font-black uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                    Remover do Dossiê
+                    Salvar Arquivo
                   </button>
                </div>
             </div>
@@ -333,7 +355,8 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       {isDeleteModalOpen && docToDelete && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/80 animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-10 text-center space-y-6 shadow-2xl">
-              <h4 className="text-lg font-black uppercase text-slate-800">Apagar Documento?</h4>
+              <h4 className="text-lg font-black uppercase text-slate-800">Apagar Foto?</h4>
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Esta ação removerá o anexo permanentemente deste dossiê.</p>
               <div className="grid grid-cols-2 gap-3">
                  <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Voltar</button>
                  <button onClick={executeDelete} className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Excluir</button>

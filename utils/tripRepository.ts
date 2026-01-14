@@ -1,6 +1,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Trip } from '../types';
+import { Trip, DriverCapturedDoc } from '../types';
+import { fileStorage } from './fileStorage';
 
 export const tripRepository = {
   mapToDb: (trip: Trip) => ({
@@ -45,6 +46,19 @@ export const tripRepository = {
       return val; 
     };
 
+    const normalizeDoc = (doc: any) => {
+      if (!doc || !doc.url) return doc;
+      return { ...doc, url: fileStorage.getPublicUrl(doc.url) };
+    };
+
+    const rawDriverDocs = safeParse(d.driver_docs, []);
+    const normalizedDriverDocs = Array.isArray(rawDriverDocs) 
+      ? rawDriverDocs.map((doc: DriverCapturedDoc) => ({
+          ...doc,
+          url: fileStorage.getPublicUrl(doc.url)
+        }))
+      : [];
+
     return {
       id: d.id,
       os: d.os || 'SEM OS',
@@ -68,23 +82,22 @@ export const tripRepository = {
       statusHistory: safeParse(d.status_history, []),
       advancePayment: safeParse(d.advance_payment, { status: 'BLOQUEADO' }),
       balancePayment: safeParse(d.balance_payment, { status: 'AGUARDANDO_DOCS' }),
-      osDoc: d.os_doc,
-      agendamentoDoc: d.agendamento_doc,
-      completoDoc: d.completo_doc,
-      freightContractDoc: d.freight_contract_doc,
-      cteDoc: d.cte_doc,
-      cvaDoc: d.cva_doc,
-      nfDoc: d.nf_doc,
+      osDoc: normalizeDoc(d.os_doc),
+      agendamentoDoc: normalizeDoc(d.agendamento_doc),
+      completoDoc: normalizeDoc(d.completo_doc),
+      freightContractDoc: normalizeDoc(d.freight_contract_doc),
+      cteDoc: normalizeDoc(d.cte_doc),
+      cvaDoc: normalizeDoc(d.cva_doc),
+      nfDoc: normalizeDoc(d.nf_doc),
       nfKey: d.nf_key,
       ocFormData: safeParse(d.oc_form_data, null),
       preStackingFormData: safeParse(d.pre_stacking_form_data, null),
       scheduling: safeParse(d.scheduling, undefined),
-      driver_docs: safeParse(d.driver_docs, []) 
+      driver_docs: normalizedDriverDocs
     };
   },
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
-    // BUSCA OTIMIZADA: Agora usa o índice de data e limita a 100 registros
     const { data, error } = await supabase
       .from('trips')
       .select('*')

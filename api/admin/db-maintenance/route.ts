@@ -30,17 +30,24 @@ export async function POST(request: Request) {
     trips_updated: 0
   };
 
+  const domain = process.env.R2_PUBLIC_DOMAIN || "";
+  const cleanDomain = domain.replace(/\/$/, "").replace(/^https?:\/\//, "");
+
+  const fixUrl = (url: string) => {
+    if (!url || !url.startsWith('http')) return url;
+    if (url.includes('/als-transportes/')) return url;
+    if (url.includes(cleanDomain)) {
+       return url.replace(cleanDomain, `${cleanDomain}/als-transportes`);
+    }
+    return url;
+  };
+
   try {
-    // 1. STAFF (COLABORADORES) - Nova lógica: Pasta por Nome
+    // 1. STAFF
     const { data: staff } = await supabase.from('staff').select('id, name, photo');
     for (const s of (staff || [])) {
       if (s.photo) {
-        const normalized = normalizeFolderName(s.name);
-        // Gera a nova URL baseada no nome
-        const domain = process.env.R2_PUBLIC_DOMAIN || "";
-        const cleanDomain = domain.replace(/\/$/, "");
-        const newPhotoUrl = `${cleanDomain}/als-transportes/colaboradores/${normalized}/foto_perfil/perfil.jpg`;
-        
+        const newPhotoUrl = fixUrl(s.photo);
         if (s.photo !== newPhotoUrl) {
           await supabase.from('staff').update({ photo: newPhotoUrl }).eq('id', s.id);
           await supabase.from('users').update({ photo: newPhotoUrl }).eq('staff_id', s.id);
@@ -49,40 +56,28 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. MOTORISTAS (Continua por ID, mas garante o prefixo pai)
+    // 2. MOTORISTAS
     const { data: drivers } = await supabase.from('drivers').select('id, photo, cnh_pdf_url');
     for (const d of (drivers || [])) {
-      const fixUrl = (url: string) => {
-        if (!url || url.includes('/als-transportes/')) return url;
-        const domain = process.env.R2_PUBLIC_DOMAIN || "";
-        const cleanDomain = domain.replace(/\/$/, "");
-        // Extrai o path após o domínio antigo ou relativo
-        const path = url.split('/').slice(-3).join('/'); // ex: drivers/id/foto.jpg
-        return `${cleanDomain}/als-transportes/${path}`;
-      };
-
       const newPhoto = fixUrl(d.photo);
       const newCnh = fixUrl(d.cnh_pdf_url);
-
       if (newPhoto !== d.photo || newCnh !== d.cnh_pdf_url) {
         await supabase.from('drivers').update({ photo: newPhoto, cnh_pdf_url: newCnh }).eq('id', d.id);
         results.drivers_updated++;
       }
     }
 
-    // 3. TRIPS (Garante o prefixo pai nos documentos)
-    const { data: trips } = await supabase.from('trips').select('id, os_doc, cte_doc, completo_doc, driver_docs');
+    // 3. TRIPS (Documentos e driver_docs)
+    const { data: trips } = await supabase.from('trips').select('id, os_doc, cte_doc, completo_doc, agendamento_doc, cva_doc, nf_doc, freight_contract_doc, driver_docs');
     for (const t of (trips || [])) {
-      const domain = process.env.R2_PUBLIC_DOMAIN || "";
-      const cleanDomain = domain.replace(/\/$/, "");
       let updated = false;
       const updatePayload: any = {};
 
       const fixDoc = (doc: any) => {
-        if (doc && doc.url && !doc.url.includes('/als-transportes/')) {
-          const path = doc.url.split('trips/')[1];
-          if (path) {
-            doc.url = `${cleanDomain}/als-transportes/trips/${path}`;
+        if (doc && doc.url) {
+          const newUrl = fixUrl(doc.url);
+          if (newUrl !== doc.url) {
+            doc.url = newUrl;
             return true;
           }
         }
@@ -92,7 +87,24 @@ export async function POST(request: Request) {
       if (fixDoc(t.os_doc)) { updatePayload.os_doc = t.os_doc; updated = true; }
       if (fixDoc(t.cte_doc)) { updatePayload.cte_doc = t.cte_doc; updated = true; }
       if (fixDoc(t.completo_doc)) { updatePayload.completo_doc = t.completo_doc; updated = true; }
+      if (fixDoc(t.agendamento_doc)) { updatePayload.agendamento_doc = t.agendamento_doc; updated = true; }
+      if (fixDoc(t.cva_doc)) { updatePayload.cva_doc = t.cva_doc; updated = true; }
+      if (fixDoc(t.nf_doc)) { updatePayload.nf_doc = t.nf_doc; updated = true; }
+      if (fixDoc(t.freight_contract_doc)) { updatePayload.freight_contract_doc = t.freight_contract_doc; updated = true; }
       
+      // Processamento especial para o array JSON driver_docs
+      if (t.driver_docs && Array.isArray(t.driver_docs)) {
+        const newDriverDocs = t.driver_docs.map((doc: any) => ({
+          ...doc,
+          url: fixUrl(doc.url)
+        }));
+        
+        if (JSON.stringify(newDriverDocs) !== JSON.stringify(t.driver_docs)) {
+          updatePayload.driver_docs = newDriverDocs;
+          updated = true;
+        }
+      }
+
       if (updated) {
         await supabase.from('trips').update(updatePayload).eq('id', t.id);
         results.trips_updated++;
@@ -102,7 +114,7 @@ export async function POST(request: Request) {
     return new Response(JSON.stringify({
       success: true,
       summary: results,
-      message: "Banco de dados sincronizado com o novo padrão de storage (Colaboradores por Nome e Prefixo Pai)."
+      message: "Limpeza de URLs concluída. Todas as fotos pré-12/01 foram corrigidas no banco de dados."
     }), { status: 200 });
 
   } catch (err: any) {
