@@ -1,5 +1,4 @@
-
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Category, StaySession, StayRecord } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { stayImporter } from '../../utils/stayImporter';
@@ -15,6 +14,9 @@ interface StaysTabProps {
 
 const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategories }) => {
   const [activeCategory, setActiveCategory] = useState<string>('GERAL');
+  const [filterYear, setFilterYear] = useState<string>('TODOS');
+  const [filterMonth, setFilterMonth] = useState<string>('TODOS');
+  
   const [isImporting, setIsImporting] = useState(false);
   const [sessions, setSessions] = useState<StaySession[]>([]);
   const [selectedSession, setSelectedSession] = useState<StaySession | null>(null);
@@ -59,7 +61,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     e.preventDefault();
     try {
       const sessionId = `stay-session-${Date.now()}`;
-      // Aplica a regra de nomenclatura centralizada
       const folderName = stayNamingRules.generateFolderName(
         newSessionForm.category, 
         newSessionForm.startDate, 
@@ -68,7 +69,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
       const newSession: StaySession = {
         id: sessionId,
-        category: folderName, // Nome gerado pela regra
+        category: folderName,
         startDate: new Date(newSessionForm.startDate).toISOString(),
         endDate: new Date(newSessionForm.endDate).toISOString(),
         createdAt: new Date().toISOString(),
@@ -188,6 +189,26 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     });
   };
 
+  // Fix: Explicitly type s as Set<number> and a, b as numbers to prevent arithmetic operation errors in sort
+  const years = useMemo(() => {
+    const s = new Set<number>(sessions.map(s => new Date(s.startDate).getFullYear()));
+    return Array.from(s).sort((a: number, b: number) => b - a);
+  }, [sessions]);
+
+  const monthsList = [
+    'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
+    'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'
+  ];
+
+  const filteredSessions = useMemo(() => {
+    return sessions.filter(s => {
+      const matchCat = activeCategory === 'GERAL' || s.category.startsWith(activeCategory);
+      const matchYear = filterYear === 'TODOS' || new Date(s.startDate).getFullYear().toString() === filterYear;
+      const matchMonth = filterMonth === 'TODOS' || monthsList[new Date(s.startDate).getMonth()] === filterMonth;
+      return matchCat && matchYear && matchMonth;
+    });
+  }, [sessions, activeCategory, filterYear, filterMonth]);
+
   const recordColumns = [
     { key: 'os', label: 'Tipo / OS', render: (r: StayRecord) => (
       <div className="flex flex-col">
@@ -255,29 +276,51 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Relatórios de Estadias</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Controle de permanência e cobrança</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de custos e permanência</p>
           </div>
           <button onClick={() => setIsCreatingSession(true)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95">Nova Pasta</button>
         </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 border-t border-slate-50 pt-6">
-           {['GERAL', ...Array.from(new Set(sessions.map(s => s.category.split(' (')[0]))).sort()].map(cat => (
-             <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all border ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-white'}`}>{cat}</button>
-           ))}
+
+        {/* FILTROS DE BUSCA */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-50">
+           <div className="space-y-1">
+              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Vínculo Operacional</label>
+              <select className="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all" value={activeCategory} onChange={e => setActiveCategory(e.target.value)}>
+                 {['GERAL', ...Array.from(new Set(sessions.map(s => s.category.split(' {')[0].split(' (')[0])))].map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+           </div>
+           <div className="space-y-1">
+              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Ano</label>
+              <select className="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black outline-none focus:border-blue-500 transition-all" value={filterYear} onChange={e => setFilterYear(e.target.value)}>
+                 <option value="TODOS">TODOS OS ANOS</option>
+                 {years.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+              </select>
+           </div>
+           <div className="space-y-1">
+              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Mês</label>
+              <select className="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
+                 <option value="TODOS">TODOS OS MESES</option>
+                 {monthsList.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+           </div>
         </div>
       </div>
 
       {!selectedSession ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-           {sessions.filter(s => activeCategory === 'GERAL' || s.category.startsWith(activeCategory)).map(session => (
+           {filteredSessions.map(session => (
              <button key={session.id} onClick={() => handleOpenSession(session)} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-xl transition-all group text-left relative overflow-hidden">
                 <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-10 group-hover:bg-blue-600 group-hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" strokeWidth="2.5"/></svg></div>
-                <h4 className="text-lg font-black text-slate-900 uppercase leading-tight mb-8 truncate">{session.category}</h4>
+                <h4 className="text-base font-black text-slate-900 uppercase leading-tight mb-8 break-words">{session.category}</h4>
                 <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6">
                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">R$ {session.costPerHour}/H • {session.gracePeriodHours}H FREE</span>
                    <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
                 </div>
              </button>
            ))}
+           {filteredSessions.length === 0 && (
+             <div className="col-span-full py-20 text-center text-slate-300 font-black uppercase italic text-xs border-2 border-dashed border-slate-100 rounded-[3rem]">Nenhuma pasta localizada para os filtros selecionados</div>
+           )}
         </div>
       ) : (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
@@ -298,7 +341,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       )}
 
-      {/* MODAL CONFIGURAÇÃO */}
       {isSettingsOpen && selectedSession && (
         <div className="fixed inset-0 z-[3500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
