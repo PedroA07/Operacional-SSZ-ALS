@@ -19,7 +19,7 @@ export const fileStorage = {
   },
 
   /**
-   * Obtém a URL pública corrigindo automaticamente caminhos que perderam o prefixo do bucket.
+   * Obtém a URL pública corrigindo automaticamente caminhos legados que perderam o prefixo do bucket.
    */
   getPublicUrl: (url: string | undefined): string => {
     if (!url) return '';
@@ -33,8 +33,9 @@ export const fileStorage = {
     // Se a URL pertence ao nosso domínio R2 mas NÃO contém o prefixo als-transportes
     // (comum em fotos antigas anteriores a 12/01)
     if (url.includes(cleanDomain) && !url.includes('/als-transportes/')) {
-      // Injeta o prefixo als-transportes logo após o domínio
-      return url.replace(cleanDomain, `${cleanDomain}/als-transportes`);
+      // Injeta o prefixo als-transportes logo após o domínio para buscar no diretório correto do R2
+      const parts = url.split(cleanDomain);
+      return `${parts[0]}${cleanDomain}/als-transportes${parts[1]}`;
     }
     
     return url;
@@ -67,7 +68,12 @@ export const fileStorage = {
         throw new Error("Formato de arquivo inválido.");
       }
       
-      formData.append('path', destinationPath);
+      // O path enviado deve conter o bucket para que a API saiba onde gravar
+      const finalPath = destinationPath.startsWith('als-transportes/') 
+        ? destinationPath 
+        : `als-transportes/${destinationPath.replace(/^\/+/, '')}`;
+        
+      formData.append('path', finalPath);
 
       const res = await fetch('/api/upload', { 
         method: 'POST', 
@@ -89,23 +95,23 @@ export const fileStorage = {
 
   uploadStaffPhoto: (file: File | string, staffName: string) => {
     const normalizedName = fileStorage.normalizeFolderName(staffName);
-    return fileStorage.upload(file, `als-transportes/colaboradores/${normalizedName}/foto_perfil/perfil.jpg`);
+    return fileStorage.upload(file, `colaboradores/${normalizedName}/foto_perfil/perfil.jpg`);
   },
 
   uploadDriverProfile: (file: File | string, driverId: string) => 
-    fileStorage.upload(file, `als-transportes/drivers/${driverId}/foto_perfil/perfil.jpg`),
+    fileStorage.upload(file, `drivers/${driverId}/foto_perfil/perfil.jpg`),
 
   uploadDriverCNH: (file: File | string, driverId: string) => 
-    fileStorage.upload(file, `als-transportes/drivers/${driverId}/cnh/cnh.pdf`),
+    fileStorage.upload(file, `drivers/${driverId}/cnh/cnh.pdf`),
 
   uploadTripDoc: (file: File | string, os: string, docType: string) => {
     const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
     const type = docType.toLowerCase().replace('_pdf', '');
-    return fileStorage.upload(file, `als-transportes/trips/${cleanOS}/documentos/${type}.pdf`);
+    return fileStorage.upload(file, `trips/${cleanOS}/documentos/${type}.pdf`);
   },
 
   uploadTripPhoto: (file: File | string, os: string, photoId: string) => {
     const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
-    return fileStorage.upload(file, `als-transportes/trips/${cleanOS}/fotos_campo/${photoId}.jpg`);
+    return fileStorage.upload(file, `trips/${cleanOS}/fotos_campo/${photoId}.jpg`);
   }
 };

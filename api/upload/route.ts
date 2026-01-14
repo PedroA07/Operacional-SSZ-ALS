@@ -28,9 +28,10 @@ export async function POST(request: Request) {
       });
     }
 
-    const finalKey = rawPath
-      .replace(/^als-transportes\//i, '')
-      .replace(/^als-transportes/i, '')
+    // Limpeza da Key: Remove o bucket se ele vier no path e garante que não haja barras duplas
+    // O R2 grava a partir da raiz do bucket, então a Key não deve começar com o nome do bucket
+    const cleanKey = rawPath
+      .replace(new RegExp(`^${bucketName}/`, 'i'), '')
       .replace(/^\/+/, '')
       .replace(/\/+/g, '/');
 
@@ -39,9 +40,10 @@ export async function POST(request: Request) {
     
     const command = new PutObjectCommand({
       Bucket: bucketName,
-      Key: finalKey,
+      Key: cleanKey,
       Body: fileBytes,
       ContentType: file.type || 'image/jpeg',
+      CacheControl: "public, max-age=31536000",
     });
 
     await client.send(command);
@@ -50,12 +52,14 @@ export async function POST(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
 
-    // ATRIBUIÇÃO DIRETA: Forçamos a pasta als-transportes na URL de visualização
-    const publicUrl = `${domain}/als-transportes/${finalKey}`;
+    // CONSTRUÇÃO DA URL PÚBLICA:
+    // Forçamos o prefixo als-transportes/ na URL para compatibilidade com o sistema de visualização
+    const publicUrl = `${domain}/als-transportes/${cleanKey}`;
 
     return new Response(JSON.stringify({ 
       url: publicUrl, 
-      path: `als-transportes/${finalKey}` 
+      path: `als-transportes/${cleanKey}`,
+      success: true 
     }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

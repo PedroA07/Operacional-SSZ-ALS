@@ -32,12 +32,11 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sincroniza estado local com prop quando o modal abre ou a trip muda externamente
   useEffect(() => {
-    if (isOpen && !isMoving) {
+    if (isOpen) {
       setDocs(trip.driver_docs || []);
     }
-  }, [trip.driver_docs, isOpen, isMoving]);
+  }, [trip.driver_docs, isOpen]);
 
   useEffect(() => {
     setExtractedContainer(null);
@@ -97,10 +96,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
       setIsProcessing(true);
       try {
         const results = await Promise.all((Array.from(files) as File[]).map(async file => {
-          return await imageCompressor.compress(file, {
-            maxWidth: 1600,
-            quality: 0.8
-          });
+          return await imageCompressor.compress(file, { maxWidth: 1600, quality: 0.8 });
         }));
         await saveNewDocs(results);
       } catch (err) {
@@ -121,10 +117,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
       const raw = canvas.toDataURL('image/jpeg', 0.95);
-      const compressed = await imageCompressor.compress(raw, {
-        maxWidth: 1600,
-        quality: 0.8
-      });
+      const compressed = await imageCompressor.compress(raw, { maxWidth: 1600, quality: 0.8 });
       saveNewDocs([compressed]);
       stopCamera();
     }
@@ -145,7 +138,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
   };
 
   const handleMovePhoto = async (e: React.MouseEvent, index: number, direction: 'up' | 'down') => {
-    e.stopPropagation(); // Impede seleção da foto ao clicar nos botões de mover
+    e.stopPropagation(); 
     if (isMoving) return;
 
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
@@ -153,22 +146,17 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
 
     setIsMoving(true);
     const newDocs = [...docs];
-    
-    // Swap de posições
-    const temp = newDocs[index];
-    newDocs[index] = newDocs[targetIdx];
-    newDocs[targetIdx] = temp;
+    const item = newDocs.splice(index, 1)[0];
+    newDocs.splice(targetIdx, 0, item);
     
     setDocs(newDocs);
 
     try {
-      // Salva a nova ordem no banco de dados de forma explícita
       await db.saveTrip({ ...trip, driver_docs: newDocs }, user);
       onSuccess();
     } catch (err) {
       console.error("Falha ao reordenar fotos:", err);
       alert("Erro ao persistir nova ordem no servidor.");
-      // Opcional: Reverter estado local em caso de erro
       setDocs(trip.driver_docs || []);
     } finally {
       setIsMoving(false);
@@ -257,8 +245,8 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
           </div>
           <div className="flex items-center gap-4">
             {isMoving && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/20">
-                 <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/20">
+                 <div className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
                  <span className="text-[8px] font-black uppercase tracking-widest">Salvando Ordem...</span>
               </div>
             )}
