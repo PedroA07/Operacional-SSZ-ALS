@@ -22,9 +22,9 @@ export const emailFormatter = {
   },
 
   /**
-   * Gera um card individual estilo "Premium" compatível com clientes de e-mail
+   * Gera um card premium sem cliente e localidade
    */
-  toCompactRichText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride, showCustomer: boolean = true): string => {
+  toCompactRichText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride): string => {
     const history = override 
       ? [...override.history].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
       : [...(trip.statusHistory || [])]
@@ -42,23 +42,20 @@ export const emailFormatter = {
     const subTextColor = '#64748b';
 
     return `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: ${textColor}; border: 1px solid ${borderColor}; border-radius: 20px; margin-bottom: 12px; overflow: hidden; background-color: #ffffff; width: 280px; display: inline-block; vertical-align: top;">
-        <!-- Cabeçalho Estilo Revisão -->
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: ${textColor}; border: 1px solid ${borderColor}; border-radius: 16px; margin-bottom: 12px; overflow: hidden; background-color: #ffffff; width: 100%; max-width: 300px;">
         <div style="background-color: ${darkBg}; padding: 12px; border-bottom: 1px solid ${borderColor};">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: #60a5fa; font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">OS:</span>
-            <span style="color: #ffffff; font-size: 13px; font-weight: 900; text-transform: uppercase;">${trip.os}</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <span style="color: #60a5fa; font-size: 8px; font-weight: 900; text-transform: uppercase;">OS:</span>
+            <span style="color: #ffffff; font-size: 13px; font-weight: 900;">${trip.os}</span>
           </div>
-          <div style="margin-top: 4px; font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">
-             <span style="color: #ffffff; background-color: #3b82f6; padding: 1px 4px; border-radius: 4px; font-family: monospace;">${trip.container || 'A DEFINIR'}</span>
+          <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
+             <span style="color: #ffffff; background-color: #3b82f6; padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 10px; font-weight: 900;">${trip.container || 'A DEFINIR'}</span>
           </div>
-          <div style="margin-top: 8px; font-size: 9px; color: #cbd5e1; font-weight: bold; text-transform: uppercase;">
+          <div style="font-size: 10px; color: #cbd5e1; font-weight: bold; text-transform: uppercase;">
             MOT: <span style="color: #60a5fa;">${trip.driver.name}</span>
           </div>
-          ${showCustomer ? `<div style="margin-top: 4px; font-size: 7px; color: #64748b; font-weight: 900; text-transform: uppercase;">CLIENTE: ${trip.customer.name}</div>` : ''}
         </div>
 
-        <!-- Histórico e Previsão -->
         <div style="padding: 12px; background-color: #ffffff;">
           <table style="width: 100%; border-collapse: collapse;">
             ${history.map((entry, idx) => `
@@ -79,7 +76,7 @@ export const emailFormatter = {
               <tr>
                 <td colspan="3" style="padding-top: 8px;">
                   <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 6px; border-radius: 8px;">
-                    <span style="font-size: 8px; font-weight: 900; color: #0369a1; text-transform: uppercase; display: block; margin-bottom: 2px;">🚀 PRÓXIMA ETAPA</span>
+                    <span style="font-size: 8px; font-weight: 900; color: #0369a1; text-transform: uppercase; display: block;">🚀 PRÓXIMA ETAPA</span>
                     <span style="font-size: 9px; font-weight: 900; color: #1e40af; text-transform: uppercase;">
                       ${prediction.label}: ${prediction.time}
                     </span>
@@ -93,61 +90,53 @@ export const emailFormatter = {
     `;
   },
 
-  allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], overrides: Record<string, ReportOverride> = {}, showCustomer: boolean = true): string => {
+  allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], overrides: Record<string, ReportOverride> = {}): string => {
     if (trips.length === 0) return "";
     
     const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
     const finishedTrips = trips.filter(t => t.status === 'Viagem concluída');
 
-    const renderTwoColumnGrid = (group: Trip[]) => {
-      if (group.length === 0) return "";
-      let html = '<table style="width: 100%; border-collapse: collapse;"><tr>';
-      
-      group.forEach((t, idx) => {
-        if (idx > 0 && idx % 2 === 0) html += '</tr><tr>';
-        html += `<td style="width: 50%; padding-right: 8px; vertical-align: top;">
-          ${emailFormatter.toCompactRichText(t, allContextTrips, overrides[t.id], showCustomer)}
-        </td>`;
-      });
-      
-      // Fecha a última linha se sobrar uma célula
-      if (group.length % 2 !== 0) html += '<td style="width: 50%;"></td>';
-      
-      html += '</tr></table>';
-      return html;
-    };
-
     return `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; padding: 20px; background-color: #fcfcfc;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 700px; padding: 20px; background-color: #fcfcfc;">
         <div style="margin-bottom: 20px; border-bottom: 4px solid #2563eb; padding-bottom: 12px;">
-          <h2 style="margin: 0; font-size: 18px; color: #2563eb; text-transform: uppercase;">Relatório Operacional ALS</h2>
-          <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: bold;">POSIÇÕES EM ${emailFormatter.formatFullDate(new Date().toISOString())}</p>
+          <h2 style="margin: 0; font-size: 20px; color: #2563eb; text-transform: uppercase; font-weight: 900;">Relatório Operacional ALS</h2>
+          <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: bold;">EMISSÃO: ${emailFormatter.formatFullDate(new Date().toISOString())}</p>
         </div>
         
-        <div style="margin-top: 15px; margin-bottom: 10px; padding: 6px 12px; background-color: #2563eb; border-radius: 8px;">
-          <span style="color: #ffffff; font-weight: 900; font-size: 11px; text-transform: uppercase;">Cargas em Trânsito (${activeTrips.length})</span>
-        </div>
-        ${renderTwoColumnGrid(activeTrips)}
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <!-- COLUNA: EM ANDAMENTO -->
+            <td style="width: 50%; vertical-align: top; padding-right: 15px;">
+              <div style="margin-bottom: 15px; padding: 8px 12px; background-color: #2563eb; border-radius: 8px;">
+                <span style="color: #ffffff; font-weight: 900; font-size: 11px; text-transform: uppercase;">EM ANDAMENTO (${activeTrips.length})</span>
+              </div>
+              ${activeTrips.map(t => emailFormatter.toCompactRichText(t, allContextTrips, overrides[t.id])).join('')}
+              ${activeTrips.length === 0 ? '<p style="font-size: 10px; color: #94a3b8; font-style: italic; text-align: center;">Nenhuma carga ativa.</p>' : ''}
+            </td>
 
-        ${finishedTrips.length > 0 ? `
-          <div style="margin-top: 25px; margin-bottom: 10px; padding: 6px 12px; background-color: #059669; border-radius: 8px;">
-            <span style="color: #ffffff; font-weight: 900; font-size: 11px; text-transform: uppercase;">Cargas Finalizadas (${finishedTrips.length})</span>
-          </div>
-          ${renderTwoColumnGrid(finishedTrips)}
-        ` : ''}
+            <!-- COLUNA: CONCLUÍDAS -->
+            <td style="width: 50%; vertical-align: top; padding-left: 15px; border-left: 1px solid #e2e8f0;">
+              <div style="margin-bottom: 15px; padding: 8px 12px; background-color: #059669; border-radius: 8px;">
+                <span style="color: #ffffff; font-weight: 900; font-size: 11px; text-transform: uppercase;">CONCLUÍDAS (${finishedTrips.length})</span>
+              </div>
+              ${finishedTrips.map(t => emailFormatter.toCompactRichText(t, allContextTrips, overrides[t.id])).join('')}
+              ${finishedTrips.length === 0 ? '<p style="font-size: 10px; color: #94a3b8; font-style: italic; text-align: center;">Sem conclusões hoje.</p>' : ''}
+            </td>
+          </tr>
+        </table>
 
         <div style="margin-top: 30px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-          <strong>ALS Transportes SSZ</strong> • Monitoramento Realtime
+          <strong>ALS Transportes SSZ</strong> • Virtual Terminal v6.7
         </div>
       </div>
     `;
   },
 
-  toPlainText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride, showCustomer: boolean = true): string => {
+  toPlainText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride): string => {
     const history = override ? override.history : [...(trip.statusHistory || [])].filter(h => h.status !== 'Pendente');
     const pred = override ? override.prediction : predictionService.getNextStatusPrediction(trip, allTrips);
 
-    let text = `OS: ${trip.os}${showCustomer ? ` | CLIENTE: ${trip.customer.name}` : ''}\n` +
+    let text = `OS: ${trip.os}\n` +
       `CONTAINER: ${trip.container || 'A DEFINIR'}\n` +
       `MOTORISTA: ${trip.driver.name}\n` +
       `STATUS: ${trip.status.toUpperCase()}\n`;
