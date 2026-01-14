@@ -107,12 +107,12 @@ export const reportGenerator = {
     const finishedTrips = trips.filter(t => t.status === 'Viagem concluída');
 
     return `
-      <div style="background-color: #f1f5f9; padding: 30px; font-family: 'Segoe UI', Tahoma, sans-serif;">
-        <div style="max-width: 850px; margin: 0 auto; background-color: #ffffff; border-radius: 35px; padding: 40px; border: 1px solid #e2e8f0; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
+      <div style="background-color: #f1f5f9; padding: 30px; font-family: 'Segoe UI', Tahoma, sans-serif; text-align: left;">
+        <div style="max-width: 850px; margin: 0; background-color: #ffffff; border-radius: 35px; padding: 40px; border: 1px solid #e2e8f0; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); text-align: left;">
           
           <table style="width: 100%; border-bottom: 4px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px;">
             <tr>
-              <td>
+              <td style="text-align: left;">
                 <h2 style="margin: 0; font-size: 24px; color: #0f172a; text-transform: uppercase; font-weight: 900;">Relatório Operacional</h2>
                 <p style="margin: 5px 0 0 0; font-size: 11px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">
                   ALS Transportes • Emissão: ${reportGenerator.formatFullDate(new Date().toISOString())}
@@ -127,7 +127,7 @@ export const reportGenerator = {
           <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
             <tr>
               <!-- COLUNA 1: EM ANDAMENTO -->
-              <td style="width: 50%; vertical-align: top; padding-right: 20px;">
+              <td style="width: 50%; vertical-align: top; padding-right: 20px; text-align: left;">
                 <div style="background-color: #2563eb; color: #ffffff; padding: 10px 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
                   <span style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">Em curso (${activeTrips.length})</span>
                 </div>
@@ -136,7 +136,7 @@ export const reportGenerator = {
               </td>
 
               <!-- COLUNA 2: CONCLUÍDAS -->
-              <td style="width: 50%; vertical-align: top; padding-left: 20px; border-left: 2px solid #f1f5f9;">
+              <td style="width: 50%; vertical-align: top; padding-left: 20px; border-left: 2px solid #f1f5f9; text-align: left;">
                 <div style="background-color: #059669; color: #ffffff; padding: 10px 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2);">
                   <span style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">Concluídas (${finishedTrips.length})</span>
                 </div>
@@ -148,7 +148,7 @@ export const reportGenerator = {
 
           <div style="margin-top: 50px; border-top: 1px solid #f1f5f9; padding-top: 25px; text-align: center;">
             <p style="margin: 0; font-size: 9px; color: #94a3b8; font-weight: 900; text-transform: uppercase; letter-spacing: 3px;">
-              ALS Transportes • Santos/SP • Monitoramento em Tempo Real
+              ALS Transportes • Guarujá/SP • Monitoramento em Tempo Real
             </p>
           </div>
         </div>

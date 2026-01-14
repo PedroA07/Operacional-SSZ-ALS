@@ -40,12 +40,12 @@ export const emailFormatter = {
     const headerBg = '#0f172a';
 
     return `
-      <div style="margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+      <div style="margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: left;">
         <!-- Header do Card -->
         <div style="background-color: ${headerBg}; padding: 12px; color: #ffffff;">
           <table style="width: 100%;">
             <tr>
-              <td>
+              <td style="text-align: left;">
                 <span style="font-size: 8px; font-weight: 900; color: #60a5fa; text-transform: uppercase; display: block; margin-bottom: 2px;">ORDEM DE SERVIÇO</span>
                 <span style="font-size: 14px; font-weight: 900; letter-spacing: -0.5px;">${trip.os}</span>
               </td>
@@ -111,17 +111,17 @@ export const emailFormatter = {
     const finishedTrips = trips.filter(t => t.status === 'Viagem concluída');
 
     return `
-      <div style="background-color: #f8fafc; padding: 20px; font-family: sans-serif;">
-        <div style="max-width: 800px; margin: 0 auto; background-color: #ffffff; border-radius: 24px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+      <div style="background-color: #f8fafc; padding: 20px; font-family: sans-serif; text-align: left;">
+        <div style="max-width: 800px; margin: 0; background-color: #ffffff; border-radius: 24px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); text-align: left;">
           
           <!-- Cabeçalho ALS -->
           <div style="border-bottom: 4px solid #2563eb; padding-bottom: 15px; margin-bottom: 25px;">
             <table style="width: 100%;">
               <tr>
-                <td>
+                <td style="text-align: left;">
                   <h2 style="margin: 0; font-size: 22px; color: #1e293b; text-transform: uppercase; font-weight: 900;">Relatório Operacional ALS</h2>
                   <p style="margin: 5px 0 0 0; font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
-                    Santos/SP • Emissão: ${emailFormatter.formatFullDate(new Date().toISOString())}
+                    Guarujá/SP • Emissão: ${emailFormatter.formatFullDate(new Date().toISOString())}
                   </p>
                 </td>
                 <td style="text-align: right; vertical-align: middle;">
@@ -135,7 +135,7 @@ export const emailFormatter = {
           <table style="width: 100%; border-collapse: collapse;">
             <tr>
               <!-- Coluna: Em Andamento -->
-              <td style="width: 50%; vertical-align: top; padding-right: 15px;">
+              <td style="width: 50%; vertical-align: top; padding-right: 15px; text-align: left;">
                 <div style="background-color: #2563eb; color: #ffffff; padding: 8px 12px; border-radius: 10px; margin-bottom: 15px;">
                   <span style="font-size: 11px; font-weight: 900; text-transform: uppercase;">EM CURSO (${activeTrips.length})</span>
                 </div>
@@ -144,7 +144,7 @@ export const emailFormatter = {
               </td>
 
               <!-- Coluna: Concluídas -->
-              <td style="width: 50%; vertical-align: top; padding-left: 15px; border-left: 1px solid #f1f5f9;">
+              <td style="width: 50%; vertical-align: top; padding-left: 15px; border-left: 1px solid #f1f5f9; text-align: left;">
                 <div style="background-color: #059669; color: #ffffff; padding: 8px 12px; border-radius: 10px; margin-bottom: 15px;">
                   <span style="font-size: 11px; font-weight: 900; text-transform: uppercase;">CONCLUÍDAS (${finishedTrips.length})</span>
                 </div>
@@ -156,7 +156,7 @@ export const emailFormatter = {
 
           <div style="margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 20px; text-align: center;">
             <p style="margin: 0; font-size: 9px; color: #94a3b8; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">
-              ALS Transportes • Santos/SP • Real-time Monitoring
+              ALS Transportes • Guarujá/SP • Real-time Monitoring
             </p>
           </div>
         </div>
