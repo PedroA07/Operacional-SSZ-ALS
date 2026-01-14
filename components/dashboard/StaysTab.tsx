@@ -80,7 +80,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }
   };
 
-  // Fix: Added missing handleCreateSession function
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -92,8 +91,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         endDate: new Date(newSessionForm.endDate).toISOString(),
         createdAt: new Date().toISOString(),
         createdBy: userId,
-        gracePeriodHours: 8, // Padrão
-        roundUpMinutes: 30,  // Padrão
+        gracePeriodHours: 8,
+        roundUpMinutes: 30,
         costPerHour: newSessionForm.costPerHour
       };
       
@@ -110,12 +109,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }
   };
 
-  // LÓGICA DE ARREDONDAMENTO ROBUSTA
+  // LÓGICA DE ARREDONDAMENTO CORRIGIDA (TS Fix: isNaN)
   const calculateExceededHoursDecimal = (arrivalTime: string, departureTime: string, session: StaySession): number => {
     if (!arrivalTime || !departureTime) return 0;
     const start = new Date(arrivalTime).getTime();
     const end = new Date(departureTime).getTime();
-    if (isNaN(start) || iSNan(end) || end <= start) return 0;
+    
+    // Fix: iSNan -> isNaN
+    if (isNaN(start) || isNaN(end) || end <= start) return 0;
 
     const totalStayMs = end - start;
     const graceMs = (session.gracePeriodHours || 8) * 3600000;
@@ -123,34 +124,24 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     if (totalStayMs <= graceMs) return 0;
     
     const exceededMs = totalStayMs - graceMs;
-    const wholeHours = Math.floor(exceededMs / 3600000);
-    const remainingMs = exceededMs % 3600000;
-    const minutes = Math.floor(remainingMs / 60000);
+    const totalMinutes = Math.floor(exceededMs / 60000);
+    const wholeHours = Math.floor(totalMinutes / 60);
+    const remainingMinutes = totalMinutes % 60;
     const roundUpTrigger = session.roundUpMinutes || 30;
 
-    // Se os minutos excedentes atingem ou passam o gatilho, arredonda para cima (+1 hora cheia)
-    if (minutes >= roundUpTrigger) {
+    // Se passar do gatilho, vira 1h cheia a mais
+    if (remainingMinutes >= roundUpTrigger) {
       return wholeHours + 1;
     }
     
-    // Caso contrário, retorna apenas as horas cheias + a fração exata dos minutos restantes
-    return wholeHours + (minutes / 60);
+    // Caso contrário, retorna apenas as horas cheias (arredondamento comercial para baixo se não atingir gatilho)
+    return wholeHours;
   };
 
   const calculateStayExceeded = (arrivalTime: string, departureTime: string, session: StaySession): string => {
-    const decimal = calculateExceededHoursDecimal(arrivalTime, departureTime, session);
-    if (decimal === 0) return '---';
-    
-    const wholeHours = Math.floor(decimal);
-    const fraction = decimal - wholeHours;
-    
-    // Se o arredondamento transformou em hora cheia
-    if (fraction === 0) {
-      return `${wholeHours}h 00m`;
-    }
-    
-    const minutes = Math.round(fraction * 60);
-    return `${wholeHours}h ${String(minutes).padStart(2, '0')}m`;
+    const hours = calculateExceededHoursDecimal(arrivalTime, departureTime, session);
+    if (hours === 0) return '---';
+    return `${hours}h 00m`;
   };
 
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,10 +203,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setEditingRecord(null);
   };
 
-  // Fix: Added missing handleOpenEditRecord function
   const handleOpenEditRecord = (r: StayRecord) => {
     setEditingRecord(r);
-    // Formata ISO para o formato aceito pelo input datetime-local (YYYY-MM-DDTHH:mm)
     const arrival = r.arrivalTime ? new Date(r.arrivalTime).toISOString().slice(0, 16) : '';
     const departure = r.departureTime ? new Date(r.departureTime).toISOString().slice(0, 16) : '';
     setEditForm({ arrival, departure });
@@ -252,14 +241,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       <span className="text-[9px] font-black uppercase text-slate-600 leading-tight block max-w-[120px] truncate">{r.location}</span>
     )},
     { key: 'times', label: 'Horários Realizados (Entrada / Saída)', render: (r: StayRecord) => (
-      <div className="flex flex-col gap-1 min-w-[140px]">
-        <div className="flex items-center gap-2">
-           <span className="text-[7px] font-black text-slate-300 uppercase w-6">Ent:</span>
-           <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">{formatFullDateTime(r.arrivalTime)}</span>
+      <div className="flex flex-col gap-1.5 min-w-[160px]">
+        <div className="flex items-center justify-between gap-3 bg-emerald-50 px-2.5 py-1.5 rounded border border-emerald-100">
+           <span className="text-[7px] font-black text-emerald-600 uppercase">Entrada:</span>
+           <span className="text-[9px] font-black text-emerald-700">{formatFullDateTime(r.arrivalTime)}</span>
         </div>
-        <div className="flex items-center gap-2">
-           <span className="text-[7px] font-black text-slate-300 uppercase w-6">Sai:</span>
-           <span className="text-[9px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">{formatFullDateTime(r.departureTime)}</span>
+        <div className="flex items-center justify-between gap-3 bg-red-50 px-2.5 py-1.5 rounded border border-red-100">
+           <span className="text-[7px] font-black text-red-600 uppercase">Saída:</span>
+           <span className="text-[9px] font-black text-red-700">{formatFullDateTime(r.departureTime)}</span>
         </div>
       </div>
     )},
@@ -397,7 +386,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                       <div className="w-7 h-7 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center shadow-sm">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                       </div>
-                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Valor da Hora Excedente (R$)</label>
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest">💰 Valor da Hora Excedente (R$)</label>
                    </div>
                    <input type="number" step="0.01" required className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 text-lg" value={selectedSession.costPerHour || 0} onChange={e => setSelectedSession({...selectedSession, costPerHour: Number(e.target.value)})} />
                 </div>
@@ -408,7 +397,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                       <div className="w-7 h-7 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center shadow-sm">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                       </div>
-                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Tempo de Carência (Horas Free)</label>
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest">⏱️ Tempo de Carência (Horas Free)</label>
                    </div>
                    <div className="flex items-center gap-4">
                      <input type="number" required min="0" className="flex-1 px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={selectedSession.gracePeriodHours || 0} onChange={e => setSelectedSession({...selectedSession, gracePeriodHours: Number(e.target.value)})} />
@@ -422,13 +411,13 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                       <div className="w-7 h-7 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center shadow-sm">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                       </div>
-                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Gatilho p/ Arredondar (Minutos)</label>
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest">🎯 Gatilho p/ Arredondar (Minutos)</label>
                    </div>
                    <div className="flex items-center gap-4">
                      <input type="number" required min="0" max="59" className="flex-1 px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={selectedSession.roundUpMinutes || 0} onChange={e => setSelectedSession({...selectedSession, roundUpMinutes: Number(e.target.value)})} />
                      <span className="text-[11px] font-black text-slate-400 uppercase">Minutos</span>
                    </div>
-                   <p className="text-[8px] text-slate-400 italic font-medium">Ex: Se definido 30 min, uma estadia de 8h 35m será cobrada como 1h cheia.</p>
+                   <p className="text-[8px] text-slate-400 italic font-medium">Ex: Se definido 30 min, uma estadia de 8h 35m será cobrada como 1h cheia excedente.</p>
                 </div>
 
                 <div className="grid gap-3 pt-4">
