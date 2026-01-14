@@ -13,6 +13,7 @@ interface CopyAllStatusesActionProps {
 const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, allTrips }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [showCustomer, setShowCustomer] = useState(true);
   
   const [reportOverrides, setReportOverrides] = useState<Record<string, ReportOverride>>({});
 
@@ -22,15 +23,18 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
       
       trips.forEach(t => {
         const pred = predictionService.getNextStatusPrediction(t, allTrips);
+        
+        // Organiza histórico cronologicamente (do mais antigo ao mais novo para a edição)
         const history = [...(t.statusHistory || [])]
           .filter(h => h.status !== 'Pendente')
           .map(h => ({ ...h }))
           .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
-        // Força padrão ALS: DD/MM/AAAA HH:MM na previsão
+        // Previsão com Data e Hora (Engine ALS)
         let finalPredLabel = pred?.label || 'Previsão de Chegada';
         let finalPredTime = pred?.time || '';
 
+        // Garante que a previsão tenha data e hora completas
         if (finalPredTime && !finalPredTime.includes('/')) {
            const d = new Date();
            finalPredTime = `${d.toLocaleDateString('pt-BR')} ${finalPredTime}`;
@@ -82,8 +86,9 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
     if (trips.length === 0) return;
 
     try {
-      const html = emailFormatter.allTripsToRichText(trips, allTrips, reportOverrides);
-      const plain = trips.map(t => emailFormatter.toPlainText(t, allTrips, reportOverrides[t.id])).join('\n');
+      // Sincroniza estado showCustomer com o motor de formatação
+      const html = emailFormatter.allTripsToRichText(trips, allTrips, reportOverrides, showCustomer);
+      const plain = trips.map(t => emailFormatter.toPlainText(t, allTrips, reportOverrides[t.id], showCustomer)).join('\n');
 
       const blobHtml = new Blob([html], { type: 'text/html' });
       const blobPlain = new Blob([plain], { type: 'text/plain' });
@@ -134,9 +139,20 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                     <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-2">Layout em Duas Colunas (Andamento vs Concluídas)</p>
                   </div>
                </div>
-               <button onClick={() => setIsPreviewOpen(false)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
-                 <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg>
-               </button>
+               <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 bg-white/5 px-5 py-2.5 rounded-2xl border border-white/10">
+                     <span className="text-[10px] font-black uppercase text-slate-400">Exibir Cliente</span>
+                     <button 
+                       onClick={() => setShowCustomer(!showCustomer)}
+                       className={`w-11 h-6.5 rounded-full transition-all relative ${showCustomer ? 'bg-blue-600' : 'bg-slate-700'}`}
+                     >
+                       <div className={`absolute top-1 w-4.5 h-4.5 bg-white rounded-full transition-all ${showCustomer ? 'left-5.5' : 'left-1'}`}></div>
+                     </button>
+                  </div>
+                  <button onClick={() => setIsPreviewOpen(false)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg>
+                  </button>
+               </div>
             </header>
 
             <div className="flex-1 overflow-hidden flex bg-slate-50">
@@ -163,7 +179,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                             </div>
 
                             <div className="space-y-3">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Histórico de Posições</label>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Histórico Cronológico (Data + Hora)</label>
                                 <div className="space-y-2">
                                   {ovr?.history.map((entry, idx) => (
                                       <div key={idx} className="flex items-center gap-2 group">
@@ -192,6 +208,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                                     <input type="text" placeholder="DD/MM/AAAA HH:MM" className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none" value={ovr?.prediction?.time || ''} onChange={(e) => handlePredictionChange(t.id, 'time', e.target.value)} />
                                 </div>
                             </div>
+                            {showCustomer && <p className="text-[8px] font-bold text-slate-300 uppercase absolute top-4 right-8 italic truncate max-w-[150px]">{t.customer.name}</p>}
                         </div>
                        );
                      })}
@@ -210,6 +227,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                              <div>
                                 <p className="text-[12px] font-black text-slate-800 uppercase">OS: {t.os}</p>
                                 <p className="text-[9px] font-mono font-bold text-slate-400 mt-1">{t.container}</p>
+                                {showCustomer && <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 italic">{t.customer.name}</p>}
                                 <p className="text-[9px] font-black text-slate-400 uppercase mt-1">MOT: {t.driver.name}</p>
                              </div>
                              <span className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 flex items-center gap-2">✓ Concluída</span>
@@ -221,7 +239,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
             </div>
 
             <footer className="p-8 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
-               <p className="text-[10px] font-bold text-slate-400 uppercase max-w-md">O relatório será gerado em layout de duas colunas, removendo automaticamente Cliente e Localidade.</p>
+               <p className="text-[10px] font-bold text-slate-400 uppercase max-w-md">O relatório será gerado em layout de duas colunas, formatando todos os eventos com data e hora completa.</p>
                <div className="flex gap-4">
                   <button onClick={() => setIsPreviewOpen(false)} className="px-8 py-5 bg-slate-100 text-slate-500 rounded-3xl text-[11px] font-black uppercase hover:bg-slate-200 transition-all">Descartar</button>
                   <button onClick={handleCopy} className={`px-12 py-5 rounded-3xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-4 shadow-2xl active:scale-95 ${isCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
