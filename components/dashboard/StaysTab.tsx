@@ -19,7 +19,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
-  // Estados para edição de registro
   const [editingRecord, setEditingRecord] = useState<StayRecord | null>(null);
   const [editForm, setEditForm] = useState({ arrival: '', departure: '' });
 
@@ -48,33 +47,22 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     await loadSessionRecords(session.id);
   };
 
-  /**
-   * Calcula a estadia excedente baseada nas regras da pasta (Session)
-   */
   const calculateStayExceeded = (arrivalTime: string, departureTime: string, session: StaySession): string => {
     if (!arrivalTime || !departureTime) return '---';
-    
     const start = new Date(arrivalTime).getTime();
     const end = new Date(departureTime).getTime();
-    
     if (isNaN(start) || isNaN(end) || end <= start) return '---';
-
     const totalStayMs = end - start;
     const graceMs = (session.gracePeriodHours || 8) * 3600000;
     const roundUpTrigger = session.roundUpMinutes || 30;
-
     if (totalStayMs <= graceMs) return '---';
-
     const exceededMs = totalStayMs - graceMs;
     let hours = Math.floor(exceededMs / 3600000);
     const minutes = Math.floor((exceededMs % 3600000) / 60000);
-
-    // Regra de Arredondamento
     if (minutes >= roundUpTrigger) {
       hours += 1;
       return `${hours}h 00m`;
     }
-
     return `${hours}h ${String(minutes).padStart(2, '0')}m`;
   };
 
@@ -108,17 +96,13 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     if (!selectedSession) return;
     const file = e.target.files?.[0];
     if (!file) return;
-
     setIsImporting(true);
     try {
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
-      
-      // Ajusta o cálculo inicial de cada registro importado com as regras da pasta
       const processed = records.map(r => ({
         ...r,
         exceededHours: calculateStayExceeded(r.arrivalTime, r.departureTime, selectedSession)
       }));
-
       await db.saveStayRecords(processed);
       alert(`Sucesso: ${processed.length} registros importados.`);
       await loadSessionRecords(selectedSession.id);
@@ -140,17 +124,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const handleSaveRecordEdit = async () => {
     if (!editingRecord || !selectedSession) return;
-    
     const arrivalISO = new Date(editForm.arrival).toISOString();
     const departureISO = new Date(editForm.departure).toISOString();
-    
     const updatedRecord: StayRecord = {
       ...editingRecord,
       arrivalTime: arrivalISO,
       departureTime: departureISO,
       exceededHours: calculateStayExceeded(arrivalISO, departureISO, selectedSession)
     };
-
     const updatedList = sessionRecords.map(r => r.id === updatedRecord.id ? updatedRecord : r);
     await db.saveStayRecords([updatedRecord]);
     setSessionRecords(updatedList);
@@ -181,9 +162,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <span className="font-black text-slate-900 text-[10px] mt-0.5">{r.os}</span>
       </div>
     )},
-    { key: 'location', label: 'Atendimento', render: (r: StayRecord) => (
-      <span className="font-bold text-[9px] uppercase text-slate-700 leading-tight">{r.location}</span>
-    )},
     { key: 'resource', label: 'Motorista / Navio / Container', render: (r: StayRecord) => (
       <div className="flex flex-col">
         <span className="font-black text-[9px] uppercase text-slate-700 truncate">{r.driverName}</span>
@@ -194,20 +172,36 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       </div>
     )},
+    { key: 'previsao', label: 'Previsão', render: (r: StayRecord) => (
+      <div className="flex flex-col">
+        <span className="text-[9px] font-black text-blue-500 uppercase">{formatDisplayDateTime(r.scheduledStart)}</span>
+      </div>
+    )},
     { key: 'times', label: 'Entrada / Saída (Editar)', render: (r: StayRecord) => (
-      <div className="flex items-center gap-3 group">
-        <div className="flex flex-col gap-0.5 text-[8px] font-bold min-w-[120px]">
-          <div className="flex justify-between gap-3"><span className="text-slate-400">ENT:</span> <span className="text-emerald-600">{formatDisplayDateTime(r.arrivalTime)}</span></div>
-          <div className="flex justify-between gap-3"><span className="text-slate-400">SAI:</span> <span className="text-red-600">{formatDisplayDateTime(r.departureTime)}</span></div>
+      <div className="flex items-center gap-2 group">
+        <div className="flex flex-col gap-0.5 text-[8px] font-bold min-w-[110px]">
+          <div className="flex justify-between gap-2"><span className="text-slate-400">ENT:</span> <span className="text-emerald-600">{formatDisplayDateTime(r.arrivalTime)}</span></div>
+          <div className="flex justify-between gap-2"><span className="text-slate-400">SAI:</span> <span className="text-red-600">{formatDisplayDateTime(r.departureTime)}</span></div>
         </div>
         <button 
           onClick={(e) => { e.stopPropagation(); handleOpenEditRecord(r); }}
-          className="p-2 bg-slate-50 text-slate-400 hover:bg-blue-600 hover:text-white rounded-lg transition-all opacity-0 group-hover:opacity-100"
+          className="p-1.5 bg-slate-50 text-slate-400 hover:bg-blue-600 hover:text-white rounded-lg transition-all opacity-0 group-hover:opacity-100"
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg>
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg>
         </button>
       </div>
     )},
+    { key: 'punctuality', label: 'Pontualidade', render: (r: StayRecord) => {
+      if (!r.scheduledStart || !r.arrivalTime) return <span className="text-[8px] text-slate-300 font-bold uppercase">SEM DADOS</span>;
+      const scheduled = new Date(r.scheduledStart).getTime();
+      const actual = new Date(r.arrivalTime).getTime();
+      const onTime = actual <= scheduled;
+      return (
+        <span className={`px-2 py-1 rounded-md text-[8px] font-black uppercase border ${onTime ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+          {onTime ? 'NÃO ATRASOU' : 'ATRASOU'}
+        </span>
+      );
+    }},
     { key: 'stay', label: 'Estadia Excedente', render: (r: StayRecord) => {
       const text = selectedSession ? calculateStayExceeded(r.arrivalTime, r.departureTime, selectedSession) : r.exceededHours;
       return (
@@ -236,7 +230,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Relatórios de Estadias</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configurações de carença e arredondamento por pasta</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Comparativo de pontualidade e excesso de jornada</p>
           </div>
           <button 
             onClick={() => setIsCreatingSession(true)}
@@ -270,12 +264,10 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                 <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-10 group-hover:bg-blue-600 group-hover:text-white transition-all">
                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" strokeWidth="2.5"/></svg>
                 </div>
-                
                 <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">{session.category}</p>
                 <h4 className="text-xl font-black text-slate-900 uppercase leading-tight mb-8">
                   {formatSessionLabel(session.startDate, session.endDate)}
                 </h4>
-
                 <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6">
                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
                      {session.gracePeriodHours}H CARENÇA • {session.roundUpMinutes}M ARRED.
@@ -311,6 +303,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                   disabled={isImporting}
                   className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2"
                 >
+                  {isImporting ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5"/></svg>}
                   Importar Planilha XLSX
                 </button>
                 <button onClick={() => { if(confirm('Excluir pasta e todos os registros nela contidos?')) { db.deleteStaySession(selectedSession.id); setSelectedSession(null); loadSessions(); } }} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
@@ -329,7 +322,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       )}
 
-      {/* MODAL DE EDIÇÃO DE HORÁRIO INDIVIDUAL */}
       {editingRecord && (
         <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
@@ -352,7 +344,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       )}
 
-      {/* MODAL DE REGRAS DA PASTA */}
       {isSettingsOpen && selectedSession && (
         <div className="fixed inset-0 z-[3500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -376,7 +367,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                    </div>
                    <p className="text-[8px] text-slate-400 italic">A estadia só começará a ser contada após este período.</p>
                 </div>
-
                 <div className="space-y-2">
                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Gatilho de Arredondamento</label>
                    <div className="flex items-center gap-4">
@@ -393,7 +383,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                    </div>
                    <p className="text-[8px] text-slate-400 italic">Se os minutos excedentes atingirem este valor, arredonda para a próxima hora cheia.</p>
                 </div>
-
                 <div className="grid gap-3 pt-4">
                    <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Salvar Regras</button>
                    <button type="button" onClick={() => setIsSettingsOpen(false)} className="w-full py-3 text-[10px] font-black text-slate-400 uppercase">Voltar</button>
@@ -413,7 +402,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                  <h3 className="text-xl font-black uppercase tracking-tight">Nova Pasta de Estadia</h3>
                  <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mt-1">Configure o período e vínculo</p>
               </div>
-              
               <form onSubmit={handleCreateSession} className="p-10 space-y-6">
                 <div className="space-y-1">
                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Vínculo (Categoria)</label>
@@ -427,7 +415,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                      {globalCategories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                    </select>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data Início</label>
@@ -438,7 +425,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                     <input type="date" required className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold" value={newSessionForm.endDate} onChange={e => setNewSessionForm({...newSessionForm, endDate: e.target.value})} />
                   </div>
                 </div>
-
                 <div className="grid gap-3 pt-6">
                    <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Criar Pasta</button>
                    <button type="button" onClick={() => setIsCreatingSession(false)} className="w-full py-3 text-[10px] font-black text-slate-400 uppercase">Cancelar</button>
