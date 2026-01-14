@@ -14,7 +14,7 @@ interface CopyAllStatusesActionProps {
 const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, allTrips }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [showCustomer, setShowCustomer] = useState(true);
+  const [showCustomer, setShowCustomer] = useState(false); // Padrão agora é ocultar
   
   const [reportOverrides, setReportOverrides] = useState<Record<string, ReportOverride>>({});
   const isInitialized = useRef(false);
@@ -28,7 +28,6 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
       trips.forEach(t => {
         const pred = predictionService.getNextStatusPrediction(t, allTrips);
         
-        // Histórico para edição: Cronológico direto (antigo para novo)
         const history = [...(t.statusHistory || [])]
           .filter(h => h.status !== 'Pendente')
           .map(h => ({ ...h }))
@@ -37,7 +36,6 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
         let finalPredLabel = pred?.label || 'Previsão de Chegada';
         let finalPredTime = pred?.time || '';
 
-        // Normalização de tempo da previsão
         if (finalPredTime && !finalPredTime.includes('/')) {
            const d = new Date();
            finalPredTime = `${d.toLocaleDateString('pt-BR')} ${finalPredTime}`;
@@ -102,7 +100,6 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
     if (trips.length === 0) return;
 
     try {
-      // Chamada rigorosa ao gerador externo respeitando o estado 'showCustomer'
       const html = reportGenerator.generateFullReportHTML(trips, allTrips, reportOverrides, showCustomer);
       const plain = reportGenerator.generatePlainText(trips, reportOverrides, showCustomer);
 
@@ -140,7 +137,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>
-        Copiar Status (${trips.length})
+        Copiar Status ({trips.length})
       </button>
 
       {isPreviewOpen && (
@@ -223,14 +220,14 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips, al
                                     <input 
                                       type="text" 
                                       placeholder="Título" 
-                                      className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none focus:ring-4 focus:ring-blue-500/10" 
+                                      className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none focus:ring-4 focus:ring-blue-50/10" 
                                       value={ovr?.prediction?.label || ''} 
                                       onChange={(e) => handlePredictionChange(t.id, 'label', e.target.value)} 
                                     />
                                     <input 
                                       type="text" 
                                       placeholder="Data e Hora" 
-                                      className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none focus:ring-4 focus:ring-blue-500/10" 
+                                      className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-700 outline-none focus:ring-4 focus:ring-blue-50/10" 
                                       value={ovr?.prediction?.time || ''} 
                                       onChange={(e) => handlePredictionChange(t.id, 'time', e.target.value)} 
                                     />

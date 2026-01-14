@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { Trip, StatusHistoryEntry, User, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 import { emailFormatter } from '../../../utils/emailFormatter';
+import { reportGenerator } from '../../../utils/reportGenerator';
 import { statusService } from '../../../utils/statusService';
 
 interface StatusHistoryManagerModalProps {
@@ -24,9 +26,9 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
 
   const handleCopyToEmail = async () => {
     try {
-      // Fix: replace non-existent toCompactRichText with renderTripCard to resolve TypeScript error on line 28
-      const html = emailFormatter.renderTripCard(trip, allTrips);
-      const plain = emailFormatter.toPlainText(trip, allTrips);
+      // Uso do motor premium com cliente desativado por padrão
+      const html = reportGenerator.renderTripCardHTML(trip, allTrips, undefined, false);
+      const plain = reportGenerator.generatePlainText([trip], {}, false);
 
       const blobHtml = new Blob([html], { type: 'text/html' });
       const blobPlain = new Blob([plain], { type: 'text/plain' });
@@ -66,7 +68,6 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
         dateTime: new Date(editTime).toISOString()
       };
 
-      // Recalcula o status principal baseado na cronologia (o mais recente ganha)
       const sorted = [...newHistory].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
       
       const updatedTrip: Trip = {

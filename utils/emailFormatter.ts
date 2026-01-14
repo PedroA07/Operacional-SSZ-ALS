@@ -24,12 +24,12 @@ export const emailFormatter = {
   /**
    * Gera o HTML de um card individual de viagem
    */
-  renderTripCard: (trip: Trip, allTrips: Trip[], override?: ReportOverride, showCustomer: boolean = true): string => {
+  renderTripCard: (trip: Trip, allTrips: Trip[], override?: ReportOverride, showCustomer: boolean = false): string => {
     const history = override 
-      ? [...override.history].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
+      ? [...override.history].sort((a, b) => new Date(a.dateTime).getTime() - new Date(a.dateTime).getTime())
       : [...(trip.statusHistory || [])]
           .filter(entry => entry.status !== 'Pendente')
-          .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+          .sort((a, b) => new Date(a.dateTime).getTime() - new Date(a.dateTime).getTime());
 
     const prediction = override 
       ? override.prediction 
@@ -104,7 +104,7 @@ export const emailFormatter = {
   /**
    * Gera o HTML completo em duas colunas
    */
-  allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], overrides: Record<string, ReportOverride> = {}, showCustomer: boolean = true): string => {
+  allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], overrides: Record<string, ReportOverride> = {}, showCustomer: boolean = false): string => {
     if (trips.length === 0) return "";
     
     const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
@@ -167,7 +167,7 @@ export const emailFormatter = {
   /**
    * Formato texto puro (para WhatsApp sem suporte a HTML)
    */
-  toPlainText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride, showCustomer: boolean = true): string => {
+  toPlainText: (trip: Trip, allTrips: Trip[] = [], override?: ReportOverride, showCustomer: boolean = false): string => {
     const history = override ? override.history : [...(trip.statusHistory || [])].filter(h => h.status !== 'Pendente');
     const pred = override ? override.prediction : predictionService.getNextStatusPrediction(trip, allTrips);
 

@@ -23,7 +23,7 @@ export const reportGenerator = {
   /**
    * Renderiza o Card de Viagem em HTML (Estilo Modal Premium)
    */
-  renderTripCardHTML: (trip: Trip, allTrips: Trip[], override?: ReportOverride, showCustomer: boolean = true): string => {
+  renderTripCardHTML: (trip: Trip, allTrips: Trip[], override?: ReportOverride, showCustomer: boolean = false): string => {
     // Organiza histórico: Mais recente no topo
     const history = override 
       ? [...override.history].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
@@ -102,7 +102,7 @@ export const reportGenerator = {
   /**
    * Gera o Relatório Completo em 2 Colunas (HTML)
    */
-  generateFullReportHTML: (trips: Trip[], allContextTrips: Trip[], overrides: Record<string, ReportOverride>, showCustomer: boolean): string => {
+  generateFullReportHTML: (trips: Trip[], allContextTrips: Trip[], overrides: Record<string, ReportOverride>, showCustomer: boolean = false): string => {
     const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
     const finishedTrips = trips.filter(t => t.status === 'Viagem concluída');
 
@@ -159,7 +159,7 @@ export const reportGenerator = {
   /**
    * Gera versão em texto simples
    */
-  generatePlainText: (trips: Trip[], overrides: Record<string, ReportOverride>, showCustomer: boolean): string => {
+  generatePlainText: (trips: Trip[], overrides: Record<string, ReportOverride>, showCustomer: boolean = false): string => {
     return trips.map(t => {
       const ovr = overrides[t.id];
       const history = ovr ? ovr.history : (t.statusHistory || []);
