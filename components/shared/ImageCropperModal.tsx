@@ -24,7 +24,6 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
       img.src = imageSrc;
       img.onload = () => {
         imageRef.current = img;
-        // Centraliza inicialmente
         setPosition({ x: 0, y: 0 });
         setZoom(1);
       };
@@ -33,15 +32,15 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
 
   const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     setIsDragging(true);
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     setDragStart({ x: clientX - position.x, y: clientY - position.y });
   };
 
   const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDragging) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     setPosition({ x: clientX - dragStart.x, y: clientY - dragStart.y });
   };
 
@@ -54,7 +53,6 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Define tamanho padrão para foto de perfil (400x400)
     canvas.width = 400;
     canvas.height = 400;
 
@@ -62,11 +60,10 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
     ctx.fillRect(0, 0, 400, 400);
 
     const img = imageRef.current;
-    const drawWidth = img.width * zoom * (400 / 300); // Ajuste de escala baseado no container de 300px
+    // Escala para ajustar ao canvas de 400px baseado na visualização de 300px
+    const drawWidth = img.width * zoom * (400 / 300);
     const drawHeight = img.height * zoom * (400 / 300);
     
-    // Desenha a imagem baseada na posição e zoom
-    // Offset de 200 é o centro do canvas de 400
     ctx.drawImage(
       img, 
       200 - (drawWidth / 2) + (position.x * (400/300)), 
@@ -83,11 +80,11 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
 
   return (
     <div className="fixed inset-0 z-[7000] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+      <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95">
         <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
           <div>
-            <h3 className="text-sm font-black uppercase tracking-widest">Ajustar Enquadramento</h3>
-            <p className="text-[8px] text-blue-400 font-bold uppercase mt-1">Selecione a área principal da foto</p>
+            <h3 className="text-sm font-black uppercase tracking-widest">Enquadramento de Perfil</h3>
+            <p className="text-[8px] text-blue-400 font-bold uppercase mt-1">Arraste para posicionar e use o zoom abaixo</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
@@ -95,9 +92,9 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
         </div>
 
         <div className="p-10 flex flex-col items-center gap-8">
-          {/* Container de Preview com Máscara Circular */}
+          {/* Container de Preview com Máscara de Enquadramento */}
           <div 
-            className="w-72 h-72 rounded-[2.5rem] border-4 border-slate-100 bg-slate-50 relative overflow-hidden cursor-move touch-none shadow-inner"
+            className="w-[300px] h-[300px] rounded-[2rem] bg-slate-200 relative overflow-hidden cursor-move touch-none shadow-inner border border-slate-100"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -106,6 +103,7 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
             onTouchMove={handleMouseMove}
             onTouchEnd={handleMouseUp}
           >
+            {/* Imagem sendo movida */}
             <div 
               className="absolute pointer-events-none transition-transform duration-75"
               style={{ 
@@ -119,26 +117,32 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
               <img src={imageSrc} className="max-w-none" alt="recorte" draggable={false} />
             </div>
             
-            {/* Máscara de Guia */}
-            <div className="absolute inset-0 pointer-events-none border-[30px] border-slate-900/40">
-               <div className="w-full h-full border-2 border-dashed border-white/50 rounded-[1.5rem]"></div>
+            {/* Máscara de Guia de Recorte (Overlay de Área Útil) */}
+            <div className="absolute inset-0 pointer-events-none border-[35px] border-black/60">
+               {/* Bordas Azuis destacando a área final */}
+               <div className="w-full h-full border-2 border-blue-500 rounded-[1.2rem] shadow-[0_0_0_9999px_rgba(0,0,0,0.1)]"></div>
+            </div>
+            
+            {/* Grid de auxílio central */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-20">
+               <div className="w-[1px] h-full bg-white"></div>
+               <div className="h-[1px] w-full bg-white absolute"></div>
             </div>
           </div>
 
-          {/* Controles */}
           <div className="w-full space-y-6">
             <div className="space-y-3">
               <div className="flex justify-between items-center text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">
-                <span>Menos Zoom</span>
-                <span>Zoom: {Math.round(zoom * 100)}%</span>
-                <span>Mais Zoom</span>
+                <span>Distante</span>
+                <span className="text-blue-600">Zoom: {Math.round(zoom * 100)}%</span>
+                <span>Perto</span>
               </div>
               <input 
                 type="range" 
                 min="0.5" 
                 max="3" 
                 step="0.01" 
-                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 value={zoom}
                 onChange={(e) => setZoom(parseFloat(e.target.value))}
               />
@@ -146,16 +150,18 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
 
             <div className="grid grid-cols-2 gap-4">
               <button 
+                type="button"
                 onClick={onClose}
                 className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all"
               >
                 Cancelar
               </button>
               <button 
+                type="button"
                 onClick={handleConfirm}
                 className="py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95"
               >
-                Confirmar Recorte
+                Salvar Recorte
               </button>
             </div>
           </div>

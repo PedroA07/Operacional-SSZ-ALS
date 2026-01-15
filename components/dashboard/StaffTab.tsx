@@ -29,9 +29,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Estado para visualização de foto
   const [viewerData, setViewerData] = useState<{url: string, name: string} | null>(null);
-
   const [users, setUsers] = useState<User[]>([]);
   const [showPasswordsList, setShowPasswordsList] = useState<Record<string, boolean>>({});
 
@@ -154,7 +152,8 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest pt-2 px-1">
                       <span className="text-slate-400">Senha Sistema</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-blue-600 font-mono text-[10px] font-black bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                        {/* normal-case garante que a senha mostre minúsculas e maiúsculas como salvas */}
+                        <span className="text-blue-600 font-mono text-[10px] font-black bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 normal-case">
                           {isPassVisible ? (linkedUser?.password || '---') : '••••••••'}
                         </span>
                         <button onClick={() => setShowPasswordsList(prev => ({ ...prev, [s.id]: !prev[s.id] }))} className="p-1.5 text-slate-300 hover:text-blue-500 transition-colors">
