@@ -51,7 +51,12 @@ const StaffModal: React.FC<StaffModalProps> = ({
     if (lastInitializedId.current === currentTargetId) return;
 
     if (editingStaff) {
-      const linkedUser = allUsers.find(u => u.staffId === editingStaff.id);
+      // Busca o usuário vinculado de forma mais flexível (checa ID e username)
+      const linkedUser = allUsers.find(u => 
+        u.staffId === editingStaff.id || 
+        u.username.toLowerCase() === editingStaff.username.toLowerCase()
+      );
+      
       setForm({ 
         ...editingStaff, 
         password: linkedUser?.password || '',

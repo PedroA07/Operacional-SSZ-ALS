@@ -168,16 +168,20 @@ export const db = {
   saveStaff: async (staff: Staff, password?: string) => {
     if (!supabase) return false;
     
-    // 1. Salvar na tabela de registro de equipe
+    // 1. Salvar na tabela de registro de equipe (Dados físicos/cadastrais)
     const staffSuccess = await staffRepository.save(supabase, staff);
     if (!staffSuccess) return false;
 
     // 2. Sincronizar com a tabela de usuários (Credenciais de Login)
-    const { data: existingUsers } = await supabase.from('users').select('*').eq('staff_id', staff.id);
+    // Buscamos o usuário pelo staff_id primeiro, ou pelo username como fallback
+    const { data: existingUsers } = await supabase
+      .from('users')
+      .select('*')
+      .or(`staff_id.eq.${staff.id},username.eq.${staff.username.toLowerCase()}`);
+    
     const existingUser = existingUsers?.[0];
 
     const userPayload: any = {
-      id: existingUser?.id || `u-${staff.id}`,
       username: staff.username.toLowerCase(),
       display_name: staff.name.toUpperCase(),
       role: staff.role,
@@ -185,15 +189,27 @@ export const db = {
       staff_id: staff.id,
       position: staff.position,
       photo: staff.photo,
-      last_login: existingUser?.last_login || new Date().toISOString()
     };
 
-    if (password) {
-      userPayload.password = password;
+    // Se encontramos um usuário, usamos o ID dele para garantir o update
+    if (existingUser) {
+      userPayload.id = existingUser.id;
+    }
+
+    // Se uma nova senha foi enviada, atualizamos e resetamos o flag de primeiro login
+    if (password && password.trim() !== '') {
+      userPayload.password = password.trim();
+      userPayload.is_first_login = false;
     }
 
     const { error: userError } = await supabase.from('users').upsert(userPayload);
-    return !userError;
+    
+    if (userError) {
+      console.error("Erro ao sincronizar usuário:", userError);
+      return false;
+    }
+
+    return true;
   },
 
   deleteStaff: async (id: string) => {
