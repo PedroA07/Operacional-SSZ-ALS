@@ -154,8 +154,14 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
             <div className="p-8 space-y-6">
               <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data/Hora Real</label><input type="datetime-local" className={inputClasses} value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
               <div className="grid gap-3">
-                {['Retirado Cragea', 'Chegada Volks', 'Saída Volks', 'Baixa Cragea'].map(st => (
-                  <button key={st} onClick={() => { onUpdateStatus(selectedSchedule.id, st as VWStatus, statusTime); setIsStatusModalOpen(false); }} className="w-full py-4 rounded-xl border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-blue-600 hover:border-blue-600 hover:text-white shadow-sm transition-all active:scale-95">{st}</button>
+                {/* Fixed status strings to match TripStatus literals in types.ts */}
+                {[
+                  { label: 'Retirada do Cheio', value: 'Retirada do cheio' },
+                  { label: 'Chegada na Volkswagen', value: 'Chegou na Volkswagen' },
+                  { label: 'Saída da Volkswagen', value: 'Saiu da Volkswagen' },
+                  { label: 'Concluir Viagem (Baixa)', value: 'Viagem concluída' }
+                ].map(opt => (
+                  <button key={opt.value} onClick={() => { onUpdateStatus(selectedSchedule.id, opt.value as VWStatus, statusTime); setIsStatusModalOpen(false); }} className="w-full py-4 rounded-xl border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-blue-600 hover:border-blue-600 hover:text-white shadow-sm transition-all active:scale-95">{opt.label}</button>
                 ))}
               </div>
             </div>

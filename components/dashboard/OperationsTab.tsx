@@ -107,7 +107,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const filteredTrips = useMemo(() => {
     let result = [...trips];
     if (activeStatusTab === 'ativas') {
-      const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
+      const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
       result = result.filter(t => active.includes(t.status));
     } else if (activeStatusTab === 'concluida') result = result.filter(t => t.status === 'Viagem concluída');
     else if (activeStatusTab === 'cancelada') result = result.filter(t => t.status === 'Viagem cancelada');
