@@ -1,7 +1,8 @@
 
 export const stayNamingRules = {
   /**
-   * Gera o nome padrão da pasta de estadia: CATEGORIA - MÊS ANO (DD a DD)
+   * Gera o nome padrão da pasta de estadia: CATEGORIA | ANO | MÊS | DIAS
+   * O caractere '|' é usado internamente para quebrar as linhas na visualização do dashboard.
    */
   generateFolderName: (category: string, startDate: string, endDate: string): string => {
     const months = [
@@ -13,7 +14,7 @@ export const stayNamingRules = {
     const dEnd = new Date(endDate + 'T12:00:00');
     
     if (isNaN(dStart.getTime()) || isNaN(dEnd.getTime())) {
-      return `${category.toUpperCase()} - DATA INVÁLIDA`;
+      return `${category.toUpperCase()} | DATA | INVÁLIDA | ---`;
     }
 
     const dayStart = String(dStart.getDate()).padStart(2, '0');
@@ -22,7 +23,7 @@ export const stayNamingRules = {
     const year = dStart.getFullYear();
     const catName = category.trim().toUpperCase() || 'GERAL';
     
-    // Formato amigável: CATEGORIA | ANO | MÊS | DIAS
+    // Formato estritamente definido para as 4 linhas:
     return `${catName}|${year}|${monthName}|${dayStart} A ${dayEnd}`;
   }
 };

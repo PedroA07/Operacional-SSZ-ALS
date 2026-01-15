@@ -163,18 +163,19 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
       
       if (records.length === 0) {
-        setFeedback({ isOpen: true, title: "Sem Dados", message: "Nenhum registro de OS válido foi localizado na planilha. Verifique o formato.", type: "warning" });
+        setFeedback({ isOpen: true, title: "Planilha Sem Dados", message: "Nenhum registro de OS válido foi localizado. Verifique se o arquivo segue o padrão (OS na coluna B).", type: "warning" });
         setIsImporting(false);
         return;
       }
 
-      // Se a pasta está vazia, não há o que comparar para duplicados
+      // IMPORTANTE: Se a pasta está vazia (sessionRecords.length === 0), ignorar filtro de duplicados contra o banco
+      // mas filtrar duplicados dentro do próprio arquivo Excel
       const { unique, duplicateList } = sessionRecords.length > 0 
         ? stayValidator.filterDuplicates(records, sessionRecords)
         : { unique: records, duplicateList: [] };
       
       if (unique.length === 0 && records.length > 0) {
-        setFeedback({ isOpen: true, title: "Itens Duplicados", message: "Todos os registros deste arquivo já foram importados para esta pasta.", type: "warning", details: duplicateList });
+        setFeedback({ isOpen: true, title: "Itens Já Importados", message: "Todos os registros deste arquivo Excel já constam nesta pasta.", type: "warning", details: duplicateList });
         setIsImporting(false);
         return;
       }
@@ -185,10 +186,10 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       }));
       
       await db.saveStayRecords(processed);
-      setFeedback({ isOpen: true, title: "Importação Concluída", message: `${processed.length} novos registros sincronizados com sucesso.`, type: "success" });
+      setFeedback({ isOpen: true, title: "Sucesso!", message: `${processed.length} novas OS importadas com sucesso.`, type: "success" });
       await loadSessionRecords(selectedSession.id);
     } catch (err: any) {
-      setFeedback({ isOpen: true, title: "Falha na Importação", message: "Não foi possível ler o arquivo Excel. Verifique as colunas.", type: "error" });
+      setFeedback({ isOpen: true, title: "Erro no Processamento", message: "Falha ao ler o Excel. Certifique-se de que não é um arquivo protegido ou corrompido.", type: "error" });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -357,11 +358,31 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       {!selectedSession ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
            {filteredSessions.map(session => {
-             const parts = session.category.split('|');
-             const catName = parts[0] || 'GERAL';
-             const year = parts[1] || '';
-             const month = parts[2] || '';
-             const days = parts[3] || '';
+             // Tenta quebrar por pipes primeiro, se não encontrar, tenta por espaço (suporte legado)
+             const hasPipes = session.category.includes('|');
+             const parts = hasPipes ? session.category.split('|') : session.category.split(' ');
+             
+             let catName = 'GERAL';
+             let year = '';
+             let month = '';
+             let days = '';
+
+             if (hasPipes) {
+               catName = parts[0] || 'GERAL';
+               year = parts[1] || '';
+               month = parts[2] || '';
+               days = parts[3] || '';
+             } else {
+               // Fallback inteligente para nomes antigos sem pipes: "CATEGORIA 2026 JANEIRO 01 A 10"
+               if (parts.length >= 4) {
+                 catName = parts[0];
+                 year = parts[1];
+                 month = parts[2];
+                 days = parts.slice(3).join(' ');
+               } else {
+                 catName = session.category;
+               }
+             }
 
              return (
                <button key={session.id} onClick={() => handleOpenSession(session)} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-xl transition-all group text-left relative overflow-hidden flex flex-col h-[320px]">
@@ -376,10 +397,10 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                   </div>
                   
                   <div className="flex-1 space-y-1">
-                    <h4 className="text-lg font-black text-slate-900 uppercase leading-none truncate">{catName}</h4>
+                    <h4 className="text-xl font-black text-slate-900 uppercase leading-none truncate mb-1">{catName}</h4>
                     <p className="text-sm font-black text-blue-600 uppercase leading-none">{year}</p>
-                    <p className="text-[11px] font-black text-slate-500 uppercase leading-none">{month}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">{days}</p>
+                    <p className="text-sm font-black text-slate-500 uppercase leading-none">{month}</p>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase leading-none">{days}</p>
                   </div>
 
                   <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6 shrink-0">
