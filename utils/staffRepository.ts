@@ -9,7 +9,6 @@ export const staffRepository = {
     username: staff.username?.toLowerCase() || '',
     role: staff.role || 'staff',
     position: staff.position?.toUpperCase() || '',
-    // Garantindo o mapeamento para snake_case esperado pelo banco
     registration_date: staff.registrationDate ? new Date(staff.registrationDate).toISOString() : new Date().toISOString(),
     status: staff.status || 'Ativo',
     status_since: staff.statusSince ? new Date(staff.statusSince).toISOString() : new Date().toISOString(),
@@ -30,8 +29,8 @@ export const staffRepository = {
     statusSince: d.status_since || d.statusSince || new Date().toISOString(),
     photo: d.photo || '',
     lastLogin: d.lastlogin || d.lastLogin || null,
-    emailCorp: d.emailcorp || d.emailCorp || '',
-    phoneCorp: d.phonecorp || d.phoneCorp || ''
+    emailCorp: d.emailcorp || d.email_corp || d.emailCorp || '',
+    phoneCorp: d.phonecorp || d.phone_corp || d.phoneCorp || ''
   }),
 
   async save(supabase: SupabaseClient, staff: Staff) {
@@ -42,10 +41,6 @@ export const staffRepository = {
       return true;
     } catch (error: any) {
       console.error("Erro no repositório Staff:", error);
-      // Se o erro for de coluna faltante, pode ser cache do Supabase
-      if (error.message?.includes('registration_date')) {
-        throw new Error("A coluna 'registration_date' não foi encontrada. Verifique se executou o SQL de migração no Supabase.");
-      }
       throw error;
     }
   },

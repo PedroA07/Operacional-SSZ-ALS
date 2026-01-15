@@ -3,8 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Staff, User } from '../../../types';
 import { db } from '../../../utils/storage';
 import { maskPhone } from '../../../utils/masks';
-import { imageCompressor } from '../../../utils/imageCompressor';
-import { usernameGenerator } from '../../../utils/usernameGenerator';
 import { fileStorage } from '../../../utils/fileStorage';
 import ImageCropperModal from '../../shared/ImageCropperModal';
 import PhotoViewerModal from '../../shared/PhotoViewerModal';
@@ -33,7 +31,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   
-  // Estados para novas funcionalidades de foto
   const [tempPhotoSrc, setTempPhotoSrc] = useState<string | null>(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
@@ -51,7 +48,6 @@ const StaffModal: React.FC<StaffModalProps> = ({
     if (lastInitializedId.current === currentTargetId) return;
 
     if (editingStaff) {
-      // Busca o usuário vinculado de forma mais flexível (checa ID e username)
       const linkedUser = allUsers.find(u => 
         u.staffId === editingStaff.id || 
         u.username.toLowerCase() === editingStaff.username.toLowerCase()
@@ -165,20 +161,8 @@ const StaffModal: React.FC<StaffModalProps> = ({
                       <span className="text-[8px] text-white font-black uppercase">Alterar</span>
                     </div>
                   </div>
-                  
-                  {form.photo && (
-                    <button 
-                      type="button"
-                      onClick={() => setIsViewerOpen(true)}
-                      className="absolute -top-2 -right-2 w-8 h-8 bg-white border border-slate-200 rounded-xl shadow-lg flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition-all z-10"
-                      title="Visualizar em tamanho real"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                    </button>
-                  )}
                 </div>
                 <input type="file" ref={photoRef} className="hidden" accept="image/*" onChange={handlePhotoFileSelect} />
-                <p className="text-[7px] text-slate-400 font-bold uppercase">Formato: JPG/PNG</p>
               </div>
 
               <div className="flex-1 space-y-5">
@@ -215,6 +199,19 @@ const StaffModal: React.FC<StaffModalProps> = ({
               <div className="space-y-1">
                 <label className={labelClass}>E-mail Corporativo</label>
                 <input type="email" className={inputClasses} value={form.emailCorp} onChange={e => setForm({...form, emailCorp: e.target.value.toLowerCase()})} placeholder="usuario@als.com.br" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-1">
+                <label className={labelClass}>Telefone Corporativo</label>
+                <input 
+                  type="text" 
+                  className={inputClasses} 
+                  value={form.phoneCorp} 
+                  onChange={e => setForm({...form, phoneCorp: maskPhone(e.target.value)})} 
+                  placeholder="(00) 00000-0000" 
+                />
               </div>
             </div>
 

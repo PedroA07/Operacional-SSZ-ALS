@@ -29,7 +29,7 @@ export const db = {
       role: u.role, lastLogin: u.last_login || u.lastlogin,
       photo: u.photo, position: u.position, driverId: u.driver_id || u.driverid,
       staffId: u.staff_id || u.staffid, status: u.status,
-      isFirstLogin: u.is_first_login ?? u.isfirstlogin,
+      isFirstLogin: u.isfirstlogin ?? u.is_first_login ?? u.isfirstlogin,
       lastSeen: u.last_seen || u.lastseen, presence_status: u.presence_status
     }));
   },
@@ -40,7 +40,8 @@ export const db = {
       id: user.id, username: user.username, password: user.password,
       display_name: user.displayName, role: user.role, last_login: user.lastLogin,
       status: user.status || 'Ativo', driver_id: user.driverId, staff_id: user.staffId,
-      position: user.position, is_first_login: user.isFirstLogin,
+      position: user.position,
+      isfirstlogin: user.isFirstLogin,
       presence_status: user.presence_status || 'offline',
       photo: user.photo
     });
@@ -173,7 +174,6 @@ export const db = {
     if (!staffSuccess) return false;
 
     // 2. Sincronizar com a tabela de usuários (Credenciais de Login)
-    // Buscamos o usuário pelo staff_id primeiro, ou pelo username como fallback
     const { data: existingUsers } = await supabase
       .from('users')
       .select('*')
@@ -191,15 +191,13 @@ export const db = {
       photo: staff.photo,
     };
 
-    // Se encontramos um usuário, usamos o ID dele para garantir o update
     if (existingUser) {
       userPayload.id = existingUser.id;
     }
 
-    // Se uma nova senha foi enviada, atualizamos e resetamos o flag de primeiro login
     if (password && password.trim() !== '') {
       userPayload.password = password.trim();
-      userPayload.is_first_login = false;
+      userPayload.isfirstlogin = false; // Se trocou a senha, não é mais o primeiro login
     }
 
     const { error: userError } = await supabase.from('users').upsert(userPayload);
@@ -230,7 +228,7 @@ export const db = {
 
   saveCategory: async (category: Category, actingUser?: User) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('categories').upsert({
+    const { error = null } = await supabase.from('categories').upsert({
       id: category.id,
       name: category.name,
       parent_id: category.parentId
