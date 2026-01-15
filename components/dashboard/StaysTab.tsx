@@ -161,17 +161,26 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setIsImporting(true);
     try {
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
-      const { unique, duplicateList } = stayValidator.filterDuplicates(records, sessionRecords);
-      if (unique.length === 0) {
-        setFeedback({ isOpen: true, title: "Itens Duplicados", message: "Nenhum item novo encontrado para esta pasta.", type: "warning", details: duplicateList });
+      
+      if (records.length === 0) {
+        setFeedback({ isOpen: true, title: "Sem Dados", message: "Nenhum registro de OS válido foi localizado na planilha. Verifique as colunas.", type: "warning" });
         return;
       }
+
+      const { unique, duplicateList } = stayValidator.filterDuplicates(records, sessionRecords);
+      
+      if (unique.length === 0) {
+        setFeedback({ isOpen: true, title: "Itens Duplicados", message: "Todos os itens desta planilha já constam nesta pasta.", type: "warning", details: duplicateList });
+        return;
+      }
+
       const processed = unique.map(r => ({
         ...r,
         exceededHours: calculateStayExceeded(r.arrivalTime, r.departureTime, selectedSession)
       }));
+      
       await db.saveStayRecords(processed);
-      setFeedback({ isOpen: true, title: "Importação Concluída", message: `${processed.length} registros sincronizados.`, type: "success" });
+      setFeedback({ isOpen: true, title: "Importação Concluída", message: `${processed.length} novos registros sincronizados.`, type: "success" });
       await loadSessionRecords(selectedSession.id);
     } catch (err: any) {
       setFeedback({ isOpen: true, title: "Falha na Importação", message: "O arquivo Excel não pôde ser processado.", type: "error" });

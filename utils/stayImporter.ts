@@ -4,7 +4,7 @@ import { StayRecord } from '../types';
 
 export const stayImporter = {
   /**
-   * Processa o Excel baseado nas colunas da imagem:
+   * Processa o Excel baseado nas colunas:
    * A: Tipo, B: OS, C: Local, D: Motorista, E: Navio, F: Container, G: Previsão, H: Entrada, I: Saída
    */
   processExcelForStays: async (file: File, sessionId: string): Promise<StayRecord[]> => {
@@ -15,23 +15,49 @@ export const stayImporter = {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows: any[] = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
           
-          // Filtra linhas que possuem dado na coluna B (Nº Programação)
-          const dataRows = rows.slice(1).filter(row => row && row[1]); 
+          // Obtém todas as linhas
+          const rows: any[] = XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false });
           
+          if (rows.length < 2) {
+            resolve([]);
+            return;
+          }
+
           const records: StayRecord[] = [];
+
+          // Tenta identificar onde começam os dados de fato (procurando o primeiro valor numérico ou OS na col B)
+          // Ignora as primeiras linhas que podem ser títulos ou vazias
+          const startIndex = rows.findIndex((row, idx) => idx > 0 && row && row[1] && String(row[1]).length > 2);
+          const effectiveRows = startIndex === -1 ? rows.slice(1) : rows.slice(startIndex);
 
           const formatDateForce = (val: any) => {
             if (!val) return '';
             const d = new Date(val);
-            if (isNaN(d.getTime())) return '';
-            // Corrige o fuso horário para manter o dia visual do Excel
-            const userTimezoneOffset = d.getTimezoneOffset() * 60000;
-            return new Date(d.getTime() + userTimezoneOffset).toISOString();
+            if (isNaN(d.getTime())) {
+              // Tenta parse manual se for string no formato brasileiro DD/MM/YYYY HH:MM
+              if (typeof val === 'string' && val.includes('/')) {
+                const parts = val.split(' ');
+                const dateParts = parts[0].split('/');
+                const timeParts = (parts[1] || '00:00').split(':');
+                const parsed = new Date(
+                  parseInt(dateParts[2]), 
+                  parseInt(dateParts[1]) - 1, 
+                  parseInt(dateParts[0]),
+                  parseInt(timeParts[0]),
+                  parseInt(timeParts[1])
+                );
+                return isNaN(parsed.getTime()) ? '' : parsed.toISOString();
+              }
+              return '';
+            }
+            return d.toISOString();
           };
 
-          for (const row of dataRows) {
+          for (const row of effectiveRows) {
+            // Se a coluna B (OS) estiver vazia, ignora a linha
+            if (!row || !row[1]) continue;
+
             const type = String(row[0] || '').toUpperCase().trim();
             const os = String(row[1] || '').toUpperCase().trim();
             const location = String(row[2] || '---').toUpperCase().trim();
@@ -56,7 +82,7 @@ export const stayImporter = {
                  const exceededMs = totalStayMs - limit8hMs;
                  const hours = Math.floor(exceededMs / 3600000);
                  const minutes = Math.floor((exceededMs % 3600000) / 60000);
-                 exceededText = `${hours}h ${minutes}m`;
+                 exceededText = `${hours}h ${String(minutes).padStart(2, '0')}m`;
                }
             }
 
