@@ -68,7 +68,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setConfirmModal({
       isOpen: true,
       title: "Excluir Pasta?",
-      message: `Deseja remover permanentemente a pasta "${session.category}" e todos os seus registros de estadia?`,
+      message: `Deseja remover permanentemente a pasta "${session.category.replace(/\|/g, ' ')}" e todos os seus registros?`,
       onConfirm: async () => {
         const success = await db.deleteStaySession(session.id);
         if (success) {
@@ -223,7 +223,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const filteredSessions = useMemo(() => {
     return sessions.filter(s => {
-      const matchCat = activeCategory === 'GERAL' || s.category.toUpperCase().includes(activeCategory.toUpperCase());
+      const normalizedCat = s.category.toUpperCase().replace(/\|/g, ' ');
+      const matchCat = activeCategory === 'GERAL' || normalizedCat.includes(activeCategory.toUpperCase());
       const matchYear = filterYear === 'TODOS' || new Date(s.startDate).getFullYear().toString() === filterYear;
       const matchMonth = filterMonth === 'TODOS' || monthsList[new Date(s.startDate).getMonth()] === filterMonth;
       return matchCat && matchYear && matchMonth;
@@ -342,12 +343,12 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       {!selectedSession ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
            {filteredSessions.map(session => {
-             // Divide o nome da pasta em partes para exibição em múltiplas linhas
-             const parts = session.category.split(' ');
-             const catName = parts[0];
+             // Divide o nome da pasta usando o separador pipe |
+             const parts = session.category.split('|');
+             const catName = parts[0] || 'GERAL';
              const year = parts[1] || '';
              const month = parts[2] || '';
-             const days = parts.slice(3).join(' ') || '';
+             const days = parts[3] || '';
 
              return (
                <button key={session.id} onClick={() => handleOpenSession(session)} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-xl transition-all group text-left relative overflow-hidden flex flex-col h-[320px]">
@@ -387,7 +388,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-6">
                  <button onClick={() => setSelectedSession(null)} className="p-3 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all shadow-sm active:scale-90"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3"/></svg></button>
-                 <div><h3 className="text-sm font-black uppercase text-slate-800 leading-none">{selectedSession.category}</h3></div>
+                 <div><h3 className="text-sm font-black uppercase text-slate-800 leading-none">{selectedSession.category.replace(/\|/g, ' ')}</h3></div>
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setIsSettingsOpen(true)} className="px-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg flex items-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg><span className="text-[10px] font-black uppercase">Taxas</span></button>
@@ -406,7 +407,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
           <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
              <div className="p-8 bg-slate-900 text-white text-center">
                 <h3 className="text-xl font-black uppercase tracking-tight">Parametrização de Custos</h3>
-                <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">{selectedSession.category}</p>
+                <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">{selectedSession.category.replace(/\|/g, ' ')}</p>
              </div>
              <form onSubmit={handleSaveSettings} className="p-10 space-y-8">
                 <div className="space-y-2">
