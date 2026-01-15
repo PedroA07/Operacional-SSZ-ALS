@@ -1,7 +1,7 @@
 
 export const stayNamingRules = {
   /**
-   * Gera o nome padrão da pasta de estadia: [ANO] [MES] [DIA] A [DIA] - CATEGORIA
+   * Gera o nome padrão da pasta de estadia: CATEGORIA [ANO] [MES] [DIA] A [DIA]
    */
   generateFolderName: (category: string, startDate: string, endDate: string): string => {
     const months = [
@@ -14,7 +14,7 @@ export const stayNamingRules = {
     const dEnd = new Date(endDate + 'T12:00:00');
     
     if (isNaN(dStart.getTime()) || isNaN(dEnd.getTime())) {
-      return `PASTA SEM DATA - ${category.toUpperCase()}`;
+      return `${category.toUpperCase()} - PERÍODO INVÁLIDO`;
     }
 
     const dayStart = String(dStart.getDate()).padStart(2, '0');
@@ -25,7 +25,7 @@ export const stayNamingRules = {
     const catName = category.trim().toUpperCase() || 'GERAL';
     const monthName = months[monthIndex];
     
-    // Formato final: [2025] [MARÇO] [01] A [10] - ALIANÇA
-    return `[${year}] [${monthName}] [${dayStart}] A [${dayEnd}] - ${catName}`;
+    // Formato final: ALIANÇA [2025] [MARÇO] [01] A [10]
+    return `${catName} [${year}] [${monthName}] [${dayStart}] A [${dayEnd}]`;
   }
 };
