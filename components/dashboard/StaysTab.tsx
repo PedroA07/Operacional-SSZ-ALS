@@ -8,6 +8,7 @@ import { stayNamingRules } from '../../utils/stayNamingRules';
 import { db } from '../../utils/storage';
 import StayFeedbackModal from '../shared/StayFeedbackModal';
 import FeedbackModal from '../shared/FeedbackModal';
+import StayFolderCard from './stays/StayFolderCard';
 
 interface StaysTabProps {
   categories: Category[];
@@ -168,8 +169,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         return;
       }
 
-      // IMPORTANTE: Se a pasta está vazia (sessionRecords.length === 0), ignorar filtro de duplicados contra o banco
-      // mas filtrar duplicados dentro do próprio arquivo Excel
       const { unique, duplicateList } = sessionRecords.length > 0 
         ? stayValidator.filterDuplicates(records, sessionRecords)
         : { unique: records, duplicateList: [] };
@@ -266,18 +265,52 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       </div>
     )},
+    { key: 'scheduled', label: 'Previsão', render: (r: StayRecord) => (
+      <div className="flex flex-col bg-slate-50 px-2 py-1 rounded border border-slate-100 w-[110px]">
+         <span className="text-[6.5px] font-black text-slate-400 uppercase leading-none mb-0.5">Janela Prevista</span>
+         <span className="text-[9px] font-black text-slate-700">{formatFullDateTime(r.scheduledStart)}</span>
+      </div>
+    )},
     { key: 'times', label: 'Janela Realizada', render: (r: StayRecord) => (
       <div className="flex flex-col gap-1 w-[135px]">
         <div className="flex flex-col bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
-           <span className="text-[6.5px] font-black text-emerald-600 uppercase leading-none mb-0.5">Entrada</span>
+           <span className="text-[6.5px] font-black text-emerald-600 uppercase leading-none mb-0.5">Entrada Real</span>
            <span className="text-[9px] font-black text-emerald-700">{formatFullDateTime(r.arrivalTime)}</span>
         </div>
         <div className="flex flex-col bg-red-50 px-2 py-1 rounded border border-red-100">
-           <span className="text-[6.5px] font-black text-red-600 uppercase leading-none mb-0.5">Saída</span>
+           <span className="text-[6.5px] font-black text-red-600 uppercase leading-none mb-0.5">Saída Real</span>
            <span className="text-[9px] font-black text-red-700">{formatFullDateTime(r.departureTime)}</span>
         </div>
       </div>
     )},
+    { key: 'punctuality', label: 'Pontualidade', render: (r: StayRecord) => {
+      if (!r.scheduledStart || !r.arrivalTime) return <span className="text-slate-300 font-bold uppercase text-[7px]">Sem dados</span>;
+      
+      const scheduled = new Date(r.scheduledStart).getTime();
+      const actual = new Date(r.arrivalTime).getTime();
+      const diffMs = actual - scheduled;
+      const diffMin = Math.round(diffMs / 60000);
+
+      if (diffMin <= 0) {
+        return (
+          <div className="flex flex-col items-center">
+            <span className="text-[9px] font-black text-emerald-600 uppercase">No Horário</span>
+            <span className="text-[6px] text-emerald-400 font-bold uppercase mt-0.5">Pontual</span>
+          </div>
+        );
+      }
+
+      const h = Math.floor(diffMin / 60);
+      const m = diffMin % 60;
+      const delayText = h > 0 ? `${h}h ${m}m` : `${m}m`;
+
+      return (
+        <div className="flex flex-col items-center">
+          <span className="text-[9px] font-black text-red-500 uppercase">Atrasado</span>
+          <span className="text-[7px] bg-red-50 text-red-500 px-1 rounded font-black mt-0.5 border border-red-100">+{delayText}</span>
+        </div>
+      );
+    }},
     { key: 'stay', label: 'Excedente', render: (r: StayRecord) => {
       const text = r.exceededHours;
       return (
@@ -357,62 +390,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
       {!selectedSession ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-           {filteredSessions.map(session => {
-             // Tenta quebrar por pipes primeiro, se não encontrar, tenta por espaço (suporte legado)
-             const hasPipes = session.category.includes('|');
-             const parts = hasPipes ? session.category.split('|') : session.category.split(' ');
-             
-             let catName = 'GERAL';
-             let year = '';
-             let month = '';
-             let days = '';
-
-             if (hasPipes) {
-               catName = parts[0] || 'GERAL';
-               year = parts[1] || '';
-               month = parts[2] || '';
-               days = parts[3] || '';
-             } else {
-               // Fallback inteligente para nomes antigos sem pipes: "CATEGORIA 2026 JANEIRO 01 A 10"
-               if (parts.length >= 4) {
-                 catName = parts[0];
-                 year = parts[1];
-                 month = parts[2];
-                 days = parts.slice(3).join(' ');
-               } else {
-                 catName = session.category;
-               }
-             }
-
-             return (
-               <button key={session.id} onClick={() => handleOpenSession(session)} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-xl transition-all group text-left relative overflow-hidden flex flex-col h-[320px]">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" strokeWidth="2.5"/></svg></div>
-                    <div 
-                      onClick={(e) => handleDeleteSession(session, e)}
-                      className="w-10 h-10 rounded-xl bg-red-50 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center shadow-sm"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </div>
-                  </div>
-                  
-                  <div className="flex-1 space-y-1">
-                    <h4 className="text-xl font-black text-slate-900 uppercase leading-none truncate mb-1">{catName}</h4>
-                    <p className="text-sm font-black text-blue-600 uppercase leading-none">{year}</p>
-                    <p className="text-sm font-black text-slate-500 uppercase leading-none">{month}</p>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase leading-none">{days}</p>
-                  </div>
-
-                  <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6 shrink-0">
-                     <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">R$ {session.costPerHour}/H</span>
-                        <span className="text-[7px] font-bold text-slate-400 uppercase">{session.gracePeriodHours}H CARÊNCIA</span>
-                     </div>
-                     <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
-                  </div>
-               </button>
-             );
-           })}
+           {filteredSessions.map(session => (
+             <StayFolderCard 
+               key={session.id} 
+               session={session} 
+               onClick={handleOpenSession} 
+               onDelete={handleDeleteSession} 
+             />
+           ))}
            {filteredSessions.length === 0 && (
              <div className="col-span-full py-24 text-center text-slate-300 font-black uppercase italic text-xs border-2 border-dashed border-slate-100 rounded-[3rem] bg-white/50">Nenhuma pasta localizada</div>
            )}
@@ -476,7 +461,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
       {editingRecord && (
         <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+          <div className="bg-white w-full max-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6">
             <h3 className="text-lg font-black uppercase text-slate-800 text-center leading-tight">Ajustar Eventos</h3>
             <div className="space-y-4">
               <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Check-in Real</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.arrival} onChange={e => setEditForm({...editForm, arrival: e.target.value})} /></div>
