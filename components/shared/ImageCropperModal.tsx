@@ -60,7 +60,6 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
     ctx.fillRect(0, 0, 400, 400);
 
     const img = imageRef.current;
-    // Escala para ajustar ao canvas de 400px baseado na visualização de 300px
     const drawWidth = img.width * zoom * (400 / 300);
     const drawHeight = img.height * zoom * (400 / 300);
     
@@ -83,8 +82,8 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
       <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95">
         <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
           <div>
-            <h3 className="text-sm font-black uppercase tracking-widest">Enquadramento de Perfil</h3>
-            <p className="text-[8px] text-blue-400 font-bold uppercase mt-1">Arraste para posicionar e use o zoom abaixo</p>
+            <h3 className="text-sm font-black uppercase tracking-widest">Ajuste de Foto</h3>
+            <p className="text-[8px] text-blue-400 font-bold uppercase mt-1">A área clara será visível no perfil</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
@@ -92,7 +91,6 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
         </div>
 
         <div className="p-10 flex flex-col items-center gap-8">
-          {/* Container de Preview com Máscara de Enquadramento */}
           <div 
             className="w-[300px] h-[300px] rounded-[2rem] bg-slate-200 relative overflow-hidden cursor-move touch-none shadow-inner border border-slate-100"
             onMouseDown={handleMouseDown}
@@ -103,7 +101,6 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
             onTouchMove={handleMouseMove}
             onTouchEnd={handleMouseUp}
           >
-            {/* Imagem sendo movida */}
             <div 
               className="absolute pointer-events-none transition-transform duration-75"
               style={{ 
@@ -117,16 +114,11 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
               <img src={imageSrc} className="max-w-none" alt="recorte" draggable={false} />
             </div>
             
-            {/* Máscara de Guia de Recorte (Overlay de Área Útil) */}
-            <div className="absolute inset-0 pointer-events-none border-[35px] border-black/60">
-               {/* Bordas Azuis destacando a área final */}
-               <div className="w-full h-full border-2 border-blue-500 rounded-[1.2rem] shadow-[0_0_0_9999px_rgba(0,0,0,0.1)]"></div>
-            </div>
-            
-            {/* Grid de auxílio central */}
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-20">
-               <div className="w-[1px] h-full bg-white"></div>
-               <div className="h-[1px] w-full bg-white absolute"></div>
+            {/* Máscara de Guia de Recorte - Indica a área final */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+               <div className="w-full h-full border-[40px] border-slate-950/70 rounded-[2rem]">
+                  <div className="w-full h-full border-2 border-blue-500 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.1)]"></div>
+               </div>
             </div>
           </div>
 
@@ -149,24 +141,11 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, onClose, 
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <button 
-                type="button"
-                onClick={onClose}
-                className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all"
-              >
-                Cancelar
-              </button>
-              <button 
-                type="button"
-                onClick={handleConfirm}
-                className="py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95"
-              >
-                Salvar Recorte
-              </button>
+              <button type="button" onClick={onClose} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all">Cancelar</button>
+              <button type="button" onClick={handleConfirm} className="py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Confirmar Foto</button>
             </div>
           </div>
         </div>
-        
         <canvas ref={canvasRef} className="hidden" />
       </div>
     </div>

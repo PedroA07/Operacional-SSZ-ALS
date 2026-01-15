@@ -90,11 +90,15 @@ export const fileStorage = {
 
   uploadStaffPhoto: (file: File | string, staffName: string) => {
     const normalizedName = fileStorage.normalizeFolderName(staffName);
-    return fileStorage.upload(file, `colaboradores/${normalizedName}/foto_perfil/perfil.jpg`);
+    // Incluímos um timestamp no nome do arquivo para forçar a atualização do cache (Busting)
+    const timestamp = Date.now();
+    return fileStorage.upload(file, `colaboradores/${normalizedName}/foto_perfil/perfil_${timestamp}.jpg`);
   },
 
-  uploadDriverProfile: (file: File | string, driverId: string) => 
-    fileStorage.upload(file, `drivers/${driverId}/foto_perfil/perfil.jpg`),
+  uploadDriverProfile: (file: File | string, driverId: string) => {
+    const timestamp = Date.now();
+    return fileStorage.upload(file, `drivers/${driverId}/foto_perfil/perfil_${timestamp}.jpg`);
+  },
 
   uploadDriverCNH: (file: File | string, driverId: string) => 
     fileStorage.upload(file, `drivers/${driverId}/cnh/cnh.pdf`),
