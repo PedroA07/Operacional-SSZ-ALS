@@ -30,27 +30,22 @@ export const statusService = {
     { label: 'Saiu do Cragea', value: 'Saiu do Cragea', color: 'bg-blue-800' },
     { label: 'Chegou na Volkswagen', value: 'Chegou na Volkswagen', color: 'bg-cyan-600' },
     { label: 'Saiu da Volkswagen', value: 'Saiu da Volkswagen', color: 'bg-slate-700' },
-    { label: 'Aguardando para Descarregar', value: 'Aguardando para Descarregar', color: 'bg-amber-400' },
+    { label: 'Aguardando Descarregar', value: 'Aguardando para Descarregar', color: 'bg-amber-400' },
     { label: 'Descarregando', value: 'Descarregando', color: 'bg-amber-700' },
     { label: 'Container sobre Rodas', value: 'Container sobre rodas', color: 'bg-emerald-500' },
-    { label: 'Aguardando baixar o Vazio', value: 'Aguardando baixar o Vazio', color: 'bg-indigo-400' },
+    { label: 'Aguardando Baixar Vazio', value: 'Aguardando baixar o Vazio', color: 'bg-indigo-400' },
     { label: 'Baixa Cragea (Concluir)', value: 'Viagem concluída', color: 'bg-emerald-800' },
     { label: 'Viagem Cancelada', value: 'Viagem cancelada', color: 'bg-red-600' },
   ] as StatusOption[],
 
-  isVWOperation: (trip: Trip): boolean => {
-    const name = (trip.customer?.name || '').toUpperCase();
-    const legal = (trip.customer?.legalName || '').toUpperCase();
-    const dest = (trip.scheduling?.location || '').toUpperCase();
-    const destOrig = (trip.destination?.name || '').toUpperCase();
-    
-    return name.includes('VOLKSWAGEN') || 
-           legal.includes('VOLKSWAGEN') || 
-           dest.includes('CRAGEA') || 
-           destOrig.includes('CRAGEA');
+  isVWOperation: (trip: any): boolean => {
+    // Verifica se os dados da viagem indicam operação VW
+    const customerName = (trip.customer?.name || trip.clientName || '').toUpperCase();
+    const destName = (trip.destination?.name || trip.destination || '').toUpperCase();
+    return customerName.includes('VOLKSWAGEN') || destName.includes('CRAGEA') || destName.includes('VW');
   },
 
-  getOptions: (trip: Trip): StatusOption[] => {
+  getOptions: (trip: any): StatusOption[] => {
     return statusService.isVWOperation(trip) 
       ? statusService.VW_STATUSES 
       : statusService.STANDARD_STATUSES;

@@ -1,7 +1,8 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { VWSchedule, Driver, VWStatus } from '../../types';
 import { createNewVWSchedule, formatVWDateTime } from '../../utils/vwService';
+import { statusService } from '../../utils/statusService';
 
 interface VWTabProps {
   schedules: VWSchedule[];
@@ -15,14 +16,16 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [selectedSchedule, setSelectedSchedule] = useState<VWSchedule | null>(null);
+  
+  const [tempStatus, setTempStatus] = useState<VWStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
+  
   const [driverSearch, setDriverSearch] = useState('');
   const [showDriverResults, setShowDriverResults] = useState(false);
   const driverSelectRef = useRef<HTMLDivElement>(null);
   
   const [form, setForm] = useState<Partial<VWSchedule>>(createNewVWSchedule());
 
-  // REFEITA: Função de Nova Programação (Garante reset total)
   const handleOpenNewSchedule = () => {
     setForm(createNewVWSchedule());
     setEditingId(undefined);
@@ -30,7 +33,6 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
     setIsScheduleModalOpen(true);
   };
 
-  // REFEITA: Função de Editar (Garante clonagem correta do objeto)
   const handleOpenEditSchedule = (s: VWSchedule) => {
     setForm({...s});
     setEditingId(s.id);
@@ -40,6 +42,7 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
 
   const handleOpenStatus = (s: VWSchedule) => {
     setSelectedSchedule(s);
+    setTempStatus(s.status);
     const now = new Date();
     const tzOffset = now.getTimezoneOffset() * 60000;
     setStatusTime(new Date(Date.now() - tzOffset).toISOString().slice(0, 16));
@@ -64,13 +67,24 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
     setIsScheduleModalOpen(false);
   };
 
-  // REGRA: Filtrar apenas motoristas vinculados à operação Volkswagen
+  const handleStatusSubmit = () => {
+    if (!selectedSchedule) return;
+    onUpdateStatus(selectedSchedule.id, tempStatus, statusTime);
+    setIsStatusModalOpen(false);
+  };
+
+  // Status dinâmicos baseados na lógica do serviço
+  const currentStatusOptions = useMemo(() => {
+    return statusService.VW_STATUSES;
+  }, []);
+
   const filteredAvailableDrivers = drivers.filter(d => 
     d.operations.some(op => op.client.toUpperCase() === 'VOLKSWAGEN') &&
     (d.name.toLowerCase().includes(driverSearch.toLowerCase()) || d.plateHorse.toLowerCase().includes(driverSearch.toLowerCase()))
   );
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none shadow-sm transition-all";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
 
   return (
     <div className="space-y-6">
@@ -134,7 +148,7 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
                     </td>
                     <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
                       <button onClick={() => handleOpenStatus(s)} className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg font-black uppercase text-[8px] hover:bg-blue-600 hover:text-white transition-all shadow-sm">Novo Status</button>
-                      <button onClick={() => handleOpenEditSchedule(s)} className="p-2 text-slate-300 hover:text-blue-600 transition-colors" title="Editar Programação"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                      <button onClick={() => handleOpenEditSchedule(s)} className="p-2 text-slate-300 hover:text-blue-600 transition-colors" title="Editar Programação"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" /></svg></button>
                     </td>
                   </tr>
                 );
@@ -145,18 +159,49 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
       </div>
 
       {isStatusModalOpen && selectedSchedule && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="font-bold text-slate-700 text-sm uppercase tracking-widest">Atualizar Operação</h3>
               <button onClick={() => setIsStatusModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
             </div>
-            <div className="p-8 space-y-6">
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data/Hora Real</label><input type="datetime-local" className={inputClasses} value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
-              <div className="grid gap-3">
-                {['Retirado Cragea', 'Chegada Volks', 'Saída Volks', 'Baixa Cragea'].map(st => (
-                  <button key={st} onClick={() => { onUpdateStatus(selectedSchedule.id, st as VWStatus, statusTime); setIsStatusModalOpen(false); }} className="w-full py-4 rounded-xl border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-blue-600 hover:border-blue-600 hover:text-white shadow-sm transition-all active:scale-95">{st}</button>
-                ))}
+            <div className="p-10 space-y-6">
+              <div className="space-y-1">
+                <label className={labelClass}>Etapa Operacional</label>
+                <select 
+                  className={inputClasses} 
+                  value={tempStatus} 
+                  onChange={e => setTempStatus(e.target.value as VWStatus)}
+                >
+                  {currentStatusOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className={labelClass}>Data/Hora Real</label>
+                <input 
+                  type="datetime-local" 
+                  className={inputClasses} 
+                  value={statusTime} 
+                  onChange={e => setStatusTime(e.target.value)} 
+                />
+              </div>
+
+              <div className="grid gap-3 pt-4">
+                <button 
+                  onClick={handleStatusSubmit} 
+                  className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95"
+                >
+                  Confirmar Registro
+                </button>
+                <button 
+                  onClick={() => setIsStatusModalOpen(false)} 
+                  className="w-full py-3 text-[10px] font-black text-slate-400 uppercase"
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
           </div>
@@ -171,8 +216,8 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
               <button onClick={() => setIsScheduleModalOpen(false)} className="text-slate-300 hover:text-red-500 transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
             <form onSubmit={handleFormSubmit} className="p-8 grid grid-cols-2 gap-6 max-h-[75vh] overflow-y-auto">
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora Agenda</label><input required type="datetime-local" className={inputClasses} value={form.dateTime} onChange={e => setForm({...form, dateTime: e.target.value})} /></div>
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nº OS</label><input required type="text" className={inputClasses} value={form.os} onChange={e => setForm({...form, os: e.target.value})} /></div>
+              <div className="space-y-1"><label className={labelClass}>Data/Hora Agenda</label><input required type="datetime-local" className={inputClasses} value={form.dateTime} onChange={e => setForm({...form, dateTime: e.target.value})} /></div>
+              <div className="space-y-1"><label className={labelClass}>Nº OS</label><input required type="text" className={inputClasses} value={form.os} onChange={e => setForm({...form, os: e.target.value.toUpperCase()})} /></div>
               
               <div className="col-span-2 space-y-1 relative" ref={driverSelectRef}>
                 <label className="text-[10px] font-black text-blue-500 uppercase ml-1">Selecionar Motorista Vinculado à Volkswagen</label>
@@ -194,13 +239,13 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
                 )}
               </div>
 
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Motorista</label><input required type="text" className={inputClasses} value={form.driverName} onChange={e => setForm({...form, driverName: e.target.value})} /></div>
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">CVA</label><input type="text" className={inputClasses} value={form.cva} onChange={e => setForm({...form, cva: e.target.value})} /></div>
+              <div className="space-y-1"><label className={labelClass}>Motorista</label><input required type="text" className={inputClasses} value={form.driverName} onChange={e => setForm({...form, driverName: e.target.value.toUpperCase()})} /></div>
+              <div className="space-y-1"><label className={labelClass}>CVA</label><input type="text" className={inputClasses} value={form.cva} onChange={e => setForm({...form, cva: e.target.value.toUpperCase()})} /></div>
               
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Placa Cavalo</label><input required type="text" className={inputClasses} value={form.plateHorse} onChange={e => setForm({...form, plateHorse: e.target.value})} /></div>
-              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Placa Carreta</label><input required type="text" className={inputClasses} value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: e.target.value})} /></div>
+              <div className="space-y-1"><label className={labelClass}>Placa Cavalo</label><input required type="text" className={inputClasses} value={form.plateHorse} onChange={e => setForm({...form, plateHorse: e.target.value.toUpperCase()})} /></div>
+              <div className="space-y-1"><label className={labelClass}>Placa Carreta</label><input required type="text" className={inputClasses} value={form.plateTrailer} onChange={e => setForm({...form, plateTrailer: e.target.value.toUpperCase()})} /></div>
               
-              <div className="col-span-2 space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Container</label><input required type="text" className={inputClasses} value={form.container} onChange={e => setForm({...form, container: e.target.value})} /></div>
+              <div className="col-span-2 space-y-1"><label className={labelClass}>Container</label><input required type="text" className={inputClasses} value={form.container} onChange={e => setForm({...form, container: e.target.value.toUpperCase()})} /></div>
               
               <div className="col-span-2 pt-4 flex gap-4">
                 <button type="submit" className="flex-1 py-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-600 transition-all">Confirmar Registro</button>

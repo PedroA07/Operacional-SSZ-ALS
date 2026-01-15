@@ -32,9 +32,9 @@ export interface StaySession {
   endDate: string;
   createdAt: string;
   createdBy: string;
-  gracePeriodHours?: number; // Ex: 8h
-  roundUpMinutes?: number;   // Ex: 30m
-  costPerHour?: number;      // Ex: R$ 40,00
+  gracePeriodHours?: number;
+  roundUpMinutes?: number;
+  costPerHour?: number;
 }
 
 export interface StayRecord {
@@ -142,10 +142,13 @@ export type TripStatus =
   | 'Saiu do Cragea'
   | 'Chegou na Volkswagen'
   | 'Saiu da Volkswagen'
-  | 'Container sobre rodas'
   | 'Aguardando para Descarregar'
   | 'Descarregando'
+  | 'Container sobre rodas'
   | 'Aguardando baixar o Vazio';
+
+// Fix: Added VWStatus to resolve export errors in components/dashboard/VWTab.tsx and utils/vwService.ts
+export type VWStatus = TripStatus;
 
 export interface StatusHistoryEntry {
   status: TripStatus;
@@ -329,11 +332,9 @@ export interface WeatherData {
 }
 
 export interface VWStatusUpdate {
-  status: VWStatus;
+  status: TripStatus;
   dateTime: string;
 }
-
-export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
 
 export interface VWSchedule {
   id: string;
@@ -347,7 +348,7 @@ export interface VWSchedule {
   plateTrailer: string;
   origin: string;
   destination: string;
-  status: VWStatus;
+  status: TripStatus;
   statusHistory: VWStatusUpdate[];
 }
 

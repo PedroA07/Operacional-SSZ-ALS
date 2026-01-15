@@ -1,7 +1,7 @@
 
 export const APP_CONFIG = {
   companyName: 'ALS Transportes',
-  version: '6.8.8',
+  version: '6.8.9',
 };
 
 export const ADMIN_CREDENTIALS = {
