@@ -34,7 +34,7 @@ export const statusService = {
     { label: 'Descarregando', value: 'Descarregando', color: 'bg-amber-700' },
     { label: 'Container sobre Rodas', value: 'Container sobre rodas', color: 'bg-emerald-500' },
     { label: 'Aguardando Baixar Vazio', value: 'Aguardando baixar o Vazio', color: 'bg-indigo-400' },
-    { label: 'Viagem Concluída', value: 'Viagem concluída', color: 'bg-emerald-800' },
+    { label: 'Baixa Cragea (Concluir)', value: 'Viagem concluída', color: 'bg-emerald-800' },
     { label: 'Viagem Cancelada', value: 'Viagem cancelada', color: 'bg-red-600' },
   ] as StatusOption[],
 
