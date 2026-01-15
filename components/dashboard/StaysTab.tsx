@@ -7,6 +7,7 @@ import { stayValidator } from '../../utils/stayValidator';
 import { stayNamingRules } from '../../utils/stayNamingRules';
 import { db } from '../../utils/storage';
 import StayFeedbackModal from '../shared/StayFeedbackModal';
+import FeedbackModal from '../shared/FeedbackModal';
 
 interface StaysTabProps {
   categories: Category[];
@@ -27,6 +28,10 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   
   const [feedback, setFeedback] = useState<{ isOpen: boolean; title: string; message: string; type: 'success' | 'warning' | 'error'; details?: string[] }>({
     isOpen: false, title: '', message: '', type: 'success'
+  });
+
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
+    isOpen: false, title: '', message: '', onConfirm: () => {}
   });
 
   const [editingRecord, setEditingRecord] = useState<StayRecord | null>(null);
@@ -58,6 +63,22 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     await loadSessionRecords(session.id);
   };
 
+  const handleDeleteSession = (session: StaySession, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmModal({
+      isOpen: true,
+      title: "Excluir Pasta?",
+      message: `Deseja remover permanentemente a pasta "${session.category}" e todos os seus registros de estadia?`,
+      onConfirm: async () => {
+        const success = await db.deleteStaySession(session.id);
+        if (success) {
+          await loadSessions();
+          setFeedback({ isOpen: true, title: "Excluído", message: "Pasta removida com sucesso.", type: "success" });
+        }
+      }
+    });
+  };
+
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -70,7 +91,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
       const newSession: StaySession = {
         id: sessionId,
-        category: folderName, // Nome gerado com data e categoria
+        category: folderName,
         startDate: new Date(newSessionForm.startDate).toISOString(),
         endDate: new Date(newSessionForm.endDate).toISOString(),
         createdAt: new Date().toISOString(),
@@ -82,7 +103,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       
       const success = await db.saveStaySession(newSession);
       if (success) {
-        setFeedback({ isOpen: true, title: "Pasta Criada", message: `A pasta "${folderName}" foi registrada com sucesso.`, type: "success" });
+        setFeedback({ isOpen: true, title: "Pasta Criada", message: `A pasta foi registrada com sucesso.`, type: "success" });
         setIsCreatingSession(false);
         await loadSessions();
       }
@@ -202,7 +223,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const filteredSessions = useMemo(() => {
     return sessions.filter(s => {
-      // Correção: Agora usa .includes() pois o nome da categoria pode estar no final do nome da pasta
       const matchCat = activeCategory === 'GERAL' || s.category.toUpperCase().includes(activeCategory.toUpperCase());
       const matchYear = filterYear === 'TODOS' || new Date(s.startDate).getFullYear().toString() === filterYear;
       const matchMonth = filterMonth === 'TODOS' || monthsList[new Date(s.startDate).getMonth()] === filterMonth;
@@ -264,7 +284,18 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     { key: 'actions', label: 'Ações', render: (r: StayRecord) => (
       <div className="flex gap-1 justify-end">
         <button onClick={(e) => { e.stopPropagation(); handleOpenEditRecord(r); }} className="p-2 text-slate-300 hover:text-blue-500 transition-all hover:bg-blue-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg></button>
-        <button onClick={(e) => { e.stopPropagation(); if(confirm('Remover registro?')) { db.deleteStayRecord(r.id); loadSessionRecords(selectedSession!.id); } }} className="p-2 text-slate-300 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+        <button onClick={(e) => { 
+          e.stopPropagation(); 
+          setConfirmModal({
+            isOpen: true,
+            title: "Remover Registro?",
+            message: `Deseja excluir permanentemente o registro da OS ${r.os}?`,
+            onConfirm: async () => {
+              await db.deleteStayRecord(r.id);
+              await loadSessionRecords(selectedSession!.id);
+            }
+          });
+        }} className="p-2 text-slate-300 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
       </div>
     )}
   ];
@@ -272,6 +303,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <StayFeedbackModal isOpen={feedback.isOpen} title={feedback.title} message={feedback.message} type={feedback.type} details={feedback.details} onClose={() => setFeedback({ ...feedback, isOpen: false })} />
+      <FeedbackModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message} type="confirm" onConfirm={confirmModal.onConfirm} onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })} />
 
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
@@ -309,19 +341,43 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
       {!selectedSession ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-           {filteredSessions.map(session => (
-             <button key={session.id} onClick={() => handleOpenSession(session)} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-xl transition-all group text-left relative overflow-hidden">
-                <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-10 group-hover:bg-blue-600 group-hover:text-white transition-all"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" strokeWidth="2.5"/></svg></div>
-                <h4 className="text-base font-black text-slate-900 uppercase leading-tight mb-8 break-words h-12 line-clamp-2">{session.category}</h4>
-                <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6">
-                   <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">R$ {session.costPerHour}/H</span>
-                      <span className="text-[7px] font-bold text-slate-400 uppercase">{session.gracePeriodHours}H CARÊNCIA</span>
-                   </div>
-                   <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
-                </div>
-             </button>
-           ))}
+           {filteredSessions.map(session => {
+             // Divide o nome da pasta em partes para exibição em múltiplas linhas
+             const parts = session.category.split(' ');
+             const catName = parts[0];
+             const year = parts[1] || '';
+             const month = parts[2] || '';
+             const days = parts.slice(3).join(' ') || '';
+
+             return (
+               <button key={session.id} onClick={() => handleOpenSession(session)} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-xl transition-all group text-left relative overflow-hidden flex flex-col h-[320px]">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" strokeWidth="2.5"/></svg></div>
+                    <div 
+                      onClick={(e) => handleDeleteSession(session, e)}
+                      className="w-10 h-10 rounded-xl bg-red-50 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center shadow-sm"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 space-y-1">
+                    <h4 className="text-lg font-black text-slate-900 uppercase leading-none truncate">{catName}</h4>
+                    <p className="text-sm font-black text-blue-600 uppercase leading-none">{year}</p>
+                    <p className="text-[11px] font-black text-slate-500 uppercase leading-none">{month}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">{days}</p>
+                  </div>
+
+                  <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-6 shrink-0">
+                     <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">R$ {session.costPerHour}/H</span>
+                        <span className="text-[7px] font-bold text-slate-400 uppercase">{session.gracePeriodHours}H CARÊNCIA</span>
+                     </div>
+                     <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
+                  </div>
+               </button>
+             );
+           })}
            {filteredSessions.length === 0 && (
              <div className="col-span-full py-24 text-center text-slate-300 font-black uppercase italic text-xs border-2 border-dashed border-slate-100 rounded-[3rem] bg-white/50">Nenhuma pasta localizada</div>
            )}
