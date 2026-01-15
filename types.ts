@@ -147,7 +147,6 @@ export type TripStatus =
   | 'Container sobre rodas'
   | 'Aguardando baixar o Vazio';
 
-// Fix: Added VWStatus to resolve export errors in components/dashboard/VWTab.tsx and utils/vwService.ts
 export type VWStatus = TripStatus;
 
 export interface StatusHistoryEntry {
