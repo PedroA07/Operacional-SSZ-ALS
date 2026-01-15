@@ -32,9 +32,9 @@ export interface StaySession {
   endDate: string;
   createdAt: string;
   createdBy: string;
-  gracePeriodHours?: number;
-  roundUpMinutes?: number;
-  costPerHour?: number;
+  gracePeriodHours?: number; // Ex: 8h
+  roundUpMinutes?: number;   // Ex: 30m
+  costPerHour?: number;      // Ex: R$ 40,00
 }
 
 export interface StayRecord {
@@ -142,12 +142,10 @@ export type TripStatus =
   | 'Saiu do Cragea'
   | 'Chegou na Volkswagen'
   | 'Saiu da Volkswagen'
+  | 'Container sobre rodas'
   | 'Aguardando para Descarregar'
   | 'Descarregando'
-  | 'Container sobre rodas'
   | 'Aguardando baixar o Vazio';
-
-export type VWStatus = TripStatus;
 
 export interface StatusHistoryEntry {
   status: TripStatus;
@@ -331,9 +329,11 @@ export interface WeatherData {
 }
 
 export interface VWStatusUpdate {
-  status: TripStatus;
+  status: VWStatus;
   dateTime: string;
 }
+
+export type VWStatus = 'Pendente' | 'Retirado Cragea' | 'Chegada Volks' | 'Saída Volks' | 'Baixa Cragea';
 
 export interface VWSchedule {
   id: string;
@@ -347,7 +347,7 @@ export interface VWSchedule {
   plateTrailer: string;
   origin: string;
   destination: string;
-  status: TripStatus;
+  status: VWStatus;
   statusHistory: VWStatusUpdate[];
 }
 
