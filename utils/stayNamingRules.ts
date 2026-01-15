@@ -9,18 +9,23 @@ export const stayNamingRules = {
       'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'
     ];
 
-    // Usamos UTC para evitar que o fuso horário altere o dia selecionado no input
+    // Garante que a data seja interpretada corretamente independente do fuso horário local
     const dStart = new Date(startDate + 'T12:00:00');
     const dEnd = new Date(endDate + 'T12:00:00');
     
+    if (isNaN(dStart.getTime()) || isNaN(dEnd.getTime())) {
+      return `PASTA SEM DATA - ${category.toUpperCase()}`;
+    }
+
     const dayStart = String(dStart.getDate()).padStart(2, '0');
     const dayEnd = String(dEnd.getDate()).padStart(2, '0');
     const monthIndex = dStart.getMonth();
     const year = dStart.getFullYear();
 
-    const cat = category.trim().toUpperCase() || 'GERAL';
+    const catName = category.trim().toUpperCase() || 'GERAL';
     const monthName = months[monthIndex];
     
-    return `[${year}] [${monthName}] [${dayStart}] A [${dayEnd}] - ${cat}`;
+    // Formato final: [2025] [MARÇO] [01] A [10] - ALIANÇA
+    return `[${year}] [${monthName}] [${dayStart}] A [${dayEnd}] - ${catName}`;
   }
 };
