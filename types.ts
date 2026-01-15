@@ -142,7 +142,10 @@ export type TripStatus =
   | 'Saiu do Cragea'
   | 'Chegou na Volkswagen'
   | 'Saiu da Volkswagen'
-  | 'Container sobre rodas';
+  | 'Container sobre rodas'
+  | 'Aguardando para Descarregar'
+  | 'Descarregando'
+  | 'Aguardando baixar o Vazio';
 
 export interface StatusHistoryEntry {
   status: TripStatus;
