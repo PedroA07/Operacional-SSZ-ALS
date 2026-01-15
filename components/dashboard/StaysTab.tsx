@@ -163,14 +163,19 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
       
       if (records.length === 0) {
-        setFeedback({ isOpen: true, title: "Sem Dados", message: "Nenhum registro de OS válido foi localizado na planilha. Verifique as colunas.", type: "warning" });
+        setFeedback({ isOpen: true, title: "Sem Dados", message: "Nenhum registro de OS válido foi localizado na planilha. Verifique o formato.", type: "warning" });
+        setIsImporting(false);
         return;
       }
 
-      const { unique, duplicateList } = stayValidator.filterDuplicates(records, sessionRecords);
+      // Se a pasta está vazia, não há o que comparar para duplicados
+      const { unique, duplicateList } = sessionRecords.length > 0 
+        ? stayValidator.filterDuplicates(records, sessionRecords)
+        : { unique: records, duplicateList: [] };
       
-      if (unique.length === 0) {
-        setFeedback({ isOpen: true, title: "Itens Duplicados", message: "Todos os itens desta planilha já constam nesta pasta.", type: "warning", details: duplicateList });
+      if (unique.length === 0 && records.length > 0) {
+        setFeedback({ isOpen: true, title: "Itens Duplicados", message: "Todos os registros deste arquivo já foram importados para esta pasta.", type: "warning", details: duplicateList });
+        setIsImporting(false);
         return;
       }
 
@@ -180,10 +185,10 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       }));
       
       await db.saveStayRecords(processed);
-      setFeedback({ isOpen: true, title: "Importação Concluída", message: `${processed.length} novos registros sincronizados.`, type: "success" });
+      setFeedback({ isOpen: true, title: "Importação Concluída", message: `${processed.length} novos registros sincronizados com sucesso.`, type: "success" });
       await loadSessionRecords(selectedSession.id);
     } catch (err: any) {
-      setFeedback({ isOpen: true, title: "Falha na Importação", message: "O arquivo Excel não pôde ser processado.", type: "error" });
+      setFeedback({ isOpen: true, title: "Falha na Importação", message: "Não foi possível ler o arquivo Excel. Verifique as colunas.", type: "error" });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -352,7 +357,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       {!selectedSession ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
            {filteredSessions.map(session => {
-             // Divide o nome da pasta usando o separador pipe |
              const parts = session.category.split('|');
              const catName = parts[0] || 'GERAL';
              const year = parts[1] || '';

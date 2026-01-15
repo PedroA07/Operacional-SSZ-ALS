@@ -1,7 +1,7 @@
 
 export const stayNamingRules = {
   /**
-   * Gera o nome padrão da pasta de estadia: CATEGORIA|ANO|MES|DIA A DIA (Sem colchetes)
+   * Gera o nome padrão da pasta de estadia: CATEGORIA - MÊS ANO (DD a DD)
    */
   generateFolderName: (category: string, startDate: string, endDate: string): string => {
     const months = [
@@ -9,23 +9,20 @@ export const stayNamingRules = {
       'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'
     ];
 
-    // Garante que a data seja interpretada corretamente independente do fuso horário local
     const dStart = new Date(startDate + 'T12:00:00');
     const dEnd = new Date(endDate + 'T12:00:00');
     
     if (isNaN(dStart.getTime()) || isNaN(dEnd.getTime())) {
-      return `${category.toUpperCase()}|ERRO|DATA|INVÁLIDA`;
+      return `${category.toUpperCase()} - DATA INVÁLIDA`;
     }
 
     const dayStart = String(dStart.getDate()).padStart(2, '0');
     const dayEnd = String(dEnd.getDate()).padStart(2, '0');
-    const monthIndex = dStart.getMonth();
+    const monthName = months[dStart.getMonth()];
     const year = dStart.getFullYear();
-
     const catName = category.trim().toUpperCase() || 'GERAL';
-    const monthName = months[monthIndex];
     
-    // Formato com pipe para facilitar o split na UI: CATEGORIA|2025|MARÇO|01 A 10
+    // Formato amigável: CATEGORIA | ANO | MÊS | DIAS
     return `${catName}|${year}|${monthName}|${dayStart} A ${dayEnd}`;
   }
 };
