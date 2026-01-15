@@ -29,7 +29,7 @@ export const db = {
       role: u.role, lastLogin: u.last_login || u.lastlogin,
       photo: u.photo, position: u.position, driverId: u.driver_id || u.driverid,
       staffId: u.staff_id || u.staffid, status: u.status,
-      isFirstLogin: u.isfirstlogin ?? u.is_first_login ?? u.isfirstlogin,
+      isFirstLogin: u.isfirstlogin ?? false, // Correção: Prioriza isfirstlogin
       lastSeen: u.last_seen || u.lastseen, presence_status: u.presence_status
     }));
   },
@@ -41,7 +41,7 @@ export const db = {
       display_name: user.displayName, role: user.role, last_login: user.lastLogin,
       status: user.status || 'Ativo', driver_id: user.driverId, staff_id: user.staffId,
       position: user.position,
-      isfirstlogin: user.isFirstLogin,
+      isfirstlogin: user.isFirstLogin, // Correção: Coluna isfirstlogin
       presence_status: user.presence_status || 'offline',
       photo: user.photo
     });

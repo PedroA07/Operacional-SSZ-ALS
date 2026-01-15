@@ -43,15 +43,15 @@ export const authService = {
       const user: User = {
         id: data.id,
         username: data.username,
-        displayName: data.display_name || data.username,
+        displayName: data.display_name || data.displayname || data.username,
         role: data.role,
         lastLogin: nowISO,
         photo: data.photo,
         position: data.position,
-        driverId: data.driver_id,
-        staffId: data.staff_id,
+        driverId: data.driver_id || data.driverid,
+        staffId: data.staff_id || data.staffid,
         status: data.status,
-        isFirstLogin: data.is_first_login
+        isFirstLogin: data.isfirstlogin // Correção: isfirstlogin sem underscore
       };
 
       await supabase.from('users').update({ last_login: nowISO, presence_status: 'online' }).eq('id', user.id);

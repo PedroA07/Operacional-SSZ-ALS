@@ -1,7 +1,7 @@
 
 export const stayNamingRules = {
   /**
-   * Gera o nome padrão da pasta de estadia: CATEGORIA {ANO} [MES] [DD] a [DD]
+   * Gera o nome padrão da pasta de estadia: [ANO] [MES] [DIA] A [DIA] - CATEGORIA
    */
   generateFolderName: (category: string, startDate: string, endDate: string): string => {
     const months = [
@@ -21,6 +21,6 @@ export const stayNamingRules = {
     const cat = category.trim().toUpperCase() || 'GERAL';
     const monthName = months[monthIndex];
     
-    return `${cat} {${year}} [${monthName}] [${dayStart}] a [${dayEnd}]`;
+    return `[${year}] [${monthName}] [${dayStart}] A [${dayEnd}] - ${cat}`;
   }
 };
