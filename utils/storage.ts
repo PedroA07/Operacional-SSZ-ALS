@@ -19,7 +19,6 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY)
   : null;
 
 export const db = {
-  // ... (outros métodos omitidos para brevidade, mas devem ser mantidos)
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('users').select('*');
@@ -53,19 +52,16 @@ export const db = {
     return await driverRepository.getAll(supabase);
   },
 
-  // Fix: Added missing saveDriver method to resolve Dashboard.tsx error
   saveDriver: async (driver: Driver, actingUser?: User) => {
     if (!supabase) return false;
     return await driverRepository.save(supabase, driver);
   },
 
-  // Fix: Added missing deleteDriver method to resolve Dashboard.tsx error
   deleteDriver: async (id: string) => {
     if (!supabase) return false;
     return await driverRepository.delete(supabase, id);
   },
 
-  // Fix: Added missing getDriverByCPF method to resolve DriversTab.tsx error
   getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
     if (!supabase) return null;
     const { data, error } = await supabase.from('drivers').select('*').eq('cpf', cpf).maybeSingle();
@@ -109,7 +105,6 @@ export const db = {
     return !error;
   },
 
-  // Fix: Added missing deleteCustomer method to resolve Dashboard.tsx error
   deleteCustomer: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('customers').delete().eq('id', id);
@@ -135,11 +130,9 @@ export const db = {
     return !error;
   },
 
-  // Fix: Added missing deletePort method to resolve Dashboard.tsx error
   deletePort: async (id: string) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('ports').delete().eq('id', id);
-    return !error;
+    return await supabase.from('ports').delete().eq('id', id);
   },
 
   getPreStacking: async (): Promise<PreStacking[]> => {
@@ -161,7 +154,6 @@ export const db = {
     return !error;
   },
 
-  // Fix: Added missing deletePreStacking method to resolve Dashboard.tsx error
   deletePreStacking: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').delete().eq('id', id);
@@ -175,12 +167,39 @@ export const db = {
 
   saveStaff: async (staff: Staff, password?: string) => {
     if (!supabase) return false;
-    return await staffRepository.save(supabase, staff);
+    
+    // 1. Salvar na tabela de registro de equipe
+    const staffSuccess = await staffRepository.save(supabase, staff);
+    if (!staffSuccess) return false;
+
+    // 2. Sincronizar com a tabela de usuários (Credenciais de Login)
+    const { data: existingUsers } = await supabase.from('users').select('*').eq('staff_id', staff.id);
+    const existingUser = existingUsers?.[0];
+
+    const userPayload: any = {
+      id: existingUser?.id || `u-${staff.id}`,
+      username: staff.username.toLowerCase(),
+      display_name: staff.name.toUpperCase(),
+      role: staff.role,
+      status: staff.status,
+      staff_id: staff.id,
+      position: staff.position,
+      photo: staff.photo,
+      last_login: existingUser?.last_login || new Date().toISOString()
+    };
+
+    if (password) {
+      userPayload.password = password;
+    }
+
+    const { error: userError } = await supabase.from('users').upsert(userPayload);
+    return !userError;
   },
 
-  // Fix: Added missing deleteStaff method to resolve Dashboard.tsx error
   deleteStaff: async (id: string) => {
     if (!supabase) return false;
+    // Remove o usuário vinculado primeiro
+    await supabase.from('users').delete().eq('staff_id', id);
     return await staffRepository.delete(supabase, id);
   },
 
@@ -193,7 +212,6 @@ export const db = {
     })) as Category[];
   },
 
-  // Fix: Added missing saveCategory method to resolve CategoryManagerModal.tsx error
   saveCategory: async (category: Category, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('categories').upsert({
@@ -203,8 +221,6 @@ export const db = {
     });
     return !error;
   },
-
-  // --- MÉTODOS DE ESTADIAS ---
 
   getStaySessions: async (): Promise<StaySession[]> => {
     if (!supabase) return [];
@@ -242,8 +258,8 @@ export const db = {
     if (error) throw error;
     return (data || []).map(r => ({
       id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
-      driverName: r.driver_name, ship: r.ship, container: r.container,
-      scheduledStart: r.scheduled_start, arrivalTime: r.arrival_time,
+      driver_name: r.driver_name, ship: r.ship, container: r.container,
+      scheduled_start: r.scheduled_start, arrivalTime: r.arrival_time,
       departureTime: r.departure_time, exceededHours: r.exceeded_hours
     }));
   },
@@ -266,7 +282,6 @@ export const db = {
     return !error;
   },
 
-  // Fix: Added missing exportBackup method to resolve SystemTab.tsx error
   exportBackup: async () => {
     const [drivers, customers, ports, preStacking, staff, trips, categories] = await Promise.all([
       db.getDrivers(),
@@ -293,7 +308,6 @@ export const db = {
     URL.revokeObjectURL(url);
   },
 
-  // Fix: Added missing importBackup method to resolve SystemTab.tsx error
   importBackup: async (file: File): Promise<boolean> => {
     if (!supabase) return false;
     return new Promise((resolve) => {
@@ -324,7 +338,6 @@ export const db = {
     });
   },
 
-  // --- NOTIFICAÇÕES E PRESENÇA ---
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: any) => {
     if (!supabase) return;
     const origin: NotificationOrigin = (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL';
