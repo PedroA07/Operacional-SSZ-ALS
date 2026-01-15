@@ -258,8 +258,8 @@ export const db = {
     if (error) throw error;
     return (data || []).map(r => ({
       id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
-      driver_name: r.driver_name, ship: r.ship, container: r.container,
-      scheduled_start: r.scheduled_start, arrivalTime: r.arrival_time,
+      driverName: r.driver_name, ship: r.ship, container: r.container,
+      scheduledStart: r.scheduled_start, arrivalTime: r.arrival_time,
       departureTime: r.departure_time, exceededHours: r.exceeded_hours
     }));
   },
