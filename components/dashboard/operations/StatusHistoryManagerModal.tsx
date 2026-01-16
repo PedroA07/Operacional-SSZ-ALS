@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Trip, StatusHistoryEntry, User, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
@@ -27,7 +26,8 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
   const handleCopyToEmail = async () => {
     try {
       // Uso do motor premium com cliente desativado por padrão
-      const html = reportGenerator.renderTripCardHTML(trip, allTrips, undefined, false);
+      // Fix: Property 'renderTripCardHTML' does not exist on type 'reportGenerator'. Changed to 'renderTripTableHTML' and removed unnecessary boolean argument.
+      const html = reportGenerator.renderTripTableHTML(trip, allTrips, undefined);
       const plain = reportGenerator.generatePlainText([trip], {}, false);
 
       const blobHtml = new Blob([html], { type: 'text/html' });
@@ -133,7 +133,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
           <div className="flex items-center gap-2">
             <button 
               onClick={handleCopyToEmail}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all shadow-lg active:scale-95 ${copyFeedback ? 'bg-emerald-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all shadow-lg active:scale-95 ${copyFeedback ? 'bg-emerald-50 text-white' : 'bg-blue-600 text-white hover:bg-blue-50'}`}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
               {copyFeedback ? 'Copiado!' : 'Copiar Posição'}

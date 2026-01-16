@@ -2,14 +2,9 @@
 import { Trip, TripStatus } from '../types';
 
 export const predictionService = {
-  /**
-   * Mapeia o status atual para o próximo evento lógico.
-   * Se for "Container sobre rodas", busca a próxima OS agendada para o motorista.
-   */
   getNextStatusPrediction: (currentTrip: Trip, allTrips: Trip[]): { label: string; time: string } | null => {
     const currentStatus = currentTrip.status;
 
-    // Caso Especial: Container sobre rodas (Busca próxima viagem do motorista)
     if (currentStatus === 'Container sobre rodas') {
       const nextTrip = allTrips
         .filter(t => 
@@ -25,23 +20,17 @@ export const predictionService = {
       const date = new Date(nextTrip.dateTime);
       return {
         label: `Próxima Viagem (${nextTrip.os})`,
-        time: `${date.toLocaleDateString('pt-BR')} às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+        time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
       };
     }
 
-    // Lógica Padrão: +45 minutos para outros status
     const map: Partial<Record<TripStatus, string>> = {
-      'Retirada de vazio': 'Retirada do cheio',
-      'Retirada do cheio': 'Chegada no cliente',
-      'Chegou no cliente': 'Saída do cliente',
-      'Pegou NF': 'Saída do cliente',
-      'Saiu do cliente': 'Chegada no Cragea',
-      'Chegou no Cragea': 'Início do Carregamento',
+      'Retirada do cheio': 'Chegada no Cragea',
+      'Chegou no Cragea': 'Aguardando carregar',
       'Aguardando carregar': 'Saída do Cragea',
       'Saiu do Cragea': 'Chegada na Volkswagen',
       'Chegou na Volkswagen': 'Saída da Volkswagen',
-      'Saiu da Volkswagen': 'Chegada no Destino/Terminal',
-      'Em viagem': 'Chegada no Destino'
+      'Saiu da Volkswagen': 'Baixa Cragea (Conclusão)'
     };
 
     const nextLabel = map[currentStatus];
@@ -49,10 +38,10 @@ export const predictionService = {
 
     const baseTime = currentTrip.statusTime || currentTrip.dateTime;
     const date = new Date(baseTime);
-    const predictionDate = new Date(date.getTime() + 45 * 60000);
+    const predictionDate = new Date(date.getTime() + 40 * 60000); // 40 min padrão
 
     return {
-      label: `Previsão de ${nextLabel}`,
+      label: nextLabel,
       time: predictionDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     };
   }
