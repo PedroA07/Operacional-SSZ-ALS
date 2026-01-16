@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import { Trip, StatusHistoryEntry, User, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 import { emailFormatter } from '../../../utils/emailFormatter';
-import { reportGenerator } from '../../../utils/reportGenerator';
+// Added TableReportData to imports
+import { reportGenerator, TableReportData } from '../../../utils/reportGenerator';
 import { statusService } from '../../../utils/statusService';
 
 interface StatusHistoryManagerModalProps {
@@ -26,19 +28,38 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
   const handleCopyToEmail = async () => {
     try {
       // Uso do motor premium com cliente desativado por padrão
-      // Fix: Property 'renderTripCardHTML' does not exist on type 'reportGenerator'. Changed to 'renderTripTableHTML' and removed unnecessary boolean argument.
-      const html = reportGenerator.renderTripTableHTML(trip, allTrips, undefined);
-      const plain = reportGenerator.generatePlainText([trip], {}, false);
+      // Fix: Corrected the calls to reportGenerator by mapping Trip to TableReportData and using appropriate methods with correct arguments
+      const history = trip.statusHistory || [];
+      const getVal = (terms: string[]) => {
+        const h = history.find(entry => terms.some(term => entry.status.toLowerCase().includes(term.toLowerCase())));
+        return h ? reportGenerator.formatFullDate(h.dateTime) : "";
+      };
+
+      const tableData: TableReportData = {
+        motorista: trip.driver.name.toUpperCase(),
+        container: (trip.container || "A DEFINIR").toUpperCase(),
+        retiradaCragea: getVal(['Cragea', 'Retirada do cheio']),
+        chegadaVolks: getVal(['Chegou na Volkswagen', 'Chegada na Volkswagen']),
+        saidaVolks: getVal(['Saiu da Volkswagen', 'Saída da Volkswagen']),
+        baixaCragea: getVal(['Viagem concluída', 'Baixa Cragea'])
+      };
+
+      const isFinished = trip.status === 'Viagem concluída';
+      const activeData = !isFinished ? [tableData] : [];
+      const finishedData = isFinished ? [tableData] : [];
+
+      const html = reportGenerator.generateFullReportHTML(activeData, finishedData);
+      const plain = reportGenerator.generatePlainText(activeData, finishedData);
 
       const blobHtml = new Blob([html], { type: 'text/html' });
       const blobPlain = new Blob([plain], { type: 'text/plain' });
       
-      const data = [new ClipboardItem({
+      const clipboardItems = [new ClipboardItem({
         'text/html': blobHtml,
         'text/plain': blobPlain
       })];
 
-      await navigator.clipboard.write(data);
+      await navigator.clipboard.write(clipboardItems);
       
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 2000);
