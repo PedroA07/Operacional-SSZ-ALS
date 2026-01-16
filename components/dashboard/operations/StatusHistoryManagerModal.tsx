@@ -1,114 +1,205 @@
 
-import React, { useState, useEffect, memo } from 'react';
-import { Trip, User } from '../../../types';
-import { reportGenerator, TableReportData } from '../../../utils/reportGenerator';
+import React, { useState, useEffect } from 'react';
+import { Trip, User, StatusHistoryEntry, TripStatus } from '../../../types';
+import { db } from '../../../utils/storage';
+import { statusService } from '../../../utils/statusService';
 
 interface StatusHistoryManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   trip: Trip;
-  allTrips: Trip[]; 
+  allTrips: Trip[];
   user: User;
-  onSuccess: () => any; 
+  onSuccess: () => any;
 }
 
-// Subcomponente memoizado para inputs individuais
-const ExcelRow = memo(({ 
-  label, 
-  value, 
-  onChange 
-}: { 
-  label: string, 
-  value: string, 
-  onChange: (val: string) => void 
-}) => (
-  <div className="grid grid-cols-[150px_1fr] border-b border-black last:border-b-0">
-    <div className="bg-[#5b9bd5] text-black font-black text-[10px] p-3 border-r border-black flex items-center justify-center uppercase text-center select-none">
-      {label}
-    </div>
-    <input 
-      type="text"
-      className="p-3 text-[11px] font-black text-center uppercase outline-none focus:bg-blue-50 w-full transition-colors"
-      style={{ textTransform: 'uppercase' }}
-      value={value}
-      onChange={e => onChange(e.target.value)}
-    />
-  </div>
-));
-
-const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ isOpen, onClose, trip, allTrips, user, onSuccess }) => {
-  const [data, setData] = useState<TableReportData>({
-    motorista: '', container: '', retiradaCragea: '', chegadaVolks: '', saidaVolks: '', baixaCragea: ''
-  });
+const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  trip, 
+  user, 
+  onSuccess 
+}) => {
+  const [localHistory, setLocalHistory] = useState<StatusHistoryEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Inicializa o histórico local ao abrir
   useEffect(() => {
     if (isOpen && trip) {
-      // Ordena o histórico para garantir a captura do evento cronologicamente mais recente de cada tipo
-      const history = [...(trip.statusHistory || [])].sort((a, b) => 
+      // Ordena do mais recente para o mais antigo para facilitar a visualização
+      const sorted = [...(trip.statusHistory || [])].sort((a, b) => 
         new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
       );
-
-      const getVal = (terms: string[]) => {
-        const h = history.find(entry => terms.some(term => entry.status.toLowerCase().includes(term.toLowerCase())));
-        return h ? reportGenerator.formatFullDate(h.dateTime) : "";
-      };
-
-      setData({
-        motorista: trip.driver.name.toUpperCase(),
-        container: (trip.container || "").toUpperCase(),
-        retiradaCragea: getVal(['Cragea', 'Retirada do cheio']),
-        chegadaVolks: getVal(['Chegou na Volkswagen', 'Chegada na Volkswagen']),
-        saidaVolks: getVal(['Saiu da Volkswagen', 'Saída da Volkswagen']),
-        baixaCragea: getVal(['Viagem concluída', 'Baixa Cragea'])
-      });
+      setLocalHistory(sorted);
     }
   }, [isOpen, trip]);
 
+  const handleUpdateEntry = (index: number, field: keyof StatusHistoryEntry, value: string) => {
+    const updated = [...localHistory];
+    updated[index] = { ...updated[index], [field]: value };
+    setLocalHistory(updated);
+  };
+
+  const handleRemoveEntry = (index: number) => {
+    if (localHistory.length <= 1) {
+      alert("A viagem precisa ter pelo menos um status no histórico.");
+      return;
+    }
+    if (confirm("Deseja realmente remover este registro do histórico?")) {
+      const updated = localHistory.filter((_, i) => i !== index);
+      setLocalHistory(updated);
+    }
+  };
+
+  const handleAddEntry = () => {
+    const now = new Date().toISOString();
+    const newEntry: StatusHistoryEntry = {
+      status: 'Pendente',
+      dateTime: now.slice(0, 16),
+      createdAt: now
+    };
+    setLocalHistory([newEntry, ...localHistory]);
+  };
+
   const handleSave = async () => {
+    if (isSaving) return;
     setIsSaving(true);
-    // Simulação de salvamento reativo
-    setTimeout(() => {
+
+    try {
+      // 1. Re-ordena cronologicamente para garantir integridade
+      const finalHistory = [...localHistory].sort((a, b) => 
+        new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+      );
+
+      // 2. O primeiro item da lista ordenada (mais recente) vira o status principal
+      const latest = finalHistory[0];
+
+      const updatedTrip: Trip = {
+        ...trip,
+        status: latest.status,
+        statusTime: latest.dateTime,
+        statusHistory: finalHistory
+      };
+
+      const success = await db.saveTrip(updatedTrip, user);
+      
+      if (success) {
+        await db.addNotification(
+          user, 
+          'SYSTEM', 
+          'Histórico Alterado', 
+          `O histórico da OS ${trip.os} foi editado manualmente por ${user.displayName}.`,
+          { os: trip.os }
+        );
+        onSuccess();
+        onClose();
+      }
+    } catch (err) {
+      alert("Falha ao sincronizar histórico.");
+    } finally {
       setIsSaving(false);
-      onSuccess();
-      onClose();
-    }, 400);
+    }
   };
 
   if (!isOpen) return null;
 
+  const statusOptions = statusService.getOptions(trip);
+
   return (
-    <div className="fixed inset-0 z-[3500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
-        <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-black italic text-xs">ALS</div>
-             <h3 className="text-xs font-black uppercase tracking-widest">Edição Rápida Individual</h3>
+    <div className="fixed inset-0 z-[4500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in">
+      <div className="bg-white w-full max-w-3xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] animate-in zoom-in-95">
+        
+        {/* Header */}
+        <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+          <div className="flex items-center gap-5">
+            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black italic text-base shadow-lg">ALS</div>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest leading-none">Gestão de Histórico Completo</h3>
+              <p className="text-[10px] font-bold text-blue-400 uppercase mt-2">OS: {trip.os} • {trip.driver.name}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button>
+          <button onClick={onClose} className="p-3 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+          </button>
+        </header>
+
+        {/* Toolbar */}
+        <div className="px-8 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+           <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">{localHistory.length} Eventos Registrados</span>
+           <button 
+             onClick={handleAddEntry}
+             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase shadow-md hover:bg-emerald-700 transition-all active:scale-95"
+           >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="3"/></svg>
+              Adicionar Status
+           </button>
         </div>
 
-        <div className="p-10 bg-[#f8fafc]">
-          <div className="border border-black bg-white shadow-xl overflow-hidden rounded-sm mx-auto w-full">
-            <ExcelRow label="Motorista" value={data.motorista} onChange={(val) => setData(p => ({...p, motorista: val}))} />
-            <ExcelRow label="Container" value={data.container} onChange={(val) => setData(p => ({...p, container: val}))} />
-            <ExcelRow label="Retirada Cragea" value={data.retiradaCragea} onChange={(val) => setData(p => ({...p, retiradaCragea: val}))} />
-            <ExcelRow label="Chegada Volks" value={data.chegadaVolks} onChange={(val) => setData(p => ({...p, chegadaVolks: val}))} />
-            <ExcelRow label="Saida Volks" value={data.saidaVolks} onChange={(val) => setData(p => ({...p, saidaVolks: val}))} />
-            <ExcelRow label="Baixa Cragea" value={data.baixaCragea} onChange={(val) => setData(p => ({...p, baixaCragea: val}))} />
-          </div>
-          
-          <div className="mt-10 flex gap-3">
-            <button 
-              onClick={handleSave}
-              disabled={isSaving}
-              className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95"
+        {/* List of Entries */}
+        <div className="flex-1 overflow-y-auto p-8 space-y-3 custom-scrollbar bg-[#f8fafc]">
+          {localHistory.map((entry, idx) => (
+            <div 
+              key={idx} 
+              className={`p-5 rounded-[2rem] border-2 transition-all flex items-center gap-4 ${idx === 0 ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-100'}`}
             >
-              {isSaving ? 'Gravando...' : 'Gravar Alterações'}
-            </button>
-            <button onClick={onClose} className="px-8 py-5 bg-slate-200 text-slate-500 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-300 transition-all">Sair</button>
-          </div>
+              {/* Indicador de Ordem */}
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${idx === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                {localHistory.length - idx}
+              </div>
+
+              {/* Status Select */}
+              <div className="flex-1 space-y-1">
+                <label className="text-[7px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição do Status</label>
+                <select 
+                  className="w-full bg-transparent font-black text-slate-800 uppercase text-[11px] outline-none cursor-pointer focus:text-blue-600"
+                  value={entry.status}
+                  onChange={e => handleUpdateEntry(idx, 'status', e.target.value)}
+                >
+                  {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label.toUpperCase()}</option>)}
+                </select>
+              </div>
+
+              {/* Date/Time Input */}
+              <div className="w-48 space-y-1">
+                <label className="text-[7px] font-black text-slate-400 uppercase tracking-widest ml-1">Data/Hora do Evento</label>
+                <input 
+                  type="datetime-local"
+                  className="w-full bg-transparent font-bold text-slate-600 text-[10px] outline-none"
+                  value={entry.dateTime.slice(0, 16)}
+                  onChange={e => handleUpdateEntry(idx, 'dateTime', e.target.value)}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 pl-4 border-l border-slate-100">
+                <button 
+                  onClick={() => handleRemoveEntry(idx)}
+                  className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all group"
+                  title="Excluir este registro"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
+
+        {/* Footer */}
+        <footer className="p-8 bg-white border-t border-slate-100 flex justify-end gap-3">
+           <button 
+             onClick={onClose}
+             className="px-8 py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+           >
+             Descartar
+           </button>
+           <button 
+             onClick={handleSave}
+             disabled={isSaving}
+             className="px-12 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50"
+           >
+             {isSaving ? 'Processando...' : 'Salvar Histórico'}
+           </button>
+        </footer>
       </div>
     </div>
   );
