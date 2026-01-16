@@ -12,6 +12,28 @@ interface StatusHistoryManagerModalProps {
   onSuccess: () => void;
 }
 
+const ExcelRow = ({ 
+  label, 
+  value, 
+  onChange 
+}: { 
+  label: string, 
+  value: string, 
+  onChange: (val: string) => void 
+}) => (
+  <div className="grid grid-cols-[150px_1fr] border-b border-black last:border-b-0">
+    <div className="bg-[#5b9bd5] text-black font-black text-[10px] p-3 border-r border-black flex items-center justify-center uppercase text-center select-none">
+      {label}
+    </div>
+    <input 
+      type="text"
+      className="p-3 text-[11px] font-black text-center uppercase outline-none focus:bg-blue-50 w-full transition-colors"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+    />
+  </div>
+);
+
 const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ isOpen, onClose, trip, user, onSuccess }) => {
   const [data, setData] = useState<TableReportData>({
     motorista: '', container: '', retiradaCragea: '', chegadaVolks: '', saidaVolks: '', baixaCragea: ''
@@ -39,57 +61,45 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Simula salvamento ou integração futura com o storage
-    // Por enquanto, apenas gera o feedback de sucesso
     setTimeout(() => {
       setIsSaving(false);
       onSuccess();
       onClose();
-    }, 500);
+    }, 400);
   };
 
   if (!isOpen) return null;
 
-  const Row = ({ label, field }: { label: string, field: keyof TableReportData }) => (
-    <div className="grid grid-cols-[150px_1fr] border-b border-black last:border-b-0">
-      <div className="bg-[#5b9bd5] text-white font-black text-[10px] p-3 border-r border-black flex items-center justify-center uppercase text-center">
-        {label}
-      </div>
-      <input 
-        className="p-3 text-[11px] font-black text-center uppercase outline-none focus:bg-blue-50"
-        value={data[field]}
-        onChange={e => setData({...data, [field]: e.target.value.toUpperCase()})}
-      />
-    </div>
-  );
-
   return (
     <div className="fixed inset-0 z-[3500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
-        <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
-          <h3 className="text-xs font-black uppercase tracking-widest">Edição Manual (Estilo Planilha)</h3>
-          <button onClick={onClose}><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button>
+      <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
+        <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-black italic text-xs">ALS</div>
+             <h3 className="text-xs font-black uppercase tracking-widest">Edição Rápida de Status (Excel)</h3>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button>
         </div>
 
-        <div className="p-10 bg-slate-50">
-          <div className="border border-black bg-white shadow-lg overflow-hidden rounded-sm">
-            <Row label="Motorista" field="motorista" />
-            <Row label="Container" field="container" />
-            <Row label="Retirada Cragea" field="retiradaCragea" />
-            <Row label="Chegada Volks" field="chegadaVolks" />
-            <Row label="Saida Volks" field="saidaVolks" />
-            <Row label="Baixa Cragea" field="baixaCragea" />
+        <div className="p-10 bg-[#f8fafc]">
+          <div className="border border-black bg-white shadow-xl overflow-hidden rounded-sm mx-auto w-full">
+            <ExcelRow label="Motorista" value={data.motorista} onChange={(val) => setData({...data, motorista: val.toUpperCase()})} />
+            <ExcelRow label="Container" value={data.container} onChange={(val) => setData({...data, container: val.toUpperCase()})} />
+            <ExcelRow label="Retirada Cragea" value={data.retiradaCragea} onChange={(val) => setData({...data, retiradaCragea: val.toUpperCase()})} />
+            <ExcelRow label="Chegada Volks" value={data.chegadaVolks} onChange={(val) => setData({...data, chegadaVolks: val.toUpperCase()})} />
+            <ExcelRow label="Saida Volks" value={data.saidaVolks} onChange={(val) => setData({...data, saidaVolks: val.toUpperCase()})} />
+            <ExcelRow label="Baixa Cragea" value={data.baixaCragea} onChange={(val) => setData({...data, baixaCragea: val.toUpperCase()})} />
           </div>
           
-          <div className="mt-8 flex gap-3">
+          <div className="mt-10 flex gap-3">
             <button 
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95"
+              className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
             >
-              {isSaving ? 'Gravando...' : 'Salvar Alterações'}
+              {isSaving ? 'Gravando...' : 'Gravar Alterações'}
             </button>
-            <button onClick={onClose} className="px-8 py-4 bg-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Sair</button>
+            <button onClick={onClose} className="px-8 py-5 bg-slate-200 text-slate-500 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-300 transition-all">Sair</button>
           </div>
         </div>
       </div>

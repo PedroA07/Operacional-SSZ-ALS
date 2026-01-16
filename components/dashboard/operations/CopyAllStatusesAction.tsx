@@ -8,11 +8,46 @@ interface CopyAllStatusesActionProps {
   allTrips: Trip[];   
 }
 
+interface IndividualTableEditorProps {
+  data: TableReportData;
+  onUpdate: (field: keyof TableReportData, val: string) => void;
+}
+
+const IndividualTableEditor: React.FC<IndividualTableEditorProps> = ({ 
+  data, 
+  onUpdate 
+}) => {
+  const rowLabels: { label: string, field: keyof TableReportData }[] = [
+    { label: 'Motorista', field: 'motorista' },
+    { label: 'Container', field: 'container' },
+    { label: 'Retirada Cragea', field: 'retiradaCragea' },
+    { label: 'Chegada Volks', field: 'chegadaVolks' },
+    { label: 'Saida Volks', field: 'saidaVolks' },
+    { label: 'Baixa Cragea', field: 'baixaCragea' }
+  ];
+
+  return (
+    <div className="inline-block border border-black mb-8 bg-white shadow-md">
+      {rowLabels.map((row) => (
+        <div key={row.field} className="grid grid-cols-[140px_260px] border-b border-black last:border-b-0">
+          <div className="bg-[#5b9bd5] text-black font-black text-[10px] p-2.5 border-r border-black text-center uppercase flex items-center justify-center">
+            {row.label}
+          </div>
+          <input 
+            type="text"
+            className="p-2.5 text-[11px] font-black text-center uppercase outline-none focus:bg-blue-50 w-full"
+            value={data[row.field]} 
+            onChange={e => onUpdate(row.field, e.target.value)} 
+          />
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  
-  // Armazena os dados no formato da tabela 2x6
   const [activeReportData, setActiveReportData] = useState<TableReportData[]>([]);
   const [finishedReportData, setFinishedReportData] = useState<TableReportData[]>([]);
 
@@ -43,7 +78,6 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
   const updateField = (section: 'active' | 'finished', index: number, field: keyof TableReportData, value: string) => {
     const setter = section === 'active' ? setActiveReportData : setFinishedReportData;
     const current = section === 'active' ? activeReportData : finishedReportData;
-    
     const newList = [...current];
     newList[index] = { ...newList[index], [field]: value.toUpperCase() };
     setter(newList);
@@ -63,38 +97,9 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
       setIsCopied(true);
       setTimeout(() => { setIsCopied(false); setIsPreviewOpen(false); }, 1500);
     } catch (err) {
-      alert('Erro ao copiar.');
+      alert('Erro ao copiar para área de transferência.');
     }
   };
-
-  const TableEditor = ({ section, list }: { section: 'active' | 'finished', list: TableReportData[] }) => (
-    <div className="space-y-8">
-      {list.map((data, idx) => (
-        <div key={idx} className="inline-block border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm">
-          <div className="grid grid-cols-[150px_300px]">
-            {/* Linhas fixas conforme a imagem */}
-            <div className="bg-[#9bc2e6] text-white font-black text-[10px] p-2 border-b border-r border-black text-center uppercase">Motorista</div>
-            <input className="p-2 border-b border-black text-[10px] font-black text-center uppercase outline-none focus:bg-blue-50" value={data.motorista} onChange={e => updateField(section, idx, 'motorista', e.target.value)} />
-
-            <div className="bg-[#9bc2e6] text-white font-black text-[10px] p-2 border-b border-r border-black text-center uppercase">Container</div>
-            <input className="p-2 border-b border-black text-[10px] font-black text-center uppercase outline-none focus:bg-blue-50" value={data.container} onChange={e => updateField(section, idx, 'container', e.target.value)} />
-
-            <div className="bg-[#9bc2e6] text-white font-black text-[10px] p-2 border-b border-r border-black text-center uppercase">Retirada Cragea</div>
-            <input className="p-2 border-b border-black text-[10px] font-black text-center uppercase outline-none focus:bg-blue-50" value={data.retiradaCragea} onChange={e => updateField(section, idx, 'retiradaCragea', e.target.value)} />
-
-            <div className="bg-[#9bc2e6] text-white font-black text-[10px] p-2 border-b border-r border-black text-center uppercase">Chegada Volks</div>
-            <input className="p-2 border-b border-black text-[10px] font-black text-center uppercase outline-none focus:bg-blue-50" value={data.chegadaVolks} onChange={e => updateField(section, idx, 'chegadaVolks', e.target.value)} />
-
-            <div className="bg-[#9bc2e6] text-white font-black text-[10px] p-2 border-b border-r border-black text-center uppercase">Saida Volks</div>
-            <input className="p-2 border-b border-black text-[10px] font-black text-center uppercase outline-none focus:bg-blue-50" value={data.saidaVolks} onChange={e => updateField(section, idx, 'saidaVolks', e.target.value)} />
-
-            <div className="bg-[#9bc2e6] text-white font-black text-[10px] p-2 border-r border-black text-center uppercase">Baixa Cragea</div>
-            <input className="p-2 text-[10px] font-black text-center uppercase outline-none focus:bg-blue-50" value={data.baixaCragea} onChange={e => updateField(section, idx, 'baixaCragea', e.target.value)} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 
   return (
     <>
@@ -113,7 +118,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
             <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                <div className="flex items-center gap-6">
                   <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center font-black italic text-xl">ALS</div>
-                  <h3 className="text-xl font-black uppercase tracking-tight">Relatório de Status (Excel Style)</h3>
+                  <h3 className="text-xl font-black uppercase tracking-tight">Painel de Cópia Operacional (Estilo Excel)</h3>
                </div>
                <button onClick={() => setIsPreviewOpen(false)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg></button>
             </header>
@@ -122,21 +127,33 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
                <div className="flex-1 flex flex-col space-y-4">
                   <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b-4 border-blue-600 w-fit pb-1">EM ANDAMENTO:</h4>
                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
-                     <TableEditor section="active" list={activeReportData} />
+                     {activeReportData.map((data, idx) => (
+                       <IndividualTableEditor 
+                         key={`active-${idx}`} 
+                         data={data} 
+                         onUpdate={(field, val) => updateField('active', idx, field, val)} 
+                       />
+                     ))}
                   </div>
                </div>
 
                <div className="flex-1 flex flex-col space-y-4">
                   <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b-4 border-emerald-600 w-fit pb-1">FINALIZADAS:</h4>
                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
-                     <TableEditor section="finished" list={finishedReportData} />
+                     {finishedReportData.map((data, idx) => (
+                       <IndividualTableEditor 
+                         key={`finished-${idx}`} 
+                         data={data} 
+                         onUpdate={(field, val) => updateField('finished', idx, field, val)} 
+                       />
+                     ))}
                   </div>
                </div>
             </div>
 
             <footer className="p-8 bg-white border-t border-slate-100 flex justify-center">
                 <button onClick={handleCopy} className={`px-20 py-6 rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${isCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                  {isCopied ? 'Relatório Copiado!' : 'Copiar para Área de Transferência'}
+                  {isCopied ? 'Status Copiados!' : 'Copiar Agora'}
                 </button>
             </footer>
           </div>

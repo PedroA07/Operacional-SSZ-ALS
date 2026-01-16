@@ -25,8 +25,9 @@ export const reportGenerator = {
   },
 
   renderTripTableHTML: (data: TableReportData): string => {
-    const headerStyle = "background-color: #5b9bd5; color: #ffffff; font-weight: bold; border: 1px solid #000000; padding: 4px 8px; text-align: center; width: 140px; font-size: 11px; font-family: Calibri, sans-serif; text-transform: uppercase;";
-    const cellStyle = "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 4px 8px; text-align: center; font-size: 11px; font-family: Calibri, sans-serif; min-width: 200px; font-weight: bold; text-transform: uppercase;";
+    // Texto alterado para preto (#000000) no cabeçalho
+    const headerStyle = "background-color: #5b9bd5; color: #000000; font-weight: bold; border: 1px solid #000000; padding: 6px 10px; text-align: center; width: 140px; font-size: 11px; font-family: Calibri, sans-serif; text-transform: uppercase;";
+    const cellStyle = "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 6px 10px; text-align: center; font-size: 11px; font-family: Calibri, sans-serif; min-width: 220px; font-weight: bold; text-transform: uppercase;";
 
     const rows = [
       { label: 'MOTORISTA', value: data.motorista },
@@ -38,7 +39,7 @@ export const reportGenerator = {
     ];
 
     return `
-      <table style="border-collapse: collapse; margin-bottom: 20px; width: 100%; max-width: 450px; table-layout: fixed;">
+      <table style="border-collapse: collapse; margin-bottom: 25px; width: 380px; table-layout: fixed;">
         ${rows.map(row => `
           <tr>
             <td style="${headerStyle}">${row.label}</td>
@@ -51,15 +52,15 @@ export const reportGenerator = {
 
   generateFullReportHTML: (activeData: TableReportData[], finishedData: TableReportData[]): string => {
     return `
-      <div style="background-color: #ffffff; padding: 10px; font-family: Calibri, sans-serif;">
-        <table style="width: 100%; border-collapse: collapse;">
+      <div style="background-color: #ffffff; padding: 15px;">
+        <table style="width: 100%; border-collapse: collapse; border: none;">
           <tr>
-            <td style="width: 50%; vertical-align: top; padding-right: 15px;">
-              <p style="font-weight: bold; font-size: 12px; margin-bottom: 8px; color: #000;">EM ANDAMENTO:</p>
+            <td style="width: 50%; vertical-align: top; padding-right: 20px; border: none;">
+              <p style="font-weight: bold; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 15px; color: #000;">EM ANDAMENTO:</p>
               ${activeData.map(d => reportGenerator.renderTripTableHTML(d)).join('')}
             </td>
-            <td style="width: 50%; vertical-align: top; padding-left: 15px;">
-              <p style="font-weight: bold; font-size: 12px; margin-bottom: 8px; color: #000;">FINALIZADAS:</p>
+            <td style="width: 50%; vertical-align: top; padding-left: 20px; border: none;">
+              <p style="font-weight: bold; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 15px; color: #000;">FINALIZADAS:</p>
               ${finishedData.map(d => reportGenerator.renderTripTableHTML(d)).join('')}
             </td>
           </tr>
@@ -69,9 +70,11 @@ export const reportGenerator = {
   },
 
   generatePlainText: (active: TableReportData[], finished: TableReportData[]): string => {
+    // Removidas todas as quebras de linha (\n) para gerar um texto contínuo
     const render = (list: TableReportData[]) => list.map(d => 
-      `MOTORISTA: ${d.motorista}\nCONTAINER: ${d.container}\nRETIRADA CRAGEA: ${d.retiradaCragea}\nCHEGADA VOLKS: ${d.chegadaVolks}\nSAIDA VOLKS: ${d.saidaVolks}\nBAIXA CRAGEA: ${d.baixaCragea}\n--------------------------`
-    ).join('\n');
-    return `EM ANDAMENTO:\n${render(active)}\n\nFINALIZADAS:\n${render(finished)}`;
+      `MOTORISTA: ${d.motorista} | CONTAINER: ${d.container} | RETIRADA CRAGEA: ${d.retiradaCragea} | CHEGADA VOLKS: ${d.chegadaVolks} | SAIDA VOLKS: ${d.saidaVolks} | BAIXA CRAGEA: ${d.baixaCragea}`
+    ).join(' || ');
+
+    return `EM ANDAMENTO: ${render(active)} [FIM ANDAMENTO] FINALIZADAS: ${render(finished)} [FIM RELATORIO]`.replace(/\s+/g, ' ').trim();
   }
 };
