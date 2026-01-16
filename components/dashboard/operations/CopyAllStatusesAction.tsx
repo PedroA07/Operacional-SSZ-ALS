@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { Trip } from '../../../types';
 import { reportGenerator, TableReportData } from '../../../utils/reportGenerator';
 
@@ -9,15 +9,22 @@ interface CopyAllStatusesActionProps {
 }
 
 interface IndividualTableEditorProps {
-  data: TableReportData;
-  onUpdate: (field: keyof TableReportData, val: string) => void;
+  initialData: TableReportData;
+  onFinalChange: (data: TableReportData) => void;
 }
 
-const IndividualTableEditor: React.FC<IndividualTableEditorProps> = ({ 
-  data, 
-  onUpdate 
-}) => {
-  const rowLabels: { label: string, field: keyof TableReportData }[] = [
+// Subcomponente memoizado para evitar re-renderizações desnecessárias e perda de foco
+const IndividualTableEditor = memo(({ initialData, onFinalChange }: IndividualTableEditorProps) => {
+  const [localData, setLocalData] = useState<TableReportData>(initialData);
+
+  const handleChange = (field: keyof TableReportData, value: string) => {
+    const updated = { ...localData, [field]: value };
+    setLocalData(updated);
+    // Notifica o pai apenas para manter os dados sincronizados, mas o foco fica aqui no estado local
+    onFinalChange(updated);
+  };
+
+  const rows: { label: string, field: keyof TableReportData }[] = [
     { label: 'Motorista', field: 'motorista' },
     { label: 'Container', field: 'container' },
     { label: 'Retirada Cragea', field: 'retiradaCragea' },
@@ -27,23 +34,24 @@ const IndividualTableEditor: React.FC<IndividualTableEditorProps> = ({
   ];
 
   return (
-    <div className="inline-block border border-black mb-8 bg-white shadow-md">
-      {rowLabels.map((row) => (
+    <div className="inline-block border border-black mb-10 bg-white shadow-md">
+      {rows.map((row) => (
         <div key={row.field} className="grid grid-cols-[140px_260px] border-b border-black last:border-b-0">
-          <div className="bg-[#5b9bd5] text-black font-black text-[10px] p-2.5 border-r border-black text-center uppercase flex items-center justify-center">
+          <div className="bg-[#5b9bd5] text-black font-black text-[10px] p-2.5 border-r border-black text-center uppercase flex items-center justify-center select-none">
             {row.label}
           </div>
           <input 
             type="text"
-            className="p-2.5 text-[11px] font-black text-center uppercase outline-none focus:bg-blue-50 w-full"
-            value={data[row.field]} 
-            onChange={e => onUpdate(row.field, e.target.value)} 
+            className="p-2.5 text-[11px] font-black text-center outline-none focus:bg-blue-50 w-full uppercase"
+            style={{ textTransform: 'uppercase' }} // CSS garante o visual sem quebrar o cursor do JS
+            value={localData[row.field]} 
+            onChange={e => handleChange(row.field, e.target.value)} 
           />
         </div>
       ))}
     </div>
   );
-};
+});
 
 const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -51,8 +59,9 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
   const [activeReportData, setActiveReportData] = useState<TableReportData[]>([]);
   const [finishedReportData, setFinishedReportData] = useState<TableReportData[]>([]);
 
+  // Inicializa os dados apenas quando o modal abre para evitar resets indesejados por refreshes globais
   useEffect(() => {
-    if (isPreviewOpen) {
+    if (isPreviewOpen && activeReportData.length === 0 && finishedReportData.length === 0) {
       const mapTrip = (t: Trip): TableReportData => {
         const history = t.statusHistory || [];
         const getVal = (terms: string[]) => {
@@ -61,6 +70,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
         };
 
         return {
+          id: t.id,
           motorista: t.driver.name.toUpperCase(),
           container: (t.container || "A DEFINIR").toUpperCase(),
           retiradaCragea: getVal(['Cragea', 'Retirada do cheio']),
@@ -75,18 +85,40 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
     }
   }, [isPreviewOpen, trips]);
 
-  const updateField = (section: 'active' | 'finished', index: number, field: keyof TableReportData, value: string) => {
-    const setter = section === 'active' ? setActiveReportData : setFinishedReportData;
-    const current = section === 'active' ? activeReportData : finishedReportData;
-    const newList = [...current];
-    newList[index] = { ...newList[index], [field]: value.toUpperCase() };
-    setter(newList);
-  };
+  const handleUpdateActive = useCallback((index: number, newData: TableReportData) => {
+    setActiveReportData(prev => {
+      const copy = [...prev];
+      copy[index] = newData;
+      return copy;
+    });
+  }, []);
+
+  const handleUpdateFinished = useCallback((index: number, newData: TableReportData) => {
+    setFinishedReportData(prev => {
+      const copy = [...prev];
+      copy[index] = newData;
+      return copy;
+    });
+  }, []);
 
   const handleCopy = async () => {
     try {
-      const html = reportGenerator.generateFullReportHTML(activeReportData, finishedReportData);
-      const plain = reportGenerator.generatePlainText(activeReportData, finishedReportData);
+      // Normaliza para maiúsculas antes de gerar o HTML final
+      const normalize = (list: TableReportData[]) => list.map(d => ({
+        ...d,
+        motorista: d.motorista.toUpperCase(),
+        container: d.container.toUpperCase(),
+        retiradaCragea: d.retiradaCragea.toUpperCase(),
+        chegadaVolks: d.chegadaVolks.toUpperCase(),
+        saidaVolks: d.saidaVolks.toUpperCase(),
+        baixaCragea: d.baixaCragea.toUpperCase()
+      }));
+
+      const active = normalize(activeReportData);
+      const finished = normalize(finishedReportData);
+
+      const html = reportGenerator.generateFullReportHTML(active, finished);
+      const plain = reportGenerator.generatePlainText(active, finished);
 
       const blobHtml = new Blob([html], { type: 'text/html' });
       const blobPlain = new Blob([plain], { type: 'text/plain' });
@@ -97,8 +129,14 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
       setIsCopied(true);
       setTimeout(() => { setIsCopied(false); setIsPreviewOpen(false); }, 1500);
     } catch (err) {
-      alert('Erro ao copiar para área de transferência.');
+      alert('Área de transferência inacessível. Verifique permissões.');
     }
+  };
+
+  const handleClose = () => {
+    setIsPreviewOpen(false);
+    setActiveReportData([]); // Reseta para carregar novos dados na próxima abertura
+    setFinishedReportData([]);
   };
 
   return (
@@ -118,9 +156,9 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
             <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                <div className="flex items-center gap-6">
                   <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center font-black italic text-xl">ALS</div>
-                  <h3 className="text-xl font-black uppercase tracking-tight">Painel de Cópia Operacional (Estilo Excel)</h3>
+                  <h3 className="text-xl font-black uppercase tracking-tight">Painel de Cópia Operacional</h3>
                </div>
-               <button onClick={() => setIsPreviewOpen(false)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg></button>
+               <button onClick={handleClose} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg></button>
             </header>
 
             <div className="flex-1 overflow-hidden flex bg-[#f4f7fa] p-10 gap-10">
@@ -129,9 +167,9 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
                      {activeReportData.map((data, idx) => (
                        <IndividualTableEditor 
-                         key={`active-${idx}`} 
-                         data={data} 
-                         onUpdate={(field, val) => updateField('active', idx, field, val)} 
+                         key={data.id || `active-${idx}`} 
+                         initialData={data} 
+                         onFinalChange={(val) => handleUpdateActive(idx, val)} 
                        />
                      ))}
                   </div>
@@ -142,9 +180,9 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
                      {finishedReportData.map((data, idx) => (
                        <IndividualTableEditor 
-                         key={`finished-${idx}`} 
-                         data={data} 
-                         onUpdate={(field, val) => updateField('finished', idx, field, val)} 
+                         key={data.id || `finished-${idx}`} 
+                         initialData={data} 
+                         onFinalChange={(val) => handleUpdateFinished(idx, val)} 
                        />
                      ))}
                   </div>

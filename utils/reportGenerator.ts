@@ -2,6 +2,7 @@
 import { Trip } from '../types';
 
 export interface TableReportData {
+  id?: string;
   motorista: string;
   container: string;
   retiradaCragea: string;
@@ -25,7 +26,6 @@ export const reportGenerator = {
   },
 
   renderTripTableHTML: (data: TableReportData): string => {
-    // Texto alterado para preto (#000000) no cabeçalho
     const headerStyle = "background-color: #5b9bd5; color: #000000; font-weight: bold; border: 1px solid #000000; padding: 6px 10px; text-align: center; width: 140px; font-size: 11px; font-family: Calibri, sans-serif; text-transform: uppercase;";
     const cellStyle = "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 6px 10px; text-align: center; font-size: 11px; font-family: Calibri, sans-serif; min-width: 220px; font-weight: bold; text-transform: uppercase;";
 
@@ -70,7 +70,6 @@ export const reportGenerator = {
   },
 
   generatePlainText: (active: TableReportData[], finished: TableReportData[]): string => {
-    // Removidas todas as quebras de linha (\n) para gerar um texto contínuo
     const render = (list: TableReportData[]) => list.map(d => 
       `MOTORISTA: ${d.motorista} | CONTAINER: ${d.container} | RETIRADA CRAGEA: ${d.retiradaCragea} | CHEGADA VOLKS: ${d.chegadaVolks} | SAIDA VOLKS: ${d.saidaVolks} | BAIXA CRAGEA: ${d.baixaCragea}`
     ).join(' || ');
