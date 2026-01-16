@@ -7,8 +7,9 @@ interface StatusHistoryManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   trip: Trip;
+  allTrips: Trip[]; // Adicionado para resolver erro de build
   user: User;
-  onSuccess: () => void;
+  onSuccess: () => any; // Ajustado para aceitar retornos diversos (como boolean de dispatchEvent)
 }
 
 // Subcomponente memoizado para inputs individuais
@@ -35,7 +36,7 @@ const ExcelRow = memo(({
   </div>
 ));
 
-const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ isOpen, onClose, trip, user, onSuccess }) => {
+const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ isOpen, onClose, trip, allTrips, user, onSuccess }) => {
   const [data, setData] = useState<TableReportData>({
     motorista: '', container: '', retiradaCragea: '', chegadaVolks: '', saidaVolks: '', baixaCragea: ''
   });

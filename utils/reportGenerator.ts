@@ -74,6 +74,8 @@ export const reportGenerator = {
       `MOTORISTA: ${d.motorista} | CONTAINER: ${d.container} | RETIRADA CRAGEA: ${d.retiradaCragea} | CHEGADA VOLKS: ${d.chegadaVolks} | SAIDA VOLKS: ${d.saidaVolks} | BAIXA CRAGEA: ${d.baixaCragea}`
     ).join(' || ');
 
-    return `EM ANDAMENTO: ${render(active)} [FIM ANDAMENTO] FINALIZADAS: ${render(finished)} [FIM RELATORIO]`.replace(/\s+/g, ' ').trim();
+    // replace(/\s+/g, ' ') garante que todos os caracteres de espaço, incluindo \n, sejam convertidos em um único espaço.
+    const result = `EM ANDAMENTO: ${render(active)} [FIM ANDAMENTO] FINALIZADAS: ${render(finished)} [FIM RELATORIO]`.replace(/\r?\n|\r/g, ' ').replace(/\s+/g, ' ').trim();
+    return result;
   }
 };
