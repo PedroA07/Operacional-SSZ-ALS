@@ -23,10 +23,22 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
   const [localHistory, setLocalHistory] = useState<StatusHistoryEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Inicializa o histórico local ao abrir
+  // Função para formatar data ISO para o input datetime-local (YYYY-MM-DDTHH:mm)
+  const formatForInput = (isoString: string) => {
+    if (!isoString) return '';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '';
+      // Ajusta para o fuso horário local para o input mostrar o tempo correto
+      const tzOffset = d.getTimezoneOffset() * 60000;
+      return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+    } catch (e) {
+      return '';
+    }
+  };
+
   useEffect(() => {
     if (isOpen && trip) {
-      // Ordena do mais recente para o mais antigo para facilitar a visualização
       const sorted = [...(trip.statusHistory || [])].sort((a, b) => 
         new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
       );
@@ -36,7 +48,12 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
 
   const handleUpdateEntry = (index: number, field: keyof StatusHistoryEntry, value: string) => {
     const updated = [...localHistory];
-    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'dateTime') {
+      // Quando o input datetime-local muda, salvamos como ISO string
+      updated[index] = { ...updated[index], [field]: new Date(value).toISOString() };
+    } else {
+      updated[index] = { ...updated[index], [field]: value } as any;
+    }
     setLocalHistory(updated);
   };
 
@@ -55,7 +72,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
     const now = new Date().toISOString();
     const newEntry: StatusHistoryEntry = {
       status: 'Pendente',
-      dateTime: now.slice(0, 16),
+      dateTime: now,
       createdAt: now
     };
     setLocalHistory([newEntry, ...localHistory]);
@@ -66,12 +83,10 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
     setIsSaving(true);
 
     try {
-      // 1. Re-ordena cronologicamente para garantir integridade
       const finalHistory = [...localHistory].sort((a, b) => 
         new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
       );
 
-      // 2. O primeiro item da lista ordenada (mais recente) vira o status principal
       const latest = finalHistory[0];
 
       const updatedTrip: Trip = {
@@ -109,7 +124,6 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
     <div className="fixed inset-0 z-[4500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in">
       <div className="bg-white w-full max-w-3xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] animate-in zoom-in-95">
         
-        {/* Header */}
         <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-5">
             <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black italic text-base shadow-lg">ALS</div>
@@ -123,7 +137,6 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
           </button>
         </header>
 
-        {/* Toolbar */}
         <div className="px-8 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">{localHistory.length} Eventos Registrados</span>
            <button 
@@ -135,19 +148,16 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
            </button>
         </div>
 
-        {/* List of Entries */}
         <div className="flex-1 overflow-y-auto p-8 space-y-3 custom-scrollbar bg-[#f8fafc]">
           {localHistory.map((entry, idx) => (
             <div 
               key={idx} 
               className={`p-5 rounded-[2rem] border-2 transition-all flex items-center gap-4 ${idx === 0 ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-100'}`}
             >
-              {/* Indicador de Ordem */}
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${idx === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
                 {localHistory.length - idx}
               </div>
 
-              {/* Status Select */}
               <div className="flex-1 space-y-1">
                 <label className="text-[7px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição do Status</label>
                 <select 
@@ -159,18 +169,16 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
                 </select>
               </div>
 
-              {/* Date/Time Input */}
               <div className="w-48 space-y-1">
                 <label className="text-[7px] font-black text-slate-400 uppercase tracking-widest ml-1">Data/Hora do Evento</label>
                 <input 
                   type="datetime-local"
                   className="w-full bg-transparent font-bold text-slate-600 text-[10px] outline-none"
-                  value={entry.dateTime.slice(0, 16)}
+                  value={formatForInput(entry.dateTime)}
                   onChange={e => handleUpdateEntry(idx, 'dateTime', e.target.value)}
                 />
               </div>
 
-              {/* Actions */}
               <div className="flex items-center gap-2 pl-4 border-l border-slate-100">
                 <button 
                   onClick={() => handleRemoveEntry(idx)}
@@ -184,7 +192,6 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
           ))}
         </div>
 
-        {/* Footer */}
         <footer className="p-8 bg-white border-t border-slate-100 flex justify-end gap-3">
            <button 
              onClick={onClose}
