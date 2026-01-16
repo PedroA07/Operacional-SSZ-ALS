@@ -63,7 +63,11 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
   useEffect(() => {
     if (isPreviewOpen && activeReportData.length === 0 && finishedReportData.length === 0) {
       const mapTrip = (t: Trip): TableReportData => {
-        const history = t.statusHistory || [];
+        // Ordena o histórico para garantir que ao usar .find(), peguemos o mais recente
+        const history = [...(t.statusHistory || [])].sort((a, b) => 
+          new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+        );
+        
         const getVal = (terms: string[]) => {
           const h = history.find(entry => terms.some(term => entry.status.toLowerCase().includes(term.toLowerCase())));
           return h ? reportGenerator.formatFullDate(h.dateTime) : "";
@@ -83,7 +87,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
       setActiveReportData(trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada').map(mapTrip));
       setFinishedReportData(trips.filter(t => t.status === 'Viagem concluída').map(mapTrip));
     }
-  }, [isPreviewOpen, trips]);
+  }, [isPreviewOpen, trips, activeReportData.length, finishedReportData.length]);
 
   const handleUpdateActive = useCallback((index: number, newData: TableReportData) => {
     setActiveReportData(prev => {

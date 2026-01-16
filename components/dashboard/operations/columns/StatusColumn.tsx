@@ -13,6 +13,11 @@ export const StatusColumn = (
     return isLatest ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-400 border-slate-100';
   };
 
+  // Ordena o histórico: o mais recente (maior dateTime) fica no índice 0
+  const sortedHistory = [...(t.statusHistory || [])].sort((a, b) => 
+    new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+  );
+
   return (
     <div className="flex flex-col space-y-1.5 min-w-[150px]">
        <div className="flex items-center justify-between gap-3 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
@@ -26,7 +31,7 @@ export const StatusColumn = (
        </div>
        
        <div className="flex flex-col gap-1 max-h-20 overflow-y-auto custom-scrollbar pr-0.5">
-          {(t.statusHistory || []).map((step, idx) => (
+          {sortedHistory.map((step, idx) => (
             <div 
               key={idx} 
               onClick={(e) => {

@@ -7,9 +7,9 @@ interface StatusHistoryManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   trip: Trip;
-  allTrips: Trip[]; // Adicionado para resolver erro de build
+  allTrips: Trip[]; 
   user: User;
-  onSuccess: () => any; // Ajustado para aceitar retornos diversos (como boolean de dispatchEvent)
+  onSuccess: () => any; 
 }
 
 // Subcomponente memoizado para inputs individuais
@@ -44,7 +44,11 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({ i
 
   useEffect(() => {
     if (isOpen && trip) {
-      const history = trip.statusHistory || [];
+      // Ordena o histórico para garantir a captura do evento cronologicamente mais recente de cada tipo
+      const history = [...(trip.statusHistory || [])].sort((a, b) => 
+        new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+      );
+
       const getVal = (terms: string[]) => {
         const h = history.find(entry => terms.some(term => entry.status.toLowerCase().includes(term.toLowerCase())));
         return h ? reportGenerator.formatFullDate(h.dateTime) : "";
