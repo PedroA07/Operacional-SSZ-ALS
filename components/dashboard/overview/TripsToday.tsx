@@ -16,19 +16,18 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const todayRaw = useMemo(() => {
     return trips.filter(t => {
       if (!t.dateTime) return false;
-      // Converte data do banco para local antes de comparar o dia
+      // Normaliza a data para string local antes de comparar
       const tripDate = new Date(t.dateTime).toLocaleDateString('en-CA');
       return tripDate === todayStr;
     });
   }, [trips, todayStr]);
 
   const stats = useMemo(() => {
-    const active = todayRaw.filter(t => t.status !== 'Viagem cancelada');
-    const canceled = todayRaw.filter(t => t.status === 'Viagem cancelada').length;
+    const active = todayRaw.filter(t => t.status?.toLowerCase() !== 'viagem cancelada');
+    const canceled = todayRaw.filter(t => t.status?.toLowerCase().includes('cancelada')).length;
     
-    // Normalização de status para contagem de concluídas
     const completed = todayRaw.filter(t => 
-      t.status?.toLowerCase() === 'viagem concluída' || 
+      t.status?.toLowerCase().includes('concluída') || 
       t.status?.toLowerCase() === 'concluída'
     ).length;
     
@@ -38,12 +37,14 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    // Atraso: Comparação absoluta de milissegundos
+    // Monitor de Atrasos: Chegou no cliente depois do agendado
     const delays = active.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (!arrival) return false;
-      // Se chegou 1 minuto depois do previsto, já é atraso
-      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 59000);
+      if (!arrival) {
+        // Se ainda não chegou e o horário agendado já passou há mais de 10 min, é atraso operacional
+        return new Date().getTime() > (new Date(t.dateTime).getTime() + 600000);
+      }
+      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 60000);
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };
@@ -57,7 +58,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   
   const todayTripsList = useMemo(() => {
     return todayRaw.filter(t => {
-      if (t.status === 'Viagem cancelada') return false;
+      if (t.status?.toLowerCase().includes('cancelada')) return false;
       const matchType = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase());
       const matchClient = selClients.length === 0 || selClients.includes(t.customer.name);
       return matchType && matchClient;

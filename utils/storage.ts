@@ -73,11 +73,10 @@ export const db = {
   getTrips: async (): Promise<Trip[]> => {
     if (!supabase) return [];
     const trips = await tripRepository.getAll(supabase);
-    // Garantia de normalização pós-busca
     return trips.map(t => ({
       ...t,
       status: t.status || 'Pendente',
-      type: t.type || 'EXPORTAÇÃO',
+      type: (t.type || 'EXPORTAÇÃO').toUpperCase() as any,
       statusHistory: Array.isArray(t.statusHistory) ? t.statusHistory : []
     }));
   },
@@ -265,7 +264,7 @@ export const db = {
       id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
       driverName: r.driver_name, ship: r.ship, container: r.container,
       scheduledStart: r.scheduled_start, arrivalTime: r.arrival_time,
-      departure_time: r.departure_time, exceededHours: r.exceeded_hours
+      departureTime: r.departure_time, exceededHours: r.exceeded_hours
     }));
   },
 
