@@ -37,7 +37,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
+  
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString('pt-BR'));
 
   const [isDeleteTripModalOpen, setIsDeleteTripModalOpen] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
@@ -45,7 +48,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
-  const loadAllData = useCallback(async () => {
+  const loadAllData = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    setIsSyncing(true);
+    
     try {
       const [d, c, p, ps, s, t, cats] = await Promise.all([
         db.getDrivers(),
@@ -64,17 +70,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       setStaffList(s || []);
       setTrips(t || []);
       setCategories(cats || []);
+      
+      setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
     } catch (e) {
       console.error("Erro na sincronização Direta:", e);
     } finally {
       setIsLoading(false);
+      setIsSyncing(false);
     }
   }, []);
 
   useEffect(() => { 
     loadAllData();
-    const refreshDataInterval = setInterval(loadAllData, 15000);
-    const handleGlobalRefresh = () => loadAllData();
+    const refreshDataInterval = setInterval(() => loadAllData(true), 15000);
+    const handleGlobalRefresh = () => loadAllData(true);
     window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
     return () => {
       clearInterval(refreshDataInterval);
@@ -96,7 +105,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     try {
       const success = await db.deleteTrip(tripToDelete.id, user);
       if (success) {
-        await loadAllData();
+        await loadAllData(true);
         setIsDeleteTripModalOpen(false);
         setTripToDelete(null);
       } else {
@@ -152,7 +161,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </header>
         
         <div className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
-           {activeTab === DashboardTab.INICIO && <OverviewTab trips={trips} drivers={drivers} />}
+           {activeTab === DashboardTab.INICIO && (
+             <OverviewTab 
+               trips={trips} 
+               drivers={drivers} 
+               onRefresh={() => loadAllData(true)} 
+               lastSyncTime={lastSyncTime} 
+               isSyncing={isSyncing} 
+             />
+           )}
            {activeTab === DashboardTab.OPERACOES && (
              <OperationsTab 
                user={user} 
@@ -166,18 +183,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                activeView={opsView} 
                setActiveView={setOpsView} 
                onDeleteTrip={handleDeleteTripRequest}
-               onRefresh={loadAllData}
+               onRefresh={() => loadAllData(true)}
              />
            )}
-           {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(); }} />}
+           {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(true); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
-           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(); }} availableOps={availableOps} />}
-           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(); } }} isAdmin={user.role === 'admin'} />}
-           {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(); }} />}
+           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(true); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(true); }} availableOps={availableOps} />}
+           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(true); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(true); } }} isAdmin={user.role === 'admin'} />}
+           {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(true); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
-           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(); } }} />}
-           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(); } }} />}
-           {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={loadAllData} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
+           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(true); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(true); } }} />}
+           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(true); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(true); } }} />}
+           {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(true)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
         </div>
       </main>
 

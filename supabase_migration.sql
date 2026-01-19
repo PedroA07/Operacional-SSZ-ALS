@@ -1,17 +1,13 @@
 
--- 1. CRIAÇÃO DE ÍNDICES PARA BUSCAS RÁPIDAS (OVERVIEW E FILTROS)
--- Melhora drasticamente a performance dos filtros de data e status
-CREATE INDEX IF NOT EXISTS idx_trips_date_time ON trips (date_time);
-CREATE INDEX IF NOT EXISTS idx_trips_status ON trips (status);
-CREATE INDEX IF NOT EXISTS idx_trips_os ON trips (os);
-CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers (status);
-CREATE INDEX IF NOT EXISTS idx_notifications_timestamp ON notifications (timestamp DESC);
+-- 1. CRIAÇÃO DE ÍNDICES PARA PERFORMANCE MÁXIMA
+-- Otimiza a busca por data e status ao mesmo tempo (comum no Overview)
+CREATE INDEX IF NOT EXISTS idx_trips_performance ON trips (date_time, status);
+CREATE INDEX IF NOT EXISTS idx_trips_os_upper ON trips (upper(os));
+CREATE INDEX IF NOT EXISTS idx_drivers_cpf_clean ON drivers (replace(cpf, '.', ''));
 
--- 2. HABILITAR REPLICAÇÃO REALTIME PARA AS TABELAS CRÍTICAS
--- O comando 'SET TABLE' substitui a lista atual da publicação pelas tabelas informadas.
--- Isso evita o erro de "tabela já existe na publicação" que o 'ADD TABLE' daria.
+-- 2. HABILITAR REALTIME (SINTAXE CORRETA POSTGRESQL)
+-- Se você quer habilitar para tabelas específicas (Recomendado):
 ALTER PUBLICATION supabase_realtime SET TABLE trips, drivers, notifications;
 
--- 3. OPCIONAL: SE VOCÊ REALMENTE QUISER TODAS AS TABELAS DO BANCO NO REALTIME
--- O comando correto (sem a palavra FOR) é:
+-- Se você realmente quiser todas as tabelas do schema public (Sintaxe correta sem o "FOR"):
 -- ALTER PUBLICATION supabase_realtime SET ALL TABLES;
