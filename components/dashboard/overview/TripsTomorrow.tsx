@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Trip } from '../../../types';
 import MultiCheckboxFilter from '../../shared/MultiCheckboxFilter';
 
@@ -10,36 +10,44 @@ interface TripsTomorrowProps {
 const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  const tomStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const tomStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toLocaleDateString('en-CA');
+  }, []);
 
-  const tomorrowRaw = useMemo(() => trips.filter(t => t.dateTime.split('T')[0] === tomStr), [trips, tomStr]);
+  const tomorrowRaw = useMemo(() => {
+    return trips.filter(t => {
+      if (!t.dateTime) return false;
+      const tripDate = new Date(t.dateTime).toLocaleDateString('en-CA');
+      return tripDate === tomStr;
+    });
+  }, [trips, tomStr]);
 
   const stats = useMemo(() => {
     const active = tomorrowRaw.filter(t => t.status !== 'Viagem cancelada');
     const canceled = tomorrowRaw.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = tomorrowRaw.filter(t => t.status === 'Viagem concluída').length;
+    const completed = tomorrowRaw.filter(t => t.status?.toLowerCase().includes('concluída')).length;
     
     const typeCounts: { [key: string]: number } = {};
     active.forEach(t => {
-      typeCounts[t.type] = (typeCounts[t.type] || 0) + 1;
+      const type = t.type?.toUpperCase() || 'OUTROS';
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
     return { total: active.length, typeCounts, canceled, completed };
   }, [tomorrowRaw]);
 
-  // Filtros
-  const allTypes = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.type))).sort(), [tomorrowRaw]);
+  const allTypes = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.type?.toUpperCase()))).sort(), [tomorrowRaw]);
   const allClients = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.customer.name))).sort(), [tomorrowRaw]);
 
-  const [selTypes, setSelTypes] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_tom_types') || '[]'));
-  const [selClients, setSelClients] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_tom_clients') || '[]'));
+  const [selTypes, setSelTypes] = useState<string[]>([]);
+  const [selClients, setSelClients] = useState<string[]>([]);
   
   const tomorrowTrips = useMemo(() => {
     return tomorrowRaw.filter(t => {
       if (t.status === 'Viagem cancelada') return false;
-      const matchType = selTypes.length === 0 || selTypes.includes(t.type);
+      const matchType = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase());
       const matchClient = selClients.length === 0 || selClients.includes(t.customer.name);
       return matchType && matchClient;
     }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));

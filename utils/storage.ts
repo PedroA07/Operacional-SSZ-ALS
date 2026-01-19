@@ -29,7 +29,7 @@ export const db = {
       role: u.role, lastLogin: u.last_login || u.lastlogin,
       photo: u.photo, position: u.position, driverId: u.driver_id || u.driverid,
       staffId: u.staff_id || u.staffid, status: u.status,
-      isFirstLogin: u.isfirstlogin ?? false, // Correção: Prioriza isfirstlogin
+      isFirstLogin: u.isfirstlogin ?? false,
       lastSeen: u.last_seen || u.lastseen, presence_status: u.presence_status
     }));
   },
@@ -41,7 +41,7 @@ export const db = {
       display_name: user.displayName, role: user.role, last_login: user.lastLogin,
       status: user.status || 'Ativo', driver_id: user.driverId, staff_id: user.staffId,
       position: user.position,
-      isfirstlogin: user.isFirstLogin, // Correção: Coluna isfirstlogin
+      isfirstlogin: user.isFirstLogin,
       presence_status: user.presence_status || 'offline',
       photo: user.photo
     });
@@ -72,7 +72,14 @@ export const db = {
 
   getTrips: async (): Promise<Trip[]> => {
     if (!supabase) return [];
-    return await tripRepository.getAll(supabase);
+    const trips = await tripRepository.getAll(supabase);
+    // Garantia de normalização pós-busca
+    return trips.map(t => ({
+      ...t,
+      status: t.status || 'Pendente',
+      type: t.type || 'EXPORTAÇÃO',
+      statusHistory: Array.isArray(t.statusHistory) ? t.statusHistory : []
+    }));
   },
 
   saveTrip: async (trip: Trip, actingUser?: User) => {
@@ -168,19 +175,15 @@ export const db = {
 
   saveStaff: async (staff: Staff, password?: string) => {
     if (!supabase) return false;
-    
-    // 1. Salvar na tabela de registro de equipe (Dados físicos/cadastrais)
     const staffSuccess = await staffRepository.save(supabase, staff);
     if (!staffSuccess) return false;
 
-    // 2. Sincronizar com a tabela de usuários (Credenciais de Login)
     const { data: existingUsers } = await supabase
       .from('users')
       .select('*')
       .or(`staff_id.eq.${staff.id},username.eq.${staff.username.toLowerCase()}`);
     
     const existingUser = existingUsers?.[0];
-
     const userPayload: any = {
       username: staff.username.toLowerCase(),
       display_name: staff.name.toUpperCase(),
@@ -190,29 +193,17 @@ export const db = {
       position: staff.position,
       photo: staff.photo,
     };
-
-    if (existingUser) {
-      userPayload.id = existingUser.id;
-    }
-
+    if (existingUser) userPayload.id = existingUser.id;
     if (password && password.trim() !== '') {
       userPayload.password = password.trim();
-      userPayload.isfirstlogin = false; // Se trocou a senha, não é mais o primeiro login
+      userPayload.isfirstlogin = false;
     }
-
     const { error: userError } = await supabase.from('users').upsert(userPayload);
-    
-    if (userError) {
-      console.error("Erro ao sincronizar usuário:", userError);
-      return false;
-    }
-
-    return true;
+    return !userError;
   },
 
   deleteStaff: async (id: string) => {
     if (!supabase) return false;
-    // Remove o usuário vinculado primeiro
     await supabase.from('users').delete().eq('staff_id', id);
     return await staffRepository.delete(supabase, id);
   },
@@ -274,7 +265,7 @@ export const db = {
       id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
       driverName: r.driver_name, ship: r.ship, container: r.container,
       scheduledStart: r.scheduled_start, arrivalTime: r.arrival_time,
-      departureTime: r.departure_time, exceededHours: r.exceeded_hours
+      departure_time: r.departure_time, exceededHours: r.exceeded_hours
     }));
   },
 
@@ -306,13 +297,7 @@ export const db = {
       db.getTrips(),
       db.getCategories()
     ]);
-
-    const backup = {
-      version: '1.0',
-      timestamp: new Date().toISOString(),
-      data: { drivers, customers, ports, preStacking, staff, trips, categories }
-    };
-
+    const backup = { version: '1.0', timestamp: new Date().toISOString(), data: { drivers, customers, ports, preStacking, staff, trips, categories } };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -330,9 +315,7 @@ export const db = {
         try {
           const content = JSON.parse(e.target?.result as string);
           if (!content.data) return resolve(false);
-
           const { drivers, customers, ports, preStacking, staff, trips, categories } = content.data;
-
           await Promise.all([
             ...drivers.map((d: any) => driverRepository.save(supabase, d)),
             ...customers.map((c: any) => db.saveCustomer(c)),
@@ -342,11 +325,8 @@ export const db = {
             ...trips.map((t: any) => tripRepository.save(supabase, t)),
             ...categories.map((cat: any) => db.saveCategory(cat))
           ]);
-
           resolve(true);
-        } catch (err) {
-          resolve(false);
-        }
+        } catch (err) { resolve(false); }
       };
       reader.readAsText(file);
     });

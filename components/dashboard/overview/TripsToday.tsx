@@ -10,19 +10,14 @@ interface TripsTodayProps {
 const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  // Calcula o dia de HOJE no fuso local do navegador (YYYY-MM-DD)
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    const z = d.getTimezoneOffset() * 60 * 1000;
-    const local = new Date(d.getTime() - z);
-    return local.toISOString().split('T')[0];
-  }, []);
+  // HOJE no fuso local do navegador (YYYY-MM-DD)
+  const todayStr = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
 
   const todayRaw = useMemo(() => {
     return trips.filter(t => {
       if (!t.dateTime) return false;
-      // Compara apenas a parte da data (YYYY-MM-DD) ignorando a hora UTC
-      const tripDate = t.dateTime.split('T')[0];
+      // Converte data do banco para local antes de comparar o dia
+      const tripDate = new Date(t.dateTime).toLocaleDateString('en-CA');
       return tripDate === todayStr;
     });
   }, [trips, todayStr]);
@@ -30,26 +25,30 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const stats = useMemo(() => {
     const active = todayRaw.filter(t => t.status !== 'Viagem cancelada');
     const canceled = todayRaw.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = todayRaw.filter(t => t.status === 'Viagem concluída').length;
+    
+    // Normalização de status para contagem de concluídas
+    const completed = todayRaw.filter(t => 
+      t.status?.toLowerCase() === 'viagem concluída' || 
+      t.status?.toLowerCase() === 'concluída'
+    ).length;
     
     const typeCounts: { [key: string]: number } = {};
     active.forEach(t => {
-      // Normaliza o tipo para evitar erros de acentuação/case
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    // Atraso: Se o status de chegada é MAIOR que o programado
+    // Atraso: Comparação absoluta de milissegundos
     const delays = active.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       if (!arrival) return false;
-      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 60000);
+      // Se chegou 1 minuto depois do previsto, já é atraso
+      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 59000);
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };
   }, [todayRaw]);
 
-  // Filtros
   const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase()))).sort(), [todayRaw]);
   const allClients = useMemo(() => Array.from(new Set(todayRaw.map(t => t.customer.name))).sort(), [todayRaw]);
 

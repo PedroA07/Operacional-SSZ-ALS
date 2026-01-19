@@ -20,7 +20,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
 
     const active = monthTrips.filter(t => t.status !== 'Viagem cancelada');
     const canceled = monthTrips.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = monthTrips.filter(t => t.status === 'Viagem concluída').length;
+    const completed = monthTrips.filter(t => t.status?.toLowerCase().includes('concluída')).length;
 
     const typeCounts: { [key: string]: number } = {};
     active.forEach(t => {
@@ -31,7 +31,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
     const delays = active.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       if (!arrival) return false;
-      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 60000);
+      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 59000);
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };

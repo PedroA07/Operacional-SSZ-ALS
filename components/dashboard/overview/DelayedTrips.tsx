@@ -13,18 +13,17 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
     return trips.filter(t => {
       if (t.status === 'Viagem cancelada') return false;
       
-      // Busca a primeira ocorrência de chegada no cliente (caso haja duplicatas no histórico)
       const arrivalEvents = t.statusHistory?.filter(h => h.status === 'Chegou no cliente') || [];
       if (arrivalEvents.length === 0) return false;
 
-      // Ordena para pegar a primeira chegada registrada cronologicamente
+      // Pega a PRIMEIRA chegada registrada
       const firstArrival = [...arrivalEvents].sort((a, b) => a.dateTime.localeCompare(b.dateTime))[0];
 
       const scheduled = new Date(t.dateTime).getTime();
       const actual = new Date(firstArrival.dateTime).getTime();
       
-      // Tolerância de 1 minuto para compensar delays de rede
-      return actual > (scheduled + 60000);
+      // Se a diferença for positiva (chegou depois), é atraso
+      return actual > (scheduled + 59000);
     }).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
   }, [trips]);
 
