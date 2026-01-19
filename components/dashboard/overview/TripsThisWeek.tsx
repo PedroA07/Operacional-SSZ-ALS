@@ -38,8 +38,12 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
 
     const delays = active.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (!arrival) return false;
-      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 59000);
+      const scheduled = new Date(t.dateTime).getTime();
+      if (arrival) {
+        return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
+      }
+      // Se não chegou e o horário agendado já passou mais de 10 min
+      return new Date().getTime() > (scheduled + 600000);
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };

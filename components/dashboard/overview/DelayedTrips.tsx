@@ -15,6 +15,7 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
     
     // Início do Mês Atual (Local)
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    startOfMonth.setHours(0, 0, 0, 0);
     
     // Até Amanhã Final do Dia
     const endOfTomorrow = new Date(now);
@@ -26,18 +27,19 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
       
       const tripTime = new Date(t.dateTime).getTime();
       
-      // Filtra apenas viagens do intervalo solicitado (Mês atual até amanhã)
+      // Filtra apenas viagens do mês atual até amanhã
       if (tripTime < startOfMonth.getTime() || tripTime > endOfTomorrow.getTime()) return false;
 
       const arrivalEvents = t.statusHistory?.filter(h => h.status === 'Chegou no cliente') || [];
+      const scheduled = new Date(t.dateTime).getTime();
+
       if (arrivalEvents.length === 0) {
-        // Se ainda não chegou e já passou do horário agendado há mais de 10 min
-        return new Date().getTime() > (new Date(t.dateTime).getTime() + 600000);
+        // Se ainda não chegou e o horário agendado já passou há mais de 10 min
+        return new Date().getTime() > (scheduled + 600000);
       }
 
       // Pega a PRIMEIRA chegada registrada
       const firstArrival = [...arrivalEvents].sort((a, b) => a.dateTime.localeCompare(b.dateTime))[0];
-      const scheduled = new Date(t.dateTime).getTime();
       const actual = new Date(firstArrival.dateTime).getTime();
       
       return actual > (scheduled + 59000);
@@ -65,14 +67,14 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
           </div>
         </div>
         <p className="mt-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">
-          {isOpen ? 'Recolher detalhes' : 'Ver ocorrências do mês'}
+          {isOpen ? 'Recolher detalhes' : 'Ver ocorrências acumuladas'}
         </p>
       </button>
 
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-4 duration-500 max-h-[450px] flex flex-col">
           <div className="p-5 bg-red-50 border-b border-red-100 flex justify-between items-center">
-            <span className="text-[9px] font-black text-red-700 uppercase tracking-widest ml-2">Incidências Acumuladas</span>
+            <span className="text-[9px] font-black text-red-700 uppercase tracking-widest ml-2">Incidências do Mês</span>
             <span className="px-2.5 py-1 bg-red-600 text-white rounded-lg text-[8px] font-black uppercase">{delayedList.length} OS</span>
           </div>
           <div className="overflow-y-auto custom-scrollbar p-4 space-y-3">
@@ -98,7 +100,7 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
                       <p className="text-[10px] font-black text-slate-700">{trip.os} • {trip.driver.plateHorse}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[7px] font-black text-slate-400 uppercase">Horário Programado</p>
+                      <p className="text-[7px] font-black text-slate-400 uppercase">Agendamento</p>
                       <p className="text-[10px] font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
                     </div>
                   </div>

@@ -16,7 +16,6 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const todayRaw = useMemo(() => {
     return trips.filter(t => {
       if (!t.dateTime) return false;
-      // Normaliza a data para string local antes de comparar
       const tripDate = new Date(t.dateTime).toLocaleDateString('en-CA');
       return tripDate === todayStr;
     });
@@ -37,14 +36,15 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    // Monitor de Atrasos: Chegou no cliente depois do agendado
+    // Monitor de Atrasos: Chegou no cliente depois do agendado OU agendado já passou e não chegou
     const delays = active.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (!arrival) {
-        // Se ainda não chegou e o horário agendado já passou há mais de 10 min, é atraso operacional
-        return new Date().getTime() > (new Date(t.dateTime).getTime() + 600000);
+      const scheduled = new Date(t.dateTime).getTime();
+      if (arrival) {
+        return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
       }
-      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 60000);
+      // Se não chegou e o horário agendado já passou há mais de 10 min
+      return new Date().getTime() > (scheduled + 600000);
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };

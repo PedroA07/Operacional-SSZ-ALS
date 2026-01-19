@@ -37,8 +37,12 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
 
     const delays = active.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (!arrival) return false;
-      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 59000);
+      const scheduled = new Date(t.dateTime).getTime();
+      if (arrival) {
+        return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
+      }
+      // Se não chegou e é de ontem, tecnicamente está atrasado em relação ao plano original
+      return new Date().getTime() > (scheduled + 600000);
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };
@@ -67,7 +71,7 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
       >
         <div className="flex justify-between items-start w-full">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dia Anterior</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ontem</p>
             <div className="flex items-baseline gap-2 mt-1">
               <p className="text-4xl font-black text-slate-800 tracking-tighter">{stats.total}</p>
             </div>
@@ -89,15 +93,15 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
             ))}
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <div className="text-center">
+            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100">
               <p className="text-[7px] font-black text-red-400 uppercase">Atraso</p>
               <p className="text-sm font-black text-red-600 leading-none mt-1">{stats.delays}</p>
             </div>
-            <div className="text-center">
+            <div className="text-center p-2">
               <p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p>
               <p className="text-sm font-black text-emerald-600 leading-none mt-1">{stats.completed}</p>
             </div>
-            <div className="text-center">
+            <div className="text-center p-2">
               <p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p>
               <p className="text-sm font-black text-slate-600 leading-none mt-1">{stats.canceled}</p>
             </div>
