@@ -10,16 +10,20 @@ interface TripsTodayProps {
 const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  // Garantir que a data hoje seja calculada a cada renderização para evitar statale data
+  // Calcula o dia de HOJE no fuso local do navegador (YYYY-MM-DD)
   const todayStr = useMemo(() => {
     const d = new Date();
-    return d.toISOString().split('T')[0];
+    const z = d.getTimezoneOffset() * 60 * 1000;
+    const local = new Date(d.getTime() - z);
+    return local.toISOString().split('T')[0];
   }, []);
 
   const todayRaw = useMemo(() => {
     return trips.filter(t => {
       if (!t.dateTime) return false;
-      return t.dateTime.split('T')[0] === todayStr;
+      // Compara apenas a parte da data (YYYY-MM-DD) ignorando a hora UTC
+      const tripDate = t.dateTime.split('T')[0];
+      return tripDate === todayStr;
     });
   }, [trips, todayStr]);
 
@@ -30,37 +34,36 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     
     const typeCounts: { [key: string]: number } = {};
     active.forEach(t => {
-      const type = t.type || 'OUTROS';
+      // Normaliza o tipo para evitar erros de acentuação/case
+      const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
+    // Atraso: Se o status de chegada é MAIOR que o programado
     const delays = active.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      return arrival && new Date(arrival.dateTime).getTime() > new Date(t.dateTime).getTime();
+      if (!arrival) return false;
+      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 60000);
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };
   }, [todayRaw]);
 
-  // Filtros para lista expandida
-  const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type))).sort(), [todayRaw]);
+  // Filtros
+  const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase()))).sort(), [todayRaw]);
   const allClients = useMemo(() => Array.from(new Set(todayRaw.map(t => t.customer.name))).sort(), [todayRaw]);
-  const allDests = useMemo(() => Array.from(new Set(todayRaw.map(t => t.destination?.name || t.scheduling?.location).filter(Boolean))).sort(), [todayRaw]);
 
   const [selTypes, setSelTypes] = useState<string[]>([]);
   const [selClients, setSelClients] = useState<string[]>([]);
-  const [selDests, setSelDests] = useState<string[]>([]);
   
   const todayTripsList = useMemo(() => {
     return todayRaw.filter(t => {
       if (t.status === 'Viagem cancelada') return false;
-      const matchType = selTypes.length === 0 || selTypes.includes(t.type);
+      const matchType = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase());
       const matchClient = selClients.length === 0 || selClients.includes(t.customer.name);
-      const dName = t.destination?.name || t.scheduling?.location || '';
-      const matchDest = selDests.length === 0 || (dName && selDests.includes(dName));
-      return matchType && matchClient && matchDest;
+      return matchType && matchClient;
     }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [todayRaw, selTypes, selClients, selDests]);
+  }, [todayRaw, selTypes, selClients]);
 
   return (
     <div className="relative group">
@@ -73,7 +76,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Viagens Hoje</p>
             <div className="flex items-baseline gap-2 mt-1">
               <p className="text-5xl font-black text-slate-800 tracking-tighter">{stats.total}</p>
-              {stats.total > 0 && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>}
+              {stats.delays > 0 && <div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>}
             </div>
           </div>
           <div className={`p-4 rounded-2xl transition-all duration-500 ${isOpen ? 'bg-blue-600 text-white shadow-lg' : 'bg-blue-50 text-blue-600'}`}>
@@ -85,7 +88,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
 
         <div className="mt-6 w-full space-y-4">
           <div className="grid grid-cols-2 gap-1.5">
-            {Object.entries(stats.typeCounts).slice(0, 2).map(([type, c]) => (
+            {Object.entries(stats.typeCounts).map(([type, c]) => (
               <div key={type} className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 flex justify-between items-center">
                 <span className="text-[7.5px] font-black text-slate-400 uppercase truncate pr-1">{type}</span>
                 <span className="text-[10px] font-black text-slate-700">{c}</span>
@@ -94,15 +97,15 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            <div className="text-center">
+            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100">
               <p className="text-[7px] font-black text-red-400 uppercase">Atraso</p>
               <p className="text-sm font-black text-red-600 leading-none mt-1">{stats.delays}</p>
             </div>
-            <div className="text-center">
+            <div className="text-center p-2">
               <p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p>
               <p className="text-sm font-black text-emerald-600 leading-none mt-1">{stats.completed}</p>
             </div>
-            <div className="text-center">
+            <div className="text-center p-2">
               <p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p>
               <p className="text-sm font-black text-slate-600 leading-none mt-1">{stats.canceled}</p>
             </div>
@@ -115,7 +118,6 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
           <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 shrink-0 relative z-[100]">
              <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
-             <MultiCheckboxFilter label="Destinos" options={allDests} selectedOptions={selDests} onChange={setSelDests} />
           </div>
           <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50/30 flex-1 min-h-[300px]">
             {todayTripsList.length > 0 ? todayTripsList.map(trip => (
@@ -125,7 +127,10 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
                   <span className="px-2 py-0.5 bg-slate-900 text-white rounded text-[7px] font-black uppercase">{trip.type}</span>
                 </div>
                 <p className="text-[10px] font-black text-slate-800 uppercase leading-none truncate">{trip.driver.name}</p>
-                <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 truncate">{trip.customer.name}</p>
+                <div className="flex justify-between items-center mt-1">
+                   <p className="text-[8px] font-bold text-slate-400 uppercase truncate flex-1">{trip.customer.name}</p>
+                   <span className="text-[8px] font-black text-blue-500">{trip.status}</span>
+                </div>
               </div>
             )) : <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem resultados para hoje</div>}
           </div>

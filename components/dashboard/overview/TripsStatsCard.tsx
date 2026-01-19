@@ -32,9 +32,9 @@ const TripsStatsCard: React.FC<TripsStatsCardProps> = ({ title, count, typeCount
         <div className="space-y-2">
           <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest border-b border-slate-50 pb-1">Modalidades Ativas</p>
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(typeCounts).length > 0 ? Object.entries(typeCounts).slice(0, 4).map(([type, c]) => (
+            {Object.entries(typeCounts).length > 0 ? Object.entries(typeCounts).map(([type, c]) => (
               <div key={type} className="flex justify-between items-center bg-slate-50/50 px-2 py-1.5 rounded-lg border border-slate-100/50">
-                <span className="text-[9px] font-bold text-slate-400 uppercase">{type.substring(0, 3)}</span>
+                <span className="text-[9px] font-bold text-slate-400 uppercase truncate pr-1">{type.substring(0, 3)}</span>
                 <span className="text-[10px] font-black text-slate-700">{c}</span>
               </div>
             )) : <p className="text-[8px] text-slate-300 italic uppercase">Sem dados</p>}
