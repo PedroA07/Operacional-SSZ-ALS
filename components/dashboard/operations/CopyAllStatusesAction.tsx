@@ -13,14 +13,12 @@ interface IndividualTableEditorProps {
   onFinalChange: (data: TableReportData) => void;
 }
 
-// Subcomponente memoizado para evitar re-renderizações desnecessárias e perda de foco
 const IndividualTableEditor = memo(({ initialData, onFinalChange }: IndividualTableEditorProps) => {
   const [localData, setLocalData] = useState<TableReportData>(initialData);
 
   const handleChange = (field: keyof TableReportData, value: string) => {
     const updated = { ...localData, [field]: value };
     setLocalData(updated);
-    // Notifica o pai apenas para manter os dados sincronizados, mas o foco fica aqui no estado local
     onFinalChange(updated);
   };
 
@@ -43,7 +41,7 @@ const IndividualTableEditor = memo(({ initialData, onFinalChange }: IndividualTa
           <input 
             type="text"
             className="p-2.5 text-[11px] font-black text-center outline-none focus:bg-blue-50 w-full uppercase"
-            style={{ textTransform: 'uppercase' }} // CSS garante o visual sem quebrar o cursor do JS
+            style={{ textTransform: 'uppercase' }}
             value={localData[row.field]} 
             onChange={e => handleChange(row.field, e.target.value)} 
           />
@@ -59,18 +57,23 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
   const [activeReportData, setActiveReportData] = useState<TableReportData[]>([]);
   const [finishedReportData, setFinishedReportData] = useState<TableReportData[]>([]);
 
-  // Inicializa os dados apenas quando o modal abre para evitar resets indesejados por refreshes globais
   useEffect(() => {
     if (isPreviewOpen && activeReportData.length === 0 && finishedReportData.length === 0) {
       const mapTrip = (t: Trip): TableReportData => {
-        // Ordena o histórico para garantir que ao usar .find(), peguemos o mais recente
         const history = [...(t.statusHistory || [])].sort((a, b) => 
           new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
         );
         
         const getVal = (terms: string[]) => {
           const h = history.find(entry => terms.some(term => entry.status.toLowerCase().includes(term.toLowerCase())));
-          return h ? reportGenerator.formatFullDate(h.dateTime) : "";
+          if (!h) return "";
+          
+          // Regra específica: se o status for "Container sobre rodas", retorna o texto fixo
+          if (h.status === 'Container sobre rodas') {
+            return "CONTAINER SOBRE RODAS";
+          }
+          
+          return reportGenerator.formatFullDate(h.dateTime);
         };
 
         return {
@@ -80,12 +83,20 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
           retiradaCragea: getVal(['Cragea', 'Retirada do cheio']),
           chegadaVolks: getVal(['Chegou na Volkswagen', 'Chegada na Volkswagen']),
           saidaVolks: getVal(['Saiu da Volkswagen', 'Saída da Volkswagen']),
-          baixaCragea: getVal(['Viagem concluída', 'Baixa Cragea'])
+          baixaCragea: getVal(['Viagem concluída', 'Baixa Cragea', 'Container sobre rodas'])
         };
       };
 
-      setActiveReportData(trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada').map(mapTrip));
-      setFinishedReportData(trips.filter(t => t.status === 'Viagem concluída').map(mapTrip));
+      setActiveReportData(trips.filter(t => 
+        t.status !== 'Viagem concluída' && 
+        t.status !== 'Viagem cancelada' && 
+        t.status !== 'Container sobre rodas'
+      ).map(mapTrip));
+
+      setFinishedReportData(trips.filter(t => 
+        t.status === 'Viagem concluída' || 
+        t.status === 'Container sobre rodas'
+      ).map(mapTrip));
     }
   }, [isPreviewOpen, trips, activeReportData.length, finishedReportData.length]);
 
@@ -107,7 +118,6 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
 
   const handleCopy = async () => {
     try {
-      // Normaliza para maiúsculas antes de gerar o HTML final
       const normalize = (list: TableReportData[]) => list.map(d => ({
         ...d,
         motorista: d.motorista.toUpperCase(),
@@ -139,7 +149,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
 
   const handleClose = () => {
     setIsPreviewOpen(false);
-    setActiveReportData([]); // Reseta para carregar novos dados na próxima abertura
+    setActiveReportData([]); 
     setFinishedReportData([]);
   };
 
