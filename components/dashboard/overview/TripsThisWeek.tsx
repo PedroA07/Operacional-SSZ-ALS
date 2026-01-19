@@ -12,7 +12,6 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
     const now = new Date();
     const day = now.getDay();
     
-    // Início (Domingo) e Fim (Sábado) locais
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - day);
     startOfWeek.setHours(0, 0, 0, 0);
@@ -22,6 +21,7 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
     endOfWeek.setHours(23, 59, 59, 999);
 
     const weekTrips = trips.filter(t => {
+      if (!t.dateTime) return false;
       const tripTime = new Date(t.dateTime).getTime();
       return tripTime >= startOfWeek.getTime() && tripTime <= endOfWeek.getTime();
     });

@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Trip, Driver } from '../../types';
+import TripsYesterday from './overview/TripsYesterday';
 import TripsToday from './overview/TripsToday';
 import TripsTomorrow from './overview/TripsTomorrow';
 import TripsThisWeek from './overview/TripsThisWeek';
@@ -27,7 +28,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
            </div>
            <div>
-              <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">Painel de Performance</h2>
+              <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">Painel de Performance ALS</h2>
               <div className="flex items-center gap-2 mt-1.5">
                  <div className={`w-1.5 h-1.5 rounded-full ${isSyncing ? 'bg-blue-500 animate-ping' : 'bg-emerald-500'}`}></div>
                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
@@ -49,15 +50,16 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
         </button>
       </div>
 
-      {/* GRID DE KPIs SUPERIOR - 4 BLOCOS PRINCIPAIS */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`}>
+      {/* GRID DE KPIs SUPERIOR - BLOCOS PRINCIPAIS */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`}>
+        <TripsYesterday trips={trips} />
         <TripsToday trips={trips} />
         <TripsTomorrow trips={trips} />
         <TripsThisWeek trips={trips} />
         <TripsThisMonth trips={trips} />
       </div>
 
-      {/* MONITOR DE ATRASOS CRÍTICO */}
+      {/* MONITOR DE ATRASOS E STATUS DOS MOTORISTAS */}
       <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`}>
          <div className="lg:col-span-1">
             <DelayedTrips trips={trips} />

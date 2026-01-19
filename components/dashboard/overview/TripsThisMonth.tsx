@@ -14,6 +14,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
     const currentYear = now.getFullYear();
     
     const monthTrips = trips.filter(t => {
+      if (!t.dateTime) return false;
       const d = new Date(t.dateTime);
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
