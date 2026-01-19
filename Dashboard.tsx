@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
 import DriversTab from './components/dashboard/DriversTab';
@@ -21,7 +21,7 @@ import NotificationCenter from './components/dashboard/notifications/Notificatio
 import NotificationToast from './components/dashboard/notifications/NotificationToast';
 import FeedbackModal from './components/shared/FeedbackModal';
 import { DEFAULT_OPERATIONS } from './constants/operations';
-import { db } from './utils/storage';
+import { db, supabase } from './utils/storage';
 import { Icons } from './constants/icons';
 
 interface DashboardProps {
@@ -45,8 +45,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString('pt-BR'));
 
-  // Estados para Modal de Feedback
   const [feedback, setFeedback] = useState<{ show: boolean; title: string; message: string; type: any; onConfirm?: () => void }>({
     show: false, title: '', message: '', type: 'info'
   });
@@ -80,6 +81,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[5].status === 'fulfilled') setTrips(responses[5].value);
       if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
 
+      setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
     } catch (e) {
       console.error("Erro na sincronização ALS:", e);
     } finally {
@@ -90,11 +92,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => { 
     loadAllData(true);
+
+    // 1. POLLING DE SEGURANÇA (Caso o Realtime falhe)
     const refreshDataInterval = setInterval(() => loadAllData(false), 30000);
+
+    // 2. CONFIGURAÇÃO SUPABASE REALTIME (ATUALIZAÇÃO INSTANTÂNEA)
+    let channel: any = null;
+    if (supabase) {
+      channel = supabase
+        .channel('db-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
+          console.debug("[Realtime] Viagem atualizada detectada.");
+          loadAllData(false);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
+          console.debug("[Realtime] Motorista atualizado detectado.");
+          loadAllData(false);
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') setIsRealtimeActive(true);
+        });
+    }
+
     const handleGlobalRefresh = () => loadAllData(false);
     window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
+
     return () => {
       clearInterval(refreshDataInterval);
+      if (channel) supabase?.removeChannel(channel);
       window.removeEventListener('als_force_global_refresh', handleGlobalRefresh);
     };
   }, [loadAllData]);
@@ -166,10 +191,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         onConfirm={feedback.onConfirm}
       />
       
-      {isSyncing && !isLoadingInitial && (
+      {(isSyncing || isRealtimeActive) && !isLoadingInitial && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4">
-           <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-           <span className="text-[8px] font-black text-white uppercase tracking-widest">Sincronizando Nuvem...</span>
+           <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+           <span className="text-[8px] font-black text-white uppercase tracking-widest">
+             {isSyncing ? 'Sincronizando Nuvem...' : 'Conexão em Tempo Real'}
+           </span>
         </div>
       )}
 
@@ -212,7 +239,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-10 shadow-sm z-40">
            <div className="flex items-center gap-5">
               <button onClick={() => setSidebarState(s => s === 'open' ? 'collapsed' : 'open')} className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90 border border-transparent hover:border-slate-200">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </button>
               <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{activeTab}</h2>
            </div>
@@ -223,7 +252,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </div>
         </header>
         <div className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
-           {activeTab === DashboardTab.INICIO && <OverviewTab trips={trips} drivers={drivers} />}
+           {activeTab === DashboardTab.INICIO && (
+             <OverviewTab 
+               trips={trips} 
+               drivers={drivers} 
+               onRefresh={() => loadAllData(false)} 
+               lastSyncTime={lastSyncTime}
+               isSyncing={isSyncing}
+             />
+           )}
            {activeTab === DashboardTab.OPERACOES && (
              <OperationsTab 
                user={user} 

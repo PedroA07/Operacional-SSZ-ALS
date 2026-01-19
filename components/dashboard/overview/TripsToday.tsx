@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Trip } from '../../../types';
 import MultiCheckboxFilter from '../../shared/MultiCheckboxFilter';
 
@@ -10,10 +10,18 @@ interface TripsTodayProps {
 const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  // Garantir que a data hoje seja calculada a cada renderização para evitar statale data
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+  }, []);
 
-  const todayRaw = useMemo(() => trips.filter(t => t.dateTime.split('T')[0] === todayStr), [trips, todayStr]);
+  const todayRaw = useMemo(() => {
+    return trips.filter(t => {
+      if (!t.dateTime) return false;
+      return t.dateTime.split('T')[0] === todayStr;
+    });
+  }, [trips, todayStr]);
 
   const stats = useMemo(() => {
     const active = todayRaw.filter(t => t.status !== 'Viagem cancelada');
@@ -22,7 +30,8 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     
     const typeCounts: { [key: string]: number } = {};
     active.forEach(t => {
-      typeCounts[t.type] = (typeCounts[t.type] || 0) + 1;
+      const type = t.type || 'OUTROS';
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
     const delays = active.filter(t => {
@@ -38,11 +47,11 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const allClients = useMemo(() => Array.from(new Set(todayRaw.map(t => t.customer.name))).sort(), [todayRaw]);
   const allDests = useMemo(() => Array.from(new Set(todayRaw.map(t => t.destination?.name || t.scheduling?.location).filter(Boolean))).sort(), [todayRaw]);
 
-  const [selTypes, setSelTypes] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_today_types') || '[]'));
-  const [selClients, setSelClients] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_today_clients') || '[]'));
-  const [selDests, setSelDests] = useState<string[]>(() => JSON.parse(localStorage.getItem('filter_today_dests') || '[]'));
+  const [selTypes, setSelTypes] = useState<string[]>([]);
+  const [selClients, setSelClients] = useState<string[]>([]);
+  const [selDests, setSelDests] = useState<string[]>([]);
   
-  const todayTrips = useMemo(() => {
+  const todayTripsList = useMemo(() => {
     return todayRaw.filter(t => {
       if (t.status === 'Viagem cancelada') return false;
       const matchType = selTypes.length === 0 || selTypes.includes(t.type);
@@ -109,8 +118,8 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
              <MultiCheckboxFilter label="Destinos" options={allDests} selectedOptions={selDests} onChange={setSelDests} />
           </div>
           <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50/30 flex-1 min-h-[300px]">
-            {todayTrips.length > 0 ? todayTrips.map(trip => (
-              <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl group shadow-sm">
+            {todayTripsList.length > 0 ? todayTripsList.map(trip => (
+              <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl group shadow-sm hover:border-blue-200 transition-colors">
                 <div className="flex justify-between items-start mb-2">
                   <span className="text-sm font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
                   <span className="px-2 py-0.5 bg-slate-900 text-white rounded text-[7px] font-black uppercase">{trip.type}</span>
@@ -118,7 +127,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
                 <p className="text-[10px] font-black text-slate-800 uppercase leading-none truncate">{trip.driver.name}</p>
                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 truncate">{trip.customer.name}</p>
               </div>
-            )) : <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem resultados</div>}
+            )) : <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem resultados para hoje</div>}
           </div>
         </div>
       )}
