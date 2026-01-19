@@ -11,16 +11,19 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
 
   const delayedList = useMemo(() => {
     return trips.filter(t => {
-      // Ignora viagens canceladas do reporte de atraso
       if (t.status === 'Viagem cancelada') return false;
       
-      const arrivalEvent = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (!arrivalEvent) return false;
+      // Busca a primeira ocorrência de chegada no cliente (caso haja duplicatas no histórico)
+      const arrivalEvents = t.statusHistory?.filter(h => h.status === 'Chegou no cliente') || [];
+      if (arrivalEvents.length === 0) return false;
+
+      // Ordena para pegar a primeira chegada registrada cronologicamente
+      const firstArrival = [...arrivalEvents].sort((a, b) => a.dateTime.localeCompare(b.dateTime))[0];
 
       const scheduled = new Date(t.dateTime).getTime();
-      const actual = new Date(arrivalEvent.dateTime).getTime();
+      const actual = new Date(firstArrival.dateTime).getTime();
       
-      // Atraso real se exceder 1 minuto da programação
+      // Tolerância de 1 minuto para compensar delays de rede
       return actual > (scheduled + 60000);
     }).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
   }, [trips]);
@@ -59,13 +62,13 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
           <div className="overflow-y-auto custom-scrollbar p-4 space-y-3">
             {delayedList.length > 0 ? delayedList.map(trip => {
               const arrival = trip.statusHistory?.find(h => h.status === 'Chegou no cliente');
-              const diff = arrival ? Math.round((new Date(arrival.dateTime).getTime() - new Date(trip.dateTime).getTime()) / 60000) : 0;
+              const diffMin = arrival ? Math.round((new Date(arrival.dateTime).getTime() - new Date(trip.dateTime).getTime()) / 60000) : 0;
               
               return (
                 <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-2xl border-l-4 border-l-red-500 shadow-sm">
                   <div className="flex justify-between items-center">
                     <p className="text-[10px] font-black text-slate-800 uppercase truncate flex-1">{trip.driver.name}</p>
-                    <span className="text-[9px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">+{diff}m</span>
+                    <span className="text-[9px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">+{diffMin}m</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-50">
                     <div>
@@ -73,7 +76,7 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
                       <p className="text-[10px] font-black text-slate-700">{trip.os}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[7px] font-black text-slate-400 uppercase">Atraso Real</p>
+                      <p className="text-[7px] font-black text-slate-400 uppercase">Chegada Real</p>
                       <p className="text-[10px] font-black text-red-600">{arrival ? new Date(arrival.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '---'}</p>
                     </div>
                   </div>

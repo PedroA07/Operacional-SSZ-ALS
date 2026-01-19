@@ -11,19 +11,19 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
   const stats = useMemo(() => {
     const now = new Date();
     
-    // Calcula o início da semana (Domingo 00:00:00)
+    // Início da Semana: Domingo às 00:00:00
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
 
-    // Calcula o fim da semana (Sábado 23:59:59)
+    // Fim da Semana: Sábado às 23:59:59
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
     const weekTrips = trips.filter(t => {
-      const tripDate = new Date(t.dateTime).getTime();
-      return tripDate >= startOfWeek.getTime() && tripDate <= endOfWeek.getTime();
+      const tripTime = new Date(t.dateTime).getTime();
+      return tripTime >= startOfWeek.getTime() && tripTime <= endOfWeek.getTime();
     });
 
     const active = weekTrips.filter(t => t.status !== 'Viagem cancelada');
@@ -40,7 +40,7 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
     const delays = active.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       if (!arrival) return false;
-      return new Date(arrival.dateTime).getTime() > new Date(t.dateTime).getTime();
+      return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 60000);
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };

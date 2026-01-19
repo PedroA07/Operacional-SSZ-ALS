@@ -31,7 +31,6 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
     const delays = active.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       if (!arrival) return false;
-      // Tolerância de 1 minuto
       return new Date(arrival.dateTime).getTime() > (new Date(t.dateTime).getTime() + 60000);
     }).length;
 
