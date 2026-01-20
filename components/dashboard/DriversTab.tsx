@@ -6,6 +6,7 @@ import { Icons } from '../../constants/icons';
 import ListFilters from './shared/ListFilters';
 import DriverModal from './drivers/DriverModal';
 import DriverDossierAction from './drivers/DriverDossierAction';
+import DriverVinculosCell from './drivers/DriverVinculosCell';
 
 interface DriversTabProps {
   drivers: Driver[];
@@ -126,14 +127,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1.5 max-w-[250px]">
-                      {d.operations && d.operations.length > 0 ? d.operations.map((op, i) => (
-                        <div key={i} className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg flex flex-col">
-                           <span className="text-[7px] font-black text-blue-600 uppercase tracking-tighter">{op.category}</span>
-                           <span className="text-[9px] font-bold text-slate-700 uppercase truncate">{op.client}</span>
-                        </div>
-                      )) : <span className="text-[8px] text-slate-300 font-bold uppercase italic">Sem vínculos ativos</span>}
-                    </div>
+                    <DriverVinculosCell driver={d} />
                   </td>
                   <td className="px-6 py-4">
                     <div className="space-y-2">
