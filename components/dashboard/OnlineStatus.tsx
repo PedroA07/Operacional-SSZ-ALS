@@ -42,7 +42,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) =
   }, [fetchStatus]);
 
   const getStatusInfo = (user: User, isSelf: boolean) => {
-    // Se for o próprio usuário, ele está sempre Ativo enquanto a aba estiver aberta
     if (isSelf) return { key: 'online', color: 'bg-emerald-500', text: 'text-emerald-400', label: 'Ativo' };
     
     if (!user.lastSeen) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
@@ -50,7 +49,6 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) =
     const lastSeenDate = new Date(user.lastSeen);
     const diffSeconds = (currentTime - lastSeenDate.getTime()) / 1000;
 
-    // Outros usuários: se não houver sinal nos últimos 5 minutos, assume Desconectado
     if (diffSeconds > 300) return { key: 'offline', color: 'bg-slate-700', text: 'text-slate-500', label: 'Desconectado' };
 
     switch (user.presence_status) {
@@ -66,7 +64,11 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) =
       const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
       const info = u ? getStatusInfo(u, isSelf) : getStatusInfo({} as User, isSelf);
       
-      const loginTimestamp = isSelf ? currentUser.lastLogin : u?.lastLogin;
+      // Timer do próprio usuário usa o session_start da aba
+      const loginTimestamp = isSelf 
+        ? (sessionStorage.getItem('als_session_start') || currentUser.lastLogin) 
+        : u?.lastLogin;
+
       const displayTime = (loginTimestamp && info.key !== 'offline') ? timeUtils.calculateDuration(loginTimestamp) : '00:00:00';
 
       return { ...s, info, displayTime };

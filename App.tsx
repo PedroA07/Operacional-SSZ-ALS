@@ -17,6 +17,7 @@ const App: React.FC = () => {
     setUser(null);
     setCurrentScreen(AppScreen.LOGIN);
     sessionStorage.removeItem('als_active_session');
+    sessionStorage.removeItem('als_session_start');
     
     if (oldId && oldId !== 'admin-master') {
       try {
@@ -37,6 +38,10 @@ const App: React.FC = () => {
           // Se for o admin master, reconecta direto
           if (sessionData.username === 'operacional_ssz') {
             setUser(sessionData);
+            // Garante que o session_start exista se não houver (ex: após refresh)
+            if (!sessionStorage.getItem('als_session_start')) {
+              sessionStorage.setItem('als_session_start', new Date().toISOString());
+            }
             setCurrentScreen(AppScreen.DASHBOARD);
             setIsInitializing(false);
             return;
@@ -49,9 +54,13 @@ const App: React.FC = () => {
           if (dbUser && dbUser.status !== 'Inativo') {
             setUser(dbUser);
             await db.updatePresence(dbUser.id, 'online');
+            if (!sessionStorage.getItem('als_session_start')) {
+              sessionStorage.setItem('als_session_start', new Date().toISOString());
+            }
             setCurrentScreen(AppScreen.DASHBOARD);
           } else {
             sessionStorage.removeItem('als_active_session');
+            sessionStorage.removeItem('als_session_start');
           }
         }
       } catch (e) {
@@ -66,9 +75,17 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = async (userData: User) => {
     setUser(userData);
+    // Define o início da sessão apenas no momento do login manual
+    const now = new Date().toISOString();
+    sessionStorage.setItem('als_session_start', now);
+    
     if (userData.id !== 'admin-master') {
       await db.updatePresence(userData.id, 'online');
+    } else {
+      // Para o master, forçamos um sinal de vida inicial
+      await db.updatePresence('admin-master', 'online');
     }
+    
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);
   };

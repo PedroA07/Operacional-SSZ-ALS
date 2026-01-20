@@ -25,7 +25,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
     loadStaffInfo();
 
     const updateTimer = () => {
-      setSessionTime(timeUtils.calculateDuration(user.lastLogin));
+      // Prioriza als_session_start gravado no momento do login manual na aba atual
+      const sessionStart = sessionStorage.getItem('als_session_start') || user.lastLogin;
+      setSessionTime(timeUtils.calculateDuration(sessionStart));
     };
 
     updateTimer();

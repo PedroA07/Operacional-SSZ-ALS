@@ -10,46 +10,39 @@ interface TripsTodayProps {
 const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  const todayStr = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
+  const todayStr = useMemo(() => new Date().toISOString().substring(0, 10), []);
 
   const todayRaw = useMemo(() => {
     return trips.filter(t => {
       if (!t.dateTime) return false;
-      const tripDate = new Date(t.dateTime).toLocaleDateString('en-CA');
-      return tripDate === todayStr;
+      return t.dateTime.substring(0, 10) === todayStr;
     });
   }, [trips, todayStr]);
 
   const stats = useMemo(() => {
-    // Filtro rigoroso: Ignora canceladas e remove duplicatas de OS
-    // Explicitly typed the Map input and variable to avoid 'unknown' inference
-    const uniqueActiveTrips: Trip[] = Array.from(new Map(
-      todayRaw
-        .filter(t => t.status?.toLowerCase() !== 'viagem cancelada')
-        .map(t => [t.os, t] as [string, Trip])
-    ).values());
-
+    // Volume Real: Todas as programações do dia que não foram canceladas
+    const activeTrips = todayRaw.filter(t => t.status?.toLowerCase() !== 'viagem cancelada');
     const canceledCount = todayRaw.filter(t => t.status?.toLowerCase().includes('cancelada')).length;
     
-    const completed = uniqueActiveTrips.filter(t => 
+    const completed = activeTrips.filter(t => 
       t.status?.toLowerCase().includes('concluída') || 
       t.status?.toLowerCase() === 'concluída'
     ).length;
     
     const typeCounts: { [key: string]: number } = {};
-    uniqueActiveTrips.forEach(t => {
+    activeTrips.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    const delays = uniqueActiveTrips.filter(t => {
+    const delays = activeTrips.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       const scheduled = new Date(t.dateTime).getTime();
       if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
       return new Date().getTime() > (scheduled + 600000);
     }).length;
 
-    return { total: uniqueActiveTrips.length, typeCounts, canceled: canceledCount, delays, completed };
+    return { total: activeTrips.length, typeCounts, canceled: canceledCount, delays, completed };
   }, [todayRaw]);
 
   const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase()))).sort(), [todayRaw]);
