@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Trip, User, PaymentStatus, TripStatus } from '../../../types';
+import { Trip, User, PaymentStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 
 interface FinanceActionProps {
@@ -10,31 +10,37 @@ interface FinanceActionProps {
 }
 
 const FinanceAction: React.FC<FinanceActionProps> = ({ trip, user, onRefresh }) => {
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   const togglePayment = async (type: 'advance' | 'balance') => {
     if (isProcessing) return;
 
-    const currentPayment = type === 'advance' ? trip.advancePayment : trip.balancePayment;
+    const isAdvance = type === 'advance';
+    const currentPayment = isAdvance ? trip.advancePayment : trip.balancePayment;
     
-    // Se já estiver pago, não permite alterar via painel operacional
+    // Bloqueio: Não altera se já estiver pago (status final do financeiro)
     if (currentPayment.status === 'PAGO') return;
 
-    const isLiberated = currentPayment.status === 'LIBERAR';
-    
-    if (isLiberated && !confirm(`Deseja BLOQUEAR novamente o ${type === 'advance' ? 'adiantamento' : 'saldo'} desta OS?`)) {
-      return;
+    // REGRA: 30% só pode ser marcado se 70% estiver LIBERADO ou PAGO
+    if (!isAdvance) {
+      const advanceStatus = trip.advancePayment.status;
+      if (advanceStatus !== 'LIBERAR' && advanceStatus !== 'PAGO') {
+        return; // Impede a ação silenciosamente ou poderia disparar um mini-toast
+      }
     }
 
-    setIsProcessing(true);
+    const isCurrentlyLiberated = currentPayment.status === 'LIBERAR';
+    
+    setIsProcessing(type);
     try {
-      const nextStatus: PaymentStatus['status'] = isLiberated 
-        ? (type === 'advance' ? 'BLOQUEADO' : 'AGUARDANDO_DOCS') 
+      const nextStatus: PaymentStatus['status'] = isCurrentlyLiberated 
+        ? (isAdvance ? 'BLOQUEADO' : 'AGUARDANDO_DOCS') 
         : 'LIBERAR';
 
       const updatedTrip = {
         ...trip,
-        [type === 'advance' ? 'advancePayment' : 'balancePayment']: {
+        [isAdvance ? 'advancePayment' : 'balancePayment']: {
+          ...currentPayment,
           status: nextStatus,
           liberatedAt: nextStatus === 'LIBERAR' ? new Date().toISOString() : undefined
         }
@@ -43,77 +49,84 @@ const FinanceAction: React.FC<FinanceActionProps> = ({ trip, user, onRefresh }) 
       const success = await db.saveTrip(updatedTrip, user);
       
       if (success) {
-        // Notifica o sistema sobre a liberação
         if (nextStatus === 'LIBERAR') {
           await db.addNotification(
             user, 
             'PAYMENT_LIBERATED', 
-            `${type === 'advance' ? '70%' : '30%'} LIBERADO`, 
-            `Pagamento da OS ${trip.os} autorizado por ${user.displayName}.`,
+            `${isAdvance ? '70%' : '30%'} LIBERADO`, 
+            `Autorização de pagamento OS ${trip.os} enviada ao financeiro.`,
             { os: trip.os, motorista: trip.driver.name }
           );
         }
         onRefresh();
       }
     } catch (e) {
-      alert("Erro ao atualizar financeiro.");
+      console.error("Erro financeiro:", e);
     } finally {
-      setIsProcessing(false);
+      setIsProcessing(null);
     }
   };
 
-  const StatusDot = ({ type, payment }: { type: 'advance' | 'balance', payment: PaymentStatus }) => {
+  const FinanceButton = ({ type }: { type: 'advance' | 'balance' }) => {
+    const isAdvance = type === 'advance';
+    const payment = isAdvance ? trip.advancePayment : trip.balancePayment;
     const isPaid = payment.status === 'PAGO';
     const isLiberated = payment.status === 'LIBERAR';
-    const label = type === 'advance' ? '70%' : '30%';
-
-    let dotClass = "bg-slate-200";
-    let shadowClass = "";
+    const label = isAdvance ? '70%' : '30%';
     
-    if (isPaid) {
-      dotClass = "bg-emerald-500";
-      shadowClass = "shadow-[0_0_10px_rgba(16,185,129,0.5)]";
-    } else if (isLiberated) {
-      dotClass = "bg-blue-500 animate-pulse";
-      shadowClass = "shadow-[0_0_10px_rgba(59,130,246,0.5)]";
-    }
+    // Verifica se este botão está bloqueado pela regra de dependência
+    const isLockedByRule = !isAdvance && 
+                           trip.advancePayment.status !== 'LIBERAR' && 
+                           trip.advancePayment.status !== 'PAGO';
+
+    const getStyles = () => {
+      if (isPaid) return "bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/20";
+      if (isLiberated) return "bg-blue-600 border-blue-700 text-white shadow-blue-600/40 ring-4 ring-blue-600/10 animate-pulse";
+      if (isLockedByRule) return "bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed opacity-50";
+      return "bg-white border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600 shadow-sm";
+    };
 
     return (
-      <div className="flex items-center gap-3 group/item">
-        <span className="text-[8px] font-black text-slate-400 uppercase w-6 leading-none">{label}</span>
+      <div className="flex items-center gap-2 group/fin">
         <button
           type="button"
-          disabled={isPaid || isProcessing}
+          disabled={isPaid || isProcessing !== null || isLockedByRule}
           onClick={(e) => {
             e.stopPropagation();
             togglePayment(type);
           }}
-          className={`relative w-6 h-6 flex items-center justify-center rounded-lg border-2 transition-all ${
-            isPaid 
-              ? 'border-emerald-100 bg-emerald-50 cursor-default' 
-              : isLiberated 
-                ? 'border-blue-200 bg-blue-50 hover:bg-white' 
-                : 'border-slate-100 bg-slate-50 hover:border-blue-300'
-          }`}
-          title={isPaid ? "Pagamento Confirmado" : isLiberated ? "Clique para Bloquear" : "Clique para Liberar"}
+          className={`
+            relative h-8 px-3 rounded-xl border-2 font-black text-[9px] tracking-tighter
+            transition-all duration-300 flex items-center justify-center gap-1.5
+            active:scale-90 select-none
+            ${getStyles()}
+          `}
         >
-          <div className={`w-2 h-2 rounded-full transition-all ${dotClass} ${shadowClass}`}></div>
+          {isProcessing === type ? (
+            <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+          ) : isPaid ? (
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="4" d="M5 13l4 4L19 7"/></svg>
+          ) : isLockedByRule ? (
+            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          ) : null}
           
-          {/* Tooltip dinâmico */}
-          {!isPaid && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-[7px] font-black uppercase rounded opacity-0 group-hover/item:opacity-100 pointer-events-none whitespace-nowrap z-50">
-              {isLiberated ? 'Revogar Liberação' : 'Liberar Agora'}
-            </div>
-          )}
+          <span>{label}</span>
+
+          {/* Tooltip Informativo */}
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-[7px] font-black uppercase rounded opacity-0 group-hover/fin:opacity-100 pointer-events-none whitespace-nowrap z-[100] transition-opacity">
+            {isPaid ? 'Pagamento Confirmado' : 
+             isLockedByRule ? 'Libere os 70% primeiro' :
+             isLiberated ? 'Clique para Bloquear' : 'Clique para Liberar'}
+          </div>
         </button>
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col gap-2 min-w-[85px] p-1">
-      <StatusDot type="advance" payment={trip.advancePayment} />
-      <StatusDot type="balance" payment={trip.balancePayment} />
+    <div className="flex flex-col gap-1.5 py-1">
+      <FinanceButton type="advance" />
+      <FinanceButton type="balance" />
     </div>
   );
 };

@@ -10,7 +10,6 @@ interface TripsTodayProps {
 const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  // HOJE no fuso local do navegador (YYYY-MM-DD)
   const todayStr = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
 
   const todayRaw = useMemo(() => {
@@ -22,32 +21,35 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   }, [trips, todayStr]);
 
   const stats = useMemo(() => {
-    const active = todayRaw.filter(t => t.status?.toLowerCase() !== 'viagem cancelada');
-    const canceled = todayRaw.filter(t => t.status?.toLowerCase().includes('cancelada')).length;
+    // Filtro rigoroso: Ignora canceladas e remove duplicatas de OS
+    // Explicitly typed the Map input and variable to avoid 'unknown' inference
+    const uniqueActiveTrips: Trip[] = Array.from(new Map(
+      todayRaw
+        .filter(t => t.status?.toLowerCase() !== 'viagem cancelada')
+        .map(t => [t.os, t] as [string, Trip])
+    ).values());
+
+    const canceledCount = todayRaw.filter(t => t.status?.toLowerCase().includes('cancelada')).length;
     
-    const completed = todayRaw.filter(t => 
+    const completed = uniqueActiveTrips.filter(t => 
       t.status?.toLowerCase().includes('concluída') || 
       t.status?.toLowerCase() === 'concluída'
     ).length;
     
     const typeCounts: { [key: string]: number } = {};
-    active.forEach(t => {
+    uniqueActiveTrips.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    // Monitor de Atrasos: Chegou no cliente depois do agendado OU agendado já passou e não chegou
-    const delays = active.filter(t => {
+    const delays = uniqueActiveTrips.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       const scheduled = new Date(t.dateTime).getTime();
-      if (arrival) {
-        return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      }
-      // Se não chegou e o horário agendado já passou há mais de 10 min
+      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
       return new Date().getTime() > (scheduled + 600000);
     }).length;
 
-    return { total: active.length, typeCounts, canceled, delays, completed };
+    return { total: uniqueActiveTrips.length, typeCounts, canceled: canceledCount, delays, completed };
   }, [todayRaw]);
 
   const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase()))).sort(), [todayRaw]);

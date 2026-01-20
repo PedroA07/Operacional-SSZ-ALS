@@ -10,10 +10,10 @@ interface TripsThisWeekProps {
 const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
   const stats = useMemo(() => {
     const now = new Date();
+    // Ajuste para Segunda-feira ser o dia 0 da contagem ALS
     const day = now.getDay();
-    
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - day);
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const startOfWeek = new Date(now.setDate(diff));
     startOfWeek.setHours(0, 0, 0, 0);
 
     const endOfWeek = new Date(startOfWeek);
@@ -26,27 +26,31 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
       return tripTime >= startOfWeek.getTime() && tripTime <= endOfWeek.getTime();
     });
 
-    const active = weekTrips.filter(t => t.status !== 'Viagem cancelada');
+    // Unicidade e Filtro de Ativas
+    // Explicitly typed the Map input and variable to avoid 'unknown' inference
+    const uniqueActive: Trip[] = Array.from(new Map(
+      weekTrips
+        .filter(t => t.status !== 'Viagem cancelada')
+        .map(t => [t.os, t] as [string, Trip])
+    ).values());
+
     const canceled = weekTrips.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = weekTrips.filter(t => t.status?.toLowerCase().includes('concluída')).length;
+    const completed = uniqueActive.filter(t => t.status?.toLowerCase().includes('concluída')).length;
     
     const typeCounts: { [key: string]: number } = {};
-    active.forEach(t => {
+    uniqueActive.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    const delays = active.filter(t => {
+    const delays = uniqueActive.filter(t => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       const scheduled = new Date(t.dateTime).getTime();
-      if (arrival) {
-        return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      }
-      // Se não chegou e o horário agendado já passou mais de 10 min
+      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
       return new Date().getTime() > (scheduled + 600000);
     }).length;
 
-    return { total: active.length, typeCounts, canceled, delays, completed };
+    return { total: uniqueActive.length, typeCounts, canceled, delays, completed };
   }, [trips]);
 
   return (
