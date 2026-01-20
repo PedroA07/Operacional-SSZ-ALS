@@ -25,6 +25,8 @@ export const tripRepository = {
     driver: trip.driver, 
     status: trip.status || 'Pendente',
     status_history: trip.statusHistory || [], 
+    advance_payment: trip.advancePayment || { status: 'BLOQUEADO' },
+    balance_payment: trip.balancePayment || { status: 'AGUARDANDO_DOCS' },
     os_doc: trip.osDoc || null,
     agendamento_doc: trip.agendamentoDoc || null,
     completo_doc: trip.completoDoc || null,

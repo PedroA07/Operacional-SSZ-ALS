@@ -16,16 +16,17 @@ const FinanceAction: React.FC<FinanceActionProps> = ({ trip, user, onRefresh }) 
     if (isProcessing) return;
 
     const isAdvance = type === 'advance';
-    const currentPayment = isAdvance ? trip.advancePayment : trip.balancePayment;
+    // Garantia de inicialização se o campo estiver nulo
+    const currentPayment = (isAdvance ? trip.advancePayment : trip.balancePayment) || { status: isAdvance ? 'BLOQUEADO' : 'AGUARDANDO_DOCS' };
     
     // Bloqueio: Não altera se já estiver pago (status final do financeiro)
     if (currentPayment.status === 'PAGO') return;
 
     // REGRA: 30% só pode ser marcado se 70% estiver LIBERADO ou PAGO
     if (!isAdvance) {
-      const advanceStatus = trip.advancePayment.status;
+      const advanceStatus = trip.advancePayment?.status || 'BLOQUEADO';
       if (advanceStatus !== 'LIBERAR' && advanceStatus !== 'PAGO') {
-        return; // Impede a ação silenciosamente ou poderia disparar um mini-toast
+        return; 
       }
     }
 
@@ -69,15 +70,15 @@ const FinanceAction: React.FC<FinanceActionProps> = ({ trip, user, onRefresh }) 
 
   const FinanceButton = ({ type }: { type: 'advance' | 'balance' }) => {
     const isAdvance = type === 'advance';
-    const payment = isAdvance ? trip.advancePayment : trip.balancePayment;
+    const payment = (isAdvance ? trip.advancePayment : trip.balancePayment) || { status: isAdvance ? 'BLOQUEADO' : 'AGUARDANDO_DOCS' };
     const isPaid = payment.status === 'PAGO';
     const isLiberated = payment.status === 'LIBERAR';
     const label = isAdvance ? '70%' : '30%';
     
     // Verifica se este botão está bloqueado pela regra de dependência
     const isLockedByRule = !isAdvance && 
-                           trip.advancePayment.status !== 'LIBERAR' && 
-                           trip.advancePayment.status !== 'PAGO';
+                           trip.advancePayment?.status !== 'LIBERAR' && 
+                           trip.advancePayment?.status !== 'PAGO';
 
     const getStyles = () => {
       if (isPaid) return "bg-emerald-500 border-emerald-600 text-white shadow-emerald-500/20";
