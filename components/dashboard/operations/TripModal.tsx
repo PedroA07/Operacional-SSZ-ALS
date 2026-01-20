@@ -87,7 +87,11 @@ const TripModal: React.FC<TripModalProps> = ({
       const success = await db.saveTrip(payload, currentUser || undefined);
       
       if (success) {
-        onSuccess();
+        // Delay técnico de consistência (500ms) para o Supabase processar a escrita
+        setTimeout(() => {
+          onSuccess();
+          window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+        }, 500);
         onClose();
       } else {
         alert("O servidor não confirmou o salvamento. Verifique sua conexão.");

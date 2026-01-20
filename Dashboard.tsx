@@ -47,6 +47,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString('pt-BR'));
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [feedback, setFeedback] = useState<{ show: boolean; title: string; message: string; type: any; onConfirm?: () => void }>({
     show: false, title: '', message: '', type: 'info'
@@ -82,6 +83,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
 
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
+      setRefreshKey(prev => prev + 1);
     } catch (e) {
       console.error("Erro na sincronização ALS:", e);
     } finally {
@@ -93,20 +95,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   useEffect(() => { 
     loadAllData(true);
 
-    // 1. POLLING DE SEGURANÇA (Caso o Realtime falhe)
     const refreshDataInterval = setInterval(() => loadAllData(false), 30000);
 
-    // 2. CONFIGURAÇÃO SUPABASE REALTIME (ATUALIZAÇÃO INSTANTÂNEA)
     let channel: any = null;
     if (supabase) {
       channel = supabase
         .channel('db-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
-          console.debug("[Realtime] Viagem atualizada detectada.");
           loadAllData(false);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
-          console.debug("[Realtime] Motorista atualizado detectado.");
           loadAllData(false);
         })
         .subscribe((status) => {
@@ -254,6 +252,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <div className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
            {activeTab === DashboardTab.INICIO && (
              <OverviewTab 
+               key={`overview-${refreshKey}`}
                trips={trips} 
                drivers={drivers} 
                onRefresh={() => loadAllData(false)} 
@@ -263,6 +262,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            )}
            {activeTab === DashboardTab.OPERACOES && (
              <OperationsTab 
+               key={`ops-${refreshKey}`}
                user={user} 
                availableOps={availableOps} 
                drivers={drivers} 
@@ -277,7 +277,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onRefresh={() => loadAllData(false)}
              />
            )}
-           {activeTab === DashboardTab.ESTADIAS && <StaysTab categories={categories} userId={user.id} />}
+           {activeTab === DashboardTab.ESTADIAS && <StaysTab key={`stays-${refreshKey}`} categories={categories} userId={user.id} />}
            {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(false); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.MOTORISTAS && (

@@ -35,10 +35,9 @@ const App: React.FC = () => {
         if (saved) {
           const sessionData: User = JSON.parse(saved);
           
-          // Se for o admin master, reconecta direto
+          // Se for o admin master operacional_ssz
           if (sessionData.username === 'operacional_ssz') {
             setUser(sessionData);
-            // Garante que o session_start exista se não houver (ex: após refresh)
             if (!sessionStorage.getItem('als_session_start')) {
               sessionStorage.setItem('als_session_start', new Date().toISOString());
             }
@@ -60,11 +59,10 @@ const App: React.FC = () => {
             setCurrentScreen(AppScreen.DASHBOARD);
           } else {
             sessionStorage.removeItem('als_active_session');
-            sessionStorage.removeItem('als_session_start');
           }
         }
       } catch (e) {
-        console.error("Session Init Error:", e);
+        console.error("Erro na carga da sessão:", e);
       } finally {
         setIsInitializing(false);
       }
@@ -75,16 +73,11 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = async (userData: User) => {
     setUser(userData);
-    // Define o início da sessão apenas no momento do login manual
     const now = new Date().toISOString();
     sessionStorage.setItem('als_session_start', now);
     
-    if (userData.id !== 'admin-master') {
-      await db.updatePresence(userData.id, 'online');
-    } else {
-      // Para o master, forçamos um sinal de vida inicial
-      await db.updatePresence('admin-master', 'online');
-    }
+    // Atualiza presença no banco
+    await db.updatePresence(userData.id === 'admin-master' ? 'admin-master' : userData.id, 'online');
     
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);
@@ -93,10 +86,13 @@ const App: React.FC = () => {
   if (isInitializing) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
-        <div className="text-blue-600 font-black italic text-5xl animate-pulse">ALS</div>
-        <div className="w-48 h-1 bg-white/5 rounded-full mt-8 overflow-hidden">
+        <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center shadow-[0_0_50px_rgba(37,99,235,0.3)] mb-8 animate-bounce">
+           <span className="text-white font-black italic text-2xl">ALS</span>
+        </div>
+        <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
            <div className="h-full bg-blue-600 animate-[loading_2s_infinite]"></div>
         </div>
+        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6">Sincronizando Terminal...</p>
       </div>
     );
   }
