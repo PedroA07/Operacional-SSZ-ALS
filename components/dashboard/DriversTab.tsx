@@ -5,6 +5,7 @@ import { maskPhone, maskCPF, maskRG } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
 import ListFilters from './shared/ListFilters';
 import DriverModal from './drivers/DriverModal';
+import DriverDossierAction from './drivers/DriverDossierAction';
 
 interface DriversTabProps {
   drivers: Driver[];
@@ -62,14 +63,15 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[1500px]">
+          <table className="w-full text-left text-xs min-w-[1600px]">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
                 <th className="px-6 py-5">Identificação / Beneficiário</th>
                 <th className="px-6 py-5">Contato Direto</th>
-                <th className="px-6 py-5">Documentação Completa</th>
+                <th className="px-6 py-5">Documentação</th>
                 <th className="px-6 py-5">Frota / Equipamento</th>
-                <th className="px-6 py-5">Tipo / Portal de Acesso</th>
+                <th className="px-6 py-5">Vínculos Operacionais</th>
+                <th className="px-6 py-5">Tipo / Portal</th>
                 <th className="px-6 py-5">Status</th>
                 <th className="px-6 py-5 text-right">Ações</th>
               </tr>
@@ -87,7 +89,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                         <div className="mt-2 p-1.5 bg-blue-50/50 rounded-lg border border-blue-100/50">
                            <p className="text-[7px] font-black text-blue-400 uppercase tracking-tighter leading-none">Beneficiário:</p>
                            <p className="text-[9px] font-bold text-blue-600 uppercase mt-0.5">{d.beneficiaryName || 'O PRÓPRIO'}</p>
-                           <p className="text-[8px] font-mono text-blue-400">{d.beneficiaryCnpj || maskCPF(d.cpf)}</p>
                         </div>
                       </div>
                     </div>
@@ -104,7 +105,6 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                   <td className="px-6 py-4">
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-slate-500 uppercase">CPF: <span className="text-slate-800 font-mono">{maskCPF(d.cpf)}</span></p>
-                      <p className="text-[9px] font-black text-slate-500 uppercase">RG: <span className="text-slate-800 font-mono">{d.rg ? maskRG(d.rg) : '---'}</span></p>
                       <div className="flex items-center gap-2 pt-1">
                          <span className="text-[9px] font-black text-slate-500 uppercase">CNH: <span className="text-slate-800">{d.cnh || '---'}</span></span>
                          {d.cnhPdfUrl && (
@@ -117,18 +117,22 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                     <div className="grid grid-cols-1 gap-2">
                        <div className="flex items-center gap-2">
                           <span className="bg-slate-900 text-white px-2 py-1 rounded text-[10px] font-mono font-bold shadow-sm">{d.plateHorse}</span>
-                          <div className="flex flex-col">
-                             <span className="text-[7px] font-black text-slate-300 uppercase leading-none">Cavalo</span>
-                             <span className="text-[9px] text-slate-500 font-bold">{d.yearHorse || '---'}</span>
-                          </div>
+                          <span className="text-[9px] text-slate-500 font-bold">{d.yearHorse || '---'}</span>
                        </div>
                        <div className="flex items-center gap-2">
                           <span className="bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded text-[10px] font-mono font-bold">{d.plateTrailer}</span>
-                          <div className="flex flex-col">
-                             <span className="text-[7px] font-black text-slate-300 uppercase leading-none">Carreta</span>
-                             <span className="text-[9px] text-slate-500 font-bold">{d.yearTrailer || '---'}</span>
-                          </div>
+                          <span className="text-[9px] text-slate-500 font-bold">{d.yearTrailer || '---'}</span>
                        </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-1.5 max-w-[250px]">
+                      {d.operations && d.operations.length > 0 ? d.operations.map((op, i) => (
+                        <div key={i} className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg flex flex-col">
+                           <span className="text-[7px] font-black text-blue-600 uppercase tracking-tighter">{op.category}</span>
+                           <span className="text-[9px] font-bold text-slate-700 uppercase truncate">{op.client}</span>
+                        </div>
+                      )) : <span className="text-[8px] text-slate-300 font-bold uppercase italic">Sem vínculos ativos</span>}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -136,12 +140,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                       <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-black uppercase border border-blue-100">{d.driverType}</span>
                       <div className="p-2 bg-slate-900 rounded-xl border border-white/5 space-y-1">
                          <div className="flex justify-between items-center gap-4">
-                            <span className="text-[7px] font-black text-slate-500 uppercase">Login (ID):</span>
+                            <span className="text-[7px] font-black text-slate-500 uppercase">Login:</span>
                             <span className="text-[9px] font-mono font-black text-blue-400">{d.cpf.replace(/\D/g,'')}</span>
-                         </div>
-                         <div className="flex justify-between items-center gap-4">
-                            <span className="text-[7px] font-black text-slate-500 uppercase">Senha Pad.:</span>
-                            <span className="text-[9px] font-mono font-black text-white">{d.generatedPassword || '---'}</span>
                          </div>
                       </div>
                     </div>
@@ -153,6 +153,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <DriverDossierAction driver={d} />
                       <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" strokeWidth="2.5"/></svg></button>
                       <button onClick={() => { setItemToDelete(d); setIsDeleteModalOpen(true); }} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Icons.Excluir /></button>
                     </div>
