@@ -35,34 +35,47 @@ const TripModal: React.FC<TripModalProps> = ({
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
-    if (saved) setCurrentUser(JSON.parse(saved));
-
+    if (saved) {
+      try {
+        setCurrentUser(JSON.parse(saved));
+      } catch (e) {
+        console.error("Erro ao ler sessão no modal", e);
+      }
+    }
+    
     const loadPorts = async () => {
       const [p, ps] = await Promise.all([db.getPorts(), db.getPreStacking()]);
       setPorts([...p, ...ps]);
     };
     loadPorts();
-  }, []);
+  }, [isOpen]);
 
   const handleSave = async (formData: any) => {
-    if (isSaving || !currentUser) return;
+    if (isSaving) return;
     setIsSaving(true);
+    
     try {
       const tripId = editTrip?.id || `trip-${Date.now()}`;
+      const now = new Date().toISOString();
       
+      // Sincroniza vínculos de motorista e cliente se for uma nova categoria detectada
       if (formData.driver && formData.customer) {
         await osCategoryService.syncVinculos(formData.category || 'Geral', formData.driver, formData.customer);
       }
 
       // Prepara o payload final preservando o histórico se for edição
-      const payload = {
+      const payload: Trip = {
         ...formData,
         id: tripId,
         dateTime: new Date(formData.dateTime).toISOString(),
         isLate: editTrip?.isLate || false,
         documents: editTrip?.documents || [],
         status: editTrip?.status || 'Pendente',
-        statusHistory: editTrip?.statusHistory || [{ status: 'Pendente', dateTime: new Date().toISOString() }],
+        statusHistory: editTrip?.statusHistory || [{ 
+          status: 'Pendente', 
+          dateTime: now,
+          createdAt: now 
+        }],
         advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },
         balancePayment: editTrip?.balancePayment || { status: 'AGUARDANDO_DOCS' },
         ocFormData: {
@@ -71,12 +84,17 @@ const TripModal: React.FC<TripModalProps> = ({
         }
       };
 
-      await db.saveTrip(payload as any, currentUser);
-      onSuccess();
-      onClose();
+      const success = await db.saveTrip(payload, currentUser || undefined);
+      
+      if (success) {
+        onSuccess();
+        onClose();
+      } else {
+        alert("O servidor não confirmou o salvamento. Verifique sua conexão.");
+      }
     } catch (err) {
-      console.error(err);
-      alert("Erro ao processar a programação.");
+      console.error("Erro crítico no cadastro:", err);
+      alert("Erro ao processar a programação. Verifique os campos e tente novamente.");
     } finally {
       setIsSaving(false);
     }

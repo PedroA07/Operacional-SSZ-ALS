@@ -20,8 +20,14 @@ interface TripFormProps {
 const TripForm: React.FC<TripFormProps> = ({ 
   editTrip, initialCategory, initialCustomer, drivers, customers, categories, ports, onCancel, onSave, isSaving 
 }) => {
+  const getLocalISOTime = () => {
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - offset).toISOString().slice(0, 16);
+  };
+
   const [formData, setFormData] = useState<any>({
-    os: '', booking: '', ship: '', dateTime: '', type: 'EXPORTAÇÃO', status: 'Pendente',
+    os: '', booking: '', ship: '', dateTime: getLocalISOTime(), type: 'EXPORTAÇÃO', status: 'Pendente',
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
     containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: '', autColeta: '',
     customer: null, destination: null, driver: null
@@ -59,18 +65,14 @@ const TripForm: React.FC<TripFormProps> = ({
         driver: editTrip.driver?.name || ''
       });
     } else {
-      setFormData({
-        os: '', booking: '', ship: '', 
-        dateTime: new Date().toISOString().slice(0, 16),
-        type: 'EXPORTAÇÃO', status: 'Pendente',
-        category: initialCategory || '',
-        subCategory: initialCustomer?.name || '',
-        container: '', tara: '', seal: '', cva: '', 
-        containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', 
-        embarcador: '', obs: '', autColeta: '',
-        customer: initialCustomer ? { ...initialCustomer } : null,
-        destination: null, driver: null
-      });
+      setFormData(prev => ({
+        ...prev,
+        category: initialCategory || prev.category,
+        customer: initialCustomer || prev.customer,
+        subCategory: initialCustomer?.name || prev.subCategory,
+        os: '', booking: '', ship: '', container: '', tara: '', seal: '', cva: '',
+        dateTime: getLocalISOTime()
+      }));
       setSearches({
         customer: initialCustomer ? initialCustomer.name : '',
         destination: '',
@@ -102,6 +104,8 @@ const TripForm: React.FC<TripFormProps> = ({
   const inputClass = "w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm placeholder:text-slate-300";
   const dateInputClass = "w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-white text-slate-700 font-bold focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
+
+  const isFormValid = formData.os && formData.customer && formData.driver && formData.category;
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-10 pb-10">
@@ -175,7 +179,7 @@ const TripForm: React.FC<TripFormProps> = ({
                 }}
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
-                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>
+                 {formData.customer ? <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="3"/></svg> : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>}
               </div>
             </div>
 
@@ -186,14 +190,13 @@ const TripForm: React.FC<TripFormProps> = ({
                     <button 
                       key={c.id} type="button"
                       onClick={() => {
-                        setFormData({...formData, customer: c, subCategory: c.name});
+                        setFormData({...formData, customer: { id: c.id, name: c.name, city: c.city, state: c.state, cnpj: c.cnpj, legalName: c.legalName }, subCategory: c.name});
                         setSearches({...searches, customer: c.name || c.legalName || ''});
                         setDropdowns(d => ({ ...d, customer: false }));
                       }}
                       className="w-full text-left p-4 rounded-2xl hover:bg-blue-50 transition-all border border-transparent hover:border-blue-100 group"
                     >
                       <p className="text-[11px] font-black text-blue-600 uppercase leading-tight group-hover:text-blue-700">{c.name}</p>
-                      {c.legalName && c.name !== c.legalName && <p className="text-[9px] font-bold text-slate-400 uppercase italic mt-0.5 truncate">RS: {c.legalName}</p>}
                       <div className="flex items-center gap-2 mt-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
                         <p className="text-[9px] font-black text-slate-400 uppercase">{c.city} - {c.state}</p>
@@ -220,7 +223,7 @@ const TripForm: React.FC<TripFormProps> = ({
                 }}
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
-                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/></svg>
+                 {formData.destination ? <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="3"/></svg> : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/></svg>}
               </div>
             </div>
 
@@ -231,7 +234,7 @@ const TripForm: React.FC<TripFormProps> = ({
                     <button 
                       key={p.id} type="button"
                       onClick={() => {
-                        setFormData({...formData, destination: p});
+                        setFormData({...formData, destination: { id: p.id, name: p.name, city: p.city, state: p.state, cnpj: p.cnpj, legalName: p.legalName }});
                         setSearches({...searches, destination: p.name || p.legalName || ''});
                         setDropdowns(d => ({ ...d, destination: false }));
                       }}
@@ -290,9 +293,6 @@ const TripForm: React.FC<TripFormProps> = ({
       </div>
 
       <div className="bg-slate-900 p-10 rounded-[3rem] text-white shadow-2xl space-y-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-5">
-           <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M20 21c-1.39 0-2.78-.47-4-1.32-2.44 1.71-5.56 1.71-8 0C6.78 20.53 5.39 21 4 21H2v2h2c1.38 0 2.74-.35 4-.99 2.52 1.29 5.48 1.29 8 0 1.26.64 2.62.99 4 .99h2v-2h-2zM3.95 19H4c1.6 0 3.02-.88 4-2 .98 1.12 2.4 2 4 2s3.02-.88 4-2c.98 1.12 2.4 2 4 2h.05l1.89-6.68c.08-.26.06-.54-.06-.78s-.34-.42-.6-.5L20 10.62V6c0-1.1-.9-2-2-2h-3V1H9v3H6c-1.1 0-2 .9-2 2v4.62l-1.29.37c-.26.08-.48.26-.6.5s-.14.52-.06.78L3.95 19zM6 6h12v4.38l-6 1.71-6-1.71V6z" /></svg>
-        </div>
         <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em]">IV. Manifesto Marítimo</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
            <div className="space-y-1">
@@ -324,7 +324,7 @@ const TripForm: React.FC<TripFormProps> = ({
             <input 
               type="text"
               placeholder="BUSCAR MOTORISTA OU PLACA..."
-              className={`${inputClass} pr-12`}
+              className={`${inputClass} pr-12 ${formData.driver ? 'border-blue-200 bg-blue-50/20' : ''}`}
               value={searches.driver}
               onFocus={() => setDropdowns(d => ({ ...d, driver: true }))}
               onChange={e => {
@@ -333,7 +333,7 @@ const TripForm: React.FC<TripFormProps> = ({
               }}
             />
             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
-               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>
+               {formData.driver ? <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="3"/></svg> : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>}
             </div>
           </div>
           {dropdowns.driver && (
@@ -367,7 +367,7 @@ const TripForm: React.FC<TripFormProps> = ({
         <button type="button" onClick={onCancel} className="px-8 py-5 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all active:scale-95">Descartar</button>
         <button 
           type="submit" 
-          disabled={isSaving || !formData.os || !formData.customer || !formData.driver}
+          disabled={isSaving || !isFormValid}
           className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-3"
         >
           {isSaving ? (
