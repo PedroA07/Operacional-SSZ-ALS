@@ -52,18 +52,34 @@ export const reportGenerator = {
   },
 
   generateFullReportHTML: (activeData: TableReportData[], finishedData: TableReportData[]): string => {
+    const hasActive = activeData.length > 0;
+    const hasFinished = finishedData.length > 0;
+
+    let columnsHtml = "";
+
+    if (hasActive) {
+      columnsHtml += `
+        <td style="vertical-align: top; ${hasFinished ? 'padding-right: 20px; width: 50%;' : 'width: 100%;'} border: none;">
+          <p style="font-weight: bold; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 15px; color: #000;">EM ANDAMENTO:</p>
+          ${activeData.map(d => reportGenerator.renderTripTableHTML(d)).join('')}
+        </td>
+      `;
+    }
+
+    if (hasFinished) {
+      columnsHtml += `
+        <td style="vertical-align: top; ${hasActive ? 'padding-left: 20px; border-left: 1px solid #f1f5f9; width: 50%;' : 'width: 100%;'} text-align: left;">
+          <p style="font-weight: bold; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 15px; color: #000;">FINALIZADAS:</p>
+          ${finishedData.map(d => reportGenerator.renderTripTableHTML(d)).join('')}
+        </td>
+      `;
+    }
+
     return `
       <div style="background-color: #ffffff; padding: 15px;">
         <table style="width: 100%; border-collapse: collapse; border: none;">
           <tr>
-            <td style="width: 50%; vertical-align: top; padding-right: 20px; border: none;">
-              <p style="font-weight: bold; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 15px; color: #000;">EM ANDAMENTO:</p>
-              ${activeData.map(d => reportGenerator.renderTripTableHTML(d)).join('')}
-            </td>
-            <td style="width: 50%; vertical-align: top; padding-left: 20px; border: none;">
-              <p style="font-weight: bold; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 15px; color: #000;">FINALIZADAS:</p>
-              ${finishedData.map(d => reportGenerator.renderTripTableHTML(d)).join('')}
-            </td>
+            ${columnsHtml}
           </tr>
         </table>
       </div>
@@ -75,7 +91,14 @@ export const reportGenerator = {
       `MOTORISTA: ${d.motorista} | CONTAINER: ${d.container} | RETIRADA CRAGEA: ${d.retiradaCragea} | CHEGADA VOLKS: ${d.chegadaVolks} | SAIDA VOLKS: ${d.saidaVolks} | BAIXA CRAGEA: ${d.baixaCragea}`
     ).join(' || ');
 
-    const result = `EM ANDAMENTO: ${render(active)} [FIM ANDAMENTO] FINALIZADAS: ${render(finished)} [FIM RELATORIO]`.replace(/\r?\n|\r/g, ' ').replace(/\s+/g, ' ').trim();
-    return result;
+    let parts = [];
+    if (active.length > 0) {
+      parts.push(`EM ANDAMENTO: ${render(active)} [FIM ANDAMENTO]`);
+    }
+    if (finished.length > 0) {
+      parts.push(`FINALIZADAS: ${render(finished)} [FIM RELATORIO]`);
+    }
+
+    return parts.join(' ').replace(/\r?\n|\r/g, ' ').replace(/\s+/g, ' ').trim();
   }
 };
