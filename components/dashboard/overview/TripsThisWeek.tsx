@@ -46,7 +46,14 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
       if (t.category?.toUpperCase() === 'CARGA SOLTA') typeCounts['SOLTA'] = (typeCounts['SOLTA'] || 0) + 1;
     });
 
-    return { total: active.length, typeCounts, canceled, completed };
+    const delays = active.filter(t => {
+      const scheduled = new Date(t.dateTime).getTime();
+      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
+      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
+      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
+    }).length;
+
+    return { total: active.length, typeCounts, canceled, completed, delays };
   }, [weekRaw]);
 
   const filteredTrips = useMemo(() => {
@@ -59,7 +66,13 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
     }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [weekRaw, selTypes, selClients, selDrivers]);
 
-  const allTypes = useMemo(() => Array.from(new Set(weekRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [weekRaw]);
+  const allTypes = useMemo(() => {
+    const types = new Set(weekRaw.map(t => t.type?.toUpperCase() || 'OUTROS'));
+    if (weekRaw.some(t => t.category?.toUpperCase() === 'INDÚSTRIA')) types.add('INDÚSTRIA');
+    if (weekRaw.some(t => t.category?.toUpperCase() === 'CARGA SOLTA')) types.add('CARGA SOLTA');
+    return Array.from(types).sort();
+  }, [weekRaw]);
+
   const allClients = useMemo(() => Array.from(new Set(weekRaw.map(t => t.customer.name))).sort(), [weekRaw]);
   const allDrivers = useMemo(() => Array.from(new Set(weekRaw.map(t => t.driver.name))).sort(), [weekRaw]);
 
@@ -88,9 +101,10 @@ const TripsThisWeek: React.FC<TripsThisWeekProps> = ({ trips }) => {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-emerald-50 p-2.5 rounded-xl text-center border border-emerald-100"><p className="text-[10px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-lg font-black text-emerald-600 leading-none mt-1">{stats.completed}</p></div>
-            <div className="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase">Canc.</p><p className="text-lg font-black text-slate-600 leading-none mt-1">{stats.canceled}</p></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-red-50 p-2.5 rounded-xl text-center border border-red-100"><p className="text-[10px] font-black text-red-400 uppercase">Atr.</p><p className="text-lg font-black text-red-600 mt-1">{stats.delays}</p></div>
+            <div className="bg-emerald-50 p-2.5 rounded-xl text-center border border-emerald-100"><p className="text-[10px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-lg font-black text-emerald-600 mt-1">{stats.completed}</p></div>
+            <div className="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase">Canc.</p><p className="text-lg font-black text-slate-600 mt-1">{stats.canceled}</p></div>
           </div>
         </div>
       </button>

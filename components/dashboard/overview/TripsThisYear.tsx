@@ -40,7 +40,8 @@ const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
       const scheduled = new Date(t.dateTime).getTime();
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      return false; // No ano, contamos apenas atrasos confirmados por chegada
+      // Para o passado (viagens que já deveriam ter acontecido e não foram concluídas)
+      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed, clientRank: Object.entries(clientRank).sort((a,b) => b[1] - a[1]) };
