@@ -32,7 +32,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
            <div>
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight leading-none">Painel de Performance ALS</h2>
               <div className="flex items-center gap-2 mt-2">
-                 <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-500 animate-ping' : 'bg-emerald-500'}`}></div>
+                 <div className={`w-2.5 h-2.5 rounded-full ${isSyncing ? 'bg-blue-500 animate-ping' : 'bg-emerald-500'}`}></div>
                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
                     {isSyncing ? 'Sincronizando nuvem...' : `Última atualização: ${lastSyncTime}`}
                  </p>
@@ -61,18 +61,18 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
         <TripsThisMonth trips={trips} />
       </div>
 
-      {/* ÁREA CENTRAL: ATIVIDADES E MONITORES */}
+      {/* ÁREA CENTRAL: STATUS E ATIVIDADES (REORGANIZADO) */}
       <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`}>
          
-         {/* COLUNA ESQUERDA: CENTRO DE ATIVIDADES (NOTIFICAÇÕES VISÍVEIS) */}
+         {/* COLUNA ESQUERDA (PRINCIPAL): MONITOR DE FROTA */}
          <div className="lg:col-span-8">
-            <RecentActivitiesCard user={user} />
+            <DriverStatusCards trips={trips} drivers={drivers} />
          </div>
 
-         {/* COLUNA DIREITA: STATUS E ATRASOS */}
+         {/* COLUNA DIREITA (WIDGETS): ATRASOS E ATIVIDADES */}
          <div className="lg:col-span-4 space-y-8">
             <DelayedTrips trips={trips} />
-            <DriverStatusCards trips={trips} drivers={drivers} />
+            <RecentActivitiesCard user={user} />
          </div>
       </div>
     </div>
