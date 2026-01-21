@@ -13,21 +13,20 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toLocaleDateString('en-CA');
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }, []);
 
   const yesterdayRaw = useMemo(() => {
     return trips.filter(t => {
       if (!t.dateTime) return false;
-      const tripDate = new Date(t.dateTime).toLocaleDateString('en-CA');
-      return tripDate === yesterdayStr;
+      return t.dateTime.substring(0, 10) === yesterdayStr;
     });
   }, [trips, yesterdayStr]);
 
   const stats = useMemo(() => {
     const active = yesterdayRaw.filter(t => t.status !== 'Viagem cancelada');
     const canceled = yesterdayRaw.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = yesterdayRaw.filter(t => t.status?.toLowerCase().includes('concluída')).length;
+    const completed = yesterdayRaw.filter(t => t.status === 'Viagem concluída').length;
     
     const typeCounts: { [key: string]: number } = {};
     active.forEach(t => {
@@ -41,8 +40,7 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
       if (arrival) {
         return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
       }
-      // Se não chegou e é de ontem, tecnicamente está atrasado em relação ao plano original
-      return new Date().getTime() > (scheduled + 600000);
+      return t.status !== 'Viagem concluída';
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };
@@ -122,7 +120,7 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
                 <p className="text-[10px] font-black text-slate-800 uppercase mt-1 leading-none truncate">{trip.driver.name}</p>
                 <div className="flex justify-between items-center mt-1">
                   <p className="text-[8px] font-bold text-slate-400 uppercase truncate">{trip.customer.name}</p>
-                  <span className="text-[8px] font-black text-blue-500">{trip.status}</span>
+                  <span className={`text-[8px] font-black ${trip.status === 'Viagem concluída' ? 'text-emerald-600' : 'text-blue-500'}`}>{trip.status}</span>
                 </div>
               </div>
             )) : <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem dados</div>}

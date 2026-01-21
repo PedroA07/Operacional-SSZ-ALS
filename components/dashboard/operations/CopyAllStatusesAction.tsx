@@ -105,22 +105,21 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
         );
       };
 
-      // REGRA: Se 'Container sobre rodas', só finalizada se tiver 'Saída Volks'. Caso contrário, fica em andamento.
-      setActiveReportData(trips.filter(t => {
-        const isFinishedGeneral = t.status === 'Viagem concluída';
-        const isCanceled = t.status === 'Viagem cancelada';
-        const isSobreRodasComSaida = t.status === 'Container sobre rodas' && hasSaidaVolks(t);
-        
-        // Se não for cancelada, e não for (Concluída ou SobreRodasComSaida), está ativa
-        return !isCanceled && !isFinishedGeneral && !isSobreRodasComSaida;
-      }).map(mapTrip));
+      // FILTRO: Em Andamento (Exclui Concluídas, Canceladas e QUALQUER 'Container sobre rodas')
+      setActiveReportData(trips.filter(t => 
+        t.status !== 'Viagem concluída' && 
+        t.status !== 'Viagem cancelada' && 
+        t.status !== 'Container sobre rodas'
+      ).map(mapTrip));
 
+      // FILTRO: Finalizadas (Viagens Concluídas OU 'Container sobre rodas' QUE TENHA SAÍDA VOLKS)
       setFinishedReportData(trips.filter(t => {
         const isFinishedGeneral = t.status === 'Viagem concluída';
         const isSobreRodasComSaida = t.status === 'Container sobre rodas' && hasSaidaVolks(t);
-        
         return isFinishedGeneral || isSobreRodasComSaida;
       }).map(mapTrip));
+      
+      // OBS: 'Container sobre rodas' SEM saída volks não entra em nenhuma lista.
     }
   }, [isPreviewOpen, trips, activeReportData.length, finishedReportData.length]);
 

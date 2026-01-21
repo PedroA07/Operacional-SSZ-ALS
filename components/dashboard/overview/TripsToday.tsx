@@ -10,7 +10,13 @@ interface TripsTodayProps {
 const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  const todayStr = useMemo(() => new Date().toISOString().substring(0, 10), []);
+  // Normalização de data para comparação fiel
+  const getTodayISO = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const todayStr = useMemo(() => getTodayISO(), []);
 
   const todayRaw = useMemo(() => {
     return trips.filter(t => {
@@ -20,13 +26,12 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   }, [trips, todayStr]);
 
   const stats = useMemo(() => {
-    // Volume Real: Todas as programações do dia que não foram canceladas
-    const activeTrips = todayRaw.filter(t => t.status?.toLowerCase() !== 'viagem cancelada');
-    const canceledCount = todayRaw.filter(t => t.status?.toLowerCase().includes('cancelada')).length;
+    // Contabiliza tudo que não foi cancelado
+    const activeTrips = todayRaw.filter(t => t.status !== 'Viagem cancelada');
+    const canceledCount = todayRaw.filter(t => t.status === 'Viagem cancelada').length;
     
     const completed = activeTrips.filter(t => 
-      t.status?.toLowerCase().includes('concluída') || 
-      t.status?.toLowerCase() === 'concluída'
+      t.status === 'Viagem concluída'
     ).length;
     
     const typeCounts: { [key: string]: number } = {};
@@ -39,7 +44,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       const scheduled = new Date(t.dateTime).getTime();
       if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      return new Date().getTime() > (scheduled + 600000);
+      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
     }).length;
 
     return { total: activeTrips.length, typeCounts, canceled: canceledCount, delays, completed };
@@ -53,7 +58,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   
   const todayTripsList = useMemo(() => {
     return todayRaw.filter(t => {
-      if (t.status?.toLowerCase().includes('cancelada')) return false;
+      if (t.status === 'Viagem cancelada') return false;
       const matchType = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase());
       const matchClient = selClients.length === 0 || selClients.includes(t.customer.name);
       return matchType && matchClient;
@@ -124,7 +129,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
                 <p className="text-[10px] font-black text-slate-800 uppercase leading-none truncate">{trip.driver.name}</p>
                 <div className="flex justify-between items-center mt-1">
                    <p className="text-[8px] font-bold text-slate-400 uppercase truncate flex-1">{trip.customer.name}</p>
-                   <span className="text-[8px] font-black text-blue-500">{trip.status}</span>
+                   <span className={`text-[8px] font-black ${trip.status === 'Viagem concluída' ? 'text-emerald-600' : 'text-blue-500'}`}>{trip.status}</span>
                 </div>
               </div>
             )) : <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem resultados para hoje</div>}
