@@ -13,14 +13,15 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toLocaleDateString('en-CA'); // Retorna YYYY-MM-DD local
+    // en-CA retorna YYYY-MM-DD
+    return d.toLocaleDateString('en-CA');
   }, []);
 
   const yesterdayRaw = useMemo(() => {
     return trips.filter(t => {
       if (!t.dateTime) return false;
-      const tripDate = new Date(t.dateTime).toLocaleDateString('en-CA');
-      return tripDate === yesterdayStr;
+      // Compara os primeiros 10 caracteres (YYYY-MM-DD) para evitar erros de timezone
+      return t.dateTime.substring(0, 10) === yesterdayStr;
     });
   }, [trips, yesterdayStr]);
 
@@ -41,7 +42,8 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
       if (arrival) {
         return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
       }
-      return false; 
+      // Se não tem chegada e já passou do horário, é atraso
+      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };
@@ -124,7 +126,7 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
                   <span className={`text-[8px] font-black ${trip.status === 'Viagem concluída' ? 'text-emerald-600' : 'text-blue-500'}`}>{trip.status}</span>
                 </div>
               </div>
-            )) : <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem dados</div>}
+            )) : <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem dados para exibir</div>}
           </div>
         </div>
       )}

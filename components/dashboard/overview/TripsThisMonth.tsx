@@ -11,12 +11,13 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
   const stats = useMemo(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
+    const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const monthPrefix = `${currentYear}-${currentMonth}`;
     
     const monthTrips = trips.filter(t => {
       if (!t.dateTime) return false;
-      const tripDate = new Date(t.dateTime);
-      return tripDate.getFullYear() === currentYear && tripDate.getMonth() === currentMonth;
+      // Compara os primeiros 7 caracteres (YYYY-MM)
+      return t.dateTime.substring(0, 7) === monthPrefix;
     });
 
     const activeTrips = monthTrips.filter(t => t.status !== 'Viagem cancelada');
@@ -33,7 +34,9 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       const scheduled = new Date(t.dateTime).getTime();
       if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      return false;
+      
+      // Viagem pendente cujo horário já passou
+      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
     }).length;
 
     return { total: activeTrips.length, typeCounts, canceled, delays, completed };
