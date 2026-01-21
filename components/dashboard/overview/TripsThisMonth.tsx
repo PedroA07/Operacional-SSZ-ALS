@@ -9,11 +9,19 @@ interface TripsThisMonthProps {
 
 const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
   const stats = useMemo(() => {
-    const currentMonthPrefix = new Date().toISOString().substring(0, 7); // YYYY-MM
+    const now = new Date();
+    // Início do mês atual (Local)
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    // Fim do mês atual (Local)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    endOfMonth.setHours(23, 59, 59, 999);
     
     const monthTrips = trips.filter(t => {
       if (!t.dateTime) return false;
-      return t.dateTime.substring(0, 7) === currentMonthPrefix;
+      const tripTime = new Date(t.dateTime).getTime();
+      return tripTime >= startOfMonth.getTime() && tripTime <= endOfMonth.getTime();
     });
 
     const activeTrips = monthTrips.filter(t => t.status !== 'Viagem cancelada');
