@@ -104,7 +104,7 @@ export const tripRepository = {
       .from('trips')
       .select('*')
       .order('date_time', { ascending: false })
-      .limit(5000); // Aumentado para 5000 para garantir que meses ativos não sejam cortados
+      .limit(5000); // AUMENTADO PARA 5000 PARA SUPORTAR VOLUME ALTO
 
     if (error) throw error;
     return (data || []).map(d => this.mapFromDb(d));

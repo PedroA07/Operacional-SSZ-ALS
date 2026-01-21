@@ -50,8 +50,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
         </button>
       </div>
 
-      {/* GRID DE KPIs SUPERIOR - BLOCOS PRINCIPAIS */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`}>
+      {/* GRID DE KPIs SUPERIOR - AJUSTADO Z-INDEX CONTAINER */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 transition-opacity duration-300 relative ${isSyncing ? 'opacity-70' : 'opacity-100'}`} style={{ zIndex: 100 }}>
         <TripsYesterday trips={trips} />
         <TripsToday trips={trips} />
         <TripsTomorrow trips={trips} />
@@ -60,7 +60,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
       </div>
 
       {/* MONITOR DE ATRASOS E STATUS DOS MOTORISTAS */}
-      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`}>
+      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`} style={{ zIndex: 50 }}>
          <div className="lg:col-span-1">
             <DelayedTrips trips={trips} />
          </div>
