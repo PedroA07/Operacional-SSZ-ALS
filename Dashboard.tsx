@@ -12,6 +12,7 @@ import AdminTab from './components/dashboard/AdminTab';
 import StaffTab from './components/dashboard/StaffTab';
 import SystemTab from './components/dashboard/SystemTab';
 import DocumentsTab from './components/dashboard/DocumentsTab';
+// Added missing import for StaysTab to resolve "Cannot find name 'StaysTab'" error on line 190
 import StaysTab from './components/dashboard/StaysTab';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
@@ -252,6 +253,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onRefresh={() => loadAllData(false)} 
                lastSyncTime={lastSyncTime} 
                isSyncing={isSyncing} 
+               user={user}
              />
            )}
            {activeTab === DashboardTab.OPERACOES && (
