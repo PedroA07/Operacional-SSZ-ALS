@@ -6,7 +6,7 @@ import { fileStorage } from '../../../utils/fileStorage';
 import ActionMenu from './ActionMenu';
 import FinanceAction from './FinanceAction';
 
-// Novos componentes de coluna modulares
+// Componentes de coluna modulares
 import { DriverColumn } from './columns/DriverColumn';
 import { EquipmentColumn } from './columns/EquipmentColumn';
 import { ShipBookingColumn } from './columns/ShipBookingColumn';
@@ -42,7 +42,6 @@ export const getOperationTableColumns = (
         const newDocs: DriverCapturedDoc[] = [];
         for (const file of filesArray) {
           const photoId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-          // Upload real para o R2
           const url = await fileStorage.uploadTripPhoto(file, trip.os, photoId);
           newDocs.push({ id: photoId, url, timestamp: new Date().toISOString() });
         }
@@ -50,7 +49,6 @@ export const getOperationTableColumns = (
       } else {
         const file = filesArray[0];
         const docTypeLabel = type.replace('_PDF', '').toLowerCase();
-        // Upload real para o R2
         const url = await fileStorage.uploadTripDoc(file, trip.os, docTypeLabel);
         
         const doc: TripDocument = { 
@@ -72,7 +70,7 @@ export const getOperationTableColumns = (
       onRefreshData();
     } catch (err) {
       console.error("Falha no upload de documento:", err);
-      alert("Falha ao subir arquivo para o R2. Verifique sua conexão.");
+      alert("Falha ao subir arquivo para o R2.");
     }
   };
 
@@ -95,18 +93,25 @@ export const getOperationTableColumns = (
   return [
     { 
       key: 'dateTime', 
-      label: '1. Prog.', 
+      label: '1. Programação / Tipo', 
       render: (t: Trip) => (
-        <div className="flex flex-col gap-0.5 min-w-[70px]">
-          <span className="font-black text-slate-800 text-[10px] leading-tight">{new Date(t.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
-          <span className="font-black text-blue-600 text-[10px] leading-tight">{new Date(t.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-          <span className="text-[6.5px] font-black text-blue-800 uppercase bg-blue-50 px-1 rounded border border-blue-100 w-fit mt-0.5">{t.category?.substring(0, 8)}</span>
+        <div className="flex flex-col gap-1.5 min-w-[100px]">
+          <div className="flex flex-col gap-0.5">
+            <span className="font-black text-slate-800 text-[11px] leading-tight">{new Date(t.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
+            <span className="font-black text-blue-600 text-[11px] leading-tight">{new Date(t.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+             <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit ${t.type === 'EXPORTAÇÃO' ? 'bg-blue-600 text-white border-blue-600' : t.type === 'IMPORTAÇÃO' ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-900 text-white border-slate-900'}`}>
+                {t.type}
+             </span>
+             <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest ml-0.5">[{t.category?.substring(0, 12)}]</span>
+          </div>
         </div>
       )
     },
     { 
       key: 'os_status', 
-      label: '2. OS / Status', 
+      label: '2. OS / Status HD', 
       render: (t: Trip) => StatusColumn(t, openStatusEditor, onOpenHistoryManager)
     },
     { 
