@@ -1,8 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
-import { Driver, OperationDefinition, Customer } from '../../types';
-import { maskPhone, maskCPF, maskRG } from '../../utils/masks';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Driver, OperationDefinition, Customer, User } from '../../types';
+import { maskPhone, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
+import { db } from '../../utils/storage';
 import ListFilters from './shared/ListFilters';
 import DriverModal from './drivers/DriverModal';
 import DriverDossierAction from './drivers/DriverDossierAction';
@@ -27,6 +28,18 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name_asc');
   const [statusFilter, setStatusFilter] = useState('todos');
+  
+  const [users, setUsers] = useState<User[]>([]);
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+
+  const fetchUsers = async () => {
+    const data = await db.getUsers();
+    setUsers(data);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [drivers, isModalOpen]);
 
   const handleOpenModal = (d?: Driver) => {
     setEditingDriver(d || null);
@@ -64,7 +77,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[1600px]">
+          <table className="w-full text-left text-xs min-w-[1700px]">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
                 <th className="px-6 py-5">Identificação / Beneficiário</th>
@@ -72,88 +85,107 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                 <th className="px-6 py-5">Documentação</th>
                 <th className="px-6 py-5">Frota / Equipamento</th>
                 <th className="px-6 py-5">Vínculos Operacionais</th>
-                <th className="px-6 py-5">Tipo / Portal</th>
+                <th className="px-6 py-5">Acesso Portal</th>
                 <th className="px-6 py-5">Status</th>
                 <th className="px-6 py-5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredDrivers.map(d => (
-                <tr key={d.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-100 border overflow-hidden shrink-0 shadow-inner">
-                        {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-[10px] text-slate-300">ALS</div>}
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-800 uppercase text-[11px] leading-none">{d.name}</p>
-                        <div className="mt-2 p-1.5 bg-blue-50/50 rounded-lg border border-blue-100/50">
-                           <p className="text-[7px] font-black text-blue-400 uppercase tracking-tighter leading-none">Beneficiário:</p>
-                           <p className="text-[9px] font-bold text-blue-600 uppercase mt-0.5">{d.beneficiaryName || 'O PRÓPRIO'}</p>
+              {filteredDrivers.map(d => {
+                const linkedUser = users.find(u => u.driverId === d.id || u.username === d.cpf.replace(/\D/g,''));
+                const passVisible = showPasswords[d.id];
+                
+                return (
+                  <tr key={d.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-100 border overflow-hidden shrink-0 shadow-inner">
+                          {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-[10px] text-slate-300">ALS</div>}
+                        </div>
+                        <div>
+                          <p className="font-black text-slate-800 uppercase text-[11px] leading-none">{d.name}</p>
+                          <div className="mt-2 p-1.5 bg-blue-50/50 rounded-lg border border-blue-100/50">
+                             <p className="text-[7px] font-black text-blue-400 uppercase tracking-tighter leading-none">Beneficiário:</p>
+                             <p className="text-[9px] font-bold text-blue-600 uppercase mt-0.5">{d.beneficiaryName || 'O PRÓPRIO'}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      <a href={`https://wa.me/55${d.phone.replace(/\D/g,'')}`} target="_blank" className="flex items-center gap-1.5 text-blue-600 font-black text-[10px] hover:underline">
-                        <Icons.Whatsapp />
-                        {maskPhone(d.phone)}
-                      </a>
-                      <p className="text-[9px] text-slate-400 font-bold lowercase truncate max-w-[150px]">{d.email || 'sem_email@als.com'}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-black text-slate-500 uppercase">CPF: <span className="text-slate-800 font-mono">{maskCPF(d.cpf)}</span></p>
-                      <div className="flex items-center gap-2 pt-1">
-                         <span className="text-[9px] font-black text-slate-500 uppercase">CNH: <span className="text-slate-800">{d.cnh || '---'}</span></span>
-                         {d.cnhPdfUrl && (
-                           <button onClick={() => { setCurrentCnhUrl(d.cnhPdfUrl!); setIsCnhModalOpen(true); }} className="px-2 py-0.5 bg-red-50 text-red-600 rounded text-[7px] font-black border border-red-100 hover:bg-red-600 hover:text-white transition-all">PDF</button>
-                         )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-1">
+                        <a href={`https://wa.me/55${d.phone.replace(/\D/g,'')}`} target="_blank" className="flex items-center gap-1.5 text-blue-600 font-black text-[10px] hover:underline">
+                          <Icons.Whatsapp />
+                          {maskPhone(d.phone)}
+                        </a>
+                        <p className="text-[9px] text-slate-400 font-bold lowercase truncate max-w-[150px]">{d.email || 'sem_email@als.com'}</p>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="grid grid-cols-1 gap-2">
-                       <div className="flex items-center gap-2">
-                          <span className="bg-slate-900 text-white px-2 py-1 rounded text-[10px] font-mono font-bold shadow-sm">{d.plateHorse}</span>
-                          <span className="text-[9px] text-slate-500 font-bold">{d.yearHorse || '---'}</span>
-                       </div>
-                       <div className="flex items-center gap-2">
-                          <span className="bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded text-[10px] font-mono font-bold">{d.plateTrailer}</span>
-                          <span className="text-[9px] text-slate-500 font-bold">{d.yearTrailer || '---'}</span>
-                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <DriverVinculosCell driver={d} />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-2">
-                      <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-black uppercase border border-blue-100">{d.driverType}</span>
-                      <div className="p-2 bg-slate-900 rounded-xl border border-white/5 space-y-1">
-                         <div className="flex justify-between items-center gap-4">
-                            <span className="text-[7px] font-black text-slate-500 uppercase">Login:</span>
-                            <span className="text-[9px] font-mono font-black text-blue-400">{d.cpf.replace(/\D/g,'')}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-500 uppercase">CPF: <span className="text-slate-800 font-mono">{maskCPF(d.cpf)}</span></p>
+                        <div className="flex items-center gap-2 pt-1">
+                           <span className="text-[9px] font-black text-slate-500 uppercase">CNH: <span className="text-slate-800">{d.cnh || '---'}</span></span>
+                           {d.cnhPdfUrl && (
+                             <button onClick={() => { setCurrentCnhUrl(d.cnhPdfUrl!); setIsCnhModalOpen(true); }} className="px-2 py-0.5 bg-red-50 text-red-600 rounded text-[7px] font-black border border-red-100 hover:bg-red-600 hover:text-white transition-all">PDF</button>
+                           )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="grid grid-cols-1 gap-3">
+                         <div className="flex items-center gap-2">
+                            <span className="text-[7px] font-black text-slate-400 uppercase w-10">Cavalo:</span>
+                            <span className="bg-slate-900 text-white px-2 py-1 rounded text-[10px] font-mono font-bold shadow-sm">{d.plateHorse}</span>
+                            <span className="text-[9px] text-slate-500 font-bold">{d.yearHorse || '---'}</span>
+                         </div>
+                         <div className="flex items-center gap-2">
+                            <span className="text-[7px] font-black text-slate-400 uppercase w-10">Carreta:</span>
+                            <span className="bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded text-[10px] font-mono font-bold">{d.plateTrailer}</span>
+                            <span className="text-[9px] text-slate-500 font-bold">{d.yearTrailer || '---'}</span>
                          </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                      {d.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <DriverDossierAction driver={d} />
-                      <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" strokeWidth="2.5"/></svg></button>
-                      <button onClick={() => { setItemToDelete(d); setIsDeleteModalOpen(true); }} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Icons.Excluir /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <DriverVinculosCell driver={d} />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="p-3 bg-slate-900 rounded-2xl border border-white/5 space-y-2 min-w-[200px]">
+                         <div className="flex justify-between items-center">
+                            <span className="text-[7px] font-black text-slate-500 uppercase">Login</span>
+                            <span className="text-[10px] font-mono font-black text-blue-400">{d.cpf.replace(/\D/g,'')}</span>
+                         </div>
+                         <div className="flex justify-between items-center">
+                            <span className="text-[7px] font-black text-slate-500 uppercase">Senha</span>
+                            <div className="flex items-center gap-2">
+                               <span className="text-[10px] font-mono font-black text-white">{passVisible ? (linkedUser?.password || '---') : '••••••••'}</span>
+                               <button onClick={() => setShowPasswords(prev => ({...prev, [d.id]: !prev[d.id]}))} className="text-slate-600 hover:text-white transition-colors">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d={passVisible ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" : "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"}/></svg>
+                               </button>
+                            </div>
+                         </div>
+                         <div className="pt-1.5 border-t border-white/5 flex justify-between items-center">
+                            <span className="text-[7px] font-black text-amber-500 uppercase">Chave Contrato</span>
+                            <span className="text-[10px] font-mono font-black text-amber-200">
+                               {d.beneficiaryCnpj ? d.beneficiaryCnpj.replace(/\D/g,'').slice(-4) : d.cpf.replace(/\D/g,'').slice(-4)}
+                            </span>
+                         </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[8px] font-black border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                        {d.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <DriverDossierAction driver={d} />
+                        <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" strokeWidth="2.5"/></svg></button>
+                        <button onClick={() => { setItemToDelete(d); setIsDeleteModalOpen(true); }} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Icons.Excluir /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

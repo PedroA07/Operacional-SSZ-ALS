@@ -50,11 +50,13 @@ const DriverStatusCards: React.FC<DriverStatusCardsProps> = ({ trips, drivers })
             <div className={`w-3 h-3 rounded-full shrink-0 mt-1 ${isAvailable ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse'}`}></div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-             <div className="bg-slate-900 text-white px-2 py-1.5 rounded-xl text-center">
+          <div className="grid grid-cols-2 gap-3">
+             <div className="bg-slate-900 text-white p-2 rounded-xl flex flex-col items-center">
+                <span className="text-[6px] font-black text-blue-400 uppercase mb-0.5">Cavalo</span>
                 <span className="text-[11px] font-mono font-black">{driver.plateHorse}</span>
              </div>
-             <div className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-1.5 rounded-xl text-center">
+             <div className="bg-slate-100 text-slate-600 border border-slate-200 p-2 rounded-xl flex flex-col items-center">
+                <span className="text-[6px] font-black text-slate-400 uppercase mb-0.5">Carreta</span>
                 <span className="text-[11px] font-mono font-black">{driver.plateTrailer}</span>
              </div>
           </div>
