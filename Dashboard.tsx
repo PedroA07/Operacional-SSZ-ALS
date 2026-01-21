@@ -58,8 +58,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
-  const loadAllData = useCallback(async (showLoading = false) => {
-    if (showLoading) setIsLoadingInitial(true);
+  const loadAllData = useCallback(async (isInitial = false) => {
+    if (isInitial) setIsLoadingInitial(true);
     setIsSyncing(true);
     
     try {
@@ -93,18 +93,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   useEffect(() => { 
     loadAllData(true);
 
-    // INTERVALO AUMENTADO PARA 60s PARA EVITAR INTERRUPÇÕES NO MANUSEIO
-    const refreshDataInterval = setInterval(() => loadAllData(false), 60000);
+    const refreshDataInterval = setInterval(() => loadAllData(false), 30000);
 
     let channel: any = null;
     if (supabase) {
       channel = supabase
         .channel('db-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
-          // Atualização realtime sem piscar a tela
-          loadAllData(false);
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
           loadAllData(false);
         })
         .subscribe((status) => {
@@ -139,11 +134,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         await loadAllData(false);
         setIsDeleteTripModalOpen(false);
         setTripToDelete(null);
-      } else {
-        setFeedback({ show: true, title: 'Erro de Conexão', message: 'O servidor não respondeu à solicitação de exclusão.', type: 'error' });
       }
     } catch (e) {
-      setFeedback({ show: true, title: 'Erro Crítico', message: 'Falha na comunicação com o banco de dados.', type: 'error' });
+      setFeedback({ show: true, title: 'Erro Crítico', message: 'Falha na comunicação.', type: 'error' });
     } finally {
       setIsDeleting(false);
     }
@@ -171,7 +164,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6 animate-pulse">Sincronizando Módulos ALS...</p>
+        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6">ALS Transportes...</p>
       </div>
     );
   }
@@ -189,11 +182,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         onConfirm={feedback.onConfirm}
       />
       
-      {(isSyncing || isRealtimeActive) && !isLoadingInitial && (
+      {(isSyncing || isRealtimeActive) && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4">
            <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'}`}></div>
            <span className="text-[8px] font-black text-white uppercase tracking-widest">
-             {isSyncing ? 'Sincronizando Nuvem...' : 'Conexão em Tempo Real'}
+             {isSyncing ? 'Sincronizando...' : 'Tempo Real Ativo'}
            </span>
         </div>
       )}
@@ -233,6 +226,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </button>
         </div>
       </aside>
+
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-10 shadow-sm z-40">
            <div className="flex items-center gap-5">
@@ -249,14 +243,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <UserProfile user={user} />
            </div>
         </header>
+        
         <div className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
            {activeTab === DashboardTab.INICIO && (
              <OverviewTab 
                trips={trips} 
                drivers={drivers} 
                onRefresh={() => loadAllData(false)} 
-               lastSyncTime={lastSyncTime}
-               isSyncing={isSyncing}
+               lastSyncTime={lastSyncTime} 
+               isSyncing={isSyncing} 
              />
            )}
            {activeTab === DashboardTab.OPERACOES && (
@@ -278,71 +273,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.ESTADIAS && <StaysTab categories={categories} userId={user.id} />}
            {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(false); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
-           {activeTab === DashboardTab.MOTORISTAS && (
-            <DriversTab 
-              drivers={drivers} 
-              customers={customers} 
-              onSaveDriver={async (d, id) => { 
-                const success = await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); 
-                if (success) await loadAllData(false);
-              }} 
-              onDeleteDriver={async id => { 
-                setFeedback({ show: true, title: 'Excluir Motorista?', message: 'Esta ação é irreversível.', type: 'confirm', onConfirm: async () => {
-                   await db.deleteDriver(id); 
-                   await loadAllData(false); 
-                }});
-              }} 
-              availableOps={availableOps} 
-            />
-           )}
-           {activeTab === DashboardTab.CLIENTES && (
-            <CustomersTab 
-              customers={customers} 
-              onSaveCustomer={async (c, id) => { 
-                const success = await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); 
-                if (success) await loadAllData(false);
-              }} 
-              onDeleteCustomer={async id => { 
-                setFeedback({ show: true, title: 'Excluir Cliente?', message: 'Deseja remover este cliente da base?', type: 'confirm', onConfirm: async () => {
-                   await db.deleteCustomer(id); 
-                   await loadAllData(false); 
-                }});
-              }} 
-              isAdmin={user.role === 'admin'} 
-            />
-           )}
+           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
+           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(false); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(false); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
-           {activeTab === DashboardTab.PORTOS && (
-            <PortsTab 
-              ports={ports} 
-              onSavePort={async (p, id) => { 
-                const success = await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); 
-                if (success) await loadAllData(false);
-              }} 
-              onDeletePort={async id => { 
-                setFeedback({ show: true, title: 'Excluir Porto?', message: 'Remover este terminal?', type: 'confirm', onConfirm: async () => {
-                   await db.deletePort(id); 
-                   await loadAllData(false); 
-                }});
-              }} 
-            />
-           )}
-           {activeTab === DashboardTab.PRE_STACKING && (
-            <PreStackingTab 
-              preStacking={preStacking} 
-              onSavePreStacking={async (p, id) => { 
-                const success = await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); 
-                if (success) await loadAllData(false);
-              }} 
-              onDeletePreStacking={async id => { 
-                setFeedback({ show: true, title: 'Excluir Unidade?', message: 'Remover esta unidade de Pré-Stacking?', type: 'confirm', onConfirm: async () => {
-                   await db.deletePreStacking(id); 
-                   await loadAllData(false); 
-                }});
-              }} 
-            />
-           )}
+           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(false); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(false); } }} />}
+           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(false); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
         </div>
       </main>
@@ -352,7 +288,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
               <div className="p-10 text-center space-y-6">
                  <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner border border-red-100">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/>
+                    </svg>
                  </div>
                  <div>
                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Excluir Viagem</h3>

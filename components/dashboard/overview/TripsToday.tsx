@@ -17,25 +17,32 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     return trips.filter(t => t.dateTime && t.dateTime.substring(0, 10) === todayStr);
   }, [trips, todayStr]);
 
+  const [selTypes, setSelTypes] = useState<string[]>([]);
+  const [selClients, setSelClients] = useState<string[]>([]);
+  const [selDrivers, setSelDrivers] = useState<string[]>([]);
+
+  const filteredTrips = useMemo(() => {
+    return todayRaw.filter(t => {
+      if (t.status === 'Viagem cancelada') return false;
+      const matchType = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase() || 'OUTROS');
+      const matchClient = selClients.length === 0 || selClients.includes(t.customer.name);
+      const matchDriver = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
+      return matchType && matchClient && matchDriver;
+    }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+  }, [todayRaw, selTypes, selClients, selDrivers]);
+
   const stats = useMemo(() => {
     const activeTrips = todayRaw.filter(t => t.status !== 'Viagem cancelada');
     const canceledCount = todayRaw.filter(t => t.status === 'Viagem cancelada').length;
     const completed = activeTrips.filter(t => t.status === 'Viagem concluída').length;
     
     const typeCounts: Record<string, number> = {};
-    const clientRank: Record<string, number> = {};
-    const driverRank: Record<string, number> = {};
-    
-    // Novo: Mapa detalhado para o filtro
     const driverDetails: Record<string, { total: number, clients: Record<string, number> }> = {};
 
     activeTrips.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
-      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
-      driverRank[t.driver.name] = (driverRank[t.driver.name] || 0) + 1;
 
-      // Construção dos dados p/ o filtro
       if (!driverDetails[t.driver.name]) {
         driverDetails[t.driver.name] = { total: 0, clients: {} };
       }
@@ -50,28 +57,31 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
     }).length;
 
-    return { 
-      total: activeTrips.length, 
-      typeCounts, 
-      canceled: canceledCount, 
-      delays, 
-      completed,
-      clientRank: Object.entries(clientRank).sort((a,b) => b[1] - a[1]),
-      driverRank: Object.entries(driverRank).sort((a,b) => b[1] - a[1]),
-      driverDetails
-    };
+    return { total: activeTrips.length, typeCounts, canceled: canceledCount, delays, completed, driverDetails };
   }, [todayRaw]);
+
+  const filteredRankings = useMemo(() => {
+    const clientRank: Record<string, number> = {};
+    const driverRank: Record<string, number> = {};
+
+    filteredTrips.forEach(t => {
+      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
+      driverRank[t.driver.name] = (driverRank[t.driver.name] || 0) + 1;
+    });
+
+    return {
+      clientRank: Object.entries(clientRank).sort((a,b) => b[1] - a[1]),
+      driverRank: Object.entries(driverRank).sort((a,b) => b[1] - a[1])
+    };
+  }, [filteredTrips]);
 
   const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [todayRaw]);
   const allClients = useMemo(() => Array.from(new Set(todayRaw.map(t => t.customer.name))).sort(), [todayRaw]);
   
-  // Opções formatadas para o filtro com contagem por cliente
   const driverOptions = useMemo(() => {
-    /* Added explicit type casting to Object.entries return value to avoid 'unknown' type inference and property errors */
     return (Object.entries(stats.driverDetails) as [string, { total: number, clients: Record<string, number> }][])
       .sort((a, b) => b[1].total - a[1].total)
       .map(([name, d]) => {
-        /* d is now typed, so accessing d.clients and d.total is safe */
         const clientBreakdown = Object.entries(d.clients)
           .map(([cName, count]) => `${cName.substring(0, 5)}: ${count}`)
           .join(', ');
@@ -81,20 +91,6 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
         };
       });
   }, [stats.driverDetails]);
-
-  const [selTypes, setSelTypes] = useState<string[]>([]);
-  const [selClients, setSelClients] = useState<string[]>([]);
-  const [selDrivers, setSelDrivers] = useState<string[]>([]);
-  
-  const list = useMemo(() => {
-    return todayRaw.filter(t => {
-      if (t.status === 'Viagem cancelada') return false;
-      const matchType = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase() || 'OUTROS');
-      const matchClient = selClients.length === 0 || selClients.includes(t.customer.name);
-      const matchDriver = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
-      return matchType && matchClient && matchDriver;
-    }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [todayRaw, selTypes, selClients, selDrivers]);
 
   return (
     <div className="relative" style={{ zIndex: isOpen ? 150 : 10 }}>
@@ -126,9 +122,9 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
             ))}
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600 mt-1">{stats.delays}</p></div>
-            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600 mt-1">{stats.completed}</p></div>
-            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600 mt-1">{stats.canceled}</p></div>
+            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600 leading-none mt-1">{stats.delays}</p></div>
+            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600 leading-none mt-1">{stats.completed}</p></div>
+            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600 leading-none mt-1">{stats.canceled}</p></div>
           </div>
         </div>
       </button>
@@ -142,34 +138,34 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
           </div>
 
           <div className="flex bg-slate-100 p-1 mx-4 mt-4 rounded-xl shrink-0">
-             <button onClick={() => setViewMode('ranking')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'ranking' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Análise Local</button>
-             <button onClick={() => setViewMode('list')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Fila Real</button>
+             <button onClick={() => setViewMode('ranking')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'ranking' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Ranking Filtrado</button>
+             <button onClick={() => setViewMode('list')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Lista OS</button>
           </div>
 
           <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 flex-1 bg-slate-50/30 min-h-[250px] rounded-b-[2.5rem]">
             {viewMode === 'ranking' ? (
               <div className="space-y-6 pb-4">
                  <section className="space-y-2">
-                   <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest ml-1">Volumes por Cliente (Hoje)</p>
-                   {stats.clientRank.map(([name, count]) => (
+                   <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest ml-1">Volume por Cliente (Filtro)</p>
+                   {filteredRankings.clientRank.length > 0 ? filteredRankings.clientRank.map(([name, count]) => (
                      <div key={name} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
                         <span className="text-[10px] font-black text-slate-700 uppercase truncate pr-4">{name}</span>
                         <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black">{count}</span>
                      </div>
-                   ))}
+                   )) : <p className="text-center text-[8px] text-slate-400 uppercase py-4">Nenhum dado</p>}
                  </section>
                  <section className="space-y-2">
-                   <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest ml-1">Produtividade Motorista (Hoje)</p>
-                   {stats.driverRank.map(([name, count]) => (
+                   <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest ml-1">Produtividade Motorista (Filtro)</p>
+                   {filteredRankings.driverRank.length > 0 ? filteredRankings.driverRank.map(([name, count]) => (
                      <div key={name} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
                         <span className="text-[10px] font-black text-slate-700 uppercase truncate pr-4">{name}</span>
                         <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black">{count}</span>
                      </div>
-                   ))}
+                   )) : <p className="text-center text-[8px] text-slate-400 uppercase py-4">Nenhum dado</p>}
                  </section>
               </div>
             ) : (
-              list.length > 0 ? list.map(trip => (
+              filteredTrips.length > 0 ? filteredTrips.map(trip => (
                 <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl shadow-sm">
                   <span className="text-xs font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
                   <p className="text-[10px] font-black text-slate-800 uppercase mt-1 leading-none truncate">{trip.driver.name}</p>

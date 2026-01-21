@@ -11,28 +11,40 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'ranking'>('ranking');
 
-  const monthStats = useMemo(() => {
+  const monthRaw = useMemo(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
     const monthPrefix = `${currentYear}-${currentMonth}`;
     
-    const monthTrips = trips.filter(t => t.dateTime && t.dateTime.substring(0, 7) === monthPrefix);
+    return trips.filter(t => t.dateTime && t.dateTime.substring(0, 7) === monthPrefix);
+  }, [trips]);
 
-    const active = monthTrips.filter(t => t.status !== 'Viagem cancelada');
-    const canceled = monthTrips.filter(t => t.status === 'Viagem cancelada').length;
+  const [selTypes, setSelTypes] = useState<string[]>([]);
+  const [selClients, setSelClients] = useState<string[]>([]);
+  const [selDrivers, setSelDrivers] = useState<string[]>([]);
+
+  const filteredTrips = useMemo(() => {
+    return monthRaw.filter(t => {
+      if (t.status === 'Viagem cancelada') return false;
+      const matchT = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase() || 'OUTROS');
+      const matchC = selClients.length === 0 || selClients.includes(t.customer.name);
+      const matchD = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
+      return matchT && matchC && matchD;
+    }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+  }, [monthRaw, selTypes, selClients, selDrivers]);
+
+  const stats = useMemo(() => {
+    const active = monthRaw.filter(t => t.status !== 'Viagem cancelada');
+    const canceled = monthRaw.filter(t => t.status === 'Viagem cancelada').length;
     const completed = active.filter(t => t.status === 'Viagem concluída').length;
 
     const typeCounts: Record<string, number> = {};
-    const clientRank: Record<string, number> = {};
-    const driverRank: Record<string, number> = {};
     const driverDetails: Record<string, { total: number, clients: Record<string, number> }> = {};
 
     active.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
-      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
-      driverRank[t.driver.name] = (driverRank[t.driver.name] || 0) + 1;
 
       if (!driverDetails[t.driver.name]) {
         driverDetails[t.driver.name] = { total: 0, clients: {} };
@@ -48,41 +60,31 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
       return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
     }).length;
 
-    return { 
-      total: active.length, 
-      typeCounts, 
-      canceled, 
-      delays, 
-      completed,
-      raw: active,
+    return { total: active.length, typeCounts, canceled, delays, completed, driverDetails };
+  }, [monthRaw]);
+
+  const filteredRankings = useMemo(() => {
+    const clientRank: Record<string, number> = {};
+    const driverRank: Record<string, number> = {};
+
+    filteredTrips.forEach(t => {
+      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
+      driverRank[t.driver.name] = (driverRank[t.driver.name] || 0) + 1;
+    });
+
+    return {
       clientRank: Object.entries(clientRank).sort((a,b) => b[1] - a[1]),
-      driverRank: Object.entries(driverRank).sort((a,b) => b[1] - a[1]),
-      driverDetails
+      driverRank: Object.entries(driverRank).sort((a,b) => b[1] - a[1])
     };
-  }, [trips]);
+  }, [filteredTrips]);
 
-  const [selTypes, setSelTypes] = useState<string[]>([]);
-  const [selClients, setSelClients] = useState<string[]>([]);
-  const [selDrivers, setSelDrivers] = useState<string[]>([]);
-
-  const filteredList = useMemo(() => {
-    return monthStats.raw.filter(t => {
-      const matchT = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase() || 'OUTROS');
-      const matchC = selClients.length === 0 || selClients.includes(t.customer.name);
-      const matchD = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
-      return matchT && matchC && matchD;
-    }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [monthStats.raw, selTypes, selClients, selDrivers]);
-
-  const allTypes = useMemo(() => Array.from(new Set(monthStats.raw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [monthStats.raw]);
-  const allClients = useMemo(() => Array.from(new Set(monthStats.raw.map(t => t.customer.name))).sort(), [monthStats.raw]);
+  const allTypes = useMemo(() => Array.from(new Set(monthRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [monthRaw]);
+  const allClients = useMemo(() => Array.from(new Set(monthRaw.map(t => t.customer.name))).sort(), [monthRaw]);
   
   const driverOptions = useMemo(() => {
-    /* Added explicit type casting to Object.entries return value to avoid 'unknown' type inference and property errors */
-    return (Object.entries(monthStats.driverDetails) as [string, { total: number, clients: Record<string, number> }][])
+    return (Object.entries(stats.driverDetails) as [string, { total: number, clients: Record<string, number> }][])
       .sort((a, b) => b[1].total - a[1].total)
       .map(([name, d]) => {
-        /* d is now typed, so accessing d.clients and d.total is safe */
         const clientBreakdown = Object.entries(d.clients)
           .map(([cName, count]) => `${cName.substring(0, 5)}: ${count}`)
           .join(', ');
@@ -91,7 +93,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
           label: `${name} [${d.total}] (${clientBreakdown})`
         };
       });
-  }, [monthStats.driverDetails]);
+  }, [stats.driverDetails]);
 
   return (
     <div className="relative" style={{ zIndex: isOpen ? 140 : 10 }}>
@@ -102,7 +104,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
         <div className="flex justify-between items-start w-full">
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Consolidado Mês</p>
-            <p className="text-4xl font-black text-slate-800 tracking-tighter mt-1">{monthStats.total}</p>
+            <p className="text-4xl font-black text-slate-800 tracking-tighter mt-1">{stats.total}</p>
           </div>
           <div className={`p-4 rounded-2xl transition-all duration-500 ${isOpen ? 'bg-slate-800 text-white shadow-lg' : 'bg-slate-50 text-slate-500'}`}>
             <svg className={`w-5 h-5 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +115,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
 
         <div className="mt-6 w-full space-y-4">
           <div className="flex flex-wrap gap-1.5 min-h-[30px]">
-            {Object.entries(monthStats.typeCounts).slice(0, 4).map(([type, c]) => (
+            {Object.entries(stats.typeCounts).slice(0, 4).map(([type, c]) => (
               <div key={type} className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
                 <span className="text-[7px] font-black text-slate-400 uppercase">{type.substring(0,3)}</span>
                 <span className="text-[9px] font-black text-slate-700">{c}</span>
@@ -121,9 +123,9 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
             ))}
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600">{monthStats.delays}</p></div>
-            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600">{monthStats.completed}</p></div>
-            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600">{monthStats.canceled}</p></div>
+            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600">{stats.delays}</p></div>
+            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600">{stats.completed}</p></div>
+            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600">{stats.canceled}</p></div>
           </div>
         </div>
       </button>
@@ -137,7 +139,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
           </div>
           
           <div className="flex bg-slate-100 p-1 mx-4 mt-4 rounded-xl shrink-0">
-             <button onClick={() => setViewMode('ranking')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'ranking' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400'}`}>Top Performers</button>
+             <button onClick={() => setViewMode('ranking')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'ranking' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400'}`}>Top Performers (Filtro)</button>
              <button onClick={() => setViewMode('list')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400'}`}>Todas do Mês</button>
           </div>
 
@@ -145,26 +147,26 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
             {viewMode === 'ranking' ? (
               <div className="space-y-6 pb-4">
                 <section className="space-y-2">
-                   <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest ml-1">Top Clientes (Volume)</p>
-                   {monthStats.clientRank.slice(0, 10).map(([name, count]) => (
+                   <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest ml-1">Top Clientes (Filtrado)</p>
+                   {filteredRankings.clientRank.length > 0 ? filteredRankings.clientRank.slice(0, 10).map(([name, count]) => (
                      <div key={name} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
                         <span className="text-[10px] font-black text-slate-700 uppercase truncate pr-4">{name}</span>
                         <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black">{count} OS</span>
                      </div>
-                   ))}
+                   )) : <p className="text-center text-[8px] text-slate-400 py-4">Sem dados</p>}
                 </section>
                 <section className="space-y-2">
-                   <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest ml-1">Top Motoristas (Produtividade)</p>
-                   {monthStats.driverRank.slice(0, 10).map(([name, count]) => (
+                   <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest ml-1">Top Motoristas (Filtrado)</p>
+                   {filteredRankings.driverRank.length > 0 ? filteredRankings.driverRank.slice(0, 10).map(([name, count]) => (
                      <div key={name} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
                         <span className="text-[10px] font-black text-slate-700 uppercase truncate pr-4">{name}</span>
                         <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black">{count} Viagens</span>
                      </div>
-                   ))}
+                   )) : <p className="text-center text-[8px] text-slate-400 py-4">Sem dados</p>}
                 </section>
               </div>
             ) : (
-              filteredList.length > 0 ? filteredList.map(trip => (
+              filteredTrips.length > 0 ? filteredTrips.map(trip => (
                 <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl shadow-sm">
                   <span className="text-xs font-black text-slate-500">{new Date(trip.dateTime).toLocaleDateString('pt-BR')}</span>
                   <p className="text-[10px] font-black text-slate-800 uppercase mt-1 leading-none truncate">{trip.driver.name}</p>
