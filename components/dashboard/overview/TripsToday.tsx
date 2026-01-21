@@ -11,15 +11,10 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'ranking'>('ranking');
   
-  const todayStr = useMemo(() => {
-    return new Date().toLocaleDateString('en-CA'); 
-  }, []);
+  const todayStr = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
 
   const todayRaw = useMemo(() => {
-    return trips.filter(t => {
-      if (!t.dateTime) return false;
-      return t.dateTime.substring(0, 10) === todayStr;
-    });
+    return trips.filter(t => t.dateTime && t.dateTime.substring(0, 10) === todayStr);
   }, [trips, todayStr]);
 
   const stats = useMemo(() => {
@@ -27,15 +22,25 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     const canceledCount = todayRaw.filter(t => t.status === 'Viagem cancelada').length;
     const completed = activeTrips.filter(t => t.status === 'Viagem concluída').length;
     
-    const typeCounts: { [key: string]: number } = {};
+    const typeCounts: Record<string, number> = {};
     const clientRank: Record<string, number> = {};
     const driverRank: Record<string, number> = {};
+    
+    // Novo: Mapa detalhado para o filtro
+    const driverDetails: Record<string, { total: number, clients: Record<string, number> }> = {};
 
     activeTrips.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
       clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
       driverRank[t.driver.name] = (driverRank[t.driver.name] || 0) + 1;
+
+      // Construção dos dados p/ o filtro
+      if (!driverDetails[t.driver.name]) {
+        driverDetails[t.driver.name] = { total: 0, clients: {} };
+      }
+      driverDetails[t.driver.name].total += 1;
+      driverDetails[t.driver.name].clients[t.customer.name] = (driverDetails[t.driver.name].clients[t.customer.name] || 0) + 1;
     });
 
     const delays = activeTrips.filter(t => {
@@ -52,13 +57,30 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       delays, 
       completed,
       clientRank: Object.entries(clientRank).sort((a,b) => b[1] - a[1]),
-      driverRank: Object.entries(driverRank).sort((a,b) => b[1] - a[1])
+      driverRank: Object.entries(driverRank).sort((a,b) => b[1] - a[1]),
+      driverDetails
     };
   }, [todayRaw]);
 
   const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [todayRaw]);
   const allClients = useMemo(() => Array.from(new Set(todayRaw.map(t => t.customer.name))).sort(), [todayRaw]);
-  const allDrivers = useMemo(() => Array.from(new Set(todayRaw.map(t => t.driver.name))).sort(), [todayRaw]);
+  
+  // Opções formatadas para o filtro com contagem por cliente
+  const driverOptions = useMemo(() => {
+    /* Added explicit type casting to Object.entries return value to avoid 'unknown' type inference and property errors */
+    return (Object.entries(stats.driverDetails) as [string, { total: number, clients: Record<string, number> }][])
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([name, d]) => {
+        /* d is now typed, so accessing d.clients and d.total is safe */
+        const clientBreakdown = Object.entries(d.clients)
+          .map(([cName, count]) => `${cName.substring(0, 5)}: ${count}`)
+          .join(', ');
+        return {
+          value: name,
+          label: `${name} [${d.total}] (${clientBreakdown})`
+        };
+      });
+  }, [stats.driverDetails]);
 
   const [selTypes, setSelTypes] = useState<string[]>([]);
   const [selClients, setSelClients] = useState<string[]>([]);
@@ -104,9 +126,9 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
             ))}
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600 leading-none mt-1">{stats.delays}</p></div>
-            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600 leading-none mt-1">{stats.completed}</p></div>
-            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600 leading-none mt-1">{stats.canceled}</p></div>
+            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600 mt-1">{stats.delays}</p></div>
+            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600 mt-1">{stats.completed}</p></div>
+            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600 mt-1">{stats.canceled}</p></div>
           </div>
         </div>
       </button>
@@ -116,7 +138,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
           <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 shrink-0 relative z-[170]">
              <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
-             <MultiCheckboxFilter label="Motoristas" options={allDrivers} selectedOptions={selDrivers} onChange={setSelDrivers} />
+             <MultiCheckboxFilter label="Motoristas" options={driverOptions} selectedOptions={selDrivers} onChange={setSelDrivers} />
           </div>
 
           <div className="flex bg-slate-100 p-1 mx-4 mt-4 rounded-xl shrink-0">

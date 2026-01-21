@@ -17,19 +17,28 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
     const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
     const monthPrefix = `${currentYear}-${currentMonth}`;
     
-    const monthTrips = trips.filter(t => {
-      if (!t.dateTime) return false;
-      return t.dateTime.substring(0, 7) === monthPrefix;
-    });
+    const monthTrips = trips.filter(t => t.dateTime && t.dateTime.substring(0, 7) === monthPrefix);
 
     const active = monthTrips.filter(t => t.status !== 'Viagem cancelada');
     const canceled = monthTrips.filter(t => t.status === 'Viagem cancelada').length;
     const completed = active.filter(t => t.status === 'Viagem concluída').length;
 
-    const typeCounts: { [key: string]: number } = {};
+    const typeCounts: Record<string, number> = {};
+    const clientRank: Record<string, number> = {};
+    const driverRank: Record<string, number> = {};
+    const driverDetails: Record<string, { total: number, clients: Record<string, number> }> = {};
+
     active.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
+      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
+      driverRank[t.driver.name] = (driverRank[t.driver.name] || 0) + 1;
+
+      if (!driverDetails[t.driver.name]) {
+        driverDetails[t.driver.name] = { total: 0, clients: {} };
+      }
+      driverDetails[t.driver.name].total += 1;
+      driverDetails[t.driver.name].clients[t.customer.name] = (driverDetails[t.driver.name].clients[t.customer.name] || 0) + 1;
     });
 
     const delays = active.filter(t => {
@@ -39,14 +48,6 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
       return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
     }).length;
 
-    // Rankings
-    const clientRank: Record<string, number> = {};
-    const driverRank: Record<string, number> = {};
-    active.forEach(t => {
-      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
-      driverRank[t.driver.name] = (driverRank[t.driver.name] || 0) + 1;
-    });
-
     return { 
       total: active.length, 
       typeCounts, 
@@ -55,7 +56,8 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
       completed,
       raw: active,
       clientRank: Object.entries(clientRank).sort((a,b) => b[1] - a[1]),
-      driverRank: Object.entries(driverRank).sort((a,b) => b[1] - a[1])
+      driverRank: Object.entries(driverRank).sort((a,b) => b[1] - a[1]),
+      driverDetails
     };
   }, [trips]);
 
@@ -74,7 +76,22 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
 
   const allTypes = useMemo(() => Array.from(new Set(monthStats.raw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [monthStats.raw]);
   const allClients = useMemo(() => Array.from(new Set(monthStats.raw.map(t => t.customer.name))).sort(), [monthStats.raw]);
-  const allDriversList = useMemo(() => Array.from(new Set(monthStats.raw.map(t => t.driver.name))).sort(), [monthStats.raw]);
+  
+  const driverOptions = useMemo(() => {
+    /* Added explicit type casting to Object.entries return value to avoid 'unknown' type inference and property errors */
+    return (Object.entries(monthStats.driverDetails) as [string, { total: number, clients: Record<string, number> }][])
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([name, d]) => {
+        /* d is now typed, so accessing d.clients and d.total is safe */
+        const clientBreakdown = Object.entries(d.clients)
+          .map(([cName, count]) => `${cName.substring(0, 5)}: ${count}`)
+          .join(', ');
+        return {
+          value: name,
+          label: `${name} [${d.total}] (${clientBreakdown})`
+        };
+      });
+  }, [monthStats.driverDetails]);
 
   return (
     <div className="relative" style={{ zIndex: isOpen ? 140 : 10 }}>
@@ -116,7 +133,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
           <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 shrink-0 relative z-[110]">
              <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
-             <MultiCheckboxFilter label="Motoristas" options={allDriversList} selectedOptions={selDrivers} onChange={setSelDrivers} />
+             <MultiCheckboxFilter label="Motoristas" options={driverOptions} selectedOptions={selDrivers} onChange={setSelDrivers} />
           </div>
           
           <div className="flex bg-slate-100 p-1 mx-4 mt-4 rounded-xl shrink-0">
