@@ -34,7 +34,14 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    return { total: active.length, completed, canceled, typeCounts };
+    const delays = active.filter(t => {
+      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
+      const scheduled = new Date(t.dateTime).getTime();
+      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
+      return t.status !== 'Viagem concluída'; // Se não concluiu ontem, já é considerado atraso/pendência
+    }).length;
+
+    return { total: active.length, completed, canceled, delays, typeCounts };
   }, [yesterdayRaw]);
 
   const allTypes = useMemo(() => Array.from(new Set(yesterdayRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [yesterdayRaw]);
@@ -73,7 +80,7 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
         </div>
 
         <div className="mt-6 w-full space-y-4">
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 min-h-[30px]">
             {Object.entries(stats.typeCounts).map(([type, c]) => (
               <div key={type} className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
                 <span className="text-[7px] font-black text-slate-400 uppercase truncate">{type}</span>
@@ -81,9 +88,10 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
               </div>
             ))}
           </div>
-          <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Concluídas</span>
-              <span className="text-xs font-black text-emerald-600">{stats.completed}</span>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600 leading-none mt-1">{stats.delays}</p></div>
+            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600 leading-none mt-1">{stats.completed}</p></div>
+            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600 leading-none mt-1">{stats.canceled}</p></div>
           </div>
         </div>
       </button>

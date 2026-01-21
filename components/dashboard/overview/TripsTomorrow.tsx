@@ -26,6 +26,7 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
   const stats = useMemo(() => {
     const active = tomorrowRaw.filter(t => t.status !== 'Viagem cancelada');
     const canceled = tomorrowRaw.filter(t => t.status === 'Viagem cancelada').length;
+    const completed = active.filter(t => t.status === 'Viagem concluída').length;
     
     const typeCounts: { [key: string]: number } = {};
     active.forEach(t => {
@@ -33,7 +34,7 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    return { total: active.length, typeCounts, canceled };
+    return { total: active.length, typeCounts, canceled, completed };
   }, [tomorrowRaw]);
 
   const allTypes = useMemo(() => Array.from(new Set(tomorrowRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [tomorrowRaw]);
@@ -72,7 +73,7 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
         </div>
 
         <div className="mt-6 w-full space-y-4">
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 min-h-[30px]">
             {Object.entries(stats.typeCounts).map(([type, c]) => (
               <div key={type} className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
                 <span className="text-[7px] font-black text-slate-400 uppercase truncate">{type}</span>
@@ -81,11 +82,10 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-2">
-            <div className="text-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-              <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Canceladas</p>
-              <p className="text-sm font-black text-slate-600 leading-none mt-1">{stats.canceled}</p>
-            </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100 opacity-30"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600 mt-1">0</p></div>
+            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600 mt-1">{stats.completed}</p></div>
+            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600 mt-1">{stats.canceled}</p></div>
           </div>
         </div>
       </button>
