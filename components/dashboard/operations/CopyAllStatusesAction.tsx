@@ -64,13 +64,11 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
           new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
         );
         
-        // Função auxiliar para pegar data formatada por termo
         const getVal = (terms: string[]) => {
           const h = [...history].reverse().find(entry => terms.some(term => entry.status.toLowerCase().includes(term.toLowerCase())));
           return h ? reportGenerator.formatFullDate(h.dateTime) : "";
         };
 
-        // Lógica Especial: Retirada Cragea (Focada em Retirada do Cheio)
         const getCrageaRetiradaVal = () => {
           const removalCheio = history.find(h => h.status === 'Retirada do cheio');
           const arrivalCragea = history.find(h => h.status === 'Chegou no Cragea');
@@ -79,7 +77,6 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
 
           const removalTime = new Date(removalCheio.dateTime).getTime();
 
-          // Se houver chegada e ela for ANTERIOR à retirada, usa a chegada
           if (arrivalCragea) {
             const arrivalTime = new Date(arrivalCragea.dateTime).getTime();
             if (arrivalTime < removalTime) {
@@ -87,7 +84,6 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
             }
           }
 
-          // Caso contrário, usa a retirada do cheio
           return reportGenerator.formatFullDate(removalCheio.dateTime);
         };
 
@@ -102,16 +98,29 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
         };
       };
 
-      setActiveReportData(trips.filter(t => 
-        t.status !== 'Viagem concluída' && 
-        t.status !== 'Viagem cancelada' && 
-        t.status !== 'Container sobre rodas'
-      ).map(mapTrip));
+      const hasSaidaVolks = (t: Trip) => {
+        return (t.statusHistory || []).some(h => 
+          h.status.toLowerCase().includes('saiu da volkswagen') || 
+          h.status.toLowerCase().includes('saída da volkswagen')
+        );
+      };
 
-      setFinishedReportData(trips.filter(t => 
-        t.status === 'Viagem concluída' || 
-        t.status === 'Container sobre rodas'
-      ).map(mapTrip));
+      // REGRA: Se 'Container sobre rodas', só finalizada se tiver 'Saída Volks'. Caso contrário, fica em andamento.
+      setActiveReportData(trips.filter(t => {
+        const isFinishedGeneral = t.status === 'Viagem concluída';
+        const isCanceled = t.status === 'Viagem cancelada';
+        const isSobreRodasComSaida = t.status === 'Container sobre rodas' && hasSaidaVolks(t);
+        
+        // Se não for cancelada, e não for (Concluída ou SobreRodasComSaida), está ativa
+        return !isCanceled && !isFinishedGeneral && !isSobreRodasComSaida;
+      }).map(mapTrip));
+
+      setFinishedReportData(trips.filter(t => {
+        const isFinishedGeneral = t.status === 'Viagem concluída';
+        const isSobreRodasComSaida = t.status === 'Container sobre rodas' && hasSaidaVolks(t);
+        
+        return isFinishedGeneral || isSobreRodasComSaida;
+      }).map(mapTrip));
     }
   }, [isPreviewOpen, trips, activeReportData.length, finishedReportData.length]);
 
@@ -180,7 +189,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
       </button>
 
       {isPreviewOpen && (
-        <div className="fixed inset-0 z-[4000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl animate-in fade-in">
+        <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in">
           <div className="bg-white w-full max-w-7xl h-[94vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
             <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                <div className="flex items-center gap-6">
