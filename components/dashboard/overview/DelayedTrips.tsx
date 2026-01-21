@@ -50,64 +50,65 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
     <div className="relative group">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full text-left bg-white p-6 rounded-[2.2rem] border transition-all duration-500 shadow-sm hover:shadow-xl ${isOpen ? 'border-red-500 ring-4 ring-red-500/5' : 'border-slate-100'}`}
+        className={`w-full text-left bg-white p-8 rounded-[2.5rem] border transition-all duration-500 shadow-sm hover:shadow-xl ${isOpen ? 'border-red-500 ring-4 ring-red-500/5' : 'border-slate-100'}`}
       >
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Monitor de Atrasos Geral</p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <p className="text-5xl font-black text-red-600 tracking-tighter">{delayedList.length}</p>
-              {delayedList.length > 0 && <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></div>}
+            <p className="text-xs font-black text-red-400 uppercase tracking-widest">Alerta de Atrasos</p>
+            <div className="flex items-baseline gap-3 mt-2">
+              <p className="text-6xl font-black text-red-600 tracking-tighter">{delayedList.length}</p>
+              {delayedList.length > 0 && <div className="w-3 h-3 rounded-full bg-red-500 animate-ping shadow-[0_0_10px_red]"></div>}
             </div>
           </div>
           <div className={`p-4 rounded-2xl transition-all duration-500 ${isOpen ? 'bg-red-600 text-white shadow-lg' : 'bg-red-50 text-red-600'}`}>
-            <svg className={`w-6 h-6 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-7 h-7 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
         </div>
-        <p className="mt-4 text-[9px] font-black uppercase text-slate-400 tracking-widest">
+        <p className="mt-6 text-[11px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
           {isOpen ? 'Recolher detalhes' : 'Ver ocorrências acumuladas'}
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 8l4 4m0 0l-4 4m4-4H3" strokeWidth="3"/></svg>
         </p>
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-4 duration-500 max-h-[450px] flex flex-col">
-          <div className="p-5 bg-red-50 border-b border-red-100 flex justify-between items-center">
-            <span className="text-[9px] font-black text-red-700 uppercase tracking-widest ml-2">Incidências do Mês</span>
-            <span className="px-2.5 py-1 bg-red-600 text-white rounded-lg text-[8px] font-black uppercase">{delayedList.length} OS</span>
+        <div className="absolute top-full left-0 right-0 mt-4 bg-white border border-slate-100 rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.2)] z-50 overflow-hidden animate-in slide-in-from-top-4 duration-500 max-h-[550px] flex flex-col">
+          <div className="p-6 bg-red-50 border-b border-red-100 flex justify-between items-center">
+            <span className="text-xs font-black text-red-700 uppercase tracking-widest ml-2">Histórico do Mês</span>
+            <span className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase">{delayedList.length} Ocorrências</span>
           </div>
-          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3">
+          <div className="overflow-y-auto custom-scrollbar p-6 space-y-4">
             {delayedList.length > 0 ? delayedList.map(trip => {
               const arrival = trip.statusHistory?.find(h => h.status === 'Chegou no cliente');
               const diffMin = arrival ? Math.round((new Date(arrival.dateTime).getTime() - new Date(trip.dateTime).getTime()) / 60000) : 0;
               const date = new Date(trip.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
               
               return (
-                <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-2xl border-l-4 border-l-red-500 shadow-sm">
+                <div key={trip.id} className="p-5 bg-white border border-slate-100 rounded-3xl border-l-[6px] border-l-red-500 shadow-sm hover:shadow-md transition-all">
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                       <span className="text-[8px] font-black bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{date}</span>
-                       <p className="text-[10px] font-black text-slate-800 uppercase truncate flex-1">{trip.driver.name}</p>
+                    <div className="flex items-center gap-3">
+                       <span className="text-[10px] font-black bg-slate-900 text-white px-2 py-1 rounded-lg font-mono">{date}</span>
+                       <p className="text-sm font-black text-slate-800 uppercase truncate">{trip.driver.name}</p>
                     </div>
-                    <span className="text-[9px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">
-                      {arrival ? `+${diffMin}m` : 'Pendente'}
+                    <span className="text-xs font-black text-red-600 bg-red-50 px-3 py-1.5 rounded-xl border border-red-100">
+                      {arrival ? `+${diffMin} min` : 'Em atraso'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-50">
+                  <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-50">
                     <div>
-                      <p className="text-[7px] font-black text-slate-400 uppercase">OS / Placa</p>
-                      <p className="text-[10px] font-black text-slate-700">{trip.os} • {trip.driver.plateHorse}</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">OS / Identificação</p>
+                      <p className="text-xs font-black text-slate-700 mt-0.5">{trip.os} • {trip.driver.plateHorse}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[7px] font-black text-slate-400 uppercase">Agendamento</p>
-                      <p className="text-[10px] font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Agendamento</p>
+                      <p className="text-xs font-black text-blue-600 mt-0.5">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
                     </div>
                   </div>
                 </div>
               );
             }) : (
-              <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px] italic">Sem ocorrências</div>
+              <div className="py-20 text-center text-slate-300 font-black uppercase text-xs italic">Sem registros de atraso</div>
             )}
           </div>
         </div>
