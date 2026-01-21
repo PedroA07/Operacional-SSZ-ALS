@@ -20,7 +20,7 @@ export const reportGenerator = {
       return d.toLocaleString('pt-BR', { 
         day: '2-digit', month: '2-digit', year: 'numeric', 
         hour: '2-digit', minute: '2-digit' 
-      }).replace(',', '');
+      }).replace(',', '').toUpperCase();
     } catch (e) {
       return "";
     }
@@ -43,8 +43,8 @@ export const reportGenerator = {
       <table style="border-collapse: collapse; margin-bottom: 25px; width: 380px; table-layout: fixed;">
         ${rows.map(row => `
           <tr>
-            <td style="${headerStyle}">${row.label}</td>
-            <td style="${cellStyle}">${row.value || ""}</td>
+            <td style="${headerStyle}">${row.label.toUpperCase()}</td>
+            <td style="${cellStyle}">${(row.value || "").toUpperCase()}</td>
           </tr>
         `).join('')}
       </table>
@@ -88,7 +88,7 @@ export const reportGenerator = {
 
   generatePlainText: (active: TableReportData[], finished: TableReportData[]): string => {
     const render = (list: TableReportData[]) => list.map(d => 
-      `MOTORISTA: ${d.motorista} | CONTAINER: ${d.container} | RETIRADA CRAGEA: ${d.retiradaCragea} | CHEGADA VOLKS: ${d.chegadaVolks} | SAIDA VOLKS: ${d.saidaVolks} | BAIXA CRAGEA: ${d.baixaCragea}`
+      `MOTORISTA: ${d.motorista.toUpperCase()} | CONTAINER: ${d.container.toUpperCase()} | RETIRADA CRAGEA: ${d.retiradaCragea.toUpperCase()} | CHEGADA VOLKS: ${d.chegadaVolks.toUpperCase()} | SAIDA VOLKS: ${d.saidaVolks.toUpperCase()} | BAIXA CRAGEA: ${d.baixaCragea.toUpperCase()}`
     ).join(' || ');
 
     let parts = [];
@@ -99,6 +99,6 @@ export const reportGenerator = {
       parts.push(`FINALIZADAS: ${render(finished)} [FIM RELATORIO]`);
     }
 
-    return parts.join(' ').replace(/\r?\n|\r/g, ' ').replace(/\s+/g, ' ').trim();
+    return parts.join(' ').replace(/\r?\n|\r/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
   }
 };

@@ -11,13 +11,15 @@ interface CopyAllStatusesActionProps {
 interface IndividualTableEditorProps {
   initialData: TableReportData;
   onFinalChange: (data: TableReportData) => void;
+  onMove: () => void;
+  moveLabel: string;
 }
 
-const IndividualTableEditor = memo(({ initialData, onFinalChange }: IndividualTableEditorProps) => {
+const IndividualTableEditor = memo(({ initialData, onFinalChange, onMove, moveLabel }: IndividualTableEditorProps) => {
   const [localData, setLocalData] = useState<TableReportData>(initialData);
 
   const handleChange = (field: keyof TableReportData, value: string) => {
-    const updated = { ...localData, [field]: value };
+    const updated = { ...localData, [field]: value.toUpperCase() };
     setLocalData(updated);
     onFinalChange(updated);
   };
@@ -32,7 +34,19 @@ const IndividualTableEditor = memo(({ initialData, onFinalChange }: IndividualTa
   ];
 
   return (
-    <div className="inline-block border border-black mb-10 bg-white shadow-md">
+    <div className="inline-block border border-black mb-10 bg-white shadow-md relative group">
+      {/* Botão de Mover Coluna */}
+      <button 
+        onClick={onMove}
+        className="absolute -right-4 top-1/2 -translate-y-1/2 translate-x-full bg-slate-900 text-white p-3 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-all z-10 hover:bg-blue-600 active:scale-90"
+        title={moveLabel}
+      >
+        <div className="flex flex-col items-center gap-1">
+           <svg className={`w-4 h-4 ${moveLabel.includes('Andamento') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+           <span className="text-[7px] font-black uppercase whitespace-nowrap">{moveLabel}</span>
+        </div>
+      </button>
+
       {rows.map((row) => (
         <div key={row.field} className="grid grid-cols-[140px_260px] border-b border-black last:border-b-0">
           <div className="bg-[#5b9bd5] text-black font-black text-[10px] p-2.5 border-r border-black text-center uppercase flex items-center justify-center select-none">
@@ -80,19 +94,18 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
         };
       };
 
-      // FILTRO: Em Andamento (Oculta explicitamente 'Container sobre rodas' da fila ativa)
+      // Carregamento inicial baseado nos status reais
       setActiveReportData(trips.filter(t => 
         t.status !== 'Viagem concluída' && 
         t.status !== 'Viagem cancelada' &&
         t.status !== 'Container sobre rodas'
       ).map(mapTrip));
 
-      // FILTRO: Finalizadas (Inclui 'Container sobre rodas' aqui se desejado, ou apenas concluídas)
       setFinishedReportData(trips.filter(t => 
         t.status === 'Viagem concluída' || t.status === 'Container sobre rodas'
       ).map(mapTrip));
     }
-  }, [isPreviewOpen, trips, activeReportData.length, finishedReportData.length]);
+  }, [isPreviewOpen, trips]);
 
   const handleUpdateActive = useCallback((index: number, newData: TableReportData) => {
     setActiveReportData(prev => {
@@ -109,6 +122,18 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
       return copy;
     });
   }, []);
+
+  const moveTrip = (index: number, from: 'active' | 'finished') => {
+    if (from === 'active') {
+      const item = activeReportData[index];
+      setActiveReportData(prev => prev.filter((_, i) => i !== index));
+      setFinishedReportData(prev => [item, ...prev]);
+    } else {
+      const item = finishedReportData[index];
+      setFinishedReportData(prev => prev.filter((_, i) => i !== index));
+      setActiveReportData(prev => [item, ...prev]);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -152,32 +177,49 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
         <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in">
           <div className="bg-white w-full max-w-7xl h-[94vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
             <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
-               <h3 className="text-xl font-black uppercase">Resumo de Status Operacional</h3>
+               <h3 className="text-xl font-black uppercase">Editor de Relatório Operacional</h3>
                <button onClick={handleClose} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg></button>
             </header>
 
             <div className="flex-1 overflow-hidden flex bg-[#f4f7fa] p-10 gap-10">
                <div className="flex-1 flex flex-col space-y-4">
-                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b-2 border-blue-600 pb-2">Em Andamento ({activeReportData.length})</h4>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
+                  <div className="flex items-center justify-between border-b-2 border-blue-600 pb-2">
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Em Andamento ({activeReportData.length})</h4>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-10">
                      {activeReportData.map((data, idx) => (
-                       <IndividualTableEditor key={idx} initialData={data} onFinalChange={(val) => handleUpdateActive(idx, val)} />
+                       <IndividualTableEditor 
+                         key={data.id || idx} 
+                         initialData={data} 
+                         onFinalChange={(val) => handleUpdateActive(idx, val)} 
+                         onMove={() => moveTrip(idx, 'active')}
+                         moveLabel="Para Finalizadas"
+                       />
                      ))}
                   </div>
                </div>
                <div className="flex-1 flex flex-col space-y-4">
-                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b-2 border-emerald-600 pb-2">Finalizadas / Rodas ({finishedReportData.length})</h4>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
+                  <div className="flex items-center justify-between border-b-2 border-emerald-600 pb-2">
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Finalizadas / Rodas ({finishedReportData.length})</h4>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-10">
                      {finishedReportData.map((data, idx) => (
-                       <IndividualTableEditor key={idx} initialData={data} onFinalChange={(val) => handleUpdateFinished(idx, val)} />
+                       <IndividualTableEditor 
+                         key={data.id || idx} 
+                         initialData={data} 
+                         onFinalChange={(val) => handleUpdateFinished(idx, val)} 
+                         onMove={() => moveTrip(idx, 'finished')}
+                         moveLabel="Para Andamento"
+                       />
                      ))}
                   </div>
                </div>
             </div>
 
-            <footer className="p-8 bg-white border-t border-slate-100 flex justify-center">
+            <footer className="p-8 bg-white border-t border-slate-100 flex flex-col items-center gap-4">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Dica: Passe o mouse sobre um card para movê-lo de coluna. Letras serão copiadas em MAIÚSCULO.</p>
                 <button onClick={handleCopy} className={`px-24 py-6 rounded-[2.5rem] text-xs font-black uppercase tracking-[0.3em] shadow-2xl transition-all active:scale-95 ${isCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                  {isCopied ? '✓ Copiado!' : 'Copiar Tudo'}
+                  {isCopied ? '✓ Copiado com Sucesso!' : 'Copiar para Clipboard'}
                 </button>
             </footer>
           </div>
