@@ -58,7 +58,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   }, [todayRaw, selTypes, selClients]);
 
   return (
-    <div className="relative" style={{ zIndex: isOpen ? 100 : 10 }}>
+    <div className="relative" style={{ zIndex: isOpen ? 150 : 10 }}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full text-left bg-white p-7 rounded-[2.5rem] border transition-all duration-500 shadow-sm hover:shadow-xl relative z-[70] flex flex-col h-full ${isOpen ? 'border-blue-500 ring-4 ring-blue-500/5 rounded-b-none' : 'border-slate-100'}`}
@@ -78,24 +78,25 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
         </div>
 
         <div className="mt-6 w-full space-y-4">
-          <div className="grid grid-cols-2 gap-1.5">
-            {Object.entries(stats.typeCounts).slice(0, 2).map(([type, c]) => (
-              <div key={type} className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 flex justify-between items-center">
-                <span className="text-[7.5px] font-black text-slate-400 uppercase truncate pr-1">{type}</span>
-                <span className="text-[10px] font-black text-slate-700">{c}</span>
+          {/* Exibição de TODAS as modalidades ativas */}
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(stats.typeCounts).map(([type, c]) => (
+              <div key={type} className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
+                <span className="text-[7px] font-black text-slate-400 uppercase truncate">{type}</span>
+                <span className="text-[9px] font-black text-slate-700">{c}</span>
               </div>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-blue-50 p-2 rounded-xl text-center"><p className="text-[7px] font-black text-blue-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600">{stats.delays}</p></div>
-            <div className="bg-emerald-50 p-2 rounded-xl text-center"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black">{stats.completed}</p></div>
+            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600 leading-none mt-1">{stats.delays}</p></div>
+            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600 leading-none mt-1">{stats.completed}</p></div>
           </div>
         </div>
       </button>
 
       {isOpen && (
-        <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[60] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col overflow-visible">
-          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 shrink-0 relative z-[110]">
+        <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[160] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
+          <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 shrink-0 relative z-[170]">
              <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
           </div>

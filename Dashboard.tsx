@@ -93,13 +93,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   useEffect(() => { 
     loadAllData(true);
 
-    const refreshDataInterval = setInterval(() => loadAllData(false), 30000);
+    // INTERVALO AUMENTADO PARA 60s PARA EVITAR INTERRUPÇÕES NO MANUSEIO
+    const refreshDataInterval = setInterval(() => loadAllData(false), 60000);
 
     let channel: any = null;
     if (supabase) {
       channel = supabase
         .channel('db-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
+          // Atualização realtime sem piscar a tela
           loadAllData(false);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, () => {
@@ -382,4 +384,5 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     </div>
   );
 };
+
 export default Dashboard;
