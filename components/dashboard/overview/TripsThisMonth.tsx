@@ -45,6 +45,10 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
     active.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
+      
+      if (t.category?.toUpperCase() === 'INDÚSTRIA') {
+        typeCounts['INDÚSTRIA'] = (typeCounts['INDÚSTRIA'] || 0) + 1;
+      }
 
       if (!driverDetails[t.driver.name]) {
         driverDetails[t.driver.name] = { total: 0, clients: {} };
@@ -78,7 +82,12 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
     };
   }, [filteredTrips]);
 
-  const allTypes = useMemo(() => Array.from(new Set(monthRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [monthRaw]);
+  const allTypes = useMemo(() => {
+    const types = new Set(monthRaw.map(t => t.type?.toUpperCase() || 'OUTROS'));
+    if (monthRaw.some(t => t.category?.toUpperCase() === 'INDÚSTRIA')) types.add('INDÚSTRIA');
+    return Array.from(types).sort();
+  }, [monthRaw]);
+
   const allClients = useMemo(() => Array.from(new Set(monthRaw.map(t => t.customer.name))).sort(), [monthRaw]);
   
   const driverOptions = useMemo(() => {
@@ -114,18 +123,18 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
         </div>
 
         <div className="mt-6 w-full space-y-4">
-          <div className="flex flex-wrap gap-1.5 min-h-[30px]">
+          <div className="flex flex-wrap gap-2 min-h-[30px]">
             {Object.entries(stats.typeCounts).slice(0, 4).map(([type, c]) => (
-              <div key={type} className="bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
-                <span className="text-[7px] font-black text-slate-400 uppercase">{type.substring(0,3)}</span>
-                <span className="text-[9px] font-black text-slate-700">{c}</span>
+              <div key={type} className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 flex items-center gap-3">
+                <span className="text-xs font-black text-slate-400 uppercase">{type.substring(0,3)}</span>
+                <span className="text-sm font-black text-slate-700">{c}</span>
               </div>
             ))}
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[7px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600">{stats.delays}</p></div>
-            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[7px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600">{stats.completed}</p></div>
-            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[7px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600">{stats.canceled}</p></div>
+            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[10px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600">{stats.delays}</p></div>
+            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[10px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600">{stats.completed}</p></div>
+            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600">{stats.canceled}</p></div>
           </div>
         </div>
       </button>
@@ -138,7 +147,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
              <MultiCheckboxFilter label="Motoristas" options={driverOptions} selectedOptions={selDrivers} onChange={setSelDrivers} />
           </div>
           
-          <div className="flex bg-slate-100 p-1 mx-4 mt-4 rounded-xl shrink-0">
+          <div className="flex bg-slate-100 p-1.5 mx-4 mt-4 rounded-xl shrink-0">
              <button onClick={() => setViewMode('ranking')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'ranking' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400'}`}>Top Performers (Filtro)</button>
              <button onClick={() => setViewMode('list')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400'}`}>Todas do Mês</button>
           </div>
@@ -152,15 +161,6 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
                      <div key={name} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
                         <span className="text-[10px] font-black text-slate-700 uppercase truncate pr-4">{name}</span>
                         <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black">{count} OS</span>
-                     </div>
-                   )) : <p className="text-center text-[8px] text-slate-400 py-4">Sem dados</p>}
-                </section>
-                <section className="space-y-2">
-                   <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest ml-1">Top Motoristas (Filtrado)</p>
-                   {filteredRankings.driverRank.length > 0 ? filteredRankings.driverRank.slice(0, 10).map(([name, count]) => (
-                     <div key={name} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
-                        <span className="text-[10px] font-black text-slate-700 uppercase truncate pr-4">{name}</span>
-                        <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black">{count} Viagens</span>
                      </div>
                    )) : <p className="text-center text-[8px] text-slate-400 py-4">Sem dados</p>}
                 </section>

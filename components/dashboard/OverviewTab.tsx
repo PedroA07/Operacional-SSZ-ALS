@@ -6,6 +6,7 @@ import TripsToday from './overview/TripsToday';
 import TripsTomorrow from './overview/TripsTomorrow';
 import TripsThisWeek from './overview/TripsThisWeek';
 import TripsThisMonth from './overview/TripsThisMonth';
+import TripsThisYear from './overview/TripsThisYear';
 import DelayedTrips from './overview/DelayedTrips';
 import DriverStatusCards from './overview/DriverStatusCards';
 import RecentActivitiesCard from './overview/RecentActivitiesCard';
@@ -52,24 +53,21 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
         </button>
       </div>
 
-      {/* GRID DE KPIs SUPERIOR */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 transition-opacity duration-300 relative ${isSyncing ? 'opacity-70' : 'opacity-100'}`} style={{ zIndex: 100 }}>
+      {/* GRID DE KPIs SUPERIOR - REORGANIZADO PARA 3 COLUNAS (Fica mais largo e legível) */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-300 relative ${isSyncing ? 'opacity-70' : 'opacity-100'}`} style={{ zIndex: 100 }}>
         <TripsYesterday trips={trips} />
         <TripsToday trips={trips} />
         <TripsTomorrow trips={trips} />
         <TripsThisWeek trips={trips} />
         <TripsThisMonth trips={trips} />
+        <TripsThisYear trips={trips} />
       </div>
 
-      {/* ÁREA CENTRAL: STATUS E ATIVIDADES (REORGANIZADO) */}
+      {/* ÁREA CENTRAL: STATUS E ATIVIDADES */}
       <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`}>
-         
-         {/* COLUNA ESQUERDA (PRINCIPAL): MONITOR DE FROTA */}
          <div className="lg:col-span-8">
             <DriverStatusCards trips={trips} drivers={drivers} />
          </div>
-
-         {/* COLUNA DIREITA (WIDGETS): ATRASOS E ATIVIDADES */}
          <div className="lg:col-span-4 space-y-8">
             <DelayedTrips trips={trips} />
             <RecentActivitiesCard user={user} />
