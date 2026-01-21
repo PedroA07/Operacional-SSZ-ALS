@@ -47,7 +47,10 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
       typeCounts[type] = (typeCounts[type] || 0) + 1;
       
       if (t.category?.toUpperCase() === 'INDÚSTRIA') {
-        typeCounts['INDÚSTRIA'] = (typeCounts['INDÚSTRIA'] || 0) + 1;
+        typeCounts['IND'] = (typeCounts['IND'] || 0) + 1;
+      }
+      if (t.category?.toUpperCase() === 'CARGA SOLTA') {
+        typeCounts['SOLTA'] = (typeCounts['SOLTA'] || 0) + 1;
       }
 
       if (!driverDetails[t.driver.name]) {
@@ -58,8 +61,8 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
     });
 
     const delays = active.filter(t => {
-      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       const scheduled = new Date(t.dateTime).getTime();
+      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
       return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
     }).length;
@@ -85,6 +88,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
   const allTypes = useMemo(() => {
     const types = new Set(monthRaw.map(t => t.type?.toUpperCase() || 'OUTROS'));
     if (monthRaw.some(t => t.category?.toUpperCase() === 'INDÚSTRIA')) types.add('INDÚSTRIA');
+    if (monthRaw.some(t => t.category?.toUpperCase() === 'CARGA SOLTA')) types.add('CARGA SOLTA');
     return Array.from(types).sort();
   }, [monthRaw]);
 
@@ -112,8 +116,8 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
       >
         <div className="flex justify-between items-start w-full">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Consolidado Mês</p>
-            <p className="text-4xl font-black text-slate-800 tracking-tighter mt-1">{stats.total}</p>
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Consolidado Mês</p>
+            <p className="text-5xl font-black text-slate-800 tracking-tighter mt-1">{stats.total}</p>
           </div>
           <div className={`p-4 rounded-2xl transition-all duration-500 ${isOpen ? 'bg-slate-800 text-white shadow-lg' : 'bg-slate-50 text-slate-500'}`}>
             <svg className={`w-5 h-5 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,19 +126,19 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
           </div>
         </div>
 
-        <div className="mt-6 w-full space-y-4">
+        <div className="mt-8 w-full space-y-5">
           <div className="flex flex-wrap gap-2 min-h-[30px]">
             {Object.entries(stats.typeCounts).slice(0, 4).map(([type, c]) => (
               <div key={type} className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 flex items-center gap-3">
-                <span className="text-xs font-black text-slate-400 uppercase">{type.substring(0,3)}</span>
+                <span className="text-xs font-black text-slate-400 uppercase">{type.substring(0,5)}</span>
                 <span className="text-sm font-black text-slate-700">{c}</span>
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="bg-red-50 p-2 rounded-xl text-center border border-red-100"><p className="text-[10px] font-black text-red-400 uppercase">Atr.</p><p className="text-sm font-black text-red-600">{stats.delays}</p></div>
-            <div className="bg-emerald-50 p-2 rounded-xl text-center border border-emerald-100"><p className="text-[10px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-sm font-black text-emerald-600">{stats.completed}</p></div>
-            <div className="bg-slate-50 p-2 rounded-xl text-center border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase">Canc.</p><p className="text-sm font-black text-slate-600">{stats.canceled}</p></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-red-50 p-2.5 rounded-xl text-center border border-red-100"><p className="text-[10px] font-black text-red-400 uppercase">Atr.</p><p className="text-lg font-black text-red-600 mt-1">{stats.delays}</p></div>
+            <div className="bg-emerald-50 p-2.5 rounded-xl text-center border border-emerald-100"><p className="text-[10px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-lg font-black text-emerald-600 mt-1">{stats.completed}</p></div>
+            <div className="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase">Canc.</p><p className="text-lg font-black text-slate-600 mt-1">{stats.canceled}</p></div>
           </div>
         </div>
       </button>
