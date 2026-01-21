@@ -34,15 +34,15 @@ export const DestinationColumn = (t: Trip, onEditScheduling: (t: Trip) => void) 
         </div>
      </div>
 
-     {/* Detalhes do Agendamento */}
+     {/* Detalhes do Agendamento Atualizados */}
      {t.scheduling ? (
        <div className="group relative">
          <div className="bg-emerald-600 p-2.5 rounded-xl text-white shadow-md flex items-center justify-between">
             <div className="flex flex-col">
-               <span className="text-[7px] font-black uppercase opacity-70 tracking-widest">Horário Agendado</span>
-               <p className="text-[11px] font-black">
-                 {new Date(t.scheduling.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
-                 {t.scheduling.obs && <span className="ml-2 text-emerald-200">[{t.scheduling.obs.slice(0,10)}]</span>}
+               <span className="text-[7px] font-black uppercase opacity-70 tracking-widest">Agendamento Confirmado</span>
+               <p className="text-[10px] font-black flex items-center gap-1.5 mt-0.5">
+                 <span className="bg-white/20 px-1.5 py-0.5 rounded">{new Date(t.scheduling.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
+                 <span className="text-white text-[11px]">{new Date(t.scheduling.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
                </p>
             </div>
             <button 
@@ -55,6 +55,11 @@ export const DestinationColumn = (t: Trip, onEditScheduling: (t: Trip) => void) 
               </svg>
             </button>
          </div>
+         {t.scheduling.obs && (
+           <div className="mt-1 px-2 py-1 bg-amber-50 border border-amber-100 rounded-lg">
+             <p className="text-[7px] font-black text-amber-600 uppercase leading-none">Notas: <span className="font-bold text-amber-800">{t.scheduling.obs.slice(0, 30)}{t.scheduling.obs.length > 30 ? '...' : ''}</span></p>
+           </div>
+         )}
        </div>
      ) : (
        <button 
