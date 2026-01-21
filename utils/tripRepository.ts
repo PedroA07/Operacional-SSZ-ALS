@@ -104,7 +104,7 @@ export const tripRepository = {
       .from('trips')
       .select('*')
       .order('date_time', { ascending: false })
-      .limit(100);
+      .limit(2000); // AUMENTADO PARA 2000 PARA SUPORTAR VOLUME MENSAL
 
     if (error) throw error;
     return (data || []).map(d => this.mapFromDb(d));

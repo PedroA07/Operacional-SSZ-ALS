@@ -10,23 +10,18 @@ interface TripsThisMonthProps {
 const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
   const stats = useMemo(() => {
     const now = new Date();
-    // Início do mês atual (Local)
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    
-    // Fim do mês atual (Local)
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    endOfMonth.setHours(23, 59, 59, 999);
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
     
     const monthTrips = trips.filter(t => {
       if (!t.dateTime) return false;
-      const tripTime = new Date(t.dateTime).getTime();
-      return tripTime >= startOfMonth.getTime() && tripTime <= endOfMonth.getTime();
+      const tripDate = new Date(t.dateTime);
+      return tripDate.getFullYear() === currentYear && tripDate.getMonth() === currentMonth;
     });
 
     const activeTrips = monthTrips.filter(t => t.status !== 'Viagem cancelada');
     const canceled = monthTrips.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = activeTrips.filter(t => t.status?.toLowerCase().includes('concluída')).length;
+    const completed = activeTrips.filter(t => t.status === 'Viagem concluída').length;
 
     const typeCounts: { [key: string]: number } = {};
     activeTrips.forEach(t => {
@@ -38,7 +33,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
       const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
       const scheduled = new Date(t.dateTime).getTime();
       if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      return new Date().getTime() > (scheduled + 600000);
+      return false;
     }).length;
 
     return { total: activeTrips.length, typeCounts, canceled, delays, completed };

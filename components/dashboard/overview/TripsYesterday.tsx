@@ -13,13 +13,14 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return d.toLocaleDateString('en-CA'); // Retorna YYYY-MM-DD local
   }, []);
 
   const yesterdayRaw = useMemo(() => {
     return trips.filter(t => {
       if (!t.dateTime) return false;
-      return t.dateTime.substring(0, 10) === yesterdayStr;
+      const tripDate = new Date(t.dateTime).toLocaleDateString('en-CA');
+      return tripDate === yesterdayStr;
     });
   }, [trips, yesterdayStr]);
 
@@ -40,7 +41,7 @@ const TripsYesterday: React.FC<TripsYesterdayProps> = ({ trips }) => {
       if (arrival) {
         return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
       }
-      return t.status !== 'Viagem concluída';
+      return false; 
     }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };
