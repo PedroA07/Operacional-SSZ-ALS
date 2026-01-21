@@ -61,29 +61,44 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
     if (isPreviewOpen && activeReportData.length === 0 && finishedReportData.length === 0) {
       const mapTrip = (t: Trip): TableReportData => {
         const history = [...(t.statusHistory || [])].sort((a, b) => 
-          new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+          new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
         );
         
+        // Função auxiliar para pegar data formatada por termo
         const getVal = (terms: string[]) => {
-          const h = history.find(entry => terms.some(term => entry.status.toLowerCase().includes(term.toLowerCase())));
-          if (!h) return "";
-          
-          // Regra específica: se o status for "Container sobre rodas", retorna o texto fixo
-          if (h.status === 'Container sobre rodas') {
-            return "CONTAINER SOBRE RODAS";
+          const h = [...history].reverse().find(entry => terms.some(term => entry.status.toLowerCase().includes(term.toLowerCase())));
+          return h ? reportGenerator.formatFullDate(h.dateTime) : "";
+        };
+
+        // Lógica Especial: Retirada Cragea (Focada em Retirada do Cheio)
+        const getCrageaRetiradaVal = () => {
+          const removalCheio = history.find(h => h.status === 'Retirada do cheio');
+          const arrivalCragea = history.find(h => h.status === 'Chegou no Cragea');
+
+          if (!removalCheio) return "";
+
+          const removalTime = new Date(removalCheio.dateTime).getTime();
+
+          // Se houver chegada e ela for ANTERIOR à retirada, usa a chegada
+          if (arrivalCragea) {
+            const arrivalTime = new Date(arrivalCragea.dateTime).getTime();
+            if (arrivalTime < removalTime) {
+              return reportGenerator.formatFullDate(arrivalCragea.dateTime);
+            }
           }
-          
-          return reportGenerator.formatFullDate(h.dateTime);
+
+          // Caso contrário, usa a retirada do cheio
+          return reportGenerator.formatFullDate(removalCheio.dateTime);
         };
 
         return {
           id: t.id,
           motorista: t.driver.name.toUpperCase(),
           container: (t.container || "A DEFINIR").toUpperCase(),
-          retiradaCragea: getVal(['Cragea', 'Retirada do cheio']),
+          retiradaCragea: getCrageaRetiradaVal(),
           chegadaVolks: getVal(['Chegou na Volkswagen', 'Chegada na Volkswagen']),
           saidaVolks: getVal(['Saiu da Volkswagen', 'Saída da Volkswagen']),
-          baixaCragea: getVal(['Viagem concluída', 'Baixa Cragea', 'Container sobre rodas'])
+          baixaCragea: t.status === 'Container sobre rodas' ? "CONTAINER SOBRE RODAS" : getVal(['Viagem concluída', 'Baixa Cragea'])
         };
       };
 
@@ -143,7 +158,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
       setIsCopied(true);
       setTimeout(() => { setIsCopied(false); setIsPreviewOpen(false); }, 1500);
     } catch (err) {
-      alert('Área de transferência inacessível. Verifique permissões.');
+      alert('Falha ao acessar área de transferência.');
     }
   };
 
@@ -170,14 +185,17 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
             <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                <div className="flex items-center gap-6">
                   <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center font-black italic text-xl">ALS</div>
-                  <h3 className="text-xl font-black uppercase tracking-tight">Painel de Cópia Operacional</h3>
+                  <h3 className="text-xl font-black uppercase tracking-tight">Cópia Operacional Inteligente</h3>
                </div>
                <button onClick={handleClose} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg></button>
             </header>
 
             <div className="flex-1 overflow-hidden flex bg-[#f4f7fa] p-10 gap-10">
                <div className="flex-1 flex flex-col space-y-4">
-                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b-4 border-blue-600 w-fit pb-1">EM ANDAMENTO:</h4>
+                  <div className="flex items-center justify-between border-b-4 border-blue-600 pb-2">
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Em Andamento</h4>
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{activeReportData.length} Viagens</span>
+                  </div>
                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
                      {activeReportData.map((data, idx) => (
                        <IndividualTableEditor 
@@ -190,7 +208,10 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
                </div>
 
                <div className="flex-1 flex flex-col space-y-4">
-                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b-4 border-emerald-600 w-fit pb-1">FINALIZADAS:</h4>
+                  <div className="flex items-center justify-between border-b-4 border-emerald-600 pb-2">
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Finalizadas / Rodas</h4>
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{finishedReportData.length} Viagens</span>
+                  </div>
                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
                      {finishedReportData.map((data, idx) => (
                        <IndividualTableEditor 
@@ -203,9 +224,10 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
                </div>
             </div>
 
-            <footer className="p-8 bg-white border-t border-slate-100 flex justify-center">
-                <button onClick={handleCopy} className={`px-20 py-6 rounded-[2rem] text-xs font-black uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${isCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                  {isCopied ? 'Status Copiados!' : 'Copiar Agora'}
+            <footer className="p-8 bg-white border-t border-slate-100 flex justify-center gap-6 items-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest max-w-xs leading-tight">Os campos acima podem ser editados manualmente antes de copiar para o WhatsApp.</p>
+                <button onClick={handleCopy} className={`px-24 py-6 rounded-[2.5rem] text-xs font-black uppercase tracking-[0.3em] shadow-2xl shadow-blue-900/20 transition-all active:scale-95 ${isCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                  {isCopied ? '✓ Status Prontos!' : 'Copiar para Área de Transferência'}
                 </button>
             </footer>
           </div>
