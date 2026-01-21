@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Trip, Driver } from '../../types';
+import { Trip, Driver, User } from '../../types';
 import TripsYesterday from './overview/TripsYesterday';
 import TripsToday from './overview/TripsToday';
 import TripsTomorrow from './overview/TripsTomorrow';
@@ -8,6 +8,7 @@ import TripsThisWeek from './overview/TripsThisWeek';
 import TripsThisMonth from './overview/TripsThisMonth';
 import DelayedTrips from './overview/DelayedTrips';
 import DriverStatusCards from './overview/DriverStatusCards';
+import RecentActivitiesCard from './overview/RecentActivitiesCard';
 
 interface OverviewTabProps {
   trips: Trip[];
@@ -15,9 +16,10 @@ interface OverviewTabProps {
   onRefresh: () => Promise<void>;
   lastSyncTime: string;
   isSyncing: boolean;
+  user: User;
 }
 
-const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, lastSyncTime, isSyncing }) => {
+const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, lastSyncTime, isSyncing, user }) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       
@@ -32,7 +34,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
               <div className="flex items-center gap-2 mt-1.5">
                  <div className={`w-1.5 h-1.5 rounded-full ${isSyncing ? 'bg-blue-500 animate-ping' : 'bg-emerald-500'}`}></div>
                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
-                    {isSyncing ? 'Atualizando dados...' : `Última sincronização: ${lastSyncTime}`}
+                    {isSyncing ? 'Sincronizando nuvem...' : `Última atualização: ${lastSyncTime}`}
                  </p>
               </div>
            </div>
@@ -50,7 +52,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
         </button>
       </div>
 
-      {/* GRID DE KPIs SUPERIOR - AJUSTADO Z-INDEX CONTAINER */}
+      {/* GRID DE KPIs SUPERIOR */}
       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 transition-opacity duration-300 relative ${isSyncing ? 'opacity-70' : 'opacity-100'}`} style={{ zIndex: 100 }}>
         <TripsYesterday trips={trips} />
         <TripsToday trips={trips} />
@@ -59,12 +61,17 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
         <TripsThisMonth trips={trips} />
       </div>
 
-      {/* MONITOR DE ATRASOS E STATUS DOS MOTORISTAS */}
-      <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`} style={{ zIndex: 50 }}>
-         <div className="lg:col-span-1">
-            <DelayedTrips trips={trips} />
+      {/* ÁREA CENTRAL: ATIVIDADES E MONITORES */}
+      <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`}>
+         
+         {/* COLUNA ESQUERDA: CENTRO DE ATIVIDADES (NOTIFICAÇÕES VISÍVEIS) */}
+         <div className="lg:col-span-8">
+            <RecentActivitiesCard user={user} />
          </div>
-         <div className="lg:col-span-2">
+
+         {/* COLUNA DIREITA: STATUS E ATRASOS */}
+         <div className="lg:col-span-4 space-y-8">
+            <DelayedTrips trips={trips} />
             <DriverStatusCards trips={trips} drivers={drivers} />
          </div>
       </div>

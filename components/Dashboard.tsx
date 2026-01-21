@@ -12,6 +12,8 @@ import AdminTab from './dashboard/AdminTab';
 import StaffTab from './dashboard/StaffTab';
 import SystemTab from './dashboard/SystemTab';
 import DocumentsTab from './dashboard/DocumentsTab';
+// Added missing import for StaysTab to resolve "Cannot find name 'StaysTab'" error on line 190
+import StaysTab from './dashboard/StaysTab';
 import Sidebar from './dashboard/Sidebar';
 import DatabaseStatus from './dashboard/DatabaseStatus';
 import UserProfile from './dashboard/UserProfile';
@@ -168,6 +170,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onRefresh={() => loadAllData(true)} 
                lastSyncTime={lastSyncTime} 
                isSyncing={isSyncing} 
+               user={user}
              />
            )}
            {activeTab === DashboardTab.OPERACOES && (
@@ -186,6 +189,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onRefresh={() => loadAllData(true)}
              />
            )}
+           {activeTab === DashboardTab.ESTADIAS && <StaysTab categories={categories} userId={user.id} />}
            {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(true); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(true); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(true); }} availableOps={availableOps} />}
