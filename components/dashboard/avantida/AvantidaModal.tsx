@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { AvantidaRecord, AvantidaStatus } from '../../../types';
+import { AvantidaRecord, AvantidaStatus, AvantidaPriceRule } from '../../../types';
 import { db } from '../../../utils/storage';
 import { lookupCarrierByContainer } from '../../../utils/carrierService';
 
@@ -9,9 +9,10 @@ interface AvantidaModalProps {
   onClose: () => void;
   onSuccess: () => void;
   editingRecord?: AvantidaRecord | null;
+  priceRules?: AvantidaPriceRule[];
 }
 
-const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSuccess, editingRecord }) => {
+const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSuccess, editingRecord, priceRules = [] }) => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Estados dos campos solicitados
@@ -21,6 +22,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
   const [status, setStatus] = useState<AvantidaStatus>('EM ANÁLISE');
   const [importLocation, setImportLocation] = useState('SÃO PAULO');
   const [reuseDate, setReuseDate] = useState('');
+  const [requestedPrice, setRequestedPrice] = useState<number>(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -31,6 +33,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         setStatus(editingRecord.status || 'EM ANÁLISE');
         setImportLocation(editingRecord.importLocation || 'SÃO PAULO');
         setReuseDate(editingRecord.reuseDate || '');
+        setRequestedPrice(editingRecord.requestedPrice || 0);
       } else {
         setDate(new Date().toISOString().split('T')[0]);
         setContainerNumber('');
@@ -38,18 +41,27 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         setStatus('EM ANÁLISE');
         setImportLocation('SÃO PAULO');
         setReuseDate('');
+        setRequestedPrice(0);
       }
     }
   }, [editingRecord, isOpen]);
 
-  // Efeito para preencher armador automaticamente via BIC Code
+  // Efeito para preencher armador e preço automaticamente via BIC Code
   useEffect(() => {
     const container = containerNumber.toUpperCase().trim();
     if (container.length >= 4) {
       const carrier = lookupCarrierByContainer(container);
-      if (carrier) setShippingLine(carrier.name);
+      if (carrier) {
+        setShippingLine(carrier.name);
+        
+        // Regra de preço vinculada ao armador
+        const rule = priceRules.find(r => r.shippingLine.toUpperCase() === carrier.name.toUpperCase());
+        if (rule) {
+          setRequestedPrice(rule.price);
+        }
+      }
     }
-  }, [containerNumber]);
+  }, [containerNumber, priceRules]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +76,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         date,
         containerNumber: container,
         exportRef: editingRecord?.exportRef || '',
-        requestedPrice: editingRecord?.requestedPrice || 0,
+        requestedPrice,
         customerRef: editingRecord?.customerRef || '',
         tripSettlement: editingRecord?.tripSettlement || '',
         verified: editingRecord?.verified || false,
@@ -141,15 +153,29 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
             />
           </div>
 
-          <div className="space-y-1">
-            <label className={labelClass}>Armador / Linha de Expedição</label>
-            <input 
-              required
-              className={`${inputClass} bg-blue-50/20 border-blue-50`}
-              value={shippingLine} 
-              onChange={e => setShippingLine(e.target.value.toUpperCase())} 
-              placeholder="AUTODETECTAR PELO CONTAINER..." 
-            />
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-1">
+              <label className={labelClass}>Armador / Linha</label>
+              <input 
+                required
+                className={`${inputClass} bg-blue-50/20 border-blue-50`}
+                value={shippingLine} 
+                onChange={e => setShippingLine(e.target.value.toUpperCase())} 
+                placeholder="AUTODETECTAR..." 
+              />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Preço do Pedido (R$)</label>
+              <input 
+                type="number"
+                step="0.01"
+                required
+                className={`${inputClass} text-emerald-600 font-black`}
+                value={requestedPrice} 
+                onChange={e => setRequestedPrice(Number(e.target.value))} 
+                placeholder="0.00" 
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">

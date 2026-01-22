@@ -1,7 +1,8 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { 
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category, 
-  Notification, AvantidaRecord, SealBatch, SealRecord, StaySession, 
+  Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession, 
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus, 
   LoginCredential 
 } from '../types';
@@ -220,8 +221,6 @@ export const db = {
   saveAvantidaRecord: async (record: Partial<AvantidaRecord>) => {
     if (!supabase) return false;
     
-    // CRÍTICO: Se o ID começar com 'new-', removemos para o Supabase gerar um UUID válido automaticamente.
-    // UUIDs em Postgres não aceitam formatos personalizados como 'new-123'.
     const payload: any = {
       date: record.date || new Date().toISOString().split('T')[0],
       container_number: record.containerNumber,
@@ -255,6 +254,35 @@ export const db = {
     return !error;
   },
 
+  getAvantidaPrices: async (): Promise<AvantidaPriceRule[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('avantida_prices').select('*').order('shipping_line');
+    if (error) return [];
+    return (data || []).map(p => ({
+      id: p.id,
+      shippingLine: p.shipping_line,
+      price: Number(p.price || 0),
+      updatedAt: p.updated_at
+    }));
+  },
+
+  saveAvantidaPrice: async (rule: Partial<AvantidaPriceRule>) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('avantida_prices').upsert({
+      id: rule.id || `prc-${Date.now()}`,
+      shipping_line: rule.shippingLine?.toUpperCase(),
+      price: rule.price,
+      updated_at: new Date().toISOString()
+    });
+    return !error;
+  },
+
+  deleteAvantidaPrice: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('avantida_prices').delete().eq('id', id);
+    return !error;
+  },
+
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });
@@ -276,7 +304,6 @@ export const db = {
 
     const finalRecords = records.map(r => ({
       batch_id: batchData.id,
-      // Fix: Changed r.seal_number to r.sealNumber to match object structure from SealBatchModal.tsx
       seal_number: r.sealNumber
     }));
 
@@ -327,7 +354,6 @@ export const db = {
       endDate: s.end_date,
       createdAt: s.created_at,
       createdBy: s.created_by,
-      /* Fix: Changed property names from snake_case to camelCase to match StaySession interface in types.ts */
       gracePeriodHours: s.grace_period_hours,
       roundUpMinutes: s.round_up_minutes,
       costPerHour: s.cost_per_hour
@@ -389,7 +415,6 @@ export const db = {
       container: r.container,
       scheduled_start: r.scheduledStart,
       arrival_time: r.arrivalTime,
-      /* Fix: Changed r.departure_time to r.departureTime to match StayRecord interface in types.ts */
       departure_time: r.departureTime,
       exceeded_hours: r.exceededHours
     }));

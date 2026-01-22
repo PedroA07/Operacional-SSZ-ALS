@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AvantidaRecord, Driver, AvantidaStatus } from '../../types';
+import { AvantidaRecord, Driver, AvantidaStatus, AvantidaPriceRule } from '../../types';
 import { db } from '../../utils/storage';
 import AvantidaModal from './avantida/AvantidaModal';
 import AvantidaFilters from './avantida/AvantidaFilters';
+import AvantidaPriceConfigModal from './avantida/AvantidaPriceConfigModal';
 import { excelAvantidaService } from '../../utils/excelAvantidaService';
 
 interface AvantidaTabProps {
@@ -13,7 +14,10 @@ interface AvantidaTabProps {
 const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   const [records, setRecords] = useState<AvantidaRecord[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [priceRules, setPriceRules] = useState<AvantidaPriceRule[]>([]);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPriceConfigOpen, setIsPriceConfigOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<AvantidaRecord | null>(null);
@@ -27,12 +31,14 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [avantidaData, driversData] = await Promise.all([
+      const [avantidaData, driversData, pricesData] = await Promise.all([
         db.getAvantidaRecords(),
-        db.getDrivers()
+        db.getDrivers(),
+        db.getAvantidaPrices()
       ]);
       setRecords(avantidaData);
       setDrivers(driversData);
+      setPriceRules(pricesData);
     } finally {
       setIsLoading(false);
     }
@@ -43,7 +49,6 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   const handleUpdateField = async (record: AvantidaRecord, field: keyof AvantidaRecord, value: any) => {
     let updated = { ...record, [field]: value };
     
-    // REGRA DE OURO: Se o campo "Acerto de Viagem" for preenchido, marca como "Conferido" automaticamente
     if (field === 'tripSettlement' && value && String(value).trim() !== '') {
       updated.verified = true;
     }
@@ -98,6 +103,13 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
             </div>
          </div>
          <div className="flex gap-4">
+           <button 
+             onClick={() => setIsPriceConfigOpen(true)}
+             className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-slate-200 hover:bg-slate-200 transition-all flex items-center gap-2"
+           >
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2.5"/></svg>
+             Preços por Armador
+           </button>
            <button 
              onClick={() => excelAvantidaService.exportToStyledExcel(filteredRecords, drivers)}
              className="px-6 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-2"
@@ -192,7 +204,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                       <input className={inputClass} value={r.exportRef} onChange={e => handleUpdateField(r, 'exportRef', e.target.value.toUpperCase())} placeholder="---" />
                     </td>
                     <td className="px-6 py-4">
-                      <input type="date" className={inputClass} value={r.reuseDate} onChange={e => handleUpdateField(r, 'reuseDate', e.target.value)} />
+                      <input type="date" className={inputClass} value={r.date} onChange={e => handleUpdateField(r, 'reuseDate', e.target.value)} />
                     </td>
                     <td className="px-6 py-4">
                       <input type="number" step="0.01" className={`${inputClass} text-emerald-600`} value={r.requestedPrice} onChange={e => handleUpdateField(r, 'requestedPrice', Number(e.target.value))} />
@@ -226,6 +238,14 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
         onClose={() => { setIsModalOpen(false); setEditingRecord(null); }} 
         onSuccess={() => { setIsModalOpen(false); setEditingRecord(null); loadData(); }} 
         editingRecord={editingRecord}
+        priceRules={priceRules}
+      />
+
+      <AvantidaPriceConfigModal 
+        isOpen={isPriceConfigOpen}
+        onClose={() => setIsPriceConfigOpen(false)}
+        onSuccess={loadData}
+        rules={priceRules}
       />
     </div>
   );

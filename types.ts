@@ -54,6 +54,13 @@ export interface AvantidaRecord {
   status: AvantidaStatus;
 }
 
+export interface AvantidaPriceRule {
+  id: string;
+  shippingLine: string;
+  price: number;
+  updatedAt: string;
+}
+
 export interface SealBatch {
   id: string;
   carrier: string;
