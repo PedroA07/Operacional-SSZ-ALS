@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { AvantidaRecord, Driver } from '../../types';
 import { db } from '../../utils/storage';

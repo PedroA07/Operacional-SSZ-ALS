@@ -1,4 +1,3 @@
-
 export enum AppScreen {
   LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD'
@@ -165,7 +164,6 @@ export enum DashboardTab {
   FORMULARIOS = 'FORMULARIOS',
   COLABORADORES = 'COLABORADORES',
   PORTOS = 'PORTOS',
-  /* Renamed PRE_STACK_TAB to PRE_STACKING to match usage in Dashboard and Sidebar */
   PRE_STACKING = 'PRE_STACKING',
   DOCUMENTOS = 'DOCUMENTOS',
   ESTADIAS = 'ESTADIAS',
@@ -347,4 +345,67 @@ export interface PreStacking {
 
 export interface Staff { 
   id: string; 
-  name:
+  name: string; 
+  username: string; 
+  role: 'admin' | 'staff'; 
+  position: string; 
+  registrationDate: string; 
+  status: 'Ativo' | 'Inativo'; 
+  statusSince: string; 
+  photo?: string; 
+  lastLogin?: string | null; 
+  emailCorp?: string; 
+  phoneCorp?: string; 
+}
+
+export interface OperationDefinition { 
+  id: string; 
+  category: string; 
+  clients: { name: string; hasDedicatedPage: boolean }[]; 
+}
+
+export interface WeatherData {
+  temp: number;
+  condition: string;
+  icon: string;
+  forecastNextDay: {
+    temp: number;
+    condition: string;
+  };
+}
+
+export interface VWStatusUpdate {
+  status: TripStatus;
+  dateTime: string;
+}
+
+export interface VWSchedule {
+  id: string;
+  dateTime: string;
+  os: string;
+  container: string;
+  cva?: string;
+  driverName: string;
+  cpf: string;
+  plateHorse: string;
+  plateTrailer: string;
+  origin: string;
+  destination: string;
+  status: TripStatus;
+  statusHistory: VWStatusUpdate[];
+}
+
+export interface OpentechTrip {
+  id: string;
+  smNumber: string;
+  clientName: string;
+  driverName: string;
+  driverCpf: string;
+  plateHorse: string;
+  origin: string;
+  destination: string;
+  startTime: string;
+  eta: string;
+  status: string;
+  riskLevel: 'Crítico' | 'Alto' | 'Médio' | 'Baixo';
+}
