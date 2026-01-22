@@ -13,37 +13,56 @@ interface AvantidaPriceConfigModalProps {
 
 const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isOpen, onClose, onSuccess, rules }) => {
   const [shippingLine, setShippingLine] = useState('');
-  const [priceInput, setPriceInput] = useState(''); // Usamos string para facilitar a digitação
+  const [priceDisplay, setPriceDisplay] = useState(''); // String formatada para o usuário
   const [isSaving, setIsSaving] = useState(false);
+
+  // Função para formatar número para Moeda Brasileira durante a digitação
+  const handlePriceChange = (value: string) => {
+    // Remove tudo que não for número
+    const digits = value.replace(/\D/g, '');
+    if (!digits) {
+      setPriceDisplay('');
+      return;
+    }
+
+    // Converte para decimal (centavos)
+    const amount = (parseInt(digits) / 100).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+
+    setPriceDisplay(amount);
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const numericPrice = parseFloat(priceInput.replace(',', '.'));
+    // Converte a string "1.250,00" para o número 1250.00
+    const numericPrice = parseFloat(priceDisplay.replace(/\./g, '').replace(',', '.'));
+    
     if (!shippingLine || isNaN(numericPrice)) {
-      alert("Por favor, selecione um armador e digite um preço válido.");
+      alert("Por favor, selecione um armador e digite um valor válido.");
       return;
     }
 
     setIsSaving(true);
     try {
-      // Verifica se já existe uma regra para este armador para atualizar o ID
-      const existingRule = rules.find(r => r.shippingLine === shippingLine);
+      const existingRule = rules.find(r => r.shippingLine.toUpperCase() === shippingLine.toUpperCase());
       
       const success = await db.saveAvantidaPrice({
-        id: existingRule?.id, // Se existir, envia o ID para fazer UPDATE
+        id: existingRule?.id,
         shippingLine: shippingLine,
         price: numericPrice
       });
 
       if (success) {
         setShippingLine('');
-        setPriceInput('');
+        setPriceDisplay('');
         onSuccess();
       }
     } catch (err) {
       console.error(err);
-      alert("Erro ao salvar preço. Verifique sua conexão.");
+      alert("Erro ao salvar preço no servidor.");
     } finally {
       setIsSaving(false);
     }
@@ -86,24 +105,27 @@ const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isO
                 ))}
               </select>
            </div>
-           <div className="w-32 space-y-1">
+           <div className="w-40 space-y-1">
               <label className="text-[8px] font-black text-blue-600 uppercase tracking-widest ml-1">Preço (R$)</label>
-              <input 
-                required
-                type="text"
-                inputMode="decimal"
-                className="w-full px-4 py-3 rounded-xl border border-blue-100 bg-white text-[10px] font-bold uppercase outline-none"
-                placeholder="0,00"
-                value={priceInput}
-                onChange={e => setPriceInput(e.target.value)}
-              />
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">R$</span>
+                <input 
+                  required
+                  type="text"
+                  inputMode="numeric"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-blue-100 bg-white text-[11px] font-black text-emerald-600 outline-none"
+                  placeholder="0,00"
+                  value={priceDisplay}
+                  onChange={e => handlePriceChange(e.target.value)}
+                />
+              </div>
            </div>
            <button 
-             disabled={isSaving || !shippingLine || !priceInput}
+             disabled={isSaving || !shippingLine || !priceDisplay}
              type="submit"
-             className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50"
+             className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
            >
-             {isSaving ? 'Gravando...' : 'Vincular Preço'}
+             {isSaving ? 'Gravando...' : 'Salvar Preço'}
            </button>
         </form>
 
@@ -117,11 +139,11 @@ const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isO
                       </div>
                       <div>
                          <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{rule.shippingLine}</p>
-                         <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">Atualizado em: {new Date(rule.updatedAt).toLocaleDateString('pt-BR')}</p>
+                         <p className="text-[8px] text-slate-400 font-bold uppercase mt-1">Sincronizado via Cloud</p>
                       </div>
                    </div>
                    <div className="flex items-center gap-6">
-                      <span className="text-sm font-black text-emerald-600">R$ {rule.price.toFixed(2)}</span>
+                      <span className="text-sm font-black text-emerald-600">R$ {rule.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                       <button 
                         onClick={() => handleDelete(rule.id)}
                         className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
@@ -140,7 +162,7 @@ const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isO
         </div>
         
         <footer className="p-6 bg-slate-50 border-t text-center shrink-0">
-           <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">ALS TRANSPORTES • PRICING ENGINE</p>
+           <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">ALS TRANSPORTES • SISTEMA DE PRECIFICAÇÃO</p>
         </footer>
       </div>
     </div>

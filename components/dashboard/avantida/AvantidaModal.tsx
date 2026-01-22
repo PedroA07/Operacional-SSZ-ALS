@@ -23,7 +23,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
   const [status, setStatus] = useState<AvantidaStatus>('EM ANÁLISE');
   const [importLocation, setImportLocation] = useState('SÃO PAULO');
   const [reuseDate, setReuseDate] = useState('');
-  const [requestedPrice, setRequestedPrice] = useState<string>(''); // Usamos string para digitação fluida
+  const [priceDisplay, setPriceDisplay] = useState(''); // Estado para máscara de moeda
 
   useEffect(() => {
     if (isOpen) {
@@ -34,7 +34,11 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         setStatus(editingRecord.status || 'EM ANÁLISE');
         setImportLocation(editingRecord.importLocation || 'SÃO PAULO');
         setReuseDate(editingRecord.reuseDate || '');
-        setRequestedPrice(String(editingRecord.requestedPrice || ''));
+        
+        // Formata o preço vindo do banco para a máscara
+        const initialPrice = editingRecord.requestedPrice || 0;
+        setPriceDisplay(initialPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        
         lastDetectedCarrier.current = editingRecord.shippingLine;
       } else {
         setDate(new Date().toISOString().split('T')[0]);
@@ -43,11 +47,25 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         setStatus('EM ANÁLISE');
         setImportLocation('SÃO PAULO');
         setReuseDate('');
-        setRequestedPrice('');
+        setPriceDisplay('');
         lastDetectedCarrier.current = null;
       }
     }
   }, [editingRecord, isOpen]);
+
+  // Máscara de Moeda (reaproveitada para consistência)
+  const handlePriceChange = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) {
+      setPriceDisplay('');
+      return;
+    }
+    const amount = (parseInt(digits) / 100).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    setPriceDisplay(amount);
+  };
 
   // Efeito inteligente para preenchimento automático
   useEffect(() => {
@@ -61,7 +79,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         
         const rule = priceRules.find(r => r.shippingLine.toUpperCase() === carrier.name.toUpperCase());
         if (rule) {
-          setRequestedPrice(String(rule.price));
+          setPriceDisplay(rule.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         }
       } else if (!carrier && container.length === 4) {
           lastDetectedCarrier.current = null;
@@ -73,7 +91,8 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
     e.preventDefault();
     if (!containerNumber.trim()) return;
 
-    const numericPrice = parseFloat(requestedPrice.replace(',', '.')) || 0;
+    // Converte máscara "1.250,00" -> 1250.00 (Número)
+    const numericPrice = parseFloat(priceDisplay.replace(/\./g, '').replace(',', '.')) || 0;
 
     setIsSaving(true);
     try {
@@ -101,7 +120,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
       }
     } catch (err: any) {
       console.error("Erro detalhado:", err);
-      alert(`Falha ao salvar registro: ${err.message || 'Verifique o formato dos dados.'}`);
+      alert(`Falha ao salvar registro: ${err.message || 'Erro de comunicação.'}`);
     } finally {
       setIsSaving(false);
     }
@@ -173,15 +192,18 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
             </div>
             <div className="space-y-1">
               <label className={labelClass}>Preço do Pedido (R$)</label>
-              <input 
-                type="text"
-                inputMode="decimal"
-                required
-                className={`${inputClass} text-emerald-600 font-black`}
-                value={requestedPrice} 
-                onChange={e => setRequestedPrice(e.target.value)} 
-                placeholder="0.00" 
-              />
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">R$</span>
+                <input 
+                  type="text"
+                  inputMode="numeric"
+                  required
+                  className={`${inputClass} pl-10 text-emerald-600 font-black`}
+                  value={priceDisplay} 
+                  onChange={e => handlePriceChange(e.target.value)} 
+                  placeholder="0,00" 
+                />
+              </div>
             </div>
           </div>
 
