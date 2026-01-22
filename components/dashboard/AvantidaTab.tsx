@@ -22,10 +22,10 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<AvantidaRecord | null>(null);
 
-  const today = new Date().toISOString().split('T')[0];
+  // Alterado: Inicia com data vazia para mostrar do mais antigo ao mais atual por padrão
   const [search, setSearch] = useState('');
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [showOnlyPending, setShowOnlyPending] = useState(false);
 
   const loadData = async () => {
@@ -64,21 +64,24 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   };
 
   const filteredRecords = useMemo(() => {
-    return records.filter(r => {
-      const drv = drivers.find(d => d.id === r.driverId);
-      const matchSearch = 
-        r.containerNumber?.toLowerCase().includes(search.toLowerCase()) ||
-        r.customerRef?.toLowerCase().includes(search.toLowerCase()) ||
-        r.exportRef?.toLowerCase().includes(search.toLowerCase()) ||
-        r.shippingLine?.toLowerCase().includes(search.toLowerCase()) ||
-        drv?.name.toLowerCase().includes(search.toLowerCase()) ||
-        drv?.plateHorse.toLowerCase().includes(search.toLowerCase());
-      
-      const matchDate = (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate);
-      const matchPending = showOnlyPending ? !r.verified : true;
-      
-      return matchSearch && matchDate && matchPending;
-    });
+    return records
+      .filter(r => {
+        const drv = drivers.find(d => d.id === r.driverId);
+        const matchSearch = 
+          r.containerNumber?.toLowerCase().includes(search.toLowerCase()) ||
+          r.customerRef?.toLowerCase().includes(search.toLowerCase()) ||
+          r.exportRef?.toLowerCase().includes(search.toLowerCase()) ||
+          r.shippingLine?.toLowerCase().includes(search.toLowerCase()) ||
+          drv?.name.toLowerCase().includes(search.toLowerCase()) ||
+          drv?.plateHorse.toLowerCase().includes(search.toLowerCase());
+        
+        const matchDate = (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate);
+        const matchPending = showOnlyPending ? !r.verified : true;
+        
+        return matchSearch && matchDate && matchPending;
+      })
+      // Alterado: Ordenação Ascendente (Mais antigo no topo)
+      .sort((a, b) => a.date.localeCompare(b.date));
   }, [records, drivers, search, startDate, endDate, showOnlyPending]);
 
   const handleDelete = async (id: string) => {

@@ -13,11 +13,12 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total, colors = ['#2563eb
   let currentOffset = 0;
 
   return (
-    <div className="flex flex-col md:flex-row items-center gap-6 w-full">
-      <div className="relative w-32 h-32 shrink-0 flex items-center justify-center">
+    <div className="flex flex-col items-center justify-center w-full h-full">
+      <div className="relative w-full aspect-square max-w-[140px] flex items-center justify-center">
         <svg viewBox="0 0 44 44" className="w-full h-full transform -rotate-90 overflow-visible">
           {entries.map(([label, value], idx) => {
             const percentage = total > 0 ? (value / total) * 100 : 0;
+            // Garante que se houver valor, o traço mínimo seja visível
             const strokeDash = `${percentage} ${100 - percentage}`;
             const strokeOffset = -currentOffset;
             currentOffset += percentage;
@@ -28,7 +29,7 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total, colors = ['#2563eb
                 cx="22" cy="22" r="15.915"
                 fill="transparent"
                 stroke={colors[idx % colors.length]}
-                strokeWidth="5.5"
+                strokeWidth="6"
                 strokeDasharray={strokeDash}
                 strokeDashoffset={strokeOffset}
                 strokeLinecap="round"
@@ -37,22 +38,18 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total, colors = ['#2563eb
             );
           })}
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-xl font-black text-slate-800">{total}</span>
-          <span className="text-[7px] font-black text-slate-400 uppercase tracking-tight">Total</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+          <span className="text-2xl font-black text-slate-800 leading-none">{total}</span>
+          <span className="text-[7px] font-black text-slate-400 uppercase tracking-tight mt-1">Lançamentos</span>
         </div>
       </div>
-
-      <div className="flex-1 space-y-2 w-full">
+      
+      {/* Mini-legenda compacta abaixo do gráfico para evitar cortes laterais */}
+      <div className="flex flex-wrap justify-center gap-3 mt-4 w-full xl:hidden">
         {entries.map(([label, value], idx) => (
-          <div key={label} className="flex items-center justify-between group rounded-xl">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors[idx % colors.length] }}></div>
-              <span className="text-[9px] font-black text-slate-500 uppercase truncate pr-2">{label}</span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[10px] font-black text-slate-800 text-right">{value}</span>
-            </div>
+          <div key={label} className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colors[idx % colors.length] }}></div>
+            <span className="text-[8px] font-black text-slate-500 uppercase">{label}</span>
           </div>
         ))}
       </div>

@@ -356,13 +356,13 @@ export const db = {
     return (data || []).map(s => ({
       id: s.id,
       category: s.category,
-      start_date: s.start_date,
-      end_date: s.end_date,
+      startDate: s.start_date,
+      endDate: s.end_date,
       createdAt: s.created_at,
       createdBy: s.created_by,
-      grace_period_hours: s.grace_period_hours,
-      round_up_minutes: s.round_up_minutes,
-      cost_per_hour: s.cost_per_hour
+      gracePeriodHours: s.grace_period_hours,
+      roundUpMinutes: s.round_up_minutes,
+      costPerHour: s.cost_per_hour
     }));
   },
 
@@ -401,10 +401,10 @@ export const db = {
       driverName: r.driver_name,
       ship: r.ship,
       container: r.container,
-      scheduledStart: r.scheduled_start,
-      arrivalTime: r.arrival_time,
-      departureTime: r.departure_time,
-      exceededHours: r.exceeded_hours
+      scheduled_start: r.scheduled_start,
+      arrival_time: r.arrival_time,
+      departure_time: r.departure_time,
+      exceeded_hours: r.exceeded_hours
     }));
   },
 
