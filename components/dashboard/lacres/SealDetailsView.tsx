@@ -35,17 +35,37 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
 
   const exportToExcel = () => {
     const dataToExport = records.map(r => ({
-      'Número do Lacre': r.sealNumber,
-      'Número do Container': r.containerNumber,
-      'Booking': r.booking,
-      'Data Utilização': r.reuseDate,
-      'Motorista': r.driverName
+      'STATUS': r.containerNumber ? 'UTILIZADO' : 'DISPONÍVEL',
+      'Nº LACRE': r.sealNumber,
+      'Nº CONTAINER': r.containerNumber?.toUpperCase() || '',
+      'BOOKING': r.booking?.toUpperCase() || '',
+      'DATA USO': r.reuseDate ? new Date(r.reuseDate + 'T12:00:00').toLocaleDateString('pt-BR') : '',
+      'MOTORISTA': r.driverName?.toUpperCase() || ''
     }));
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
+    
+    // Configuração de largura das colunas estilizada
+    const wscols = [
+      { wch: 15 }, // Status
+      { wch: 15 }, // Nº Lacre
+      { wch: 20 }, // Nº Container
+      { wch: 20 }, // Booking
+      { wch: 15 }, // Data Uso
+      { wch: 35 }  // Motorista
+    ];
+    ws['!cols'] = wscols;
+
+    // Filtros automáticos
+    if (dataToExport.length > 0) {
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      ws['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Controle de Lacres");
-    XLSX.writeFile(wb, `Lacres_${batch.carrier}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    
+    XLSX.writeFile(wb, `CONTROLE_LACRES_${batch.carrier}_${Date.now()}.xlsx`);
   };
 
   if (isLoading) return <div className="py-20 text-center text-[10px] font-black text-slate-400 uppercase animate-pulse tracking-widest">Carregando Sequência...</div>;
@@ -64,7 +84,7 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
         </div>
         <button 
           onClick={exportToExcel}
-          className="px-6 py-3 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95"
+          className="px-6 py-3 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="3"/></svg>
           Exportar Excel

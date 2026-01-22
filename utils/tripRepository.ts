@@ -1,6 +1,6 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Trip, DriverCapturedDoc } from '../types';
+import { Trip, DriverCapturedDoc, User } from '../types';
 import { fileStorage } from './fileStorage';
 
 export const tripRepository = {
@@ -93,7 +93,7 @@ export const tripRepository = {
       nfDoc: normalizeDoc(d.nf_doc),
       nfKey: d.nf_key,
       ocFormData: safeParse(d.oc_form_data, null),
-      preStackingFormData: safeParse(d.pre_stacking_form_data, null),
+      pre_stacking_form_data: safeParse(d.pre_stacking_form_data, null),
       scheduling: safeParse(d.scheduling, undefined),
       driver_docs: normalizedDriverDocs
     };
@@ -110,7 +110,8 @@ export const tripRepository = {
     return (data || []).map(d => this.mapFromDb(d));
   },
 
-  async save(supabase: SupabaseClient, trip: Trip) {
+  // Fixed: Added actingUser as an optional third argument for consistency with storage.ts
+  async save(supabase: SupabaseClient, trip: Trip, actingUser?: User) {
     const payload = this.mapToDb(trip);
     const { error } = await supabase.from('trips').upsert(payload);
     if (error) throw error;

@@ -33,7 +33,8 @@ export const staffRepository = {
     phoneCorp: d.phonecorp || d.phone_corp || d.phoneCorp || ''
   }),
 
-  async save(supabase: SupabaseClient, staff: Staff) {
+  // Fixed: Added password as an optional third argument to match the call in storage.ts
+  async save(supabase: SupabaseClient, staff: Staff, password?: string) {
     try {
       const payload = this.mapToDb(staff);
       const { error } = await supabase.from('staff').upsert(payload);
