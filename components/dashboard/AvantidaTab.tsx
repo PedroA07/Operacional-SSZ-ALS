@@ -6,7 +6,11 @@ import AvantidaModal from './avantida/AvantidaModal';
 import AvantidaFilters from './avantida/AvantidaFilters';
 import { excelAvantidaService } from '../../utils/excelAvantidaService';
 
-const AvantidaTab: React.FC = () => {
+interface AvantidaTabProps {
+  userId: string;
+}
+
+const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   const [records, setRecords] = useState<AvantidaRecord[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
