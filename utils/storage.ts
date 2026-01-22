@@ -158,7 +158,6 @@ export const db = {
     return data || [];
   },
 
-  // Added saveCategory method to resolve errors in CategoryManagerModal.tsx and vinculoService.ts
   saveCategory: async (c: Partial<Category>, user?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('categories').upsert(c);
@@ -211,7 +210,10 @@ export const db = {
       tripSettlement: a.trip_settlement,
       verified: a.verified,
       driverId: a.driver_id,
-      createdAt: a.created_at
+      createdAt: a.created_at,
+      shippingLine: a.shipping_line || '',
+      importLocation: a.import_location || '',
+      reuseDate: a.reuse_date || ''
     }));
   },
 
@@ -226,7 +228,10 @@ export const db = {
       customer_ref: record.customerRef,
       trip_settlement: record.tripSettlement,
       verified: record.verified,
-      driver_id: record.driverId
+      driver_id: record.driverId,
+      shipping_line: record.shippingLine,
+      import_location: record.importLocation,
+      reuse_date: record.reuseDate
     });
     return !error;
   },
@@ -308,9 +313,9 @@ export const db = {
       endDate: s.end_date,
       createdAt: s.created_at,
       createdBy: s.created_by,
-      gracePeriodHours: s.grace_period_hours,
-      roundUpMinutes: s.round_up_minutes,
-      costPerHour: s.cost_per_hour
+      grace_period_hours: s.grace_period_hours,
+      round_up_minutes: s.round_up_minutes,
+      cost_per_hour: s.cost_per_hour
     }));
   },
 
@@ -349,10 +354,10 @@ export const db = {
       driverName: r.driver_name,
       ship: r.ship,
       container: r.container,
-      scheduledStart: r.scheduled_start,
-      arrivalTime: r.arrival_time,
-      departureTime: r.departure_time,
-      exceededHours: r.exceeded_hours
+      scheduled_start: r.scheduled_start,
+      arrival_time: r.arrival_time,
+      departure_time: r.departure_time,
+      exceeded_hours: r.exceeded_hours
     }));
   },
 

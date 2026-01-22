@@ -40,7 +40,13 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   useEffect(() => { loadData(); }, []);
 
   const handleUpdateField = async (record: AvantidaRecord, field: keyof AvantidaRecord, value: any) => {
-    const updated = { ...record, [field]: value };
+    let updated = { ...record, [field]: value };
+    
+    // REGRA: Se preencher Acerto de Viagem, marca como Conferido automaticamente
+    if (field === 'tripSettlement' && value && value.trim() !== '') {
+      updated.verified = true;
+    }
+
     setRecords(prev => prev.map(r => r.id === record.id ? updated : r));
     
     setSavingId(record.id);
@@ -58,6 +64,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
         r.containerNumber?.toLowerCase().includes(search.toLowerCase()) ||
         r.customerRef?.toLowerCase().includes(search.toLowerCase()) ||
         r.exportRef?.toLowerCase().includes(search.toLowerCase()) ||
+        r.shippingLine?.toLowerCase().includes(search.toLowerCase()) ||
         drv?.name.toLowerCase().includes(search.toLowerCase()) ||
         drv?.plateHorse.toLowerCase().includes(search.toLowerCase());
       
@@ -116,66 +123,81 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1400px]">
+          <table className="w-full text-left border-collapse min-w-[1700px]">
              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                   <th className="px-6 py-5 w-16 text-center">Audit.</th>
-                   <th className="px-6 py-5 w-32">Data Pedido</th>
-                   <th className="px-6 py-5 w-40">Nº Container</th>
-                   <th className="px-6 py-5 w-40 text-blue-600 bg-blue-50/20">Export Ref.</th>
-                   <th className="px-6 py-5 w-32">Valor (R$)</th>
-                   <th className="px-6 py-5 w-60">Motorista</th>
-                   <th className="px-6 py-5">Ref. Cliente</th>
-                   <th className="px-6 py-5">Acerto Viagem</th>
-                   <th className="px-6 py-5 text-right">Ações</th>
+                   <th className="px-6 py-5 w-40">Linha expedição</th>
+                   <th className="px-6 py-5 w-48">Localização importação</th>
+                   <th className="px-6 py-5 w-32">Data do pedido</th>
+                   <th className="px-6 py-5 w-16 text-center">Estado</th>
+                   <th className="px-6 py-5 w-40">Número do container</th>
+                   <th className="px-6 py-5 w-40">Exportar ref.</th>
+                   <th className="px-6 py-5 w-32">Data de reutilização</th>
+                   <th className="px-6 py-5 w-32">Preço pedido (R$)</th>
+                   <th className="px-6 py-5">Ref. do cliente</th>
+                   <th className="px-6 py-5 text-blue-600 bg-blue-50/20">Acerto de viagem</th>
+                   <th className="px-6 py-5 text-right w-16"></th>
                 </tr>
              </thead>
              <tbody className="divide-y divide-slate-50">
                 {filteredRecords.map((r) => (
-                  <tr key={r.id} className="hover:bg-blue-50/10 transition-colors">
-                    <td className="px-6 py-4 text-center">
-                       {savingId === r.id ? (
-                         <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                       ) : (
-                         <input 
-                           type="checkbox" 
-                           checked={r.verified} 
-                           onChange={e => handleUpdateField(r, 'verified', e.target.checked)}
-                           className="w-5 h-5 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                         />
-                       )}
+                  <tr key={r.id} className="hover:bg-blue-50/10 transition-colors group">
+                    <td className="px-6 py-4">
+                      <input className={`${inputClass} text-indigo-600`} value={r.shippingLine} onChange={e => handleUpdateField(r, 'shippingLine', e.target.value.toUpperCase())} placeholder="ARMADOR" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <input className={inputClass} value={r.importLocation} onChange={e => handleUpdateField(r, 'importLocation', e.target.value.toUpperCase())} placeholder="DEPOT" />
                     </td>
                     <td className="px-6 py-4">
                       <input type="date" className={inputClass} value={r.date} onChange={e => handleUpdateField(r, 'date', e.target.value)} />
                     </td>
+                    <td className="px-6 py-4 text-center">
+                       {savingId === r.id ? (
+                         <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                       ) : (
+                         <div className="flex flex-col items-center">
+                           <input 
+                             type="checkbox" 
+                             checked={r.verified} 
+                             onChange={e => handleUpdateField(r, 'verified', e.target.checked)}
+                             className="w-4 h-4 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                           />
+                           <span className={`text-[7px] font-black uppercase mt-1 ${r.verified ? 'text-emerald-600' : 'text-amber-500'}`}>
+                             {r.verified ? 'CONF.' : 'PEND.'}
+                           </span>
+                         </div>
+                       )}
+                    </td>
                     <td className="px-6 py-4">
                       <input className={`${inputClass} font-mono text-blue-700 text-[12px] font-black`} value={r.containerNumber} onChange={e => handleUpdateField(r, 'containerNumber', e.target.value.toUpperCase())} />
                     </td>
-                    <td className="px-6 py-4 bg-blue-50/10">
-                      <input className={inputClass} value={r.exportRef} onChange={e => handleUpdateField(r, 'exportRef', e.target.value.toUpperCase())} placeholder="---" />
+                    <td className="px-6 py-4">
+                      <input className={inputClass} value={r.exportRef} onChange={e => handleUpdateField(r, 'exportRef', e.target.value.toUpperCase())} placeholder="EXPORT REF" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <input type="date" className={inputClass} value={r.reuseDate} onChange={e => handleUpdateField(r, 'reuseDate', e.target.value)} />
                     </td>
                     <td className="px-6 py-4">
                       <input type="number" step="0.01" className={`${inputClass} text-emerald-600`} value={r.requestedPrice} onChange={e => handleUpdateField(r, 'requestedPrice', Number(e.target.value))} />
                     </td>
                     <td className="px-6 py-4">
-                      <select className={inputClass} value={r.driverId} onChange={e => handleUpdateField(r, 'driverId', e.target.value)}>
-                        <option value="">SELECIONAR MOTORISTA...</option>
-                        {drivers.map(d => <option key={d.id} value={d.id}>{d.name} [{d.plateHorse}]</option>)}
-                      </select>
-                    </td>
-                    <td className="px-6 py-4">
                       <input className={inputClass} value={r.customerRef} onChange={e => handleUpdateField(r, 'customerRef', e.target.value.toUpperCase())} placeholder="CLIENTE" />
                     </td>
-                    <td className="px-6 py-4">
-                      <input className={inputClass} value={r.tripSettlement} onChange={e => handleUpdateField(r, 'tripSettlement', e.target.value.toUpperCase())} placeholder="ACERTO" />
+                    <td className="px-6 py-4 bg-blue-50/10">
+                      <input className={`${inputClass} font-black text-blue-800`} value={r.tripSettlement} onChange={e => handleUpdateField(r, 'tripSettlement', e.target.value.toUpperCase())} placeholder="---" />
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => handleDelete(r.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all active:scale-90"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                      <button onClick={() => handleDelete(r.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
                     </td>
                   </tr>
                 ))}
              </tbody>
           </table>
+          {filteredRecords.length === 0 && !isLoading && (
+            <div className="py-24 text-center border-t border-slate-50 bg-white">
+               <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum registro localizado</p>
+            </div>
+          )}
         </div>
       </div>
 

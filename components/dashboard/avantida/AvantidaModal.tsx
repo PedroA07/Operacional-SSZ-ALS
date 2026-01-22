@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AvantidaRecord } from '../../../types';
 import { db } from '../../../utils/storage';
+import { lookupCarrierByContainer } from '../../../utils/carrierService';
 
 interface AvantidaModalProps {
   isOpen: boolean;
@@ -26,17 +27,23 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
 
     setIsSaving(true);
     try {
+      const container = containerNumber.toUpperCase().trim();
+      const carrier = lookupCarrierByContainer(container);
+      
       const success = await db.saveAvantidaRecord({
         id: editingRecord?.id || `new-${Date.now()}`,
         date: editingRecord?.date || new Date().toISOString().split('T')[0],
-        containerNumber: containerNumber.toUpperCase().trim(),
-        requestedPrice: editingRecord?.requestedPrice || 0,
+        containerNumber: container,
         exportRef: editingRecord?.exportRef || '',
+        requestedPrice: editingRecord?.requestedPrice || 0,
         customerRef: editingRecord?.customerRef || '',
         tripSettlement: editingRecord?.tripSettlement || '',
         verified: editingRecord?.verified || false,
         driverId: editingRecord?.driverId || '',
-        createdAt: editingRecord?.createdAt || new Date().toISOString()
+        createdAt: editingRecord?.createdAt || new Date().toISOString(),
+        shippingLine: carrier ? carrier.name : (editingRecord?.shippingLine || ''),
+        importLocation: editingRecord?.importLocation || '',
+        reuseDate: editingRecord?.reuseDate || ''
       });
       if (success) {
         setContainerNumber('');
