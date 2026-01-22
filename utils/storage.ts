@@ -202,7 +202,7 @@ export const db = {
     return !error;
   },
 
-  // AVANTIDA - ORDENAÇÃO DESCENDENTE
+  // AVANTIDA
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase
@@ -245,7 +245,7 @@ export const db = {
     return !error;
   },
 
-  // LACRES - ORDENAÇÃO DESCENDENTE
+  // LACRES
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase
@@ -327,7 +327,7 @@ export const db = {
       createdBy: s.created_by,
       gracePeriodHours: s.grace_period_hours,
       roundUpMinutes: s.round_up_minutes,
-      cost_per_hour: s.cost_per_hour
+      costPerHour: s.cost_per_hour
     }));
   },
   saveStaySession: async (session: StaySession) => {
@@ -366,7 +366,7 @@ export const db = {
       scheduledStart: r.scheduled_start,
       arrivalTime: r.arrival_time,
       departureTime: r.departure_time,
-      exceeded_hours: r.exceeded_hours
+      exceededHours: r.exceeded_hours
     }));
   },
   saveStayRecords: async (records: StayRecord[]) => {
