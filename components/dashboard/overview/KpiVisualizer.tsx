@@ -25,6 +25,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
   });
 
   // Função ALS de Normalização Estrita (Ignora acentos, espaços e variações de plural)
+  // Essencial para evitar o erro de "zero resultados" por mismatch de caracteres
   const strictNormalize = (str: string) => {
     if (!str) return '';
     // 1. Remove acentos e espaços extras
@@ -33,10 +34,10 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
       .trim()
       .toUpperCase();
     
-    // 2. Unifica variações comuns de Indústria/Industrias e Plurais genéricos
+    // 2. Unifica variações comuns para garantir soma de dados
     if (norm === 'INDUSTRIAS' || norm === 'INDUSTRIA') return 'INDÚSTRIA';
     if (norm === 'ALIANCAS' || norm === 'ALIANCA') return 'ALIANÇA';
-    if (norm === 'MERCOSUIS' || norm === 'MERCOSUL') return 'MERCOSUL';
+    if (norm === 'MERCOSUIS' || norm === 'MERCO SUL' || norm === 'MERCOSUL') return 'MERCOSUL';
     
     return norm;
   };
@@ -55,6 +56,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     }
 
     // Extração ÚNICA e NORMALIZADA de Categorias REAIS baseadas em dados do banco
+    // Remove "GERAL" e garante que "Indústria" e "INDÚSTRIAS" sejam uma só
     const categories = Array.from(
       new Set(
         filtered
@@ -74,13 +76,29 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     // Stats para os Donuts de Mix (Visão Macro do Período)
     const mixStats = statsCalculator.calculateFullDashboardStats(filtered, 'client');
 
+    // Normalização dos nomes de categorias no MixStats para evitar duplicidade visual no Donut
+    const normalizedCategoryCounts: Record<string, number> = {};
+    Object.entries(mixStats.categoryCounts).forEach(([cat, count]) => {
+      const norm = strictNormalize(cat);
+      if (norm && norm !== 'GERAL') {
+        normalizedCategoryCounts[norm] = (normalizedCategoryCounts[norm] || 0) + count;
+      }
+    });
+
     const typeCounts: Record<string, number> = {};
     filtered.forEach(t => {
       const type = (t.type || 'OUTROS').toUpperCase();
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    return { filtered, categories, types, mixStats, typeCounts, total: filtered.length };
+    return { 
+      filtered, 
+      categories, 
+      types, 
+      mixStats: { ...mixStats, categoryCounts: normalizedCategoryCounts }, 
+      typeCounts, 
+      total: filtered.length 
+    };
   }, [trips, activePeriod]);
 
   // Efeito para garantir que a categoria inicial do Core seja válida e não "GERAL"
@@ -89,13 +107,16 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
       if (!coreCategory || !availableData.categories.includes(coreCategory)) {
         setCoreCategory(availableData.categories[0]);
       }
+    } else {
+      setCoreCategory('');
     }
-  }, [availableData.categories]);
+  }, [availableData.categories, coreCategory]);
 
   // Cálculo do Category Core Analysis (Apenas categorias filtradas e normalizadas)
   const coreStats = useMemo(() => {
     if (!coreCategory) return { total: 0, typeDistribution: {} };
 
+    // Aqui está a correção: normalizamos a categoria da viagem ANTES de comparar
     const subset = availableData.filtered.filter(t => strictNormalize(t.category) === coreCategory);
     
     const total = subset.length;
@@ -206,7 +227,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
       <div className="bg-white p-8 rounded-[3.5rem] border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
            <div className="w-14 h-14 bg-slate-900 rounded-3xl flex items-center justify-center text-white shadow-2xl">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
            </div>
            <div>
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">ALS Intelligence Hub</h2>
