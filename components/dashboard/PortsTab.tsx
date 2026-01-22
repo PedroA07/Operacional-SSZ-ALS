@@ -233,7 +233,7 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
               <tr>
-                <th className="px-8 py-5">Identificação</th>
+                <th className="px-8 py-5">Identificação do Terminal</th>
                 <th className="px-8 py-5">CNPJ</th>
                 <th className="px-8 py-5">Endereço / Localidade</th>
                 <th className="px-8 py-5 text-right">Ações</th>
@@ -243,8 +243,16 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
               {filteredPorts.map(p => (
                 <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-8 py-4">
-                    <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{p.legalName || p.name}</p>
-                    {p.legalName && p.name !== p.legalName && <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">FANTASIA: {p.name}</p>}
+                    <div className="flex flex-col gap-1.5 min-w-[280px]">
+                      <div className="flex flex-col">
+                         <span className="text-[7px] font-black text-blue-500 uppercase tracking-widest leading-none">Razão Social</span>
+                         <p className="font-black text-slate-800 uppercase text-[11px] leading-tight mt-1">{p.legalName || '---'}</p>
+                      </div>
+                      <div className="flex flex-col border-t border-slate-50 pt-1">
+                         <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Nome Fantasia</span>
+                         <p className="text-[10px] font-bold text-slate-600 uppercase leading-tight mt-0.5">{p.name || '---'}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-8 py-4 font-mono font-bold text-slate-500">{maskCNPJ(p.cnpj)}</td>
                   <td className="px-8 py-4">
