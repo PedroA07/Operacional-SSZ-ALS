@@ -16,6 +16,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   const [isLoading, setIsLoading] = useState(true);
   const [retryWithoutCORS, setRetryWithoutCORS] = useState(false);
   
+  // Detecção de tipo de arquivo
+  const isPDF = url.toLowerCase().endsWith('.pdf') || url.startsWith('data:application/pdf');
+  
   const { scale, setScale, resetZoom, zoomIn, zoomOut } = useMouseZoom({ containerRef });
   const { 
     position, 
@@ -38,7 +41,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
 
   // Sincroniza eventos de mouse/touch globais para o Pan funcionar fora do elemento
   useEffect(() => {
-    if (isDragging) {
+    if (isDragging && !isPDF) {
       window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onMouseUp);
       window.addEventListener('touchmove', onMouseMove as any);
@@ -50,7 +53,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
       window.removeEventListener('touchmove', onMouseMove as any);
       window.removeEventListener('touchend', onMouseUp);
     };
-  }, [isDragging, onMouseMove, onMouseUp]);
+  }, [isDragging, onMouseMove, onMouseUp, isPDF]);
 
   const handleRotate = () => {
     setRotation(prev => (prev + 90) % 360);
@@ -72,6 +75,26 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     }
   };
 
+  // Se for PDF, renderiza o iframe nativo do navegador
+  if (isPDF) {
+    return (
+      <div className={`relative w-full h-full bg-white rounded-[2.5rem] overflow-hidden border border-slate-200 ${className}`}>
+        <iframe 
+          src={`${url}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`} 
+          className="w-full h-full border-none"
+          title={alt}
+          onLoad={() => setIsLoading(false)}
+        />
+        {isLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10">
+            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-[8px] font-black text-blue-500 uppercase mt-4 tracking-widest">Carregando PDF...</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div 
       ref={containerRef}
@@ -80,8 +103,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     >
       <div 
         className="flex-1 relative overflow-hidden flex items-center justify-center p-4 touch-none"
-        onMouseDown={onMouseDown}
-        onTouchStart={onMouseDown}
+        onMouseDown={!isPDF ? onMouseDown : undefined}
+        onTouchStart={!isPDF ? onMouseDown : undefined}
       >
         {isLoading && !hasError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50 z-10">
