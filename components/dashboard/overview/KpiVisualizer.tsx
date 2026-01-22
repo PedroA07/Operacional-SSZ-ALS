@@ -13,7 +13,7 @@ interface KpiVisualizerProps {
 const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
   const [activePeriod, setActivePeriod] = useState<'WEEK' | 'MONTH' | 'YEAR'>('WEEK');
   
-  // Filtro para o Gráfico de Núcleo (Core Analysis) - Agora inicia vazio e é preenchido pelo useEffect
+  // Filtro para o Gráfico de Núcleo (Core Analysis)
   const [coreCategory, setCoreCategory] = useState<string>('');
 
   // Estados de Filtro por Card (Combinações Independentes)
@@ -23,6 +23,15 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     city: { cat: 'TODAS', type: 'TODOS' },
     terminal: { cat: 'TODAS', type: 'TODOS' }
   });
+
+  // Função interna para normalizar strings de categoria
+  const normalizeCat = (cat: string) => {
+    if (!cat) return '';
+    let normalized = cat.trim().toUpperCase();
+    // Unifica variações comuns de Indústria
+    if (normalized === 'INDÚSTRIAS' || normalized === 'INDUSTRIAS') return 'INDÚSTRIA';
+    return normalized;
+  };
 
   const availableData = useMemo(() => {
     const now = new Date();
@@ -41,8 +50,8 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     const categories = Array.from(
       new Set(
         trips
-          .map(t => t.category?.trim().toUpperCase())
-          .filter(c => c && c !== 'GERAL' && c !== 'NENHUM' && c !== 'UNDEFINED')
+          .map(t => normalizeCat(t.category))
+          .filter(c => c && c !== 'GERAL' && c !== 'NENHUM' && c !== 'UNDEFINED' && c !== 'NULL')
       )
     ).sort();
 
@@ -66,16 +75,16 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     return { filtered, categories, types, mixStats, typeCounts, total: filtered.length };
   }, [trips, activePeriod]);
 
-  // Efeito para garantir que a categoria inicial do Core não seja "GERAL"
+  // Efeito para garantir que a categoria inicial do Core seja válida
   useEffect(() => {
-    if (!coreCategory && availableData.categories.length > 0) {
+    if ((!coreCategory || !availableData.categories.includes(coreCategory)) && availableData.categories.length > 0) {
       setCoreCategory(availableData.categories[0]);
     }
-  }, [availableData.categories]);
+  }, [availableData.categories, coreCategory]);
 
-  // Cálculo do Category Core Analysis (Apenas categorias reais)
+  // Cálculo do Category Core Analysis (Apenas categorias reais normalizadas)
   const coreStats = useMemo(() => {
-    const subset = availableData.filtered.filter(t => t.category?.toUpperCase() === coreCategory);
+    const subset = availableData.filtered.filter(t => normalizeCat(t.category) === coreCategory);
     
     const total = subset.length;
     const typeDistribution: Record<string, number> = {};
@@ -89,7 +98,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
   const getFilteredStatsForCard = (cardKey: keyof typeof cardFilters) => {
     let subset = availableData.filtered;
     const f = cardFilters[cardKey];
-    if (f.cat !== 'TODAS') subset = subset.filter(t => t.category?.toUpperCase() === f.cat.toUpperCase());
+    if (f.cat !== 'TODAS') subset = subset.filter(t => normalizeCat(t.category) === normalizeCat(f.cat));
     if (f.type !== 'TODOS') subset = subset.filter(t => t.type?.toUpperCase() === f.type.toUpperCase());
     return statsCalculator.calculateFullDashboardStats(subset, cardKey === 'driver' ? 'driver' : 'client');
   };
@@ -185,7 +194,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
       <div className="bg-white p-8 rounded-[3.5rem] border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
            <div className="w-14 h-14 bg-slate-900 rounded-3xl flex items-center justify-center text-white shadow-2xl">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
            </div>
            <div>
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">ALS Intelligence Hub</h2>
