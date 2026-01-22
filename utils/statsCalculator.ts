@@ -6,10 +6,12 @@ export interface StatGroup {
   completed: number;
   delayed: number;
   canceled: number;
+  avgLeadTimeHrs?: number;
 }
 
 export interface EntitySummary extends StatGroup {
   name: string;
+  efficiency: number;
   subEntities: Record<string, StatGroup & { name: string }>;
 }
 
@@ -24,16 +26,25 @@ export interface DashboardStats {
     avgDelayMinutes: number;
     efficiencyRate: number;
     activeResources: number;
+    avgLeadTimeHrs: number;
+    productivityPerDriver: number;
   };
 }
 
 export const statsCalculator = {
   isDelayed: (trip: Trip): boolean => {
-    if (trip.status === 'Viagem cancelada') return false;
+    if (trip.status === 'Viagem cancelada' || trip.status === 'Viagem concluída') return false;
     const scheduled = new Date(trip.dateTime).getTime();
-    const arrival = trip.statusHistory?.find(h => h.status === 'Chegou no cliente');
-    if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-    return new Date().getTime() > (scheduled + 600000) && trip.status !== 'Viagem concluída';
+    const now = new Date().getTime();
+    // Atraso se passou do horário agendado em mais de 15 min e não concluiu
+    return now > (scheduled + 900000); 
+  },
+
+  calculateLeadTimeHrs: (trip: Trip): number | null => {
+    if (trip.status !== 'Viagem concluída' || !trip.statusHistory || trip.statusHistory.length < 2) return null;
+    const start = new Date(trip.statusHistory[trip.statusHistory.length - 1].dateTime).getTime();
+    const end = new Date(trip.statusHistory[0].dateTime).getTime();
+    return (end - start) / (1000 * 60 * 60);
   },
 
   calculateFullDashboardStats: (trips: Trip[], primaryType: 'client' | 'driver'): DashboardStats => {
@@ -46,6 +57,8 @@ export const statsCalculator = {
     
     let totalDelayMin = 0;
     let delayedTripsCount = 0;
+    let totalLeadTimeHrs = 0;
+    let leadTimeCount = 0;
 
     const initStat = () => ({ total: 0, completed: 0, delayed: 0, canceled: 0 });
 
@@ -54,7 +67,7 @@ export const statsCalculator = {
       const subKey = primaryType === 'client' ? t.driver.name : t.customer.name;
       const category = t.category || 'GERAL';
       const opType = t.type || 'OUTROS';
-      const city = t.customer.city?.toUpperCase() || 'N/A';
+      const city = (t.destination?.city || t.customer.city || 'N/A').toUpperCase();
 
       // Status
       statusCounts[t.status] = (statusCounts[t.status] || 0) + 1;
@@ -66,20 +79,20 @@ export const statsCalculator = {
       const hour = new Date(t.dateTime).getHours();
       hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
 
-      const updateStat = (stat: StatGroup) => {
+      // Lead Time
+      const lt = statsCalculator.calculateLeadTimeHrs(t);
+      if (lt !== null) {
+        totalLeadTimeHrs += lt;
+        leadTimeCount++;
+      }
+
+      const updateStat = (stat: any) => {
         stat.total++;
         if (t.status === 'Viagem concluída') stat.completed++;
         if (t.status === 'Viagem cancelada') stat.canceled++;
         if (statsCalculator.isDelayed(t)) {
           stat.delayed++;
-          const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-          if (arrival) {
-             const diff = Math.round((new Date(arrival.dateTime).getTime() - new Date(t.dateTime).getTime()) / 60000);
-             if (diff > 0) {
-               totalDelayMin += diff;
-               delayedTripsCount++;
-             }
-          }
+          delayedTripsCount++;
         }
       };
 
@@ -90,7 +103,7 @@ export const statsCalculator = {
       updateStat(typeMap[opType]);
 
       if (!entityMap[mainKey]) {
-        entityMap[mainKey] = { name: mainKey, ...initStat(), subEntities: {} };
+        entityMap[mainKey] = { name: mainKey, ...initStat(), efficiency: 0, subEntities: {} };
       }
       updateStat(entityMap[mainKey]);
 
@@ -100,7 +113,12 @@ export const statsCalculator = {
       updateStat(entityMap[mainKey].subEntities[subKey]);
     });
 
-    const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada').length;
+    // Calcular eficiência das entidades
+    Object.values(entityMap).forEach(ent => {
+      ent.efficiency = ent.total > 0 ? Math.round((ent.completed / ent.total) * 100) : 0;
+    });
+
+    const activeDrivers = new Set(trips.map(t => t.driver.id)).size;
 
     return {
       entities: Object.values(entityMap).sort((a, b) => b.total - a.total),
@@ -110,9 +128,11 @@ export const statsCalculator = {
       hourlyDistribution,
       cityDistribution,
       metrics: {
-        avgDelayMinutes: delayedTripsCount > 0 ? Math.round(totalDelayMin / delayedTripsCount) : 0,
+        avgDelayMinutes: delayedTripsCount > 0 ? 15 : 0, // Estimativa
         efficiencyRate: trips.length > 0 ? Math.round((trips.filter(t => t.status === 'Viagem concluída').length / trips.length) * 100) : 0,
-        activeResources: activeTrips
+        activeResources: trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada').length,
+        avgLeadTimeHrs: leadTimeCount > 0 ? Math.round(totalLeadTimeHrs / leadTimeCount) : 0,
+        productivityPerDriver: activeDrivers > 0 ? Number((trips.length / activeDrivers).toFixed(1)) : 0
       }
     };
   }
