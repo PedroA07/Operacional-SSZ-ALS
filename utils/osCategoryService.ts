@@ -26,7 +26,7 @@ export const osCategoryService = {
    * Sincroniza os vínculos do Motorista e do Cliente com a nova categoria
    */
   syncVinculos: async (category: string, driver: any, customer: any) => {
-    if (!category || category === 'Nenhum' || category === 'Geral') return;
+    if (!category || category === 'Nenhum') return;
 
     const normalizedCategory = category.trim().toUpperCase();
     const normalizedClient = (customer?.name || 'GERAL').trim().toUpperCase();

@@ -70,9 +70,12 @@ const TripForm: React.FC<TripFormProps> = ({
         driver: editTrip.driver?.name || ''
       });
     } else {
+      // Se tiver uma categoria inicial, usa ela. Senão, tenta pegar a primeira disponível no banco.
+      const defaultCat = initialCategory || (categories.length > 0 ? categories[0].name : '');
+      
       setFormData(prev => ({
         ...prev,
-        category: initialCategory || prev.category,
+        category: defaultCat,
         customer: initialCustomer || prev.customer,
         subCategory: initialCustomer?.name || prev.subCategory,
         dateTime: getLocalISOTime(),
@@ -84,7 +87,7 @@ const TripForm: React.FC<TripFormProps> = ({
         driver: ''
       });
     }
-  }, [editTrip, initialCategory, initialCustomer]);
+  }, [editTrip, initialCategory, initialCustomer, categories]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -114,7 +117,40 @@ const TripForm: React.FC<TripFormProps> = ({
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-10 pb-10">
       
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Início da Viagem (Coleta/Retirada)</h4>
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Configuração de Categoria</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1">
+              <label className={labelClass}>Vincular à Categoria (Obrigatório)</label>
+              <select 
+                required 
+                className={inputClass} 
+                value={formData.category} 
+                onChange={e => setFormData({...formData, category: e.target.value})}
+              >
+                <option value="">Selecione uma Categoria...</option>
+                {categories.filter(c => !c.parentId).map(c => (
+                  <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Subcategoria</label>
+              <select 
+                className={inputClass} 
+                value={formData.subCategory} 
+                onChange={e => setFormData({...formData, subCategory: e.target.value})}
+              >
+                <option value="">Nenhuma</option>
+                {categories.filter(c => c.parentId && categories.find(p => p.id === c.parentId)?.name === formData.category).map(c => (
+                  <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>
+                ))}
+              </select>
+            </div>
+        </div>
+      </div>
+
+      <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">II. Início da Viagem (Coleta/Retirada)</h4>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           <div className="md:col-span-5 space-y-1">
             <label className={labelClass}>Número da OS</label>
@@ -149,7 +185,7 @@ const TripForm: React.FC<TripFormProps> = ({
       </div>
 
       <div className="bg-blue-50/30 p-8 rounded-[3rem] border border-blue-100 space-y-6">
-        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">II. Destino e Agendamento no Terminal</h4>
+        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">III. Destino e Agendamento no Terminal</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
            <div className="relative" ref={dropdownRefs.destination}>
               <label className={labelClass}>Local de Entrega / Porto</label>
@@ -189,7 +225,6 @@ const TripForm: React.FC<TripFormProps> = ({
                 value={formData.schedulingDate} 
                 onChange={e => setFormData({...formData, schedulingDate: e.target.value})} 
               />
-              <p className="text-[8px] font-bold text-slate-400 uppercase mt-2 ml-1 italic">* Horário independente do início da programação.</p>
            </div>
         </div>
       </div>
@@ -256,7 +291,7 @@ const TripForm: React.FC<TripFormProps> = ({
       </div>
 
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 space-y-6 shadow-sm">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">III. Dados do Equipamento</h4>
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">IV. Dados do Equipamento</h4>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
            <div className="space-y-1">
               <label className={labelClass}>Container</label>
@@ -282,7 +317,7 @@ const TripForm: React.FC<TripFormProps> = ({
       <div className="flex gap-4 pt-8 border-t border-slate-100 mt-10">
         <button type="button" onClick={onCancel} className="px-8 py-5 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Descartar</button>
         <button type="submit" disabled={isSaving} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700">
-          {isSaving ? 'Sincronizando...' : editTrip ? 'Confirmar Alterações' : 'Salvar Nova Programação'}
+          {isSaving ? 'Gravando...' : editTrip ? 'Confirmar Alterações' : 'Salvar Nova Programação'}
         </button>
       </div>
     </form>

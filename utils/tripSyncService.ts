@@ -14,7 +14,8 @@ export const tripSyncService = {
       existing.customer?.id !== customerId,
       (existing.container || '').toUpperCase() !== (currentForm.container || '').toUpperCase(),
       (existing.dateTime || '').slice(0,16) !== (currentForm.dateTime || '').slice(0,16),
-      (existing.scheduling?.dateTime || '').slice(0,16) !== (currentForm.schedulingDate || '').slice(0,16)
+      (existing.scheduling?.dateTime || '').slice(0,16) !== (currentForm.schedulingDate || '').slice(0,16),
+      existing.category !== currentForm.category
     ];
     return diffs.some(d => d === true);
   },
@@ -22,14 +23,11 @@ export const tripSyncService = {
   mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port): Partial<Trip> => {
     const now = new Date().toISOString();
     
-    // Horário de Início (Coleta)
     const tripStartTime = formData.dateTime ? new Date(formData.dateTime).toISOString() : now;
-    
-    // Horário no Terminal (Agendamento) - Se não informado, não espelha o início por padrão
     const terminalTime = formData.schedulingDate ? new Date(formData.schedulingDate).toISOString() : null;
     
     const scheduling: TripScheduling | undefined = (destination || terminalTime) ? {
-       dateTime: terminalTime || tripStartTime, // Fallback apenas se destino existir mas data for nula
+       dateTime: terminalTime || tripStartTime,
        location: destination?.name || formData.manualLocal || '',
        locationId: destination?.id || '',
        obs: formData.obs || ''
@@ -42,7 +40,7 @@ export const tripSyncService = {
       dateTime: tripStartTime,
       isLate: false,
       type: (formData.type || 'EXPORTAÇÃO').toUpperCase() as any,
-      category: category || 'Geral',
+      category: category, // Utiliza a categoria passada, sem fallback
       container: formData.container,
       tara: formData.tara,
       seal: formData.seal,
@@ -78,7 +76,8 @@ export const tripSyncService = {
       ocFormData: {
         ...formData,
         dateTime: tripStartTime,
-        schedulingDate: terminalTime
+        schedulingDate: terminalTime,
+        category: category
       },
       scheduling: scheduling
     };

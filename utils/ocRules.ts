@@ -14,13 +14,18 @@ export const ocRules = {
    */
   async processOCWorkflow(formData: any, driver: Driver, customer: Customer, user: User, destination?: Port, existingTripId?: string) {
     try {
-      // 1. Detectar Categoria baseada no padrão da OS (ALC ou SP) ou usar a manual do formulário
-      const detectedCategory = formData.category || osCategoryService.detectCategoryFromOS(formData.os) || 'Geral';
+      // 1. Prioriza a categoria selecionada manualmente no formulário. 
+      // Se não houver, tenta detectar via OS.
+      let finalCategory = formData.category || osCategoryService.detectCategoryFromOS(formData.os);
 
-      // 2. Sincronizar Vínculos via vinculoService (Cria categoria se não existir)
-      await vinculoService.syncVinculo(detectedCategory, driver, customer, user);
+      if (!finalCategory) {
+        throw new Error("Categoria não identificada. Por favor, selecione uma categoria válida do banco de dados.");
+      }
 
-      // 3. Verificar se já existe uma viagem com esta OS (caso o ID não tenha sido passado)
+      // 2. Sincronizar Vínculos via vinculoService
+      await vinculoService.syncVinculo(finalCategory, driver, customer, user);
+
+      // 3. Verificar se já existe uma viagem com esta OS
       const targetId = existingTripId || (await tripSyncService.findExistingTrip(formData.os))?.id;
 
       // 4. Mapear dados do formulário para o modelo de Viagem (Trip)
@@ -28,7 +33,7 @@ export const ocRules = {
         formData, 
         driver, 
         customer, 
-        detectedCategory, 
+        finalCategory, 
         destination
       );
 
@@ -40,7 +45,7 @@ export const ocRules = {
         user, 
         'OC_GENERATED', 
         `OC Digital: OS ${formData.os}`, 
-        `Viagem atualizada para ${driver.name}. Registro sincronizado por ${user.displayName}.`,
+        `Viagem vinculada à categoria ${finalCategory.toUpperCase()}. Registro sincronizado por ${user.displayName}.`,
         { 
           os: formData.os, 
           motorista: driver.name, 

@@ -14,7 +14,7 @@ export const tripRepository = {
     is_late: trip.isLate || false,
     type: trip.type || 'EXPORTAÇÃO',
     container_type: trip.containerType || null,
-    category: trip.category || 'Geral',
+    category: trip.category, // Removido o || 'Geral'
     sub_category: trip.subCategory || null,
     container: trip.container?.toUpperCase() || '',
     tara: trip.tara || null,
@@ -71,7 +71,7 @@ export const tripRepository = {
       isLate: d.is_late ?? false,
       type: d.type || 'EXPORTAÇÃO',
       containerType: d.container_type || '40HC',
-      category: d.category || 'Geral',
+      category: d.category || '', // Removido 'Geral'
       subCategory: d.sub_category || '',
       container: d.container || '',
       tara: d.tara || '',
