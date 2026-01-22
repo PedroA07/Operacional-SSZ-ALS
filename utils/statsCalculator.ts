@@ -10,26 +10,33 @@ export interface StatGroup {
 
 export interface EntitySummary extends StatGroup {
   name: string;
+  document: string; // CNPJ ou CPF
+  subLabel: string;  // Localidade ou Placa
   efficiency: number;
   subEntities: Record<string, StatGroup & { name: string }>;
+}
+
+export interface TerminalSummary {
+  total: number;
+  location: string;
 }
 
 export interface DashboardStats {
   entities: EntitySummary[];
   categories: Record<string, StatGroup>;
-  categoryCounts: Record<string, number>; // Nova contagem simplificada para Pizza
+  categoryCounts: Record<string, number>;
   operationTypes: Record<string, StatGroup>;
   statusCounts: Record<string, number>;
   cityDistribution: Record<string, number>;
   clientCityDistribution: Record<string, number>;
-  terminalDistribution: Record<string, number>;
+  terminalDistribution: Record<string, TerminalSummary>; // Atualizado para objeto complexo
   metrics: {
     avgDelayMinutes: number;
     efficiencyRate: number;
     activeResources: number;
     avgLeadTimeHrs: number;
     productivityPerDriver: number;
-    productivityTarget: number; // Meta fixa para o gráfico
+    productivityTarget: number;
   };
 }
 
@@ -49,28 +56,32 @@ export const statsCalculator = {
     const statusCounts: Record<string, number> = {};
     const cityDistribution: Record<string, number> = {};
     const clientCityDistribution: Record<string, number> = {};
-    const terminalDistribution: Record<string, number> = {};
+    const terminalDistribution: Record<string, TerminalSummary> = {};
     
-    let totalLeadTimeHrs = 0;
-    let leadTimeCount = 0;
-
     const initStat = () => ({ total: 0, completed: 0, delayed: 0, canceled: 0 });
 
     trips.forEach(t => {
       const mainKey = primaryType === 'client' ? t.customer.name : t.driver.name;
-      const subKey = primaryType === 'client' ? t.driver.name : t.customer.name;
+      const doc = primaryType === 'client' ? (t.customer.cnpj || '---') : (t.driver.cpf || '---');
+      const sub = primaryType === 'client' ? t.customer.city : t.driver.plateHorse;
+      
       const catName = (t.category || 'GERAL').toUpperCase();
       const opType = (t.type || 'OUTROS').toUpperCase();
       
       const destCity = (t.destination?.city || 'N/A').toUpperCase();
       const clientCity = (t.customer?.city || 'N/A').toUpperCase();
       const terminalName = (t.destination?.name || t.scheduling?.location || 'NÃO INFORMADO').toUpperCase();
+      const terminalLoc = (t.destination?.city ? `${t.destination.city}/${t.destination.state || 'SP'}` : 'LOCAL INDEFINIDO').toUpperCase();
 
       categoryCounts[catName] = (categoryCounts[catName] || 0) + 1;
       statusCounts[t.status] = (statusCounts[t.status] || 0) + 1;
       cityDistribution[destCity] = (cityDistribution[destCity] || 0) + 1;
       clientCityDistribution[clientCity] = (clientCityDistribution[clientCity] || 0) + 1;
-      terminalDistribution[terminalName] = (terminalDistribution[terminalName] || 0) + 1;
+      
+      if (!terminalDistribution[terminalName]) {
+        terminalDistribution[terminalName] = { total: 0, location: terminalLoc };
+      }
+      terminalDistribution[terminalName].total++;
 
       const updateStat = (stat: any) => {
         stat.total++;
@@ -85,7 +96,14 @@ export const statsCalculator = {
       updateStat(typeMap[opType]);
 
       if (!entityMap[mainKey]) {
-        entityMap[mainKey] = { name: mainKey, ...initStat(), efficiency: 0, subEntities: {} };
+        entityMap[mainKey] = { 
+          name: mainKey, 
+          document: doc, 
+          subLabel: sub, 
+          ...initStat(), 
+          efficiency: 0, 
+          subEntities: {} 
+        };
       }
       updateStat(entityMap[mainKey]);
     });
@@ -107,7 +125,7 @@ export const statsCalculator = {
         activeResources: trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada').length,
         avgLeadTimeHrs: 4,
         productivityPerDriver: activeDrivers > 0 ? Number((trips.length / activeDrivers).toFixed(1)) : 0,
-        productivityTarget: 20 // Meta de 20 viagens por recurso
+        productivityTarget: 20
       }
     };
   }

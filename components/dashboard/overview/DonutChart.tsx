@@ -14,8 +14,9 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total, colors = ['#2563eb
 
   return (
     <div className="flex flex-col md:flex-row items-center gap-10">
-      <div className="relative w-44 h-44 shrink-0">
-        <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+      <div className="relative w-48 h-48 shrink-0 flex items-center justify-center">
+        {/* viewBox 44x44 com círculos em 22,22 r=15.9 permite strokeWidth 6 sem cortar */}
+        <svg viewBox="0 0 44 44" className="w-full h-full transform -rotate-90 overflow-visible">
           {entries.map(([label, value], idx) => {
             const percentage = total > 0 ? (value / total) * 100 : 0;
             const strokeDash = `${percentage} ${100 - percentage}`;
@@ -25,12 +26,13 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total, colors = ['#2563eb
             return (
               <circle
                 key={label}
-                cx="18" cy="18" r="15.915"
+                cx="22" cy="22" r="15.915"
                 fill="transparent"
                 stroke={colors[idx % colors.length]}
-                strokeWidth="5"
+                strokeWidth="5.5"
                 strokeDasharray={strokeDash}
                 strokeDashoffset={strokeOffset}
+                strokeLinecap="round"
                 className="transition-all duration-1000 ease-in-out"
               />
             );
@@ -38,7 +40,7 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total, colors = ['#2563eb
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <span className="text-3xl font-black text-slate-800">{total}</span>
-          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Geral</span>
+          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Movimentações</span>
         </div>
       </div>
 

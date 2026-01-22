@@ -12,6 +12,7 @@ interface KpiVisualizerProps {
 
 const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
   const [activePeriod, setActivePeriod] = useState<'WEEK' | 'MONTH' | 'YEAR'>('WEEK');
+  const [cityLimit, setCityLimit] = useState(10);
 
   const analytics = useMemo(() => {
     const now = new Date();
@@ -49,10 +50,25 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
 
   const RankingCard = ({ title, data, type = 'Maiores', colorClass = 'bg-blue-600', kpiKey }: any) => {
     const [localLimit, setLocalLimit] = useState(5);
-    const items = Array.isArray(data) ? data : (Object.entries(data) as [string, number][]).map(([name, total]) => ({ name, total }));
-    const sortedData = type === 'Maiores' 
-      ? [...items].sort((a, b) => b.total - a.total).slice(0, localLimit)
-      : [...items].sort((a, b) => a.total - b.total).filter(i => i.total > 0).slice(0, localLimit);
+    
+    const items = useMemo(() => {
+      if (Array.isArray(data)) return data; 
+      
+      return (Object.entries(data) as [string, any][]).map(([name, info]) => ({
+        name,
+        total: typeof info === 'number' ? info : info.total,
+        document: typeof info === 'number' ? '' : '',
+        subLabel: typeof info === 'number' ? '' : info.location
+      }));
+    }, [data]);
+
+    const sortedData = useMemo(() => {
+      const sorted = type === 'Maiores' 
+        ? [...items].sort((a, b) => b.total - a.total)
+        : [...items].sort((a, b) => a.total - b.total).filter(i => i.total > 0);
+      return sorted.slice(0, localLimit);
+    }, [items, type, localLimit]);
+
     const maxVal = items.length > 0 ? Math.max(...items.map((i: any) => i.total)) : 1;
 
     return (
@@ -70,15 +86,25 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
               ))}
            </div>
         </div>
-        <div className="space-y-5 flex-1">
+        <div className="space-y-6 flex-1">
           {sortedData.map((item) => (
-            <div key={item.name} className="space-y-1.5 group">
-              <div className="flex justify-between text-[10px] font-black uppercase">
-                <span className="text-slate-600 truncate max-w-[240px] group-hover:text-slate-900 transition-colors">{item.name}</span>
-                <span className="text-slate-900 font-mono">{item.total}</span>
+            <div key={item.name} className="space-y-2 group">
+              <div className="flex justify-between items-end">
+                <div className="min-w-0">
+                  <span className="text-[11px] font-black text-slate-900 uppercase truncate block leading-none">{item.name}</span>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    {item.document && (
+                      <span className="text-[8px] font-mono font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase">{item.document}</span>
+                    )}
+                    {item.subLabel && (
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{item.subLabel}</span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-lg font-black text-slate-800 font-mono leading-none pl-4">{item.total}</span>
               </div>
-              <div className="h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100 group-hover:border-blue-100 transition-all">
-                <div className={`h-full ${type === 'Maiores' ? colorClass : 'bg-amber-400'} transition-all duration-1000 ease-out`} style={{ width: `${(item.total / maxVal) * 100}%` }}></div>
+              <div className="h-1.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100 group-hover:border-blue-100 transition-all">
+                <div className={`h-full ${type === 'Maiores' ? colorClass : 'bg-amber-400'} transition-all duration-1000 ease-out shadow-sm`} style={{ width: `${(item.total / maxVal) * 100}%` }}></div>
               </div>
             </div>
           ))}
@@ -184,12 +210,23 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
                 <h3 className="text-sm font-black uppercase tracking-widest text-blue-400">Origem de Faturamento</h3>
                 <KpiInfoIcon kpiKey="CIDADES_CLIENTES" />
               </div>
-              <span className="text-[9px] font-black bg-white/10 px-3 py-1.5 rounded-full uppercase border border-white/5">Localização dos Clientes</span>
+              
+              {/* Seletor de Quantidade para Cidades */}
+              <div className="flex gap-1 bg-white/10 p-1 rounded-lg">
+                {[5, 10, 15].map(v => (
+                  <button 
+                    key={v} onClick={() => setCityLimit(v)}
+                    className={`w-7 h-6 rounded flex items-center justify-center text-[8px] font-black transition-all ${cityLimit === v ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
            </div>
            <div className="grid grid-cols-1 gap-y-4 relative z-10 overflow-y-auto custom-scrollbar pr-4">
               {(Object.entries(analytics.clientCities) as [string, number][])
                 .sort((a,b) => b[1] - a[1])
-                .slice(0, 15)
+                .slice(0, cityLimit)
                 .map(([city, count], idx) => (
                 <div key={city} className="flex items-center justify-between border-b border-white/5 pb-3 group hover:border-blue-500/50 transition-colors">
                    <div className="flex items-center gap-4">
@@ -199,7 +236,6 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
                    <div className="flex items-center gap-3">
                       <span className="text-[11px] font-black text-blue-400">{count} OS</span>
                       <div className="h-1 w-24 bg-white/5 rounded-full overflow-hidden">
-                        {/* Fix: cast Object.values to number[] to fix 'Argument of type unknown is not assignable' error */}
                         <div className="h-full bg-blue-500/50" style={{ width: `${(count / (Math.max(1, ...Object.values(analytics.clientCities) as number[]))) * 100}%` }}></div>
                       </div>
                    </div>
