@@ -22,7 +22,6 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<AvantidaRecord | null>(null);
 
-  // Alterado: Inicia com data vazia para mostrar do mais antigo ao mais atual por padrão
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -36,9 +35,23 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
         db.getDrivers(),
         db.getAvantidaPrices()
       ]);
+      
       setRecords(avantidaData);
       setDrivers(driversData);
       setPriceRules(pricesData);
+
+      // Lógica de Data Dinâmica ALS
+      const hasPending = avantidaData.some(r => !r.verified);
+      if (!hasPending && avantidaData.length > 0) {
+        // Se não há pendentes, busca a data do registro mais recente no banco
+        const latestRecord = [...avantidaData].sort((a, b) => b.date.localeCompare(a.date))[0];
+        setStartDate(latestRecord.date);
+        setEndDate(latestRecord.date);
+      } else if (hasPending) {
+        // Se há pendentes, mantém os filtros limpos para mostrar a fila completa
+        setStartDate('');
+        setEndDate('');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -80,7 +93,6 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
         
         return matchSearch && matchDate && matchPending;
       })
-      // Alterado: Ordenação Ascendente (Mais antigo no topo)
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [records, drivers, search, startDate, endDate, showOnlyPending]);
 

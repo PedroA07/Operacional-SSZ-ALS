@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../../../utils/storage';
 
 interface Column {
@@ -17,7 +17,7 @@ interface SmartOperationTableProps {
   title?: string;
   defaultVisibleKeys?: string[];
   onRowClick?: (row: any) => void;
-  hideInternalSearch?: boolean; // Nova prop
+  hideInternalSearch?: boolean;
 }
 
 const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
@@ -34,6 +34,10 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Estados de Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   useEffect(() => {
     const prefs = db.getPreferences(userId);
@@ -64,25 +68,55 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filteredData = hideInternalSearch ? data : data.filter(row => {
-    const searchStr = searchQuery.toLowerCase();
-    return Object.values(row).some(val => {
-      if (typeof val === 'object' && val !== null) {
-        return Object.values(val).some(v => String(v).toLowerCase().includes(searchStr));
-      }
-      return String(val).toLowerCase().includes(searchStr);
+  const filteredData = useMemo(() => {
+    const base = hideInternalSearch ? data : data.filter(row => {
+      const searchStr = searchQuery.toLowerCase();
+      return Object.values(row).some(val => {
+        if (typeof val === 'object' && val !== null) {
+          return Object.values(val).some(v => String(v).toLowerCase().includes(searchStr));
+        }
+        return String(val).toLowerCase().includes(searchStr);
+      });
     });
-  });
+    return base;
+  }, [data, searchQuery, hideInternalSearch]);
+
+  // Lógica de Paginação
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(start, start + itemsPerPage);
+  }, [filteredData, currentPage, itemsPerPage]);
+
+  // Resetar para página 1 ao filtrar
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, itemsPerPage]);
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm animate-in fade-in duration-500 relative">
+    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm animate-in fade-in duration-500 relative flex flex-col">
       <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50 rounded-t-[2.5rem]">
         <div className="z-10">
           {title && <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">{title}</h3>}
-          <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 tracking-widest">{filteredData.length} registros exibidos</p>
+          <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 tracking-widest">
+            {filteredData.length} registros no total • Página {currentPage} de {totalPages}
+          </p>
         </div>
 
         <div className="flex items-center gap-3 z-20">
+          {/* Seletor de Itens por Página */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm shrink-0">
+             <span className="text-[8px] font-black text-slate-400 uppercase">Exibir:</span>
+             <select 
+               className="text-[10px] font-black text-blue-600 outline-none bg-transparent cursor-pointer"
+               value={itemsPerPage}
+               onChange={(e) => setItemsPerPage(Number(e.target.value))}
+             >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+             </select>
+          </div>
+
           {!hideInternalSearch && (
             <div className="relative">
               <input 
@@ -133,7 +167,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-b-[2.5rem]">
+      <div className="overflow-x-auto">
         <table className="w-full text-left text-[10px] border-collapse min-w-[1000px]">
           <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-400 font-black uppercase tracking-widest">
             <tr>
@@ -143,7 +177,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {filteredData.map((row, idx) => (
+            {paginatedData.map((row, idx) => (
               <tr 
                 key={row.id || idx} 
                 onClick={() => onRowClick?.(row)}
@@ -165,8 +199,50 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
             )}
           </tbody>
         </table>
-        {/* ESPAÇADOR PARA DROPDOWNS DAS ÚLTIMAS LINHAS */}
-        <div className="h-60 pointer-events-none"></div>
+      </div>
+
+      {/* RODAPÉ COM CONTROLES DE PÁGINA */}
+      <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between rounded-b-[2.5rem]">
+         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+           Exibindo {paginatedData.length} de {filteredData.length} registros
+         </p>
+         
+         <div className="flex items-center gap-2">
+            <button 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-30 transition-all active:scale-90"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            
+            <div className="flex gap-1">
+               {/* Lógica simples de páginas */}
+               {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                 // Mostra páginas ao redor da atual
+                 let pageNum = currentPage > 3 ? currentPage - 2 + i : i + 1;
+                 if (pageNum > totalPages) return null;
+                 
+                 return (
+                   <button 
+                     key={pageNum}
+                     onClick={() => setCurrentPage(pageNum)}
+                     className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+                   >
+                     {pageNum}
+                   </button>
+                 );
+               })}
+            </div>
+
+            <button 
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-30 transition-all active:scale-90"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+         </div>
       </div>
     </div>
   );
