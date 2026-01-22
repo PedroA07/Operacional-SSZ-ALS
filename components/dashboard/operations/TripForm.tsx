@@ -112,12 +112,19 @@ const TripForm: React.FC<TripFormProps> = ({
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-10 pb-10">
+      
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Início da Viagem</h4>
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Início da Viagem (Coleta/Retirada)</h4>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           <div className="md:col-span-5 space-y-1">
             <label className={labelClass}>Número da OS</label>
-            <input required className={`${inputClass} text-xl border-blue-100 text-blue-700`} value={formData.os} onChange={e => setFormData({...formData, os: e.target.value.toUpperCase()})} />
+            <input 
+              required 
+              className={`${inputClass} text-xl border-blue-100 text-blue-700`} 
+              placeholder="EX: 123ALC..."
+              value={formData.os} 
+              onChange={e => setFormData({...formData, os: e.target.value.toUpperCase()})} 
+            />
           </div>
           <div className="md:col-span-3 space-y-1">
             <label className={labelClass}>Modalidade</label>
@@ -130,31 +137,152 @@ const TripForm: React.FC<TripFormProps> = ({
           </div>
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Data/Hora Programação (INÍCIO)</label>
-            <input required type="datetime-local" className={dateInputClass} value={formData.dateTime} onChange={e => setFormData({...formData, dateTime: e.target.value})} />
+            <input 
+              required 
+              type="datetime-local" 
+              className={dateInputClass} 
+              value={formData.dateTime} 
+              onChange={e => setFormData({...formData, dateTime: e.target.value})} 
+            />
           </div>
         </div>
       </div>
 
       <div className="bg-blue-50/30 p-8 rounded-[3rem] border border-blue-100 space-y-6">
-        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">II. Agendamento Terminal (DESTINO)</h4>
+        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">II. Destino e Agendamento no Terminal</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="space-y-1">
-              <label className={labelClass}>Janela Agendada no Destino</label>
-              <input type="datetime-local" className={`${dateInputClass} border-blue-200 text-blue-800`} value={formData.schedulingDate} onChange={e => setFormData({...formData, schedulingDate: e.target.value})} />
-              <p className="text-[8px] font-bold text-slate-400 uppercase mt-2 italic">* Independente do horário de início da programação.</p>
+           <div className="relative" ref={dropdownRefs.destination}>
+              <label className={labelClass}>Local de Entrega / Porto</label>
+              <input 
+                type="text"
+                placeholder="BUSCAR TERMINAL..."
+                className={inputClass}
+                value={searches.destination}
+                onFocus={() => setDropdowns(d => ({ ...d, destination: true }))}
+                onChange={e => {
+                  setSearches({...searches, destination: e.target.value});
+                  setDropdowns(d => ({ ...d, destination: true }));
+                }}
+              />
+              {dropdowns.destination && (
+                <div className="absolute z-[100] w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+                  <div className="max-h-60 overflow-y-auto custom-scrollbar p-2">
+                    {ports.filter(p => (p.name || '').toUpperCase().includes(searches.destination.toUpperCase())).map(p => (
+                      <button key={p.id} type="button" onClick={() => {
+                        setFormData({...formData, destination: p});
+                        setSearches({...searches, destination: p.name});
+                        setDropdowns(d => ({ ...d, destination: false }));
+                      }} className="w-full text-left p-3 hover:bg-blue-50 rounded-xl text-[10px] font-black uppercase">
+                        {p.name} - {p.city}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
            </div>
+
            <div className="space-y-1">
-              <label className={labelClass}>Notas / Senha / Box</label>
-              <input className={inputClass} placeholder="EX: SENHA 123, BOX 10" value={formData.obs} onChange={e => setFormData({...formData, obs: e.target.value.toUpperCase()})} />
+              <label className={labelClass}>Janela Agendada no Destino (TERMINAL)</label>
+              <input 
+                type="datetime-local" 
+                className={`${dateInputClass} border-blue-200 text-blue-800`}
+                value={formData.schedulingDate} 
+                onChange={e => setFormData({...formData, schedulingDate: e.target.value})} 
+              />
+              <p className="text-[8px] font-bold text-slate-400 uppercase mt-2 ml-1 italic">* Horário independente do início da programação.</p>
            </div>
         </div>
       </div>
 
-      {/* Resto do formulário mantido conforme original para clientes e equipamentos */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="relative" ref={dropdownRefs.customer}>
+          <label className={labelClass}>Cliente Contratante</label>
+          <input 
+            type="text"
+            placeholder="BUSCAR CLIENTE..."
+            className={inputClass}
+            value={searches.customer}
+            onFocus={() => setDropdowns(d => ({ ...d, customer: true }))}
+            onChange={e => {
+              setSearches({...searches, customer: e.target.value});
+              setDropdowns(d => ({ ...d, customer: true }));
+            }}
+          />
+          {dropdowns.customer && (
+            <div className="absolute z-[100] w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+              <div className="max-h-60 overflow-y-auto p-2">
+                {customers.filter(c => (c.name || '').toUpperCase().includes(searches.customer.toUpperCase())).map(c => (
+                  <button key={c.id} type="button" onClick={() => {
+                    setFormData({...formData, customer: c});
+                    setSearches({...searches, customer: c.name});
+                    setDropdowns(d => ({ ...d, customer: false }));
+                  }} className="w-full text-left p-3 hover:bg-blue-50 rounded-xl text-[10px] font-black uppercase">{c.name}</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="relative" ref={dropdownRefs.driver}>
+          <label className={labelClass}>Motorista / Veículo</label>
+          <input 
+            type="text"
+            placeholder="BUSCAR MOTORISTA OU PLACA..."
+            className={inputClass}
+            value={searches.driver}
+            onFocus={() => setDropdowns(d => ({ ...d, driver: true }))}
+            onChange={e => {
+              setSearches({...searches, driver: e.target.value});
+              setDropdowns(d => ({ ...d, driver: true }));
+            }}
+          />
+          {dropdowns.driver && (
+            <div className="absolute z-[100] w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+              <div className="max-h-60 overflow-y-auto p-2">
+                {drivers.filter(d => d.name.toUpperCase().includes(searches.driver.toUpperCase()) || d.plateHorse.toUpperCase().includes(searches.driver.toUpperCase())).map(d => (
+                  <button key={d.id} type="button" onClick={() => {
+                    setFormData({...formData, driver: d});
+                    setSearches({...searches, driver: d.name});
+                    setDropdowns(d => ({ ...d, driver: false }));
+                  }} className="w-full text-left p-3 hover:bg-blue-50 rounded-xl flex justify-between items-center group">
+                    <span className="text-[10px] font-black uppercase">{d.name}</span>
+                    <span className="bg-slate-900 text-white px-2 py-1 rounded font-mono text-[9px]">{d.plateHorse}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 space-y-6 shadow-sm">
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">III. Dados do Equipamento</h4>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+           <div className="space-y-1">
+              <label className={labelClass}>Container</label>
+              <input className={inputClass} value={formData.container} onChange={e => handleContainerChange(e.target.value)} />
+           </div>
+           <div className="space-y-1">
+              <label className={labelClass}>Tipo Unidade</label>
+              <select className={inputClass} value={formData.containerType} onChange={e => setFormData({...formData, containerType: e.target.value})}>
+                 <option value="40HC">40HC</option><option value="20DC">20DC</option><option value="40HR">40HR</option>
+              </select>
+           </div>
+           <div className="space-y-1">
+              <label className={labelClass}>Lacre</label>
+              <input className={inputClass} value={formData.seal} onChange={e => setFormData({...formData, seal: maskSeal(e.target.value)})} />
+           </div>
+           <div className="space-y-1">
+              <label className={labelClass}>Armador</label>
+              <input className={inputClass} value={formData.agencia} onChange={e => setFormData({...formData, agencia: e.target.value.toUpperCase()})} />
+           </div>
+        </div>
+      </div>
+
       <div className="flex gap-4 pt-8 border-t border-slate-100 mt-10">
         <button type="button" onClick={onCancel} className="px-8 py-5 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Descartar</button>
         <button type="submit" disabled={isSaving} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700">
-          {isSaving ? 'Gravando...' : 'Salvar Programação'}
+          {isSaving ? 'Sincronizando...' : editTrip ? 'Confirmar Alterações' : 'Salvar Nova Programação'}
         </button>
       </div>
     </form>

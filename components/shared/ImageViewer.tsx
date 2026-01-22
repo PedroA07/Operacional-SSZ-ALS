@@ -16,8 +16,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   const [isLoading, setIsLoading] = useState(true);
   const [retryWithoutCORS, setRetryWithoutCORS] = useState(false);
   
-  // Detecção de tipo de arquivo
-  const isPDF = url.toLowerCase().endsWith('.pdf') || url.startsWith('data:application/pdf');
+  // Detecção robusta para links do R2 (.pdf no final ou no path)
+  const isPDF = url.toLowerCase().includes('.pdf') || url.startsWith('data:application/pdf');
   
   const { scale, setScale, resetZoom, zoomIn, zoomOut } = useMouseZoom({ containerRef });
   const { 
@@ -39,7 +39,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     setRotation(0);
   }, [url]);
 
-  // Sincroniza eventos de mouse/touch globais para o Pan funcionar fora do elemento
   useEffect(() => {
     if (isDragging && !isPDF) {
       window.addEventListener('mousemove', onMouseMove);
@@ -75,26 +74,35 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     }
   };
 
-  // Se for PDF, renderiza o iframe nativo do navegador
+  // RENDERIZAÇÃO PARA PDF (NATÍSTICA DO NAVEGADOR)
   if (isPDF) {
     return (
-      <div className={`relative w-full h-full bg-white rounded-[2.5rem] overflow-hidden border border-slate-200 ${className}`}>
+      <div className={`relative w-full h-full bg-slate-100 rounded-[2.5rem] overflow-hidden border border-slate-200 ${className}`}>
         <iframe 
           src={`${url}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`} 
-          className="w-full h-full border-none"
+          className="w-full h-full border-none shadow-inner bg-white"
           title={alt}
           onLoad={() => setIsLoading(false)}
         />
         {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-10">
-            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-[8px] font-black text-blue-500 uppercase mt-4 tracking-widest">Carregando PDF...</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-10">
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-[9px] font-black text-blue-600 uppercase mt-4 tracking-[0.3em] animate-pulse">Carregando PDF do Terminal...</p>
           </div>
         )}
+        <div className="absolute top-4 right-4 z-20 flex gap-2">
+           <button 
+             onClick={() => window.open(url, '_blank')}
+             className="px-4 py-2 bg-slate-900/80 text-white rounded-xl text-[8px] font-black uppercase backdrop-blur-md border border-white/10 hover:bg-blue-600 transition-all shadow-xl"
+           >
+             Abrir Externo
+           </button>
+        </div>
       </div>
     );
   }
 
+  // RENDERIZAÇÃO PARA IMAGEM (COM ZOOM/PAN)
   return (
     <div 
       ref={containerRef}
@@ -119,7 +127,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
             <p className="text-white font-black uppercase text-[10px]">Falha de Carregamento</p>
-            <button onClick={() => window.open(url, '_blank')} className="px-5 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase">Abrir em nova aba</button>
+            <button onClick={() => window.open(url, '_blank')} className="px-5 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase">Tentar Abrir Direto</button>
           </div>
         ) : (
           <div 

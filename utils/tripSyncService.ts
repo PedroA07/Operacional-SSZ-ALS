@@ -22,12 +22,14 @@ export const tripSyncService = {
   mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port): Partial<Trip> => {
     const now = new Date().toISOString();
     
-    // Horários agora são tratados como fluxos independentes
+    // Horário de Início (Coleta)
     const tripStartTime = formData.dateTime ? new Date(formData.dateTime).toISOString() : now;
+    
+    // Horário no Terminal (Agendamento) - Se não informado, não espelha o início por padrão
     const terminalTime = formData.schedulingDate ? new Date(formData.schedulingDate).toISOString() : null;
     
     const scheduling: TripScheduling | undefined = (destination || terminalTime) ? {
-       dateTime: terminalTime || tripStartTime,
+       dateTime: terminalTime || tripStartTime, // Fallback apenas se destino existir mas data for nula
        location: destination?.name || formData.manualLocal || '',
        locationId: destination?.id || '',
        obs: formData.obs || ''

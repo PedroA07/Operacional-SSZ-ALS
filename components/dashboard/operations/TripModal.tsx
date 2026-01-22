@@ -58,20 +58,19 @@ const TripModal: React.FC<TripModalProps> = ({
       const tripId = editTrip?.id || `trip-${Date.now()}`;
       const now = new Date().toISOString();
       
-      // Sincroniza vínculos de motorista e cliente se for uma nova categoria detectada
       if (formData.driver && formData.customer) {
         await osCategoryService.syncVinculos(formData.category || 'Geral', formData.driver, formData.customer);
       }
 
-      // Horários convertidos para UTC/ISO
+      // Horário de Início
       const tripStartTime = new Date(formData.dateTime).toISOString();
       
-      // Janela no terminal
+      // Janela no terminal (Agendamento)
       const terminalTime = formData.schedulingDate 
         ? new Date(formData.schedulingDate).toISOString() 
         : undefined;
 
-      // Monta o objeto de agendamento se houver destino ou data
+      // Monta o objeto de agendamento independente
       const scheduling = (formData.destination || terminalTime) ? {
         dateTime: terminalTime || tripStartTime,
         location: formData.destination?.name || '',
@@ -88,7 +87,7 @@ const TripModal: React.FC<TripModalProps> = ({
         status: editTrip?.status || 'Pendente',
         statusHistory: editTrip?.statusHistory || [{ 
           status: 'Pendente', 
-          dateTime: now,
+          dateTime: tripStartTime,
           createdAt: now 
         }],
         advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },
@@ -96,7 +95,7 @@ const TripModal: React.FC<TripModalProps> = ({
         scheduling: scheduling,
         ocFormData: {
           ...formData,
-          horarioAgendado: tripStartTime,
+          dateTime: tripStartTime,
           schedulingDate: terminalTime
         }
       };
@@ -110,11 +109,11 @@ const TripModal: React.FC<TripModalProps> = ({
         }, 300);
         onClose();
       } else {
-        alert("Falha ao salvar. Verifique sua conexão.");
+        alert("Falha ao salvar no servidor.");
       }
     } catch (err) {
       console.error("Erro crítico no cadastro:", err);
-      alert("Erro ao processar. Verifique os campos.");
+      alert("Erro ao processar dados.");
     } finally {
       setIsSaving(false);
     }
