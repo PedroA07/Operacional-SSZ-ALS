@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Trip } from '../../../types';
-import MultiCheckboxFilter, { FilterStats } from '../../shared/MultiCheckboxFilter';
+import { statsCalculator } from '../../../utils/statsCalculator';
+import RichEntityFilter from './RichEntityFilter';
 
 interface TripsTodayProps {
   trips: Trip[];
@@ -15,69 +16,23 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     return trips.filter(t => t.dateTime && t.dateTime.substring(0, 10) === todayStr);
   }, [trips, todayStr]);
 
-  const [selTypes, setSelTypes] = useState<string[]>([]);
   const [selClients, setSelClients] = useState<string[]>([]);
   const [selDrivers, setSelDrivers] = useState<string[]>([]);
 
-  const getStatsForEntity = (name: string, type: 'driver' | 'client'): FilterStats => {
-    const entityTrips = todayRaw.filter(t => type === 'driver' ? t.driver.name === name : t.customer.name === name);
-    const active = entityTrips.filter(t => t.status !== 'Viagem cancelada');
-    
-    const delayed = active.filter(t => {
-      const scheduled = new Date(t.dateTime).getTime();
-      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
-    }).length;
-
-    const completed = active.filter(t => t.status === 'Viagem concluída').length;
-    const canceled = entityTrips.filter(t => t.status === 'Viagem cancelada').length;
-
-    // Added explicit type to Set to ensure items is inferred as string[]
-    const details = type === 'driver' 
-      ? { label: 'Clientes Atendidos', subLabel: 'Empresas', items: Array.from(new Set<string>(entityTrips.map(t => t.customer.name))) }
-      : { label: 'Motoristas Alocados', subLabel: 'Equipe', items: Array.from(new Set<string>(entityTrips.map(t => t.driver.name))) };
-
-    return { total: entityTrips.length, completed, delayed, canceled, details };
-  };
-
-  const driverOptions = useMemo(() => {
-    // Added explicit type to Set to ensure names is inferred as string[]
-    const names = Array.from(new Set<string>(todayRaw.map(t => t.driver.name))).sort();
-    return names.map(name => ({
-      value: name,
-      label: name,
-      stats: getStatsForEntity(name, 'driver')
-    }));
-  }, [todayRaw]);
-
-  const clientOptions = useMemo(() => {
-    // Added explicit type to Set to ensure names is inferred as string[]
-    const names = Array.from(new Set<string>(todayRaw.map(t => t.customer.name))).sort();
-    return names.map(name => ({
-      value: name,
-      label: name,
-      stats: getStatsForEntity(name, 'client')
-    }));
-  }, [todayRaw]);
+  const clientStats = useMemo(() => statsCalculator.calculateStats(todayRaw, 'client'), [todayRaw]);
+  const driverStats = useMemo(() => statsCalculator.calculateStats(todayRaw, 'driver'), [todayRaw]);
 
   const stats = useMemo(() => {
     const activeTrips = todayRaw.filter(t => t.status !== 'Viagem cancelada');
     const canceled = todayRaw.filter(t => t.status === 'Viagem cancelada').length;
     const completed = activeTrips.filter(t => t.status === 'Viagem concluída').length;
-    
+    const delays = activeTrips.filter(t => statsCalculator.isDelayed(t)).length;
+
     const typeCounts: Record<string, number> = {};
     activeTrips.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
-
-    const delays = activeTrips.filter(t => {
-      const scheduled = new Date(t.dateTime).getTime();
-      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
-    }).length;
 
     return { total: activeTrips.length, typeCounts, canceled, delays, completed };
   }, [todayRaw]);
@@ -85,14 +40,11 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const filteredTrips = useMemo(() => {
     return todayRaw.filter(t => {
       if (t.status === 'Viagem cancelada') return false;
-      const matchType = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase() || 'OUTROS');
       const matchClient = selClients.length === 0 || selClients.includes(t.customer.name);
       const matchDriver = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
-      return matchType && matchClient && matchDriver;
+      return matchClient && matchDriver;
     }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [todayRaw, selTypes, selClients, selDrivers]);
-
-  const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [todayRaw]);
+  }, [todayRaw, selClients, selDrivers]);
 
   return (
     <div className="relative" style={{ zIndex: isOpen ? 150 : 10 }}>
@@ -130,9 +82,8 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       {isOpen && (
         <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[160] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
           <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 shrink-0 relative z-[170]">
-             <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
-             <MultiCheckboxFilter label="Clientes" options={clientOptions} selectedOptions={selClients} onChange={setSelClients} />
-             <MultiCheckboxFilter label="Motoristas" options={driverOptions} selectedOptions={selDrivers} onChange={setSelDrivers} />
+             <RichEntityFilter label="Performance Cliente" data={clientStats} selectedItems={selClients} onChange={setSelClients} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>} />
+             <RichEntityFilter label="Performance Motorista" data={driverStats} selectedItems={selDrivers} onChange={setSelDrivers} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2"/></svg>} />
           </div>
           
           <div className="overflow-y-auto custom-scrollbar p-5 space-y-3 flex-1 bg-slate-50/30 min-h-[300px] rounded-b-[2.5rem]">
@@ -141,7 +92,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-                    <h4 className="text-[12px] font-black text-slate-800 uppercase truncate leading-none">{trip.driver.name}</h4>
+                    <h4 className="text-[11px] font-black text-slate-800 uppercase truncate leading-none">{trip.driver.name}</h4>
                   </div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 truncate">{trip.customer.name}</p>
                 </div>
