@@ -10,8 +10,8 @@ export interface StatGroup {
 
 export interface EntitySummary extends StatGroup {
   name: string;
-  document: string; // CNPJ ou CPF
-  subLabel: string;  // Localidade ou Placa
+  document: string;
+  subLabel: string;
   efficiency: number;
   subEntities: Record<string, StatGroup & { name: string }>;
 }
@@ -29,7 +29,7 @@ export interface DashboardStats {
   statusCounts: Record<string, number>;
   cityDistribution: Record<string, number>;
   clientCityDistribution: Record<string, number>;
-  terminalDistribution: Record<string, TerminalSummary>; // Atualizado para objeto complexo
+  terminalDistribution: Record<string, TerminalSummary>;
   metrics: {
     avgDelayMinutes: number;
     efficiencyRate: number;
@@ -87,6 +87,7 @@ export const statsCalculator = {
         stat.total++;
         if (t.status === 'Viagem concluída') stat.completed++;
         if (t.status === 'Viagem cancelada') stat.canceled++;
+        if (statsCalculator.isDelayed(t)) stat.delayed++;
       };
 
       if (!categoryMap[catName]) categoryMap[catName] = initStat();
