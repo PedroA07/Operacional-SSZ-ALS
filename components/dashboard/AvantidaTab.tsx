@@ -204,7 +204,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                       <input className={inputClass} value={r.exportRef} onChange={e => handleUpdateField(r, 'exportRef', e.target.value.toUpperCase())} placeholder="---" />
                     </td>
                     <td className="px-6 py-4">
-                      <input type="date" className={inputClass} value={r.date} onChange={e => handleUpdateField(r, 'reuseDate', e.target.value)} />
+                      <input type="date" className={inputClass} value={r.reuseDate || ''} onChange={e => handleUpdateField(r, 'reuseDate', e.target.value)} />
                     </td>
                     <td className="px-6 py-4">
                       <input type="number" step="0.01" className={`${inputClass} text-emerald-600`} value={r.requestedPrice} onChange={e => handleUpdateField(r, 'requestedPrice', Number(e.target.value))} />

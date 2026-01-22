@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AvantidaRecord, AvantidaStatus, AvantidaPriceRule } from '../../../types';
 import { db } from '../../../utils/storage';
 import { lookupCarrierByContainer } from '../../../utils/carrierService';
@@ -14,8 +14,9 @@ interface AvantidaModalProps {
 
 const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSuccess, editingRecord, priceRules = [] }) => {
   const [isSaving, setIsSaving] = useState(false);
+  const lastDetectedCarrier = useRef<string | null>(null);
 
-  // Estados dos campos solicitados
+  // Estados dos campos
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [containerNumber, setContainerNumber] = useState('');
   const [shippingLine, setShippingLine] = useState('');
@@ -34,31 +35,37 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         setImportLocation(editingRecord.importLocation || 'SÃO PAULO');
         setReuseDate(editingRecord.reuseDate || '');
         setRequestedPrice(editingRecord.requestedPrice || 0);
+        lastDetectedCarrier.current = editingRecord.shippingLine;
       } else {
+        // Novo registro
         setDate(new Date().toISOString().split('T')[0]);
         setContainerNumber('');
         setShippingLine('');
         setStatus('EM ANÁLISE');
         setImportLocation('SÃO PAULO');
-        setReuseDate('');
+        setReuseDate(''); // Mantém vazio por padrão para não confundir com data do pedido
         setRequestedPrice(0);
+        lastDetectedCarrier.current = null;
       }
     }
   }, [editingRecord, isOpen]);
 
-  // Efeito para preencher armador e preço automaticamente via BIC Code
+  // Efeito inteligente para preenchimento automático
   useEffect(() => {
     const container = containerNumber.toUpperCase().trim();
     if (container.length >= 4) {
       const carrier = lookupCarrierByContainer(container);
-      if (carrier) {
+      
+      if (carrier && carrier.name !== lastDetectedCarrier.current) {
         setShippingLine(carrier.name);
+        lastDetectedCarrier.current = carrier.name;
         
-        // Regra de preço vinculada ao armador
         const rule = priceRules.find(r => r.shippingLine.toUpperCase() === carrier.name.toUpperCase());
         if (rule) {
           setRequestedPrice(rule.price);
         }
+      } else if (!carrier && container.length === 4) {
+          lastDetectedCarrier.current = null;
       }
     }
   }, [containerNumber, priceRules]);
@@ -73,10 +80,10 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
       
       const success = await db.saveAvantidaRecord({
         id: editingRecord?.id || `new-${Date.now()}`,
-        date,
+        date, // Data do Pedido
         containerNumber: container,
         exportRef: editingRecord?.exportRef || '',
-        requestedPrice,
+        requestedPrice: Number(requestedPrice),
         customerRef: editingRecord?.customerRef || '',
         tripSettlement: editingRecord?.tripSettlement || '',
         verified: editingRecord?.verified || false,
@@ -84,7 +91,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         createdAt: editingRecord?.createdAt || new Date().toISOString(),
         shippingLine: shippingLine.toUpperCase(),
         importLocation: importLocation.toUpperCase(),
-        reuseDate: reuseDate || '',
+        reuseDate: (reuseDate && reuseDate.trim() !== "") ? reuseDate : null, // Data do Reuso
         status
       });
 
@@ -93,8 +100,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
       }
     } catch (err: any) {
       console.error("Erro detalhado:", err);
-      const msg = err.message || "Verifique o formato dos dados.";
-      alert(`Falha ao salvar registro: ${msg}`);
+      alert(`Falha ao salvar registro: ${err.message || 'Verifique o formato dos dados.'}`);
     } finally {
       setIsSaving(false);
     }
