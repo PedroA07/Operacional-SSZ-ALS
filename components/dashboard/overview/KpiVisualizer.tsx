@@ -13,11 +13,11 @@ interface KpiVisualizerProps {
 const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
   const [activePeriod, setActivePeriod] = useState<'WEEK' | 'MONTH' | 'YEAR'>('WEEK');
   
-  // Filtros Globais de Categoria para o Novo Gráfico Central
-  const [coreCategory, setCoreCategory] = useState<string>('');
+  // Filtro para o Gráfico de Núcleo (Core Analysis)
+  const [coreCategory, setCoreCategory] = useState<string>('GERAL');
 
-  // Estados de Filtro por Card (Combinações)
-  const [filters, setFilters] = useState({
+  // Estados de Filtro por Card (Combinações Independentes)
+  const [cardFilters, setCardFilters] = useState({
     client: { cat: 'TODAS', type: 'TODOS' },
     driver: { cat: 'TODAS', type: 'TODOS' },
     city: { cat: 'TODAS', type: 'TODOS' },
@@ -40,14 +40,24 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     const categories = Array.from(new Set(trips.map(t => t.category))).filter(Boolean).sort();
     const types = Array.from(new Set(trips.map(t => t.type))).filter(Boolean).sort();
 
-    if (!coreCategory && categories.length > 0) setCoreCategory(categories[0]);
+    // Stats para os Donuts de Mix (Período Selecionado)
+    const mixStats = statsCalculator.calculateFullDashboardStats(filtered, 'client');
 
-    return { filtered, categories, types };
+    const typeCounts: Record<string, number> = {};
+    filtered.forEach(t => {
+      const type = (t.type || 'OUTROS').toUpperCase();
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+    });
+
+    return { filtered, categories, types, mixStats, typeCounts, total: filtered.length };
   }, [trips, activePeriod]);
 
-  // Cálculo do Category Core Analysis
+  // Cálculo do Category Core Analysis (Suporta "GERAL")
   const coreStats = useMemo(() => {
-    const subset = availableData.filtered.filter(t => t.category === coreCategory);
+    const subset = coreCategory === 'GERAL' 
+      ? availableData.filtered 
+      : availableData.filtered.filter(t => t.category === coreCategory);
+    
     const total = subset.length;
     const typeDistribution: Record<string, number> = {};
     subset.forEach(t => {
@@ -57,35 +67,35 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     return { total, typeDistribution };
   }, [availableData.filtered, coreCategory]);
 
-  const getFilteredStats = (cardKey: keyof typeof filters) => {
+  const getFilteredStatsForCard = (cardKey: keyof typeof cardFilters) => {
     let subset = availableData.filtered;
-    const f = filters[cardKey];
+    const f = cardFilters[cardKey];
     if (f.cat !== 'TODAS') subset = subset.filter(t => t.category === f.cat);
     if (f.type !== 'TODOS') subset = subset.filter(t => t.type === f.type);
     return statsCalculator.calculateFullDashboardStats(subset, cardKey === 'driver' ? 'driver' : 'client');
   };
 
-  const CardFilters = ({ cardKey }: { cardKey: keyof typeof filters }) => (
+  const CardFilters = ({ cardKey }: { cardKey: keyof typeof cardFilters }) => (
     <div className="grid grid-cols-2 gap-2 mb-6 pt-4 border-t border-slate-50">
       <div className="space-y-1">
-        <p className="text-[7px] font-black text-slate-400 uppercase ml-1">Filtrar Categoria</p>
+        <p className="text-[7px] font-black text-slate-400 uppercase ml-1">Categoria</p>
         <select 
           className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-[9px] font-black uppercase outline-none focus:border-blue-300 transition-all"
-          value={filters[cardKey].cat}
-          onChange={(e) => setFilters({...filters, [cardKey]: { ...filters[cardKey], cat: e.target.value }})}
+          value={cardFilters[cardKey].cat}
+          onChange={(e) => setCardFilters({...cardFilters, [cardKey]: { ...cardFilters[cardKey], cat: e.target.value }})}
         >
-          <option value="TODAS">TODAS AS CATEGORIAS</option>
+          <option value="TODAS">TODAS</option>
           {availableData.categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
       <div className="space-y-1">
-        <p className="text-[7px] font-black text-slate-400 uppercase ml-1">Filtrar Modalidade</p>
+        <p className="text-[7px] font-black text-slate-400 uppercase ml-1">Modalidade</p>
         <select 
           className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-[9px] font-black uppercase outline-none focus:border-blue-300 transition-all"
-          value={filters[cardKey].type}
-          onChange={(e) => setFilters({...filters, [cardKey]: { ...filters[cardKey], type: e.target.value }})}
+          value={cardFilters[cardKey].type}
+          onChange={(e) => setCardFilters({...cardFilters, [cardKey]: { ...cardFilters[cardKey], type: e.target.value }})}
         >
-          <option value="TODOS">TODOS OS TIPOS</option>
+          <option value="TODOS">TODAS</option>
           {availableData.types.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
@@ -94,15 +104,13 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
 
   const RankingCard = ({ title, cardKey, colorClass = 'bg-blue-600', kpiKey }: any) => {
     const [limit, setLimit] = useState(5);
-    const data = getFilteredStats(cardKey);
+    const data = getFilteredStatsForCard(cardKey);
     
     const items = useMemo(() => {
       if (cardKey === 'city') {
-        // Explicitly cast Object.entries to ensure type safety for arithmetic operations
-        return (Object.entries(data.cityDistribution) as [string, number][]).map(([name, total]) => ({ name, total, document: '', subLabel: 'LOCALIDADE' }));
+        return (Object.entries(data.clientCityDistribution) as [string, number][]).map(([name, total]) => ({ name, total, document: '', subLabel: 'LOCALIDADE' }));
       }
       if (cardKey === 'terminal') {
-        // Explicitly cast Object.entries to ensure type safety for accessing info properties
         return (Object.entries(data.terminalDistribution) as [string, any][]).map(([name, info]) => ({ name, total: info.total, document: '', subLabel: info.location }));
       }
       return data.entities;
@@ -173,63 +181,13 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
         </div>
       </div>
 
-      {/* NOVO GRÁFICO: CATEGORY CORE ANALYSIS */}
-      <div className="bg-slate-900 p-10 rounded-[4rem] shadow-2xl relative overflow-hidden">
-         <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none">
-            <svg className="w-64 h-64 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
-         </div>
-
-         <div className="relative z-10 flex flex-col items-center">
-            <div className="flex flex-col items-center mb-10">
-               <h3 className="text-blue-400 text-xs font-black uppercase tracking-[0.4em] mb-4">Análise de Núcleo por Categoria</h3>
-               <select 
-                 className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-2xl text-sm font-black uppercase outline-none focus:border-blue-500 transition-all cursor-pointer"
-                 value={coreCategory}
-                 onChange={e => setCoreCategory(e.target.value)}
-               >
-                 {availableData.categories.map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)}
-               </select>
-            </div>
-
-            <div className="flex flex-col lg:flex-row items-center justify-center gap-16 w-full">
-               {/* Centro */}
-               <div className="relative">
-                  <div className="w-64 h-64 rounded-full border-[12px] border-blue-600/20 flex flex-col items-center justify-center bg-black/40 backdrop-blur-xl shadow-[0_0_100px_rgba(37,99,235,0.2)] animate-pulse">
-                     <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Total OS</span>
-                     <span className="text-7xl font-black text-white tracking-tighter">{coreStats.total}</span>
-                  </div>
-                  {/* Partículas decorativas circulares */}
-                  <div className="absolute inset-[-20px] rounded-full border border-white/5 animate-[spin_20s_linear_infinite]"></div>
-                  <div className="absolute inset-[-40px] rounded-full border border-white/5 animate-[spin_30s_linear_infinite_reverse]"></div>
-               </div>
-
-               {/* Mini-Pulses (Tipos de Operação) */}
-               <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-6 w-full max-w-2xl">
-                  {/* Fixed type error in arithmetic operation by explicitly casting Object.entries values to numbers. */}
-                  {(Object.entries(coreStats.typeDistribution) as [string, number][]).map(([type, count]) => (
-                    <div key={type} className="bg-white/5 border border-white/10 p-5 rounded-[2rem] flex flex-col items-center text-center group hover:bg-white/10 transition-all">
-                       <div className="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                          <span className="text-xs font-black">{coreStats.total > 0 ? Math.round((count/coreStats.total)*100) : 0}%</span>
-                       </div>
-                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">{type}</p>
-                       <p className="text-xl font-black text-white font-mono">{count}</p>
-                    </div>
-                  ))}
-                  {Object.keys(coreStats.typeDistribution).length === 0 && (
-                    <div className="col-span-full py-10 text-center text-slate-600 font-black uppercase text-[10px] italic">Nenhuma movimentação para {coreCategory} no período</div>
-                  )}
-               </div>
-            </div>
-         </div>
-      </div>
-
-      {/* INDICADORES CHAVE (KPIs) */}
+      {/* 1. INDICADORES CHAVE (KPIs) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { key: 'ASSERTIVIDADE', label: 'Assertividade', val: `${getFilteredStats('client').metrics.efficiencyRate}%`, color: 'bg-blue-600', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
-          { key: 'LEAD_TIME', label: 'Lead Time Médio', val: `${getFilteredStats('client').metrics.avgLeadTimeHrs}h`, color: 'bg-indigo-600', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
-          { key: 'PRODUTIVIDADE', label: 'Produtividade', val: getFilteredStats('client').metrics.productivityPerDriver, color: 'bg-emerald-500', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-          { key: 'FILA_ATIVA', label: 'Fila Ativa', val: getFilteredStats('client').metrics.activeResources, color: 'bg-slate-900', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10' }
+          { key: 'ASSERTIVIDADE', label: 'Assertividade', val: `${availableData.mixStats.metrics.efficiencyRate}%`, color: 'bg-blue-600', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+          { key: 'LEAD_TIME', label: 'Lead Time Médio', val: `${availableData.mixStats.metrics.avgLeadTimeHrs}h`, color: 'bg-indigo-600', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+          { key: 'PRODUTIVIDADE', label: 'Produtividade', val: availableData.mixStats.metrics.productivityPerDriver, color: 'bg-emerald-500', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+          { key: 'FILA_ATIVA', label: 'Fila Ativa', val: availableData.mixStats.metrics.activeResources, color: 'bg-slate-900', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10' }
         ].map((item) => (
           <div key={item.key} className="bg-white p-7 rounded-[2.5rem] border border-slate-200 shadow-sm group hover:border-blue-200 transition-all">
              <div className="flex items-center justify-between">
@@ -248,15 +206,86 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
         ))}
       </div>
 
-      {/* RANKINGS COM SELETORES DE COMBINAÇÃO */}
+      {/* 2. GRÁFICOS DE PIZZA (DONUTS) - RESTAURADOS */}
+      <div className="bg-white p-10 rounded-[3.5rem] border border-slate-200 shadow-sm grid grid-cols-1 lg:grid-cols-2 gap-12">
+          <div className="space-y-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <h3 className="text-sm font-black uppercase tracking-widest text-blue-600">Mix de Modalidades</h3>
+                <KpiInfoIcon kpiKey="MODALIDADES" />
+              </div>
+              <span className="text-[9px] font-bold text-slate-300 uppercase">Volume Global</span>
+            </div>
+            <DonutChart data={availableData.typeCounts} total={availableData.total} colors={['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe']} />
+          </div>
+
+          <div className="space-y-8 lg:border-l lg:border-slate-100 lg:pl-12">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <h3 className="text-sm font-black uppercase tracking-widest text-indigo-600">Fatia por Categoria</h3>
+                <KpiInfoIcon kpiKey="PERFORMANCE_ENTIDADES" />
+              </div>
+              <span className="text-[9px] font-bold text-slate-300 uppercase">Vínculos Ativos</span>
+            </div>
+            <DonutChart data={availableData.mixStats.categoryCounts} total={availableData.total} colors={['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe']} />
+          </div>
+      </div>
+
+      {/* 3. CATEGORY CORE ANALYSIS */}
+      <div className="bg-slate-900 p-10 rounded-[4rem] shadow-2xl relative overflow-hidden">
+         <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none">
+            <svg className="w-64 h-64 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+         </div>
+
+         <div className="relative z-10 flex flex-col items-center">
+            <div className="flex flex-col items-center mb-10">
+               <h3 className="text-blue-400 text-xs font-black uppercase tracking-[0.4em] mb-4">Análise de Núcleo por Categoria</h3>
+               <select 
+                 className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-2xl text-sm font-black uppercase outline-none focus:border-blue-500 transition-all cursor-pointer"
+                 value={coreCategory}
+                 onChange={e => setCoreCategory(e.target.value)}
+               >
+                 <option value="GERAL" className="bg-slate-900">VIRTUAL CORE (GERAL)</option>
+                 {availableData.categories.map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)}
+               </select>
+            </div>
+
+            <div className="flex flex-col lg:flex-row items-center justify-center gap-16 w-full">
+               {/* Centro */}
+               <div className="relative">
+                  <div className="w-64 h-64 rounded-full border-[12px] border-blue-600/20 flex flex-col items-center justify-center bg-black/40 backdrop-blur-xl shadow-[0_0_100px_rgba(37,99,235,0.2)] animate-pulse">
+                     <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Consolidado Período</span>
+                     <span className="text-7xl font-black text-white tracking-tighter">{coreStats.total}</span>
+                  </div>
+                  <div className="absolute inset-[-20px] rounded-full border border-white/5 animate-[spin_20s_linear_infinite]"></div>
+                  <div className="absolute inset-[-40px] rounded-full border border-white/5 animate-[spin_30s_linear_infinite_reverse]"></div>
+               </div>
+
+               {/* Mini-Pulses (Tipos de Operação) */}
+               <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-6 w-full max-w-2xl">
+                  {(Object.entries(coreStats.typeDistribution) as [string, number][]).map(([type, count]) => (
+                    <div key={type} className="bg-white/5 border border-white/10 p-5 rounded-[2rem] flex flex-col items-center text-center group hover:bg-white/10 transition-all">
+                       <div className="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                          <span className="text-xs font-black">{coreStats.total > 0 ? Math.round((count/coreStats.total)*100) : 0}%</span>
+                       </div>
+                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">{type}</p>
+                       <p className="text-xl font-black text-white font-mono">{count}</p>
+                    </div>
+                  ))}
+               </div>
+            </div>
+         </div>
+      </div>
+
+      {/* 4. RANKINGS MULTIDIMENSIONAIS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <RankingCard title="Maiores Clientes" cardKey="client" colorClass="bg-blue-600" kpiKey="PERFORMANCE_ENTIDADES" />
-        <RankingCard title="Maiores Motoristas" cardKey="driver" colorClass="bg-emerald-500" kpiKey="PERFORMANCE_ENTIDADES" />
+        <RankingCard title="Performance Motoristas" cardKey="driver" colorClass="bg-emerald-500" kpiKey="PERFORMANCE_ENTIDADES" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <RankingCard title="Pólos de Origem (Cidades)" cardKey="city" colorClass="bg-slate-900" kpiKey="CIDADES_CLIENTES" />
-        <RankingCard title="Fluxo por Terminal" cardKey="terminal" colorClass="bg-indigo-600" kpiKey="TERMINAIS" />
+        <RankingCard title="Pólos Comercializados (Cidades)" cardKey="city" colorClass="bg-slate-900" kpiKey="CIDADES_CLIENTES" />
+        <RankingCard title="Volume por Terminal" cardKey="terminal" colorClass="bg-indigo-600" kpiKey="TERMINAIS" />
       </div>
 
     </div>
