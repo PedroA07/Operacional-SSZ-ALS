@@ -1,13 +1,22 @@
 
 import { Trip, TripStatus } from '../types';
 
-export interface EntitySummary {
-  name: string;
+export interface StatGroup {
   total: number;
   completed: number;
   delayed: number;
   canceled: number;
-  subEntities: Record<string, EntitySummary>;
+}
+
+export interface EntitySummary extends StatGroup {
+  name: string;
+  subEntities: Record<string, StatGroup & { name: string }>;
+}
+
+export interface DashboardStats {
+  entities: EntitySummary[];
+  categories: Record<string, StatGroup>;
+  operationTypes: Record<string, StatGroup>;
 }
 
 export const statsCalculator = {
@@ -16,38 +25,53 @@ export const statsCalculator = {
     const scheduled = new Date(trip.dateTime).getTime();
     const arrival = trip.statusHistory?.find(h => h.status === 'Chegou no cliente');
     if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-    // Se ainda não chegou e já passou 10 min do horário
     return new Date().getTime() > (scheduled + 600000) && trip.status !== 'Viagem concluída';
   },
 
-  calculateStats: (trips: Trip[], type: 'client' | 'driver'): EntitySummary[] => {
-    const map: Record<string, EntitySummary> = {};
+  calculateFullDashboardStats: (trips: Trip[], primaryType: 'client' | 'driver'): DashboardStats => {
+    const entityMap: Record<string, EntitySummary> = {};
+    const categoryMap: Record<string, StatGroup> = {};
+    const typeMap: Record<string, StatGroup> = {};
+
+    const initStat = () => ({ total: 0, completed: 0, delayed: 0, canceled: 0 });
 
     trips.forEach(t => {
-      const mainKey = type === 'client' ? t.customer.name : t.driver.name;
-      const subKey = type === 'client' ? t.driver.name : t.customer.name;
+      const mainKey = primaryType === 'client' ? t.customer.name : t.driver.name;
+      const subKey = primaryType === 'client' ? t.driver.name : t.customer.name;
+      const category = t.category || 'GERAL';
+      const opType = t.type || 'OUTROS';
 
-      if (!map[mainKey]) {
-        map[mainKey] = { name: mainKey, total: 0, completed: 0, delayed: 0, canceled: 0, subEntities: {} };
+      const updateStat = (stat: StatGroup) => {
+        stat.total++;
+        if (t.status === 'Viagem concluída') stat.completed++;
+        if (t.status === 'Viagem cancelada') stat.canceled++;
+        if (statsCalculator.isDelayed(t)) stat.delayed++;
+      };
+
+      // 1. Atualiza Categorias
+      if (!categoryMap[category]) categoryMap[category] = initStat();
+      updateStat(categoryMap[category]);
+
+      // 2. Atualiza Tipos de Operação
+      if (!typeMap[opType]) typeMap[opType] = initStat();
+      updateStat(typeMap[opType]);
+
+      // 3. Atualiza Entidade Principal e Sub-entidade
+      if (!entityMap[mainKey]) {
+        entityMap[mainKey] = { name: mainKey, ...initStat(), subEntities: {} };
       }
+      updateStat(entityMap[mainKey]);
 
-      const entry = map[mainKey];
-      entry.total++;
-      if (t.status === 'Viagem concluída') entry.completed++;
-      if (t.status === 'Viagem cancelada') entry.canceled++;
-      if (statsCalculator.isDelayed(t)) entry.delayed++;
-
-      if (!entry.subEntities[subKey]) {
-        entry.subEntities[subKey] = { name: subKey, total: 0, completed: 0, delayed: 0, canceled: 0, subEntities: {} };
+      if (!entityMap[mainKey].subEntities[subKey]) {
+        entityMap[mainKey].subEntities[subKey] = { name: subKey, ...initStat() };
       }
-
-      const subEntry = entry.subEntities[subKey];
-      subEntry.total++;
-      if (t.status === 'Viagem concluída') subEntry.completed++;
-      if (t.status === 'Viagem cancelada') subEntry.canceled++;
-      if (statsCalculator.isDelayed(t)) subEntry.delayed++;
+      updateStat(entityMap[mainKey].subEntities[subKey]);
     });
 
-    return Object.values(map).sort((a, b) => b.total - a.total);
+    return {
+      entities: Object.values(entityMap).sort((a, b) => b.total - a.total),
+      categories: categoryMap,
+      operationTypes: typeMap
+    };
   }
 };

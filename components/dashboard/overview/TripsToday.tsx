@@ -19,8 +19,9 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [selClients, setSelClients] = useState<string[]>([]);
   const [selDrivers, setSelDrivers] = useState<string[]>([]);
 
-  const clientStats = useMemo(() => statsCalculator.calculateStats(todayRaw, 'client'), [todayRaw]);
-  const driverStats = useMemo(() => statsCalculator.calculateStats(todayRaw, 'driver'), [todayRaw]);
+  // Fix: renamed calculateStats to calculateFullDashboardStats as per utils/statsCalculator.ts
+  const clientStats = useMemo(() => statsCalculator.calculateFullDashboardStats(todayRaw, 'client'), [todayRaw]);
+  const driverStats = useMemo(() => statsCalculator.calculateFullDashboardStats(todayRaw, 'driver'), [todayRaw]);
 
   const stats = useMemo(() => {
     const activeTrips = todayRaw.filter(t => t.status !== 'Viagem cancelada');
@@ -82,8 +83,9 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       {isOpen && (
         <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[160] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
           <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 shrink-0 relative z-[170]">
-             <RichEntityFilter label="Performance Cliente" data={clientStats} selectedItems={selClients} onChange={setSelClients} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>} />
-             <RichEntityFilter label="Performance Motorista" data={driverStats} selectedItems={selDrivers} onChange={setSelDrivers} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2"/></svg>} />
+             {/* Fix: changed data prop to stats prop for RichEntityFilter to match its definition */}
+             <RichEntityFilter label="Performance Cliente" stats={clientStats} selectedItems={selClients} onChange={setSelClients} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>} />
+             <RichEntityFilter label="Performance Motorista" stats={driverStats} selectedItems={selDrivers} onChange={setSelDrivers} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2"/></svg>} />
           </div>
           
           <div className="overflow-y-auto custom-scrollbar p-5 space-y-3 flex-1 bg-slate-50/30 min-h-[300px] rounded-b-[2.5rem]">

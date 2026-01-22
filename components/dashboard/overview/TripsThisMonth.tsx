@@ -1,6 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Trip } from '../../../types';
+import { statsCalculator } from '../../../utils/statsCalculator';
+import RichEntityFilter from './RichEntityFilter';
 import MultiCheckboxFilter from '../../shared/MultiCheckboxFilter';
 
 interface TripsThisMonthProps {
@@ -9,104 +11,50 @@ interface TripsThisMonthProps {
 
 const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'ranking'>('ranking');
+  const [selTypes, setSelTypes] = useState<string[]>([]);
+  const [selClients, setSelClients] = useState<string[]>([]);
+  const [selDrivers, setSelDrivers] = useState<string[]>([]);
 
   const monthRaw = useMemo(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
     const monthPrefix = `${currentYear}-${currentMonth}`;
-    
     return trips.filter(t => t.dateTime && t.dateTime.substring(0, 7) === monthPrefix);
   }, [trips]);
 
-  const [selTypes, setSelTypes] = useState<string[]>([]);
-  const [selClients, setSelClients] = useState<string[]>([]);
-  const [selDrivers, setSelDrivers] = useState<string[]>([]);
+  const filteredBase = useMemo(() => {
+    return monthRaw.filter(t => selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase() || 'OUTROS'));
+  }, [monthRaw, selTypes]);
 
-  const filteredTrips = useMemo(() => {
-    return monthRaw.filter(t => {
-      if (t.status === 'Viagem cancelada') return false;
-      const matchT = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase() || 'OUTROS');
-      const matchC = selClients.length === 0 || selClients.includes(t.customer.name);
-      const matchD = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
-      return matchT && matchC && matchD;
-    }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [monthRaw, selTypes, selClients, selDrivers]);
+  const clientStats = useMemo(() => statsCalculator.calculateFullDashboardStats(filteredBase, 'client'), [filteredBase]);
+  const driverStats = useMemo(() => statsCalculator.calculateFullDashboardStats(filteredBase, 'driver'), [filteredBase]);
 
   const stats = useMemo(() => {
-    const active = monthRaw.filter(t => t.status !== 'Viagem cancelada');
-    const canceled = monthRaw.filter(t => t.status === 'Viagem cancelada').length;
+    const active = filteredBase.filter(t => t.status !== 'Viagem cancelada');
+    const canceled = filteredBase.filter(t => t.status === 'Viagem cancelada').length;
     const completed = active.filter(t => t.status === 'Viagem concluída').length;
+    const delays = active.filter(t => statsCalculator.isDelayed(t)).length;
 
     const typeCounts: Record<string, number> = {};
-    const driverDetails: Record<string, { total: number, clients: Record<string, number> }> = {};
-
     active.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
-      
-      if (t.category?.toUpperCase() === 'INDÚSTRIA') {
-        typeCounts['IND'] = (typeCounts['IND'] || 0) + 1;
-      }
-      if (t.category?.toUpperCase() === 'CARGA SOLTA') {
-        typeCounts['SOLTA'] = (typeCounts['SOLTA'] || 0) + 1;
-      }
-
-      if (!driverDetails[t.driver.name]) {
-        driverDetails[t.driver.name] = { total: 0, clients: {} };
-      }
-      driverDetails[t.driver.name].total += 1;
-      driverDetails[t.driver.name].clients[t.customer.name] = (driverDetails[t.driver.name].clients[t.customer.name] || 0) + 1;
     });
 
-    const delays = active.filter(t => {
-      const scheduled = new Date(t.dateTime).getTime();
-      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
-    }).length;
+    return { total: active.length, typeCounts, canceled, delays, completed };
+  }, [filteredBase]);
 
-    return { total: active.length, typeCounts, canceled, delays, completed, driverDetails };
-  }, [monthRaw]);
+  const displayTrips = useMemo(() => {
+    return filteredBase.filter(t => {
+      if (t.status === 'Viagem cancelada') return false;
+      const matchC = selClients.length === 0 || selClients.includes(t.customer.name);
+      const matchD = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
+      return matchC && matchD;
+    }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+  }, [filteredBase, selClients, selDrivers]);
 
-  const filteredRankings = useMemo(() => {
-    const clientRank: Record<string, number> = {};
-    const driverRank: Record<string, number> = {};
-
-    filteredTrips.forEach(t => {
-      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
-      driverRank[t.driver.name] = (driverRank[t.driver.name] || 0) + 1;
-    });
-
-    return {
-      clientRank: Object.entries(clientRank).sort((a,b) => b[1] - a[1]),
-      driverRank: Object.entries(driverRank).sort((a,b) => b[1] - a[1])
-    };
-  }, [filteredTrips]);
-
-  const allTypes = useMemo(() => {
-    const types = new Set(monthRaw.map(t => t.type?.toUpperCase() || 'OUTROS'));
-    if (monthRaw.some(t => t.category?.toUpperCase() === 'INDÚSTRIA')) types.add('INDÚSTRIA');
-    if (monthRaw.some(t => t.category?.toUpperCase() === 'CARGA SOLTA')) types.add('CARGA SOLTA');
-    return Array.from(types).sort();
-  }, [monthRaw]);
-
-  const allClients = useMemo(() => Array.from(new Set(monthRaw.map(t => t.customer.name))).sort(), [monthRaw]);
-  
-  const driverOptions = useMemo(() => {
-    return (Object.entries(stats.driverDetails) as [string, { total: number, clients: Record<string, number> }][])
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([name, d]) => {
-        const clientBreakdown = Object.entries(d.clients)
-          .map(([cName, count]) => `${cName.substring(0, 5)}: ${count}`)
-          .join(', ');
-        return {
-          value: name,
-          label: `${name} [${d.total}] (${clientBreakdown})`
-        };
-      });
-  }, [stats.driverDetails]);
+  const allOpTypes = useMemo(() => Array.from(new Set(monthRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [monthRaw]);
 
   return (
     <div className="relative" style={{ zIndex: isOpen ? 140 : 10 }}>
@@ -120,9 +68,7 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
             <p className="text-5xl font-black text-slate-800 tracking-tighter mt-1">{stats.total}</p>
           </div>
           <div className={`p-4 rounded-2xl transition-all duration-500 ${isOpen ? 'bg-slate-800 text-white shadow-lg' : 'bg-slate-50 text-slate-500'}`}>
-            <svg className={`w-5 h-5 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <svg className={`w-5 h-5 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
         </div>
 
@@ -146,40 +92,19 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
       {isOpen && (
         <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border border-slate-800 rounded-b-[2.5rem] shadow-2xl z-[60] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
           <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 shrink-0 relative z-[110]">
-             <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
-             <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
-             <MultiCheckboxFilter label="Motoristas" options={driverOptions} selectedOptions={selDrivers} onChange={setSelDrivers} />
+             <MultiCheckboxFilter label="Modalidades" options={allOpTypes} selectedOptions={selTypes} onChange={setSelTypes} />
+             <RichEntityFilter label="Performance Clientes" stats={clientStats} selectedItems={selClients} onChange={setSelClients} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>} />
+             <RichEntityFilter label="Performance Equipe" stats={driverStats} selectedItems={selDrivers} onChange={setSelDrivers} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2"/></svg>} />
           </div>
           
-          <div className="flex bg-slate-100 p-1.5 mx-4 mt-4 rounded-xl shrink-0">
-             <button onClick={() => setViewMode('ranking')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'ranking' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400'}`}>Top Performers (Filtro)</button>
-             <button onClick={() => setViewMode('list')} className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${viewMode === 'list' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400'}`}>Todas do Mês</button>
-          </div>
-
           <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 flex-1 bg-slate-50/30 min-h-[250px] rounded-b-[2.5rem]">
-            {viewMode === 'ranking' ? (
-              <div className="space-y-6 pb-4">
-                <section className="space-y-2">
-                   <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest ml-1">Ranking de Volume (Filtrado)</p>
-                   {filteredRankings.clientRank.length > 0 ? filteredRankings.clientRank.slice(0, 10).map(([name, count]) => (
-                     <div key={name} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm animate-in fade-in">
-                        <span className="text-[10px] font-black text-slate-700 uppercase truncate pr-4">{name}</span>
-                        <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black">{count} OS</span>
-                     </div>
-                   )) : (
-                     <div className="py-12 text-center text-slate-300 font-black uppercase text-[9px] italic">Sem dados para estes filtros</div>
-                   )}
-                </section>
+            {displayTrips.slice(0, 50).map(trip => (
+              <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl shadow-sm">
+                <span className="text-xs font-black text-slate-500">{new Date(trip.dateTime).toLocaleDateString('pt-BR')}</span>
+                <p className="text-[10px] font-black text-slate-800 uppercase mt-1 leading-none truncate">{trip.driver.name}</p>
+                <p className="text-[8px] font-bold text-slate-400 uppercase truncate mt-1">{trip.customer.name}</p>
               </div>
-            ) : (
-              filteredTrips.length > 0 ? filteredTrips.map(trip => (
-                <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl shadow-sm animate-in slide-in-from-right-2">
-                  <span className="text-xs font-black text-slate-500">{new Date(trip.dateTime).toLocaleDateString('pt-BR')}</span>
-                  <p className="text-[10px] font-black text-slate-800 uppercase mt-1 leading-none truncate">{trip.driver.name}</p>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase truncate mt-1">{trip.customer.name}</p>
-                </div>
-              )) : <div className="py-12 text-center text-slate-300 font-black uppercase text-[10px]">Sem dados para este período</div>
-            )}
+            ))}
           </div>
         </div>
       )}

@@ -1,6 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Trip } from '../../../types';
+import { statsCalculator } from '../../../utils/statsCalculator';
+import RichEntityFilter from './RichEntityFilter';
 import MultiCheckboxFilter from '../../shared/MultiCheckboxFilter';
 
 interface TripsThisYearProps {
@@ -9,69 +11,47 @@ interface TripsThisYearProps {
 
 const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'ranking' | 'list'>('ranking');
+  const [selTypes, setSelTypes] = useState<string[]>([]);
+  const [selClients, setSelClients] = useState<string[]>([]);
+  const [selDrivers, setSelDrivers] = useState<string[]>([]);
 
   const yearRaw = useMemo(() => {
     const currentYear = new Date().getFullYear().toString();
     return trips.filter(t => t.dateTime && t.dateTime.substring(0, 4) === currentYear);
   }, [trips]);
 
-  const [selTypes, setSelTypes] = useState<string[]>([]);
-  const [selClients, setSelClients] = useState<string[]>([]);
-  const [selDrivers, setSelDrivers] = useState<string[]>([]);
+  const filteredBase = useMemo(() => {
+    return yearRaw.filter(t => selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase() || 'OUTROS'));
+  }, [yearRaw, selTypes]);
 
-  const filteredTrips = useMemo(() => {
-    return yearRaw.filter(t => {
-      if (t.status === 'Viagem cancelada') return false;
-      const matchT = selTypes.length === 0 || selTypes.includes(t.type?.toUpperCase() || 'OUTROS');
-      const matchC = selClients.length === 0 || selClients.includes(t.customer.name);
-      const matchD = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
-      return matchT && matchC && matchD;
-    }).sort((a, b) => a.dateTime.localeCompare(a.dateTime));
-  }, [yearRaw, selTypes, selClients, selDrivers]);
+  const clientStats = useMemo(() => statsCalculator.calculateFullDashboardStats(filteredBase, 'client'), [filteredBase]);
+  const driverStats = useMemo(() => statsCalculator.calculateFullDashboardStats(filteredBase, 'driver'), [filteredBase]);
 
   const stats = useMemo(() => {
-    const active = yearRaw.filter(t => t.status !== 'Viagem cancelada');
-    const canceled = yearRaw.filter(t => t.status === 'Viagem cancelada').length;
+    const active = filteredBase.filter(t => t.status !== 'Viagem cancelada');
+    const canceled = filteredBase.filter(t => t.status === 'Viagem cancelada').length;
     const completed = active.filter(t => t.status === 'Viagem concluída').length;
+    const delays = active.filter(t => statsCalculator.isDelayed(t)).length;
 
     const typeCounts: Record<string, number> = {};
-
     active.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
-      if (t.category?.toUpperCase() === 'INDÚSTRIA') typeCounts['IND'] = (typeCounts['IND'] || 0) + 1;
-      if (t.category?.toUpperCase() === 'CARGA SOLTA') typeCounts['SOLTA'] = (typeCounts['SOLTA'] || 0) + 1;
     });
-
-    const delays = active.filter(t => {
-      const scheduled = new Date(t.dateTime).getTime();
-      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
-    }).length;
 
     return { total: active.length, typeCounts, canceled, delays, completed };
-  }, [yearRaw]);
+  }, [filteredBase]);
 
-  // Ranking reativo aos filtros
-  const filteredRankings = useMemo(() => {
-    const clientRank: Record<string, number> = {};
-    filteredTrips.forEach(t => {
-      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
-    });
-    return Object.entries(clientRank).sort((a,b) => b[1] - a[1]);
-  }, [filteredTrips]);
+  const displayTrips = useMemo(() => {
+    return filteredBase.filter(t => {
+      if (t.status === 'Viagem cancelada') return false;
+      const matchC = selClients.length === 0 || selClients.includes(t.customer.name);
+      const matchD = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
+      return matchC && matchD;
+    }).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+  }, [filteredBase, selClients, selDrivers]);
 
-  const allTypes = useMemo(() => {
-    const types = new Set(yearRaw.map(t => t.type?.toUpperCase() || 'OUTROS'));
-    if (yearRaw.some(t => t.category?.toUpperCase() === 'INDÚSTRIA')) types.add('INDÚSTRIA');
-    if (yearRaw.some(t => t.category?.toUpperCase() === 'CARGA SOLTA')) types.add('CARGA SOLTA');
-    return Array.from(types).sort();
-  }, [yearRaw]);
-
-  const allClients = useMemo(() => Array.from(new Set(yearRaw.map(t => t.customer.name))).sort(), [yearRaw]);
-  const allDrivers = useMemo(() => Array.from(new Set(yearRaw.map(t => t.driver.name))).sort(), [yearRaw]);
+  const allOpTypes = useMemo(() => Array.from(new Set(yearRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [yearRaw]);
 
   return (
     <div className="relative" style={{ zIndex: isOpen ? 140 : 10 }}>
@@ -109,37 +89,19 @@ const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
       {isOpen && (
         <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-slate-900 border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[160] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
           <div className="p-4 bg-slate-950/50 border-b border-white/5 flex flex-wrap gap-2 shrink-0">
-             <MultiCheckboxFilter label="Modalidade" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
-             <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
-             <MultiCheckboxFilter label="Motoristas" options={allDrivers} selectedOptions={selDrivers} onChange={setSelDrivers} />
+             <MultiCheckboxFilter label="Filtrar Modalidade" options={allOpTypes} selectedOptions={selTypes} onChange={setSelTypes} />
+             <RichEntityFilter label="Ranking Clientes" stats={clientStats} selectedItems={selClients} onChange={setSelClients} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>} />
+             <RichEntityFilter label="Ranking Equipe" stats={driverStats} selectedItems={selDrivers} onChange={setSelDrivers} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2"/></svg>} />
           </div>
           
-          <div className="flex bg-slate-800 p-1 mx-4 mt-4 rounded-xl shrink-0">
-             <button onClick={() => setViewMode('ranking')} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${viewMode === 'ranking' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'}`}>Ranking Clientes</button>
-             <button onClick={() => setViewMode('list')} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'}`}>Últimas do Ano</button>
-          </div>
-
           <div className="overflow-y-auto custom-scrollbar p-6 space-y-4 flex-1 bg-slate-950/20 min-h-[250px] rounded-b-[2.5rem]">
-            {viewMode === 'ranking' ? (
-              <div className="space-y-4 pb-4">
-                 {filteredRankings.length > 0 ? filteredRankings.slice(0, 15).map(([name, count]) => (
-                   <div key={name} className="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center animate-in fade-in zoom-in-95">
-                      <span className="text-sm font-black text-slate-300 uppercase truncate pr-4">{name}</span>
-                      <span className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-black">{count}</span>
-                   </div>
-                 )) : (
-                   <div className="py-20 text-center text-slate-500 font-black uppercase text-[10px] italic">Nenhum dado com estes filtros</div>
-                 )}
+            {displayTrips.slice(0, 100).map(trip => (
+              <div key={trip.id} className="p-4 bg-white/5 border border-white/5 rounded-3xl">
+                <span className="text-xs font-black text-slate-500">{new Date(trip.dateTime).toLocaleDateString('pt-BR')}</span>
+                <p className="text-[13px] font-black text-white uppercase mt-1 leading-none truncate">{trip.driver.name}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase truncate mt-1">{trip.customer.name}</p>
               </div>
-            ) : (
-              filteredTrips.slice(0, 50).map(trip => (
-                <div key={trip.id} className="p-4 bg-white/5 border border-white/5 rounded-3xl animate-in slide-in-from-right-2">
-                  <span className="text-xs font-black text-slate-500">{new Date(trip.dateTime).toLocaleDateString('pt-BR')}</span>
-                  <p className="text-[13px] font-black text-white uppercase mt-1 leading-none truncate">{trip.driver.name}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase truncate mt-1">{trip.customer.name}</p>
-                </div>
-              ))
-            )}
+            ))}
           </div>
         </div>
       )}
