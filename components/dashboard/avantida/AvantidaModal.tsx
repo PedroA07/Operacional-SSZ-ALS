@@ -23,7 +23,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
   const [status, setStatus] = useState<AvantidaStatus>('EM ANÁLISE');
   const [importLocation, setImportLocation] = useState('SÃO PAULO');
   const [reuseDate, setReuseDate] = useState('');
-  const [requestedPrice, setRequestedPrice] = useState<number>(0);
+  const [requestedPrice, setRequestedPrice] = useState<string>(''); // Usamos string para digitação fluida
 
   useEffect(() => {
     if (isOpen) {
@@ -34,17 +34,16 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         setStatus(editingRecord.status || 'EM ANÁLISE');
         setImportLocation(editingRecord.importLocation || 'SÃO PAULO');
         setReuseDate(editingRecord.reuseDate || '');
-        setRequestedPrice(editingRecord.requestedPrice || 0);
+        setRequestedPrice(String(editingRecord.requestedPrice || ''));
         lastDetectedCarrier.current = editingRecord.shippingLine;
       } else {
-        // Novo registro
         setDate(new Date().toISOString().split('T')[0]);
         setContainerNumber('');
         setShippingLine('');
         setStatus('EM ANÁLISE');
         setImportLocation('SÃO PAULO');
-        setReuseDate(''); // Mantém vazio por padrão para não confundir com data do pedido
-        setRequestedPrice(0);
+        setReuseDate('');
+        setRequestedPrice('');
         lastDetectedCarrier.current = null;
       }
     }
@@ -62,7 +61,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         
         const rule = priceRules.find(r => r.shippingLine.toUpperCase() === carrier.name.toUpperCase());
         if (rule) {
-          setRequestedPrice(rule.price);
+          setRequestedPrice(String(rule.price));
         }
       } else if (!carrier && container.length === 4) {
           lastDetectedCarrier.current = null;
@@ -74,16 +73,18 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
     e.preventDefault();
     if (!containerNumber.trim()) return;
 
+    const numericPrice = parseFloat(requestedPrice.replace(',', '.')) || 0;
+
     setIsSaving(true);
     try {
       const container = containerNumber.toUpperCase().trim();
       
       const success = await db.saveAvantidaRecord({
         id: editingRecord?.id || `new-${Date.now()}`,
-        date, // Data do Pedido
+        date,
         containerNumber: container,
         exportRef: editingRecord?.exportRef || '',
-        requestedPrice: Number(requestedPrice),
+        requestedPrice: numericPrice,
         customerRef: editingRecord?.customerRef || '',
         tripSettlement: editingRecord?.tripSettlement || '',
         verified: editingRecord?.verified || false,
@@ -91,7 +92,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         createdAt: editingRecord?.createdAt || new Date().toISOString(),
         shippingLine: shippingLine.toUpperCase(),
         importLocation: importLocation.toUpperCase(),
-        reuseDate: (reuseDate && reuseDate.trim() !== "") ? reuseDate : null, // Data do Reuso
+        reuseDate: (reuseDate && reuseDate.trim() !== "") ? reuseDate : null,
         status
       });
 
@@ -173,12 +174,12 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
             <div className="space-y-1">
               <label className={labelClass}>Preço do Pedido (R$)</label>
               <input 
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 required
                 className={`${inputClass} text-emerald-600 font-black`}
                 value={requestedPrice} 
-                onChange={e => setRequestedPrice(Number(e.target.value))} 
+                onChange={e => setRequestedPrice(e.target.value)} 
                 placeholder="0.00" 
               />
             </div>

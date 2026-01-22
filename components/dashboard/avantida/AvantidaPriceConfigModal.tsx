@@ -12,24 +12,41 @@ interface AvantidaPriceConfigModalProps {
 }
 
 const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isOpen, onClose, onSuccess, rules }) => {
-  const [form, setForm] = useState({ shippingLine: '', price: 0 });
+  const [shippingLine, setShippingLine] = useState('');
+  const [priceInput, setPriceInput] = useState(''); // Usamos string para facilitar a digitação
   const [isSaving, setIsSaving] = useState(false);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.shippingLine || form.price <= 0) return;
+    
+    const numericPrice = parseFloat(priceInput.replace(',', '.'));
+    if (!shippingLine || isNaN(numericPrice)) {
+      alert("Por favor, selecione um armador e digite um preço válido.");
+      return;
+    }
 
     setIsSaving(true);
-    const success = await db.saveAvantidaPrice({
-      shippingLine: form.shippingLine,
-      price: form.price
-    });
+    try {
+      // Verifica se já existe uma regra para este armador para atualizar o ID
+      const existingRule = rules.find(r => r.shippingLine === shippingLine);
+      
+      const success = await db.saveAvantidaPrice({
+        id: existingRule?.id, // Se existir, envia o ID para fazer UPDATE
+        shippingLine: shippingLine,
+        price: numericPrice
+      });
 
-    if (success) {
-      setForm({ shippingLine: '', price: 0 });
-      onSuccess();
+      if (success) {
+        setShippingLine('');
+        setPriceInput('');
+        onSuccess();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao salvar preço. Verifique sua conexão.");
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -60,8 +77,8 @@ const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isO
               <select 
                 required
                 className="w-full px-4 py-3 rounded-xl border border-blue-100 bg-white text-[10px] font-bold uppercase outline-none focus:ring-4 focus:ring-blue-500/10"
-                value={form.shippingLine}
-                onChange={e => setForm({...form, shippingLine: e.target.value})}
+                value={shippingLine}
+                onChange={e => setShippingLine(e.target.value)}
               >
                 <option value="">SELECIONE...</option>
                 {CARRIERS.map(c => (
@@ -73,19 +90,20 @@ const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isO
               <label className="text-[8px] font-black text-blue-600 uppercase tracking-widest ml-1">Preço (R$)</label>
               <input 
                 required
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 className="w-full px-4 py-3 rounded-xl border border-blue-100 bg-white text-[10px] font-bold uppercase outline-none"
-                value={form.price}
-                onChange={e => setForm({...form, price: Number(e.target.value)})}
+                placeholder="0,00"
+                value={priceInput}
+                onChange={e => setPriceInput(e.target.value)}
               />
            </div>
            <button 
-             disabled={isSaving || !form.shippingLine}
+             disabled={isSaving || !shippingLine || !priceInput}
              type="submit"
              className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50"
            >
-             Vincular Preço
+             {isSaving ? 'Gravando...' : 'Vincular Preço'}
            </button>
         </form>
 
@@ -114,7 +132,7 @@ const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isO
                 </div>
               ))}
               {rules.length === 0 && (
-                <div className="py-20 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50">
+                <div className="py-24 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50">
                    <p className="text-[10px] font-black text-slate-300 uppercase italic">Nenhum preço configurado</p>
                 </div>
               )}
