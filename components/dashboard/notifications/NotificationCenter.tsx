@@ -13,7 +13,12 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState<'list' | 'settings'>('list');
-  const [activeTab, setActiveTab] = useState<NotificationOrigin>('OPERACIONAL');
+  
+  // Lembrar preferência de aba durante a sessão
+  const [activeTab, setActiveTab] = useState<NotificationOrigin>(() => {
+    return (sessionStorage.getItem('als_notif_filter') as NotificationOrigin) || 'OPERACIONAL';
+  });
+
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -24,13 +29,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
 
   const loadNotifications = useCallback(async (isSilent = false) => {
     if (!isSilent && notifications.length === 0) setIsLoading(true);
-    
     try {
       const data = await db.getNotifications();
-      
-      if (data && Array.isArray(data) && data.length > 0) {
+      if (data && Array.isArray(data)) {
         setNotifications(data);
-        
         const lastCheckStr = localStorage.getItem(`als_notif_last_check_${user.id}`);
         const lastCheck = lastCheckStr ? new Date(lastCheckStr).getTime() : 0;
         const count = data.filter(n => new Date(n.timestamp).getTime() > lastCheck).length;
@@ -46,11 +48,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
   useEffect(() => {
     loadNotifications();
     const interval = setInterval(() => loadNotifications(true), 15000);
-    
-    const handleForcedRefresh = () => {
-      loadNotifications(true);
-    };
-    
+    const handleForcedRefresh = () => loadNotifications(true);
     window.addEventListener('als_new_notification_event', handleForcedRefresh);
     
     const handleClickOutside = (e: MouseEvent) => {
@@ -77,6 +75,11 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
     } else {
       setView('list');
     }
+  };
+
+  const handleTabChange = (tab: NotificationOrigin) => {
+    setActiveTab(tab);
+    sessionStorage.setItem('als_notif_filter', tab);
   };
 
   const handleNotifClick = (n: Notification) => {
@@ -126,8 +129,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
 
               {view === 'list' && (
                 <div className="flex bg-slate-200/50 p-1 rounded-2xl gap-1">
-                   <button onClick={() => setActiveTab('OPERACIONAL')} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'OPERACIONAL' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Operacional</button>
-                   <button onClick={() => setActiveTab('MOTORISTA')} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'MOTORISTA' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Motorista</button>
+                   <button onClick={() => handleTabChange('OPERACIONAL')} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'OPERACIONAL' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Operacional</button>
+                   <button onClick={() => handleTabChange('MOTORISTA')} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'MOTORISTA' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Motorista</button>
                 </div>
               )}
            </div>
@@ -155,6 +158,11 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
                    </div>
                    <h5 className="text-[10px] font-black text-slate-800 uppercase leading-tight group-hover:text-blue-600 transition-colors">{n.title}</h5>
                    <p className="text-[9px] text-slate-500 font-medium mt-1 leading-snug line-clamp-1">{n.description}</p>
+                   
+                   <div className="mt-3 pt-2 border-t border-slate-200/50 flex items-center justify-between">
+                      <span className="text-[7.5px] font-black text-slate-400 uppercase">Ação por: <span className="text-slate-600">{n.authorName}</span></span>
+                      {n.summary?.os && <span className="text-[8px] font-black text-blue-500">OS {n.summary.os}</span>}
+                   </div>
                 </button>
               ))}
            </div>
