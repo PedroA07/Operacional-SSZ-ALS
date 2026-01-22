@@ -12,6 +12,7 @@ interface KpiVisualizerProps {
 
 const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
   const [activePeriod, setActivePeriod] = useState<'WEEK' | 'MONTH' | 'YEAR'>('WEEK');
+  const [rankLimit, setRankLimit] = useState<5 | 10 | 20>(5);
 
   const analytics = useMemo(() => {
     const now = new Date();
@@ -29,7 +30,6 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     const clientStats = statsCalculator.calculateFullDashboardStats(filtered, 'client');
     const driverStats = statsCalculator.calculateFullDashboardStats(filtered, 'driver');
 
-    // Distribuição de Tipos (Donut)
     const typeCounts: Record<string, number> = {};
     filtered.forEach(t => {
       const type = t.type || 'OUTROS';
@@ -48,111 +48,162 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
 
   const RankingCard = ({ title, data, type = 'Top', colorClass = 'bg-blue-600', kpiKey }: any) => {
     const sortedData = type === 'Top' 
-      ? [...data].sort((a, b) => b.total - a.total).slice(0, 5)
-      : [...data].sort((a, b) => a.total - b.total).filter(i => i.total > 0).slice(0, 5);
+      ? [...data].sort((a, b) => b.total - a.total).slice(0, rankLimit)
+      : [...data].sort((a, b) => a.total - b.total).filter(i => i.total > 0).slice(0, rankLimit);
 
     const maxVal = data.length > 0 ? Math.max(...data.map((i: any) => i.total)) : 1;
 
     return (
-      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-full">
-        <div className="flex justify-between items-center mb-8">
+      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-full transition-all">
+        <div className="flex justify-between items-start mb-8">
            <div className="flex items-center">
               <h3 className={`text-sm font-black uppercase tracking-widest ${type === 'Top' ? 'text-slate-800' : 'text-amber-600'}`}>
-                {type} 5 {title}
+                {type} {rankLimit} {title}
               </h3>
               {kpiKey && <KpiInfoIcon kpiKey={kpiKey} />}
            </div>
-           <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase ${type === 'Top' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
-             {type === 'Top' ? 'Alta Volumetria' : 'Baixa Volumetria'}
-           </span>
+           <div className={`px-2.5 py-1 rounded-lg text-[7px] font-black uppercase flex items-center gap-1.5 ${type === 'Top' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+             <div className={`w-1.5 h-1.5 rounded-full ${type === 'Top' ? 'bg-blue-400' : 'bg-amber-400'}`}></div>
+             {type === 'Top' ? 'Líderes' : 'Menor Volume'}
+           </div>
         </div>
-        <div className="space-y-6 flex-1">
+        <div className="space-y-5 flex-1">
           {sortedData.map((item) => (
-            <div key={item.name} className="space-y-2">
+            <div key={item.name} className="space-y-1.5 group">
               <div className="flex justify-between text-[10px] font-black uppercase">
-                <span className="text-slate-600 truncate max-w-[200px]">{item.name}</span>
-                <span className="text-slate-900">{item.total} OS</span>
+                <span className="text-slate-600 truncate max-w-[240px] group-hover:text-slate-900 transition-colors">{item.name}</span>
+                <span className="text-slate-900 font-mono">{item.total}</span>
               </div>
-              <div className="h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+              <div className="h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100 group-hover:border-blue-100 transition-all">
                 <div 
-                  className={`h-full ${type === 'Top' ? colorClass : 'bg-amber-400'} transition-all duration-1000`} 
+                  className={`h-full ${type === 'Top' ? colorClass : 'bg-amber-400'} transition-all duration-1000 ease-out shadow-sm`} 
                   style={{ width: `${(item.total / maxVal) * 100}%` }}
                 ></div>
               </div>
             </div>
           ))}
-          {sortedData.length === 0 && <p className="text-center text-slate-300 font-bold uppercase text-[10px] py-10">Sem dados</p>}
+          {sortedData.length === 0 && (
+            <div className="py-20 text-center">
+               <p className="text-[10px] font-black text-slate-300 uppercase italic">Sem dados registrados</p>
+            </div>
+          )}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-700 pb-20">
+    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-700 pb-32">
       
+      {/* HEADER DE CONTROLES BI */}
+      <div className="bg-white p-8 rounded-[3.5rem] border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="flex items-center gap-5">
+           <div className="w-14 h-14 bg-slate-900 rounded-3xl flex items-center justify-center text-white shadow-2xl">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+           </div>
+           <div>
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">ALS BI Analytics</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Inteligência Operacional em Tempo Real</p>
+           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+           {/* SELETOR DE LIMITE DE RANKING */}
+           <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+              <span className="text-[8px] font-black text-slate-400 uppercase ml-2">Exibir:</span>
+              <div className="flex gap-1">
+                 {([5, 10, 20] as const).map(limit => (
+                   <button 
+                     key={limit} onClick={() => setRankLimit(limit)}
+                     className={`w-10 h-8 rounded-lg text-[10px] font-black transition-all ${rankLimit === limit ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-400 hover:text-slate-600'}`}
+                   >
+                     {limit}
+                   </button>
+                 ))}
+              </div>
+           </div>
+
+           <div className="flex bg-slate-100 p-1 rounded-2xl">
+              {(['WEEK', 'MONTH', 'YEAR'] as const).map(p => (
+                <button 
+                  key={p} onClick={() => setActivePeriod(p)}
+                  className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activePeriod === p ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
+                >
+                  {p === 'WEEK' ? 'Semana' : p === 'MONTH' ? 'Mês' : 'Ano'}
+                </button>
+              ))}
+           </div>
+        </div>
+      </div>
+
       {/* 1. KEY PERFORMANCE INDICATORS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { key: 'ASSERTIVIDADE', label: 'Assertividade', val: `${analytics.metrics.efficiencyRate}%`, color: 'bg-blue-600' },
-          { key: 'LEAD_TIME', label: 'Lead Time Médio', val: `${analytics.metrics.avgLeadTimeHrs}h`, color: 'bg-indigo-600' },
-          { key: 'PRODUTIVIDADE', label: 'Produtividade', val: analytics.metrics.productivityPerDriver, color: 'bg-emerald-500' },
-          { key: 'FILA_ATIVA', label: 'Fila Ativa', val: analytics.metrics.activeResources, color: 'bg-slate-900' }
+          { key: 'ASSERTIVIDADE', label: 'Assertividade', val: `${analytics.metrics.efficiencyRate}%`, color: 'bg-blue-600', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+          { key: 'LEAD_TIME', label: 'Lead Time Médio', val: `${analytics.metrics.avgLeadTimeHrs}h`, color: 'bg-indigo-600', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+          { key: 'PRODUTIVIDADE', label: 'Produtividade', val: analytics.metrics.productivityPerDriver, color: 'bg-emerald-500', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+          { key: 'FILA_ATIVA', label: 'Fila Ativa', val: analytics.metrics.activeResources, color: 'bg-slate-900', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10' }
         ].map((item) => (
-          <div key={item.key} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center justify-between">
+          <div key={item.key} className="bg-white p-7 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all">
              <div className="flex flex-col">
-                <div className="flex items-center mb-1">
+                <div className="flex items-center mb-2">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">{item.label}</p>
                   <KpiInfoIcon kpiKey={item.key as any} />
                 </div>
-                <p className="text-2xl font-black text-slate-800 leading-none">{item.val}</p>
+                <p className="text-3xl font-black text-slate-800 leading-none tracking-tighter">{item.val}</p>
              </div>
-             <div className={`w-10 h-10 ${item.color} rounded-xl shadow-lg`}></div>
+             <div className={`w-14 h-14 ${item.color} rounded-[1.4rem] flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform`}>
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d={item.icon}/></svg>
+             </div>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
         {/* 2. TIPOS DE VIAGEM (DONUT) */}
         <div className="lg:col-span-5 bg-white p-10 rounded-[3.5rem] border border-slate-200 shadow-sm">
-           <div className="flex items-center justify-between mb-8">
+           <div className="flex items-center justify-between mb-10">
               <div className="flex items-center">
                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Mix de Modalidades</h3>
                  <KpiInfoIcon kpiKey="MODALIDADES" />
               </div>
-              <div className="flex bg-slate-100 p-1 rounded-xl">
-                 {(['WEEK', 'MONTH', 'YEAR'] as const).map(p => (
-                   <button 
-                     key={p} onClick={() => setActivePeriod(p)}
-                     className={`px-4 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${activePeriod === p ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
-                   >
-                     {p === 'WEEK' ? 'Sem' : p === 'MONTH' ? 'Mês' : 'Ano'}
-                   </button>
-                 ))}
+              <div className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center">
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path strokeWidth="2.5" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
               </div>
            </div>
            <DonutChart data={analytics.typeCounts} total={analytics.total} />
         </div>
 
         {/* 3. RANKING DE CIDADES (CLIENTES) */}
-        <div className="lg:col-span-7 bg-slate-900 p-10 rounded-[3.5rem] shadow-2xl text-white flex flex-col">
-           <div className="flex justify-between items-center mb-10">
-              <h3 className="text-sm font-black uppercase tracking-widest text-blue-400">Distribuição Regional (Clientes)</h3>
-              <span className="text-[8px] font-black bg-white/5 px-3 py-1 rounded-full uppercase">Top 10 Cidades</span>
+        <div className="lg:col-span-7 bg-slate-900 p-10 rounded-[3.5rem] shadow-2xl text-white flex flex-col relative overflow-hidden">
+           <div className="absolute top-0 right-0 p-10 opacity-5">
+              <svg className="w-48 h-48" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
            </div>
-           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-              {/* Fix: cast Object.entries to [string, number][] to fix arithmetic errors during sort */}
-              {(Object.entries(analytics.cities) as [string, number][]).sort((a,b) => b[1] - a[1]).slice(0, 10).map(([city, count], idx) => (
-                <div key={city} className="flex items-center justify-between border-b border-white/5 pb-2">
+           <div className="flex justify-between items-center mb-10 relative z-10">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-blue-400">Pólos Comerciais</h3>
+                <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">Top {rankLimit} Cidades dos Clientes</p>
+              </div>
+              <span className="text-[9px] font-black bg-white/10 px-3 py-1.5 rounded-full uppercase border border-white/5">Origem Fiscal</span>
+           </div>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 relative z-10">
+              {(Object.entries(analytics.cities) as [string, number][])
+                .sort((a,b) => b[1] - a[1])
+                .slice(0, rankLimit)
+                .map(([city, count], idx) => (
+                <div key={city} className="flex items-center justify-between border-b border-white/5 pb-3 group hover:border-blue-500/50 transition-colors">
                    <div className="flex items-center gap-3">
                       <span className="text-[10px] font-black text-slate-600 font-mono">#{(idx+1).toString().padStart(2, '0')}</span>
-                      <span className="text-[11px] font-black uppercase tracking-tight truncate max-w-[140px]">{city}</span>
+                      <span className="text-[11px] font-black uppercase tracking-tight truncate max-w-[140px] group-hover:text-blue-200 transition-colors">{city}</span>
                    </div>
-                   <span className="text-[11px] font-black text-blue-400">{count}</span>
+                   <div className="flex items-center gap-3">
+                      <span className="text-[11px] font-black text-blue-400">{count}</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                   </div>
                 </div>
               ))}
            </div>
-           <p className="mt-auto text-[8px] text-slate-500 font-bold uppercase tracking-widest text-center pt-8 italic">Dados baseados no endereço fiscal dos contratantes</p>
+           <p className="mt-auto text-[8px] text-slate-500 font-bold uppercase tracking-widest text-center pt-8 italic opacity-40">Dados atualizados com base no cadastro de clientes ALS</p>
         </div>
       </div>
 

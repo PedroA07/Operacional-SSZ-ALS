@@ -8,32 +8,32 @@ export interface KpiDetail {
 export const KPI_DEFINITIONS: Record<string, KpiDetail> = {
   ASSERTIVIDADE: {
     title: "Taxa de Assertividade",
-    description: "Percentual de ordens de serviço concluídas com sucesso em relação ao total de ordens criadas no período selecionado.",
-    formula: "(Viagens Concluídas / Total de OS) * 100"
+    description: "Mede a eficácia da operação comparando viagens finalizadas com o total programado. Indica o sucesso real de entrega da frota.",
+    formula: "(Concluídas / (Total - Canceladas)) * 100"
   },
   LEAD_TIME: {
     title: "Lead Time Médio",
-    description: "Média de tempo que uma carga leva desde o primeiro registro de status até a conclusão final da viagem.",
-    formula: "Σ (Data Conclusão - Data Início) / Quantidade de Viagens"
+    description: "Tempo total de ciclo da carga. Desde a primeira retirada do equipamento até a baixa final no sistema ALS.",
+    formula: "Σ(Data Baixa - Data Retirada) / Qtd Viagens"
   },
   PRODUTIVIDADE: {
-    title: "Produtividade por Motorista",
-    description: "Média de quantas viagens cada motorista ativo realizou dentro do intervalo de tempo filtrado.",
-    formula: "Total de Viagens / Quantidade de Motoristas Únicos"
+    title: "Produtividade da Frota",
+    description: "Média de movimentações por recurso ativo. Ajuda a identificar se a frota está sendo bem aproveitada ou se há ociosidade.",
+    formula: "Total de Viagens / Motoristas Únicos no Período"
   },
   FILA_ATIVA: {
-    title: "Carga na Fila Ativa",
-    description: "Quantidade total de veículos que estão atualmente com o status diferente de 'Concluído' ou 'Cancelado'.",
-    formula: "Contagem de OS com status em andamento"
+    title: "Carga em Trânsito",
+    description: "Volume de ordens de serviço que já saíram do estado pendente mas ainda não foram finalizadas.",
+    formula: "Contagem de OS com status ativo (Em Viagem, No Cliente, etc)"
   },
   MODALIDADES: {
-    title: "Distribuição de Modais",
-    description: "Divisão do volume operacional por tipo de contrato (Exportação, Importação, Coleta, etc).",
-    formula: "Total por Tipo / Volume Geral"
+    title: "Mix de Operações",
+    description: "Distribuição percentual do volume entre Exportação, Importação e outras modalidades contratadas.",
+    formula: "(Total Modalidade / Volume Total) * 100"
   },
   PERFORMANCE_ENTIDADES: {
     title: "Ranking de Performance",
-    description: "Comparativo entre os maiores volumes (Top) e menores volumes (Bottom) para identificar gargalos ou parceiros estratégicos.",
-    formula: "Ordenação simples por volume absoluto de OS"
+    description: "Identificação volumétrica de parceiros. Os maiores (Top) indicam faturamento e os menores (Bottom) indicam potencial de crescimento ou churn.",
+    formula: "Contagem absoluta de OS vinculadas por ID"
   }
 };
