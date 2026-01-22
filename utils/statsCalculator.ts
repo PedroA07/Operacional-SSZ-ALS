@@ -17,6 +17,14 @@ export interface DashboardStats {
   entities: EntitySummary[];
   categories: Record<string, StatGroup>;
   operationTypes: Record<string, StatGroup>;
+  statusCounts: Record<string, number>;
+  hourlyDistribution: Record<number, number>;
+  cityDistribution: Record<string, number>;
+  metrics: {
+    avgDelayMinutes: number;
+    efficiencyRate: number;
+    activeResources: number;
+  };
 }
 
 export const statsCalculator = {
@@ -32,6 +40,12 @@ export const statsCalculator = {
     const entityMap: Record<string, EntitySummary> = {};
     const categoryMap: Record<string, StatGroup> = {};
     const typeMap: Record<string, StatGroup> = {};
+    const statusCounts: Record<string, number> = {};
+    const hourlyDistribution: Record<number, number> = {};
+    const cityDistribution: Record<string, number> = {};
+    
+    let totalDelayMin = 0;
+    let delayedTripsCount = 0;
 
     const initStat = () => ({ total: 0, completed: 0, delayed: 0, canceled: 0 });
 
@@ -40,23 +54,41 @@ export const statsCalculator = {
       const subKey = primaryType === 'client' ? t.driver.name : t.customer.name;
       const category = t.category || 'GERAL';
       const opType = t.type || 'OUTROS';
+      const city = t.customer.city?.toUpperCase() || 'N/A';
+
+      // Status
+      statusCounts[t.status] = (statusCounts[t.status] || 0) + 1;
+
+      // Cidades
+      cityDistribution[city] = (cityDistribution[city] || 0) + 1;
+
+      // Horários
+      const hour = new Date(t.dateTime).getHours();
+      hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
 
       const updateStat = (stat: StatGroup) => {
         stat.total++;
         if (t.status === 'Viagem concluída') stat.completed++;
         if (t.status === 'Viagem cancelada') stat.canceled++;
-        if (statsCalculator.isDelayed(t)) stat.delayed++;
+        if (statsCalculator.isDelayed(t)) {
+          stat.delayed++;
+          const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
+          if (arrival) {
+             const diff = Math.round((new Date(arrival.dateTime).getTime() - new Date(t.dateTime).getTime()) / 60000);
+             if (diff > 0) {
+               totalDelayMin += diff;
+               delayedTripsCount++;
+             }
+          }
+        }
       };
 
-      // 1. Atualiza Categorias
       if (!categoryMap[category]) categoryMap[category] = initStat();
       updateStat(categoryMap[category]);
 
-      // 2. Atualiza Tipos de Operação
       if (!typeMap[opType]) typeMap[opType] = initStat();
       updateStat(typeMap[opType]);
 
-      // 3. Atualiza Entidade Principal e Sub-entidade
       if (!entityMap[mainKey]) {
         entityMap[mainKey] = { name: mainKey, ...initStat(), subEntities: {} };
       }
@@ -68,10 +100,20 @@ export const statsCalculator = {
       updateStat(entityMap[mainKey].subEntities[subKey]);
     });
 
+    const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada').length;
+
     return {
       entities: Object.values(entityMap).sort((a, b) => b.total - a.total),
       categories: categoryMap,
-      operationTypes: typeMap
+      operationTypes: typeMap,
+      statusCounts,
+      hourlyDistribution,
+      cityDistribution,
+      metrics: {
+        avgDelayMinutes: delayedTripsCount > 0 ? Math.round(totalDelayMin / delayedTripsCount) : 0,
+        efficiencyRate: trips.length > 0 ? Math.round((trips.filter(t => t.status === 'Viagem concluída').length / trips.length) * 100) : 0,
+        activeResources: activeTrips
+      }
     };
   }
 };
