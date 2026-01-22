@@ -67,7 +67,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       
       if (initialData) {
         const detected = initialData.category || osCategoryService.detectCategoryFromOS(initialData.os);
-        setFormData(prev => ({ ...prev, category: detected || '' }));
+        // Garantir que a categoria detectada exista na lista do banco
+        const existsInDb = c.some(cat => cat.name.toUpperCase() === (detected || '').toUpperCase());
+        setFormData(prev => ({ ...prev, category: existsInDb ? detected : '' }));
       }
     };
     loadCats();
@@ -98,7 +100,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       let next = { ...prev, [field]: upValue };
       if (field === 'os') {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
-        if (detected) next.category = detected;
+        // Só auto-seleciona se a categoria existir no banco de dados
+        if (detected) {
+          const catInDb = categories.find(c => c.name.toUpperCase() === detected.toUpperCase());
+          if (catInDb) next.category = catInDb.name;
+        }
       }
       if (field === 'container') {
         const carrier = lookupCarrierByContainer(upValue);
@@ -120,6 +126,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       alert("Preencha OS, Motorista e Cliente para prosseguir.");
       return;
     }
+    
+    if (!formData.category) {
+      alert("Por favor, selecione uma categoria válida do banco de dados.");
+      return;
+    }
+
     setPendingAction(mode);
     
     let existing = null;
@@ -167,13 +179,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       if (!element) return;
       
       const canvas = await html2canvas(element, { 
-        scale: 3, // Aumentado para 3.0 para máxima nitidez em impressão
+        scale: 3, 
         useCORS: true, 
         backgroundColor: "#ffffff",
         logging: false
       });
       
-      const imgData = canvas.toDataURL('image/jpeg', 1.0); // Qualidade máxima para o PDF
+      const imgData = canvas.toDataURL('image/jpeg', 1.0); 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       
@@ -259,21 +271,16 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                  </select>
               </div>
               <div className="space-y-1">
-                 <label className={labelClass}>Vínculo</label>
+                 <label className={labelClass}>Vínculo Operacional</label>
                  <select 
+                   required
                    className={`${selectClasses} ${formData.category ? 'text-blue-600 border-blue-200' : ''}`} 
                    value={formData.category} 
                    onChange={e => handleInputChange('category', e.target.value)}
                  >
-                    <option value="">AUTO DETECTAR...</option>
-                    <option value="Aliança">ALIANÇA</option>
-                    <option value="Mercosul">MERCOSUL</option>
-                    <option value="Indústria">INDÚSTRIA</option>
-                    <option value="Carga Solta">CARGA SOLTA</option>
-                    {categories.map(cat => (
-                      !['Aliança', 'Mercosul', 'Indústria', 'Carga Solta'].includes(cat.name) && (
-                        <option key={cat.id} value={cat.name}>{cat.name.toUpperCase()}</option>
-                      )
+                    <option value="">AUTO DETECTAR / SELECIONE...</option>
+                    {categories.filter(c => !c.parentId).map(cat => (
+                       <option key={cat.id} value={cat.name}>{cat.name.toUpperCase()}</option>
                     ))}
                  </select>
               </div>
@@ -349,7 +356,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           </div>
         </div>
 
-        {/* BUSCA AVANÇADA DE MOTORISTA COM REQUISITOS ESPECÍFICOS */}
+        {/* BUSCA AVANÇADA DE MOTORISTA */}
         <AutocompleteSearch 
           label="5. Motorista Alocado"
           placeholder="Nome, Placa ou CPF..."
