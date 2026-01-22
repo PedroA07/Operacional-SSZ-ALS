@@ -55,14 +55,18 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     <div className="relative" style={{ zIndex: isOpen ? 500 : 10 }}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full text-left bg-white p-7 rounded-[2.5rem] border transition-all duration-500 shadow-sm hover:shadow-xl relative z-[70] flex flex-col h-full ${isOpen ? 'border-blue-500 ring-4 ring-blue-500/5 rounded-b-none' : 'border-slate-100'}`}
+        className={`w-full text-left p-7 rounded-[2.5rem] border-2 transition-all duration-500 shadow-xl relative z-[70] flex flex-col h-full ${
+          isOpen 
+          ? 'bg-blue-600 border-blue-400 ring-4 ring-blue-500/10 rounded-b-none' 
+          : 'bg-gradient-to-br from-blue-50 to-white border-blue-200 hover:border-blue-400'
+        }`}
       >
         <div className="flex justify-between items-start w-full">
             <div>
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Viagens Hoje</p>
-                <p className="text-5xl font-black text-slate-800 tracking-tighter mt-1">{stats.total}</p>
+                <p className={`text-[11px] font-black uppercase tracking-widest ${isOpen ? 'text-blue-100' : 'text-blue-400'}`}>Operação Hoje</p>
+                <p className={`text-5xl font-black tracking-tighter mt-1 ${isOpen ? 'text-white' : 'text-blue-600'}`}>{stats.total}</p>
             </div>
-            <div className={`p-4 rounded-2xl transition-all duration-500 ${isOpen ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}>
+            <div className={`p-4 rounded-2xl transition-all duration-500 ${isOpen ? 'bg-white/20 text-white' : 'bg-blue-600 text-white shadow-lg'}`}>
                <svg className={`w-6 h-6 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
         </div>
@@ -70,22 +74,22 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
         <div className="mt-8 w-full space-y-5">
           <div className="flex flex-wrap gap-2 min-h-[30px]">
             {Object.entries(stats.typeCounts).slice(0, 3).map(([type, c]) => (
-              <div key={type} className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 flex items-center gap-3">
-                <span className="text-[10px] font-black text-slate-400 uppercase">{type.substring(0,5)}</span>
-                <span className="text-sm font-black text-slate-700">{c}</span>
+              <div key={type} className={`px-3 py-2 rounded-xl border flex items-center gap-3 ${isOpen ? 'bg-white/10 border-white/10 text-white' : 'bg-white border-blue-100 text-blue-800'}`}>
+                <span className={`text-[10px] font-black uppercase ${isOpen ? 'text-blue-200' : 'text-blue-400'}`}>{type.substring(0,5)}</span>
+                <span className="text-sm font-black">{c}</span>
               </div>
             ))}
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-red-50 p-2.5 rounded-xl text-center border border-red-100"><p className="text-[9px] font-black text-red-400 uppercase">Atr.</p><p className="text-lg font-black text-red-600 mt-1">{stats.delays}</p></div>
-            <div className="bg-emerald-50 p-2.5 rounded-xl text-center border border-emerald-100"><p className="text-[9px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-lg font-black text-emerald-600 mt-1">{stats.completed}</p></div>
-            <div className="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200"><p className="text-[9px] font-black text-slate-400 uppercase">Canc.</p><p className="text-lg font-black text-slate-600 mt-1">{stats.canceled}</p></div>
+            <div className={`p-2.5 rounded-xl text-center border ${isOpen ? 'bg-red-500/20 border-red-500/20 text-white' : 'bg-red-50 border-red-100 text-red-600'}`}><p className="text-[9px] font-black uppercase">Atr.</p><p className="text-lg font-black mt-1">{stats.delays}</p></div>
+            <div className={`p-2.5 rounded-xl text-center border ${isOpen ? 'bg-emerald-500/20 border-emerald-500/20 text-white' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}><p className="text-[9px] font-black uppercase">Concl.</p><p className="text-lg font-black mt-1">{stats.completed}</p></div>
+            <div className={`p-2.5 rounded-xl text-center border ${isOpen ? 'bg-white/10 border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-500'}`}><p className="text-[9px] font-black uppercase">Canc.</p><p className="text-lg font-black mt-1">{stats.canceled}</p></div>
           </div>
         </div>
       </button>
 
       {isOpen && (
-        <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[160] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
+        <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border-2 border-blue-400 rounded-b-[2.5rem] shadow-2xl z-[160] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
           <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 shrink-0 relative z-[170]">
              <MultiCheckboxFilter label="Modalidades" options={allOpTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <RichEntityFilter label="Performance Clientes" stats={clientStats} selectedItems={selClients} onChange={setSelClients} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>} />

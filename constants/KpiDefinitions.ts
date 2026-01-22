@@ -33,7 +33,17 @@ export const KPI_DEFINITIONS: Record<string, KpiDetail> = {
   },
   PERFORMANCE_ENTIDADES: {
     title: "Ranking de Performance",
-    description: "Identificação volumétrica de parceiros. Os maiores (Top) indicam faturamento e os menores (Bottom) indicam potencial de crescimento ou churn.",
+    description: "Identificação volumétrica de parceiros. Os maiores indicam faturamento e os menores indicam potencial de crescimento ou risco de inatividade.",
     formula: "Contagem absoluta de OS vinculadas por ID"
+  },
+  TERMINAIS: {
+    title: "Fluxo por Terminal",
+    description: "Ranking dos destinos finais ou locais de entrega/devolução com maior e menor volume de movimentação.",
+    formula: "Soma de OS agrupadas por nome do terminal de destino"
+  },
+  CIDADES_CLIENTES: {
+    title: "Origem Comercial",
+    description: "Distribuição geográfica dos clientes contratantes. Ajuda a entender onde a base de faturamento está concentrada.",
+    formula: "Agrupamento de OS pela cidade sede do cliente"
   }
 };

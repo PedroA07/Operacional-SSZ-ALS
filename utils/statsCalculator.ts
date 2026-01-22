@@ -22,6 +22,8 @@ export interface DashboardStats {
   statusCounts: Record<string, number>;
   hourlyDistribution: Record<number, number>;
   cityDistribution: Record<string, number>;
+  clientCityDistribution: Record<string, number>; // Cidades dos clientes
+  terminalDistribution: Record<string, number>;   // Nomes dos terminais
   metrics: {
     avgDelayMinutes: number;
     efficiencyRate: number;
@@ -36,7 +38,6 @@ export const statsCalculator = {
     if (trip.status === 'Viagem cancelada' || trip.status === 'Viagem concluída') return false;
     const scheduled = new Date(trip.dateTime).getTime();
     const now = new Date().getTime();
-    // Atraso se passou do horário agendado em mais de 15 min e não concluiu
     return now > (scheduled + 900000); 
   },
 
@@ -54,6 +55,8 @@ export const statsCalculator = {
     const statusCounts: Record<string, number> = {};
     const hourlyDistribution: Record<number, number> = {};
     const cityDistribution: Record<string, number> = {};
+    const clientCityDistribution: Record<string, number> = {};
+    const terminalDistribution: Record<string, number> = {};
     
     let totalDelayMin = 0;
     let delayedTripsCount = 0;
@@ -67,13 +70,16 @@ export const statsCalculator = {
       const subKey = primaryType === 'client' ? t.driver.name : t.customer.name;
       const category = t.category || 'GERAL';
       const opType = t.type || 'OUTROS';
-      const city = (t.destination?.city || t.customer.city || 'N/A').toUpperCase();
+      
+      const destCity = (t.destination?.city || 'N/A').toUpperCase();
+      const clientCity = (t.customer?.city || 'N/A').toUpperCase();
+      const terminalName = (t.destination?.name || t.scheduling?.location || 'NÃO INFORMADO').toUpperCase();
 
-      // Status
+      // Contagens Geográficas e Terminais
       statusCounts[t.status] = (statusCounts[t.status] || 0) + 1;
-
-      // Cidades
-      cityDistribution[city] = (cityDistribution[city] || 0) + 1;
+      cityDistribution[destCity] = (cityDistribution[destCity] || 0) + 1;
+      clientCityDistribution[clientCity] = (clientCityDistribution[clientCity] || 0) + 1;
+      terminalDistribution[terminalName] = (terminalDistribution[terminalName] || 0) + 1;
 
       // Horários
       const hour = new Date(t.dateTime).getHours();
@@ -113,7 +119,6 @@ export const statsCalculator = {
       updateStat(entityMap[mainKey].subEntities[subKey]);
     });
 
-    // Calcular eficiência das entidades
     Object.values(entityMap).forEach(ent => {
       ent.efficiency = ent.total > 0 ? Math.round((ent.completed / ent.total) * 100) : 0;
     });
@@ -127,8 +132,10 @@ export const statsCalculator = {
       statusCounts,
       hourlyDistribution,
       cityDistribution,
+      clientCityDistribution,
+      terminalDistribution,
       metrics: {
-        avgDelayMinutes: delayedTripsCount > 0 ? 15 : 0, // Estimativa
+        avgDelayMinutes: delayedTripsCount > 0 ? 15 : 0,
         efficiencyRate: trips.length > 0 ? Math.round((trips.filter(t => t.status === 'Viagem concluída').length / trips.length) * 100) : 0,
         activeResources: trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada').length,
         avgLeadTimeHrs: leadTimeCount > 0 ? Math.round(totalLeadTimeHrs / leadTimeCount) : 0,
