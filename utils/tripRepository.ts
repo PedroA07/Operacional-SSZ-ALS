@@ -93,7 +93,7 @@ export const tripRepository = {
       nfDoc: normalizeDoc(d.nf_doc),
       nfKey: d.nf_key,
       ocFormData: safeParse(d.oc_form_data, null),
-      pre_stacking_form_data: safeParse(d.pre_stacking_form_data, null),
+      preStackingFormData: safeParse(d.pre_stacking_form_data, null),
       scheduling: safeParse(d.scheduling, undefined),
       driver_docs: normalizedDriverDocs
     };
@@ -104,13 +104,12 @@ export const tripRepository = {
       .from('trips')
       .select('*')
       .order('date_time', { ascending: false })
-      .limit(5000); // AUMENTADO PARA 5000 PARA SUPORTAR VOLUME ALTO
+      .limit(5000); 
 
     if (error) throw error;
     return (data || []).map(d => this.mapFromDb(d));
   },
 
-  // Fixed: Added actingUser as an optional third argument for consistency with storage.ts
   async save(supabase: SupabaseClient, trip: Trip, actingUser?: User) {
     const payload = this.mapToDb(trip);
     const { error } = await supabase.from('trips').upsert(payload);

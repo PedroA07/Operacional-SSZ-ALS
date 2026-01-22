@@ -147,7 +147,6 @@ export const db = {
   deleteStaff: (id: string) => staffRepository.delete(supabase!, id),
 
   getTrips: () => tripRepository.getAll(supabase!),
-  // Fixed: Pass user as third argument to repo to fix line 146 reported signature issue
   saveTrip: (t: Trip, user?: User) => tripRepository.save(supabase!, t, user),
   deleteTrip: async (id: string, user?: User) => {
     if (!supabase) return false;
@@ -203,7 +202,7 @@ export const db = {
     return !error;
   },
 
-  // AVANTIDA - ORDENAÇÃO POR DATA DE CRIAÇÃO DESCENDENTE (MAIS RECENTES PRIMEIRO)
+  // AVANTIDA - ORDENAÇÃO DESCENDENTE
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase
@@ -246,7 +245,7 @@ export const db = {
     return !error;
   },
 
-  // LACRES - LOTES MAIS RECENTES PRIMEIRO
+  // LACRES - ORDENAÇÃO DESCENDENTE
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase
@@ -326,8 +325,8 @@ export const db = {
       endDate: s.end_date,
       createdAt: s.created_at,
       createdBy: s.created_by,
-      grace_period_hours: s.grace_period_hours,
-      round_up_minutes: s.round_up_minutes,
+      gracePeriodHours: s.grace_period_hours,
+      roundUpMinutes: s.round_up_minutes,
       cost_per_hour: s.cost_per_hour
     }));
   },
@@ -367,7 +366,7 @@ export const db = {
       scheduledStart: r.scheduled_start,
       arrivalTime: r.arrival_time,
       departureTime: r.departure_time,
-      exceededHours: r.exceeded_hours
+      exceeded_hours: r.exceeded_hours
     }));
   },
   saveStayRecords: async (records: StayRecord[]) => {
