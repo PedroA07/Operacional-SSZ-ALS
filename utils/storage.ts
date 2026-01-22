@@ -10,7 +10,6 @@ import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
 
-// Acesso seguro para evitar Uncaught TypeError caso o ambiente não suporte import.meta.env
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
@@ -19,18 +18,14 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY)
   : null;
 
 export const db = {
-  // CONNECTION
   checkConnection: async () => {
     if (!supabase) return false;
     try {
       const { error } = await supabase.from('users').select('id').limit(1);
       return !error;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   },
 
-  // USERS & PRESENCE
   getUsers: async (): Promise<User[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('users').select('*');
@@ -78,15 +73,11 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase
       .from('users')
-      .update({ 
-        presence_status: status, 
-        last_seen: new Date().toISOString() 
-      })
+      .update({ presence_status: status, last_seen: new Date().toISOString() })
       .eq('id', userId);
     return !error;
   },
 
-  // REPOSITORIES
   getDrivers: () => driverRepository.getAll(supabase!),
   saveDriver: (d: Driver, user?: User) => driverRepository.save(supabase!, d),
   deleteDriver: (id: string) => driverRepository.delete(supabase!, id),
@@ -97,11 +88,13 @@ export const db = {
     if (error) throw error;
     return data || [];
   },
+
   saveCustomer: async (c: Partial<Customer>, user?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('customers').upsert(c);
     return !error;
   },
+
   deleteCustomer: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('customers').delete().eq('id', id);
@@ -114,11 +107,13 @@ export const db = {
     if (error) throw error;
     return data || [];
   },
+
   savePort: async (p: Partial<Port>, user?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('ports').upsert(p);
     return !error;
   },
+
   deletePort: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('ports').delete().eq('id', id);
@@ -131,11 +126,13 @@ export const db = {
     if (error) throw error;
     return data || [];
   },
+
   savePreStacking: async (p: Partial<PreStacking>, user?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').upsert(p);
     return !error;
   },
+
   deletePreStacking: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').delete().eq('id', id);
@@ -160,19 +157,17 @@ export const db = {
     if (error) throw error;
     return data || [];
   },
-  saveCategory: async (c: Category, user?: User) => {
+
+  // Added saveCategory method to resolve errors in CategoryManagerModal.tsx and vinculoService.ts
+  saveCategory: async (c: Partial<Category>, user?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('categories').upsert(c);
     return !error;
   },
 
-  // NOTIFICATIONS
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .order('timestamp', { ascending: false });
+    const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false });
     if (error) throw error;
     return (data || []).map(n => ({
       id: String(n.id),
@@ -186,13 +181,13 @@ export const db = {
       summary: n.summary || { os: n.os_ref }
     }));
   },
+
   addNotification: async (user: User, type: NotificationType, title: string, description: string, summary?: any) => {
     if (!supabase) return false;
     const { error } = await supabase.from('notifications').insert({
       user_id: user.id,
       user_name: user.displayName,
-      type,
-      title,
+      type, title,
       message: description,
       origin: (user.role === 'driver' || user.role === 'motoboy') ? 'MOTORISTA' : 'OPERACIONAL',
       timestamp: new Date().toISOString(),
@@ -202,14 +197,9 @@ export const db = {
     return !error;
   },
 
-  // AVANTIDA
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('avantida_records')
-      .select('*')
-      .order('created_at', { ascending: false }); 
-      
+    const { data, error } = await supabase.from('avantida_records').select('*').order('date', { ascending: false });
     if (error) throw error;
     return (data || []).map(a => ({
       id: a.id,
@@ -224,6 +214,7 @@ export const db = {
       createdAt: a.created_at
     }));
   },
+
   saveAvantidaRecord: async (record: Partial<AvantidaRecord>) => {
     if (!supabase) return false;
     const { error } = await supabase.from('avantida_records').upsert({
@@ -239,39 +230,29 @@ export const db = {
     });
     return !error;
   },
+
   deleteAvantidaRecord: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('avantida_records').delete().eq('id', id);
     return !error;
   },
 
-  // LACRES
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('seal_batches')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []).map(b => ({
-      id: b.id, 
-      carrier: b.carrier, 
-      startNumber: b.start_number, 
-      endNumber: b.end_number, 
-      createdAt: b.created_at
+      id: b.id, carrier: b.carrier, startNumber: b.start_number, endNumber: b.end_number, createdAt: b.created_at
     }));
   },
+
   saveSealBatch: async (batch: SealBatch, records: any[]) => {
     if (!supabase) return false;
-    const { data: batchData, error: batchErr } = await supabase
-      .from('seal_batches')
-      .insert({
-        carrier: batch.carrier,
-        start_number: batch.startNumber,
-        end_number: batch.endNumber
-      })
-      .select()
-      .single();
+    const { data: batchData, error: batchErr } = await supabase.from('seal_batches').insert({
+      carrier: batch.carrier,
+      start_number: batch.startNumber,
+      end_number: batch.endNumber
+    }).select().single();
 
     if (batchErr) throw batchErr;
 
@@ -283,11 +264,13 @@ export const db = {
     const { error: recErr } = await supabase.from('seal_records').insert(finalRecords);
     return !recErr;
   },
+
   deleteSealBatch: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('seal_batches').delete().eq('id', id);
     return !error;
   },
+
   getSealRecords: async (batchId: string): Promise<SealRecord[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('seal_records').select('*').eq('batch_id', batchId).order('seal_number');
@@ -302,6 +285,7 @@ export const db = {
       driverName: r.driver_name
     }));
   },
+
   updateSealRecord: async (record: SealRecord) => {
     if (!supabase) return false;
     const { error } = await supabase.from('seal_records').update({
@@ -313,7 +297,6 @@ export const db = {
     return !error;
   },
 
-  // STAYS
   getStaySessions: async (): Promise<StaySession[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('stay_sessions').select('*').order('created_at', { ascending: false });
@@ -330,6 +313,7 @@ export const db = {
       costPerHour: s.cost_per_hour
     }));
   },
+
   saveStaySession: async (session: StaySession) => {
     if (!supabase) return false;
     const { error } = await supabase.from('stay_sessions').upsert({
@@ -345,11 +329,13 @@ export const db = {
     });
     return !error;
   },
+
   deleteStaySession: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('stay_sessions').delete().eq('id', id);
     return !error;
   },
+
   getStayRecords: async (sessionId: string): Promise<StayRecord[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('stay_records').select('*').eq('session_id', sessionId);
@@ -369,6 +355,7 @@ export const db = {
       exceededHours: r.exceeded_hours
     }));
   },
+
   saveStayRecords: async (records: StayRecord[]) => {
     if (!supabase) return false;
     const payload = records.map(r => ({
@@ -388,13 +375,13 @@ export const db = {
     const { error } = await supabase.from('stay_records').upsert(payload);
     return !error;
   },
+
   deleteStayRecord: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('stay_records').delete().eq('id', id);
     return !error;
   },
 
-  // LOGINS
   getLogins: async (): Promise<LoginCredential[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('logins').select('*').order('sitename');
@@ -409,6 +396,7 @@ export const db = {
       createdAt: l.createdat
     }));
   },
+
   saveLogin: async (l: LoginCredential) => {
     if (!supabase) return false;
     const { error } = await supabase.from('logins').upsert({
@@ -422,22 +410,24 @@ export const db = {
     });
     return !error;
   },
+
   deleteLogin: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('logins').delete().eq('id', id);
     return !error;
   },
 
-  // SYSTEM
   getPreferences: (userId: string) => {
     const p = localStorage.getItem(`als_prefs_${userId}`);
     return p ? JSON.parse(p) : { visibleColumns: {} };
   },
+
   savePreference: (userId: string, componentId: string, cols: string[]) => {
     const p = db.getPreferences(userId);
     p.visibleColumns[componentId] = cols;
     localStorage.setItem(`als_prefs_${userId}`, JSON.stringify(p));
   },
+
   exportBackup: async () => {
     const data = {
       drivers: await db.getDrivers(),
@@ -453,6 +443,7 @@ export const db = {
     a.download = `ALS_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   },
+
   importBackup: async (file: File) => {
     try {
       const text = await file.text();
@@ -462,8 +453,6 @@ export const db = {
       if (data.trips) for (const t of data.trips) await db.saveTrip(t);
       if (data.staff) for (const s of data.staff) await db.saveStaff(s);
       return true;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
 };

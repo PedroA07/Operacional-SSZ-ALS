@@ -8,10 +8,12 @@ interface AvantidaFiltersProps {
   setStartDate: (val: string) => void;
   endDate: string;
   setEndDate: (val: string) => void;
+  showOnlyPending: boolean;
+  setShowOnlyPending: (val: boolean) => void;
 }
 
 const AvantidaFilters: React.FC<AvantidaFiltersProps> = ({ 
-  search, setSearch, startDate, setStartDate, endDate, setEndDate 
+  search, setSearch, startDate, setStartDate, endDate, setEndDate, showOnlyPending, setShowOnlyPending
 }) => {
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 block";
   const inputClass = "w-full px-5 py-3.5 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[11px] font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm";
@@ -19,12 +21,12 @@ const AvantidaFilters: React.FC<AvantidaFiltersProps> = ({
   return (
     <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col lg:flex-row items-end gap-6">
       <div className="flex-1 w-full space-y-1">
-        <label className={labelClass}>Busca Global (Container, Refs)</label>
+        <label className={labelClass}>Busca Global</label>
         <div className="relative group">
            <input 
              type="text" 
              className={`${inputClass} pl-12`} 
-             placeholder="FILTRAR REGISTROS..." 
+             placeholder="FILTRAR CONTAINER, EXPORT REF..." 
              value={search}
              onChange={e => setSearch(e.target.value)}
            />
@@ -32,23 +34,31 @@ const AvantidaFilters: React.FC<AvantidaFiltersProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 w-full lg:w-[450px]">
+      <div className="grid grid-cols-2 gap-4 w-full lg:w-[400px]">
         <div className="space-y-1">
-           <label className={labelClass}>Início</label>
+           <label className={labelClass}>Data Início</label>
            <input type="date" className={inputClass} value={startDate} onChange={e => setStartDate(e.target.value)} />
         </div>
         <div className="space-y-1">
-           <label className={labelClass}>Fim</label>
+           <label className={labelClass}>Data Fim</label>
            <input type="date" className={inputClass} value={endDate} onChange={e => setEndDate(e.target.value)} />
         </div>
       </div>
 
-      <div className="shrink-0">
+      <div className="shrink-0 flex items-center gap-3">
         <button 
-          onClick={() => { setSearch(''); setStartDate(''); setEndDate(''); }}
+          onClick={() => setShowOnlyPending(!showOnlyPending)}
+          className={`px-6 py-3.5 rounded-2xl text-[9px] font-black uppercase transition-all flex items-center gap-2 border-2 ${showOnlyPending ? 'bg-amber-50 border-amber-500 text-amber-600 shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
+        >
+          <div className={`w-2 h-2 rounded-full ${showOnlyPending ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'}`}></div>
+          Apenas Pendentes
+        </button>
+        
+        <button 
+          onClick={() => { setSearch(''); setStartDate(''); setEndDate(''); setShowOnlyPending(false); }}
           className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl text-[9px] font-black uppercase transition-all"
         >
-          Limpar Filtros
+          Limpar
         </button>
       </div>
     </div>
