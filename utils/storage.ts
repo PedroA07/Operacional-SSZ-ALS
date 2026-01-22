@@ -213,7 +213,8 @@ export const db = {
       createdAt: a.created_at,
       shippingLine: a.shipping_line || '',
       importLocation: a.import_location || '',
-      reuseDate: a.reuse_date || ''
+      reuseDate: a.reuse_date || '',
+      status: a.status || 'EM ANÁLISE'
     }));
   },
 
@@ -231,7 +232,8 @@ export const db = {
       driver_id: record.driverId,
       shipping_line: record.shippingLine,
       import_location: record.importLocation,
-      reuse_date: record.reuseDate
+      reuse_date: record.reuseDate,
+      status: record.status
     });
     return !error;
   },

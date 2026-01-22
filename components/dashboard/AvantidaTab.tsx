@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AvantidaRecord, Driver } from '../../types';
+import { AvantidaRecord, Driver, AvantidaStatus } from '../../types';
 import { db } from '../../utils/storage';
 import AvantidaModal from './avantida/AvantidaModal';
 import AvantidaFilters from './avantida/AvantidaFilters';
@@ -16,6 +16,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [editingRecord, setEditingRecord] = useState<AvantidaRecord | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
   const [search, setSearch] = useState('');
@@ -105,7 +106,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
              Exportar Excel
            </button>
            <button 
-             onClick={() => { setIsModalOpen(true); }}
+             onClick={() => { setEditingRecord(null); setIsModalOpen(true); }}
              className="px-8 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95"
            >
              Novo Lançamento
@@ -127,12 +128,13 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                    <th className="px-6 py-5 w-48">Linha de expedição</th>
-                   <th className="px-6 py-5 w-48">Localização de importação</th>
+                   <th className="px-6 py-5 w-32 text-center">Status</th>
+                   <th className="px-6 py-5 w-48">Localização Importação</th>
                    <th className="px-6 py-5 w-32">Data do pedido</th>
-                   <th className="px-6 py-5 w-24 text-center">Estado</th>
+                   <th className="px-6 py-5 w-24 text-center">Conf.</th>
                    <th className="px-6 py-5 w-40">Número do container</th>
                    <th className="px-6 py-5 w-40">Exportar ref.</th>
-                   <th className="px-6 py-5 w-32">Data de reutilização</th>
+                   <th className="px-6 py-5 w-32">Data reuso</th>
                    <th className="px-6 py-5 w-32">Preço pedido (R$)</th>
                    <th className="px-6 py-5">Ref. do cliente</th>
                    <th className="px-6 py-5 text-blue-600 bg-blue-50/20">Acerto de viagem</th>
@@ -144,6 +146,21 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                   <tr key={r.id} className="hover:bg-blue-50/10 transition-colors group">
                     <td className="px-6 py-4">
                       <input className={`${inputClass} text-indigo-600`} value={r.shippingLine} onChange={e => handleUpdateField(r, 'shippingLine', e.target.value.toUpperCase())} placeholder="ARMADOR" />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                       <select 
+                         className={`px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all ${
+                           r.status === 'APROVADO' ? 'bg-emerald-50 text-emerald-600' : 
+                           r.status === 'RECUSADO' ? 'bg-red-50 text-red-600' : 
+                           'bg-amber-50 text-amber-600'
+                         }`}
+                         value={r.status}
+                         onChange={e => handleUpdateField(r, 'status', e.target.value as AvantidaStatus)}
+                       >
+                         <option value="EM ANÁLISE">EM ANÁLISE</option>
+                         <option value="APROVADO">APROVADO</option>
+                         <option value="RECUSADO">RECUSADO</option>
+                       </select>
                     </td>
                     <td className="px-6 py-4">
                       <input className={inputClass} value={r.importLocation} onChange={e => handleUpdateField(r, 'importLocation', e.target.value.toUpperCase())} placeholder="SANTOS / DEPOT" />
@@ -187,7 +204,10 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                       <input className={`${inputClass} font-black text-blue-800`} value={r.tripSettlement} onChange={e => handleUpdateField(r, 'tripSettlement', e.target.value.toUpperCase())} placeholder="---" />
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => handleDelete(r.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                      <div className="flex items-center gap-2">
+                         <button onClick={() => { setEditingRecord(r); setIsModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-500 transition-all opacity-0 group-hover:opacity-100"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" strokeWidth="2.5"/></svg></button>
+                         <button onClick={() => handleDelete(r.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -201,7 +221,12 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
         </div>
       </div>
 
-      <AvantidaModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={() => { setIsModalOpen(false); loadData(); }} />
+      <AvantidaModal 
+        isOpen={isModalOpen} 
+        onClose={() => { setIsModalOpen(false); setEditingRecord(null); }} 
+        onSuccess={() => { setIsModalOpen(false); setEditingRecord(null); loadData(); }} 
+        editingRecord={editingRecord}
+      />
     </div>
   );
 };

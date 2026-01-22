@@ -1,3 +1,4 @@
+
 export enum AppScreen {
   LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD'
@@ -34,6 +35,8 @@ export interface LoginCredential {
   createdAt: string;
 }
 
+export type AvantidaStatus = 'APROVADO' | 'RECUSADO' | 'EM ANÁLISE';
+
 export interface AvantidaRecord {
   id: string;
   date: string; // Data do pedido
@@ -45,10 +48,10 @@ export interface AvantidaRecord {
   verified: boolean;
   driverId: string;
   createdAt: string;
-  // Campos novos baseados na imagem
   shippingLine: string; // Linha de expedição (Armador)
   importLocation: string; // Localização de importação
   reuseDate: string; // Data de reutilização
+  status: AvantidaStatus;
 }
 
 export interface SealBatch {
