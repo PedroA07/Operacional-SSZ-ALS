@@ -20,33 +20,6 @@ const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
   const [selClients, setSelClients] = useState<string[]>([]);
   const [selDrivers, setSelDrivers] = useState<string[]>([]);
 
-  const stats = useMemo(() => {
-    const active = yearRaw.filter(t => t.status !== 'Viagem cancelada');
-    const canceled = yearRaw.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = active.filter(t => t.status === 'Viagem concluída').length;
-
-    const typeCounts: Record<string, number> = {};
-    const clientRank: Record<string, number> = {};
-
-    active.forEach(t => {
-      const type = t.type?.toUpperCase() || 'OUTROS';
-      typeCounts[type] = (typeCounts[type] || 0) + 1;
-      if (t.category?.toUpperCase() === 'INDÚSTRIA') typeCounts['IND'] = (typeCounts['IND'] || 0) + 1;
-      if (t.category?.toUpperCase() === 'CARGA SOLTA') typeCounts['SOLTA'] = (typeCounts['SOLTA'] || 0) + 1;
-      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
-    });
-
-    const delays = active.filter(t => {
-      const scheduled = new Date(t.dateTime).getTime();
-      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
-      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
-      // Para o passado (viagens que já deveriam ter acontecido e não foram concluídas)
-      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
-    }).length;
-
-    return { total: active.length, typeCounts, canceled, delays, completed, clientRank: Object.entries(clientRank).sort((a,b) => b[1] - a[1]) };
-  }, [yearRaw]);
-
   const filteredTrips = useMemo(() => {
     return yearRaw.filter(t => {
       if (t.status === 'Viagem cancelada') return false;
@@ -54,8 +27,41 @@ const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
       const matchC = selClients.length === 0 || selClients.includes(t.customer.name);
       const matchD = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
       return matchT && matchC && matchD;
-    }).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+    }).sort((a, b) => a.dateTime.localeCompare(a.dateTime));
   }, [yearRaw, selTypes, selClients, selDrivers]);
+
+  const stats = useMemo(() => {
+    const active = yearRaw.filter(t => t.status !== 'Viagem cancelada');
+    const canceled = yearRaw.filter(t => t.status === 'Viagem cancelada').length;
+    const completed = active.filter(t => t.status === 'Viagem concluída').length;
+
+    const typeCounts: Record<string, number> = {};
+
+    active.forEach(t => {
+      const type = t.type?.toUpperCase() || 'OUTROS';
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+      if (t.category?.toUpperCase() === 'INDÚSTRIA') typeCounts['IND'] = (typeCounts['IND'] || 0) + 1;
+      if (t.category?.toUpperCase() === 'CARGA SOLTA') typeCounts['SOLTA'] = (typeCounts['SOLTA'] || 0) + 1;
+    });
+
+    const delays = active.filter(t => {
+      const scheduled = new Date(t.dateTime).getTime();
+      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
+      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
+      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
+    }).length;
+
+    return { total: active.length, typeCounts, canceled, delays, completed };
+  }, [yearRaw]);
+
+  // Ranking reativo aos filtros
+  const filteredRankings = useMemo(() => {
+    const clientRank: Record<string, number> = {};
+    filteredTrips.forEach(t => {
+      clientRank[t.customer.name] = (clientRank[t.customer.name] || 0) + 1;
+    });
+    return Object.entries(clientRank).sort((a,b) => b[1] - a[1]);
+  }, [filteredTrips]);
 
   const allTypes = useMemo(() => {
     const types = new Set(yearRaw.map(t => t.type?.toUpperCase() || 'OUTROS'));
@@ -116,16 +122,18 @@ const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
           <div className="overflow-y-auto custom-scrollbar p-6 space-y-4 flex-1 bg-slate-950/20 min-h-[250px] rounded-b-[2.5rem]">
             {viewMode === 'ranking' ? (
               <div className="space-y-4 pb-4">
-                 {stats.clientRank.slice(0, 15).map(([name, count]) => (
-                   <div key={name} className="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center">
+                 {filteredRankings.length > 0 ? filteredRankings.slice(0, 15).map(([name, count]) => (
+                   <div key={name} className="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center animate-in fade-in zoom-in-95">
                       <span className="text-sm font-black text-slate-300 uppercase truncate pr-4">{name}</span>
                       <span className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-black">{count}</span>
                    </div>
-                 ))}
+                 )) : (
+                   <div className="py-20 text-center text-slate-500 font-black uppercase text-[10px] italic">Nenhum dado com estes filtros</div>
+                 )}
               </div>
             ) : (
               filteredTrips.slice(0, 50).map(trip => (
-                <div key={trip.id} className="p-4 bg-white/5 border border-white/5 rounded-3xl">
+                <div key={trip.id} className="p-4 bg-white/5 border border-white/5 rounded-3xl animate-in slide-in-from-right-2">
                   <span className="text-xs font-black text-slate-500">{new Date(trip.dateTime).toLocaleDateString('pt-BR')}</span>
                   <p className="text-[13px] font-black text-white uppercase mt-1 leading-none truncate">{trip.driver.name}</p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase truncate mt-1">{trip.customer.name}</p>

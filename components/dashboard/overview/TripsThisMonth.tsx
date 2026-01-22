@@ -160,18 +160,20 @@ const TripsThisMonth: React.FC<TripsThisMonthProps> = ({ trips }) => {
             {viewMode === 'ranking' ? (
               <div className="space-y-6 pb-4">
                 <section className="space-y-2">
-                   <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest ml-1">Top Clientes (Filtrado)</p>
+                   <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest ml-1">Ranking de Volume (Filtrado)</p>
                    {filteredRankings.clientRank.length > 0 ? filteredRankings.clientRank.slice(0, 10).map(([name, count]) => (
-                     <div key={name} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
+                     <div key={name} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm animate-in fade-in">
                         <span className="text-[10px] font-black text-slate-700 uppercase truncate pr-4">{name}</span>
                         <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black">{count} OS</span>
                      </div>
-                   )) : <p className="text-center text-[8px] text-slate-400 py-4">Sem dados</p>}
+                   )) : (
+                     <div className="py-12 text-center text-slate-300 font-black uppercase text-[9px] italic">Sem dados para estes filtros</div>
+                   )}
                 </section>
               </div>
             ) : (
               filteredTrips.length > 0 ? filteredTrips.map(trip => (
-                <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl shadow-sm">
+                <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl shadow-sm animate-in slide-in-from-right-2">
                   <span className="text-xs font-black text-slate-500">{new Date(trip.dateTime).toLocaleDateString('pt-BR')}</span>
                   <p className="text-[10px] font-black text-slate-800 uppercase mt-1 leading-none truncate">{trip.driver.name}</p>
                   <p className="text-[8px] font-bold text-slate-400 uppercase truncate mt-1">{trip.customer.name}</p>
