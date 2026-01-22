@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
-import { Trip, Driver } from '../../../types';
-import { statsCalculator } from '../../../utils/statsCalculator';
+import { Trip, Driver, Category } from '../../../types';
+import { statsCalculator, EntitySummary } from '../../../utils/statsCalculator';
 import KpiInfoIcon from './KpiInfoIcon';
 import DonutChart from './DonutChart';
 
@@ -13,6 +13,10 @@ interface KpiVisualizerProps {
 const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
   const [activePeriod, setActivePeriod] = useState<'WEEK' | 'MONTH' | 'YEAR'>('WEEK');
   const [cityLimit, setCityLimit] = useState(10);
+  
+  // Filtros locais para os cards de Clientes
+  const [clientCategoryFilter, setClientCategoryFilter] = useState<string>('TODAS');
+  const [clientTypeFilter, setClientTypeFilter] = useState<string>('TODOS');
 
   const analytics = useMemo(() => {
     const now = new Date();
@@ -30,30 +34,45 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     const clientStats = statsCalculator.calculateFullDashboardStats(filtered, 'client');
     const driverStats = statsCalculator.calculateFullDashboardStats(filtered, 'driver');
 
+    // Stats filtrados especificamente para os rankings de Clientes (Baseado nos filtros de Categoria/Tipo)
+    let tripsForClientRanking = filtered;
+    if (clientCategoryFilter !== 'TODAS') {
+      tripsForClientRanking = tripsForClientRanking.filter(t => t.category === clientCategoryFilter);
+    }
+    if (clientTypeFilter !== 'TODOS') {
+      tripsForClientRanking = tripsForClientRanking.filter(t => t.type === clientTypeFilter);
+    }
+    const filteredClientStats = statsCalculator.calculateFullDashboardStats(tripsForClientRanking, 'client');
+
     const typeCounts: Record<string, number> = {};
     filtered.forEach(t => {
       const type = (t.type || 'OUTROS').toUpperCase();
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
+    const categories = Array.from(new Set(trips.map(t => t.category))).filter(Boolean);
+    const types = Array.from(new Set(trips.map(t => t.type))).filter(Boolean);
+
     return { 
       clientStats, 
-      driverStats, 
+      driverStats,
+      filteredClientStats,
       total: filtered.length,
       metrics: clientStats.metrics,
       typeCounts,
       categoryCounts: clientStats.categoryCounts,
       clientCities: clientStats.clientCityDistribution,
-      terminals: clientStats.terminalDistribution
+      terminals: clientStats.terminalDistribution,
+      availableCategories: categories,
+      availableTypes: types
     };
-  }, [trips, activePeriod]);
+  }, [trips, activePeriod, clientCategoryFilter, clientTypeFilter]);
 
-  const RankingCard = ({ title, data, type = 'Maiores', colorClass = 'bg-blue-600', kpiKey }: any) => {
+  const RankingCard = ({ title, data, type = 'Maiores', colorClass = 'bg-blue-600', kpiKey, isClientCard = false }: any) => {
     const [localLimit, setLocalLimit] = useState(5);
     
     const items = useMemo(() => {
       if (Array.isArray(data)) return data; 
-      
       return (Object.entries(data) as [string, any][]).map(([name, info]) => ({
         name,
         total: typeof info === 'number' ? info : info.total,
@@ -73,19 +92,50 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
 
     return (
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-full transition-all hover:border-blue-100">
-        <div className="flex justify-between items-start mb-8">
-           <div className="flex items-center">
-              <h3 className={`text-sm font-black uppercase tracking-widest ${type === 'Maiores' ? 'text-slate-800' : 'text-amber-600'}`}>
-                {type} {title}
-              </h3>
-              {kpiKey && <KpiInfoIcon kpiKey={kpiKey} />}
+        <div className="flex flex-col gap-6 mb-8">
+           <div className="flex justify-between items-start">
+              <div className="flex items-center">
+                 <h3 className={`text-sm font-black uppercase tracking-widest ${type === 'Maiores' ? 'text-slate-800' : 'text-amber-600'}`}>
+                   {type} {title}
+                 </h3>
+                 {kpiKey && <KpiInfoIcon kpiKey={kpiKey} />}
+              </div>
+              <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+                 {[5, 10, 15].map(v => (
+                   <button key={v} onClick={() => setLocalLimit(v)} className={`w-7 h-6 rounded flex items-center justify-center text-[8px] font-black transition-all ${localLimit === v ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{v}</button>
+                 ))}
+              </div>
            </div>
-           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
-              {[5, 10, 15].map(v => (
-                <button key={v} onClick={() => setLocalLimit(v)} className={`w-7 h-6 rounded flex items-center justify-center text-[8px] font-black transition-all ${localLimit === v ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{v}</button>
-              ))}
-           </div>
+
+           {/* Filtros Internos para Clientes */}
+           {isClientCard && (
+             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-50">
+                <div className="space-y-1">
+                   <p className="text-[7px] font-black text-slate-400 uppercase ml-1">Categoria</p>
+                   <select 
+                     className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-[9px] font-bold uppercase outline-none focus:border-blue-300"
+                     value={clientCategoryFilter}
+                     onChange={(e) => setClientCategoryFilter(e.target.value)}
+                   >
+                     <option value="TODAS">TODAS</option>
+                     {analytics.availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                   </select>
+                </div>
+                <div className="space-y-1">
+                   <p className="text-[7px] font-black text-slate-400 uppercase ml-1">Modalidade</p>
+                   <select 
+                     className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-[9px] font-bold uppercase outline-none focus:border-blue-300"
+                     value={clientTypeFilter}
+                     onChange={(e) => setClientTypeFilter(e.target.value)}
+                   >
+                     <option value="TODOS">TODOS</option>
+                     {analytics.availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                   </select>
+                </div>
+             </div>
+           )}
         </div>
+
         <div className="space-y-6 flex-1">
           {sortedData.map((item) => (
             <div key={item.name} className="space-y-2 group">
@@ -97,7 +147,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
                       <span className="text-[8px] font-mono font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase">{item.document}</span>
                     )}
                     {item.subLabel && (
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{item.subLabel}</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[150px]">{item.subLabel}</span>
                     )}
                   </div>
                 </div>
@@ -109,7 +159,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
             </div>
           ))}
           {sortedData.length === 0 && (
-             <p className="text-center py-10 text-[9px] font-black text-slate-300 uppercase italic">Sem dados registrados</p>
+             <p className="text-center py-10 text-[9px] font-black text-slate-300 uppercase italic">Sem registros para os filtros selecionados</p>
           )}
         </div>
       </div>
@@ -123,7 +173,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
       <div className="bg-white p-8 rounded-[3.5rem] border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
            <div className="w-14 h-14 bg-slate-900 rounded-3xl flex items-center justify-center text-white shadow-2xl">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
            </div>
            <div>
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">ALS Analytics BI</h2>
@@ -211,7 +261,6 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
                 <KpiInfoIcon kpiKey="CIDADES_CLIENTES" />
               </div>
               
-              {/* Seletor de Quantidade para Cidades */}
               <div className="flex gap-1 bg-white/10 p-1 rounded-lg">
                 {[5, 10, 15].map(v => (
                   <button 
@@ -246,8 +295,8 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <RankingCard title="Clientes (Volume)" data={analytics.clientStats.entities} type="Maiores" colorClass="bg-blue-600" kpiKey="PERFORMANCE_ENTIDADES" />
-        <RankingCard title="Clientes (Volume)" data={analytics.clientStats.entities} type="Menores" kpiKey="PERFORMANCE_ENTIDADES" />
+        <RankingCard title="Clientes (Volume)" data={analytics.filteredClientStats.entities} type="Maiores" colorClass="bg-blue-600" kpiKey="PERFORMANCE_ENTIDADES" isClientCard={true} />
+        <RankingCard title="Clientes (Volume)" data={analytics.filteredClientStats.entities} type="Menores" kpiKey="PERFORMANCE_ENTIDADES" isClientCard={true} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
