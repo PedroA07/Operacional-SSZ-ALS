@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category } from '../types';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch } from '../types';
 import OverviewTab from './dashboard/OverviewTab';
 import DriversTab from './dashboard/DriversTab';
 import FormsTab from './dashboard/FormsTab';
@@ -12,8 +12,10 @@ import AdminTab from './dashboard/AdminTab';
 import StaffTab from './dashboard/StaffTab';
 import SystemTab from './dashboard/SystemTab';
 import DocumentsTab from './dashboard/DocumentsTab';
-// Added missing import for StaysTab to resolve "Cannot find name 'StaysTab'" error on line 190
 import StaysTab from './dashboard/StaysTab';
+import LoginsTab from './dashboard/LoginsTab';
+import LacresTab from './dashboard/LacresTab';
+import AvantidaTab from './dashboard/AvantidaTab';
 import Sidebar from './dashboard/Sidebar';
 import DatabaseStatus from './dashboard/DatabaseStatus';
 import UserProfile from './dashboard/UserProfile';
@@ -38,6 +40,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [avantidaRecords, setAvantidaRecords] = useState<AvantidaRecord[]>([]);
+  const [sealBatches, setSealBatches] = useState<SealBatch[]>([]);
   const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
   
   const [isLoading, setIsLoading] = useState(true);
@@ -55,27 +59,31 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setIsSyncing(true);
     
     try {
-      const [d, c, p, ps, s, t, cats] = await Promise.all([
+      const responses = await Promise.allSettled([
         db.getDrivers(),
         db.getCustomers(),
         db.getPorts(),
         db.getPreStacking(),
         db.getStaff(),
         db.getTrips(),
-        db.getCategories()
+        db.getCategories(),
+        db.getAvantidaRecords(),
+        db.getSealBatches()
       ]);
 
-      setDrivers(d || []);
-      setCustomers(c || []);
-      setPorts(p || []);
-      setPreStacking(ps || []);
-      setStaffList(s || []);
-      setTrips(t || []);
-      setCategories(cats || []);
+      if (responses[0].status === 'fulfilled') setDrivers(responses[0].value || []);
+      if (responses[1].status === 'fulfilled') setCustomers(responses[1].value || []);
+      if (responses[2].status === 'fulfilled') setPorts(responses[2].value || []);
+      if (responses[3].status === 'fulfilled') setPreStacking(responses[3].value || []);
+      if (responses[4].status === 'fulfilled') setStaffList(responses[4].value || []);
+      if (responses[5].status === 'fulfilled') setTrips(responses[5].value || []);
+      if (responses[6].status === 'fulfilled') setCategories(responses[6].value || []);
+      if (responses[7].status === 'fulfilled') setAvantidaRecords(responses[7].value || []);
+      if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value || []);
       
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
     } catch (e) {
-      console.error("Erro na sincronização Direta:", e);
+      console.error("Erro na sincronização ALS:", e);
     } finally {
       setIsLoading(false);
       setIsSyncing(false);
@@ -84,7 +92,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   useEffect(() => { 
     loadAllData();
-    const refreshDataInterval = setInterval(() => loadAllData(true), 15000);
+    const refreshDataInterval = setInterval(() => loadAllData(true), 20000);
     const handleGlobalRefresh = () => loadAllData(true);
     window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
     return () => {
@@ -167,6 +175,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              <OverviewTab 
                trips={trips} 
                drivers={drivers} 
+               avantidaRecords={avantidaRecords}
+               sealBatches={sealBatches}
                onRefresh={() => loadAllData(true)} 
                lastSyncTime={lastSyncTime} 
                isSyncing={isSyncing} 
@@ -192,6 +202,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.ESTADIAS && <StaysTab categories={categories} userId={user.id} />}
            {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(true); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
+           {activeTab === DashboardTab.LOGINS && <LoginsTab />}
+           {activeTab === DashboardTab.LACRES && <LacresTab />}
+           {activeTab === DashboardTab.AVANTIDA && <AvantidaTab userId={user.id} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(true); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(true); }} availableOps={availableOps} />}
            {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(true); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(true); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(true); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} />}
@@ -204,7 +217,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
       {isDeleteTripModalOpen && tripToDelete && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
+           <div className="bg-white w-full max-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
               <div className="p-10 text-center space-y-6">
                  <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner border border-red-100">
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
