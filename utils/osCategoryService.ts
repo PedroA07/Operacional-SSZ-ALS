@@ -29,7 +29,9 @@ export const osCategoryService = {
     if (!category || category === 'Nenhum') return;
 
     const normalizedCategory = category.trim().toUpperCase();
-    const normalizedClient = (customer?.name || 'GERAL').trim().toUpperCase();
+    const clientName = (customer?.name || '').trim().toUpperCase();
+
+    if (!clientName) return;
 
     if (driver && driver.id) {
       const currentDrivers = await database.getDrivers();
@@ -38,7 +40,7 @@ export const osCategoryService = {
       if (dbDriver) {
         const hasOp = (dbDriver.operations || []).some(op => 
           op.category.toUpperCase() === normalizedCategory && 
-          op.client.toUpperCase() === normalizedClient
+          op.client.toUpperCase() === clientName
         );
 
         if (!hasOp) {
@@ -46,7 +48,7 @@ export const osCategoryService = {
             ...dbDriver,
             operations: [
               ...(dbDriver.operations || []), 
-              { category: category.trim(), client: (customer?.name || 'Geral').trim() }
+              { category: category.trim(), client: (customer?.name || 'Cliente').trim() }
             ]
           };
           await database.saveDriver(updatedDriver);

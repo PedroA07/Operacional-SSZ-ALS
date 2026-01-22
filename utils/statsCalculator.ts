@@ -65,7 +65,6 @@ export const statsCalculator = {
       const doc = primaryType === 'client' ? (t.customer.cnpj || '---') : (t.driver.cpf || '---');
       const sub = primaryType === 'client' ? t.customer.city : t.driver.plateHorse;
       
-      // Categorias agora são estritas, sem fallback 'GERAL'
       const catName = (t.category || 'NÃO CATEGORIZADO').toUpperCase();
       const opType = (t.type || 'OUTROS').toUpperCase();
       

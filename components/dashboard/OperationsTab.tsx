@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo, useRef } from 'react';
-import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, StatusHistoryEntry, PreStacking } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db } from '../../utils/storage';
 import OperationRegisterAction from './operations/OperationRegisterAction';
@@ -38,6 +38,8 @@ interface OperationsTabProps {
   onRefresh: () => void;
 }
 
+const MODALITIES = ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
+
 const OperationsTab: React.FC<OperationsTabProps> = ({ 
   user, drivers, customers, ports, trips, categories, preStacking, availableOps, activeView, setActiveView, onDeleteTrip, onRefresh 
 }) => {
@@ -69,7 +71,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [endDate, setEndDate] = useState(today);
   
   const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
-  
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
   const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
@@ -77,24 +78,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     setIsSavingStatus(true);
-    
-    const now = new Date().toISOString();
     const eventTime = new Date(statusTime).toISOString();
-    
-    if (tempStatus === 'Chegou no cliente') {
-      const scheduledTime = new Date(selectedTrip.dateTime).getTime();
-      const actualTime = new Date(eventTime).getTime();
-      if (actualTime > scheduledTime) {
-        const diffMin = Math.round((actualTime - scheduledTime) / 60000);
-        await db.addNotification(user, 'SYSTEM', 'ALERTA DE ATRASO', `A OS ${selectedTrip.os} chegou no cliente com ${diffMin} min de atraso.`, { os: selectedTrip.os, motorista: selectedTrip.driver.name });
-      }
-    }
-
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
       statusTime: eventTime, 
-      statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: now }, ...(selectedTrip.statusHistory || [])] 
+      statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: new Date().toISOString() }, ...(selectedTrip.statusHistory || [])] 
     };
     try {
       if (await db.saveTrip(updatedTrip, user)) {
@@ -132,15 +121,14 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         t.os.toLowerCase().includes(q) || 
         (t.container && t.container.toLowerCase().includes(q)) || 
         (t.driver && t.driver.name.toLowerCase().includes(q)) || 
-        (t.customer && t.customer.name.toLowerCase().includes(q)) ||
-        (t.booking && t.booking.toLowerCase().includes(q))
+        (t.customer && t.customer.name.toLowerCase().includes(q))
       );
     }
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery]);
 
   const columns = useMemo(() => getOperationTableColumns(
-    (t, s) => { setSelectedTrip(t); setTempStatus(s); const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); setStatusTime(d.toISOString().slice(0,16)); setIsStatusModalOpen(true); },
+    (t, s) => { setSelectedTrip(t); setTempStatus(s); setStatusTime(new Date().toISOString().slice(0,16)); setIsStatusModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); }, 
@@ -167,8 +155,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     );
   }
 
-  const currentStatusOptions = selectedTrip ? statusService.getOptions(selectedTrip) : [];
-
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex flex-col lg:flex-row justify-between items-end gap-6">
@@ -187,34 +173,59 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       </div>
 
       <div className="pt-8 border-t border-slate-200 space-y-6">
-        <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
-           <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm flex gap-1 w-full lg:w-auto overflow-x-auto">
-             {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
-               <button key={tab} onClick={() => setActiveStatusTab(tab as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>{tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}</button>
-             ))}
-           </div>
-           
-           <div className="flex-1 w-full max-w-md relative group">
-              <input 
-                type="text" 
-                placeholder="BUSCAR OS, CONTAINER, MOTORISTA NA TELA..."
-                className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-50 bg-white text-[10px] font-black uppercase focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all outline-none"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-              <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        {/* BARRA DE FILTROS PRINCIPAL */}
+        <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
+           <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+              <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-1 w-full lg:w-auto overflow-x-auto">
+                {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
+                  <button key={tab} onClick={() => setActiveStatusTab(tab as any)} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>{tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}</button>
+                ))}
+              </div>
+              
+              <div className="flex-1 w-full max-w-md relative group">
+                 <input 
+                   type="text" 
+                   placeholder="BUSCAR OS, CONTAINER OU MOTORISTA..."
+                   className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
+                   value={searchQuery}
+                   onChange={e => setSearchQuery(e.target.value)}
+                 />
+                 <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+
+              <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
            </div>
 
-           <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
+           {/* FILTROS POR MODALIDADE (NOVO) */}
+           <div className="flex flex-col gap-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Filtro por Tipo de Operação</p>
+              <div className="flex flex-wrap gap-2">
+                 <button 
+                   onClick={() => setFilterTypes([])}
+                   className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${filterTypes.length === 0 ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'}`}
+                 >
+                   Todas as Modalidades
+                 </button>
+                 {MODALITIES.map(m => (
+                   <button 
+                     key={m}
+                     onClick={() => setFilterTypes(prev => prev.includes(m) ? prev.filter(t => t !== m) : [...prev, m])}
+                     className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${filterTypes.includes(m) ? 'bg-slate-900 border-slate-900 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-500 hover:text-blue-600'}`}
+                   >
+                     {m}
+                   </button>
+                 ))}
+              </div>
+           </div>
+
+           <OperationFilters selectedTypes={[]} onTypesChange={() => {}} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} hideModality />
         </div>
-        
-        <OperationFilters selectedTypes={filterTypes} onTypesChange={setFilterTypes} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} />
         
         <div className={density === 'compact' ? 'table-compact' : ''}>
            <SmartOperationTable 
              userId={user.id} 
              componentId="ops-global" 
-             title={`Painel Geral ALS`} 
+             title={`Painel Operacional Sincronizado`} 
              columns={columns} 
              data={filteredTrips} 
              hideInternalSearch
@@ -231,44 +242,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       
       {isOCFormOpen && selectedTrip && (
         <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
-          <div className="p-6 bg-blue-600 text-white flex justify-between items-center shrink-0">
-             <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-black italic">OC</div>
-                <h3 className="font-black text-sm uppercase tracking-widest">Edição de Ordem de Coleta: {selectedTrip.os}</h3>
-             </div>
-             <button onClick={() => setIsOCFormOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-             </button>
-          </div>
-          <OrdemColetaForm 
-            drivers={drivers} 
-            customers={customers} 
-            ports={ports} 
-            onClose={() => { setIsOCFormOpen(false); onRefresh(); }} 
-            initialData={selectedTrip.ocFormData} 
-            tripId={selectedTrip.id}
-          />
-        </div>
-      )}
-
-      {isMinutaFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
-          <div className="p-6 bg-emerald-600 text-white flex justify-between items-center shrink-0">
-             <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-black italic">PS</div>
-                <h3 className="font-black text-sm uppercase tracking-widest">Minuta Pre-Stacking: {selectedTrip.os}</h3>
-             </div>
-             <button onClick={() => setIsMinutaFormOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-             </button>
-          </div>
-          <PreStackingForm 
-            drivers={drivers} 
-            customers={customers} 
-            ports={ports} 
-            onClose={() => { setIsMinutaFormOpen(false); onRefresh(); }} 
-            initialOS={selectedTrip.os} 
-          />
+          <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); onRefresh(); }} initialData={selectedTrip.ocFormData} tripId={selectedTrip.id} />
         </div>
       )}
 
@@ -277,13 +251,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       )}
 
       {isTripDetailsOpen && selectedTrip && (
-        <TripDetailsViewerModal 
-          isOpen={isTripDetailsOpen} 
-          onClose={() => setIsTripDetailsOpen(false)} 
-          trip={selectedTrip} 
-          user={user} 
-          onManageHistory={() => setIsHistoryModalOpen(true)}
-        />
+        <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} user={user} onManageHistory={() => setIsHistoryModalOpen(true)} />
       )}
 
       {isDriverDocsModalOpen && selectedTrip && (
@@ -297,26 +265,24 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       {isStatusModalOpen && selectedTrip && (
         <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">
-             <div className="text-center shrink-0">
-               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Inserção de Novo Status</p>
+             <div className="text-center">
+               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Registro de Status</p>
                <p className="text-xl font-black text-slate-800 uppercase">OS: {selectedTrip.os}</p>
              </div>
              <div className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Próxima Etapa Operacional</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status</label>
                   <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                    {currentStatusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    {statusService.getOptions(selectedTrip).map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora Real do Evento</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora Real</label>
                   <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
                 </div>
              </div>
              <div className="grid gap-3 pt-4">
-                <button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 active:scale-95">
-                  {isSavingStatus ? 'Gravando...' : 'Confirmar Registro'}
-                </button>
+                <button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700">Confirmar Registro</button>
                 <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button>
              </div>
           </div>

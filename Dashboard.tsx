@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
 import DriversTab from './components/dashboard/DriversTab';
@@ -24,7 +24,6 @@ import UserProfile from './components/dashboard/UserProfile';
 import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
 import NotificationToast from './components/dashboard/notifications/NotificationToast';
 import FeedbackModal from './components/shared/FeedbackModal';
-import { DEFAULT_OPERATIONS } from './constants/operations';
 import { db, supabase } from './utils/storage';
 import { Icons } from './constants/icons';
 
@@ -47,7 +46,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [avantidaRecords, setAvantidaRecords] = useState<AvantidaRecord[]>([]);
   const [sealBatches, setSealBatches] = useState<SealBatch[]>([]);
-  const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
   
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -63,6 +61,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
+
+  // CONSTRUÇÃO DINÂMICA DAS OPERAÇÕES BASEADA NO BANCO DE DADOS
+  const availableOps = useMemo<OperationDefinition[]>(() => {
+    return categories
+      .filter(cat => !cat.parentId) // Apenas categorias principais
+      .map(cat => {
+        // Busca clientes que possuem esta categoria vinculada em seu perfil
+        const linkedClients = customers
+          .filter(c => c.operations?.some(op => op.toUpperCase() === cat.name.toUpperCase()))
+          .map(c => ({ name: c.name, hasDedicatedPage: true }));
+
+        return {
+          id: cat.id,
+          category: cat.name,
+          clients: linkedClients
+        };
+      })
+      .sort((a, b) => a.category.localeCompare(b.category));
+  }, [categories, customers]);
 
   const loadAllData = useCallback(async (isInitial = false) => {
     if (isInitial) setIsLoadingInitial(true);
@@ -261,7 +278,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
       {isDeleteTripModalOpen && tripToDelete && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
+           <div className="bg-white w-full max-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
               <div className="p-10 text-center space-y-6">
                  <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner border border-red-100">
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">

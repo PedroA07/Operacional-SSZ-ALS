@@ -11,6 +11,7 @@ interface OperationFiltersProps {
   onDriversChange: (drivers: string[]) => void;
   customers: Customer[];
   drivers: Driver[];
+  hideModality?: boolean;
 }
 
 const OperationFilters: React.FC<OperationFiltersProps> = ({ 
@@ -21,7 +22,8 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
   selectedDrivers,
   onDriversChange,
   customers,
-  drivers
+  drivers,
+  hideModality = false
 }) => {
   const [clientSearch, setClientSearch] = useState('');
   const [driverSearch, setDriverSearch] = useState('');
@@ -50,51 +52,57 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
       onClick={onClick}
       className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl border-2 transition-all text-[11px] font-bold uppercase ${isOpen ? 'border-blue-500 bg-white shadow-lg' : 'border-slate-50 bg-slate-50 hover:bg-white'}`}
     >
-      <span className="truncate">{count === 0 ? `TODOS OS ${label}` : `${count} ${label} SELEC.`}</span>
+      <span className="truncate">{count === 0 ? `FILTRAR ${label}` : `${count} ${label} SELEC.`}</span>
       <svg className={`w-4 h-4 text-slate-300 transition-transform ${isOpen ? 'rotate-180 text-blue-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
     </button>
   );
 
   return (
-    <div className="flex flex-wrap gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-6">
+    <div className="flex flex-wrap gap-4 items-end">
       
-      {/* MODALIDADES */}
-      <div className="flex-1 min-w-[200px] space-y-2 relative">
-        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Modalidade</label>
-        <DropdownHeader label="TIPOS" count={selectedTypes.length} isOpen={openDropdown === 'types'} onClick={() => setOpenDropdown(openDropdown === 'types' ? null : 'types')} />
-        {openDropdown === 'types' && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 animate-in fade-in zoom-in-95">
-             <div className="flex gap-2 mb-3">
-                <button onClick={() => selectAll(MODALITIES, onTypesChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-blue-600 border border-blue-100 hover:bg-blue-50 transition-colors">Marcar Todos</button>
-                <button onClick={() => deselectAll(onTypesChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-100 hover:bg-slate-50 transition-colors">Desmarcar</button>
-             </div>
-             <div className="space-y-1">
-                {MODALITIES.map(t => (
-                  <label key={t} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                    <input type="checkbox" checked={selectedTypes.includes(t)} onChange={() => toggleItem(selectedTypes, t, onTypesChange)} className="w-4 h-4 rounded text-blue-600" />
-                    <span className="text-[10px] font-bold uppercase">{t}</span>
-                  </label>
-                ))}
-             </div>
-          </div>
-        )}
-      </div>
+      {!hideModality && (
+        <div className="flex-1 min-w-[200px] space-y-2 relative">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Modalidade</label>
+          <DropdownHeader label="TIPOS" count={selectedTypes.length} isOpen={openDropdown === 'types'} onClick={() => setOpenDropdown(openDropdown === 'types' ? null : 'types')} />
+          {openDropdown === 'types' && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 animate-in fade-in zoom-in-95">
+               <div className="flex gap-2 mb-3">
+                  <button onClick={() => selectAll(MODALITIES, onTypesChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-blue-600 border border-blue-100 hover:bg-blue-50">Tudo</button>
+                  <button onClick={() => deselectAll(onTypesChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-100 hover:bg-slate-50">Limpar</button>
+               </div>
+               <div className="space-y-1">
+                  {MODALITIES.map(t => (
+                    <label key={t} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+                      <input type="checkbox" checked={selectedTypes.includes(t)} onChange={() => toggleItem(selectedTypes, t, onTypesChange)} className="w-4 h-4 rounded text-blue-600" />
+                      <span className="text-[10px] font-bold uppercase">{t}</span>
+                    </label>
+                  ))}
+               </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* CLIENTES */}
       <div className="flex-1 min-w-[280px] space-y-2 relative">
-        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Clientes</label>
+        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Carteira de Clientes</label>
         <DropdownHeader label="CLIENTES" count={selectedClients.length} isOpen={openDropdown === 'clients'} onClick={() => setOpenDropdown(openDropdown === 'clients' ? null : 'clients')} />
         {openDropdown === 'clients' && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 animate-in fade-in zoom-in-95">
-             <input type="text" placeholder="BUSCAR CLIENTE..." className="w-full px-4 py-2 mb-3 bg-slate-50 rounded-xl text-[10px] outline-none" value={clientSearch} onChange={e => setClientSearch(e.target.value)} />
+             <input type="text" placeholder="BUSCAR CLIENTE..." className="w-full px-4 py-2.5 mb-3 bg-slate-50 rounded-xl text-[10px] outline-none border border-slate-100" value={clientSearch} onChange={e => setClientSearch(e.target.value)} />
              <div className="flex gap-2 mb-3">
-                <button onClick={() => selectAll(customers.map(c => c.name), onClientsChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-blue-600 border border-blue-100 hover:bg-blue-50">Marcar Todos</button>
-                <button onClick={() => deselectAll(onClientsChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-100 hover:bg-slate-50">Desmarcar</button>
+                <button onClick={() => selectAll(customers.map(c => c.name), onClientsChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-blue-600 border border-blue-100 hover:bg-blue-50">Todos</button>
+                <button onClick={() => deselectAll(onClientsChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-100 hover:bg-slate-50">Limpar</button>
              </div>
              <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1 pr-1">
                 {filteredCustomers.map(c => (
                   <label key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                    <input type="checkbox" checked={selectedClients.includes(c.name)} onChange={() => toggleItem(selectedClients, c.name, onClientsChange)} className="w-4 h-4 rounded text-blue-600" />
+                    <input 
+                      type={hideModality ? "radio" : "checkbox"} 
+                      checked={selectedClients.includes(c.name)} 
+                      onChange={() => hideModality ? onClientsChange([c.name]) : toggleItem(selectedClients, c.name, onClientsChange)} 
+                      className="w-4 h-4 rounded text-blue-600" 
+                    />
                     <span className="text-[10px] font-bold uppercase truncate">{c.legalName || c.name}</span>
                   </label>
                 ))}
@@ -105,14 +113,14 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
 
       {/* MOTORISTAS */}
       <div className="flex-1 min-w-[280px] space-y-2 relative">
-        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Motoristas</label>
+        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Monitor Equipe</label>
         <DropdownHeader label="MOTORISTAS" count={selectedDrivers.length} isOpen={openDropdown === 'drivers'} onClick={() => setOpenDropdown(openDropdown === 'drivers' ? null : 'drivers')} />
         {openDropdown === 'drivers' && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 animate-in fade-in zoom-in-95">
-             <input type="text" placeholder="BUSCAR MOTORISTA..." className="w-full px-4 py-2 mb-3 bg-slate-50 rounded-xl text-[10px] outline-none" value={driverSearch} onChange={e => setDriverSearch(e.target.value)} />
+             <input type="text" placeholder="BUSCAR MOTORISTA..." className="w-full px-4 py-2.5 mb-3 bg-slate-50 rounded-xl text-[10px] outline-none border border-slate-100" value={driverSearch} onChange={e => setDriverSearch(e.target.value)} />
              <div className="flex gap-2 mb-3">
                 <button onClick={() => selectAll(drivers.map(d => d.name), onDriversChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-blue-600 border border-blue-100 hover:bg-blue-50">Marcar Todos</button>
-                <button onClick={() => deselectAll(onDriversChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-100 hover:bg-slate-50">Desmarcar</button>
+                <button onClick={() => deselectAll(onDriversChange)} className="flex-1 px-3 py-2 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-100 hover:bg-slate-50">Limpar</button>
              </div>
              <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1 pr-1">
                 {filteredDriversList.map(d => (
@@ -126,14 +134,12 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
         )}
       </div>
       
-      <div className="flex items-end pb-1.5">
-        <button 
-          onClick={() => { onTypesChange([]); onClientsChange([]); onDriversChange([]); setOpenDropdown(null); }}
-          className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
-        >
-          Limpar Tudo
-        </button>
-      </div>
+      <button 
+        onClick={() => { onTypesChange([]); onClientsChange([]); onDriversChange([]); setOpenDropdown(null); }}
+        className="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
+      >
+        Limpar Seleção
+      </button>
     </div>
   );
 };

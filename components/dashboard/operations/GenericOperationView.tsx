@@ -12,6 +12,7 @@ import StatusHistoryManagerModal from './StatusHistoryManagerModal';
 import TripModal from './TripModal';
 import TripDetailsViewerModal from './TripDetailsViewerModal';
 import DateRangeFilter from './DateRangeFilter';
+import OperationFilters from './OperationFilters';
 import OrdemColetaForm from '../forms/OrdemColetaForm';
 import PreStackingForm from '../forms/PreStackingForm';
 import DriverLocationModal from './DriverLocationModal';
@@ -32,6 +33,8 @@ interface GenericOperationViewProps {
   onLocateDriver: (driverId: string) => void;
   density?: 'compact' | 'comfortable';
 }
+
+const MODALITIES = ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
 
 const GenericOperationView: React.FC<GenericOperationViewProps> = ({ 
   user, type, categoryName, clientName, drivers, customers, allTrips, availableOps, categories, onNavigate, onLocateDriver, density: initialDensity
@@ -57,14 +60,14 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
-  
   const today = new Date().toLocaleDateString('en-CA');
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   
-  const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
-  const [clientSearchText, setClientSearchText] = useState('');
   const [localDensity, setLocalDensity] = useState<'compact' | 'comfortable'>(initialDensity || 'compact');
+  const [filterTypes, setFilterTypes] = useState<string[]>([]);
+  const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
+  const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
 
   const loadAuxData = useCallback(async () => {
     const [p, ps] = await Promise.all([db.getPorts(), db.getPreStacking()]);
@@ -76,54 +79,32 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     setIsSavingStatus(true);
-    const now = new Date().toISOString();
     const eventTime = new Date(statusTime).toISOString();
-
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
       statusTime: eventTime, 
-      statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: now }, ...(selectedTrip.statusHistory || [])] 
+      statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: new Date().toISOString() }, ...(selectedTrip.statusHistory || [])] 
     };
-
     try {
       if (await db.saveTrip(updatedTrip, user)) {
         setIsStatusModalOpen(false);
         window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
       }
-    } catch (e) { 
-      alert("Erro ao atualizar status."); 
-    } finally { 
-      setIsSavingStatus(false); 
-    }
+    } catch (e) { alert("Erro."); } finally { setIsSavingStatus(false); }
   };
 
   const categoryCustomers = useMemo(() => {
     const normCategory = categoryName.toUpperCase();
-    const namesFromTrips = new Set(
-      allTrips
-        .filter(t => t.category?.toUpperCase() === normCategory)
-        .map(t => t.customer.name.toUpperCase())
-    );
-    return customers
-      .filter(c => {
-        const hasOpInProfile = c.operations?.some(op => op.toUpperCase() === normCategory);
-        const hasActiveHistory = namesFromTrips.has(c.name.toUpperCase());
-        return hasOpInProfile || hasActiveHistory;
-      })
-      .filter(c => c.name.toUpperCase().includes(clientSearchText.toUpperCase()))
-      .sort((a,b) => a.name.localeCompare(b.name));
-  }, [allTrips, categoryName, customers, clientSearchText]);
+    return customers.filter(c => c.operations?.some(op => op.toUpperCase() === normCategory)).sort((a,b) => a.name.localeCompare(b.name));
+  }, [categoryName, customers]);
 
   const filteredTrips = useMemo(() => {
-    let result = allTrips.filter(t => {
-      if (!t.category) return false;
-      const matchCategory = t.category.toUpperCase() === categoryName.toUpperCase();
-      if (selectedFilterClient !== 'TODOS') {
-         return matchCategory && (t.customer?.name === selectedFilterClient);
-      }
-      return matchCategory;
-    });
+    let result = allTrips.filter(t => t.category?.toUpperCase() === categoryName.toUpperCase());
+
+    if (selectedFilterClient !== 'TODOS') result = result.filter(t => t.customer?.name === selectedFilterClient);
+    if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
+    if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
 
     if (activeStatusTab === 'ativas') {
       const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
@@ -147,10 +128,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       });
     }
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [allTrips, categoryName, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient]);
+  }, [allTrips, categoryName, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient, filterTypes, filterDriverNames]);
 
   const tripColumns = useMemo(() => getOperationTableColumns(
-    (t, s) => { setSelectedTrip(t); setTempStatus(s); const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); setStatusTime(d.toISOString().slice(0,16)); setIsStatusModalOpen(true); },
+    (t, s) => { setSelectedTrip(t); setTempStatus(s); setStatusTime(new Date().toISOString().slice(0,16)); setIsStatusModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); },
     (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); },
@@ -166,8 +147,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   ), [user, drivers]);
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
-
-  const currentStatusOptions = selectedTrip ? statusService.getOptions(selectedTrip) : [];
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20">
@@ -192,41 +171,53 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         </div>
       </header>
 
-      <div className="flex flex-col lg:flex-row justify-between items-center gap-6 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
-         <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
-           {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
-             <button key={tab} onClick={() => setActiveStatusTab(tab as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>{tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}</button>
-           ))}
-         </div>
-         
-         <div className="flex-1 w-full max-md relative group">
-            <input 
-              type="text" 
-              placeholder="BUSCAR OS, CONTAINER, MOTORISTA..."
-              className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>
+      {/* PAINEL DE FILTROS SINCRONIZADO */}
+      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
+         <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+            <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-1 w-full lg:w-auto">
+              {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
+                <button key={tab} onClick={() => setActiveStatusTab(tab as any)} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>{tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}</button>
+              ))}
+            </div>
+            
+            <div className="flex-1 w-full max-md relative group">
+               <input 
+                 type="text" 
+                 placeholder="BUSCAR NESTA CATEGORIA..."
+                 className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
+                 value={searchQuery}
+                 onChange={e => setSearchQuery(e.target.value)}
+               />
+               <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>
+            </div>
+
+            <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
          </div>
 
-         <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
-      </div>
-
-      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-5">
-         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Clientes Habilitados</h3>
-            <div className="relative w-full md:w-64">
-               <input type="text" placeholder="BUSCAR CLIENTE..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all" value={clientSearchText} onChange={e => setClientSearchText(e.target.value)} />
-               <svg className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>
+         {/* ATALHOS DE MODALIDADE */}
+         <div className="flex flex-col gap-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Modalidade da Operação</p>
+            <div className="flex flex-wrap gap-2">
+               <button 
+                 onClick={() => setFilterTypes([])}
+                 className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${filterTypes.length === 0 ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400'}`}
+               >
+                 Tudo
+               </button>
+               {MODALITIES.map(m => (
+                 <button 
+                   key={m}
+                   onClick={() => setFilterTypes(prev => prev.includes(m) ? prev.filter(t => t !== m) : [...prev, m])}
+                   className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${filterTypes.includes(m) ? 'bg-slate-900 border-slate-900 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-500'}`}
+                 >
+                   {m}
+                 </button>
+               ))}
             </div>
          </div>
 
-         <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-            <button onClick={() => setSelectedFilterClient('TODOS')} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap border ${selectedFilterClient === 'TODOS' ? 'bg-blue-600 text-white border-blue-600 shadow-xl' : 'text-slate-400 bg-slate-50 border-slate-100 hover:bg-white'}`}>Todos os Clientes</button>
-            {categoryCustomers.map(c => (
-              <button key={c.id} onClick={() => setSelectedFilterClient(c.name)} className={`px-8 py-4 rounded-[1.6rem] text-[10px] font-black uppercase transition-all whitespace-nowrap border ${selectedFilterClient === c.name ? 'bg-slate-900 text-white border-slate-900 shadow-xl' : 'text-slate-400 bg-slate-50 border-slate-100 hover:bg-white'}`}>{c.name}</button>
-            ))}
+         <div className="pt-4 border-t border-slate-50">
+            <OperationFilters selectedTypes={[]} onTypesChange={() => {}} selectedClients={selectedFilterClient === 'TODOS' ? [] : [selectedFilterClient]} onClientsChange={(cl) => setSelectedFilterClient(cl[0] || 'TODOS')} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={categoryCustomers} drivers={drivers} hideModality />
          </div>
       </div>
       
@@ -234,7 +225,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         <SmartOperationTable 
           userId={user.id} 
           componentId={`op-trips-${categoryName}-${selectedFilterClient}`} 
-          title={`${categoryName} Monitoramento`} 
+          title={`${categoryName} › ${selectedFilterClient}`} 
           columns={tripColumns} 
           data={filteredTrips} 
           onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
@@ -242,73 +233,12 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
         />
       </div>
 
-      {isTripDetailsOpen && selectedTrip && (
-        <TripDetailsViewerModal 
-          isOpen={isTripDetailsOpen} 
-          onClose={() => setIsTripDetailsOpen(false)} 
-          trip={selectedTrip} 
-          user={user} 
-          onManageHistory={() => setIsHistoryModalOpen(true)}
-        />
-      )}
-      {isStatusModalOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">
-             <div className="text-center">
-               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Registro de Status</p>
-               <p className="text-xl font-black text-slate-800 uppercase">OS: {selectedTrip.os}</p>
-             </div>
-             <div className="space-y-4">
-                <div className="space-y-1"><label className={labelClass}>Status</label><select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                  {currentStatusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select></div>
-                <div className="space-y-1"><label className={labelClass}>Data/Hora</label><input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} /></div>
-             </div>
-             <div className="grid gap-3 pt-4">
-                <button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700">Confirmar Registro</button>
-                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button>
-             </div>
-          </div>
-        </div>
-      )}
-
-      {isHistoryModalOpen && selectedTrip && <StatusHistoryManagerModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} trip={selectedTrip} allTrips={allTrips} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />}
+      {isTripDetailsOpen && selectedTrip && <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} user={user} onManageHistory={() => setIsHistoryModalOpen(true)} />}
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => setIsSchedulingModalOpen(false)} trip={selectedTrip} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} preStackingUnits={preStackingUnits} />
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
-      {isTripModalOpen && <TripModal isOpen={isTripModalOpen} onClose={() => setIsTripModalOpen(false)} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} initialCategory={categoryName} />}
-      {isDriverDocsModalOpen && selectedTrip && <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => setIsDriverDocsModalOpen(false)} trip={selectedTrip} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />}
-      
-      {isOCFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3300] bg-white animate-in slide-in-from-bottom duration-500 flex flex-col">
-          <div className="p-6 bg-blue-600 text-white flex justify-between items-center shrink-0">
-             <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-black italic">OC</div>
-                <h3 className="font-black text-sm uppercase tracking-widest">Ordem de Coleta: {selectedTrip.os}</h3>
-             </div>
-             <button onClick={() => setIsOCFormOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
-          </div>
-          <OrdemColetaForm drivers={drivers} customers={customers} ports={preStackingUnits as any} onClose={() => { setIsOCFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} initialData={selectedTrip.ocFormData} />
-        </div>
-      )}
-
-      {isMinutaFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3300] bg-white animate-in slide-in-from-bottom duration-500 flex flex-col">
-          <div className="p-6 bg-emerald-600 text-white flex justify-between items-center shrink-0">
-             <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-black italic">PS</div>
-                <h3 className="font-black text-sm uppercase tracking-widest">Pré-Stacking: {selectedTrip.os}</h3>
-             </div>
-             <button onClick={() => setIsMinutaFormOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg></button>
-          </div>
-          <PreStackingForm drivers={drivers} customers={customers} ports={preStackingUnits as any} onClose={() => { setIsMinutaFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} initialOS={selectedTrip.os} />
-        </div>
-      )}
-
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
 
-      <style>{`
-        .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; }
-      `}</style>
+      <style>{` .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; } `}</style>
     </div>
   );
 };

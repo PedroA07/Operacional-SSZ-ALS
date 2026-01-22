@@ -115,7 +115,7 @@ const TripForm: React.FC<TripFormProps> = ({
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-10 pb-10">
       
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Configuração da Categoria</h4>
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Configuração da Categoria Operacional</h4>
         <div className="grid grid-cols-1 gap-6">
             <div className="space-y-1">
               <label className={labelClass}>Vincular à Categoria do Banco de Dados (Obrigatório)</label>
@@ -125,7 +125,7 @@ const TripForm: React.FC<TripFormProps> = ({
                 value={formData.category} 
                 onChange={e => setFormData({...formData, category: e.target.value})}
               >
-                <option value="">Selecione uma Categoria...</option>
+                <option value="">Selecione uma Categoria Registrada...</option>
                 {categories.filter(c => !c.parentId).map(c => (
                   <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>
                 ))}
@@ -216,7 +216,7 @@ const TripForm: React.FC<TripFormProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="relative" ref={dropdownRefs.customer}>
-          <label className={labelClass}>Cliente Contratante</label>
+          <label className={labelClass}>Cliente Contratante (Subcategoria Real)</label>
           <input 
             type="text"
             placeholder="BUSCAR CLIENTE..."
