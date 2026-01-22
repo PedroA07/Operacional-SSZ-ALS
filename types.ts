@@ -35,6 +35,18 @@ export interface LoginCredential {
   createdAt: string;
 }
 
+export interface AvantidaRecord {
+  id: string;
+  date: string;
+  containerNumber: string;
+  exportRef: string;
+  requestedPrice: number;
+  customerRef: string;
+  tripSettlement: string;
+  verified: boolean;
+  createdAt: string;
+}
+
 export interface SealBatch {
   id: string;
   carrier: string;
@@ -152,7 +164,8 @@ export enum DashboardTab {
   DOCUMENTOS = 'DOCUMENTOS',
   ESTADIAS = 'ESTADIAS',
   LOGINS = 'COFRE_DE_LOGINS',
-  LACRES = 'CONTROLE_DE_LACRES'
+  LACRES = 'CONTROLE_DE_LACRES',
+  AVANTIDA = 'AVANTIDA'
 }
 
 export type TripStatus = 

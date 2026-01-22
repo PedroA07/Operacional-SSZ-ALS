@@ -15,6 +15,7 @@ import DocumentsTab from './components/dashboard/DocumentsTab';
 import StaysTab from './components/dashboard/StaysTab';
 import LoginsTab from './components/dashboard/LoginsTab';
 import LacresTab from './components/dashboard/LacresTab';
+import AvantidaTab from './components/dashboard/AvantidaTab';
 import Sidebar from './components/dashboard/Sidebar';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
@@ -169,7 +170,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       
       {(isSyncing || isRealtimeActive) && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4">
-           <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+           <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-50 animate-pulse' : 'bg-emerald-50'}`}></div>
            <span className="text-[8px] font-black text-white uppercase tracking-widest">
              {isSyncing ? 'Sincronizando...' : 'Tempo Real Ativo'}
            </span>
@@ -239,6 +240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.LOGINS && <LoginsTab />}
            {activeTab === DashboardTab.LACRES && <LacresTab />}
+           {activeTab === DashboardTab.AVANTIDA && <AvantidaTab userId={user.id} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
            {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(false); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} />}

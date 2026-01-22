@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus, StaySession, StayRecord, LoginCredential, SealBatch, SealRecord } from '../types';
+import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus, StaySession, StayRecord, LoginCredential, SealBatch, SealRecord, AvantidaRecord } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
@@ -119,7 +119,46 @@ export const db = {
     return !error;
   },
 
-  // LACRES
+  // AVANTIDA
+  getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('avantida_records').select('*').order('date', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(a => ({
+      id: a.id,
+      date: a.date,
+      containerNumber: a.container_number,
+      exportRef: a.export_ref,
+      requestedPrice: Number(a.requested_price || 0),
+      customerRef: a.customer_ref,
+      tripSettlement: a.trip_settlement,
+      verified: a.verified,
+      createdAt: a.created_at
+    }));
+  },
+
+  saveAvantidaRecord: async (record: Partial<AvantidaRecord>) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('avantida_records').upsert({
+      id: record.id?.startsWith('new-') ? undefined : record.id,
+      date: record.date,
+      container_number: record.containerNumber?.toUpperCase(),
+      export_ref: record.exportRef?.toUpperCase(),
+      requested_price: record.requestedPrice,
+      customer_ref: record.customerRef?.toUpperCase(),
+      trip_settlement: record.tripSettlement?.toUpperCase(),
+      verified: record.verified
+    });
+    return !error;
+  },
+
+  deleteAvantidaRecord: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('avantida_records').delete().eq('id', id);
+    return !error;
+  },
+
+  // LACRES - ORDENAÇÃO POR DATA DE CRIAÇÃO DESCENDENTE
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });
