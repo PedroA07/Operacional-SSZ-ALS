@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Trip } from '../../../types';
-import MultiCheckboxFilter from '../../shared/MultiCheckboxFilter';
+import MultiCheckboxFilter, { FilterStats } from '../../shared/MultiCheckboxFilter';
 
 interface TripsTodayProps {
   trips: Trip[];
@@ -9,8 +9,6 @@ interface TripsTodayProps {
 
 const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'ranking'>('ranking');
-  
   const todayStr = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
 
   const todayRaw = useMemo(() => {
@@ -21,6 +19,48 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const [selClients, setSelClients] = useState<string[]>([]);
   const [selDrivers, setSelDrivers] = useState<string[]>([]);
 
+  const getStatsForEntity = (name: string, type: 'driver' | 'client'): FilterStats => {
+    const entityTrips = todayRaw.filter(t => type === 'driver' ? t.driver.name === name : t.customer.name === name);
+    const active = entityTrips.filter(t => t.status !== 'Viagem cancelada');
+    
+    const delayed = active.filter(t => {
+      const scheduled = new Date(t.dateTime).getTime();
+      const arrival = t.statusHistory?.find(h => h.status === 'Chegou no cliente');
+      if (arrival) return new Date(arrival.dateTime).getTime() > (scheduled + 59000);
+      return new Date().getTime() > (scheduled + 600000) && t.status !== 'Viagem concluída';
+    }).length;
+
+    const completed = active.filter(t => t.status === 'Viagem concluída').length;
+    const canceled = entityTrips.filter(t => t.status === 'Viagem cancelada').length;
+
+    // Added explicit type to Set to ensure items is inferred as string[]
+    const details = type === 'driver' 
+      ? { label: 'Clientes Atendidos', subLabel: 'Empresas', items: Array.from(new Set<string>(entityTrips.map(t => t.customer.name))) }
+      : { label: 'Motoristas Alocados', subLabel: 'Equipe', items: Array.from(new Set<string>(entityTrips.map(t => t.driver.name))) };
+
+    return { total: entityTrips.length, completed, delayed, canceled, details };
+  };
+
+  const driverOptions = useMemo(() => {
+    // Added explicit type to Set to ensure names is inferred as string[]
+    const names = Array.from(new Set<string>(todayRaw.map(t => t.driver.name))).sort();
+    return names.map(name => ({
+      value: name,
+      label: name,
+      stats: getStatsForEntity(name, 'driver')
+    }));
+  }, [todayRaw]);
+
+  const clientOptions = useMemo(() => {
+    // Added explicit type to Set to ensure names is inferred as string[]
+    const names = Array.from(new Set<string>(todayRaw.map(t => t.customer.name))).sort();
+    return names.map(name => ({
+      value: name,
+      label: name,
+      stats: getStatsForEntity(name, 'client')
+    }));
+  }, [todayRaw]);
+
   const stats = useMemo(() => {
     const activeTrips = todayRaw.filter(t => t.status !== 'Viagem cancelada');
     const canceled = todayRaw.filter(t => t.status === 'Viagem cancelada').length;
@@ -30,8 +70,6 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     activeTrips.forEach(t => {
       const type = t.type?.toUpperCase() || 'OUTROS';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
-      if (t.category?.toUpperCase() === 'INDÚSTRIA') typeCounts['IND'] = (typeCounts['IND'] || 0) + 1;
-      if (t.category?.toUpperCase() === 'CARGA SOLTA') typeCounts['SOLTA'] = (typeCounts['SOLTA'] || 0) + 1;
     });
 
     const delays = activeTrips.filter(t => {
@@ -54,15 +92,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
     }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [todayRaw, selTypes, selClients, selDrivers]);
 
-  const allTypes = useMemo(() => {
-    const types = new Set(todayRaw.map(t => t.type?.toUpperCase() || 'OUTROS'));
-    if (todayRaw.some(t => t.category?.toUpperCase() === 'INDÚSTRIA')) types.add('INDÚSTRIA');
-    if (todayRaw.some(t => t.category?.toUpperCase() === 'CARGA SOLTA')) types.add('CARGA SOLTA');
-    return Array.from(types).sort();
-  }, [todayRaw]);
-
-  const allClients = useMemo(() => Array.from(new Set(todayRaw.map(t => t.customer.name))).sort(), [todayRaw]);
-  const allDrivers = useMemo(() => Array.from(new Set(todayRaw.map(t => t.driver.name))).sort(), [todayRaw]);
+  const allTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [todayRaw]);
 
   return (
     <div className="relative" style={{ zIndex: isOpen ? 150 : 10 }}>
@@ -82,17 +112,17 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
 
         <div className="mt-8 w-full space-y-5">
           <div className="flex flex-wrap gap-2 min-h-[30px]">
-            {Object.entries(stats.typeCounts).map(([type, c]) => (
+            {Object.entries(stats.typeCounts).slice(0, 3).map(([type, c]) => (
               <div key={type} className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 flex items-center gap-3">
-                <span className="text-xs font-black text-slate-400 uppercase">{type.substring(0,5)}</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase">{type.substring(0,5)}</span>
                 <span className="text-sm font-black text-slate-700">{c}</span>
               </div>
             ))}
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-red-50 p-2.5 rounded-xl text-center border border-red-100"><p className="text-[10px] font-black text-red-400 uppercase">Atr.</p><p className="text-lg font-black text-red-600 mt-1">{stats.delays}</p></div>
-            <div className="bg-emerald-50 p-2.5 rounded-xl text-center border border-emerald-100"><p className="text-[10px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-lg font-black text-emerald-600 mt-1">{stats.completed}</p></div>
-            <div className="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200"><p className="text-[10px] font-black text-slate-400 uppercase">Canc.</p><p className="text-lg font-black text-slate-600 mt-1">{stats.canceled}</p></div>
+            <div className="bg-red-50 p-2.5 rounded-xl text-center border border-red-100"><p className="text-[9px] font-black text-red-400 uppercase">Atr.</p><p className="text-lg font-black text-red-600 mt-1">{stats.delays}</p></div>
+            <div className="bg-emerald-50 p-2.5 rounded-xl text-center border border-emerald-100"><p className="text-[9px] font-black text-emerald-400 uppercase">Concl.</p><p className="text-lg font-black text-emerald-600 mt-1">{stats.completed}</p></div>
+            <div className="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200"><p className="text-[9px] font-black text-slate-400 uppercase">Canc.</p><p className="text-lg font-black text-slate-600 mt-1">{stats.canceled}</p></div>
           </div>
         </div>
       </button>
@@ -101,21 +131,27 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
         <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-white border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[160] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
           <div className="p-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 shrink-0 relative z-[170]">
              <MultiCheckboxFilter label="Tipos" options={allTypes} selectedOptions={selTypes} onChange={setSelTypes} />
-             <MultiCheckboxFilter label="Clientes" options={allClients} selectedOptions={selClients} onChange={setSelClients} />
-             <MultiCheckboxFilter label="Motoristas" options={allDrivers} selectedOptions={selDrivers} onChange={setSelDrivers} />
+             <MultiCheckboxFilter label="Clientes" options={clientOptions} selectedOptions={selClients} onChange={setSelClients} />
+             <MultiCheckboxFilter label="Motoristas" options={driverOptions} selectedOptions={selDrivers} onChange={setSelDrivers} />
           </div>
-          <div className="flex bg-slate-100 p-1.5 mx-4 mt-4 rounded-xl shrink-0">
-             <button onClick={() => setViewMode('ranking')} className={`flex-1 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${viewMode === 'ranking' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'}`}>Ranking Dia</button>
-             <button onClick={() => setViewMode('list')} className={`flex-1 py-1.5 rounded-lg text-xs font-black uppercase transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'}`}>Lista OS</button>
-          </div>
-          <div className="overflow-y-auto custom-scrollbar p-4 space-y-3 flex-1 bg-slate-50/30 min-h-[250px] rounded-b-[2.5rem]">
+          
+          <div className="overflow-y-auto custom-scrollbar p-5 space-y-3 flex-1 bg-slate-50/30 min-h-[300px] rounded-b-[2.5rem]">
             {filteredTrips.map(trip => (
-              <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-3xl shadow-sm">
-                <span className="text-xs font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-                <p className="text-[12px] font-black text-slate-800 uppercase mt-2 leading-none truncate">{trip.driver.name}</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 truncate">{trip.customer.name}</p>
+              <div key={trip.id} className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex items-center justify-between hover:border-blue-300 transition-all">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                    <h4 className="text-[12px] font-black text-slate-800 uppercase truncate leading-none">{trip.driver.name}</h4>
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 truncate">{trip.customer.name}</p>
+                </div>
+                <div className="flex flex-col items-end shrink-0">
+                   <span className="bg-slate-900 text-white px-2 py-1 rounded text-[9px] font-mono font-bold uppercase">{trip.driver.plateHorse}</span>
+                   <span className={`text-[8px] font-black uppercase mt-1.5 ${trip.status === 'Viagem concluída' ? 'text-emerald-500' : 'text-blue-500'}`}>{trip.status}</span>
+                </div>
               </div>
             ))}
+            {filteredTrips.length === 0 && <p className="py-12 text-center text-[10px] font-black text-slate-300 uppercase italic">Nenhuma OS para os filtros atuais</p>}
           </div>
         </div>
       )}
