@@ -79,9 +79,10 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
       if (success) {
         onSuccess();
       }
-    } catch (err) {
-      // O erro 400 será capturado aqui se o SQL não tiver sido rodado
-      alert("Falha ao salvar registro. Verifique se as colunas 'status', 'shipping_line' e 'import_location' foram criadas no Supabase.");
+    } catch (err: any) {
+      console.error("Erro detalhado:", err);
+      const msg = err.message || "Verifique o formato dos dados.";
+      alert(`Falha ao salvar registro: ${msg}`);
     } finally {
       setIsSaving(false);
     }

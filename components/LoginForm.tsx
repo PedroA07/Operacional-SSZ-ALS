@@ -38,7 +38,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       if (result.success && result.user) {
         onLoginSuccess(result.user);
       } else {
-        setError(result.error || 'Acesso negado.');
+        setError(result.error || 'Credenciais Inválidas.');
         setIsLoading(false);
       }
     } catch (err) {
@@ -138,7 +138,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           </form>
 
           <p className="mt-12 text-[9px] font-black text-blue-900/40 uppercase tracking-[0.5em] text-center">
-            Logística Inteligente — v{APP_CONFIG.version}
+            ALS Transportes SSZ — v{APP_CONFIG.version}
           </p>
         </div>
       </div>

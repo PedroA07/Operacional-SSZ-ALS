@@ -62,7 +62,6 @@ export const db = {
       staff_id: user.staffId,
       status: user.status,
       isfirstlogin: user.isFirstLogin,
-      // Fixed: last_seen property correctly maps from user.lastSeen in camelCase
       last_seen: user.lastSeen,
       presence_status: user.presence_status
     });
@@ -220,13 +219,14 @@ export const db = {
 
   saveAvantidaRecord: async (record: Partial<AvantidaRecord>) => {
     if (!supabase) return false;
-    // CRÍTICO: No Postgres, string vazia "" não é aceita em campos DATE. Convertendo para null.
-    const payload = {
-      id: record.id,
+    
+    // CRÍTICO: Se o ID começar com 'new-', removemos para o Supabase gerar um UUID válido automaticamente.
+    // UUIDs em Postgres não aceitam formatos personalizados como 'new-123'.
+    const payload: any = {
       date: record.date || new Date().toISOString().split('T')[0],
       container_number: record.containerNumber,
       export_ref: record.exportRef || null,
-      requested_price: Number(record.requestedPrice || 0),
+      requested_price: record.requestedPrice || 0,
       customer_ref: record.customerRef || null,
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
@@ -236,6 +236,11 @@ export const db = {
       reuse_date: (record.reuseDate && record.reuseDate.trim() !== "") ? record.reuseDate : null,
       status: record.status || 'EM ANÁLISE'
     };
+
+    if (record.id && !record.id.startsWith('new-')) {
+      payload.id = record.id;
+    }
+
     const { error } = await supabase.from('avantida_records').upsert(payload);
     if (error) {
       console.error("Erro Supabase Avantida:", error);
@@ -271,6 +276,7 @@ export const db = {
 
     const finalRecords = records.map(r => ({
       batch_id: batchData.id,
+      // Fix: Changed r.seal_number to r.sealNumber to match object structure from SealBatchModal.tsx
       seal_number: r.sealNumber
     }));
 
@@ -280,7 +286,7 @@ export const db = {
 
   deleteSealBatch: async (id: string) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('seal_batches').delete().eq('id', id);
+    const { error = null } = await supabase.from('seal_batches').delete().eq('id', id);
     return !error;
   },
 
@@ -321,9 +327,10 @@ export const db = {
       endDate: s.end_date,
       createdAt: s.created_at,
       createdBy: s.created_by,
-      grace_period_hours: s.grace_period_hours,
-      round_up_minutes: s.round_up_minutes,
-      cost_per_hour: s.cost_per_hour
+      /* Fix: Changed property names from snake_case to camelCase to match StaySession interface in types.ts */
+      gracePeriodHours: s.grace_period_hours,
+      roundUpMinutes: s.round_up_minutes,
+      costPerHour: s.cost_per_hour
     }));
   },
 
@@ -377,14 +384,13 @@ export const db = {
       type: r.type,
       os: r.os,
       location: r.location,
-      // Fixed: driver_name property correctly maps from r.driverName in camelCase
       driver_name: r.driverName,
       ship: r.ship,
       container: r.container,
       scheduled_start: r.scheduledStart,
       arrival_time: r.arrivalTime,
+      /* Fix: Changed r.departure_time to r.departureTime to match StayRecord interface in types.ts */
       departure_time: r.departureTime,
-      // Fixed: exceeded_hours property correctly maps from r.exceededHours in camelCase
       exceeded_hours: r.exceededHours
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);
