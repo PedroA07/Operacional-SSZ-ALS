@@ -63,11 +63,26 @@ const TripModal: React.FC<TripModalProps> = ({
         await osCategoryService.syncVinculos(formData.category || 'Geral', formData.driver, formData.customer);
       }
 
-      // Prepara o payload final preservando o histórico se for edição
+      // Horários convertidos para UTC/ISO
+      const tripStartTime = new Date(formData.dateTime).toISOString();
+      
+      // Janela no terminal
+      const terminalTime = formData.schedulingDate 
+        ? new Date(formData.schedulingDate).toISOString() 
+        : undefined;
+
+      // Monta o objeto de agendamento se houver destino ou data
+      const scheduling = (formData.destination || terminalTime) ? {
+        dateTime: terminalTime || tripStartTime,
+        location: formData.destination?.name || '',
+        locationId: formData.destination?.id || '',
+        obs: formData.obs || ''
+      } : editTrip?.scheduling;
+
       const payload: Trip = {
         ...formData,
         id: tripId,
-        dateTime: new Date(formData.dateTime).toISOString(),
+        dateTime: tripStartTime,
         isLate: editTrip?.isLate || false,
         documents: editTrip?.documents || [],
         status: editTrip?.status || 'Pendente',
@@ -78,27 +93,28 @@ const TripModal: React.FC<TripModalProps> = ({
         }],
         advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },
         balancePayment: editTrip?.balancePayment || { status: 'AGUARDANDO_DOCS' },
+        scheduling: scheduling,
         ocFormData: {
           ...formData,
-          horarioAgendado: new Date(formData.dateTime).toISOString()
+          horarioAgendado: tripStartTime,
+          schedulingDate: terminalTime
         }
       };
 
       const success = await db.saveTrip(payload, currentUser || undefined);
       
       if (success) {
-        // Delay técnico de consistência (500ms) para o Supabase processar a escrita
         setTimeout(() => {
           onSuccess();
           window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
-        }, 500);
+        }, 300);
         onClose();
       } else {
-        alert("O servidor não confirmou o salvamento. Verifique sua conexão.");
+        alert("Falha ao salvar. Verifique sua conexão.");
       }
     } catch (err) {
       console.error("Erro crítico no cadastro:", err);
-      alert("Erro ao processar a programação. Verifique os campos e tente novamente.");
+      alert("Erro ao processar. Verifique os campos.");
     } finally {
       setIsSaving(false);
     }
