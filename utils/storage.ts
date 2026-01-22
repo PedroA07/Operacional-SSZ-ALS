@@ -119,7 +119,7 @@ export const db = {
     return !error;
   },
 
-  // AVANTIDA
+  // AVANTIDA - Atualizado para suportar driver_id como TEXT
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('avantida_records').select('*').order('date', { ascending: false });
@@ -133,6 +133,7 @@ export const db = {
       customerRef: a.customer_ref,
       tripSettlement: a.trip_settlement,
       verified: a.verified,
+      driverId: a.driver_id, // Recebe como string (text no banco)
       createdAt: a.created_at
     }));
   },
@@ -147,7 +148,8 @@ export const db = {
       requested_price: record.requestedPrice,
       customer_ref: record.customerRef?.toUpperCase(),
       trip_settlement: record.tripSettlement?.toUpperCase(),
-      verified: record.verified
+      verified: record.verified,
+      driver_id: record.driverId // Salva como string (text no banco)
     });
     return !error;
   },
@@ -158,7 +160,7 @@ export const db = {
     return !error;
   },
 
-  // LACRES - ORDENAÇÃO POR DATA DE CRIAÇÃO DESCENDENTE
+  // LACRES - ORDENAÇÃO POR DATA DE CRIAÇÃO DESCENDENTE (REFORÇADO)
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });

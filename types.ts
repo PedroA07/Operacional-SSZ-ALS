@@ -44,6 +44,7 @@ export interface AvantidaRecord {
   customerRef: string;
   tripSettlement: string;
   verified: boolean;
+  driverId: string;
   createdAt: string;
 }
 
