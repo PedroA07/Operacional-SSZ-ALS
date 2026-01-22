@@ -242,10 +242,10 @@ export const db = {
 
     const { error } = await supabase.from('avantida_records').upsert(payload);
     if (error) {
-      console.error("Erro Supabase Avantida:", error);
+      console.error("[Supabase Avantida Error]:", error);
       throw error;
     }
-    return !error;
+    return true;
   },
 
   deleteAvantidaRecord: async (id: string) => {
@@ -268,13 +268,19 @@ export const db = {
 
   saveAvantidaPrice: async (rule: Partial<AvantidaPriceRule>) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('avantida_prices').upsert({
+    const payload = {
       id: rule.id || `prc-${Date.now()}`,
       shipping_line: rule.shippingLine?.toUpperCase(),
-      price: rule.price,
+      price: Number(rule.price || 0),
       updated_at: new Date().toISOString()
-    });
-    return !error;
+    };
+
+    const { error } = await supabase.from('avantida_prices').upsert(payload);
+    if (error) {
+      console.error("[Supabase Price Error]:", error);
+      throw error;
+    }
+    return true;
   },
 
   deleteAvantidaPrice: async (id: string) => {
@@ -350,13 +356,13 @@ export const db = {
     return (data || []).map(s => ({
       id: s.id,
       category: s.category,
-      startDate: s.start_date,
-      endDate: s.end_date,
+      start_date: s.start_date,
+      end_date: s.end_date,
       createdAt: s.created_at,
       createdBy: s.created_by,
-      gracePeriodHours: s.grace_period_hours,
-      roundUpMinutes: s.round_up_minutes,
-      costPerHour: s.cost_per_hour
+      grace_period_hours: s.grace_period_hours,
+      round_up_minutes: s.round_up_minutes,
+      cost_per_hour: s.cost_per_hour
     }));
   },
 

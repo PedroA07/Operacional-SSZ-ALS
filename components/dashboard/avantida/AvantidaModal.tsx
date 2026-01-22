@@ -35,7 +35,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         setImportLocation(editingRecord.importLocation || 'SÃO PAULO');
         setReuseDate(editingRecord.reuseDate || '');
         
-        // Formata o preço vindo do banco para a máscara
+        // Formata o preço vindo do banco para a máscara BRL
         const initialPrice = editingRecord.requestedPrice || 0;
         setPriceDisplay(initialPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         
@@ -47,19 +47,21 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         setStatus('EM ANÁLISE');
         setImportLocation('SÃO PAULO');
         setReuseDate('');
-        setPriceDisplay('');
+        setPriceDisplay('0,00');
         lastDetectedCarrier.current = null;
       }
     }
   }, [editingRecord, isOpen]);
 
-  // Máscara de Moeda (reaproveitada para consistência)
+  // Função para máscara de moeda em tempo real
   const handlePriceChange = (value: string) => {
+    // Remove tudo que não for número
     const digits = value.replace(/\D/g, '');
     if (!digits) {
-      setPriceDisplay('');
+      setPriceDisplay('0,00');
       return;
     }
+    // Converte para centavos e formata
     const amount = (parseInt(digits) / 100).toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
@@ -67,7 +69,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
     setPriceDisplay(amount);
   };
 
-  // Efeito inteligente para preenchimento automático
+  // Efeito inteligente para preenchimento automático baseado no container
   useEffect(() => {
     const container = containerNumber.toUpperCase().trim();
     if (container.length >= 4) {
@@ -77,6 +79,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         setShippingLine(carrier.name);
         lastDetectedCarrier.current = carrier.name;
         
+        // Busca preço padrão para este armador
         const rule = priceRules.find(r => r.shippingLine.toUpperCase() === carrier.name.toUpperCase());
         if (rule) {
           setPriceDisplay(rule.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -91,7 +94,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
     e.preventDefault();
     if (!containerNumber.trim()) return;
 
-    // Converte máscara "1.250,00" -> 1250.00 (Número)
+    // Converte máscara "1.250,00" -> 1250.00 (Número puro para o banco)
     const numericPrice = parseFloat(priceDisplay.replace(/\./g, '').replace(',', '.')) || 0;
 
     setIsSaving(true);
@@ -136,8 +139,8 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
       <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
         <header className="p-8 border-b bg-slate-50 flex justify-between items-center">
           <div>
-            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Gestão de Reuso Avantida</h3>
-            <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Formulário de Controle de Solicitação</p>
+            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Lançamento Avantida</h3>
+            <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Gestão de Custos e Reuso</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
@@ -191,17 +194,16 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
               />
             </div>
             <div className="space-y-1">
-              <label className={labelClass}>Preço do Pedido (R$)</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">R$</span>
+              <label className={labelClass}>Valor do Reuso (R$)</label>
+              <div className="relative group">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 group-focus-within:text-blue-500 transition-colors">R$</span>
                 <input 
                   type="text"
                   inputMode="numeric"
                   required
-                  className={`${inputClass} pl-10 text-emerald-600 font-black`}
+                  className={`${inputClass} pl-12 text-emerald-600 font-black text-lg`}
                   value={priceDisplay} 
                   onChange={e => handlePriceChange(e.target.value)} 
-                  placeholder="0,00" 
                 />
               </div>
             </div>
@@ -237,7 +239,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
                 type="submit" 
                 className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50"
               >
-                {isSaving ? 'Sincronizando...' : 'Gravar Registro'}
+                {isSaving ? 'Gravando...' : 'Gravar Registro'}
               </button>
           </div>
         </form>

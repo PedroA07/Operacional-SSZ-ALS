@@ -60,9 +60,13 @@ const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isO
         setPriceDisplay('');
         onSuccess();
       }
-    } catch (err) {
-      console.error(err);
-      alert("Erro ao salvar preço no servidor.");
+    } catch (err: any) {
+      console.error("Erro técnico:", err);
+      if (err.code === '42501' || err.status === 401) {
+         alert("ERRO DE PERMISSÃO (401): Verifique se as políticas de RLS no Supabase foram desativadas para esta tabela.");
+      } else {
+         alert(`ERRO AO SALVAR: ${err.message || 'Falha de comunicação.'}`);
+      }
     } finally {
       setIsSaving(false);
     }
