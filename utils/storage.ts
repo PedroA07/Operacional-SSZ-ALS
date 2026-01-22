@@ -220,21 +220,27 @@ export const db = {
 
   saveAvantidaRecord: async (record: Partial<AvantidaRecord>) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('avantida_records').upsert({
+    // CRÍTICO: No Postgres, string vazia "" não é aceita em campos DATE. Convertendo para null.
+    const payload = {
       id: record.id,
-      date: record.date,
+      date: record.date || new Date().toISOString().split('T')[0],
       container_number: record.containerNumber,
-      export_ref: record.exportRef,
-      requested_price: record.requestedPrice,
-      customer_ref: record.customerRef,
-      trip_settlement: record.tripSettlement,
-      verified: record.verified,
-      driver_id: record.driverId,
-      shipping_line: record.shippingLine,
-      import_location: record.importLocation,
-      reuse_date: record.reuseDate,
-      status: record.status
-    });
+      export_ref: record.exportRef || null,
+      requested_price: record.requestedPrice || 0,
+      customer_ref: record.customerRef || null,
+      trip_settlement: record.tripSettlement || null,
+      verified: record.verified || false,
+      driver_id: record.driverId || null,
+      shipping_line: record.shippingLine || null,
+      import_location: record.importLocation || null,
+      reuse_date: (record.reuseDate && record.reuseDate.trim() !== "") ? record.reuseDate : null,
+      status: record.status || 'EM ANÁLISE'
+    };
+    const { error } = await supabase.from('avantida_records').upsert(payload);
+    if (error) {
+      console.error("Erro Supabase Avantida:", error);
+      throw error;
+    }
     return !error;
   },
 
