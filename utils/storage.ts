@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { 
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category, 
@@ -63,6 +62,7 @@ export const db = {
       staff_id: user.staffId,
       status: user.status,
       isfirstlogin: user.isFirstLogin,
+      // Fixed: last_seen property correctly maps from user.lastSeen in camelCase
       last_seen: user.lastSeen,
       presence_status: user.presence_status
     });
@@ -226,7 +226,7 @@ export const db = {
       date: record.date || new Date().toISOString().split('T')[0],
       container_number: record.containerNumber,
       export_ref: record.exportRef || null,
-      requested_price: record.requestedPrice || 0,
+      requested_price: Number(record.requestedPrice || 0),
       customer_ref: record.customerRef || null,
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
@@ -377,12 +377,14 @@ export const db = {
       type: r.type,
       os: r.os,
       location: r.location,
+      // Fixed: driver_name property correctly maps from r.driverName in camelCase
       driver_name: r.driverName,
       ship: r.ship,
       container: r.container,
       scheduled_start: r.scheduledStart,
       arrival_time: r.arrivalTime,
       departure_time: r.departureTime,
+      // Fixed: exceeded_hours property correctly maps from r.exceededHours in camelCase
       exceeded_hours: r.exceededHours
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);

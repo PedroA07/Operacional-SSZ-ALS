@@ -14,7 +14,7 @@ interface AvantidaModalProps {
 const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSuccess, editingRecord }) => {
   const [isSaving, setIsSaving] = useState(false);
 
-  // Estados dos campos
+  // Estados dos campos solicitados
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [containerNumber, setContainerNumber] = useState('');
   const [shippingLine, setShippingLine] = useState('');
@@ -42,10 +42,11 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
     }
   }, [editingRecord, isOpen]);
 
-  // Efeito para preencher armador automaticamente
+  // Efeito para preencher armador automaticamente via BIC Code
   useEffect(() => {
-    if (containerNumber.length >= 4) {
-      const carrier = lookupCarrierByContainer(containerNumber.toUpperCase());
+    const container = containerNumber.toUpperCase().trim();
+    if (container.length >= 4) {
+      const carrier = lookupCarrierByContainer(container);
       if (carrier) setShippingLine(carrier.name);
     }
   }, [containerNumber]);
@@ -71,13 +72,16 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         createdAt: editingRecord?.createdAt || new Date().toISOString(),
         shippingLine: shippingLine.toUpperCase(),
         importLocation: importLocation.toUpperCase(),
-        reuseDate,
+        reuseDate: reuseDate || '',
         status
       });
 
       if (success) {
         onSuccess();
       }
+    } catch (err) {
+      // O erro 400 será capturado aqui se o SQL não tiver sido rodado
+      alert("Falha ao salvar registro. Verifique se as colunas 'status', 'shipping_line' e 'import_location' foram criadas no Supabase.");
     } finally {
       setIsSaving(false);
     }
@@ -143,7 +147,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
               className={`${inputClass} bg-blue-50/20 border-blue-50`}
               value={shippingLine} 
               onChange={e => setShippingLine(e.target.value.toUpperCase())} 
-              placeholder="AUTODETECTAR..." 
+              placeholder="AUTODETECTAR PELO CONTAINER..." 
             />
           </div>
 
