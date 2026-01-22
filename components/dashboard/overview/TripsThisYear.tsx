@@ -48,13 +48,13 @@ const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
       const matchC = selClients.length === 0 || selClients.includes(t.customer.name);
       const matchD = selDrivers.length === 0 || selDrivers.includes(t.driver.name);
       return matchC && matchD;
-    }).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+    }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [filteredBase, selClients, selDrivers]);
 
   const allOpTypes = useMemo(() => Array.from(new Set(yearRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [yearRaw]);
 
   return (
-    <div className="relative" style={{ zIndex: isOpen ? 140 : 10 }}>
+    <div className="relative" style={{ zIndex: isOpen ? 500 : 10 }}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full text-left bg-slate-900 p-7 rounded-[2.5rem] border transition-all duration-500 shadow-sm hover:shadow-xl relative z-[70] flex flex-col h-full ${isOpen ? 'border-blue-500 ring-4 ring-blue-500/10 rounded-b-none' : 'border-white/10'}`}
@@ -87,7 +87,7 @@ const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-slate-900 border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[160] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col">
+        <div className="absolute top-[calc(100%-1px)] left-0 right-0 bg-slate-900 border border-blue-500 rounded-b-[2.5rem] shadow-2xl z-[160] animate-in slide-in-from-top-1 duration-300 max-h-[600px] flex flex-col overflow-visible">
           <div className="p-4 bg-slate-950/50 border-b border-white/5 flex flex-wrap gap-2 shrink-0">
              <MultiCheckboxFilter label="Filtrar Modalidade" options={allOpTypes} selectedOptions={selTypes} onChange={setSelTypes} />
              <RichEntityFilter label="Ranking Clientes" stats={clientStats} selectedItems={selClients} onChange={setSelClients} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>} />
