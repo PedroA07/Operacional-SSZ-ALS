@@ -24,13 +24,21 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     terminal: { cat: 'TODAS', type: 'TODOS' }
   });
 
-  // Função interna para normalizar strings de categoria
-  const normalizeCat = (cat: string) => {
-    if (!cat) return '';
-    let normalized = cat.trim().toUpperCase();
-    // Unifica variações comuns de Indústria
-    if (normalized === 'INDÚSTRIAS' || normalized === 'INDUSTRIAS') return 'INDÚSTRIA';
-    return normalized;
+  // Função ALS de Normalização Estrita (Ignora acentos, espaços e variações de plural)
+  const strictNormalize = (str: string) => {
+    if (!str) return '';
+    // 1. Remove acentos e espaços extras
+    let norm = str.normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toUpperCase();
+    
+    // 2. Unifica variações comuns de Indústria/Industrias e Plurais genéricos
+    if (norm === 'INDUSTRIAS' || norm === 'INDUSTRIA') return 'INDÚSTRIA';
+    if (norm === 'ALIANCAS' || norm === 'ALIANCA') return 'ALIANÇA';
+    if (norm === 'MERCOSUIS' || norm === 'MERCOSUL') return 'MERCOSUL';
+    
+    return norm;
   };
 
   const availableData = useMemo(() => {
@@ -46,24 +54,24 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
       filtered = trips.filter(t => new Date(t.dateTime) >= startOfMonth);
     }
 
-    // Extração ÚNICA e NORMALIZADA de Categorias (Remove duplicados e ignora "GERAL")
+    // Extração ÚNICA e NORMALIZADA de Categorias REAIS baseadas em dados do banco
     const categories = Array.from(
       new Set(
-        trips
-          .map(t => normalizeCat(t.category))
+        filtered
+          .map(t => strictNormalize(t.category))
           .filter(c => c && c !== 'GERAL' && c !== 'NENHUM' && c !== 'UNDEFINED' && c !== 'NULL')
       )
     ).sort();
 
     const types = Array.from(
       new Set(
-        trips
+        filtered
           .map(t => t.type?.trim().toUpperCase())
           .filter(Boolean)
       )
     ).sort();
 
-    // Stats para os Donuts de Mix (Visão Global do Período)
+    // Stats para os Donuts de Mix (Visão Macro do Período)
     const mixStats = statsCalculator.calculateFullDashboardStats(filtered, 'client');
 
     const typeCounts: Record<string, number> = {};
@@ -75,16 +83,20 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
     return { filtered, categories, types, mixStats, typeCounts, total: filtered.length };
   }, [trips, activePeriod]);
 
-  // Efeito para garantir que a categoria inicial do Core seja válida
+  // Efeito para garantir que a categoria inicial do Core seja válida e não "GERAL"
   useEffect(() => {
-    if ((!coreCategory || !availableData.categories.includes(coreCategory)) && availableData.categories.length > 0) {
-      setCoreCategory(availableData.categories[0]);
+    if (availableData.categories.length > 0) {
+      if (!coreCategory || !availableData.categories.includes(coreCategory)) {
+        setCoreCategory(availableData.categories[0]);
+      }
     }
-  }, [availableData.categories, coreCategory]);
+  }, [availableData.categories]);
 
-  // Cálculo do Category Core Analysis (Apenas categorias reais normalizadas)
+  // Cálculo do Category Core Analysis (Apenas categorias filtradas e normalizadas)
   const coreStats = useMemo(() => {
-    const subset = availableData.filtered.filter(t => normalizeCat(t.category) === coreCategory);
+    if (!coreCategory) return { total: 0, typeDistribution: {} };
+
+    const subset = availableData.filtered.filter(t => strictNormalize(t.category) === coreCategory);
     
     const total = subset.length;
     const typeDistribution: Record<string, number> = {};
@@ -98,7 +110,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
   const getFilteredStatsForCard = (cardKey: keyof typeof cardFilters) => {
     let subset = availableData.filtered;
     const f = cardFilters[cardKey];
-    if (f.cat !== 'TODAS') subset = subset.filter(t => normalizeCat(t.category) === normalizeCat(f.cat));
+    if (f.cat !== 'TODAS') subset = subset.filter(t => strictNormalize(t.category) === strictNormalize(f.cat));
     if (f.type !== 'TODOS') subset = subset.filter(t => t.type?.toUpperCase() === f.type.toUpperCase());
     return statsCalculator.calculateFullDashboardStats(subset, cardKey === 'driver' ? 'driver' : 'client');
   };
@@ -234,7 +246,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
         ))}
       </div>
 
-      {/* 2. GRÁFICOS DE PIZZA (DONUTS) */}
+      {/* 2. GRÁFICOS DE PIZZA (DONUTS) - MANTIDOS COMO VISÃO GERAL */}
       <div className="bg-white p-10 rounded-[3.5rem] border border-slate-200 shadow-sm grid grid-cols-1 lg:grid-cols-2 gap-12">
           <div className="space-y-8">
             <div className="flex items-center justify-between">
@@ -259,7 +271,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
           </div>
       </div>
 
-      {/* 3. CATEGORY CORE ANALYSIS */}
+      {/* 3. CATEGORY CORE ANALYSIS - CORRIGIDO E FILTRADO */}
       <div className="bg-slate-900 p-10 rounded-[4rem] shadow-2xl relative overflow-hidden">
          <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none">
             <svg className="w-64 h-64 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
@@ -269,12 +281,14 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
             <div className="flex flex-col items-center mb-10">
                <h3 className="text-blue-400 text-xs font-black uppercase tracking-[0.4em] mb-4">Análise de Núcleo Setorial</h3>
                <select 
-                 className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-2xl text-sm font-black uppercase outline-none focus:border-blue-500 transition-all cursor-pointer"
+                 className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-2xl text-sm font-black uppercase outline-none focus:border-blue-500 transition-all cursor-pointer min-w-[280px]"
                  value={coreCategory}
                  onChange={e => setCoreCategory(e.target.value)}
                >
-                 {availableData.categories.map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)}
-                 {availableData.categories.length === 0 && <option value="">Sem categorias no período</option>}
+                 {availableData.categories.map(c => (
+                   <option key={c} value={c} className="bg-slate-900">{c}</option>
+                 ))}
+                 {availableData.categories.length === 0 && <option value="">Sem dados registrados no período</option>}
                </select>
             </div>
 
@@ -289,7 +303,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
                   <div className="absolute inset-[-40px] rounded-full border border-white/5 animate-[spin_30s_linear_infinite_reverse]"></div>
                </div>
 
-               {/* Mini-Pulses (Tipos de Operação) */}
+               {/* Mini-Pulses (Tipos de Operação dentro da Categoria) */}
                <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-6 w-full max-w-2xl">
                   {(Object.entries(coreStats.typeDistribution) as [string, number][]).map(([type, count]) => (
                     <div key={type} className="bg-white/5 border border-white/10 p-5 rounded-[2rem] flex flex-col items-center text-center group hover:bg-white/10 transition-all">
