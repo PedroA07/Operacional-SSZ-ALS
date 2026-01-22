@@ -35,6 +35,24 @@ export interface LoginCredential {
   createdAt: string;
 }
 
+export interface SealBatch {
+  id: string;
+  carrier: string;
+  startNumber: string;
+  endNumber: string;
+  createdAt: string;
+}
+
+export interface SealRecord {
+  id: string;
+  batchId: string;
+  sealNumber: string;
+  containerNumber: string;
+  booking: string;
+  reuseDate: string;
+  driverName: string;
+}
+
 export interface StaySession {
   id: string;
   category: string;
@@ -133,7 +151,8 @@ export enum DashboardTab {
   PRE_STACKING = 'PRE_STACKING',
   DOCUMENTOS = 'DOCUMENTOS',
   ESTADIAS = 'ESTADIAS',
-  LOGINS = 'COFRE_DE_LOGINS'
+  LOGINS = 'COFRE_DE_LOGINS',
+  LACRES = 'CONTROLE_DE_LACRES'
 }
 
 export type TripStatus = 

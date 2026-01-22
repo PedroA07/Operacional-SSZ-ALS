@@ -115,6 +115,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             <button onClick={() => setActiveTab(DashboardTab.LOGINS)} className={`w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase transition-colors ${activeTab === DashboardTab.LOGINS ? 'text-blue-400' : 'text-slate-500 hover:text-white'}`}>
               • Cofre de Logins
             </button>
+            <button onClick={() => setActiveTab(DashboardTab.LACRES)} className={`w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase transition-colors ${activeTab === DashboardTab.LACRES ? 'text-blue-400' : 'text-slate-500 hover:text-white'}`}>
+              • Controle de Lacres
+            </button>
         </MenuItem>
 
         <div className="pt-6 pb-2">

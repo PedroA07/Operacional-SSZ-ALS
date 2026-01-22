@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus, StaySession, StayRecord, LoginCredential } from '../types';
+import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus, StaySession, StayRecord, LoginCredential, SealBatch, SealRecord } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
@@ -116,6 +116,62 @@ export const db = {
   deleteLogin: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('external_logins').delete().eq('id', id);
+    return !error;
+  },
+
+  // LACRES
+  getSealBatches: async (): Promise<SealBatch[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(b => ({
+      id: b.id, carrier: b.carrier, startNumber: b.start_number, endNumber: b.end_number, createdAt: b.created_at
+    }));
+  },
+
+  saveSealBatch: async (batch: SealBatch, records: Partial<SealRecord>[]) => {
+    if (!supabase) return false;
+    const { data, error } = await supabase.from('seal_batches').insert({
+      carrier: batch.carrier, start_number: batch.startNumber, end_number: batch.endNumber
+    }).select().single();
+    
+    if (error || !data) return false;
+
+    const finalRecords = records.map(r => ({
+      batch_id: data.id,
+      seal_number: r.sealNumber,
+      container_number: '',
+      booking: '',
+      driver_name: ''
+    }));
+
+    await supabase.from('seal_records').insert(finalRecords);
+    return true;
+  },
+
+  deleteSealBatch: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('seal_batches').delete().eq('id', id);
+    return !error;
+  },
+
+  getSealRecords: async (batchId: string): Promise<SealRecord[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('seal_records').select('*').eq('batch_id', batchId).order('seal_number');
+    if (error) throw error;
+    return (data || []).map(r => ({
+      id: r.id, batchId: r.batch_id, sealNumber: r.seal_number, containerNumber: r.container_number || '', booking: r.booking || '', reuseDate: r.reuse_date || '', driverName: r.driver_name || ''
+    }));
+  },
+
+  updateSealRecord: async (record: SealRecord) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('seal_records').update({
+      container_number: record.containerNumber,
+      booking: record.booking,
+      reuse_date: record.reuseDate || null,
+      driver_name: record.driverName
+    }).eq('id', record.id);
     return !error;
   },
 
@@ -288,18 +344,10 @@ export const db = {
     const { data, error } = await supabase.from('stay_records').select('*').eq('session_id', sessionId).order('created_at');
     if (error) throw error;
     return (data || []).map(r => ({
-      id: r.id,
-      sessionId: r.session_id,
-      type: r.type,
-      os: r.os,
-      location: r.location,
-      driverName: r.driver_name,
-      ship: r.ship,
-      container: r.container,
-      scheduledStart: r.scheduled_start,
-      arrivalTime: r.arrival_time,
-      departureTime: r.departure_time,
-      exceededHours: r.exceeded_hours
+      id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
+      driver_name: r.driver_name, ship: r.ship, container: r.container,
+      scheduled_start: r.scheduled_start, arrival_time: r.arrival_time,
+      departure_time: r.departure_time, exceeded_hours: r.exceeded_hours
     }));
   },
 
