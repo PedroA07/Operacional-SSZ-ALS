@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus, StaySession, StayRecord } from '../types';
+import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus, StaySession, StayRecord, LoginCredential } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
@@ -63,13 +63,6 @@ export const db = {
     return await driverRepository.delete(supabase, id);
   },
 
-  getDriverByCPF: async (cpf: string): Promise<Driver | null> => {
-    if (!supabase) return null;
-    const { data, error } = await supabase.from('drivers').select('*').eq('cpf', cpf).maybeSingle();
-    if (error) return null;
-    return data ? driverRepository.mapFromDb(data) : null;
-  },
-
   getTrips: async (): Promise<Trip[]> => {
     if (!supabase) return [];
     const trips = await tripRepository.getAll(supabase);
@@ -89,6 +82,40 @@ export const db = {
   deleteTrip: async (id: string, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('trips').delete().eq('id', id);
+    return !error;
+  },
+
+  getLogins: async (): Promise<LoginCredential[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('external_logins').select('*').order('site_name');
+    if (error) throw error;
+    return (data || []).map(l => ({
+      id: l.id,
+      siteName: l.site_name,
+      url: l.url,
+      username: l.username,
+      password: l.password,
+      additionalFields: l.additional_fields || [],
+      createdAt: l.created_at
+    }));
+  },
+
+  saveLogin: async (login: LoginCredential) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('external_logins').upsert({
+      id: login.id.startsWith('new-') ? undefined : login.id,
+      site_name: login.siteName,
+      url: login.url,
+      username: login.username,
+      password: login.password,
+      additional_fields: login.additionalFields
+    });
+    return !error;
+  },
+
+  deleteLogin: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('external_logins').delete().eq('id', id);
     return !error;
   },
 
@@ -262,9 +289,9 @@ export const db = {
     if (error) throw error;
     return (data || []).map(r => ({
       id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
-      driverName: r.driver_name, ship: r.ship, container: r.container,
-      scheduledStart: r.scheduled_start, arrivalTime: r.arrival_time,
-      departureTime: r.departure_time, exceededHours: r.exceeded_hours
+      driver_name: r.driver_name, ship: r.ship, container: r.container,
+      scheduled_start: r.scheduled_start, arrival_time: r.arrival_time,
+      departure_time: r.departure_time, exceeded_hours: r.exceeded_hours
     }));
   },
 

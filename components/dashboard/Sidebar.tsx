@@ -111,6 +111,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         <MenuItem tab={DashboardTab.PORTOS} label="Portos" icon={<Icons.Portos />} />
         <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" icon={<Icons.PreStacking />} />
         
+        <MenuItem label="Outros" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>}>
+            <button onClick={() => setActiveTab(DashboardTab.LOGINS)} className={`w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase transition-colors ${activeTab === DashboardTab.LOGINS ? 'text-blue-400' : 'text-slate-500 hover:text-white'}`}>
+              • Cofre de Logins
+            </button>
+        </MenuItem>
+
         <div className="pt-6 pb-2">
            {sidebarState === 'open' && <p className="px-5 text-[8px] font-black text-slate-600 uppercase mb-3 tracking-[0.3em]">Administração</p>}
            <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" icon={<Icons.Equipe />} />

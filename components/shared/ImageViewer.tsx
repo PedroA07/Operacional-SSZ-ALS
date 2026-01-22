@@ -16,7 +16,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   const [isLoading, setIsLoading] = useState(true);
   const [retryWithoutCORS, setRetryWithoutCORS] = useState(false);
   
-  // Detecção robusta: Verifica se termina em .pdf ou contém .pdf antes de parâmetros ? ou #
+  // Detecção robusta de PDF no R2: Ignora maiúsculas e busca .pdf antes de qualquer parâmetro
   const isPDF = url.toLowerCase().match(/\.pdf($|\?|#)/) || url.startsWith('data:application/pdf');
   
   const { scale, setScale, resetZoom, zoomIn, zoomOut } = useMouseZoom({ containerRef });
@@ -74,7 +74,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     }
   };
 
-  // RENDERIZAÇÃO PARA PDF (エンジン NATIVO)
+  // RENDERIZAÇÃO PARA PDF (NATÍSTICA DO NAVEGADOR)
   if (isPDF) {
     return (
       <div className={`relative w-full h-full bg-slate-100 rounded-[2.5rem] overflow-hidden border border-slate-200 ${className}`}>
@@ -83,7 +83,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
           className="w-full h-full border-none shadow-inner bg-white"
           title={alt}
           onLoad={() => setIsLoading(false)}
-          sandbox="allow-scripts allow-same-origin allow-popups"
         />
         {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-10">
@@ -91,7 +90,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
             <p className="text-[9px] font-black text-blue-600 uppercase mt-4 tracking-[0.3em] animate-pulse">Injetando PDF Reader...</p>
           </div>
         )}
-        <div className="absolute top-4 right-4 z-20">
+        <div className="absolute top-4 right-4 z-20 flex gap-2">
            <button 
              onClick={() => window.open(url, '_blank')}
              className="px-4 py-2 bg-slate-900/80 text-white rounded-xl text-[8px] font-black uppercase backdrop-blur-md border border-white/10 hover:bg-blue-600 transition-all shadow-xl"
@@ -103,7 +102,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
     );
   }
 
-  // RENDERIZAÇÃO PARA IMAGEM
+  // RENDERIZAÇÃO PARA IMAGEM (COM ZOOM/PAN)
   return (
     <div 
       ref={containerRef}
@@ -127,7 +126,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
             <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
-            <p className="text-white font-black uppercase text-[10px]">Falha de Carregamento de Imagem</p>
+            <p className="text-white font-black uppercase text-[10px]">Falha de Carregamento</p>
             <div className="flex flex-col gap-2">
                <button onClick={() => window.open(url, '_blank')} className="px-5 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg">Abrir Direto</button>
                <p className="text-[8px] text-slate-500 font-bold uppercase">Se o arquivo for um PDF, verifique a extensão</p>

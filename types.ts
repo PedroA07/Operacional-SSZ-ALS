@@ -25,6 +25,16 @@ export interface User {
   presence_status?: PresenceStatus;
 }
 
+export interface LoginCredential {
+  id: string;
+  siteName: string;
+  url: string;
+  username: string;
+  password: string;
+  additionalFields: { label: string; value: string }[];
+  createdAt: string;
+}
+
 export interface StaySession {
   id: string;
   category: string;
@@ -122,7 +132,8 @@ export enum DashboardTab {
   PORTOS = 'PORTOS',
   PRE_STACKING = 'PRE_STACKING',
   DOCUMENTOS = 'DOCUMENTOS',
-  ESTADIAS = 'ESTADIAS'
+  ESTADIAS = 'ESTADIAS',
+  LOGINS = 'COFRE_DE_LOGINS'
 }
 
 export type TripStatus = 
@@ -144,9 +155,6 @@ export type TripStatus =
   | 'Saiu da Volkswagen'
   | 'Container sobre rodas';
 
-/**
- * Added VWStatus type alias for TripStatus to resolve import errors.
- */
 export type VWStatus = TripStatus;
 
 export interface StatusHistoryEntry {
