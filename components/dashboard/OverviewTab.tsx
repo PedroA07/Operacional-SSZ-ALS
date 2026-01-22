@@ -13,6 +13,8 @@ import DriverStatusCards from './overview/DriverStatusCards';
 import RecentActivitiesCard from './overview/RecentActivitiesCard';
 import KpiVisualizer from './overview/KpiVisualizer';
 import DonutChart from './overview/DonutChart';
+import WeeklyTrendChart from './overview/WeeklyTrendChart';
+import CategoryVolumeChart from './overview/CategoryVolumeChart';
 
 interface OverviewTabProps {
   trips: Trip[];
@@ -32,23 +34,19 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   const [sealStats, setSealStats] = useState({ used: 0, available: 0, total: 0 });
   const [isLoadingSeals, setIsLoadingSeals] = useState(false);
 
-  // Lógica aprimorada para contagem unitária de lacres
   useEffect(() => {
     const countSeals = async () => {
       setIsLoadingSeals(true);
       try {
         let used = 0;
         let available = 0;
-        
         for (const batch of sealBatches) {
           const records = await db.getSealRecords(batch.id);
           const batchUsed = records.filter(r => r.containerNumber && r.containerNumber.trim() !== '').length;
           const batchAvail = records.length - batchUsed;
-          
           used += batchUsed;
           available += batchAvail;
         }
-        
         setSealStats({ used, available, total: used + available });
       } catch (e) {
         console.error("Erro no processamento de estoque:", e);
@@ -56,12 +54,10 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         setIsLoadingSeals(false);
       }
     };
-    
     if (sealBatches.length > 0) countSeals();
     else setSealStats({ used: 0, available: 0, total: 0 });
   }, [sealBatches]);
 
-  // Estatísticas Avantida
   const avantidaStats = React.useMemo(() => {
     const total = avantidaRecords.length;
     const verified = avantidaRecords.filter(r => r.verified).length;
@@ -76,7 +72,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-6">
            <div className="w-14 h-14 bg-blue-600/10 text-blue-600 rounded-[1.8rem] flex items-center justify-center shadow-inner shrink-0">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
            </div>
            <div>
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight leading-none">Painel de Performance ALS</h2>
@@ -97,16 +93,20 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
 
       {viewMode === 'CARDS' ? (
         <>
+          {/* DASHBOARD DE BI SUPERIOR */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+             <WeeklyTrendChart trips={trips} />
+             <CategoryVolumeChart trips={trips} />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <TripsYesterday trips={trips} />
             <TripsToday trips={trips} />
             <TripsTomorrow trips={trips} />
           </div>
 
-          {/* MONITORES ADMINISTRATIVOS REESTRUTURADOS */}
+          {/* MONITORES ADMINISTRATIVOS */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-             
-             {/* MONITOR AVANTIDA (Ajustado para não cortar informações) */}
              <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-10">
                 <div className="w-36 h-36 shrink-0 relative flex items-center justify-center">
                    <DonutChart 
@@ -133,12 +133,10 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 </div>
              </div>
 
-             {/* MONITOR DE LACRES (DETALHADO) */}
              <div className="bg-slate-950 p-10 rounded-[3rem] border border-white/5 shadow-2xl flex flex-col sm:flex-row items-center gap-10 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
                    <svg className="w-48 h-48 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
                 </div>
-                
                 <div className="w-36 h-36 bg-gradient-to-br from-blue-600 to-blue-800 rounded-[2.5rem] flex flex-col items-center justify-center text-white shadow-2xl shrink-0 border border-white/10">
                    {isLoadingSeals ? (
                      <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -150,7 +148,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                      </>
                    )}
                 </div>
-
                 <div className="flex-1 w-full space-y-6">
                    <div className="flex justify-between items-center">
                       <div>
@@ -161,26 +158,17 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                          <span className="px-3 py-1 bg-white/5 rounded-lg text-[9px] font-black text-slate-400 uppercase border border-white/5">{sealBatches.length} Lotes</span>
                       </div>
                    </div>
-
                    <div className="space-y-4">
-                      {/* BARRA DE PROGRESSO DUPLA */}
                       <div className="space-y-1.5">
                          <div className="flex justify-between text-[8px] font-black uppercase tracking-widest px-1">
                             <span className="text-slate-500">Utilizados: {sealStats.used}</span>
                             <span className="text-blue-400">Total: {sealStats.total}</span>
                          </div>
                          <div className="h-3 bg-white/5 rounded-full overflow-hidden flex border border-white/5">
-                            <div 
-                               className="h-full bg-slate-700 transition-all duration-1000" 
-                               style={{ width: `${(sealStats.used / (sealStats.total || 1)) * 100}%` }}
-                            ></div>
-                            <div 
-                               className="h-full bg-blue-500 animate-pulse transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" 
-                               style={{ width: `${(sealStats.available / (sealStats.total || 1)) * 100}%` }}
-                            ></div>
+                            <div className="h-full bg-slate-700 transition-all duration-1000" style={{ width: `${(sealStats.used / (sealStats.total || 1)) * 100}%` }}></div>
+                            <div className="h-full bg-blue-500 animate-pulse transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${(sealStats.available / (sealStats.total || 1)) * 100}%` }}></div>
                          </div>
                       </div>
-                      
                       <div className="grid grid-cols-2 gap-4">
                          <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
                             <p className="text-[7px] font-black text-slate-500 uppercase">Saíram p/ Viagem</p>
