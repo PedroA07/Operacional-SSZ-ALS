@@ -401,10 +401,10 @@ export const db = {
       driverName: r.driver_name,
       ship: r.ship,
       container: r.container,
-      scheduled_start: r.scheduled_start,
-      arrival_time: r.arrival_time,
-      departure_time: r.departure_time,
-      exceeded_hours: r.exceeded_hours
+      scheduledStart: r.scheduled_start,
+      arrivalTime: r.arrival_time,
+      departureTime: r.departure_time,
+      exceededHours: r.exceeded_hours
     }));
   },
 
