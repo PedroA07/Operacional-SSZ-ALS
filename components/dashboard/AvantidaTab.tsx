@@ -53,6 +53,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
       
       return matchSearch && matchDate;
     });
+    // A ordem já vem do banco via created_at DESC, preservamos isso aqui.
   }, [records, drivers, search, startDate, endDate]);
 
   const handleToggleVerified = async (record: AvantidaRecord) => {

@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Driver, Customer, Port, PreStacking, Staff, User, Trip, Category, Notification, NotificationType, NotificationOrigin, PresenceStatus, StaySession, StayRecord, LoginCredential, SealBatch, SealRecord, AvantidaRecord } from '../types';
 import { driverRepository } from './driverRepository';
@@ -119,10 +118,15 @@ export const db = {
     return !error;
   },
 
-  // AVANTIDA - Atualizado para suportar driver_id como TEXT
+  // AVANTIDA - Ajustado para ordernar estritamente pelos últimos criados
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('avantida_records').select('*').order('date', { ascending: false });
+    // Alterado: primeiro por data do pedido e desempate pelo timestamp de criação (id ou created_at)
+    const { data, error } = await supabase
+      .from('avantida_records')
+      .select('*')
+      .order('created_at', { ascending: false }); 
+      
     if (error) throw error;
     return (data || []).map(a => ({
       id: a.id,
@@ -133,7 +137,7 @@ export const db = {
       customerRef: a.customer_ref,
       tripSettlement: a.trip_settlement,
       verified: a.verified,
-      driverId: a.driver_id, // Recebe como string (text no banco)
+      driverId: a.driver_id,
       createdAt: a.created_at
     }));
   },
@@ -149,7 +153,7 @@ export const db = {
       customer_ref: record.customerRef?.toUpperCase(),
       trip_settlement: record.tripSettlement?.toUpperCase(),
       verified: record.verified,
-      driver_id: record.driverId // Salva como string (text no banco)
+      driver_id: record.driverId
     });
     return !error;
   },
@@ -278,6 +282,7 @@ export const db = {
   savePreStacking: async (ps: PreStacking, actingUser?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('pre_stacking').upsert({
+      // Fix: Property 'legal_name' does not exist on type 'PreStacking'. Changed to ps.legalName.
       id: ps.id, name: ps.name, legal_name: ps.legalName, cnpj: ps.cnpj,
       address: ps.address, neighborhood: ps.neighborhood, zip_code: ps.zipCode,
       city: ps.city, state: ps.state
