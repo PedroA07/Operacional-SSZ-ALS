@@ -13,9 +13,8 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total, colors = ['#2563eb
   let currentOffset = 0;
 
   return (
-    <div className="flex flex-col md:flex-row items-center gap-10">
-      <div className="relative w-48 h-48 shrink-0 flex items-center justify-center">
-        {/* viewBox 44x44 com círculos em 22,22 r=15.9 permite strokeWidth 6 sem cortar */}
+    <div className="flex flex-col md:flex-row items-center gap-6 w-full">
+      <div className="relative w-32 h-32 shrink-0 flex items-center justify-center">
         <svg viewBox="0 0 44 44" className="w-full h-full transform -rotate-90 overflow-visible">
           {entries.map(([label, value], idx) => {
             const percentage = total > 0 ? (value / total) * 100 : 0;
@@ -39,21 +38,20 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, total, colors = ['#2563eb
           })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-3xl font-black text-slate-800">{total}</span>
-          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Movimentações</span>
+          <span className="text-xl font-black text-slate-800">{total}</span>
+          <span className="text-[7px] font-black text-slate-400 uppercase tracking-tight">Total</span>
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 w-full">
+      <div className="flex-1 space-y-2 w-full">
         {entries.map(([label, value], idx) => (
-          <div key={label} className="flex items-center justify-between group p-2 hover:bg-slate-50 rounded-xl transition-colors">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-2.5 h-2.5 rounded-md shrink-0" style={{ backgroundColor: colors[idx % colors.length] }}></div>
-              <span className="text-[10px] font-black text-slate-600 uppercase truncate pr-2">{label}</span>
+          <div key={label} className="flex items-center justify-between group rounded-xl">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors[idx % colors.length] }}></div>
+              <span className="text-[9px] font-black text-slate-500 uppercase truncate pr-2">{label}</span>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <span className="text-[10px] font-mono font-bold text-blue-500">{total > 0 ? Math.round((value / total) * 100) : 0}%</span>
-              <span className="text-[11px] font-black text-slate-800 w-8 text-right">{value}</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] font-black text-slate-800 text-right">{value}</span>
             </div>
           </div>
         ))}

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Trip, Driver, User } from '../../types';
+import { Trip, Driver, User, AvantidaRecord, SealBatch } from '../../types';
 import TripsYesterday from './overview/TripsYesterday';
 import TripsToday from './overview/TripsToday';
 import TripsTomorrow from './overview/TripsTomorrow';
@@ -11,17 +11,22 @@ import DelayedTrips from './overview/DelayedTrips';
 import DriverStatusCards from './overview/DriverStatusCards';
 import RecentActivitiesCard from './overview/RecentActivitiesCard';
 import KpiVisualizer from './overview/KpiVisualizer';
+import DonutChart from './overview/DonutChart';
 
 interface OverviewTabProps {
   trips: Trip[];
   drivers: Driver[];
+  avantidaRecords: AvantidaRecord[];
+  sealBatches: SealBatch[];
   onRefresh: () => Promise<void>;
   lastSyncTime: string;
   isSyncing: boolean;
   user: User;
 }
 
-const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, lastSyncTime, isSyncing, user }) => {
+const OverviewTab: React.FC<OverviewTabProps> = ({ 
+  trips, drivers, avantidaRecords, sealBatches, onRefresh, lastSyncTime, isSyncing, user 
+}) => {
   const [viewMode, setViewMode] = useState<'CARDS' | 'ANALYTICS'>(() => {
     return (localStorage.getItem('als_overview_mode') as 'CARDS' | 'ANALYTICS') || 'CARDS';
   });
@@ -30,6 +35,24 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
     setViewMode(mode);
     localStorage.setItem('als_overview_mode', mode);
   };
+
+  // Cálculos Administrativos
+  const avantidaStats = React.useMemo(() => {
+    const total = avantidaRecords.length;
+    const verified = avantidaRecords.filter(r => r.verified).length;
+    const pending = total - verified;
+    return { total, verified, pending };
+  }, [avantidaRecords]);
+
+  // Simplificação para Dashboard: Soma de todos os lotes
+  // Em um app real, buscaríamos contagem via SQL agregada por performance
+  const lacresStats = React.useMemo(() => {
+    // Nota: Como não temos SealRecord[] aqui por performance, estimamos 
+    // ou assumimos que o campo total e used foram injetados no Dashboard
+    // Para fins de UI, usaremos contagem de lotes ou placeholders se os registros individuais forem muitos
+    const totalBatches = sealBatches.length;
+    return { totalBatches };
+  }, [sealBatches]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -91,6 +114,62 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, onRefresh, la
             <TripsThisWeek trips={trips} />
             <TripsThisMonth trips={trips} />
             <TripsThisYear trips={trips} />
+          </div>
+
+          {/* NOVA SEÇÃO: MONITORAMENTO ADMINISTRATIVO */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+             {/* CARD AVANTIDA */}
+             <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-10 hover:shadow-xl transition-all">
+                <div className="shrink-0 w-36 h-36">
+                   <DonutChart 
+                     data={{ 
+                       "CONFERIDO": avantidaStats.verified, 
+                       "PENDENTE": avantidaStats.pending 
+                     }} 
+                     total={avantidaStats.total} 
+                     colors={['#10b981', '#f59e0b']}
+                   />
+                </div>
+                <div className="flex-1 space-y-4 text-center md:text-left">
+                   <div>
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Auditoria Avantida</h3>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Conformidade de Reuso</p>
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
+                         <p className="text-[8px] font-black text-emerald-600 uppercase">Verificados</p>
+                         <p className="text-xl font-black text-emerald-700">{avantidaStats.verified}</p>
+                      </div>
+                      <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100">
+                         <p className="text-[8px] font-black text-amber-600 uppercase">Pendentes</p>
+                         <p className="text-xl font-black text-amber-700">{avantidaStats.pending}</p>
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             {/* CARD LACRES */}
+             <div className="bg-slate-900 p-10 rounded-[3rem] border border-white/5 shadow-2xl flex flex-col md:flex-row items-center gap-10 hover:shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all">
+                <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white shadow-xl rotate-3">
+                   <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                </div>
+                <div className="flex-1 space-y-4">
+                   <div>
+                      <h3 className="text-sm font-black text-blue-400 uppercase tracking-widest">Estoque de Lacres</h3>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Gestão de Lotes por Armador</p>
+                   </div>
+                   <div className="space-y-2">
+                      <div className="flex justify-between items-end px-1">
+                         <span className="text-[9px] font-black text-slate-500 uppercase">Lotes Ativos</span>
+                         <span className="text-xl font-black text-white">{lacresStats.totalBatches}</span>
+                      </div>
+                      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                         <div className="h-full bg-blue-500 animate-pulse w-[65%]"></div>
+                      </div>
+                      <p className="text-[7px] text-slate-600 font-black uppercase text-center tracking-[0.2em]">Monitoramento de Inventário</p>
+                   </div>
+                </div>
+             </div>
           </div>
 
           <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 transition-opacity duration-300 ${isSyncing ? 'opacity-70' : 'opacity-100'}`}>

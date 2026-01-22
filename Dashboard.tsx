@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category } from './types';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
 import DriversTab from './components/dashboard/DriversTab';
 import FormsTab from './components/dashboard/FormsTab';
@@ -45,6 +45,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [avantidaRecords, setAvantidaRecords] = useState<AvantidaRecord[]>([]);
+  const [sealBatches, setSealBatches] = useState<SealBatch[]>([]);
   const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
   
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
@@ -74,7 +76,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         db.getPreStacking(),
         db.getStaff(),
         db.getTrips(),
-        db.getCategories()
+        db.getCategories(),
+        db.getAvantidaRecords(),
+        db.getSealBatches()
       ]);
 
       if (responses[0].status === 'fulfilled') setDrivers(responses[0].value);
@@ -84,6 +88,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[4].status === 'fulfilled') setStaffList(responses[4].value);
       if (responses[5].status === 'fulfilled') setTrips(responses[5].value);
       if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
+      if (responses[7].status === 'fulfilled') setAvantidaRecords(responses[7].value);
+      if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value);
 
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
     } catch (e) {
@@ -213,6 +219,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              <OverviewTab 
                trips={trips} 
                drivers={drivers} 
+               avantidaRecords={avantidaRecords}
+               sealBatches={sealBatches}
                onRefresh={() => loadAllData(false)} 
                lastSyncTime={lastSyncTime} 
                isSyncing={isSyncing} 
