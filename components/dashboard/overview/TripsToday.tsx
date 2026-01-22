@@ -51,6 +51,13 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
 
   const allOpTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [todayRaw]);
 
+  // Função auxiliar para definir a cor do item na lista de hoje
+  const getTripItemStyle = (status: string) => {
+    if (status === 'Viagem concluída') return 'bg-emerald-50/50 border-emerald-100 text-emerald-700';
+    if (['Em viagem', 'Chegou no cliente', 'Saiu do cliente'].includes(status)) return 'bg-blue-50 border-blue-200 text-blue-800 shadow-sm';
+    return 'bg-amber-50/30 border-amber-100 text-amber-700'; // Pendentes
+  };
+
   return (
     <div className="relative" style={{ zIndex: isOpen ? 500 : 10 }}>
       <button 
@@ -97,18 +104,26 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
           </div>
           <div className="overflow-y-auto custom-scrollbar p-5 space-y-3 flex-1 bg-slate-50/30 min-h-[300px] rounded-b-[2.5rem]">
             {displayTrips.map(trip => (
-              <div key={trip.id} className="p-4 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex items-center justify-between">
+              <div key={trip.id} className={`p-4 border rounded-[2rem] shadow-sm flex items-center justify-between transition-all ${getTripItemStyle(trip.status)}`}>
                 <div className="min-w-0">
-                  <span className="text-[10px] font-black text-blue-600">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-                  <h4 className="text-[11px] font-black text-slate-800 uppercase truncate leading-none mt-1">{trip.driver.name}</h4>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 truncate">{trip.customer.name}</p>
+                  <div className="flex items-center gap-2">
+                     <span className="text-[10px] font-black">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                     <div className={`w-1 h-1 rounded-full ${trip.status === 'Viagem concluída' ? 'bg-emerald-400' : 'bg-blue-400'}`}></div>
+                  </div>
+                  <h4 className="text-[11px] font-black uppercase truncate leading-none mt-1">{trip.driver.name}</h4>
+                  <p className="text-[9px] font-bold opacity-60 uppercase mt-0.5 truncate">{trip.customer.name}</p>
                 </div>
                 <div className="flex flex-col items-end shrink-0">
-                   <span className="bg-slate-900 text-white px-2 py-1 rounded text-[9px] font-mono font-bold uppercase">{trip.driver.plateHorse}</span>
-                   <span className={`text-[8px] font-black uppercase mt-1.5 ${trip.status === 'Viagem concluída' ? 'text-emerald-500' : 'text-blue-500'}`}>{trip.status}</span>
+                   <span className="bg-slate-900 text-white px-2 py-1 rounded text-[9px] font-mono font-bold uppercase shadow-sm">{trip.driver.plateHorse}</span>
+                   <span className="text-[8px] font-black uppercase mt-1.5 opacity-80">{trip.status}</span>
                 </div>
               </div>
             ))}
+            {displayTrips.length === 0 && (
+              <div className="py-20 text-center opacity-30">
+                 <p className="text-[10px] font-black uppercase tracking-widest">Sem viagens no filtro atual</p>
+              </div>
+            )}
           </div>
         </div>
       )}

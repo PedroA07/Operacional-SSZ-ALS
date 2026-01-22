@@ -82,6 +82,9 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
               </div>
             </div>
           ))}
+          {sortedData.length === 0 && (
+             <p className="text-center py-10 text-[9px] font-black text-slate-300 uppercase italic">Sem dados registrados</p>
+          )}
         </div>
       </div>
     );
@@ -104,7 +107,7 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
 
         <div className="flex bg-slate-100 p-1.5 rounded-2xl">
            {(['WEEK', 'MONTH', 'YEAR'] as const).map(p => (
-             <button key={p} onClick={() => setActivePeriod(p)} className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activePeriod === p ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{p === 'WEEK' ? 'Semana' : p === 'MONTH' ? 'Mês' : 'Ano'}</button>
+             <button key={p} onClick={() => setActivePeriod(p)} className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activePeriod === p ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{p === 'WEEK' ? 'Semana' : p === 'MONTH' ? 'Mês' : 'Ano'}</button>
            ))}
         </div>
       </div>
@@ -133,8 +136,8 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
              {item.target && (
                 <div className="mt-6 space-y-2">
                    <div className="flex justify-between text-[8px] font-black uppercase">
-                      <span className="text-slate-400">Meta: {item.target} Viagens</span>
-                      <span className="text-emerald-500">{Math.round((item.val as number / item.target) * 100)}% Alcançado</span>
+                      <span className="text-slate-400">Máximo sugerido: {item.target}</span>
+                      <span className="text-emerald-500">{Math.round((item.val as number / item.target) * 100)}% de Eficiência</span>
                    </div>
                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (item.val as number / item.target) * 100)}%` }}></div>
@@ -165,14 +168,14 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
                   <h3 className="text-sm font-black uppercase tracking-widest text-indigo-600">Fatia por Categoria</h3>
                   <KpiInfoIcon kpiKey="PERFORMANCE_ENTIDADES" />
                 </div>
-                <span className="text-[9px] font-bold text-slate-300 uppercase">Vínculos Operacionais</span>
+                <span className="text-[9px] font-bold text-slate-300 uppercase">Vínculos Estratégicos</span>
               </div>
               <DonutChart data={analytics.categoryCounts} total={analytics.total} colors={['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe']} />
            </div>
         </div>
 
         {/* 3. PÓLOS COMERCIAIS */}
-        <div className="bg-slate-900 p-10 rounded-[3.5rem] shadow-2xl text-white flex flex-col relative overflow-hidden">
+        <div className="bg-slate-900 p-10 rounded-[3.5rem] shadow-2xl text-white flex flex-col relative overflow-hidden h-full">
            <div className="absolute top-0 right-0 p-10 opacity-5">
               <svg className="w-48 h-48" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
            </div>
@@ -196,7 +199,8 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
                    <div className="flex items-center gap-3">
                       <span className="text-[11px] font-black text-blue-400">{count} OS</span>
                       <div className="h-1 w-24 bg-white/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500/50" style={{ width: `${(count / analytics.total) * 100}%` }}></div>
+                        {/* Fix: cast Object.values to number[] to fix 'Argument of type unknown is not assignable' error */}
+                        <div className="h-full bg-blue-500/50" style={{ width: `${(count / (Math.max(1, ...Object.values(analytics.clientCities) as number[]))) * 100}%` }}></div>
                       </div>
                    </div>
                 </div>
