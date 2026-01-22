@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 
 export const useMousePan = (scale: number) => {
@@ -6,7 +7,6 @@ export const useMousePan = (scale: number) => {
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
 
   const onMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    // Só permite arrastar se houver algum zoom ou for intenção do usuário
     setIsDragging(true);
     
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
