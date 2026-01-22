@@ -5,29 +5,21 @@ export const DEFAULT_OPERATIONS: OperationDefinition[] = [
   {
     id: 'op-alianca',
     category: 'Aliança',
-    clients: [
-      { name: 'Volkswagen', hasDedicatedPage: false }
-    ]
+    clients: []
   },
   {
     id: 'op-mercosul',
     category: 'Mercosul',
-    clients: [
-      { name: 'Owens', hasDedicatedPage: false }
-    ]
+    clients: []
   },
   {
     id: 'op-industria',
     category: 'Indústria',
-    clients: [
-      { name: 'Diageo', hasDedicatedPage: false }
-    ]
+    clients: []
   },
   {
     id: 'op-carga-solta',
     category: 'Carga Solta',
-    clients: [
-      { name: 'Geral', hasDedicatedPage: false }
-    ]
+    clients: []
   }
 ];

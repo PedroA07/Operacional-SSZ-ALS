@@ -28,7 +28,7 @@ const TripForm: React.FC<TripFormProps> = ({
 
   const [formData, setFormData] = useState<any>({
     os: '', booking: '', ship: '', dateTime: getLocalISOTime(), type: 'EXPORTAÇÃO', status: 'Pendente',
-    category: '', subCategory: '', container: '', tara: '', seal: '', cva: '', 
+    category: '', container: '', tara: '', seal: '', cva: '', 
     containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: '', autColeta: '',
     customer: null, destination: null, driver: null,
     schedulingDate: '' 
@@ -70,14 +70,12 @@ const TripForm: React.FC<TripFormProps> = ({
         driver: editTrip.driver?.name || ''
       });
     } else {
-      // Se tiver uma categoria inicial, usa ela. Senão, tenta pegar a primeira disponível no banco.
       const defaultCat = initialCategory || (categories.length > 0 ? categories[0].name : '');
       
       setFormData(prev => ({
         ...prev,
         category: defaultCat,
         customer: initialCustomer || prev.customer,
-        subCategory: initialCustomer?.name || prev.subCategory,
         dateTime: getLocalISOTime(),
         schedulingDate: ''
       }));
@@ -117,10 +115,10 @@ const TripForm: React.FC<TripFormProps> = ({
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-10 pb-10">
       
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Configuração de Categoria</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Configuração da Categoria</h4>
+        <div className="grid grid-cols-1 gap-6">
             <div className="space-y-1">
-              <label className={labelClass}>Vincular à Categoria (Obrigatório)</label>
+              <label className={labelClass}>Vincular à Categoria do Banco de Dados (Obrigatório)</label>
               <select 
                 required 
                 className={inputClass} 
@@ -129,19 +127,6 @@ const TripForm: React.FC<TripFormProps> = ({
               >
                 <option value="">Selecione uma Categoria...</option>
                 {categories.filter(c => !c.parentId).map(c => (
-                  <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className={labelClass}>Subcategoria</label>
-              <select 
-                className={inputClass} 
-                value={formData.subCategory} 
-                onChange={e => setFormData({...formData, subCategory: e.target.value})}
-              >
-                <option value="">Nenhuma</option>
-                {categories.filter(c => c.parentId && categories.find(p => p.id === c.parentId)?.name === formData.category).map(c => (
                   <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>
                 ))}
               </select>
