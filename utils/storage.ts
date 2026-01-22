@@ -288,10 +288,18 @@ export const db = {
     const { data, error } = await supabase.from('stay_records').select('*').eq('session_id', sessionId).order('created_at');
     if (error) throw error;
     return (data || []).map(r => ({
-      id: r.id, sessionId: r.session_id, type: r.type, os: r.os, location: r.location,
-      driver_name: r.driver_name, ship: r.ship, container: r.container,
-      scheduled_start: r.scheduled_start, arrival_time: r.arrival_time,
-      departure_time: r.departure_time, exceeded_hours: r.exceeded_hours
+      id: r.id,
+      sessionId: r.session_id,
+      type: r.type,
+      os: r.os,
+      location: r.location,
+      driverName: r.driver_name,
+      ship: r.ship,
+      container: r.container,
+      scheduledStart: r.scheduled_start,
+      arrivalTime: r.arrival_time,
+      departureTime: r.departure_time,
+      exceededHours: r.exceeded_hours
     }));
   },
 

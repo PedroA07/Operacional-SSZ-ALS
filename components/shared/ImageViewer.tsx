@@ -16,8 +16,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   const [isLoading, setIsLoading] = useState(true);
   const [retryWithoutCORS, setRetryWithoutCORS] = useState(false);
   
-  // Detecção robusta de PDF no R2: Ignora maiúsculas e busca .pdf antes de qualquer parâmetro
-  const isPDF = url.toLowerCase().match(/\.pdf($|\?|#)/) || url.startsWith('data:application/pdf');
+  // Detecção ultra-robusta: verifica extensão .pdf antes de ? ou #, ou o mimetype base64
+  const isPDF = url.toLowerCase().split(/[?#]/)[0].endsWith('.pdf') || 
+                url.includes('.pdf?') || 
+                url.startsWith('data:application/pdf');
   
   const { scale, setScale, resetZoom, zoomIn, zoomOut } = useMouseZoom({ containerRef });
   const { 
@@ -77,12 +79,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
   // RENDERIZAÇÃO PARA PDF (NATÍSTICA DO NAVEGADOR)
   if (isPDF) {
     return (
-      <div className={`relative w-full h-full bg-slate-100 rounded-[2.5rem] overflow-hidden border border-slate-200 ${className}`}>
+      <div className={`relative w-full h-full bg-slate-100 rounded-[2.5rem] overflow-hidden border border-slate-200 shadow-inner ${className}`}>
         <iframe 
           src={`${url}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`} 
           className="w-full h-full border-none shadow-inner bg-white"
           title={alt}
           onLoad={() => setIsLoading(false)}
+          loading="lazy"
         />
         {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-10">
@@ -126,7 +129,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ url, alt = "Documento", class
             <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
-            <p className="text-white font-black uppercase text-[10px]">Falha de Carregamento</p>
+            <p className="text-white font-black uppercase text-[10px]">Falha de Carregamento de Imagem</p>
             <div className="flex flex-col gap-2">
                <button onClick={() => window.open(url, '_blank')} className="px-5 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg">Abrir Direto</button>
                <p className="text-[8px] text-slate-500 font-bold uppercase">Se o arquivo for um PDF, verifique a extensão</p>
