@@ -76,6 +76,13 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
     }
   };
 
+  // Função para lidar com a mudança de preço na tabela (Máscara de Moeda)
+  const handlePriceChange = (record: AvantidaRecord, value: string) => {
+    const digits = value.replace(/\D/g, '');
+    const num = digits ? parseFloat(digits) / 100 : 0;
+    handleUpdateField(record, 'requestedPrice', num);
+  };
+
   const filteredRecords = useMemo(() => {
     return records
       .filter(r => {
@@ -162,7 +169,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                    <th className="px-6 py-5 w-40">Número do container</th>
                    <th className="px-6 py-5 w-40">Exportar ref.</th>
                    <th className="px-6 py-5 w-32">Data reuso</th>
-                   <th className="px-6 py-5 w-32">Preço pedido (R$)</th>
+                   <th className="px-6 py-5 w-40 text-center">Preço pedido</th>
                    <th className="px-6 py-5">Ref. do cliente</th>
                    <th className="px-6 py-5 text-blue-600 bg-blue-50/20">Acerto de viagem</th>
                    <th className="px-6 py-5 text-right w-16"></th>
@@ -222,7 +229,15 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                       <input type="date" className={inputClass} value={r.reuseDate || ''} onChange={e => handleUpdateField(r, 'reuseDate', e.target.value)} />
                     </td>
                     <td className="px-6 py-4">
-                      <input type="number" step="0.01" className={`${inputClass} text-emerald-600`} value={r.requestedPrice} onChange={e => handleUpdateField(r, 'requestedPrice', Number(e.target.value))} />
+                      <div className="relative group/price">
+                        <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 group-focus-within/price:text-blue-500">R$</span>
+                        <input 
+                          type="text" 
+                          className={`${inputClass} text-emerald-600 pl-6 text-right font-black`} 
+                          value={(r.requestedPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
+                          onChange={e => handlePriceChange(r, e.target.value)} 
+                        />
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <input className={inputClass} value={r.customerRef} onChange={e => handleUpdateField(r, 'customerRef', e.target.value.toUpperCase())} placeholder="CLIENTE" />
