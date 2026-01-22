@@ -28,6 +28,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
     setIsSaving(true);
     try {
       const container = containerNumber.toUpperCase().trim();
+      // Identifica automaticamente o armador usando o motor BIC Code do sistema
       const carrier = lookupCarrierByContainer(container);
       
       const success = await db.saveAvantidaRecord({
@@ -62,7 +63,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         <header className="p-8 border-b bg-slate-50 flex justify-between items-center">
           <div>
             <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Lançamento de Reuso</h3>
-            <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Identificação Unitária</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Identificação Unitária por Container</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>

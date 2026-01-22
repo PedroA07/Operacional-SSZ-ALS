@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { AvantidaRecord, Driver } from '../../types';
 import { db } from '../../utils/storage';
@@ -41,8 +42,8 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
   const handleUpdateField = async (record: AvantidaRecord, field: keyof AvantidaRecord, value: any) => {
     let updated = { ...record, [field]: value };
     
-    // REGRA: Se preencher Acerto de Viagem, marca como Conferido automaticamente
-    if (field === 'tripSettlement' && value && value.trim() !== '') {
+    // REGRA DE OURO: Se o campo "Acerto de Viagem" for preenchido, marca como "Conferido" automaticamente
+    if (field === 'tripSettlement' && value && String(value).trim() !== '') {
       updated.verified = true;
     }
 
@@ -122,13 +123,13 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1700px]">
+          <table className="w-full text-left border-collapse min-w-[1800px]">
              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                   <th className="px-6 py-5 w-40">Linha expedição</th>
-                   <th className="px-6 py-5 w-48">Localização importação</th>
+                   <th className="px-6 py-5 w-48">Linha de expedição</th>
+                   <th className="px-6 py-5 w-48">Localização de importação</th>
                    <th className="px-6 py-5 w-32">Data do pedido</th>
-                   <th className="px-6 py-5 w-16 text-center">Estado</th>
+                   <th className="px-6 py-5 w-24 text-center">Estado</th>
                    <th className="px-6 py-5 w-40">Número do container</th>
                    <th className="px-6 py-5 w-40">Exportar ref.</th>
                    <th className="px-6 py-5 w-32">Data de reutilização</th>
@@ -145,7 +146,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                       <input className={`${inputClass} text-indigo-600`} value={r.shippingLine} onChange={e => handleUpdateField(r, 'shippingLine', e.target.value.toUpperCase())} placeholder="ARMADOR" />
                     </td>
                     <td className="px-6 py-4">
-                      <input className={inputClass} value={r.importLocation} onChange={e => handleUpdateField(r, 'importLocation', e.target.value.toUpperCase())} placeholder="DEPOT" />
+                      <input className={inputClass} value={r.importLocation} onChange={e => handleUpdateField(r, 'importLocation', e.target.value.toUpperCase())} placeholder="SANTOS / DEPOT" />
                     </td>
                     <td className="px-6 py-4">
                       <input type="date" className={inputClass} value={r.date} onChange={e => handleUpdateField(r, 'date', e.target.value)} />
@@ -171,7 +172,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                       <input className={`${inputClass} font-mono text-blue-700 text-[12px] font-black`} value={r.containerNumber} onChange={e => handleUpdateField(r, 'containerNumber', e.target.value.toUpperCase())} />
                     </td>
                     <td className="px-6 py-4">
-                      <input className={inputClass} value={r.exportRef} onChange={e => handleUpdateField(r, 'exportRef', e.target.value.toUpperCase())} placeholder="EXPORT REF" />
+                      <input className={inputClass} value={r.exportRef} onChange={e => handleUpdateField(r, 'exportRef', e.target.value.toUpperCase())} placeholder="---" />
                     </td>
                     <td className="px-6 py-4">
                       <input type="date" className={inputClass} value={r.reuseDate} onChange={e => handleUpdateField(r, 'reuseDate', e.target.value)} />
@@ -194,7 +195,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
           </table>
           {filteredRecords.length === 0 && !isLoading && (
             <div className="py-24 text-center border-t border-slate-50 bg-white">
-               <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum registro localizado</p>
+               <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum registro localizado para o período selecionado</p>
             </div>
           )}
         </div>
