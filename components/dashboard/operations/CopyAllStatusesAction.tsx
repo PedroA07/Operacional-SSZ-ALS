@@ -85,26 +85,30 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
           return h ? reportGenerator.formatFullDate(h.dateTime) : "";
         };
 
+        const formatFullPrediction = (date: Date) => {
+          const dd = String(date.getDate()).padStart(2, '0');
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const yyyy = date.getFullYear();
+          const hh = String(date.getHours()).padStart(2, '0');
+          const min = String(date.getMinutes()).padStart(2, '0');
+          return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+        };
+
         // Lógica Baixa Cragea com Previsão de 45min
         let baixaValue = "";
-        // Fix: Removed 'Baixa Cragea' as it's not a valid TripStatus value (it's a UI label)
         const isFinished = t.status === 'Viagem concluída';
         
         if (isFinished) {
-          // Fix: Removed 'Baixa Cragea' from search terms as it's not stored in history
           baixaValue = getVal(['Viagem concluída']);
-        } else if (t.status === 'Container sobre rodas') {
-          baixaValue = "RODAS";
-        } else if (t.status === 'Saiu da Volkswagen') {
-          // Busca o evento exato de saída da volks
-          const exitEvent = history.find(h => h.status === 'Saiu da Volkswagen');
-          if (exitEvent) {
-             const exitTime = new Date(exitEvent.dateTime);
-             const predTime = new Date(exitTime.getTime() + 45 * 60000); // +45min
-             const hhmm = predTime.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-             baixaValue = `RODAS | PREVISÃO BAIXA: ${hhmm}`;
+        } else if (t.status === 'Container sobre rodas' || t.status === 'Saiu da Volkswagen') {
+          // Busca o evento exato que disparou o status atual no histórico
+          const event = [...history].reverse().find(h => h.status === t.status);
+          if (event) {
+             const eventTime = new Date(event.dateTime);
+             const predTime = new Date(eventTime.getTime() + 45 * 60000); // +45min
+             baixaValue = `CONTAINER SOBRE RODAS | PREVISÃO BAIXA: ${formatFullPrediction(predTime)}`;
           } else {
-             baixaValue = "RODAS";
+             baixaValue = "CONTAINER SOBRE RODAS";
           }
         }
 
@@ -226,7 +230,7 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
                </div>
                <div className="flex-1 flex flex-col space-y-4">
                   <div className="flex items-center justify-between border-b-2 border-emerald-600 pb-2">
-                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Finalizadas / Rodas ({finishedReportData.length})</h4>
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Finalizadas / Container sobre rodas ({finishedReportData.length})</h4>
                   </div>
                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-10">
                      {finishedReportData.map((data, idx) => (
