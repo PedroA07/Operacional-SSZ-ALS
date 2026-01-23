@@ -65,18 +65,9 @@ const TripModal: React.FC<TripModalProps> = ({
       // Horário de Início
       const tripStartTime = new Date(formData.dateTime).toISOString();
       
-      // Janela no terminal (Agendamento)
-      const terminalTime = formData.schedulingDate 
-        ? new Date(formData.schedulingDate).toISOString() 
-        : undefined;
-
-      // Monta o objeto de agendamento independente
-      const scheduling = (formData.destination || terminalTime) ? {
-        dateTime: terminalTime || tripStartTime,
-        location: formData.destination?.name || '',
-        locationId: formData.destination?.id || '',
-        obs: formData.obs || ''
-      } : editTrip?.scheduling;
+      // O agendamento agora é nulo por padrão para novas viagens
+      // Só mantemos se já existir no editTrip e não for explicitamente removido
+      const scheduling = editTrip ? editTrip.scheduling : null;
 
       const payload: Trip = {
         ...formData,
@@ -96,7 +87,7 @@ const TripModal: React.FC<TripModalProps> = ({
         ocFormData: {
           ...formData,
           dateTime: tripStartTime,
-          schedulingDate: terminalTime
+          scheduling: scheduling
         }
       };
 

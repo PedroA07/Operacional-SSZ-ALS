@@ -33,7 +33,7 @@ const TripForm: React.FC<TripFormProps> = ({
     category: '', container: '', tara: '', seal: '', cva: '', 
     containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: '', autColeta: '',
     customer: null, destination: null, driver: null,
-    schedulingDate: '' // Inicia vazio conforme solicitado
+    scheduling: null // Agendamento agora é sempre NULL na criação inicial
   });
 
   const hasInitialized = useRef<string | null>(null);
@@ -53,7 +53,6 @@ const TripForm: React.FC<TripFormProps> = ({
       setFormData({
         ...editTrip,
         dateTime: formatToInput(editTrip.dateTime),
-        schedulingDate: formatToInput(editTrip.scheduling?.dateTime),
         agencia: editTrip.ocFormData?.agencia || '',
         padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
         embarcador: editTrip.ocFormData?.embarcador || '',
@@ -63,7 +62,8 @@ const TripForm: React.FC<TripFormProps> = ({
         tara: editTrip.tara || '',
         seal: editTrip.seal || '',
         ship: editTrip.ship || '',
-        booking: editTrip.booking || ''
+        booking: editTrip.booking || '',
+        scheduling: editTrip.scheduling || null
       });
     } else {
       const defaultCat = initialCategory || (categories.length > 0 ? categories[0].name : '');
@@ -72,7 +72,7 @@ const TripForm: React.FC<TripFormProps> = ({
         category: defaultCat,
         customer: initialCustomer || prev.customer,
         dateTime: getLocalISOTime(),
-        schedulingDate: ''
+        scheduling: null
       }));
     }
     hasInitialized.current = currentId;
@@ -250,35 +250,9 @@ const TripForm: React.FC<TripFormProps> = ({
         </div>
       </div>
 
-      {/* VI. AGENDAMENTO */}
-      <div className="bg-blue-50/30 p-8 rounded-[3rem] border border-blue-100 space-y-6">
-        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">VI. Janela de Agendamento (Durante Operação)</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="space-y-1">
-              <label className={labelClass}>Janela Agendada no Terminal (Se já houver)</label>
-              <input 
-                type="datetime-local" 
-                className={`${dateInputClass} border-blue-200 text-blue-800`}
-                value={formData.schedulingDate} 
-                onChange={e => setFormData({...formData, schedulingDate: e.target.value})} 
-              />
-              <p className="text-[8px] font-bold text-slate-400 uppercase mt-2 ml-1 italic">* Pode ser preenchido posteriormente.</p>
-           </div>
-           <div className="space-y-1">
-              <label className={labelClass}>Notas / Observações da Agenda</label>
-              <input 
-                className={inputClass}
-                placeholder="EX: BOX 04, SENHA 123..."
-                value={formData.obs} 
-                onChange={e => setFormData({...formData, obs: e.target.value.toUpperCase()})} 
-              />
-           </div>
-        </div>
-      </div>
-
-      {/* VII. MOTORISTA */}
+      {/* VI. MOTORISTA */}
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VII. Recurso de Transporte</h4>
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VI. Recurso de Transporte</h4>
         {formData.driver ? (
           <div className="bg-slate-900 p-6 rounded-3xl text-white flex items-center justify-between shadow-xl animate-in zoom-in-95">
              <div className="flex items-center gap-5">
@@ -308,9 +282,9 @@ const TripForm: React.FC<TripFormProps> = ({
         )}
       </div>
 
-      {/* VIII. EQUIPAMENTO */}
+      {/* VII. EQUIPAMENTO */}
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 space-y-6 shadow-sm">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VIII. Dados do Equipamento</h4>
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VII. Dados do Equipamento</h4>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
            <div className="md:col-span-3 space-y-1">
               <label className={labelClass}>Container</label>
