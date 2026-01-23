@@ -33,7 +33,7 @@ const TripForm: React.FC<TripFormProps> = ({
     category: '', container: '', tara: '', seal: '', cva: '', 
     containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', obs: '',
     customer: null, destination: null, driver: null,
-    scheduling: null // Agendamento agora é explicitamente nulo no cadastro
+    scheduling: null 
   });
 
   const hasInitialized = useRef<string | null>(null);
@@ -53,7 +53,7 @@ const TripForm: React.FC<TripFormProps> = ({
       setFormData({
         ...editTrip,
         dateTime: formatToInput(editTrip.dateTime),
-        agencia: editTrip.ocFormData?.agencia || '',
+        agencia: editTrip.ocFormData?.agencia || editTrip.agencia || '',
         padrao: editTrip.ocFormData?.padrao || 'CARGA GERAL',
         obs: editTrip.ocFormData?.obs || editTrip.scheduling?.obs || '',
         cva: editTrip.cva || '',
@@ -215,6 +215,10 @@ const TripForm: React.FC<TripFormProps> = ({
               <input className={inputClass} value={formData.container} onChange={e => handleContainerChange(e.target.value)} placeholder="ABCD1234567" />
            </div>
            <div className="md:col-span-3 space-y-1">
+              <label className={labelClass}>Armador (Agência)</label>
+              <input className={inputClass} value={formData.agencia} onChange={e => setFormData({...formData, agencia: e.target.value.toUpperCase()})} placeholder="MSC, MAERSK, ETC" />
+           </div>
+           <div className="md:col-span-2 space-y-1">
               <label className={labelClass}>Certificado (CVA)</label>
               <input className={inputClass} value={formData.cva} onChange={e => setFormData({...formData, cva: e.target.value.toUpperCase()})} placeholder="Nº CVA" />
            </div>
@@ -222,7 +226,7 @@ const TripForm: React.FC<TripFormProps> = ({
               <label className={labelClass}>Lacre</label>
               <input className={inputClass} value={formData.seal} onChange={e => setFormData({...formData, seal: maskSeal(e.target.value)})} placeholder="LACRE" />
            </div>
-           <div className="md:col-span-4 space-y-1">
+           <div className="md:col-span-2 space-y-1">
               <label className={labelClass}>Tipo Unidade</label>
               <select className={inputClass} value={formData.containerType} onChange={e => setFormData({...formData, containerType: e.target.value})}>
                  <option value="40HC">40HC</option><option value="20DC">20DC</option><option value="40HR">40HR</option>
