@@ -2,7 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Trip, Driver, Customer, Category, Port, PreStacking } from '../../../types';
 import { lookupCarrierByContainer } from '../../../utils/carrierService';
-import { maskSeal } from '../../../utils/masks';
+import { maskSeal, maskCNPJ } from '../../../utils/masks';
+import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import { searchService } from '../../../utils/searchService';
 
 interface TripFormProps {
   editTrip?: Trip | null;
@@ -34,21 +36,10 @@ const TripForm: React.FC<TripFormProps> = ({
     schedulingDate: '' 
   });
 
-  const [searches, setSearches] = useState({ customer: '', destination: '', driver: '' });
-  const [dropdowns, setDropdowns] = useState({ customer: false, destination: false, driver: false });
-  const dropdownRefs = {
-    customer: useRef<HTMLDivElement>(null),
-    destination: useRef<HTMLDivElement>(null),
-    driver: useRef<HTMLDivElement>(null)
-  };
-
-  // REF CRÍTICA: Impede que o sync do Dashboard resete o que o usuário está digitando
   const hasInitialized = useRef<string | null>(null);
 
   useEffect(() => {
     const currentId = editTrip?.id || 'new_trip';
-    
-    // Se já inicializamos este formulário para este ID (ou para uma nova trip), não reseta mais
     if (hasInitialized.current === currentId) return;
 
     const formatToInput = (isoString?: string) => {
@@ -72,14 +63,8 @@ const TripForm: React.FC<TripFormProps> = ({
         tara: editTrip.tara || '',
         seal: editTrip.seal || ''
       });
-      setSearches({
-        customer: editTrip.customer?.name || editTrip.customer?.legalName || '',
-        destination: editTrip.destination?.name || editTrip.destination?.legalName || '',
-        driver: editTrip.driver?.name || ''
-      });
     } else {
       const defaultCat = initialCategory || (categories.length > 0 ? categories[0].name : '');
-      
       setFormData(prev => ({
         ...prev,
         category: defaultCat,
@@ -87,25 +72,9 @@ const TripForm: React.FC<TripFormProps> = ({
         dateTime: getLocalISOTime(),
         schedulingDate: ''
       }));
-      setSearches({
-        customer: initialCustomer ? initialCustomer.name : '',
-        destination: '',
-        driver: ''
-      });
     }
-
     hasInitialized.current = currentId;
   }, [editTrip, initialCategory, initialCustomer, categories]);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (dropdownRefs.customer.current && !dropdownRefs.customer.current.contains(e.target as Node)) setDropdowns(d => ({ ...d, customer: false }));
-      if (dropdownRefs.destination.current && !dropdownRefs.destination.current.contains(e.target as Node)) setDropdowns(d => ({ ...d, destination: false }));
-      if (dropdownRefs.driver.current && !dropdownRefs.driver.current.contains(e.target as Node)) setDropdowns(d => ({ ...d, driver: false }));
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
 
   const handleContainerChange = (val: string) => {
     const container = val.toUpperCase();
@@ -121,31 +90,54 @@ const TripForm: React.FC<TripFormProps> = ({
   const dateInputClass = "w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-white text-slate-700 font-bold focus:border-blue-500 outline-none transition-all shadow-sm";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
 
+  const SelectedEntityCard = ({ entity, onClear, type }: any) => {
+    if (!entity) return null;
+    const isCustomer = type === 'customer';
+    return (
+      <div className="bg-white p-5 rounded-3xl border-2 border-blue-500 shadow-lg flex items-center justify-between animate-in zoom-in-95">
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">{isCustomer ? 'Cliente Selecionado' : 'Destino Selecionado'}</p>
+          <h5 className="text-sm font-black text-slate-900 uppercase truncate leading-tight">{entity.legalName || entity.name}</h5>
+          {entity.legalName && entity.name !== entity.legalName && (
+            <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5 italic">FAN: {entity.name}</p>
+          )}
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-[9px] font-black bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">{maskCNPJ(entity.cnpj)}</span>
+            <span className="text-[9px] font-bold text-slate-500 uppercase">{entity.city} - {entity.state}</span>
+          </div>
+        </div>
+        <button type="button" onClick={onClear} className="w-10 h-10 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all ml-4">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+        </button>
+      </div>
+    );
+  };
+
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-10 pb-10">
       
+      {/* I. CATEGORIA */}
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Configuração da Categoria Operacional</h4>
-        <div className="grid grid-cols-1 gap-6">
-            <div className="space-y-1">
-              <label className={labelClass}>Vincular à Categoria do Banco de Dados (Obrigatório)</label>
-              <select 
-                required 
-                className={inputClass} 
-                value={formData.category} 
-                onChange={e => setFormData({...formData, category: e.target.value})}
-              >
-                <option value="">Selecione uma Categoria Registrada...</option>
-                {categories.filter(c => !c.parentId).map(c => (
-                  <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>
-                ))}
-              </select>
-            </div>
+        <div className="space-y-1">
+          <label className={labelClass}>Vincular à Categoria do Banco de Dados</label>
+          <select 
+            required 
+            className={inputClass} 
+            value={formData.category} 
+            onChange={e => setFormData({...formData, category: e.target.value})}
+          >
+            <option value="">Selecione uma Categoria Registrada...</option>
+            {categories.filter(c => !c.parentId).map(c => (
+              <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>
+            ))}
+          </select>
         </div>
       </div>
 
+      {/* II. DADOS DA VIAGEM */}
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">II. Início da Viagem (Coleta/Retirada)</h4>
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">II. Dados da Viagem</h4>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           <div className="md:col-span-5 space-y-1">
             <label className={labelClass}>Número da OS</label>
@@ -167,7 +159,7 @@ const TripForm: React.FC<TripFormProps> = ({
             </select>
           </div>
           <div className="md:col-span-4 space-y-1">
-            <label className={labelClass}>Data/Hora Programação (INÍCIO)</label>
+            <label className={labelClass}>Início da Viagem</label>
             <input 
               required 
               type="datetime-local" 
@@ -179,41 +171,46 @@ const TripForm: React.FC<TripFormProps> = ({
         </div>
       </div>
 
-      <div className="bg-blue-50/30 p-8 rounded-[3rem] border border-blue-100 space-y-6">
-        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">III. Destino e Agendamento no Terminal</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="relative" ref={dropdownRefs.destination}>
-              <label className={labelClass}>Local de Entrega / Porto</label>
-              <input 
-                type="text"
-                placeholder="BUSCAR TERMINAL..."
-                className={inputClass}
-                value={searches.destination}
-                onFocus={() => setDropdowns(d => ({ ...d, destination: true }))}
-                onChange={e => {
-                  setSearches({...searches, destination: e.target.value});
-                  setDropdowns(d => ({ ...d, destination: true }));
-                }}
-              />
-              {dropdowns.destination && (
-                <div className="absolute z-[100] w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
-                  <div className="max-h-60 overflow-y-auto custom-scrollbar p-2">
-                    {ports.filter(p => (p.name || '').toUpperCase().includes(searches.destination.toUpperCase())).map(p => (
-                      <button key={p.id} type="button" onClick={() => {
-                        setFormData({...formData, destination: p});
-                        setSearches({...searches, destination: p.name});
-                        setDropdowns(d => ({ ...d, destination: false }));
-                      }} className="w-full text-left p-3 hover:bg-blue-50 rounded-xl text-[10px] font-black uppercase">
-                        {p.name} - {p.city}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-           </div>
+      {/* III. CLIENTE */}
+      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
+        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">III. Identificação do Cliente</h4>
+        {formData.customer ? (
+          <SelectedEntityCard entity={formData.customer} type="customer" onClear={() => setFormData({...formData, customer: null})} />
+        ) : (
+          <AutocompleteSearch 
+            label="Buscar Cliente"
+            placeholder="Razão, Fantasia ou CNPJ..."
+            data={customers}
+            onSelect={(c) => setFormData({...formData, customer: c})}
+            mapToAutocomplete={searchService.mapCustomer}
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>}
+          />
+        )}
+      </div>
 
+      {/* IV. DESTINO */}
+      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
+        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">IV. Local de Entrega / Destino</h4>
+        {formData.destination ? (
+          <SelectedEntityCard entity={formData.destination} type="destination" onClear={() => setFormData({...formData, destination: null})} />
+        ) : (
+          <AutocompleteSearch 
+            label="Buscar Terminal / Porto"
+            placeholder="Nome do Terminal ou Porto..."
+            data={ports}
+            onSelect={(p) => setFormData({...formData, destination: p})}
+            mapToAutocomplete={searchService.mapPort}
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>}
+          />
+        )}
+      </div>
+
+      {/* V. AGENDAMENTO */}
+      <div className="bg-blue-50/30 p-8 rounded-[3rem] border border-blue-100 space-y-6">
+        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">V. Detalhes de Agendamento (Opcional)</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
            <div className="space-y-1">
-              <label className={labelClass}>Janela Agendada no Destino (TERMINAL)</label>
+              <label className={labelClass}>Janela Agendada no Terminal</label>
               <input 
                 type="datetime-local" 
                 className={`${dateInputClass} border-blue-200 text-blue-800`}
@@ -221,76 +218,57 @@ const TripForm: React.FC<TripFormProps> = ({
                 onChange={e => setFormData({...formData, schedulingDate: e.target.value})} 
               />
            </div>
+           <div className="space-y-1">
+              <label className={labelClass}>Notas / Observações da Agenda</label>
+              <input 
+                className={inputClass}
+                placeholder="EX: BOX 04, SENHA 123..."
+                value={formData.obs} 
+                onChange={e => setFormData({...formData, obs: e.target.value.toUpperCase()})} 
+              />
+           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="relative" ref={dropdownRefs.customer}>
-          <label className={labelClass}>Cliente Contratante (Subcategoria Real)</label>
-          <input 
-            type="text"
-            placeholder="BUSCAR CLIENTE..."
-            className={inputClass}
-            value={searches.customer}
-            onFocus={() => setDropdowns(d => ({ ...d, customer: true }))}
-            onChange={e => {
-              setSearches({...searches, customer: e.target.value});
-              setDropdowns(d => ({ ...d, customer: true }));
-            }}
+      {/* VI. MOTORISTA */}
+      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VI. Recurso de Transporte</h4>
+        {formData.driver ? (
+          <div className="bg-slate-900 p-6 rounded-3xl text-white flex items-center justify-between shadow-xl animate-in zoom-in-95">
+             <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-xl italic shadow-lg">ALS</div>
+                <div>
+                   <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Motorista Alocado</p>
+                   <h5 className="text-sm font-black uppercase leading-none">{formData.driver.name}</h5>
+                   <div className="flex gap-3 mt-2">
+                      <span className="text-[10px] font-mono font-black text-blue-200 bg-white/5 px-2 py-0.5 rounded border border-white/10">{formData.driver.plateHorse}</span>
+                      <span className="text-[10px] font-mono font-black text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">{formData.driver.plateTrailer}</span>
+                   </div>
+                </div>
+             </div>
+             <button type="button" onClick={() => setFormData({...formData, driver: null})} className="w-10 h-10 rounded-2xl bg-white/5 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+             </button>
+          </div>
+        ) : (
+          <AutocompleteSearch 
+            label="Buscar Motorista"
+            placeholder="Nome ou Placa..."
+            data={drivers}
+            onSelect={(d) => setFormData({...formData, driver: d})}
+            mapToAutocomplete={searchService.mapDriver}
+            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>}
           />
-          {dropdowns.customer && (
-            <div className="absolute z-[100] w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
-              <div className="max-h-60 overflow-y-auto p-2">
-                {customers.filter(c => (c.name || '').toUpperCase().includes(searches.customer.toUpperCase())).map(c => (
-                  <button key={c.id} type="button" onClick={() => {
-                    setFormData({...formData, customer: c});
-                    setSearches({...searches, customer: c.name});
-                    setDropdowns(d => ({ ...d, customer: false }));
-                  }} className="w-full text-left p-3 hover:bg-blue-50 rounded-xl text-[10px] font-black uppercase">{c.name}</button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="relative" ref={dropdownRefs.driver}>
-          <label className={labelClass}>Motorista / Veículo</label>
-          <input 
-            type="text"
-            placeholder="BUSCAR MOTORISTA OU PLACA..."
-            className={inputClass}
-            value={searches.driver}
-            onFocus={() => setDropdowns(d => ({ ...d, driver: true }))}
-            onChange={e => {
-              setSearches({...searches, driver: e.target.value});
-              setDropdowns(d => ({ ...d, driver: true }));
-            }}
-          />
-          {dropdowns.driver && (
-            <div className="absolute z-[100] w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
-              <div className="max-h-60 overflow-y-auto p-2">
-                {drivers.filter(d => d.name.toUpperCase().includes(searches.driver.toUpperCase()) || d.plateHorse.toUpperCase().includes(searches.driver.toUpperCase())).map(d => (
-                  <button key={d.id} type="button" onClick={() => {
-                    setFormData({...formData, driver: d});
-                    setSearches({...searches, driver: d.name});
-                    setDropdowns(d => ({ ...d, driver: false }));
-                  }} className="w-full text-left p-3 hover:bg-blue-50 rounded-xl flex justify-between items-center group">
-                    <span className="text-[10px] font-black uppercase">{d.name}</span>
-                    <span className="bg-slate-900 text-white px-2 py-1 rounded font-mono text-[9px]">{d.plateHorse}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
+      {/* VII. EQUIPAMENTO */}
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 space-y-6 shadow-sm">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">IV. Dados do Equipamento</h4>
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VII. Dados do Equipamento</h4>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
            <div className="space-y-1">
               <label className={labelClass}>Container</label>
-              <input className={inputClass} value={formData.container} onChange={e => handleContainerChange(e.target.value)} />
+              <input className={inputClass} value={formData.container} onChange={e => handleContainerChange(e.target.value)} placeholder="ABCD1234567" />
            </div>
            <div className="space-y-1">
               <label className={labelClass}>Tipo Unidade</label>
@@ -300,11 +278,11 @@ const TripForm: React.FC<TripFormProps> = ({
            </div>
            <div className="space-y-1">
               <label className={labelClass}>Lacre</label>
-              <input className={inputClass} value={formData.seal} onChange={e => setFormData({...formData, seal: maskSeal(e.target.value)})} />
+              <input className={inputClass} value={formData.seal} onChange={e => setFormData({...formData, seal: maskSeal(e.target.value)})} placeholder="LACRE" />
            </div>
            <div className="space-y-1">
               <label className={labelClass}>Armador</label>
-              <input className={inputClass} value={formData.agencia} onChange={e => setFormData({...formData, agencia: e.target.value.toUpperCase()})} />
+              <input className={inputClass} value={formData.agencia} onChange={e => setFormData({...formData, agencia: e.target.value.toUpperCase()})} placeholder="AGÊNCIA" />
            </div>
         </div>
       </div>
