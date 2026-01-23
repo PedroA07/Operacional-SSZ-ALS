@@ -33,7 +33,7 @@ const TripForm: React.FC<TripFormProps> = ({
     category: '', container: '', tara: '', seal: '', cva: '', 
     containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', embarcador: '', obs: '', autColeta: '',
     customer: null, destination: null, driver: null,
-    schedulingDate: '' 
+    schedulingDate: '' // Inicia vazio conforme solicitado
   });
 
   const hasInitialized = useRef<string | null>(null);
@@ -61,7 +61,9 @@ const TripForm: React.FC<TripFormProps> = ({
         obs: editTrip.ocFormData?.obs || editTrip.scheduling?.obs || '',
         cva: editTrip.cva || '',
         tara: editTrip.tara || '',
-        seal: editTrip.seal || ''
+        seal: editTrip.seal || '',
+        ship: editTrip.ship || '',
+        booking: editTrip.booking || ''
       });
     } else {
       const defaultCat = initialCategory || (categories.length > 0 ? categories[0].name : '');
@@ -139,7 +141,7 @@ const TripForm: React.FC<TripFormProps> = ({
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">II. Dados da Viagem</h4>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          <div className="md:col-span-5 space-y-1">
+          <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Número da OS</label>
             <input 
               required 
@@ -149,7 +151,25 @@ const TripForm: React.FC<TripFormProps> = ({
               onChange={e => setFormData({...formData, os: e.target.value.toUpperCase()})} 
             />
           </div>
-          <div className="md:col-span-3 space-y-1">
+          <div className="md:col-span-4 space-y-1">
+            <label className={labelClass}>Navio / Embarcação</label>
+            <input 
+              className={inputClass} 
+              placeholder="NOME DO NAVIO"
+              value={formData.ship} 
+              onChange={e => setFormData({...formData, ship: e.target.value.toUpperCase()})} 
+            />
+          </div>
+          <div className="md:col-span-4 space-y-1">
+            <label className={labelClass}>Booking / Reserva</label>
+            <input 
+              className={inputClass} 
+              placeholder="Nº BOOKING"
+              value={formData.booking} 
+              onChange={e => setFormData({...formData, booking: e.target.value.toUpperCase()})} 
+            />
+          </div>
+          <div className="md:col-span-6 space-y-1">
             <label className={labelClass}>Modalidade</label>
             <select className={inputClass} value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
               <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
@@ -158,8 +178,8 @@ const TripForm: React.FC<TripFormProps> = ({
               <option value="ENTREGA">ENTREGA</option>
             </select>
           </div>
-          <div className="md:col-span-4 space-y-1">
-            <label className={labelClass}>Início da Viagem</label>
+          <div className="md:col-span-6 space-y-1">
+            <label className={labelClass}>Previsão Início da Viagem</label>
             <input 
               required 
               type="datetime-local" 
@@ -205,18 +225,44 @@ const TripForm: React.FC<TripFormProps> = ({
         )}
       </div>
 
-      {/* V. AGENDAMENTO */}
-      <div className="bg-blue-50/30 p-8 rounded-[3rem] border border-blue-100 space-y-6">
-        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">V. Detalhes de Agendamento (Opcional)</h4>
+      {/* V. DETALHES OPERACIONAIS */}
+      <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">V. Detalhes Operacionais Adicionais</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
            <div className="space-y-1">
-              <label className={labelClass}>Janela Agendada no Terminal</label>
+              <label className={labelClass}>Autorização de Coleta</label>
+              <input 
+                className={inputClass}
+                placeholder="Nº AUTORIZAÇÃO"
+                value={formData.autColeta} 
+                onChange={e => setFormData({...formData, autColeta: e.target.value.toUpperCase()})} 
+              />
+           </div>
+           <div className="space-y-1">
+              <label className={labelClass}>Embarcador (Shipper)</label>
+              <input 
+                className={inputClass}
+                placeholder="NOME DO EMBARCADOR"
+                value={formData.embarcador} 
+                onChange={e => setFormData({...formData, embarcador: e.target.value.toUpperCase()})} 
+              />
+           </div>
+        </div>
+      </div>
+
+      {/* VI. AGENDAMENTO */}
+      <div className="bg-blue-50/30 p-8 rounded-[3rem] border border-blue-100 space-y-6">
+        <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">VI. Janela de Agendamento (Durante Operação)</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+           <div className="space-y-1">
+              <label className={labelClass}>Janela Agendada no Terminal (Se já houver)</label>
               <input 
                 type="datetime-local" 
                 className={`${dateInputClass} border-blue-200 text-blue-800`}
                 value={formData.schedulingDate} 
                 onChange={e => setFormData({...formData, schedulingDate: e.target.value})} 
               />
+              <p className="text-[8px] font-bold text-slate-400 uppercase mt-2 ml-1 italic">* Pode ser preenchido posteriormente.</p>
            </div>
            <div className="space-y-1">
               <label className={labelClass}>Notas / Observações da Agenda</label>
@@ -230,9 +276,9 @@ const TripForm: React.FC<TripFormProps> = ({
         </div>
       </div>
 
-      {/* VI. MOTORISTA */}
+      {/* VII. MOTORISTA */}
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VI. Recurso de Transporte</h4>
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VII. Recurso de Transporte</h4>
         {formData.driver ? (
           <div className="bg-slate-900 p-6 rounded-3xl text-white flex items-center justify-between shadow-xl animate-in zoom-in-95">
              <div className="flex items-center gap-5">
@@ -262,25 +308,29 @@ const TripForm: React.FC<TripFormProps> = ({
         )}
       </div>
 
-      {/* VII. EQUIPAMENTO */}
+      {/* VIII. EQUIPAMENTO */}
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 space-y-6 shadow-sm">
-        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VII. Dados do Equipamento</h4>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-           <div className="space-y-1">
+        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">VIII. Dados do Equipamento</h4>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+           <div className="md:col-span-3 space-y-1">
               <label className={labelClass}>Container</label>
               <input className={inputClass} value={formData.container} onChange={e => handleContainerChange(e.target.value)} placeholder="ABCD1234567" />
            </div>
-           <div className="space-y-1">
+           <div className="md:col-span-2 space-y-1">
               <label className={labelClass}>Tipo Unidade</label>
               <select className={inputClass} value={formData.containerType} onChange={e => setFormData({...formData, containerType: e.target.value})}>
                  <option value="40HC">40HC</option><option value="20DC">20DC</option><option value="40HR">40HR</option>
               </select>
            </div>
-           <div className="space-y-1">
+           <div className="md:col-span-2 space-y-1">
               <label className={labelClass}>Lacre</label>
               <input className={inputClass} value={formData.seal} onChange={e => setFormData({...formData, seal: maskSeal(e.target.value)})} placeholder="LACRE" />
            </div>
-           <div className="space-y-1">
+           <div className="md:col-span-2 space-y-1">
+              <label className={labelClass}>Certificado (CVA)</label>
+              <input className={inputClass} value={formData.cva} onChange={e => setFormData({...formData, cva: e.target.value.toUpperCase()})} placeholder="Nº CVA" />
+           </div>
+           <div className="md:col-span-3 space-y-1">
               <label className={labelClass}>Armador</label>
               <input className={inputClass} value={formData.agencia} onChange={e => setFormData({...formData, agencia: e.target.value.toUpperCase()})} placeholder="AGÊNCIA" />
            </div>
