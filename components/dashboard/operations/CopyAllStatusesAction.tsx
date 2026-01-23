@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, memo } from 'react';
-import { Trip } from '../../../types';
+import { Trip, StatusHistoryEntry } from '../../../types';
 import { reportGenerator, TableReportData } from '../../../utils/reportGenerator';
 
 interface CopyAllStatusesActionProps {
@@ -78,19 +77,46 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
           new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
         );
         
+        // Função para capturar a data formatada de termos específicos
         const getVal = (terms: string[]) => {
-          const h = [...history].reverse().find(entry => terms.some(term => entry.status.toLowerCase().includes(term.toLowerCase())));
+          const h = [...history].reverse().find(entry => 
+            terms.some(term => entry.status.toLowerCase().trim() === term.toLowerCase().trim())
+          );
           return h ? reportGenerator.formatFullDate(h.dateTime) : "";
         };
+
+        // Lógica Baixa Cragea com Previsão de 45min
+        let baixaValue = "";
+        // Fix: Removed 'Baixa Cragea' as it's not a valid TripStatus value (it's a UI label)
+        const isFinished = t.status === 'Viagem concluída';
+        
+        if (isFinished) {
+          // Fix: Removed 'Baixa Cragea' from search terms as it's not stored in history
+          baixaValue = getVal(['Viagem concluída']);
+        } else if (t.status === 'Container sobre rodas') {
+          baixaValue = "RODAS";
+        } else if (t.status === 'Saiu da Volkswagen') {
+          // Busca o evento exato de saída da volks
+          const exitEvent = history.find(h => h.status === 'Saiu da Volkswagen');
+          if (exitEvent) {
+             const exitTime = new Date(exitEvent.dateTime);
+             const predTime = new Date(exitTime.getTime() + 45 * 60000); // +45min
+             const hhmm = predTime.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+             baixaValue = `RODAS | PREVISÃO BAIXA: ${hhmm}`;
+          } else {
+             baixaValue = "RODAS";
+          }
+        }
 
         return {
           id: t.id,
           motorista: t.driver.name.toUpperCase(),
           container: (t.container || "A DEFINIR").toUpperCase(),
-          retiradaCragea: getVal(['Retirada do cheio', 'Chegou no Cragea']),
+          // PRIORIDADE: Saiu do Cragea -> Chegou no Cragea -> Retirada do cheio
+          retiradaCragea: getVal(['Saiu do Cragea', 'Chegou no Cragea', 'Retirada do cheio']),
           chegadaVolks: getVal(['Chegou na Volkswagen', 'Chegada na Volkswagen']),
           saidaVolks: getVal(['Saiu da Volkswagen', 'Saída da Volkswagen']),
-          baixaCragea: t.status === 'Container sobre rodas' ? "RODAS" : getVal(['Viagem concluída', 'Baixa Cragea'])
+          baixaCragea: baixaValue
         };
       };
 

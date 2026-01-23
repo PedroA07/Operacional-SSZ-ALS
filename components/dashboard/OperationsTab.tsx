@@ -75,6 +75,19 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
   const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
 
+  const handleOpenStatusEditor = (t: Trip, s: TripStatus) => {
+    setSelectedTrip(t);
+    setTempStatus(s);
+    
+    // CORREÇÃO DE HORA: Ajusta para fuso horário local no datetime-local
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localISO = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+    
+    setStatusTime(localISO);
+    setIsStatusModalOpen(true);
+  };
+
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     setIsSavingStatus(true);
@@ -128,7 +141,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery]);
 
   const columns = useMemo(() => getOperationTableColumns(
-    (t, s) => { setSelectedTrip(t); setTempStatus(s); setStatusTime(new Date().toISOString().slice(0,16)); setIsStatusModalOpen(true); },
+    handleOpenStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); }, 
     (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); }, 
@@ -173,7 +186,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       </div>
 
       <div className="pt-8 border-t border-slate-200 space-y-6">
-        {/* BARRA DE FILTROS PRINCIPAL */}
         <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
            <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
               <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-1 w-full lg:w-auto overflow-x-auto">
@@ -196,7 +208,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
               <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
            </div>
 
-           {/* FILTROS POR MODALIDADE (NOVO) */}
            <div className="flex flex-col gap-4">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Filtro por Tipo de Operação</p>
               <div className="flex flex-wrap gap-2">

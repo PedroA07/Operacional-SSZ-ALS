@@ -52,22 +52,23 @@ export const fileStorage = {
 
       if (typeof file === 'string' && file.startsWith('data:')) {
         fileToUpload = fileStorage.dataURLtoBlob(file);
-        const extension = fileToUpload.type === 'application/pdf' ? 'pdf' : 'jpg';
+        const isPdf = fileToUpload.type === 'application/pdf' || destinationPath.toLowerCase().endsWith('.pdf');
+        const extension = isPdf ? 'pdf' : 'jpg';
+        
+        // Garante que o path final tem a extensão correta se estiver sendo enviado via base64
+        const finalDestPath = destinationPath.includes('.') ? destinationPath : `${destinationPath}.${extension}`;
+        
         const fileName = `${Date.now()}.${extension}`;
         formData.append('file', fileToUpload, fileName);
+        formData.append('path', finalDestPath);
       } else if (file instanceof File) {
         fileToUpload = file;
         formData.append('file', file);
+        formData.append('path', destinationPath);
       } else {
         throw new Error("Formato de arquivo inválido para upload.");
       }
       
-      const finalPath = destinationPath.startsWith('als-transportes/') 
-        ? destinationPath 
-        : `als-transportes/${destinationPath.replace(/^\/+/, '')}`;
-        
-      formData.append('path', finalPath);
-
       const res = await fetch('/api/upload', { 
         method: 'POST', 
         body: formData
@@ -90,7 +91,6 @@ export const fileStorage = {
 
   uploadStaffPhoto: (file: File | string, staffName: string) => {
     const normalizedName = fileStorage.normalizeFolderName(staffName);
-    // Incluímos um timestamp no nome do arquivo para forçar a atualização do cache (Busting)
     const timestamp = Date.now();
     return fileStorage.upload(file, `colaboradores/${normalizedName}/foto_perfil/perfil_${timestamp}.jpg`);
   },
@@ -111,6 +111,11 @@ export const fileStorage = {
 
   uploadTripPhoto: (file: File | string, os: string, photoId: string) => {
     const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
-    return fileStorage.upload(file, `trips/${cleanOS}/fotos_campo/${photoId}.jpg`);
+    // Verifica se o arquivo original é um PDF para manter a extensão
+    const isPdf = (file instanceof File && file.type === 'application/pdf') || 
+                  (typeof file === 'string' && file.startsWith('data:application/pdf'));
+    
+    const ext = isPdf ? 'pdf' : 'jpg';
+    return fileStorage.upload(file, `trips/${cleanOS}/fotos_campo/${photoId}.${ext}`);
   }
 };
