@@ -39,7 +39,7 @@ export type AvantidaStatus = 'APROVADO' | 'RECUSADO' | 'EM ANÁLISE';
 
 export interface AvantidaRecord {
   id: string;
-  date: string; // Data do pedido
+  date: string;
   containerNumber: string;
   exportRef: string;
   requestedPrice: number;
@@ -48,9 +48,9 @@ export interface AvantidaRecord {
   verified: boolean;
   driverId: string;
   createdAt: string;
-  shippingLine: string; // Linha de expedição (Armador)
-  importLocation: string; // Localização de importação
-  reuseDate: string; // Data de reutilização
+  shippingLine: string;
+  importLocation: string;
+  reuseDate: string;
   status: AvantidaStatus;
 }
 
@@ -248,6 +248,8 @@ export interface Trip {
   os: string;
   booking: string;
   ship: string;
+  autColeta?: string;
+  embarcador?: string;
   dateTime: string;
   statusTime?: string;
   isLate: boolean;
@@ -277,7 +279,7 @@ export interface Trip {
   nfKey?: string; 
   ocFormData?: any;
   preStackingFormData?: any;
-  scheduling?: TripScheduling;
+  scheduling?: TripScheduling | null;
   driver_docs?: DriverCapturedDoc[];
   stay_session_id?: string;
 }

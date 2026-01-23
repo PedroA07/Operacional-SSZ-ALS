@@ -9,6 +9,8 @@ export const tripRepository = {
     os: trip.os?.toUpperCase() || '',
     booking: trip.booking?.toUpperCase() || '',
     ship: trip.ship?.toUpperCase() || '',
+    aut_coleta: trip.autColeta?.toUpperCase() || null,
+    embarcador: trip.embarcador?.toUpperCase() || null,
     date_time: trip.dateTime, 
     status_time: trip.statusTime || trip.dateTime,
     is_late: trip.isLate || false,
@@ -65,6 +67,8 @@ export const tripRepository = {
       os: d.os || 'SEM OS',
       booking: d.booking || '',
       ship: d.ship || '',
+      autColeta: d.aut_coleta || '',
+      embarcador: d.embarcador || '',
       dateTime: d.date_time,
       statusTime: d.status_time || d.date_time,
       isLate: d.is_late ?? false,
@@ -92,7 +96,7 @@ export const tripRepository = {
       nfKey: d.nf_key,
       ocFormData: safeParse(d.oc_form_data, null),
       preStackingFormData: safeParse(d.pre_stacking_form_data, null),
-      scheduling: safeParse(d.scheduling, undefined),
+      scheduling: safeParse(d.scheduling, null),
       driver_docs: normalizedDriverDocs
     };
   },

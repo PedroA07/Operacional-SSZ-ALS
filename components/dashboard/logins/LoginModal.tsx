@@ -46,6 +46,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess, edi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.siteName || !form.username || !form.password) {
+      alert("Por favor, preencha os campos obrigatórios (Site, Usuário e Senha).");
+      return;
+    }
+
     setIsSaving(true);
     const payload = {
       ...form,
@@ -53,12 +58,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess, edi
       createdAt: editingLogin?.createdAt || new Date().toISOString()
     } as LoginCredential;
 
-    const success = await db.saveLogin(payload);
-    if (success) {
-      onSuccess();
-      onClose();
+    try {
+      const success = await db.saveLogin(payload);
+      if (success) {
+        onSuccess();
+        onClose();
+      } else {
+        alert("Falha ao salvar no banco de dados. Verifique sua conexão ou permissões.");
+      }
+    } catch (err) {
+      alert("Ocorreu um erro inesperado ao tentar salvar o registro.");
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   if (!isOpen) return null;
