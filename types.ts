@@ -261,6 +261,7 @@ export interface Trip {
   tara?: string;
   seal?: string;
   cva?: string; 
+  agencia?: string;
   customer: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
   destination?: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
   driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string; phone?: string };

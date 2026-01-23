@@ -101,7 +101,13 @@ export const getOperationTableColumns = (
             <span className="font-black text-blue-600 text-[11px] leading-tight">{new Date(t.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
           </div>
           <div className="flex flex-col gap-1">
-             <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit ${t.type === 'EXPORTAÇÃO' ? 'bg-blue-600 text-white border-blue-600' : t.type === 'IMPORTAÇÃO' ? 'bg-amber-50 text-white border-amber-500' : 'bg-slate-900 text-white border-slate-900'}`}>
+             <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit ${
+                t.type === 'EXPORTAÇÃO' 
+                  ? 'bg-blue-600 text-white border-blue-600' 
+                  : t.type === 'IMPORTAÇÃO' 
+                    ? 'bg-amber-500 text-white border-amber-600 shadow-amber-500/10' 
+                    : 'bg-slate-900 text-white border-slate-900'
+             }`}>
                 {t.type}
              </span>
              <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-widest ml-0.5">[{t.category?.substring(0, 12)}]</span>
