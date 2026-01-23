@@ -123,18 +123,35 @@ const TripForm: React.FC<TripFormProps> = ({
             <input required className={`${inputClass} text-xl border-blue-100 text-blue-700`} placeholder="EX: 123ALC..." value={formData.os} onChange={e => setFormData({...formData, os: e.target.value.toUpperCase()})} />
           </div>
           <div className="md:col-span-4 space-y-1">
+            <label className={labelClass}>Tipo de Operação</label>
+            <select className={inputClass} value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
+              <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
+              <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
+              <option value="COLETA">COLETA</option>
+              <option value="ENTREGA">ENTREGA</option>
+              <option value="CABOTAGEM">CABOTAGEM</option>
+            </select>
+          </div>
+          <div className="md:col-span-4 space-y-1">
+            <label className={labelClass}>Vínculo Operacional</label>
+            <select required className={inputClass} value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+              <option value="">SELECIONE...</option>
+              {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>)}
+            </select>
+          </div>
+          <div className="md:col-span-3 space-y-1">
             <label className={labelClass}>Navio / Embarcação</label>
             <input className={inputClass} placeholder="NOME DO NAVIO" value={formData.ship} onChange={e => setFormData({...formData, ship: e.target.value.toUpperCase()})} />
           </div>
-          <div className="md:col-span-4 space-y-1">
+          <div className="md:col-span-3 space-y-1">
             <label className={labelClass}>Booking / Reserva</label>
             <input className={inputClass} placeholder="Nº BOOKING" value={formData.booking} onChange={e => setFormData({...formData, booking: e.target.value.toUpperCase()})} />
           </div>
-          <div className="md:col-span-4 space-y-1">
+          <div className="md:col-span-3 space-y-1">
             <label className={labelClass}>Autorização de Coleta</label>
             <input className={inputClass} placeholder="AUT. COLETA" value={formData.autColeta} onChange={e => setFormData({...formData, autColeta: e.target.value.toUpperCase()})} />
           </div>
-          <div className="md:col-span-4 space-y-1">
+          <div className="md:col-span-3 space-y-1">
             <label className={labelClass}>Embarcador (Shipper)</label>
             <input className={inputClass} placeholder="EMBARCADOR" value={formData.embarcador} onChange={e => setFormData({...formData, embarcador: e.target.value.toUpperCase()})} />
           </div>

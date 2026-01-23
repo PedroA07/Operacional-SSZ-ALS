@@ -1,7 +1,18 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trip, Driver, User, AvantidaRecord, SealBatch } from '../../types';
-import { statsCalculator, CrossReferenceResult } from '../../utils/statsCalculator';
+import { db } from '../../utils/storage';
+import TripsYesterday from './overview/TripsYesterday';
+import TripsToday from './overview/TripsToday';
+import TripsTomorrow from './overview/TripsTomorrow';
+import TripsThisWeek from './overview/TripsThisWeek';
+import TripsThisMonth from './overview/TripsThisMonth';
+import TripsThisYear from './overview/TripsThisYear';
+import DelayedTrips from './overview/DelayedTrips';
+import DriverStatusCards from './overview/DriverStatusCards';
+import RecentActivitiesCard from './overview/RecentActivitiesCard';
+import KpiVisualizer from './overview/KpiVisualizer';
+import DonutChart from './overview/DonutChart';
 import WeeklyTrendChart from './overview/WeeklyTrendChart';
 import CategoryVolumeChart from './overview/CategoryVolumeChart';
 
@@ -16,162 +27,184 @@ interface OverviewTabProps {
   user: User;
 }
 
-type TimePeriod = 'YESTERDAY' | 'TODAY' | 'TOMORROW' | 'WEEK' | 'MONTH' | 'YEAR';
+const OverviewTab: React.FC<OverviewTabProps> = ({ 
+  trips, drivers, avantidaRecords, sealBatches, onRefresh, lastSyncTime, isSyncing, user 
+}) => {
+  const [viewMode, setViewMode] = useState<'CARDS' | 'ANALYTICS'>('CARDS');
+  const [sealStats, setSealStats] = useState({ used: 0, available: 0, total: 0 });
+  const [isLoadingSeals, setIsLoadingSeals] = useState(false);
 
-const OverviewTab: React.FC<OverviewTabProps> = ({ trips, drivers, isSyncing, lastSyncTime }) => {
-  const [period, setPeriod] = useState<TimePeriod>('TODAY');
-  const [viewType, setViewType] = useState<'client' | 'driver'>('client');
-  const [search, setSearch] = useState('');
+  useEffect(() => {
+    const countSeals = async () => {
+      setIsLoadingSeals(true);
+      try {
+        let used = 0;
+        let available = 0;
+        for (const batch of sealBatches) {
+          const records = await db.getSealRecords(batch.id);
+          const batchUsed = records.filter(r => r.containerNumber && r.containerNumber.trim() !== '').length;
+          const batchAvail = records.length - batchUsed;
+          used += batchUsed;
+          available += batchAvail;
+        }
+        setSealStats({ used, available, total: used + available });
+      } catch (e) {
+        console.error("Erro no processamento de estoque:", e);
+      } finally {
+        setIsLoadingSeals(false);
+      }
+    };
+    if (sealBatches.length > 0) countSeals();
+    else setSealStats({ used: 0, available: 0, total: 0 });
+  }, [sealBatches]);
 
-  const filteredTrips = useMemo(() => {
-    const { start, end } = statsCalculator.getPeriodDates(period);
-    return trips.filter(t => {
-      const d = new Date(t.dateTime).getTime();
-      return d >= start.getTime() && d <= end.getTime();
-    });
-  }, [trips, period]);
-
-  const results = useMemo(() => {
-    const base = statsCalculator.calculateCrossReference(filteredTrips, viewType);
-    if (!search) return base;
-    return base.filter(r => r.name.toLowerCase().includes(search.toLowerCase()) || r.subLabel.toLowerCase().includes(search.toLowerCase()));
-  }, [filteredTrips, viewType, search]);
-
-  const periods = [
-    { id: 'YESTERDAY', label: 'Ontem' },
-    { id: 'TODAY', label: 'Hoje' },
-    { id: 'TOMORROW', label: 'Amanhã' },
-    { id: 'WEEK', label: 'Semana' },
-    { id: 'MONTH', label: 'Mês' },
-    { id: 'YEAR', label: 'Ano' },
-  ];
+  const avantidaStats = React.useMemo(() => {
+    const total = avantidaRecords.length;
+    const verified = avantidaRecords.filter(r => r.verified).length;
+    const pending = total - verified;
+    return { total, verified, pending };
+  }, [avantidaRecords]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-24">
-      {/* 1. CABEÇALHO E FILTROS DE TEMPO */}
-      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
-        <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg font-black italic">ALS</div>
-            <div>
-              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Análise Operacional</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{isSyncing ? 'Sincronizando...' : `Sinc: ${lastSyncTime}`}</p>
-            </div>
-          </div>
-
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl overflow-x-auto no-scrollbar max-w-full">
-            {periods.map(p => (
-              <button 
-                key={p.id} 
-                onClick={() => setPeriod(p.id as TimePeriod)}
-                className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${period === p.id ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 2. FILTROS DE ENTIDADE */}
-        <div className="flex flex-col md:flex-row gap-4 pt-6 border-t border-slate-50">
-          <div className="flex bg-slate-100 p-1 rounded-2xl shrink-0">
-             <button onClick={() => setViewType('client')} className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${viewType === 'client' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Por Clientes</button>
-             <button onClick={() => setViewType('driver')} className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${viewType === 'driver' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Por Equipe</button>
-          </div>
-          <div className="flex-1 relative">
-            <input 
-              type="text" 
-              placeholder={`BUSCAR ${viewType === 'client' ? 'CLIENTE' : 'MOTORISTA'}...`}
-              className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-[10px] font-black uppercase outline-none focus:bg-white focus:border-blue-500 transition-all shadow-inner"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="3"/></svg>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. DASHBOARD DE VOLUMETRIA (VISÃO GRÁFICA) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-         <WeeklyTrendChart trips={filteredTrips} />
-         <CategoryVolumeChart trips={filteredTrips} />
-      </div>
-
-      {/* 4. LISTA DE RESULTADOS DETALHADA */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between px-4">
-           <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">Detalhamento Operacional ({results.length})</h3>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6">
-          {results.map(item => (
-            <div key={item.id} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden hover:shadow-xl transition-all duration-500 group">
-              <div className="p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-8 bg-slate-50/50 border-b border-slate-100">
-                <div className="flex items-center gap-6">
-                  <div className={`w-16 h-16 rounded-[1.8rem] flex items-center justify-center text-white font-black text-xl italic shadow-lg ${viewType === 'client' ? 'bg-slate-900' : 'bg-blue-600'}`}>
-                    {item.name[0]}
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-black text-slate-800 uppercase leading-none">{item.name}</h4>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 tracking-widest">{item.subLabel}</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-4">
-                  <StatBadge label="Total" value={item.total} color="bg-blue-50 text-blue-600 border-blue-100" />
-                  <StatBadge label="Atrasos" value={item.delayed} color="bg-red-50 text-red-600 border-red-100" />
-                  <StatBadge label="Concluídas" value={item.completed} color="bg-emerald-50 text-emerald-600 border-emerald-100" />
-                  <StatBadge label="Canceladas" value={item.canceled} color="bg-slate-100 text-slate-400 border-slate-200" />
-                </div>
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      
+      {/* HEADER PRINCIPAL */}
+      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="flex items-center gap-6">
+           <div className="w-14 h-14 bg-blue-600/10 text-blue-600 rounded-[1.8rem] flex items-center justify-center shadow-inner shrink-0">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+           </div>
+           <div>
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight leading-none">Painel de Performance ALS</h2>
+              <div className="flex items-center gap-2 mt-2">
+                 <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-500 animate-ping' : 'bg-emerald-500'}`}></div>
+                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                    {isSyncing ? 'Sincronizando dados...' : `Última atualização: ${lastSyncTime}`}
+                 </p>
               </div>
+           </div>
+        </div>
 
-              <div className="p-8 space-y-6">
-                <div>
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">{viewType === 'client' ? 'Motoristas Alocados' : 'Clientes Atendidos'}</p>
-                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {item.relatedEntities.map(sub => (
-                        <div key={sub.id} className="p-5 bg-white border border-slate-100 rounded-3xl shadow-sm hover:border-blue-200 transition-all">
-                           <div className="flex justify-between items-start mb-4">
-                              <div className="min-w-0">
-                                 <p className="text-[11px] font-black text-slate-800 uppercase truncate">{sub.name}</p>
-                                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{sub.subLabel}</p>
-                              </div>
-                              <span className="bg-blue-600 text-white px-2 py-0.5 rounded-lg text-[10px] font-black font-mono">{sub.total}</span>
-                           </div>
-                           <div className="flex gap-2 mb-4">
-                              {Object.entries(sub.opTypes).map(([type, count]) => (
-                                <span key={type} className="px-2 py-0.5 bg-slate-50 text-slate-500 border border-slate-100 rounded text-[7px] font-black uppercase">{type}: {count}</span>
-                              ))}
-                           </div>
-                           <div className="grid grid-cols-3 gap-2 border-t border-slate-50 pt-4">
-                              <div className="text-center"><p className="text-[6px] font-black text-red-400 uppercase">Atr</p><p className="text-[10px] font-black text-red-600">{sub.delayed}</p></div>
-                              <div className="text-center"><p className="text-[6px] font-black text-emerald-400 uppercase">Ok</p><p className="text-[10px] font-black text-emerald-600">{sub.completed}</p></div>
-                              <div className="text-center"><p className="text-[6px] font-black text-slate-400 uppercase">Can</p><p className="text-[10px] font-black text-slate-600">{sub.canceled}</p></div>
-                           </div>
-                        </div>
-                      ))}
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+           <button onClick={() => setViewMode('CARDS')} className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'CARDS' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400'}`}>Monitoramento</button>
+           <button onClick={() => setViewMode('ANALYTICS')} className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${viewMode === 'ANALYTICS' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400'}`}>Analytics</button>
+        </div>
+      </div>
+
+      {viewMode === 'CARDS' ? (
+        <>
+          {/* DASHBOARD DE BI SUPERIOR */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+             <WeeklyTrendChart trips={trips} />
+             <CategoryVolumeChart trips={trips} />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <TripsYesterday trips={trips} />
+            <TripsToday trips={trips} />
+            <TripsTomorrow trips={trips} />
+          </div>
+
+          {/* MONITORES ADMINISTRATIVOS */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+             <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-10">
+                <div className="w-36 h-36 shrink-0 relative flex items-center justify-center">
+                   <DonutChart 
+                     data={{ "CONFERIDO": avantidaStats.verified, "PENDENTE": avantidaStats.pending }} 
+                     total={avantidaStats.total} 
+                     colors={['#10b981', '#f59e0b']}
+                   />
+                </div>
+                <div className="flex-1 w-full space-y-5">
+                   <div>
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Auditoria Avantida</h3>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Verificação de Lançamentos de Reuso</p>
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-emerald-50 p-4 rounded-3xl border border-emerald-100 group hover:bg-emerald-100 transition-colors">
+                         <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Verificados</p>
+                         <p className="text-3xl font-black text-emerald-700 mt-1">{avantidaStats.verified}</p>
+                      </div>
+                      <div className="bg-amber-50 p-4 rounded-3xl border-amber-100 group hover:bg-amber-100 transition-colors">
+                         <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest">Pendentes</p>
+                         <p className="text-3xl font-black text-amber-700 mt-1">{avantidaStats.pending}</p>
+                      </div>
                    </div>
                 </div>
-              </div>
-            </div>
-          ))}
-
-          {results.length === 0 && (
-             <div className="py-32 text-center border-2 border-dashed border-slate-200 rounded-[3rem] bg-white/50">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhuma movimentação para o período de {period}</p>
              </div>
-          )}
-        </div>
-      </div>
+
+             <div className="bg-slate-950 p-10 rounded-[3rem] border border-white/5 shadow-2xl flex flex-col sm:flex-row items-center gap-10 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
+                   <svg className="w-48 h-48 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+                </div>
+                <div className="w-36 h-36 bg-gradient-to-br from-blue-600 to-blue-800 rounded-[2.5rem] flex flex-col items-center justify-center text-white shadow-2xl shrink-0 border border-white/10">
+                   {isLoadingSeals ? (
+                     <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
+                   ) : (
+                     <>
+                        <span className="text-[10px] font-black uppercase opacity-60 mb-1">Disponíveis</span>
+                        <span className="text-5xl font-black leading-none">{sealStats.available}</span>
+                        <span className="text-[8px] font-black uppercase mt-2 tracking-widest">Unidades</span>
+                     </>
+                   )}
+                </div>
+                <div className="flex-1 w-full space-y-6">
+                   <div className="flex justify-between items-center">
+                      <div>
+                         <h3 className="text-sm font-black text-blue-400 uppercase tracking-widest">Estoque de Lacres</h3>
+                         <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Movimentação Imediata</p>
+                      </div>
+                      <div className="text-right">
+                         <span className="px-3 py-1 bg-white/5 rounded-lg text-[9px] font-black text-slate-400 uppercase border border-white/5">{sealBatches.length} Lotes</span>
+                      </div>
+                   </div>
+                   <div className="space-y-4">
+                      <div className="space-y-1.5">
+                         <div className="flex justify-between text-[8px] font-black uppercase tracking-widest px-1">
+                            <span className="text-slate-500">Utilizados: {sealStats.used}</span>
+                            <span className="text-blue-400">Total: {sealStats.total}</span>
+                         </div>
+                         <div className="h-3 bg-white/5 rounded-full overflow-hidden flex border border-white/5">
+                            <div className="h-full bg-slate-700 transition-all duration-1000" style={{ width: `${(sealStats.used / (sealStats.total || 1)) * 100}%` }}></div>
+                            <div className="h-full bg-blue-500 animate-pulse transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${(sealStats.available / (sealStats.total || 1)) * 100}%` }}></div>
+                         </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                         <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                            <p className="text-[7px] font-black text-slate-500 uppercase">Saíram p/ Viagem</p>
+                            <p className="text-lg font-black text-white">{sealStats.used}</p>
+                         </div>
+                         <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                            <p className="text-[7px] font-black text-slate-500 uppercase">Prontos p/ Uso</p>
+                            <p className="text-lg font-black text-blue-400">{sealStats.available}</p>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <TripsThisWeek trips={trips} />
+            <TripsThisMonth trips={trips} />
+            <TripsThisYear trips={trips} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+             <div className="lg:col-span-8">
+                <DriverStatusCards trips={trips} drivers={drivers} />
+             </div>
+             <div className="lg:col-span-4 space-y-8">
+                <DelayedTrips trips={trips} />
+                <RecentActivitiesCard user={user} />
+             </div>
+          </div>
+        </>
+      ) : (
+        <KpiVisualizer trips={trips} drivers={drivers} />
+      )}
     </div>
   );
 };
-
-const StatBadge = ({ label, value, color }: { label: string; value: number; color: string }) => (
-  <div className={`px-5 py-2.5 rounded-2xl border text-center min-w-[100px] ${color}`}>
-     <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mb-0.5">{label}</p>
-     <p className="text-xl font-black font-mono leading-none">{value}</p>
-  </div>
-);
 
 export default OverviewTab;

@@ -1,33 +1,33 @@
 
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Trip } from '../../../types';
 
 interface WeeklyTrendChartProps {
   trips: Trip[];
 }
 
+type Period = 'WEEK' | 'MONTH' | 'YEAR';
+
 const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({ trips }) => {
+  const [period, setPeriod] = useState<Period>('WEEK');
+
   const chartData = useMemo(() => {
     const now = new Date();
     const data: { label: string; value: number }[] = [];
-    
-    // Detectamos o agrupamento baseado no volume de dias nas trips
-    // Se cobrir mais de 31 dias, agrupamos por mês, senão por dia
-    const dates = trips.map(t => new Date(t.dateTime).getTime());
-    const minDate = dates.length ? Math.min(...dates) : now.getTime();
-    const diffDays = (now.getTime() - minDate) / (1000 * 60 * 60 * 24);
 
-    if (diffDays <= 7) {
-      // Últimos 7 dias
+    if (period === 'WEEK') {
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(now.getDate() - i);
         const dateStr = d.toISOString().split('T')[0];
-        const count = trips.filter(t => t.dateTime.startsWith(dateStr)).length;
-        data.push({ label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''), value: count });
+        const count = trips.filter(t => t.dateTime.startsWith(dateStr) && t.status !== 'Viagem cancelada').length;
+        data.push({ 
+          label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''), 
+          value: count 
+        });
       }
-    } else if (diffDays <= 31) {
-      // Últimas 4 semanas
+    } else if (period === 'MONTH') {
+      // Agrupa por semanas do mês atual
       for (let i = 3; i >= 0; i--) {
         const start = new Date();
         start.setDate(now.getDate() - (i * 7 + 7));
@@ -35,24 +35,26 @@ const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({ trips }) => {
         end.setDate(now.getDate() - (i * 7));
         const count = trips.filter(t => {
           const dt = new Date(t.dateTime);
-          return dt >= start && dt <= end;
+          return dt >= start && dt <= end && t.status !== 'Viagem cancelada';
         }).length;
-        data.push({ label: `S${4-i}`, value: count });
+        data.push({ label: `Sem. ${4-i}`, value: count });
       }
     } else {
-      // Últimos 6 meses
+      // Agrupa pelos últimos 6 meses
       const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const month = d.getMonth();
+        const year = d.getFullYear();
         const count = trips.filter(t => {
           const dt = new Date(t.dateTime);
-          return dt.getMonth() === d.getMonth() && dt.getFullYear() === d.getFullYear();
+          return dt.getMonth() === month && dt.getFullYear() === year && t.status !== 'Viagem cancelada';
         }).length;
-        data.push({ label: monthNames[d.getMonth()], value: count });
+        data.push({ label: monthNames[month], value: count });
       }
     }
     return data;
-  }, [trips]);
+  }, [trips, period]);
 
   const maxVal = Math.max(...chartData.map(d => d.value), 5);
   const height = 140;
@@ -69,11 +71,22 @@ const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({ trips }) => {
   const areaPath = points.length > 1 ? `${dPath} L ${points[points.length-1].x},${height} L 0,${height} Z` : '';
 
   return (
-    <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-full">
+    <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-full animate-in fade-in duration-500">
       <div className="flex justify-between items-start mb-8">
         <div>
           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fluxo de Movimentação</h4>
-          <p className="text-sm font-black text-slate-800 uppercase mt-1">Cargas no Período Selecionado</p>
+          <p className="text-sm font-black text-slate-800 uppercase mt-1">Volume de Cargas ALS</p>
+        </div>
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          {(['WEEK', 'MONTH', 'YEAR'] as Period[]).map(p => (
+            <button 
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${period === p ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              {p === 'WEEK' ? 'Semana' : p === 'MONTH' ? 'Mês' : 'Ano'}
+            </button>
+          ))}
         </div>
       </div>
       
@@ -85,12 +98,15 @@ const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({ trips }) => {
               <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
             </linearGradient>
           </defs>
+          
           <path d={areaPath} fill="url(#flowGrad)" className="transition-all duration-700" />
           <path d={dPath} fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-700" />
+          
           {points.map((p, i) => (
             <g key={i} className="group/point">
-              <circle cx={p.x} cy={p.y} r="5" fill="white" stroke="#2563eb" strokeWidth="3" />
-              <text x={p.x} y={p.y - 15} textAnchor="middle" className="text-[10px] font-black fill-blue-600 opacity-0 group-hover/point:opacity-100 transition-opacity">{chartData[i].value}</text>
+              <circle cx={p.x} cy={p.y} r="5" fill="white" stroke="#2563eb" strokeWidth="3" className="transition-all hover:r-7" />
+              <rect x={p.x - 15} y={p.y - 30} width="30" height="20" rx="6" fill="#0f172a" className="opacity-0 group-hover/point:opacity-100 transition-opacity" />
+              <text x={p.x} y={p.y - 17} textAnchor="middle" className="text-[10px] font-black fill-white opacity-0 group-hover/point:opacity-100 pointer-events-none">{chartData[i].value}</text>
             </g>
           ))}
         </svg>
@@ -98,7 +114,9 @@ const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({ trips }) => {
       
       <div className="flex justify-between mt-6 border-t border-slate-50 pt-4">
         {chartData.map((d, i) => (
-          <span key={i} className="text-[8px] font-black text-slate-300 uppercase italic">{d.label}</span>
+          <span key={i} className="text-[8px] font-black text-slate-300 uppercase italic">
+            {d.label}
+          </span>
         ))}
       </div>
     </div>
