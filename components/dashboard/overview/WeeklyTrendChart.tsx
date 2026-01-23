@@ -1,85 +1,121 @@
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Trip } from '../../../types';
 
 interface WeeklyTrendChartProps {
   trips: Trip[];
 }
 
+type Period = 'WEEK' | 'MONTH' | 'YEAR';
+
 const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({ trips }) => {
-  const last7Days = useMemo(() => {
-    const dates = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      dates.push(d.toISOString().split('T')[0]);
+  const [period, setPeriod] = useState<Period>('WEEK');
+
+  const chartData = useMemo(() => {
+    const now = new Date();
+    const data: { label: string; value: number }[] = [];
+
+    if (period === 'WEEK') {
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(now.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const count = trips.filter(t => t.dateTime.startsWith(dateStr) && t.status !== 'Viagem cancelada').length;
+        data.push({ 
+          label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''), 
+          value: count 
+        });
+      }
+    } else if (period === 'MONTH') {
+      // Agrupa por semanas do mês atual
+      for (let i = 3; i >= 0; i--) {
+        const start = new Date();
+        start.setDate(now.getDate() - (i * 7 + 7));
+        const end = new Date();
+        end.setDate(now.getDate() - (i * 7));
+        const count = trips.filter(t => {
+          const dt = new Date(t.dateTime);
+          return dt >= start && dt <= end && t.status !== 'Viagem cancelada';
+        }).length;
+        data.push({ label: `Sem. ${4-i}`, value: count });
+      }
+    } else {
+      // Agrupa pelos últimos 6 meses
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const month = d.getMonth();
+        const year = d.getFullYear();
+        const count = trips.filter(t => {
+          const dt = new Date(t.dateTime);
+          return dt.getMonth() === month && dt.getFullYear() === year && t.status !== 'Viagem cancelada';
+        }).length;
+        data.push({ label: monthNames[month], value: count });
+      }
     }
-    return dates;
-  }, []);
+    return data;
+  }, [trips, period]);
 
-  const data = last7Days.map(date => {
-    return trips.filter(t => t.dateTime.startsWith(date) && t.status !== 'Viagem cancelada').length;
-  });
-
-  const maxVal = Math.max(...data, 5);
-  const height = 120;
+  const maxVal = Math.max(...chartData.map(d => d.value), 5);
+  const height = 140;
   const width = 400;
   const padding = 20;
 
-  // Gerar pontos para o SVG
-  const points = data.map((val, i) => {
-    const x = (i * (width / (data.length - 1)));
-    const y = height - (val / maxVal) * (height - padding);
+  const points = chartData.map((d, i) => {
+    const x = (i * (width / (chartData.length - 1 || 1)));
+    const y = height - (d.value / maxVal) * (height - padding * 2) - padding;
     return { x, y };
   });
 
-  const dPath = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`;
-  const areaPath = `${dPath} L ${points[points.length-1].x},${height} L 0,${height} Z`;
+  const dPath = points.length > 1 ? `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}` : '';
+  const areaPath = points.length > 1 ? `${dPath} L ${points[points.length-1].x},${height} L 0,${height} Z` : '';
 
   return (
-    <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col h-full">
-      <div className="flex justify-between items-center mb-6">
+    <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-full animate-in fade-in duration-500">
+      <div className="flex justify-between items-start mb-8">
         <div>
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fluxo de Carga</h4>
-          <p className="text-xs font-black text-slate-800 uppercase mt-0.5">Últimos 7 Dias</p>
+          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fluxo de Movimentação</h4>
+          <p className="text-sm font-black text-slate-800 uppercase mt-1">Volume de Cargas ALS</p>
         </div>
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 rounded-lg border border-blue-100">
-           <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
-           <span className="text-[8px] font-black text-blue-600 uppercase">Real-time</span>
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          {(['WEEK', 'MONTH', 'YEAR'] as Period[]).map(p => (
+            <button 
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${period === p ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              {p === 'WEEK' ? 'Semana' : p === 'MONTH' ? 'Mês' : 'Ano'}
+            </button>
+          ))}
         </div>
       </div>
       
-      <div className="flex-1 relative mt-2">
+      <div className="flex-1 relative min-h-[140px]">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
           <defs>
-            <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="flowGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#2563eb" stopOpacity="0.2" />
               <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
             </linearGradient>
           </defs>
           
-          {/* Grid lines */}
-          <line x1="0" y1={height} x2={width} y2={height} stroke="#f1f5f9" strokeWidth="1" />
-          <line x1="0" y1={height/2} x2={width} y2={height/2} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4" />
+          <path d={areaPath} fill="url(#flowGrad)" className="transition-all duration-700" />
+          <path d={dPath} fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="transition-all duration-700" />
           
-          {/* Área e Linha */}
-          <path d={areaPath} fill="url(#grad)" />
-          <path d={dPath} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          
-          {/* Pontos */}
           {points.map((p, i) => (
             <g key={i} className="group/point">
-              <circle cx={p.x} cy={p.y} r="4" fill="white" stroke="#2563eb" strokeWidth="2" />
-              <text x={p.x} y={p.y - 10} textAnchor="middle" className="text-[14px] font-black fill-slate-800 opacity-0 group-hover/point:opacity-100 transition-opacity">{data[i]}</text>
+              <circle cx={p.x} cy={p.y} r="5" fill="white" stroke="#2563eb" strokeWidth="3" className="transition-all hover:r-7" />
+              <rect x={p.x - 15} y={p.y - 30} width="30" height="20" rx="6" fill="#0f172a" className="opacity-0 group-hover/point:opacity-100 transition-opacity" />
+              <text x={p.x} y={p.y - 17} textAnchor="middle" className="text-[10px] font-black fill-white opacity-0 group-hover/point:opacity-100 pointer-events-none">{chartData[i].value}</text>
             </g>
           ))}
         </svg>
       </div>
       
-      <div className="flex justify-between mt-4 px-1">
-        {last7Days.map((date, i) => (
-          <span key={i} className="text-[7px] font-black text-slate-300 uppercase italic">
-            {new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}
+      <div className="flex justify-between mt-6 border-t border-slate-50 pt-4">
+        {chartData.map((d, i) => (
+          <span key={i} className="text-[8px] font-black text-slate-300 uppercase italic">
+            {d.label}
           </span>
         ))}
       </div>
@@ -87,5 +123,4 @@ const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({ trips }) => {
   );
 };
 
-import { useMemo } from 'react';
 export default WeeklyTrendChart;
