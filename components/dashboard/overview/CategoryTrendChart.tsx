@@ -8,8 +8,8 @@ interface CategoryTrendChartProps {
 const CategoryTrendChart: React.FC<CategoryTrendChartProps> = ({ trips }) => {
   const chartData = useMemo(() => {
     const now = new Date();
-    // Explicitly type categories to avoid 'unknown' index type errors
-    const categories: string[] = Array.from(new Set(trips.map(t => t.category || 'GERAL'))).slice(0, 5);
+    // Fix: Explicitly type Set to string to avoid 'unknown[]' type inference from Array.from
+    const categories: string[] = Array.from(new Set<string>(trips.map(t => t.category || 'GERAL'))).slice(0, 5);
     const labels: string[] = [];
     const series: Record<string, number[]> = {};
 
