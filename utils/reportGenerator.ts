@@ -28,7 +28,7 @@ export const reportGenerator = {
 
   renderTripTableHTML: (data: TableReportData): string => {
     const headerStyle = "background-color: #5b9bd5; color: #000000; font-weight: bold; border: 1px solid #000000; padding: 6px 10px; text-align: center; width: 140px; font-size: 11px; font-family: Calibri, sans-serif; text-transform: uppercase;";
-    const cellStyle = "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 6px 10px; text-align: center; font-size: 11px; font-family: Calibri, sans-serif; min-width: 220px; font-weight: bold; text-transform: uppercase;";
+    const cellStyle = "background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 6px 10px; text-align: center; font-size: 11px; font-family: Calibri, sans-serif; min-width: 220px; font-weight: bold; text-transform: uppercase; white-space: normal; word-break: break-word;";
 
     const rows = [
       { label: 'MOTORISTA', value: data.motorista },
@@ -69,7 +69,7 @@ export const reportGenerator = {
     if (hasFinished) {
       columnsHtml += `
         <td style="vertical-align: top; ${hasActive ? 'padding-left: 20px; border-left: 1px solid #f1f5f9; width: 50%;' : 'width: 100%;'} text-align: left;">
-          <p style="font-weight: bold; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 15px; color: #000;">FINALIZADAS:</p>
+          <p style="font-weight: bold; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 15px; color: #000;">FINALIZADAS / CONTAINER SOBRE RODAS:</p>
           ${finishedData.map(d => reportGenerator.renderTripTableHTML(d)).join('')}
         </td>
       `;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { Trip, StatusHistoryEntry } from '../../../types';
 import { reportGenerator, TableReportData } from '../../../utils/reportGenerator';
@@ -51,9 +52,10 @@ const IndividualTableEditor = memo(({ initialData, onFinalChange, onMove, moveLa
           <div className="bg-[#5b9bd5] text-black font-black text-[10px] p-2.5 border-r border-black text-center uppercase flex items-center justify-center select-none">
             {row.label}
           </div>
-          <input 
-            type="text"
-            className="p-2.5 text-[11px] font-black text-center outline-none focus:bg-blue-50 w-full uppercase"
+          {/* Alterado para textarea para suportar quebra de linha no editor */}
+          <textarea 
+            rows={row.field === 'baixaCragea' ? 2 : 1}
+            className="p-2.5 text-[11px] font-black text-center outline-none focus:bg-blue-50 w-full uppercase resize-none overflow-hidden"
             style={{ textTransform: 'uppercase' }}
             value={localData[row.field]} 
             onChange={e => handleChange(row.field, e.target.value)} 
@@ -94,22 +96,16 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
           return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
         };
 
-        // Lógica Baixa Cragea com Previsão de 45min
+        // Lógica Baixa Cragea com Previsão de 45min a partir do horário ATUAL
         let baixaValue = "";
         const isFinished = t.status === 'Viagem concluída';
         
         if (isFinished) {
           baixaValue = getVal(['Viagem concluída']);
         } else if (t.status === 'Container sobre rodas' || t.status === 'Saiu da Volkswagen') {
-          // Busca o evento exato que disparou o status atual no histórico
-          const event = [...history].reverse().find(h => h.status === t.status);
-          if (event) {
-             const eventTime = new Date(event.dateTime);
-             const predTime = new Date(eventTime.getTime() + 45 * 60000); // +45min
-             baixaValue = `CONTAINER SOBRE RODAS | PREVISÃO BAIXA: ${formatFullPrediction(predTime)}`;
-          } else {
-             baixaValue = "CONTAINER SOBRE RODAS";
-          }
+          // Adiciona 45 min a partir do horário atual para a previsão
+          const predTime = new Date(Date.now() + 45 * 60000); 
+          baixaValue = `CONTAINER SOBRE RODAS | PREVISÃO BAIXA: ${formatFullPrediction(predTime)}`;
         }
 
         return {
@@ -128,11 +124,14 @@ const CopyAllStatusesAction: React.FC<CopyAllStatusesActionProps> = ({ trips }) 
       setActiveReportData(trips.filter(t => 
         t.status !== 'Viagem concluída' && 
         t.status !== 'Viagem cancelada' &&
-        t.status !== 'Container sobre rodas'
+        t.status !== 'Container sobre rodas' &&
+        t.status !== 'Saiu da Volkswagen'
       ).map(mapTrip));
 
       setFinishedReportData(trips.filter(t => 
-        t.status === 'Viagem concluída' || t.status === 'Container sobre rodas'
+        t.status === 'Viagem concluída' || 
+        t.status === 'Container sobre rodas' ||
+        t.status === 'Saiu da Volkswagen'
       ).map(mapTrip));
     }
   }, [isPreviewOpen, trips]);
