@@ -34,12 +34,23 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
   const [tempCategory, setTempCategory] = useState(availableOps[0]?.category || '');
   const [tempClient, setTempClient] = useState('Geral');
 
+  // REF CRÍTICA: Bloqueia resets vindos de sincronizações externas (props update)
+  const hasInitialized = useRef<string | null>(null);
+
   useEffect(() => {
-    if (isOpen) {
-      setForm(editingDriver ? { ...editingDriver, operations: editingDriver.operations || [] } : initialForm);
-      setTempCategory(availableOps[0]?.category || '');
-      setTempClient('Geral');
+    if (!isOpen) {
+      hasInitialized.current = null;
+      return;
     }
+
+    const currentId = editingDriver?.id || 'new_driver';
+    if (hasInitialized.current === currentId) return;
+
+    setForm(editingDriver ? { ...editingDriver, operations: editingDriver.operations || [] } : initialForm);
+    setTempCategory(availableOps[0]?.category || '');
+    setTempClient('Geral');
+    
+    hasInitialized.current = currentId;
   }, [isOpen, editingDriver]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

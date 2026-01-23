@@ -42,7 +42,15 @@ const TripForm: React.FC<TripFormProps> = ({
     driver: useRef<HTMLDivElement>(null)
   };
 
+  // REF CRÍTICA: Impede que o sync do Dashboard resete o que o usuário está digitando
+  const hasInitialized = useRef<string | null>(null);
+
   useEffect(() => {
+    const currentId = editTrip?.id || 'new_trip';
+    
+    // Se já inicializamos este formulário para este ID (ou para uma nova trip), não reseta mais
+    if (hasInitialized.current === currentId) return;
+
     const formatToInput = (isoString?: string) => {
       if (!isoString) return '';
       const date = new Date(isoString);
@@ -85,6 +93,8 @@ const TripForm: React.FC<TripFormProps> = ({
         driver: ''
       });
     }
+
+    hasInitialized.current = currentId;
   }, [editTrip, initialCategory, initialCustomer, categories]);
 
   useEffect(() => {

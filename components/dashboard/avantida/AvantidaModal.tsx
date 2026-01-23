@@ -26,31 +26,42 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
   const [reuseDate, setReuseDate] = useState('');
   const [priceDisplay, setPriceDisplay] = useState('0,00');
 
+  // REF CRÍTICA: Bloqueia resets durante digitação (sync do pai)
+  const hasInitialized = useRef<string | null>(null);
+
   // Inicialização do Modal
   useEffect(() => {
-    if (isOpen) {
-      if (editingRecord) {
-        setDate(editingRecord.date);
-        setContainerNumber(editingRecord.containerNumber);
-        setShippingLine(editingRecord.shippingLine);
-        setStatus(editingRecord.status || 'EM ANÁLISE');
-        setImportLocation(editingRecord.importLocation || 'SÃO PAULO');
-        setReuseDate(editingRecord.reuseDate || '');
-        
-        const initialPrice = editingRecord.requestedPrice || 0;
-        setPriceDisplay(initialPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-        lastDetectedCarrier.current = editingRecord.shippingLine;
-      } else {
-        setDate(new Date().toISOString().split('T')[0]);
-        setContainerNumber('');
-        setShippingLine('');
-        setStatus('EM ANÁLISE');
-        setImportLocation('SÃO PAULO');
-        setReuseDate('');
-        setPriceDisplay('0,00');
-        lastDetectedCarrier.current = null;
-      }
+    if (!isOpen) {
+      hasInitialized.current = null;
+      return;
     }
+
+    const currentId = editingRecord?.id || 'new_avantida';
+    if (hasInitialized.current === currentId) return;
+
+    if (editingRecord) {
+      setDate(editingRecord.date);
+      setContainerNumber(editingRecord.containerNumber);
+      setShippingLine(editingRecord.shippingLine);
+      setStatus(editingRecord.status || 'EM ANÁLISE');
+      setImportLocation(editingRecord.importLocation || 'SÃO PAULO');
+      setReuseDate(editingRecord.reuseDate || '');
+      
+      const initialPrice = editingRecord.requestedPrice || 0;
+      setPriceDisplay(initialPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+      lastDetectedCarrier.current = editingRecord.shippingLine;
+    } else {
+      setDate(new Date().toISOString().split('T')[0]);
+      setContainerNumber('');
+      setShippingLine('');
+      setStatus('EM ANÁLISE');
+      setImportLocation('SÃO PAULO');
+      setReuseDate('');
+      setPriceDisplay('0,00');
+      lastDetectedCarrier.current = null;
+    }
+
+    hasInitialized.current = currentId;
   }, [editingRecord, isOpen]);
 
   // Função auxiliar para buscar e aplicar preço
@@ -194,7 +205,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
               <div className="relative group">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 group-focus-within:text-blue-500 transition-colors">R$</span>
                 <input 
-                  type="text"
+                  type="text" 
                   inputMode="numeric"
                   required
                   className={`${inputClass} pl-12 text-emerald-600 font-black text-lg border-emerald-100`}
