@@ -239,6 +239,7 @@ export interface TripScheduling {
 export interface DriverCapturedDoc {
   id: string;
   url: string;
+  fileName?: string;
   timestamp: string;
   extractedKey?: string; 
 }

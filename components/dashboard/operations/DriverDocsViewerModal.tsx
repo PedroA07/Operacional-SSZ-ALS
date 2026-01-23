@@ -53,8 +53,8 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
 
         for (const file of fileList) {
           let finalData: File | string = file;
+          const originalName = file.name;
           
-          // Se for imagem, comprime. Se for PDF, envia direto.
           if (file.type.startsWith('image/')) {
             finalData = await imageCompressor.compress(file, { maxWidth: 1600, quality: 0.8 });
           }
@@ -65,6 +65,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
           uploadedDocs.push({ 
             id: photoId, 
             url: publicUrl, 
+            fileName: originalName,
             timestamp: new Date().toISOString() 
           });
         }
@@ -74,7 +75,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
         if (uploadedDocs.length === 1) setSelectedDoc(uploadedDocs[0]);
         setIsAddingMode('none');
         await db.saveTrip({ ...trip, driver_docs: updatedDocs }, user);
-        onSuccess();
+        onRefresh();
       } catch (err) {
         console.error(err);
         alert("Falha ao processar arquivos.");
@@ -158,6 +159,11 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
     onSuccess();
   };
 
+  const onRefresh = () => {
+    onSuccess();
+    window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+  };
+
   if (!isOpen) return null;
 
   const checkIsPDF = (url: string) => url.toLowerCase().includes('.pdf');
@@ -190,7 +196,7 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
         </div>
 
         <div className="flex-1 overflow-hidden flex">
-          <div className="w-56 bg-slate-50 border-r border-slate-200 overflow-y-auto custom-scrollbar p-4 space-y-4 shrink-0">
+          <div className="w-64 bg-slate-50 border-r border-slate-200 overflow-y-auto custom-scrollbar p-4 space-y-4 shrink-0">
              <button onClick={() => setIsAddingMode('choice')} className="w-full aspect-video rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-2 hover:border-blue-500 hover:bg-blue-50 transition-all group mb-4">
                 <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg></div>
                 <span className="text-[8px] font-black text-slate-400 uppercase">Novo Arquivo</span>
@@ -207,13 +213,17 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
                       {isPDF ? (
                         <div className="flex flex-col items-center gap-1">
                           <svg className="w-8 h-8 text-red-600" fill="currentColor" viewBox="0 0 24 24"><path d="M11.363 2c4.155 0 2.637 6 2.637 6s6-1.518 6 2.638v11.362h-17.363v-20h8.726zm.637-2h-11v24h21v-15l-10-9z"/></svg>
-                          <span className="text-[8px] font-black text-slate-500 uppercase">Documento PDF</span>
+                          <span className="text-[8px] font-black text-slate-500 uppercase">PDF</span>
                         </div>
                       ) : (
                         <img src={doc.url} className="w-full h-full object-cover" loading="lazy" />
                       )}
                       <div className="absolute top-1 left-1 bg-black/60 text-white text-[7px] px-1.5 rounded font-black">#{idx + 1}</div>
                    </button>
+                   {/* NOME DO ARQUIVO NA SIDEBAR */}
+                   <p className="text-[8px] font-black text-slate-400 uppercase truncate px-1 group-hover/thumb:text-slate-800 transition-colors" title={doc.fileName || 'Sem nome'}>
+                     {doc.fileName || `Anexo #${idx + 1}`}
+                   </p>
                    <div className={`flex gap-1 transition-opacity justify-center ${isMoving || isProcessing ? 'opacity-20 pointer-events-none' : 'opacity-0 group-hover/thumb:opacity-100'}`}>
                       <button onClick={(e) => handleMovePhoto(e, idx, 'up')} disabled={idx === 0} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 shadow-sm disabled:opacity-20"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M5 15l7-7 7 7"/></svg></button>
                       <button onClick={(e) => handleMovePhoto(e, idx, 'down')} disabled={idx === docs.length - 1} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 shadow-sm disabled:opacity-20"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 9l-7 7-7-7"/></svg></button>
@@ -254,6 +264,23 @@ const DriverDocsViewerModal: React.FC<DriverDocsViewerModalProps> = ({ isOpen, o
           {selectedDoc && isAddingMode === 'none' && (
             <div className="w-85 bg-white border-l border-slate-200 p-8 flex flex-col gap-8 shrink-0 overflow-y-auto custom-scrollbar">
                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-6">Propriedades do Arquivo</p>
+                  
+                  {/* EXIBIÇÃO DO NOME DO DOCUMENTO EM DESTAQUE */}
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4 mb-8">
+                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${checkIsPDF(selectedDoc.url) ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                        {checkIsPDF(selectedDoc.url) ? (
+                          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M11.363 2c4.155 0 2.637 6 2.637 6s6-1.518 6 2.638v11.362h-17.363v-20h8.726zm.637-2h-11v24h21v-15l-10-9z"/></svg>
+                        ) : (
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        )}
+                     </div>
+                     <div className="min-w-0 flex-1">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Nome do Arquivo</p>
+                        <p className="text-[11px] font-black text-slate-700 uppercase break-all leading-tight mt-1">{selectedDoc.fileName || 'NÃO IDENTIFICADO'}</p>
+                     </div>
+                  </div>
+
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2 mb-6">Processamento Inteligente</p>
                   
                   {isProcessing ? (
