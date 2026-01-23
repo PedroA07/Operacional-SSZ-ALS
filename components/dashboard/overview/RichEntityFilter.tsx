@@ -61,7 +61,7 @@ const RichEntityFilter: React.FC<RichEntityFilterProps> = ({ label, stats, selec
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-3 w-[460px] bg-white rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.3)] border border-slate-100 z-[300] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+        <div className="absolute top-full left-0 mt-3 w-[520px] bg-white rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.3)] border border-slate-100 z-[300] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
           <div className="p-6 bg-slate-50 border-b border-slate-100 space-y-4">
              <div className="flex justify-between items-end">
                 <div>
@@ -69,7 +69,6 @@ const RichEntityFilter: React.FC<RichEntityFilterProps> = ({ label, stats, selec
                    <h4 className="text-xs font-black text-slate-800 uppercase">Resumo Operacional</h4>
                 </div>
                 <div className="flex gap-2">
-                   {/* Explicitly casting Object.entries to fix "Property 'total' does not exist on type 'unknown'" error */}
                    {(Object.entries(stats.operationTypes) as [string, StatGroup][]).slice(0,2).map(([type, s]) => (
                      <div key={type} className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[8px] font-black text-blue-600 uppercase">{type}: {s.total}</div>
                    ))}
@@ -85,19 +84,19 @@ const RichEntityFilter: React.FC<RichEntityFilterProps> = ({ label, stats, selec
              />
           </div>
           
-          <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-4 space-y-2">
+          <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-4 space-y-2">
             {filteredData.map(item => (
-              <div key={item.name} className="group/item">
+              <div key={item.name} className="group/item border border-slate-50 rounded-[2rem] overflow-hidden">
                 <div 
                   onClick={() => toggleSelect(item.name)}
-                  className={`flex items-center justify-between p-4 rounded-3xl cursor-pointer transition-all border ${selectedItems.includes(item.name) ? 'bg-blue-50 border-blue-200 shadow-sm' : 'hover:bg-slate-50 border-transparent'}`}
+                  className={`flex items-center justify-between p-4 cursor-pointer transition-all border-b border-slate-50 ${selectedItems.includes(item.name) ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}`}
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <button 
                       onClick={(e) => toggleExpand(e, item.name)} 
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${expandedItems.includes(item.name) ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${expandedItems.includes(item.name) ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-blue-600 hover:text-white'}`}
                     >
-                      <svg className={`w-4 h-4 transition-transform ${expandedItems.includes(item.name) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
+                      <svg className={`w-3.5 h-3.5 transition-transform ${expandedItems.includes(item.name) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
                     </button>
                     <div className="min-w-0">
                        <span className="text-[11px] font-black uppercase truncate text-slate-800 block leading-none">{item.name}</span>
@@ -113,23 +112,29 @@ const RichEntityFilter: React.FC<RichEntityFilterProps> = ({ label, stats, selec
                 </div>
 
                 {expandedItems.includes(item.name) && (
-                  <div className="ml-14 mt-2 space-y-1.5 pr-2 mb-4 animate-in slide-in-from-top-2 duration-300">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 pb-1">Vínculos Diretos ({Object.keys(item.subEntities).length})</p>
+                  <div className="bg-white p-4 space-y-2 animate-in slide-in-from-top-2 duration-300">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-100 pb-1">
+                      {label.includes('Cliente') ? 'Motoristas que atenderam' : 'Clientes atendidos'} ({Object.keys(item.subEntities).length})
+                    </p>
                     {Object.values(item.subEntities).map((sub: any) => (
-                      <div key={sub.name} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 hover:bg-white transition-colors">
-                        <div className="min-w-0 flex-1 pr-3">
-                           <span className="text-[10px] font-black uppercase text-slate-600 truncate block">{sub.name}</span>
-                           <div className="flex gap-2 mt-0.5">
-                              {Array.from(sub.opTypes as Set<string>).map(type => (
-                                <span key={type} className="text-[6px] font-black text-blue-400">{type}</span>
-                              ))}
+                      <div key={sub.name} className="flex flex-col p-4 bg-slate-50/50 rounded-2xl border border-slate-100 shadow-inner">
+                        <div className="flex justify-between items-start mb-3">
+                           <div className="min-w-0 flex-1">
+                              <span className="text-[10px] font-black uppercase text-slate-800 block truncate">{sub.name}</span>
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                 {Array.from(sub.opTypes as Set<string>).map(type => (
+                                   <span key={type} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[6px] font-black uppercase rounded border border-blue-200">
+                                     {type}
+                                   </span>
+                                 ))}
+                              </div>
                            </div>
-                        </div>
-                        <div className="flex gap-1 shrink-0">
-                          <StatBadge value={sub.total} color="text-slate-400" label="T" size="sm" />
-                          <StatBadge value={sub.completed} color="text-emerald-500" label="O" size="sm" />
-                          <StatBadge value={sub.delayed} color="text-red-500" label="A" size="sm" />
-                          <StatBadge value={sub.canceled} color="text-slate-300" label="C" size="sm" />
+                           <div className="flex gap-1 shrink-0">
+                             <StatBadge value={sub.total} color="bg-white text-slate-600 border-slate-200" label="T" size="sm" />
+                             <StatBadge value={sub.completed} color="bg-white text-emerald-600 border-emerald-100" label="OK" size="sm" />
+                             <StatBadge value={sub.delayed} color="bg-white text-red-500 border-red-100" label="ATR" size="sm" />
+                             <StatBadge value={sub.canceled} color="bg-white text-slate-400 border-slate-200" label="CAN" size="sm" />
+                           </div>
                         </div>
                       </div>
                     ))}
@@ -140,8 +145,8 @@ const RichEntityFilter: React.FC<RichEntityFilterProps> = ({ label, stats, selec
           </div>
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-            <button onClick={() => onChange([])} className="text-[9px] font-black text-slate-400 uppercase hover:text-red-500 transition-colors">Resetar Filtros</button>
-            <span className="text-[8px] font-black text-blue-300 uppercase tracking-[0.3em] italic">ALS High-Precision Analytics</span>
+            <button onClick={() => onChange([])} className="text-[9px] font-black text-slate-400 uppercase hover:text-red-500 transition-colors">Resetar Seleção</button>
+            <span className="text-[8px] font-black text-blue-400 uppercase tracking-[0.3em] italic">ALS Deep Performance</span>
           </div>
         </div>
       )}

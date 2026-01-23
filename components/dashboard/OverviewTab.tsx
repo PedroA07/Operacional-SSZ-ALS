@@ -13,8 +13,6 @@ import DriverStatusCards from './overview/DriverStatusCards';
 import RecentActivitiesCard from './overview/RecentActivitiesCard';
 import KpiVisualizer from './overview/KpiVisualizer';
 import DonutChart from './overview/DonutChart';
-import WeeklyTrendChart from './overview/WeeklyTrendChart';
-import CategoryVolumeChart from './overview/CategoryVolumeChart';
 
 interface OverviewTabProps {
   trips: Trip[];
@@ -93,12 +91,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
 
       {viewMode === 'CARDS' ? (
         <>
-          {/* DASHBOARD DE BI SUPERIOR */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-             <WeeklyTrendChart trips={trips} />
-             <CategoryVolumeChart trips={trips} />
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <TripsYesterday trips={trips} />
             <TripsToday trips={trips} />

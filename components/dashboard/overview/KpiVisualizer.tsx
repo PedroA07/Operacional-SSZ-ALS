@@ -4,6 +4,9 @@ import { Trip, Driver } from '../../../types';
 import { statsCalculator, StatGroup, TerminalSummary } from '../../../utils/statsCalculator';
 import KpiInfoIcon from './KpiInfoIcon';
 import DonutChart from './DonutChart';
+import WeeklyTrendChart from './WeeklyTrendChart';
+import CategoryVolumeChart from './CategoryVolumeChart';
+import CategoryTrendChart from './CategoryTrendChart';
 
 interface KpiVisualizerProps {
   trips: Trip[];
@@ -131,6 +134,11 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+         <WeeklyTrendChart trips={trips} />
+         <CategoryTrendChart trips={trips} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-12">
             <div className="w-48 h-48 shrink-0 relative">
                <DonutChart data={availableData.stats.categoryCounts} total={availableData.total} colors={['#2563eb', '#6366f1', '#10b981', '#f59e0b', '#0f172a']} />
@@ -182,7 +190,17 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
          </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <CategoryVolumeChart trips={trips} />
+          <RankingCard 
+            title="Fluxo de Terminais" 
+            items={(Object.entries(availableData.stats.terminalDistribution) as [string, TerminalSummary][]).map(([name, info]) => ({ name, total: info.total, subLabel: info.location }))} 
+            modeKey="terminal" 
+            colorClass="bg-slate-900" 
+          />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <RankingCard 
           title="Ranking Clientes" 
           items={availableData.stats.entities} 
@@ -195,20 +213,14 @@ const KpiVisualizer: React.FC<KpiVisualizerProps> = ({ trips, drivers }) => {
           modeKey="driver" 
           colorClass="bg-indigo-500" 
         />
-        <RankingCard 
-          title="Fluxo de Terminais" 
-          items={(Object.entries(availableData.stats.terminalDistribution) as [string, TerminalSummary][]).map(([name, info]) => ({ name, total: info.total, subLabel: info.location }))} 
-          modeKey="terminal" 
-          colorClass="bg-slate-900" 
-        />
       </div>
 
       <div className="bg-slate-950 p-12 rounded-[4rem] shadow-2xl relative overflow-hidden group">
          <div className="relative z-10 flex flex-col items-center">
             <h3 className="text-blue-500 text-[11px] font-black uppercase tracking-[0.5em] mb-8">Raio-X de Núcleo Operacional</h3>
-            <div className="flex bg-white/5 p-2 rounded-[2.5rem] border border-white/10 mb-12">
-               {categories.slice(0, 4).map(c => (
-                 <button key={c} onClick={() => setCoreCategory(c)} className={`px-10 py-4 rounded-[2rem] text-[10px] font-black uppercase transition-all ${coreCategory === c ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>{c}</button>
+            <div className="flex bg-white/5 p-2 rounded-[2.5rem] border border-white/10 mb-12 overflow-x-auto max-w-full">
+               {categories.slice(0, 8).map(c => (
+                 <button key={c} onClick={() => setCoreCategory(c)} className={`px-10 py-4 rounded-[2rem] text-[10px] font-black uppercase transition-all whitespace-nowrap ${coreCategory === c ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>{c}</button>
                ))}
                {categories.length === 0 && <span className="px-10 py-4 text-slate-600 text-[10px] font-black uppercase italic">Sem Categorias</span>}
             </div>
