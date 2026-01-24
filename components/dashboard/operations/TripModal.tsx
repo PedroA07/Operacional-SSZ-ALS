@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Trip, Driver, Customer, Category, Port, PreStacking, User } from '../../../types';
+import { Trip, Driver, Customer, Category, Port, PreStacking, User, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import TripForm from './TripForm';
@@ -62,11 +61,9 @@ const TripModal: React.FC<TripModalProps> = ({
         await osCategoryService.syncVinculos(formData.category || 'Geral', formData.driver, formData.customer);
       }
 
-      // Horário de Início
+      // Horário de Início (Agendado)
       const tripStartTime = new Date(formData.dateTime).toISOString();
       
-      // O agendamento agora é nulo por padrão para novas viagens
-      // Só mantemos se já existir no editTrip e não for explicitamente removido
       const scheduling = editTrip ? editTrip.scheduling : null;
 
       const payload: Trip = {
@@ -76,9 +73,10 @@ const TripModal: React.FC<TripModalProps> = ({
         isLate: editTrip?.isLate || false,
         documents: editTrip?.documents || [],
         status: editTrip?.status || 'Pendente',
+        // REGRA SOLICITADA: O status pendente inicial deve ser o horário da criação (now)
         statusHistory: editTrip?.statusHistory || [{ 
-          status: 'Pendente', 
-          dateTime: tripStartTime,
+          status: 'Pendente' as TripStatus, 
+          dateTime: now, 
           createdAt: now 
         }],
         advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },

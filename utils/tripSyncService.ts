@@ -1,5 +1,4 @@
-
-import { Trip, Driver, Customer, Port, TripScheduling, User } from '../types';
+import { Trip, Driver, Customer, Port, TripScheduling, User, TripStatus } from '../types';
 import { db } from './storage';
 
 export const tripSyncService = {
@@ -40,7 +39,7 @@ export const tripSyncService = {
       dateTime: tripStartTime,
       isLate: false,
       type: (formData.type || 'EXPORTAÇÃO').toUpperCase() as any,
-      category: category, // Utiliza a categoria passada, sem fallback
+      category: category, 
       container: formData.container,
       tara: formData.tara,
       seal: formData.seal,
@@ -70,7 +69,8 @@ export const tripSyncService = {
         phone: driver.phone
       },
       status: 'Pendente',
-      statusHistory: [{ status: 'Pendente', dateTime: tripStartTime, createdAt: now }],
+      // REGRA: Status Pendente reflete o horário de criação da OC
+      statusHistory: [{ status: 'Pendente' as TripStatus, dateTime: now, createdAt: now }],
       advancePayment: { status: 'BLOQUEADO' },
       balancePayment: { status: 'AGUARDANDO_DOCS' },
       ocFormData: {

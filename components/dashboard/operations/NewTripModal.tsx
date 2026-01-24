@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Trip, Driver, Customer, Category } from '../../../types';
+import { Trip, Driver, Customer, Category, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 
 interface NewTripModalProps {
@@ -21,13 +20,17 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tripId = `trip-${Date.now()}`;
+    const now = new Date().toISOString();
+    
     await db.saveTrip({
       ...form,
       id: tripId,
       isLate: false,
       documents: [],
       advancePayment: { status: 'BLOQUEADO' },
-      balancePayment: { status: 'AGUARDANDO_DOCS' }
+      balancePayment: { status: 'AGUARDANDO_DOCS' },
+      // REGRA: Status Pendente com horário da criação
+      statusHistory: [{ status: 'Pendente' as TripStatus, dateTime: now, createdAt: now }]
     } as any);
     onSuccess();
     onClose();
