@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { LoginCredential } from '../../types';
 import { db } from '../../utils/storage';
@@ -28,7 +27,6 @@ const LoginsTab: React.FC = () => {
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    // Poderia adicionar um toast aqui
   };
 
   const handleDelete = async (id: string) => {
@@ -74,19 +72,21 @@ const LoginsTab: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filtered.map(item => (
           <div key={item.id} className="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-sm hover:shadow-xl transition-all group flex flex-col">
-            <div className="flex justify-between items-start mb-6">
-               <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black italic">
+            <div className="flex justify-between items-start mb-6 gap-4">
+               <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black italic shrink-0">
                     {item.siteName.substring(0,2).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="text-sm font-black text-slate-800 uppercase truncate max-w-[150px]">{item.siteName}</h3>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-black text-slate-800 uppercase whitespace-normal break-words leading-tight">
+                      {item.siteName}
+                    </h3>
                     {item.url && (
-                      <a href={item.url} target="_blank" className="text-[9px] font-bold text-blue-500 hover:underline uppercase tracking-tighter">Acessar Link</a>
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[9px] font-bold text-blue-500 hover:underline uppercase tracking-tighter block mt-1">Acessar Link</a>
                     )}
                   </div>
                </div>
-               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                   <button onClick={() => { setEditingLogin(item); setIsModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" strokeWidth="3"/></svg></button>
                   <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-300 hover:text-red-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="3"/></svg></button>
                </div>
