@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface LiberacaoVazioTemplateProps {
@@ -15,7 +14,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
   selectedDestinatario 
 }) => {
   const borderStyle = "1px solid #1e293b";
-  const themeColor = "#334155"; // Slate Escuro / Azul Metálico
+  const themeColor = "#334155"; // Slate Escuro
 
   return (
     <div 
@@ -52,9 +51,9 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
         </div>
       </div>
 
-      {/* LOCAL DE RETIRADA - DESTAQUE */}
+      {/* TERMINAL DE RETIRADA - DESTAQUE */}
       <div style={{ border: `2px solid ${themeColor}`, padding: '15px', backgroundColor: '#f8fafc', marginBottom: '20px', borderRadius: '4px' }}>
-        <p style={{ fontSize: '9px', fontWeight: 900, color: themeColor, marginBottom: '5px', letterSpacing: '2px' }}>LOCAL DE RETIRADA (TERMINAL / DEPOT)</p>
+        <p style={{ fontSize: '9px', fontWeight: 900, color: themeColor, marginBottom: '5px', letterSpacing: '2px' }}>LOCAL DE RETIRADA (TERMINAL / DEPÓSITO)</p>
         <p style={{ fontSize: '20px', fontWeight: 900, color: '#000000', textTransform: 'uppercase' }}>
           {selectedDestinatario?.legalName || selectedDestinatario?.name || formData.manualLocal || 'NÃO INFORMADO'}
         </p>
@@ -68,8 +67,8 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
       {/* GRID DE DADOS DA OPERAÇÃO */}
       <div style={{ border: borderStyle, marginBottom: '10px', display: 'flex' }}>
          <div style={{ flex: 1, borderRight: borderStyle, padding: '12px' }}>
-            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>BOOKING / REFERÊNCIA</p>
-            <p style={{ fontSize: '18px', fontWeight: 900, color: themeColor }}>{formData.booking || '---'}</p>
+            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>BOOKING</p>
+            <p style={{ fontSize: '16px', fontWeight: 900, color: themeColor }}>{formData.booking || '---'}</p>
          </div>
          <div style={{ flex: 1, padding: '12px' }}>
             <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>ARMADOR</p>
@@ -92,21 +91,18 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
 
       <div style={{ border: borderStyle, marginBottom: '20px', display: 'flex', backgroundColor: '#f1f5f9' }}>
          <div style={{ flex: 1, borderRight: borderStyle, padding: '12px' }}>
-            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>EQUIPAMENTO (UNIT)</p>
-            <p style={{ fontSize: '16px', fontWeight: 900, color: themeColor }}>
-              {formData.qtdContainer} X {formData.tipo}
-            </p>
-            <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b', marginTop: '2px' }}>
-              PADRÃO: {formData.padrao}
+            <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>EQUIPAMENTO</p>
+            <p style={{ fontSize: '14px', fontWeight: 900 }}>
+              {formData.qtdContainer} X {formData.tipo} - {formData.padrao}
             </p>
          </div>
          <div style={{ flex: 1, padding: '12px' }}>
             <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>POD (PORTO DE DESCARGA)</p>
-            <p style={{ fontSize: '16px', fontWeight: 900 }}>{formData.pod || '---'}</p>
+            <p style={{ fontSize: '16px', fontWeight: 900, color: themeColor }}>{formData.pod || '---'}</p>
          </div>
       </div>
 
-      {/* BLOCO MOTORISTA AJUSTADO (PADRÃO ALS) */}
+      {/* BLOCO MOTORISTA AJUSTADO (PADRÃO ALS SLATE) */}
       <div style={{ border: borderStyle, padding: '15px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', marginBottom: '10px' }}>
           <div style={{ flex: '2' }}>

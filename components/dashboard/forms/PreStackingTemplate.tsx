@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface PreStackingTemplateProps {
@@ -52,7 +51,7 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
         </div>
       </div>
 
-      {/* LOCAL DE ENTREGA - DESTAQUE */}
+      {/* LOCAL DE ENTREGA - DESTAQUE EMERALD */}
       <div style={{ border: `2px solid ${themeColor}`, padding: '15px', backgroundColor: '#ecfdf5', marginBottom: '20px', borderRadius: '4px' }}>
         <p style={{ fontSize: '9px', fontWeight: 900, color: themeColor, marginBottom: '5px', letterSpacing: '2px' }}>LOCAL DE ENTREGA (TERMINAL DE DESTINO)</p>
         <p style={{ fontSize: '20px', fontWeight: 900, color: '#000000', textTransform: 'uppercase' }}>
@@ -104,7 +103,7 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
          </div>
       </div>
 
-      {/* BLOCO MOTORISTA AJUSTADO (PADRÃO ALS) */}
+      {/* BLOCO MOTORISTA AJUSTADO (PADRÃO ALS EMERALD) */}
       <div style={{ border: borderStyle, padding: '15px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', marginBottom: '10px' }}>
           <div style={{ flex: '2' }}>

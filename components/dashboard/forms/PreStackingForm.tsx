@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Driver, Customer, Port, PreStacking, Trip, User } from '../../../types';
 import { jsPDF } from 'jspdf';
@@ -32,7 +31,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
   const [showPodResults, setShowPodResults] = useState(false);
 
   const [formData, setFormData] = useState({
-    os: '', nf: '', container: '', tipo: '40HC', tara: '', seal: '', booking: '', autColeta: '', ship: '', driverId: '', remetenteId: '', destinatarioId: '', padrao: 'CHEIO', obs: '', pod: 'SANTOS', displayDate: new Date().toLocaleDateString('pt-BR')
+    os: '', nf: '', container: '', tipo: '40HC', tara: '', seal: '', booking: '', autColeta: '', ship: '', driverId: '', remetenteId: '', destinatarioId: '', padrao: 'CHEIO', obs: '', pod: 'SANTOS', displayDate: new Date().toLocaleDateString('pt-BR'), manualLocal: ''
   });
 
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
