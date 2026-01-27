@@ -102,7 +102,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
 
   const inputClasses = "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:border-slate-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
-  const labelThemeClass = "text-[9px] font-black text-slate-700 uppercase tracking-widest mb-1.5 block";
+  const labelSlateClass = "text-[9px] font-black text-slate-700 uppercase tracking-widest mb-1.5 block";
 
   const filteredCustomers = customers.filter(c => 
     (c.name && c.name.toUpperCase().includes(remetenteSearch)) || 
@@ -124,14 +124,14 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
         </div>
       </div>
 
-      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
+      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
         <div className="space-y-1">
-          <label className={labelThemeClass}>1. Local de Retirada (Manual)</label>
+          <label className={labelSlateClass}>1. Local de Retirada (Manual)</label>
           <input type="text" placeholder="TERMINAL / DEPÓSITO..." className={inputClasses} value={formData.manualLocal} onChange={e => handleInputChange('manualLocal', e.target.value)} />
         </div>
 
         <div className="relative">
-          <label className={labelThemeClass}>2. Cliente (Exportador)</label>
+          <label className={labelSlateClass}>2. Cliente (Exportador)</label>
           <input type="text" placeholder="BUSCAR..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} />
           {showRemetenteResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-slate-700 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -215,9 +215,10 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
                       }}
                     >
                       <span>{p}</span>
+                      {formData.pod === p && <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>}
                     </button>
                   )) : (
-                    <div className="p-4 text-center text-[9px] font-bold text-slate-300 uppercase italic">Entrada manual</div>
+                    <div className="p-4 text-center text-[9px] font-bold text-slate-300 uppercase italic">Porto não listado (entrada manual)</div>
                   )}
                 </div>
               </div>
@@ -226,25 +227,28 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
         </div>
 
         <div className="relative">
-          <label className={labelThemeClass}>5. Motorista Autorizado</label>
+          <label className={labelSlateClass}>5. Motorista Autorizado</label>
           <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
           {showDriverResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-slate-700">
               {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => (
-                <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name} ({d.plateHorse})</button>
+                <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-50 transition-colors" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>
+                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{d.name} ({d.plateHorse})</p>
+                </button>
               ))}
             </div>
           )}
         </div>
 
         <div className="space-y-1">
-          <label className={labelThemeClass}>6. Observações Adicionais</label>
+          <label className={labelSlateClass}>6. Observações Adicionais</label>
           <textarea 
             placeholder="INSTRUÇÕES PARA O MOTORISTA OU DEPÓSITO..." 
             className={`${inputClasses} h-28 resize-none py-4 lowercase leading-relaxed`} 
             value={formData.obs} 
             onChange={e => handleInputChange('obs', e.target.value)} 
           />
+          <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 ml-1">* Este texto aparecerá no rodapé da liberação.</p>
         </div>
 
         <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 shadow-xl transition-all active:scale-95">

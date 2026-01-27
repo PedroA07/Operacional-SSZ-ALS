@@ -51,7 +51,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
         </div>
       </div>
 
-      {/* TERMINAL DE RETIRADA - DESTAQUE */}
+      {/* TERMINAL DE RETIRADA - DESTAQUE SLATE */}
       <div style={{ border: `2px solid ${themeColor}`, padding: '15px', backgroundColor: '#f8fafc', marginBottom: '20px', borderRadius: '4px' }}>
         <p style={{ fontSize: '9px', fontWeight: 900, color: themeColor, marginBottom: '5px', letterSpacing: '2px' }}>LOCAL DE RETIRADA (TERMINAL / DEPÓSITO)</p>
         <p style={{ fontSize: '20px', fontWeight: 900, color: '#000000', textTransform: 'uppercase' }}>
@@ -82,6 +82,11 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
             <p style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', lineHeight: '1.2' }}>
               {selectedRemetente?.legalName || selectedRemetente?.name || '---'}
             </p>
+            {selectedRemetente?.legalName && selectedRemetente?.name && selectedRemetente.name !== selectedRemetente.legalName && (
+              <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b', marginTop: '2px', textTransform: 'uppercase' }}>
+                FANTASIA: {selectedRemetente.name}
+              </p>
+            )}
          </div>
          <div style={{ flex: 1, padding: '12px' }}>
             <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>NAVIO</p>
@@ -89,7 +94,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
          </div>
       </div>
 
-      <div style={{ border: borderStyle, marginBottom: '20px', display: 'flex', backgroundColor: '#f1f5f9' }}>
+      <div style={{ border: borderStyle, marginBottom: '20px', display: 'flex', backgroundColor: '#f8fafc' }}>
          <div style={{ flex: 1, borderRight: borderStyle, padding: '12px' }}>
             <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>EQUIPAMENTO</p>
             <p style={{ fontSize: '14px', fontWeight: 900 }}>
@@ -145,7 +150,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
       {/* ESPAÇO PARA CARIMBO E ASSINATURA */}
       <div style={{ display: 'flex', gap: '20px', flex: 1, marginTop: '20px' }}>
          <div style={{ flex: 1, border: '1px dashed #cbd5e1', borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa' }}>
-            <span style={{ fontSize: '10px', fontWeight: 900, color: '#cbd5e1', textTransform: 'uppercase', fontStyle: 'italic' }}>Carimbo / Visto Terminal</span>
+            <span style={{ fontSize: '10px', fontWeight: 900, color: '#cbd5e1', textTransform: 'uppercase', fontStyle: 'italic' }}>Carimbo / Visto Depósito</span>
          </div>
          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: '10px' }}>
             <div style={{ borderBottom: '1px solid #000', marginBottom: '10px' }}></div>
@@ -154,7 +159,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
       </div>
 
       {/* RODAPÉ INSTITUCIONAL SLATE */}
-      <div style={{ marginTop: '30px', borderTop: `1px solid ${themeColor}33`, paddingTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginTop: '30px', borderTop: '1px solid #f1f5f9', paddingTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
          <div style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 'bold' }}>
            AVENIDA ANA COSTA, 59 - SANTOS SP | CONTATO: 13 99628-0762
          </div>
