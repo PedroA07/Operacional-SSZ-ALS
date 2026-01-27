@@ -1,4 +1,3 @@
-
 import { Trip, Driver, Customer, Port, TripScheduling, User, TripStatus } from '../types';
 import { db } from './storage';
 
@@ -31,10 +30,12 @@ export const tripSyncService = {
     const rawDateTime = formData.horarioAgendado || formData.dateTime;
     const tripStartTime = rawDateTime ? new Date(rawDateTime).toISOString() : now;
     
+    // REGRA: schedulingDate só vem se houver um campo de data específico para o terminal
     const terminalTime = formData.schedulingDate ? new Date(formData.schedulingDate).toISOString() : null;
     
+    // REGRA SOLICITADA: O agendamento (scheduling) não deve assumir a data da viagem se estiver vazio.
     const scheduling: TripScheduling | undefined = (destination || terminalTime) ? {
-       dateTime: terminalTime || tripStartTime,
+       dateTime: terminalTime, // Mantém null se não houver data específica de agendamento
        location: destination?.name || formData.manualLocal || '',
        locationId: destination?.id || '',
        obs: formData.obs || ''

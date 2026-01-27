@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Driver, Customer, Port, Category, Trip, User } from '../../../types';
 import { jsPDF } from 'jspdf';
@@ -28,6 +27,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const captureRef = useRef<HTMLDivElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userHasChosenCategory, setUserHasChosenCategory] = useState(false);
   
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
@@ -65,10 +65,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       const c = await db.getCategories();
       setCategories(c);
       
-      if (initialData) {
-        const detected = initialData.category || osCategoryService.detectCategoryFromOS(initialData.os);
-        // Permite que o estado receba a categoria detectada mesmo que ainda não esteja no banco
-        setFormData(prev => ({ ...prev, category: detected || prev.category || '' }));
+      if (initialData?.category) {
+        setFormData(prev => ({ ...prev, category: initialData.category }));
+        setUserHasChosenCategory(true);
       }
     };
     loadCats();
@@ -97,12 +96,19 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     
     setFormData(prev => {
       let next = { ...prev, [field]: upValue };
-      if (field === 'os') {
+      
+      // Detecção automática de vínculo via padrão de OS (Apenas se o usuário não escolheu um manualmente)
+      if (field === 'os' && !userHasChosenCategory) {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
         if (detected) {
           next.category = detected;
         }
       }
+
+      if (field === 'category') {
+        setUserHasChosenCategory(true);
+      }
+
       if (field === 'container') {
         const carrier = lookupCarrierByContainer(upValue);
         next.agencia = carrier ? carrier.name : prev.agencia;
@@ -210,10 +216,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const labelBlueClass = "text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 block";
   const inputClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
 
-  // Prepara categorias para o dropdown, garantindo que o valor atual seja exibido
-  const categoriesToDisplay = categories.filter(c => !c.parentId);
-  const isCurrentCategoryNew = formData.category && !categoriesToDisplay.some(c => c.name.toUpperCase() === formData.category.toUpperCase());
-
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
@@ -279,11 +281,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                    value={formData.category} 
                    onChange={e => handleInputChange('category', e.target.value)}
                  >
-                    <option value="">AUTO DETECTAR / SELECIONE...</option>
-                    {isCurrentCategoryNew && (
-                      <option value={formData.category}>{formData.category.toUpperCase()} (DETEC.)</option>
-                    )}
-                    {categoriesToDisplay.map(cat => (
+                    <option value="">SELECIONE VÍNCULO...</option>
+                    {categories.filter(c => !c.parentId).map(cat => (
                        <option key={cat.id} value={cat.name}>{cat.name.toUpperCase()}</option>
                     ))}
                  </select>
