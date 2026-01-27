@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Driver, Customer, Port, User } from '../../../types';
 import { jsPDF } from 'jspdf';
@@ -72,7 +73,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
 
   const downloadPDF = async () => {
     if (!selectedDriver || !formData.booking) {
-      alert("Preencha Booking e Motorista.");
+      alert("Preencha Booking e Motorista para prosseguir.");
       return;
     }
 
@@ -82,8 +83,8 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
         await db.addNotification(
           currentUser,
           'LIBERACAO_GENERATED',
-          `Liberação Emitida: ${formData.booking}`,
-          `Documento de liberação de vazio para ${selectedDriver.name} gerado com sucesso.`,
+          `Liberação de Vazio: ${formData.booking}`,
+          `Minuta de liberação gerada para ${selectedDriver.name}.`,
           { os: formData.booking, motorista: selectedDriver.name, placa: selectedDriver.plateHorse }
         );
       }
@@ -100,9 +101,9 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
-  const inputClasses = "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
+  const inputClasses = "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:border-slate-900 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
-  const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block";
+  const labelThemeClass = "text-[9px] font-black text-slate-900 uppercase tracking-widest mb-1.5 block";
 
   const filteredCustomers = customers.filter(c => 
     (c.name && c.name.toUpperCase().includes(remetenteSearch)) || 
@@ -124,19 +125,19 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
         </div>
       </div>
 
-      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
+      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
         <div className="space-y-1">
-          <label className={labelBlueClass}>1. Local de Retirada (Manual)</label>
+          <label className={labelThemeClass}>1. Local de Retirada (Depot / Terminal)</label>
           <input type="text" placeholder="TERMINAL / DEPÓSITO..." className={inputClasses} value={formData.manualLocal} onChange={e => handleInputChange('manualLocal', e.target.value)} />
         </div>
 
         <div className="relative">
-          <label className={labelBlueClass}>2. Cliente (Exportador)</label>
-          <input type="text" placeholder="BUSCAR..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} />
+          <label className={labelThemeClass}>2. Cliente (Exportador)</label>
+          <input type="text" placeholder="BUSCAR CLIENTE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} />
           {showRemetenteResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-blue-500 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-slate-900 animate-in fade-in slide-in-from-top-2 duration-200">
               {filteredCustomers.map(c => (
-                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-slate-50 transition-colors" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.legalName || c.name); setShowRemetenteResults(false); }}>
+                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-50 transition-colors" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.legalName || c.name); setShowRemetenteResults(false); }}>
                   <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
                 </button>
               ))}
@@ -176,86 +177,63 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
           <p className={labelClass}>4. Dados da Operação</p>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
+            <div className="space-y-1"><label className={labelClass}>Booking</label><input className={`${inputClasses} border-slate-300`} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
             <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
           </div>
-          <div className="space-y-1"><label className={labelClass}>Armador</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
           
           <div className="space-y-1 relative" ref={podRef}>
             <label className={labelClass}>Porto de Descarga (POD)</label>
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="BUSCAR OU DIGITAR POD..." 
-                className={`${inputClasses} pr-10`} 
-                value={podSearch || formData.pod} 
-                onFocus={() => setShowPodResults(true)}
-                onChange={e => {
-                  const val = e.target.value.toUpperCase();
-                  setPodSearch(val);
-                  handleInputChange('pod', val);
-                }} 
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
-              </div>
-            </div>
-            
+            <input 
+              type="text" 
+              placeholder="BUSCAR POD..." 
+              className={inputClasses} 
+              value={podSearch || formData.pod} 
+              onFocus={() => setShowPodResults(true)}
+              onChange={e => {
+                const val = e.target.value.toUpperCase();
+                setPodSearch(val);
+                handleInputChange('pod', val);
+              }} 
+            />
             {showPodResults && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-h-52 overflow-y-auto border-t-4 border-blue-500 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="p-2 space-y-0.5">
-                  {filteredPODs.length > 0 ? filteredPODs.map(p => (
-                    <button 
-                      key={p} 
-                      className={`w-full text-left px-4 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-between group ${formData.pod === p ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-600'}`}
-                      onClick={() => {
-                        handleInputChange('pod', p);
-                        setPodSearch(p);
-                        setShowPodResults(false);
-                      }}
-                    >
-                      <span>{p}</span>
-                      {formData.pod === p && <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>}
-                    </button>
-                  )) : (
-                    <div className="p-4 text-center text-[9px] font-bold text-slate-300 uppercase italic">Porto não listado (entrada manual)</div>
-                  )}
-                </div>
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-52 overflow-y-auto border-t-4 border-slate-900 animate-in fade-in slide-in-from-top-2 duration-200">
+                {filteredPODs.map(p => (
+                  <button key={p} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-[10px] font-black uppercase border-b border-slate-50 transition-all" onClick={() => { handleInputChange('pod', p); setPodSearch(p); setShowPodResults(false); }}>{p}</button>
+                ))}
               </div>
             )}
           </div>
+          <div className="space-y-1"><label className={labelClass}>Armador</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
         </div>
 
         <div className="relative">
-          <label className={labelBlueClass}>5. Motorista Autorizado</label>
+          <label className={labelThemeClass}>5. Motorista Transportador</label>
           <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
           {showDriverResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-blue-500">
+            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-slate-900">
               {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => (
-                <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-blue-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name} ({d.plateHorse})</button>
+                <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-slate-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name} ({d.plateHorse})</button>
               ))}
             </div>
           )}
         </div>
 
-        {/* NOVA SEÇÃO: OBSERVAÇÕES OPERACIONAIS */}
         <div className="space-y-1">
-          <label className={labelBlueClass}>6. Observações Adicionais</label>
+          <label className={labelThemeClass}>6. Observações Operacionais</label>
           <textarea 
             placeholder="INSTRUÇÕES PARA O MOTORISTA OU DEPÓSITO..." 
             className={`${inputClasses} h-28 resize-none py-4 lowercase leading-relaxed`} 
             value={formData.obs} 
             onChange={e => handleInputChange('obs', e.target.value)} 
           />
-          <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 ml-1">* Este texto aparecerá no rodapé da liberação.</p>
         </div>
 
-        <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95">
+        <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 shadow-xl transition-all active:scale-95">
           {isExporting ? 'GERANDO PDF...' : 'BAIXAR LIBERAÇÃO DE VAZIO'}
         </button>
       </div>
 
-      <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
+      <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-12 custom-scrollbar">
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
           <LiberacaoVazioTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={null} />
         </div>
