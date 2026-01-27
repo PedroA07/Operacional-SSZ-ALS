@@ -66,7 +66,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       setCategories(c);
       
       if (initialData?.category) {
-        setFormData(prev => ({ ...prev, category: initialData.category }));
+        setFormData(prev => ({ ...prev, category: initialData.category.toUpperCase() }));
         setUserHasChosenCategory(true);
       }
     };
@@ -94,7 +94,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const handleInputChange = (field: string, value: string) => {
     const upValue = (field === 'horarioAgendado' || field === 'obs') ? value : value.toUpperCase();
     
-    // Atualização de estado imediata para evitar lag na UI
     if (field === 'category') {
       setUserHasChosenCategory(true);
     }
@@ -102,12 +101,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     setFormData(prev => {
       let next = { ...prev, [field]: upValue };
       
-      // Detecção automática de vínculo via padrão de OS 
-      // REGRA: Só detecta se o campo estiver vazio ou se o usuário ainda não escolheu um manualmente
-      if (field === 'os' && (!prev.category || !userHasChosenCategory)) {
+      // Detecção automática (apenas se o usuário não tiver selecionado manualmente ainda)
+      if (field === 'os' && !userHasChosenCategory) {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
         if (detected) {
-          next.category = detected;
+          next.category = detected.toUpperCase();
         }
       }
 
@@ -218,6 +216,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const labelBlueClass = "text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 block";
   const inputClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
 
+  // Preparação consistente das opções
+  const availableOptions = Array.from(new Set([
+    ...categories.filter(c => !c.parentId).map(c => c.name.toUpperCase()),
+    'ALIANÇA',
+    'MERCOSUL'
+  ])).sort();
+
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
@@ -251,7 +256,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
       )}
 
-      <div className="w-full lg:w-[540px] p-10 overflow-y-auto space-y-8 bg-slate-50 border-r border-slate-100 custom-scrollbar">
+      <div className="w-full lg:min-w-[560px] lg:w-[560px] p-10 overflow-y-auto space-y-8 bg-slate-50 border-r border-slate-100 custom-scrollbar">
         <div className="bg-blue-50 p-8 rounded-[2.5rem] border border-blue-100 shadow-sm space-y-6">
            <div className="space-y-1">
               <label className={labelBlueClass}>Identificação da Viagem (OS)</label>
@@ -279,15 +284,18 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                  <label className={labelClass}>Vínculo Operacional</label>
                  <select 
                    required
-                   className={`${selectClasses} ${formData.category ? 'text-blue-600 border-blue-200' : ''}`} 
+                   className={`${selectClasses} ${formData.category ? 'text-blue-600 border-blue-400 ring-2 ring-blue-500/5' : ''}`} 
                    value={formData.category} 
                    onChange={e => handleInputChange('category', e.target.value)}
                  >
-                    <option value="">SELECIONE VÍNCULO...</option>
-                    {categories.filter(c => !c.parentId).map(cat => (
-                       <option key={cat.id} value={cat.name}>{cat.name.toUpperCase()}</option>
+                    <option value="">{userHasChosenCategory ? 'SELECIONE VÍNCULO...' : 'AUTO DETECTANDO...'}</option>
+                    {availableOptions.map(name => (
+                       <option key={name} value={name}>{name}</option>
                     ))}
                  </select>
+                 {formData.category && !userHasChosenCategory && (
+                    <p className="text-[8px] font-black text-blue-500 uppercase mt-2 ml-1 animate-pulse">✓ Sugestão Automática: {formData.category}</p>
+                 )}
               </div>
            </div>
         </div>

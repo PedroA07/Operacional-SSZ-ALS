@@ -26,27 +26,24 @@ export const tripSyncService = {
   mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port): Partial<Trip> => {
     const now = new Date().toISOString();
     
-    // PRIORIDADE: horarioAgendado (usado no form de OC) ou dateTime (usado no TripModal)
     const rawDateTime = formData.horarioAgendado || formData.dateTime;
     const tripStartTime = rawDateTime ? new Date(rawDateTime).toISOString() : now;
     
-    // REGRA: schedulingDate só vem se houver um campo de data específico para o terminal (janela)
     const terminalTime = formData.schedulingDate ? new Date(formData.schedulingDate).toISOString() : null;
     
-    // CORREÇÃO SOLICITADA: O agendamento só deve ser criado se houver uma DATA de agendamento.
-    // Se não houver data, o campo 'scheduling' deve ser null para não criar agendamento vazio no painel.
-    const scheduling: TripScheduling | null = terminalTime ? {
+    // CORREÇÃO: Usar undefined para que a chave 'scheduling' NÃO exista no objeto final se não houver data.
+    const scheduling: TripScheduling | undefined = terminalTime ? {
        dateTime: terminalTime,
        location: destination?.name || formData.manualLocal || '',
        locationId: destination?.id || '',
        obs: formData.obs || ''
-    } : null;
+    } : undefined;
 
     return {
       os: formData.os,
       booking: formData.booking,
       ship: formData.ship,
-      dateTime: tripStartTime, // Sincroniza com a data da OC
+      dateTime: tripStartTime,
       isLate: false,
       type: (formData.type || formData.tipoOperacao || 'EXPORTAÇÃO').toUpperCase() as any,
       category: category, 
@@ -79,7 +76,6 @@ export const tripSyncService = {
         phone: driver.phone
       },
       status: 'Pendente',
-      // Horário da criação do registro (Pendente) é "agora"
       statusHistory: [{ status: 'Pendente' as TripStatus, dateTime: now, createdAt: now }],
       advancePayment: { status: 'BLOQUEADO' },
       balancePayment: { status: 'AGUARDANDO_DOCS' },
