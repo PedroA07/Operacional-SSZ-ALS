@@ -67,9 +67,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       
       if (initialData) {
         const detected = initialData.category || osCategoryService.detectCategoryFromOS(initialData.os);
-        // Garantir que a categoria detectada exista na lista do banco
-        const existsInDb = c.some(cat => cat.name.toUpperCase() === (detected || '').toUpperCase());
-        setFormData(prev => ({ ...prev, category: existsInDb ? detected : '' }));
+        // Permite que o estado receba a categoria detectada mesmo que ainda não esteja no banco
+        setFormData(prev => ({ ...prev, category: detected || prev.category || '' }));
       }
     };
     loadCats();
@@ -100,10 +99,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       let next = { ...prev, [field]: upValue };
       if (field === 'os') {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
-        // Só auto-seleciona se a categoria existir no banco de dados
         if (detected) {
-          const catInDb = categories.find(c => c.name.toUpperCase() === detected.toUpperCase());
-          if (catInDb) next.category = catInDb.name;
+          next.category = detected;
         }
       }
       if (field === 'container') {
@@ -128,7 +125,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     }
     
     if (!formData.category) {
-      alert("Por favor, selecione uma categoria válida do banco de dados.");
+      alert("Por favor, selecione um vínculo (categoria) para a operação.");
       return;
     }
 
@@ -213,6 +210,10 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const labelBlueClass = "text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 block";
   const inputClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
 
+  // Prepara categorias para o dropdown, garantindo que o valor atual seja exibido
+  const categoriesToDisplay = categories.filter(c => !c.parentId);
+  const isCurrentCategoryNew = formData.category && !categoriesToDisplay.some(c => c.name.toUpperCase() === formData.category.toUpperCase());
+
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
@@ -279,7 +280,10 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                    onChange={e => handleInputChange('category', e.target.value)}
                  >
                     <option value="">AUTO DETECTAR / SELECIONE...</option>
-                    {categories.filter(c => !c.parentId).map(cat => (
+                    {isCurrentCategoryNew && (
+                      <option value={formData.category}>{formData.category.toUpperCase()} (DETEC.)</option>
+                    )}
+                    {categoriesToDisplay.map(cat => (
                        <option key={cat.id} value={cat.name}>{cat.name.toUpperCase()}</option>
                     ))}
                  </select>
@@ -287,7 +291,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
            </div>
         </div>
 
-        {/* BUSCA AVANÇADA DE CLIENTE */}
         <AutocompleteSearch 
           label="1. Remetente (Cliente)"
           placeholder="Razão, Fantasia, CNPJ ou Cidade..."
@@ -298,7 +301,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>}
         />
 
-        {/* BUSCA AVANÇADA DE DESTINO */}
         <AutocompleteSearch 
           label="2. Destinatário (Local Destino)"
           placeholder="Nome do Porto ou Terminal..."
@@ -346,17 +348,16 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 space-y-6 shadow-sm">
           <p className={labelClass}>4. Manifesto Marítimo</p>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} placeholder="NOME DO NAVIO" /></div>
             <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} placeholder="REF / BOOKING" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={labelClass}>Autorização Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} placeholder="Nº AUTORIZAÇÃO" /></div>
             <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} placeholder="SHIPPER" /></div>
           </div>
         </div>
 
-        {/* BUSCA AVANÇADA DE MOTORISTA */}
         <AutocompleteSearch 
           label="5. Motorista Alocado"
           placeholder="Nome, Placa ou CPF..."

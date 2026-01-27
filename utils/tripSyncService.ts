@@ -1,3 +1,4 @@
+
 import { Trip, Driver, Customer, Port, TripScheduling, User, TripStatus } from '../types';
 import { db } from './storage';
 
@@ -8,11 +9,15 @@ export const tripSyncService = {
   },
 
   hasChanges: (existing: Trip, currentForm: any, driverId: string, customerId: string): boolean => {
+    // Compara o horário agendado da OC com o dateTime da viagem salva
+    const formDateTime = currentForm.horarioAgendado || currentForm.dateTime;
+    const existingDateTime = existing.dateTime;
+
     const diffs = [
       existing.driver?.id !== driverId,
       existing.customer?.id !== customerId,
       (existing.container || '').toUpperCase() !== (currentForm.container || '').toUpperCase(),
-      (existing.dateTime || '').slice(0,16) !== (currentForm.dateTime || '').slice(0,16),
+      (existingDateTime || '').slice(0,16) !== (formDateTime || '').slice(0,16),
       (existing.scheduling?.dateTime || '').slice(0,16) !== (currentForm.schedulingDate || '').slice(0,16),
       existing.category !== currentForm.category
     ];
@@ -22,7 +27,10 @@ export const tripSyncService = {
   mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port): Partial<Trip> => {
     const now = new Date().toISOString();
     
-    const tripStartTime = formData.dateTime ? new Date(formData.dateTime).toISOString() : now;
+    // PRIORIDADE: horarioAgendado (usado no form de OC) ou dateTime (usado no TripModal)
+    const rawDateTime = formData.horarioAgendado || formData.dateTime;
+    const tripStartTime = rawDateTime ? new Date(rawDateTime).toISOString() : now;
+    
     const terminalTime = formData.schedulingDate ? new Date(formData.schedulingDate).toISOString() : null;
     
     const scheduling: TripScheduling | undefined = (destination || terminalTime) ? {
@@ -36,9 +44,9 @@ export const tripSyncService = {
       os: formData.os,
       booking: formData.booking,
       ship: formData.ship,
-      dateTime: tripStartTime,
+      dateTime: tripStartTime, // Sincroniza com a data da OC
       isLate: false,
-      type: (formData.type || 'EXPORTAÇÃO').toUpperCase() as any,
+      type: (formData.type || formData.tipoOperacao || 'EXPORTAÇÃO').toUpperCase() as any,
       category: category, 
       container: formData.container,
       tara: formData.tara,
@@ -69,7 +77,7 @@ export const tripSyncService = {
         phone: driver.phone
       },
       status: 'Pendente',
-      // REGRA: Status Pendente reflete o horário de criação da OC
+      // Horário da criação do registro (Pendente) é "agora"
       statusHistory: [{ status: 'Pendente' as TripStatus, dateTime: now, createdAt: now }],
       advancePayment: { status: 'BLOQUEADO' },
       balancePayment: { status: 'AGUARDANDO_DOCS' },
