@@ -30,16 +30,17 @@ export const tripSyncService = {
     const rawDateTime = formData.horarioAgendado || formData.dateTime;
     const tripStartTime = rawDateTime ? new Date(rawDateTime).toISOString() : now;
     
-    // REGRA: schedulingDate só vem se houver um campo de data específico para o terminal
+    // REGRA: schedulingDate só vem se houver um campo de data específico para o terminal (janela)
     const terminalTime = formData.schedulingDate ? new Date(formData.schedulingDate).toISOString() : null;
     
-    // REGRA SOLICITADA: O agendamento (scheduling) não deve assumir a data da viagem se estiver vazio.
-    const scheduling: TripScheduling | undefined = (destination || terminalTime) ? {
-       dateTime: terminalTime, // Mantém null se não houver data específica de agendamento
+    // CORREÇÃO SOLICITADA: O agendamento só deve ser criado se houver uma DATA de agendamento.
+    // Se não houver data, o campo 'scheduling' deve ser null para não criar agendamento vazio no painel.
+    const scheduling: TripScheduling | null = terminalTime ? {
+       dateTime: terminalTime,
        location: destination?.name || formData.manualLocal || '',
        locationId: destination?.id || '',
        obs: formData.obs || ''
-    } : undefined;
+    } : null;
 
     return {
       os: formData.os,

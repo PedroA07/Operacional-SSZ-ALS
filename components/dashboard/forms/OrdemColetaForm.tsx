@@ -94,19 +94,21 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const handleInputChange = (field: string, value: string) => {
     const upValue = (field === 'horarioAgendado' || field === 'obs') ? value : value.toUpperCase();
     
+    // Atualização de estado imediata para evitar lag na UI
+    if (field === 'category') {
+      setUserHasChosenCategory(true);
+    }
+
     setFormData(prev => {
       let next = { ...prev, [field]: upValue };
       
-      // Detecção automática de vínculo via padrão de OS (Apenas se o usuário não escolheu um manualmente)
-      if (field === 'os' && !userHasChosenCategory) {
+      // Detecção automática de vínculo via padrão de OS 
+      // REGRA: Só detecta se o campo estiver vazio ou se o usuário ainda não escolheu um manualmente
+      if (field === 'os' && (!prev.category || !userHasChosenCategory)) {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
         if (detected) {
           next.category = detected;
         }
-      }
-
-      if (field === 'category') {
-        setUserHasChosenCategory(true);
       }
 
       if (field === 'container') {
