@@ -29,7 +29,6 @@ export const stayImporter = {
 
           /**
            * CONVERSÃO MATEMÁTICA PURA
-           * Evita que o JavaScript altere as horas baseado no fuso horário do PC.
            */
           const excelSerialToLocalString = (serial: any): string => {
             if (serial === undefined || serial === null || serial === '') return '';
@@ -37,7 +36,6 @@ export const stayImporter = {
             if (typeof serial === 'string') return serial.trim();
             if (typeof serial !== 'number') return String(serial);
 
-            // Cálculo baseado na época do Excel (30/12/1899)
             const days = Math.floor(serial);
             const fraction = serial - days;
 
@@ -66,11 +64,9 @@ export const stayImporter = {
           for (let i = 1; i < rows.length; i++) {
             const row = rows[i];
             
-            // Ignora apenas se a linha for nula ou estiver totalmente vazia
             if (!row || row.length === 0) continue;
             if (row.every(cell => cell === null || cell === undefined || String(cell).trim() === '')) continue;
 
-            // Extração das colunas
             const type = String(row[0] || 'GERAL').toUpperCase().trim();
             const os = String(row[1] || '').toUpperCase().trim();
             const location = String(row[2] || '---').toUpperCase().trim();
@@ -78,24 +74,32 @@ export const stayImporter = {
             const ship = String(row[4] || '').toUpperCase().trim();
             const container = String(row[5] || '').toUpperCase().trim();
             
-            // Datas (G, H, I)
             const scheduledStart = excelSerialToLocalString(row[6]);
             const arrivalTime = excelSerialToLocalString(row[7]);
             const departureTime = excelSerialToLocalString(row[8]);
 
-            // Cálculo de Pontualidade na Importação
+            // Cálculo de Pontualidade e Atraso
             let arrivalStatus = '---';
             if (scheduledStart && arrivalTime) {
               const sched = new Date(scheduledStart).getTime();
               const arriv = new Date(arrivalTime).getTime();
-              arrivalStatus = arriv > sched ? 'ATRASADO' : 'NO HORÁRIO';
+              
+              if (arriv <= sched) {
+                arrivalStatus = 'NO HORÁRIO';
+              } else {
+                const diffMs = arriv - sched;
+                const diffMin = Math.floor(diffMs / 60000);
+                const h = Math.floor(diffMin / 60);
+                const m = diffMin % 60;
+                arrivalStatus = `ATRASADO (+${h}h ${m}m)`;
+              }
             }
 
             records.push({
               id: `rec-${sessionId}-${os || 'SN'}-${Date.now()}-${i}`,
               sessionId,
               type,
-              os: os || `LINHA-${i + 1}`, // Se não tiver OS, identifica pela linha para não perder o dado
+              os: os || `LINHA-${i + 1}`,
               location,
               driverName,
               ship,
@@ -108,7 +112,6 @@ export const stayImporter = {
             });
           }
 
-          // ORDENAÇÃO POR DATA DE PREVISÃO (scheduledStart)
           const sortedRecords = records.sort((a, b) => {
             if (!a.scheduledStart) return 1;
             if (!b.scheduledStart) return -1;

@@ -56,7 +56,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const loadSessionRecords = async (sessionId: string) => {
     const records = await db.getStayRecords(sessionId);
-    // Garante ordenação por data de previsão ao carregar do banco
     const sorted = records.sort((a, b) => (a.scheduledStart || '').localeCompare(b.scheduledStart || ''));
     setSessionRecords(sorted);
   };
@@ -119,7 +118,16 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     const schedTime = new Date(scheduled).getTime();
     const actualTime = new Date(actual).getTime();
     if (isNaN(schedTime) || isNaN(actualTime)) return '---';
-    return actualTime > schedTime ? 'ATRASADO' : 'NO HORÁRIO';
+    
+    if (actualTime <= schedTime) {
+      return 'NO HORÁRIO';
+    } else {
+      const diffMs = actualTime - schedTime;
+      const diffMin = Math.floor(diffMs / 60000);
+      const h = Math.floor(diffMin / 60);
+      const m = diffMin % 60;
+      return `ATRASADO (+${h}h ${m}m)`;
+    }
   };
 
   const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
@@ -316,8 +324,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     )},
     { key: 'status_arrival', label: 'Status Chegada', render: (r: StayRecord) => {
       const status = r.arrivalStatus || '---';
+      const isLate = status.includes('ATRASADO');
       return (
-        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase ${status === 'ATRASADO' ? 'bg-red-50 text-red-600' : status === 'NO HORÁRIO' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
+        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase ${isLate ? 'bg-red-50 text-red-600 border border-red-100' : status === 'NO HORÁRIO' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-400'}`}>
           {status}
         </span>
       );
