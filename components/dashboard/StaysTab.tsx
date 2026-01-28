@@ -56,7 +56,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const loadSessionRecords = async (sessionId: string) => {
     const records = await db.getStayRecords(sessionId);
-    setSessionRecords(records);
+    // Garante ordenação por data de previsão ao carregar do banco
+    const sorted = records.sort((a, b) => (a.scheduledStart || '').localeCompare(b.scheduledStart || ''));
+    setSessionRecords(sorted);
   };
 
   const handleOpenSession = async (session: StaySession) => {
@@ -115,7 +117,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
     if (!scheduledStartTime || !departureTime) return 0;
     
-    // As datas agora são strings locais puras YYYY-MM-DDTHH:mm:ss
     const schedule = new Date(scheduledStartTime).getTime();
     const departure = new Date(departureTime).getTime();
     
@@ -173,7 +174,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         return;
       }
 
-      // Evita duplicados na mesma pasta
       const { unique, duplicateCount, duplicateList } = stayValidator.filterDuplicates(records, sessionRecords);
 
       if (unique.length === 0) {
