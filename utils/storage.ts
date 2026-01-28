@@ -322,7 +322,6 @@ export const db = {
     return !error;
   },
 
-  // Fix for missing getSealBatches
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });
@@ -336,7 +335,6 @@ export const db = {
     }));
   },
 
-  // Fix for missing getSealRecords
   getSealRecords: async (batchId: string): Promise<SealRecord[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('seal_records').select('*').eq('batch_id', batchId).order('seal_number');
@@ -352,7 +350,6 @@ export const db = {
     }));
   },
 
-  // Fix for missing saveSealBatch
   saveSealBatch: async (batch: SealBatch, records: Partial<SealRecord>[]) => {
     if (!supabase) return false;
     const batchId = batch.id || `batch-${Date.now()}`;
@@ -377,7 +374,6 @@ export const db = {
     return !recErr;
   },
 
-  // Fix for missing updateSealRecord
   updateSealRecord: async (record: SealRecord) => {
     if (!supabase) return false;
     const { error } = await supabase.from('seal_records').update({
@@ -389,14 +385,12 @@ export const db = {
     return !error;
   },
 
-  // Fix for missing deleteSealBatch
   deleteSealBatch: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('seal_batches').delete().eq('id', id);
     return !error;
   },
 
-  // Fix for missing getStaySessions
   getStaySessions: async (): Promise<StaySession[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('stay_sessions').select('*').order('created_at', { ascending: false });
@@ -414,10 +408,13 @@ export const db = {
     }));
   },
 
-  // Fix for missing getStayRecords
   getStayRecords: async (sessionId: string): Promise<StayRecord[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('stay_records').select('*').eq('session_id', sessionId).order('os');
+    const { data, error } = await supabase
+      .from('stay_records')
+      .select('id, session_id, type, os, location, driver_name, ship, container, scheduled_start, arrival_time, departure_time, exceeded_hours')
+      .eq('session_id', sessionId)
+      .order('os');
     if (error) throw error;
     return (data || []).map(r => ({
       id: r.id,
@@ -435,7 +432,6 @@ export const db = {
     }));
   },
 
-  // Fix for missing saveStaySession
   saveStaySession: async (s: StaySession) => {
     if (!supabase) return false;
     const { error } = await supabase.from('stay_sessions').upsert({
@@ -452,7 +448,6 @@ export const db = {
     return !error;
   },
 
-  // Fix for missing saveStayRecords
   saveStayRecords: async (records: StayRecord[]) => {
     if (!supabase) return false;
     const payload = records.map(r => ({
@@ -464,30 +459,27 @@ export const db = {
       driver_name: r.driverName,
       ship: r.ship,
       container: r.container,
-      scheduled_start: r.scheduledStart,
-      arrival_time: r.arrivalTime,
-      departure_time: r.departureTime,
+      scheduled_start: r.scheduledStart || null,
+      arrival_time: r.arrivalTime || null,
+      departure_time: r.departureTime || null,
       exceeded_hours: r.exceededHours
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);
     return !error;
   },
 
-  // Fix for missing deleteStaySession
   deleteStaySession: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('stay_sessions').delete().eq('id', id);
     return !error;
   },
 
-  // Fix for missing deleteStayRecord
   deleteStayRecord: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('stay_records').delete().eq('id', id);
     return !error;
   },
 
-  // Fix for missing exportBackup
   exportBackup: async () => {
     if (!supabase) return;
     const tables = ['users', 'drivers', 'customers', 'ports', 'pre_stacking', 'staff', 'trips', 'categories', 'notifications', 'avantida_records', 'avantida_prices', 'logins', 'seal_batches', 'seal_records', 'stay_sessions', 'stay_records'];
@@ -505,7 +497,6 @@ export const db = {
     URL.revokeObjectURL(url);
   },
 
-  // Fix for missing importBackup
   importBackup: async (file: File) => {
     if (!supabase) return false;
     try {
@@ -520,7 +511,6 @@ export const db = {
     } catch { return false; }
   },
 
-  // Fix for missing getPreferences
   getPreferences: (userId: string) => {
     try {
       const prefs = localStorage.getItem(`als_prefs_${userId}`);
@@ -528,7 +518,6 @@ export const db = {
     } catch { return { visibleColumns: {} }; }
   },
 
-  // Fix for missing savePreference
   savePreference: (userId: string, componentId: string, columns: string[]) => {
     const prefs = db.getPreferences(userId);
     if (!prefs.visibleColumns) prefs.visibleColumns = {};

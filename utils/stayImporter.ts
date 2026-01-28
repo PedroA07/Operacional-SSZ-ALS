@@ -27,36 +27,47 @@ export const stayImporter = {
           const records: StayRecord[] = [];
 
           // Tenta identificar onde começam os dados de fato (procurando o primeiro valor numérico ou OS na col B)
-          // Ignora as primeiras linhas que podem ser títulos ou vazias
-          const startIndex = rows.findIndex((row, idx) => idx > 0 && row && row[1] && String(row[1]).length > 2);
+          const startIndex = rows.findIndex((row, idx) => idx > 0 && row && row[1] && String(row[1]).trim().length > 2);
           const effectiveRows = startIndex === -1 ? rows.slice(1) : rows.slice(startIndex);
 
-          const formatDateForce = (val: any) => {
-            if (!val) return '';
+          const formatDateForce = (val: any): string => {
+            if (val === undefined || val === null || String(val).trim() === '') return '';
+            
             const d = new Date(val);
-            if (isNaN(d.getTime())) {
-              // Tenta parse manual se for string no formato brasileiro DD/MM/YYYY HH:MM
-              if (typeof val === 'string' && val.includes('/')) {
-                const parts = val.split(' ');
+            if (!isNaN(d.getTime())) {
+              return d.toISOString();
+            }
+
+            // Tenta parse manual se for string no formato brasileiro DD/MM/YYYY HH:MM
+            if (typeof val === 'string' && val.includes('/')) {
+              try {
+                const parts = val.trim().split(/\s+/);
                 const dateParts = parts[0].split('/');
                 const timeParts = (parts[1] || '00:00').split(':');
+                
+                const day = parseInt(dateParts[0], 10);
+                const month = parseInt(dateParts[1], 10) - 1;
+                const year = dateParts[2].length === 2 ? 2000 + parseInt(dateParts[2], 10) : parseInt(dateParts[2], 10);
+                
                 const parsed = new Date(
-                  parseInt(dateParts[2]), 
-                  parseInt(dateParts[1]) - 1, 
-                  parseInt(dateParts[0]),
-                  parseInt(timeParts[0]),
-                  parseInt(timeParts[1])
+                  year, 
+                  month, 
+                  day,
+                  parseInt(timeParts[0], 10) || 0,
+                  parseInt(timeParts[1], 10) || 0
                 );
+                
                 return isNaN(parsed.getTime()) ? '' : parsed.toISOString();
+              } catch (e) {
+                return '';
               }
-              return '';
             }
-            return d.toISOString();
+            return '';
           };
 
           for (const row of effectiveRows) {
             // Se a coluna B (OS) estiver vazia, ignora a linha
-            if (!row || !row[1]) continue;
+            if (!row || !row[1] || String(row[1]).trim() === '') continue;
 
             const type = String(row[0] || '').toUpperCase().trim();
             const os = String(row[1] || '').toUpperCase().trim();
@@ -104,6 +115,7 @@ export const stayImporter = {
 
           resolve(records);
         } catch (err) {
+          console.error("Excel processing error:", err);
           reject(new Error("Erro ao ler planilha. Verifique se o arquivo está no padrão correto."));
         }
       };
