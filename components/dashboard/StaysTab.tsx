@@ -36,7 +36,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   });
 
   const [editingRecord, setEditingRecord] = useState<StayRecord | null>(null);
-  const [editForm, setEditForm] = useState({ arrival: '', departure: '' });
+  const [editForm, setEditForm] = useState({ scheduled: '', arrival: '', departure: '' });
 
   const [newSessionForm, setNewSessionForm] = useState({
     startDate: new Date().toISOString().split('T')[0],
@@ -112,20 +112,17 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }
   };
 
-  /**
-   * NOVA REGRA DE CÁLCULO:
-   * A cobrança inicia X horas após a PREVISÃO e vai até a SAÍDA.
-   */
   const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
     if (!scheduledStartTime || !departureTime) return 0;
     
+    // Tratamos a string ISO Local como absoluta para evitar deslocamento de fuso
     const schedule = new Date(scheduledStartTime).getTime();
     const departure = new Date(departureTime).getTime();
     
     if (isNaN(schedule) || isNaN(departure)) return 0;
     
     const graceMs = (session.gracePeriodHours || 8) * 3600000;
-    const triggerPoint = schedule + graceMs; // Ponto onde a cobrança deve começar
+    const triggerPoint = schedule + graceMs; 
     
     if (departure <= triggerPoint) return 0;
     
@@ -171,7 +168,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
       
       if (records.length === 0) {
-        setFeedback({ isOpen: true, title: "Erro", message: "Nenhum dado válido no Excel.", type: "warning" });
+        setFeedback({ isOpen: true, title: "Erro", message: "Nenhum dado válido localizado. Verifique se a planilha começa na linha 2.", type: "warning" });
         setIsImporting(false);
         return;
       }
@@ -184,13 +181,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       await db.saveStayRecords(processed);
       await loadSessionRecords(selectedSession.id);
     } catch (err: any) {
-      setFeedback({ isOpen: true, title: "Erro", message: "Falha na leitura.", type: "error" });
+      setFeedback({ isOpen: true, title: "Erro", message: "Falha na leitura do arquivo.", type: "error" });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
+  // Garante que o input datetime-local receba exatamente a string salva sem conversão
   const formatISOToInput = (isoString: string) => {
     if (!isoString) return '';
     return isoString.substring(0, 16);
@@ -199,6 +197,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const handleOpenEditRecord = (r: StayRecord) => {
     setEditingRecord(r);
     setEditForm({ 
+      scheduled: formatISOToInput(r.scheduledStart),
       arrival: formatISOToInput(r.arrivalTime), 
       departure: formatISOToInput(r.departureTime) 
     });
@@ -206,14 +205,18 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const handleSaveRecordEdit = async () => {
     if (!editingRecord || !selectedSession) return;
+    
+    // Salva exatamente como digitado no input
+    const scheduledISO = editForm.scheduled ? `${editForm.scheduled}:00` : '';
     const arrivalISO = editForm.arrival ? `${editForm.arrival}:00` : '';
     const departureISO = editForm.departure ? `${editForm.departure}:00` : '';
 
     const updatedRecord: StayRecord = {
       ...editingRecord,
+      scheduledStart: scheduledISO,
       arrivalTime: arrivalISO,
       departureTime: departureISO,
-      exceededHours: calculateStayExceeded(editingRecord.scheduledStart, departureISO, selectedSession)
+      exceededHours: calculateStayExceeded(scheduledISO, departureISO, selectedSession)
     };
     
     await db.saveStayRecords([updatedRecord]);
@@ -224,6 +227,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const formatFullDateTime = (iso: string) => {
     if (!iso) return '---';
     try {
+      // Parse manual para ignorar qualquer ajuste de Timezone do navegador
       const [datePart, timePart] = iso.split('T');
       const [y, m, d] = datePart.split('-');
       const [hh, mm] = timePart.split(':');
@@ -336,7 +340,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Estadias ALS</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Cálculo: (Saída - (Previsão + Carência))</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Cálculo Baseado em Hora Local Pura (Saída - [Previsão + Carência])</p>
           </div>
           <button onClick={() => setIsCreatingSession(true)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95">Criar Nova Pasta</button>
         </div>
@@ -416,6 +420,23 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                   <button type="button" onClick={() => setIsSettingsOpen(false)} className="w-full py-2 text-[10px] font-black text-slate-400 uppercase">Voltar</button>
                 </div>
              </form>
+          </div>
+        </div>
+      )}
+
+      {editingRecord && (
+        <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+            <h3 className="text-lg font-black uppercase text-slate-800 text-center leading-tight">Ajustar Eventos</h3>
+            <div className="space-y-4">
+              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Previsão (Gatilho)</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.scheduled} onChange={e => setEditForm({...editForm, scheduled: e.target.value})} /></div>
+              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Check-in Real</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.arrival} onChange={e => setEditForm({...editForm, arrival: e.target.value})} /></div>
+              <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Check-out Real</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.departure} onChange={e => setEditForm({...editForm, departure: e.target.value})} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-4">
+              <button onClick={() => setEditingRecord(null)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Cancelar</button>
+              <button onClick={handleSaveRecordEdit} className="py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Confirmar</button>
+            </div>
           </div>
         </div>
       )}
