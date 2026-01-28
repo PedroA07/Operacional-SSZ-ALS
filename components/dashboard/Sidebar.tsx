@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { User, DashboardTab, OperationDefinition, Staff } from '../../types';
 import WeatherWidget from './WeatherWidget';
@@ -105,6 +104,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </MenuItem>
         <MenuItem tab={DashboardTab.DOCUMENTOS} label="Documentação" icon={<Icons.Formularios />} />
         <MenuItem tab={DashboardTab.ADMINISTRATIVO} label="Financeiro" icon={<Icons.Clientes />} />
+        <MenuItem tab={DashboardTab.ESTADIAS} label="Estadias" icon={<Icons.Estadias />} />
         <MenuItem tab={DashboardTab.MOTORISTAS} label="Motoristas" icon={<Icons.Motoristas />} />
         <MenuItem tab={DashboardTab.FORMULARIOS} label="Formulários" icon={<Icons.Formularios />} />
         <MenuItem tab={DashboardTab.CLIENTES} label="Clientes" icon={<Icons.Clientes />} />
