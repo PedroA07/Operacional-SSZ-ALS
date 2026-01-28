@@ -115,6 +115,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
     if (!scheduledStartTime || !departureTime) return 0;
     
+    // As datas agora são strings locais puras YYYY-MM-DDTHH:mm:ss
     const schedule = new Date(scheduledStartTime).getTime();
     const departure = new Date(departureTime).getTime();
     
@@ -167,18 +168,44 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
       
       if (records.length === 0) {
-        setFeedback({ isOpen: true, title: "Erro", message: "Nenhum dado válido localizado. Verifique se a OS está na coluna B.", type: "warning" });
+        setFeedback({ isOpen: true, title: "Erro", message: "Nenhum dado válido localizado. Verifique o Excel.", type: "warning" });
         setIsImporting(false);
         return;
       }
 
-      const processed = records.map(r => ({
+      // Evita duplicados na mesma pasta
+      const { unique, duplicateCount, duplicateList } = stayValidator.filterDuplicates(records, sessionRecords);
+
+      if (unique.length === 0) {
+        setFeedback({ 
+          isOpen: true, 
+          title: "Importação Ignorada", 
+          message: `Todos os ${duplicateCount} registros já existem nesta pasta.`, 
+          type: "warning" 
+        });
+        setIsImporting(false);
+        return;
+      }
+
+      const processed = unique.map(r => ({
         ...r,
         exceededHours: calculateStayExceeded(r.scheduledStart, r.departureTime, selectedSession)
       }));
       
       await db.saveStayRecords(processed);
       await loadSessionRecords(selectedSession.id);
+
+      if (duplicateCount > 0) {
+        setFeedback({ 
+          isOpen: true, 
+          title: "Importação Parcial", 
+          message: `${unique.length} novos registros adicionados. ${duplicateCount} foram ignorados por já existirem.`, 
+          type: "success",
+          details: duplicateList
+        });
+      } else {
+        setFeedback({ isOpen: true, title: "Sucesso", message: `${unique.length} registros importados com sucesso.`, type: "success" });
+      }
     } catch (err: any) {
       setFeedback({ isOpen: true, title: "Erro", message: "Falha na leitura do arquivo.", type: "error" });
     } finally {
@@ -189,7 +216,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const formatISOToInput = (isoString: string) => {
     if (!isoString) return '';
-    // Como os dados são salvos como YYYY-MM-DDTHH:mm:ss sem Z, extraímos os primeiros 16 chars
     return isoString.substring(0, 16);
   };
 
@@ -205,9 +231,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const handleSaveRecordEdit = async () => {
     if (!editingRecord || !selectedSession) return;
     
-    const scheduledISO = editForm.scheduled ? `${editForm.scheduled}:00` : '';
-    const arrivalISO = editForm.arrival ? `${editForm.arrival}:00` : '';
-    const departureISO = editForm.departure ? `${editForm.departure}:00` : '';
+    const scheduledISO = editForm.scheduled ? (editForm.scheduled.includes('T') ? editForm.scheduled : `${editForm.scheduled}:00`) : '';
+    const arrivalISO = editForm.arrival ? (editForm.arrival.includes('T') ? editForm.arrival : `${editForm.arrival}:00`) : '';
+    const departureISO = editForm.departure ? (editForm.departure.includes('T') ? editForm.departure : `${editForm.departure}:00`) : '';
 
     const updatedRecord: StayRecord = {
       ...editingRecord,
@@ -222,18 +248,13 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setEditingRecord(null);
   };
 
-  /**
-   * FORMATAÇÃO DE EXIBIÇÃO ABSOLUTA
-   * Ignora fuso horário e mostra exatamente os caracteres salvos.
-   */
   const formatFullDateTime = (iso: string) => {
-    if (!iso || iso.length < 16) return '---';
+    if (!iso || iso.length < 10) return '---';
     try {
-      // Ex: 2024-05-20T10:00:00 -> 20/05/2024 10:00
       const [datePart, timePart] = iso.split('T');
       const [y, m, d] = datePart.split('-');
-      const [hh, mm] = timePart.split(':');
-      return `${d}/${m}/${y} ${hh}:${mm}`;
+      const time = timePart ? timePart.substring(0, 5) : '00:00';
+      return `${d}/${m}/${y} ${time}`;
     } catch (e) { return '---'; }
   };
 
@@ -290,7 +311,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
            <span className="text-[9px] font-black text-emerald-700">{formatFullDateTime(r.arrivalTime)}</span>
         </div>
         <div className="flex flex-col bg-red-50 px-2 py-1 rounded border border-red-100">
-           <span className="text-[6.5px] font-black text-red-600 uppercase leading-none mb-0.5">Saída Real</span>
+           <span className="text-[6.5px] font-black text-red-600 uppercase tracking-tight leading-none mb-0.5">Saída Real</span>
            <span className="text-[9px] font-black text-red-700">{formatFullDateTime(r.departureTime)}</span>
         </div>
       </div>
