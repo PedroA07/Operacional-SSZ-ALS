@@ -164,7 +164,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
       
       if (records.length === 0) {
-        setFeedback({ isOpen: true, title: "Planilha Sem Dados", message: "Nenhum registro de OS válido foi localizado. Verifique se o arquivo segue o padrão (OS na coluna B).", type: "warning" });
+        setFeedback({ isOpen: true, title: "Planilha Sem Dados", message: "Nenhum registro de OS válido foi localizado. Verifique se o arquivo segue o padrão.", type: "warning" });
         setIsImporting(false);
         return;
       }
@@ -188,18 +188,30 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       setFeedback({ isOpen: true, title: "Sucesso!", message: `${processed.length} novas OS importadas com sucesso.`, type: "success" });
       await loadSessionRecords(selectedSession.id);
     } catch (err: any) {
-      setFeedback({ isOpen: true, title: "Erro no Processamento", message: "Falha ao ler o Excel. Certifique-se de que não é um arquivo protegido ou corrompido.", type: "error" });
+      setFeedback({ isOpen: true, title: "Erro no Processamento", message: "Falha ao ler o Excel. Certifique-se de que não é um arquivo protegido.", type: "error" });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
+  // Helper para converter ISO para formato de input datetime-local respeitando o fuso local
+  const formatISOToInput = (isoString: string) => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '';
+      const offset = date.getTimezoneOffset() * 60000;
+      return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    } catch (e) { return ''; }
+  };
+
   const handleOpenEditRecord = (r: StayRecord) => {
     setEditingRecord(r);
-    const arrival = r.arrivalTime ? new Date(r.arrivalTime).toISOString().slice(0, 16) : '';
-    const departure = r.departureTime ? new Date(r.departureTime).toISOString().slice(0, 16) : '';
-    setEditForm({ arrival, departure });
+    setEditForm({ 
+      arrival: formatISOToInput(r.arrivalTime), 
+      departure: formatISOToInput(r.departureTime) 
+    });
   };
 
   const handleSaveRecordEdit = async () => {

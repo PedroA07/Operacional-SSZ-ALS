@@ -13,10 +13,11 @@ export const stayImporter = {
       reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+          // cellDates: true converte números do Excel em objetos Date JS
+          const workbook = XLSX.read(data, { type: 'array', cellDates: true, dateNF: 'dd/mm/yyyy hh:mm' });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           
-          // Obtém todas as linhas
+          // Obtém todas as linhas como matriz de arrays
           const rows: any[] = XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false });
           
           if (rows.length < 2) {
@@ -26,19 +27,19 @@ export const stayImporter = {
 
           const records: StayRecord[] = [];
 
-          // Tenta identificar onde começam os dados de fato (procurando o primeiro valor numérico ou OS na col B)
+          // Identifica o início dos dados ignorando cabeçalhos vazios ou informativos
           const startIndex = rows.findIndex((row, idx) => idx > 0 && row && row[1] && String(row[1]).trim().length > 2);
           const effectiveRows = startIndex === -1 ? rows.slice(1) : rows.slice(startIndex);
 
-          const formatDateForce = (val: any): string => {
+          const formatDateToISO = (val: any): string => {
             if (val === undefined || val === null || String(val).trim() === '') return '';
             
-            const d = new Date(val);
-            if (!isNaN(d.getTime())) {
-              return d.toISOString();
+            // Se já for um Date do JS (via cellDates do XLSX)
+            if (val instanceof Date) {
+              return val.toISOString();
             }
 
-            // Tenta parse manual se for string no formato brasileiro DD/MM/YYYY HH:MM
+            // Se for string no formato brasileiro DD/MM/YYYY HH:MM ou similar
             if (typeof val === 'string' && val.includes('/')) {
               try {
                 const parts = val.trim().split(/\s+/);
@@ -47,29 +48,29 @@ export const stayImporter = {
                 
                 const day = parseInt(dateParts[0], 10);
                 const month = parseInt(dateParts[1], 10) - 1;
-                const year = dateParts[2].length === 2 ? 2000 + parseInt(dateParts[2], 10) : parseInt(dateParts[2], 10);
+                let year = parseInt(dateParts[2], 10);
+                if (dateParts[2].length === 2) year += 2000;
                 
-                const parsed = new Date(
-                  year, 
-                  month, 
-                  day,
-                  parseInt(timeParts[0], 10) || 0,
-                  parseInt(timeParts[1], 10) || 0
-                );
-                
+                const hours = parseInt(timeParts[0], 10) || 0;
+                const minutes = parseInt(timeParts[1], 10) || 0;
+
+                const parsed = new Date(year, month, day, hours, minutes);
                 return isNaN(parsed.getTime()) ? '' : parsed.toISOString();
               } catch (e) {
                 return '';
               }
             }
-            return '';
+
+            // Fallback para conversão padrão
+            const d = new Date(val);
+            return isNaN(d.getTime()) ? '' : d.toISOString();
           };
 
           for (const row of effectiveRows) {
-            // Se a coluna B (OS) estiver vazia, ignora a linha
+            // OS é obrigatória (coluna B)
             if (!row || !row[1] || String(row[1]).trim() === '') continue;
 
-            const type = String(row[0] || '').toUpperCase().trim();
+            const type = String(row[0] || 'GERAL').toUpperCase().trim();
             const os = String(row[1] || '').toUpperCase().trim();
             const location = String(row[2] || '---').toUpperCase().trim();
             const driverName = String(row[3] || '---').toUpperCase().trim();
@@ -77,11 +78,11 @@ export const stayImporter = {
             const container = String(row[5] || '').toUpperCase().trim();
             
             // Datas (G:6, H:7, I:8)
-            const scheduledStart = formatDateForce(row[6]);
-            const arrivalTime = formatDateForce(row[7]);
-            const departureTime = formatDateForce(row[8]);
+            const scheduledStart = formatDateToISO(row[6]);
+            const arrivalTime = formatDateToISO(row[7]);
+            const departureTime = formatDateToISO(row[8]);
 
-            // Cálculo de estadia (> 8h)
+            // Cálculo de estadia (> 8h) com base em milissegundos absolutos
             let exceededText = '---';
             if (arrivalTime && departureTime) {
                const start = new Date(arrivalTime).getTime();
@@ -116,7 +117,7 @@ export const stayImporter = {
           resolve(records);
         } catch (err) {
           console.error("Excel processing error:", err);
-          reject(new Error("Erro ao ler planilha. Verifique se o arquivo está no padrão correto."));
+          reject(new Error("Erro ao processar planilha. Verifique os formatos de data."));
         }
       };
       reader.onerror = (err) => reject(err);

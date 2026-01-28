@@ -75,16 +75,18 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
   const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
 
+  // Converte data ISO para local no formato do input datetime-local
+  const formatISOToInput = (isoString?: string) => {
+    const date = isoString ? new Date(isoString) : new Date();
+    if (isNaN(date.getTime())) return '';
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  };
+
   const handleOpenStatusEditor = (t: Trip, s: TripStatus) => {
     setSelectedTrip(t);
     setTempStatus(s);
-    
-    // CORREÇÃO DE HORA: Ajusta para fuso horário local no datetime-local
-    const now = new Date();
-    const tzOffset = now.getTimezoneOffset() * 60000;
-    const localISO = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
-    
-    setStatusTime(localISO);
+    setStatusTime(formatISOToInput()); // Pega a hora local agora
     setIsStatusModalOpen(true);
   };
 
