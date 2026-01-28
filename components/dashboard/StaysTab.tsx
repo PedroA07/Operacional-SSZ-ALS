@@ -134,21 +134,17 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }
   };
 
-  /**
-   * LÓGICA DE ESTADIA (REGRA SOLICITADA):
-   * Só começa a contar após X horas (gracePeriodHours) depois da PREVISÃO.
-   * Conta até a SAÍDA.
-   */
   const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
     if (!scheduledStartTime || !departureTime) return 0;
     
+    // Tratamos as strings ISO Local como instantes de tempo absolutos
     const schedule = new Date(scheduledStartTime).getTime();
     const departure = new Date(departureTime).getTime();
     
     if (isNaN(schedule) || isNaN(departure)) return 0;
     
     const graceMs = (session.gracePeriodHours || 8) * 3600000;
-    const triggerPoint = schedule + graceMs; // Momento que inicia a cobrança
+    const triggerPoint = schedule + graceMs;
     
     if (departure <= triggerPoint) return 0;
     
@@ -158,7 +154,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     const remainingMinutes = totalMinutes % 60;
     const roundUpTrigger = session.roundUpMinutes || 30;
     
-    // Se passar do gatilho de arredondamento (ex: 30min), conta uma hora cheia
     return remainingMinutes >= roundUpTrigger ? wholeHours + 1 : wholeHours;
   };
 
@@ -176,7 +171,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
       
       if (records.length === 0) {
-        setFeedback({ isOpen: true, title: "Planilha Sem Dados", message: "Nenhum registro de OS válido foi localizado. Verifique se o arquivo segue o padrão.", type: "warning" });
+        setFeedback({ isOpen: true, title: "Planilha Sem Dados", message: "Nenhum registro de OS válido foi localizado.", type: "warning" });
         setIsImporting(false);
         return;
       }
@@ -198,21 +193,19 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       setFeedback({ isOpen: true, title: "Sucesso!", message: `${processed.length} novas OS importadas com sucesso.`, type: "success" });
       await loadSessionRecords(selectedSession.id);
     } catch (err: any) {
-      setFeedback({ isOpen: true, title: "Erro no Processamento", message: "Falha ao ler o Excel. Certifique-se de que não é um arquivo protegido.", type: "error" });
+      setFeedback({ isOpen: true, title: "Erro no Processamento", message: "Falha ao ler o Excel.", type: "error" });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  // Helper para converter ISO para formato de input datetime-local respeitando o fuso local
+  // Helper para converter ISO Local para string compatível com input datetime-local
   const formatISOToInput = (isoString: string) => {
     if (!isoString) return '';
     try {
-      const date = new Date(isoString);
-      if (isNaN(date.getTime())) return '';
-      const offset = date.getTimezoneOffset() * 60000;
-      return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+      // Como já salvamos no formato Local YYYY-MM-DDTHH:mm:ss, basta dar um slice
+      return isoString.slice(0, 16);
     } catch (e) { return ''; }
   };
 
@@ -226,10 +219,13 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const handleSaveRecordEdit = async () => {
     if (!editingRecord || !selectedSession) return;
-    const departureISO = new Date(editForm.departure).toISOString();
+    // Salva exatamente como digitado, reconstruindo o ISO Local
+    const arrivalISO = editForm.arrival ? `${editForm.arrival}:00` : '';
+    const departureISO = editForm.departure ? `${editForm.departure}:00` : '';
+
     const updatedRecord: StayRecord = {
       ...editingRecord,
-      arrivalTime: new Date(editForm.arrival).toISOString(),
+      arrivalTime: arrivalISO,
       departureTime: departureISO,
       exceededHours: calculateStayExceeded(editingRecord.scheduledStart, departureISO, selectedSession)
     };
@@ -240,12 +236,22 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const formatFullDateTime = (iso: string) => {
     if (!iso) return '---';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '---';
-    return d.toLocaleString('pt-BR', { 
-      day: '2-digit', month: '2-digit', year: 'numeric', 
-      hour: '2-digit', minute: '2-digit' 
-    });
+    try {
+      const date = new Date(iso);
+      if (isNaN(date.getTime())) return '---';
+      
+      // Formatação manual para evitar conversão de fuso horário indesejada na exibição
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const d = pad(date.getDate());
+      const m = pad(date.getMonth() + 1);
+      const y = date.getFullYear();
+      const hh = pad(date.getHours());
+      const mm = pad(date.getMinutes());
+
+      return `${d}/${m}/${y} ${hh}:${mm}`;
+    } catch (e) {
+      return '---';
+    }
   };
 
   const years = useMemo(() => {
