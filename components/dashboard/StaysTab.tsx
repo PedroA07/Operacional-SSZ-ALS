@@ -54,10 +54,59 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   useEffect(() => { loadSessions(); }, [loadSessions]);
 
+  const calculateArrivalStatus = (scheduled: string, actual: string): string => {
+    if (!scheduled || !actual) return '---';
+    const schedTime = new Date(scheduled).getTime();
+    const actualTime = new Date(actual).getTime();
+    if (isNaN(schedTime) || isNaN(actualTime)) return '---';
+    
+    if (actualTime <= schedTime) {
+      return 'NO HORÁRIO';
+    } else {
+      const diffMs = actualTime - schedTime;
+      const diffMin = Math.floor(diffMs / 60000);
+      const h = Math.floor(diffMin / 60);
+      const m = diffMin % 60;
+      return `ATRASADO (+${h}h ${m}m)`;
+    }
+  };
+
+  const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
+    if (!scheduledStartTime || !departureTime) return 0;
+    
+    const schedule = new Date(scheduledStartTime).getTime();
+    const departure = new Date(departureTime).getTime();
+    
+    if (isNaN(schedule) || isNaN(departure)) return 0;
+    
+    const graceMs = (session.gracePeriodHours || 8) * 3600000;
+    const triggerPoint = schedule + graceMs; 
+    
+    if (departure <= triggerPoint) return 0;
+    
+    const billableMs = departure - triggerPoint;
+    const totalMinutes = Math.floor(billableMs / 60000);
+    const wholeHours = Math.floor(totalMinutes / 60);
+    const remainingMinutes = totalMinutes % 60;
+    const roundUpTrigger = session.roundUpMinutes || 30;
+    
+    return remainingMinutes >= roundUpTrigger ? wholeHours + 1 : wholeHours;
+  };
+
+  const calculateStayExceeded = (scheduledStartTime: string, departureTime: string, session: StaySession): string => {
+    const hours = calculateExceededHoursDecimal(scheduledStartTime, departureTime, session);
+    return hours === 0 ? '---' : `${hours}h 00m`;
+  };
+
   const loadSessionRecords = async (sessionId: string) => {
     const records = await db.getStayRecords(sessionId);
-    const sorted = records.sort((a, b) => (a.scheduledStart || '').localeCompare(b.scheduledStart || ''));
-    setSessionRecords(sorted);
+    // Garante ordenação por data de previsão e recálculo de status se estiver vazio
+    const processed = records.map(r => ({
+      ...r,
+      arrivalStatus: r.arrivalStatus || calculateArrivalStatus(r.scheduledStart, r.arrivalTime)
+    })).sort((a, b) => (a.scheduledStart || '').localeCompare(b.scheduledStart || ''));
+    
+    setSessionRecords(processed);
   };
 
   const handleOpenSession = async (session: StaySession) => {
@@ -111,50 +160,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     } catch (err) {
       setFeedback({ isOpen: true, title: "Erro", message: "Falha ao gravar.", type: "error" });
     }
-  };
-
-  const calculateArrivalStatus = (scheduled: string, actual: string): string => {
-    if (!scheduled || !actual) return '---';
-    const schedTime = new Date(scheduled).getTime();
-    const actualTime = new Date(actual).getTime();
-    if (isNaN(schedTime) || isNaN(actualTime)) return '---';
-    
-    if (actualTime <= schedTime) {
-      return 'NO HORÁRIO';
-    } else {
-      const diffMs = actualTime - schedTime;
-      const diffMin = Math.floor(diffMs / 60000);
-      const h = Math.floor(diffMin / 60);
-      const m = diffMin % 60;
-      return `ATRASADO (+${h}h ${m}m)`;
-    }
-  };
-
-  const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
-    if (!scheduledStartTime || !departureTime) return 0;
-    
-    const schedule = new Date(scheduledStartTime).getTime();
-    const departure = new Date(departureTime).getTime();
-    
-    if (isNaN(schedule) || isNaN(departure)) return 0;
-    
-    const graceMs = (session.gracePeriodHours || 8) * 3600000;
-    const triggerPoint = schedule + graceMs; 
-    
-    if (departure <= triggerPoint) return 0;
-    
-    const billableMs = departure - triggerPoint;
-    const totalMinutes = Math.floor(billableMs / 60000);
-    const wholeHours = Math.floor(totalMinutes / 60);
-    const remainingMinutes = totalMinutes % 60;
-    const roundUpTrigger = session.roundUpMinutes || 30;
-    
-    return remainingMinutes >= roundUpTrigger ? wholeHours + 1 : wholeHours;
-  };
-
-  const calculateStayExceeded = (scheduledStartTime: string, departureTime: string, session: StaySession): string => {
-    const hours = calculateExceededHoursDecimal(scheduledStartTime, departureTime, session);
-    return hours === 0 ? '---' : `${hours}h 00m`;
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -326,7 +331,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const status = r.arrivalStatus || '---';
       const isLate = status.includes('ATRASADO');
       return (
-        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase ${isLate ? 'bg-red-50 text-red-600 border border-red-100' : status === 'NO HORÁRIO' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-400'}`}>
+        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase border ${isLate ? 'bg-red-50 text-red-600 border-red-100' : status === 'NO HORÁRIO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400'}`}>
           {status}
         </span>
       );
