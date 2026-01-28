@@ -54,59 +54,15 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   useEffect(() => { loadSessions(); }, [loadSessions]);
 
-  const calculateArrivalStatus = (scheduled: string, actual: string): string => {
-    if (!scheduled || !actual) return '---';
-    const schedTime = new Date(scheduled).getTime();
-    const actualTime = new Date(actual).getTime();
-    if (isNaN(schedTime) || isNaN(actualTime)) return '---';
-    
-    if (actualTime <= schedTime) {
-      return 'NO HORÁRIO';
-    } else {
-      const diffMs = actualTime - schedTime;
-      const diffMin = Math.floor(diffMs / 60000);
-      const h = Math.floor(diffMin / 60);
-      const m = diffMin % 60;
-      return `ATRASADO (+${h}h ${m}m)`;
-    }
-  };
-
-  const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
-    if (!scheduledStartTime || !departureTime) return 0;
-    
-    const schedule = new Date(scheduledStartTime).getTime();
-    const departure = new Date(departureTime).getTime();
-    
-    if (isNaN(schedule) || isNaN(departure)) return 0;
-    
-    const graceMs = (session.gracePeriodHours || 8) * 3600000;
-    const triggerPoint = schedule + graceMs; 
-    
-    if (departure <= triggerPoint) return 0;
-    
-    const billableMs = departure - triggerPoint;
-    const totalMinutes = Math.floor(billableMs / 60000);
-    const wholeHours = Math.floor(totalMinutes / 60);
-    const remainingMinutes = totalMinutes % 60;
-    const roundUpTrigger = session.roundUpMinutes || 30;
-    
-    return remainingMinutes >= roundUpTrigger ? wholeHours + 1 : wholeHours;
-  };
-
-  const calculateStayExceeded = (scheduledStartTime: string, departureTime: string, session: StaySession): string => {
-    const hours = calculateExceededHoursDecimal(scheduledStartTime, departureTime, session);
-    return hours === 0 ? '---' : `${hours}h 00m`;
-  };
-
   const loadSessionRecords = async (sessionId: string) => {
-    const records = await db.getStayRecords(sessionId);
-    // Garante ordenação por data de previsão e recálculo de status se estiver vazio
-    const processed = records.map(r => ({
-      ...r,
-      arrivalStatus: r.arrivalStatus || calculateArrivalStatus(r.scheduledStart, r.arrivalTime)
-    })).sort((a, b) => (a.scheduledStart || '').localeCompare(b.scheduledStart || ''));
-    
-    setSessionRecords(processed);
+    try {
+      const records = await db.getStayRecords(sessionId);
+      // Ordena por data de previsão (scheduledStart)
+      const sorted = records.sort((a, b) => (a.scheduledStart || '').localeCompare(b.scheduledStart || ''));
+      setSessionRecords(sorted);
+    } catch (e) {
+      console.error("Erro ao carregar registros de estadia:", e);
+    }
   };
 
   const handleOpenSession = async (session: StaySession) => {
@@ -162,6 +118,55 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }
   };
 
+  /**
+   * Cálculo de Pontualidade Pura (Executado na renderização)
+   */
+  const getArrivalStatus = (scheduled: string, actual: string): { text: string; color: string } => {
+    if (!scheduled || !actual) return { text: '---', color: 'bg-slate-50 text-slate-400' };
+    
+    const schedTime = new Date(scheduled).getTime();
+    const actualTime = new Date(actual).getTime();
+    
+    if (isNaN(schedTime) || isNaN(actualTime)) return { text: '---', color: 'bg-slate-50 text-slate-400' };
+    
+    if (actualTime <= schedTime) {
+      return { text: 'NO HORÁRIO', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
+    } else {
+      const diffMs = actualTime - schedTime;
+      const diffMin = Math.floor(diffMs / 60000);
+      const h = Math.floor(diffMin / 60);
+      const m = diffMin % 60;
+      return { 
+        text: `ATRASADO (+${h}h ${m}m)`, 
+        color: 'bg-red-50 text-red-600 border-red-100' 
+      };
+    }
+  };
+
+  const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
+    if (!scheduledStartTime || !departureTime) return 0;
+    const schedule = new Date(scheduledStartTime).getTime();
+    const departure = new Date(departureTime).getTime();
+    if (isNaN(schedule) || isNaN(departure)) return 0;
+    
+    const graceMs = (session.gracePeriodHours || 8) * 3600000;
+    const triggerPoint = schedule + graceMs; 
+    if (departure <= triggerPoint) return 0;
+    
+    const billableMs = departure - triggerPoint;
+    const totalMinutes = Math.floor(billableMs / 60000);
+    const wholeHours = Math.floor(totalMinutes / 60);
+    const remainingMinutes = totalMinutes % 60;
+    const roundUpTrigger = session.roundUpMinutes || 30;
+    
+    return remainingMinutes >= roundUpTrigger ? wholeHours + 1 : wholeHours;
+  };
+
+  const calculateStayExceeded = (scheduledStartTime: string, departureTime: string, session: StaySession): string => {
+    const hours = calculateExceededHoursDecimal(scheduledStartTime, departureTime, session);
+    return hours === 0 ? '---' : `${hours}h 00m`;
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSession) return;
@@ -190,7 +195,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
       
       if (records.length === 0) {
-        setFeedback({ isOpen: true, title: "Erro", message: "Nenhum dado válido localizado. Verifique o Excel.", type: "warning" });
+        setFeedback({ isOpen: true, title: "Erro", message: "Nenhum dado válido localizado.", type: "warning" });
         setIsImporting(false);
         return;
       }
@@ -198,19 +203,13 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const { unique, duplicateCount, duplicateList } = stayValidator.filterDuplicates(records, sessionRecords);
 
       if (unique.length === 0) {
-        setFeedback({ 
-          isOpen: true, 
-          title: "Importação Ignorada", 
-          message: `Todos os ${duplicateCount} registros já existem nesta pasta.`, 
-          type: "warning" 
-        });
+        setFeedback({ isOpen: true, title: "Importação Ignorada", message: `Todos os ${duplicateCount} registros já existem.`, type: "warning" });
         setIsImporting(false);
         return;
       }
 
       const processed = unique.map(r => ({
         ...r,
-        arrivalStatus: calculateArrivalStatus(r.scheduledStart, r.arrivalTime),
         exceededHours: calculateStayExceeded(r.scheduledStart, r.departureTime, selectedSession)
       }));
       
@@ -219,17 +218,15 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
       if (duplicateCount > 0) {
         setFeedback({ 
-          isOpen: true, 
-          title: "Importação Parcial", 
-          message: `${unique.length} novos registros adicionados. ${duplicateCount} foram ignorados por já existirem.`, 
-          type: "success",
-          details: duplicateList
+          isOpen: true, title: "Importação Parcial", 
+          message: `${unique.length} novos adicionados. ${duplicateCount} duplicados ignorados.`, 
+          type: "success", details: duplicateList
         });
       } else {
-        setFeedback({ isOpen: true, title: "Sucesso", message: `${unique.length} registros importados com sucesso.`, type: "success" });
+        setFeedback({ isOpen: true, title: "Sucesso", message: `${unique.length} registros importados.`, type: "success" });
       }
     } catch (err: any) {
-      setFeedback({ isOpen: true, title: "Erro", message: "Falha na leitura do arquivo.", type: "error" });
+      setFeedback({ isOpen: true, title: "Erro", message: "Falha na leitura.", type: "error" });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -262,7 +259,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       scheduledStart: scheduledISO,
       arrivalTime: arrivalISO,
       departureTime: departureISO,
-      arrivalStatus: calculateArrivalStatus(scheduledISO, arrivalISO),
       exceededHours: calculateStayExceeded(scheduledISO, departureISO, selectedSession)
     };
     
@@ -328,11 +324,10 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       </div>
     )},
     { key: 'status_arrival', label: 'Status Chegada', render: (r: StayRecord) => {
-      const status = r.arrivalStatus || '---';
-      const isLate = status.includes('ATRASADO');
+      const status = getArrivalStatus(r.scheduledStart, r.arrivalTime);
       return (
-        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase border ${isLate ? 'bg-red-50 text-red-600 border-red-100' : status === 'NO HORÁRIO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400'}`}>
-          {status}
+        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase border ${status.color}`}>
+          {status.text}
         </span>
       );
     }},
@@ -395,7 +390,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Estadias ALS</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Cálculo Baseado em Hora Local Pura (Saída - [Previsão + Carência])</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Cálculo em Tempo Real (Saída - [Previsão + Carência])</p>
           </div>
           <button onClick={() => setIsCreatingSession(true)} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95">Criar Nova Pasta</button>
         </div>
