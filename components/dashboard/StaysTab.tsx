@@ -137,7 +137,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
     if (!scheduledStartTime || !departureTime) return 0;
     
-    // Tratamos as strings ISO Local como instantes de tempo absolutos
+    // JS interpreta strings sem "Z" como tempo local, mantendo a coerência com o Excel
     const schedule = new Date(scheduledStartTime).getTime();
     const departure = new Date(departureTime).getTime();
     
@@ -201,11 +201,12 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   };
 
   // Helper para converter ISO Local para string compatível com input datetime-local
+  // O input exige exatamente YYYY-MM-DDTHH:mm
   const formatISOToInput = (isoString: string) => {
     if (!isoString) return '';
     try {
-      // Como já salvamos no formato Local YYYY-MM-DDTHH:mm:ss, basta dar um slice
-      return isoString.slice(0, 16);
+      // Como já salvamos no formato Local YYYY-MM-DDTHH:mm:ss, basta extrair os 16 primeiros caracteres
+      return isoString.substring(0, 16);
     } catch (e) { return ''; }
   };
 
@@ -219,7 +220,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const handleSaveRecordEdit = async () => {
     if (!editingRecord || !selectedSession) return;
-    // Salva exatamente como digitado, reconstruindo o ISO Local
+    
+    // CRUCIAL: Salva como string local pura, preservando os minutos digitados exatamente.
+    // Não usamos toISOString() para não aplicar deslocamento de fuso horário.
     const arrivalISO = editForm.arrival ? `${editForm.arrival}:00` : '';
     const departureISO = editForm.departure ? `${editForm.departure}:00` : '';
 
@@ -229,6 +232,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       departureTime: departureISO,
       exceededHours: calculateStayExceeded(editingRecord.scheduledStart, departureISO, selectedSession)
     };
+    
     await db.saveStayRecords([updatedRecord]);
     await loadSessionRecords(selectedSession.id);
     setEditingRecord(null);
@@ -237,16 +241,10 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const formatFullDateTime = (iso: string) => {
     if (!iso) return '---';
     try {
-      const date = new Date(iso);
-      if (isNaN(date.getTime())) return '---';
-      
-      // Formatação manual para evitar conversão de fuso horário indesejada na exibição
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const d = pad(date.getDate());
-      const m = pad(date.getMonth() + 1);
-      const y = date.getFullYear();
-      const hh = pad(date.getHours());
-      const mm = pad(date.getMinutes());
+      // Faz o split manual para garantir que a exibição na tabela ignore fusos do sistema
+      const [datePart, timePart] = iso.split('T');
+      const [y, m, d] = datePart.split('-');
+      const [hh, mm] = timePart.split(':');
 
       return `${d}/${m}/${y} ${hh}:${mm}`;
     } catch (e) {
