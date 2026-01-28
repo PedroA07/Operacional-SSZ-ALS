@@ -115,7 +115,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
     if (!scheduledStartTime || !departureTime) return 0;
     
-    // Tratamos a string ISO Local como absoluta para evitar deslocamento de fuso
     const schedule = new Date(scheduledStartTime).getTime();
     const departure = new Date(departureTime).getTime();
     
@@ -168,7 +167,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
       
       if (records.length === 0) {
-        setFeedback({ isOpen: true, title: "Erro", message: "Nenhum dado válido localizado. Verifique se a planilha começa na linha 2.", type: "warning" });
+        setFeedback({ isOpen: true, title: "Erro", message: "Nenhum dado válido localizado. Verifique se a OS está na coluna B.", type: "warning" });
         setIsImporting(false);
         return;
       }
@@ -188,9 +187,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }
   };
 
-  // Garante que o input datetime-local receba exatamente a string salva sem conversão
   const formatISOToInput = (isoString: string) => {
     if (!isoString) return '';
+    // Como os dados são salvos como YYYY-MM-DDTHH:mm:ss sem Z, extraímos os primeiros 16 chars
     return isoString.substring(0, 16);
   };
 
@@ -206,7 +205,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const handleSaveRecordEdit = async () => {
     if (!editingRecord || !selectedSession) return;
     
-    // Salva exatamente como digitado no input
     const scheduledISO = editForm.scheduled ? `${editForm.scheduled}:00` : '';
     const arrivalISO = editForm.arrival ? `${editForm.arrival}:00` : '';
     const departureISO = editForm.departure ? `${editForm.departure}:00` : '';
@@ -224,10 +222,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setEditingRecord(null);
   };
 
+  /**
+   * FORMATAÇÃO DE EXIBIÇÃO ABSOLUTA
+   * Ignora fuso horário e mostra exatamente os caracteres salvos.
+   */
   const formatFullDateTime = (iso: string) => {
-    if (!iso) return '---';
+    if (!iso || iso.length < 16) return '---';
     try {
-      // Parse manual para ignorar qualquer ajuste de Timezone do navegador
+      // Ex: 2024-05-20T10:00:00 -> 20/05/2024 10:00
       const [datePart, timePart] = iso.split('T');
       const [y, m, d] = datePart.split('-');
       const [hh, mm] = timePart.split(':');
@@ -404,7 +406,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
              </div>
              <form onSubmit={handleSaveSettings} className="p-10 space-y-8">
                 <div className="space-y-2">
-                   <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest">💰 Valor Hora Excedente (R$)</label>
+                   <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest">💰 Valor Hora Adicional (R$)</label>
                    <input type="number" step="0.01" required className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 text-lg" value={selectedSession.costPerHour || 0} onChange={e => setSelectedSession({...selectedSession, costPerHour: Number(e.target.value)})} />
                 </div>
                 <div className="space-y-2">

@@ -4,8 +4,8 @@ import { StayRecord } from '../types';
 
 export const stayImporter = {
   /**
-   * Processa o Excel preservando a hora exata.
-   * Pula apenas a primeira linha (cabeçalho).
+   * Processa o Excel preservando a fidelidade total dos dados.
+   * Não utiliza conversão de fuso horário do sistema.
    */
   processExcelForStays: async (file: File, sessionId: string): Promise<StayRecord[]> => {
     return new Promise((resolve, reject) => {
@@ -13,11 +13,10 @@ export const stayImporter = {
       reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          // cellDates: false para pegar os números seriais brutos do Excel e evitar conversão automática do fuso
-          const workbook = XLSX.read(data, { type: 'array', cellDates: false });
+          // raw: true para pegar os números seriais do Excel sem processamento da lib
+          const workbook = XLSX.read(data, { type: 'array', raw: true });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           
-          // Obtém as linhas como arrays de valores
           const rows: any[][] = XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: true });
           
           if (rows.length < 1) {
@@ -26,34 +25,33 @@ export const stayImporter = {
           }
 
           const records: StayRecord[] = [];
-          // Pula apenas a primeira linha (índice 0)
+          // Pula EXCLUSIVAMENTE a primeira linha (cabeçalho)
+          // Linhas 2 e 3 agora são processadas normalmente
           const effectiveRows = rows.slice(1);
 
           /**
-           * Converte o número serial de data do Excel ou String para ISO Local
-           * Sem aplicar deslocamento de Timezone.
+           * Calcula Data/Hora a partir do Serial do Excel sem usar o motor de data do JS.
+           * Isso garante que 10:00 na planilha continue sendo 10:00 no sistema.
            */
-          const parseExcelDate = (val: any): string => {
-            if (val === undefined || val === null || String(val).trim() === '') return '';
+          const serialToLocalString = (serial: any): string => {
+            if (serial === undefined || serial === null || serial === '') return '';
             
-            let date: Date;
-
-            if (typeof val === 'number') {
-              // Lógica de conversão de data serial do Excel (dias desde 1900)
-              // O valor decimal representa a fração do dia (horas/minutos)
-              const secondsInDay = 24 * 60 * 60;
-              const excelEpoch = new Date(1899, 11, 30); // 30/12/1899 é o ponto zero do Excel
-              const totalSeconds = val * secondsInDay;
-              date = new Date(excelEpoch.getTime() + totalSeconds * 1000);
-            } else {
-              // Se vier como string, tenta parsear normalmente
-              date = new Date(val);
+            // Se já for string (ex: digitado como texto no Excel)
+            if (typeof serial === 'string') {
+               // Se for formato ISO parcial (YYYY-MM-DDTHH:mm), completa
+               if (serial.includes('T')) return serial.length === 16 ? `${serial}:00` : serial;
+               return serial;
             }
 
-            if (isNaN(date.getTime())) return '';
+            if (typeof serial !== 'number') return String(serial);
 
-            // Extração manual dos componentes locais para garantir "Exatamente como no doc"
+            // Parte inteira = Dias / Parte decimal = Horas
+            const totalSeconds = Math.round(serial * 86400);
+            const date = new Date(1899, 11, 30); // Base Excel
+            date.setSeconds(date.getSeconds() + totalSeconds);
+
             const pad = (n: number) => String(n).padStart(2, '0');
+            
             const y = date.getFullYear();
             const m = pad(date.getMonth() + 1);
             const d = pad(date.getDate());
@@ -61,25 +59,29 @@ export const stayImporter = {
             const mm = pad(date.getMinutes());
             const ss = pad(date.getSeconds());
 
-            // Retorna formato ISO Local (Sem o 'Z' de UTC)
+            // Retorna string local pura (ISO sem Z)
             return `${y}-${m}-${d}T${hh}:${mm}:${ss}`;
           };
 
           for (const row of effectiveRows) {
-            // Ignora linhas totalmente vazias (onde não há OS nem Tipo)
-            if (!row || (!row[0] && !row[1])) continue;
+            // Só ignora se a linha for realmente nula/indefinida
+            if (!row) continue;
 
             const type = String(row[0] || 'GERAL').toUpperCase().trim();
             const os = String(row[1] || '').toUpperCase().trim();
+            
+            // Se não tem OS, não é um registro válido
+            if (!os) continue;
+
             const location = String(row[2] || '---').toUpperCase().trim();
             const driverName = String(row[3] || '---').toUpperCase().trim();
             const ship = String(row[4] || '').toUpperCase().trim();
             const container = String(row[5] || '').toUpperCase().trim();
             
             // Colunas: G(6): Previsão, H(7): Entrada, I(8): Saída
-            const scheduledStart = parseExcelDate(row[6]);
-            const arrivalTime = parseExcelDate(row[7]);
-            const departureTime = parseExcelDate(row[8]);
+            const scheduledStart = serialToLocalString(row[6]);
+            const arrivalTime = serialToLocalString(row[7]);
+            const departureTime = serialToLocalString(row[8]);
 
             records.push({
               id: `rec-${sessionId}-${os}-${Date.now()}-${records.length}`,
@@ -100,7 +102,7 @@ export const stayImporter = {
           resolve(records);
         } catch (err) {
           console.error("Erro importação:", err);
-          reject(new Error("Erro ao processar planilha. Verifique o formato do arquivo."));
+          reject(new Error("Erro ao processar planilha."));
         }
       };
       reader.onerror = (err) => reject(err);
