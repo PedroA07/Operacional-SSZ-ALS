@@ -114,6 +114,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }
   };
 
+  const calculateArrivalStatus = (scheduled: string, actual: string): string => {
+    if (!scheduled || !actual) return '---';
+    const schedTime = new Date(scheduled).getTime();
+    const actualTime = new Date(actual).getTime();
+    if (isNaN(schedTime) || isNaN(actualTime)) return '---';
+    return actualTime > schedTime ? 'ATRASADO' : 'NO HORÁRIO';
+  };
+
   const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
     if (!scheduledStartTime || !departureTime) return 0;
     
@@ -189,6 +197,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
       const processed = unique.map(r => ({
         ...r,
+        arrivalStatus: calculateArrivalStatus(r.scheduledStart, r.arrivalTime),
         exceededHours: calculateStayExceeded(r.scheduledStart, r.departureTime, selectedSession)
       }));
       
@@ -240,6 +249,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       scheduledStart: scheduledISO,
       arrivalTime: arrivalISO,
       departureTime: departureISO,
+      arrivalStatus: calculateArrivalStatus(scheduledISO, arrivalISO),
       exceededHours: calculateStayExceeded(scheduledISO, departureISO, selectedSession)
     };
     
@@ -298,12 +308,20 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       </div>
     )},
-    { key: 'scheduled', label: 'Previsão (Gatilho Carência)', render: (r: StayRecord) => (
+    { key: 'scheduled', label: 'Previsão (Gatilho)', render: (r: StayRecord) => (
       <div className="flex flex-col bg-slate-50 px-2 py-1 rounded border border-slate-100 w-[110px]">
          <span className="text-[6.5px] font-black text-slate-400 uppercase leading-none mb-0.5">Agendado</span>
          <span className="text-[9px] font-black text-slate-700">{formatFullDateTime(r.scheduledStart)}</span>
       </div>
     )},
+    { key: 'status_arrival', label: 'Status Chegada', render: (r: StayRecord) => {
+      const status = r.arrivalStatus || '---';
+      return (
+        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase ${status === 'ATRASADO' ? 'bg-red-50 text-red-600' : status === 'NO HORÁRIO' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
+          {status}
+        </span>
+      );
+    }},
     { key: 'times', label: 'Janela Realizada', render: (r: StayRecord) => (
       <div className="flex flex-col gap-1 w-[135px]">
         <div className="flex flex-col bg-emerald-50 px-2 py-1 rounded border border-emerald-100">

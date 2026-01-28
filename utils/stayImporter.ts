@@ -83,6 +83,14 @@ export const stayImporter = {
             const arrivalTime = excelSerialToLocalString(row[7]);
             const departureTime = excelSerialToLocalString(row[8]);
 
+            // Cálculo de Pontualidade na Importação
+            let arrivalStatus = '---';
+            if (scheduledStart && arrivalTime) {
+              const sched = new Date(scheduledStart).getTime();
+              const arriv = new Date(arrivalTime).getTime();
+              arrivalStatus = arriv > sched ? 'ATRASADO' : 'NO HORÁRIO';
+            }
+
             records.push({
               id: `rec-${sessionId}-${os || 'SN'}-${Date.now()}-${i}`,
               sessionId,
@@ -95,7 +103,8 @@ export const stayImporter = {
               scheduledStart,
               arrivalTime,
               departureTime,
-              exceededHours: '---'
+              exceededHours: '---',
+              arrivalStatus
             });
           }
 
