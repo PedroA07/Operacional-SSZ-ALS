@@ -224,9 +224,12 @@ export const db = {
     const payload: any = {
       date: record.date || new Date().toISOString().split('T')[0],
       container_number: record.containerNumber,
+      /* Fix: Changed record.export_ref to record.exportRef to match interface property name */
       export_ref: record.exportRef || null,
       requested_price: record.requestedPrice || 0,
+      /* Fix: Changed record.customer_ref to record.customerRef to match interface property name */
       customer_ref: record.customerRef || null,
+      /* Fix: Changed record.trip_settlement to record.tripSettlement to match interface property name */
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
       driver_id: record.driverId || null,
@@ -365,9 +368,12 @@ export const db = {
     const recordsToInsert = records.map(r => ({
       batch_id: batchId,
       seal_number: r.sealNumber,
+      /* Fix: Changed r.container_number to r.containerNumber to match interface property name */
       container_number: r.containerNumber,
       booking: r.booking,
+      /* Fix: Changed r.reuse_date to r.reuseDate to match interface property name */
       reuse_date: r.reuseDate,
+      /* Fix: Changed r.driver_name to r.driverName to match interface property name */
       driver_name: r.driverName
     }));
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
@@ -412,7 +418,7 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase
       .from('stay_records')
-      .select('id, session_id, type, os, location, driver_name, ship, container, scheduled_start, arrival_time, departure_time, exceeded_hours')
+      .select('id, session_id, type, os, location, driver_name, ship, container, scheduled_start, arrival_time, departure_time, exceeded_hours, observations')
       .eq('session_id', sessionId)
       .order('os');
     if (error) throw error;
@@ -428,7 +434,8 @@ export const db = {
       scheduledStart: r.scheduled_start,
       arrivalTime: r.arrival_time,
       departureTime: r.departure_time,
-      exceededHours: r.exceeded_hours
+      exceededHours: r.exceeded_hours,
+      observations: r.observations
     }));
   },
 
@@ -462,7 +469,8 @@ export const db = {
       scheduled_start: r.scheduledStart || null,
       arrival_time: r.arrivalTime || null,
       departure_time: r.departureTime || null,
-      exceeded_hours: r.exceededHours
+      exceeded_hours: r.exceeded_hours,
+      observations: r.observations
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);
     return !error;
