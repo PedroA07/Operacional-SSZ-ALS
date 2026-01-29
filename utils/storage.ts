@@ -402,9 +402,9 @@ export const db = {
       endDate: s.end_date,
       createdAt: s.created_at,
       createdBy: s.created_by,
-      gracePeriodHours: s.grace_period_hours,
-      roundUpMinutes: s.round_up_minutes,
-      costPerHour: s.cost_per_hour
+      grace_period_hours: s.grace_period_hours,
+      round_up_minutes: s.round_up_minutes,
+      cost_per_hour: s.cost_per_hour
     }));
   },
 
@@ -412,7 +412,7 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase
       .from('stay_records')
-      .select('id, session_id, type, os, location, driver_name, ship, container, scheduled_start, arrival_time, departure_time, exceeded_hours')
+      .select('id, session_id, type, os, location, driver_name, ship, container, scheduled_start, arrival_time, departure_time, exceeded_hours, observations')
       .eq('session_id', sessionId)
       .order('os');
     if (error) throw error;
@@ -428,7 +428,8 @@ export const db = {
       scheduledStart: r.scheduled_start,
       arrivalTime: r.arrival_time,
       departureTime: r.departure_time,
-      exceededHours: r.exceeded_hours
+      exceededHours: r.exceeded_hours,
+      observations: r.observations
     }));
   },
 
@@ -462,7 +463,8 @@ export const db = {
       scheduled_start: r.scheduledStart || null,
       arrival_time: r.arrivalTime || null,
       departure_time: r.departureTime || null,
-      exceeded_hours: r.exceededHours
+      exceeded_hours: r.exceededHours,
+      observations: r.observations
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);
     return !error;

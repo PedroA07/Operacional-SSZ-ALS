@@ -267,6 +267,17 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setEditingRecord(null);
   };
 
+  const handleUpdateObservation = async (record: StayRecord, value: string) => {
+    if (!selectedSession) return;
+    const updated = { ...record, observations: value };
+    
+    // Atualiza o estado local para feedback imediato
+    setSessionRecords(prev => prev.map(r => r.id === record.id ? updated : r));
+    
+    // Salva no banco
+    await db.saveStayRecords([updated]);
+  };
+
   const formatFullDateTime = (iso: string) => {
     if (!iso || iso.length < 10) return '---';
     try {
@@ -352,6 +363,19 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       );
     }},
+    { key: 'observations', label: 'Observações Internas', render: (r: StayRecord) => (
+      <div className="relative group/obs">
+        <textarea 
+          className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-300 focus:bg-white transition-all resize-none h-12 leading-tight"
+          placeholder="DIGITAR NOTA..."
+          defaultValue={r.observations || ''}
+          onBlur={(e) => handleUpdateObservation(r, e.target.value.toUpperCase())}
+        />
+        <div className="absolute top-1 right-1 opacity-0 group-hover/obs:opacity-100 pointer-events-none transition-opacity">
+           <svg className="w-2.5 h-2.5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg>
+        </div>
+      </div>
+    )},
     { key: 'totalCost', label: 'Fatura Estimada', render: (r: StayRecord) => {
       if (!selectedSession) return '---';
       const hours = calculateExceededHoursDecimal(r.scheduledStart, r.departureTime, selectedSession);
