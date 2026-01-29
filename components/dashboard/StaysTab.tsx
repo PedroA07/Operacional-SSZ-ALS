@@ -318,12 +318,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       );
     }},
     { key: 'times', label: 'Janela Realizada', render: (r: StayRecord) => (
-      <div className="flex flex-col gap-1 w-[125px]">
+      <div className="flex flex-col gap-1 w-[135px]">
         <div className="flex flex-col bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
-           <span className="text-[6.5px] font-black text-emerald-600 uppercase leading-none mb-0.5">In: {formatFullDateTime(r.arrivalTime).split(' ')[1]}</span>
+           <span className="text-[6.5px] font-black text-emerald-600 uppercase leading-none mb-0.5">Entrada Real</span>
+           <span className="text-[9px] font-black text-emerald-700">{formatFullDateTime(r.arrivalTime)}</span>
         </div>
         <div className="flex flex-col bg-red-50 px-2 py-1 rounded border border-red-100">
-           <span className="text-[6.5px] font-black text-red-600 uppercase tracking-tight leading-none mb-0.5">Out: {formatFullDateTime(r.departureTime).split(' ')[1]}</span>
+           <span className="text-[6.5px] font-black text-red-600 uppercase tracking-tight leading-none mb-0.5">Saída Real</span>
+           <span className="text-[9px] font-black text-red-700">{formatFullDateTime(r.departureTime)}</span>
         </div>
       </div>
     )},
@@ -333,6 +335,19 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <div className="flex flex-col items-center">
           <span className={`text-[10px] font-black ${text !== '---' ? 'text-red-600' : 'text-slate-400'}`}>{text}</span>
           {text !== '---' && <span className="text-[6px] bg-red-100 text-red-600 px-1 rounded font-black uppercase mt-0.5 shadow-sm">Cobrar</span>}
+        </div>
+      );
+    }},
+    { key: 'totalCost', label: 'Valor Estadia', render: (r: StayRecord) => {
+      if (!selectedSession) return <span className="text-slate-300 font-bold">---</span>;
+      const hours = calculateExceededHoursDecimal(r.scheduledStart, r.departureTime, selectedSession);
+      const total = hours * (selectedSession.costPerHour || 0);
+      return total === 0 ? <span className="text-slate-300 font-bold">---</span> : (
+        <div className="flex flex-col items-end">
+          <span className="text-[11px] font-black text-emerald-700">
+            {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </span>
+          <span className="text-[6px] text-slate-400 font-bold uppercase">{hours}H x R$ {selectedSession.costPerHour}</span>
         </div>
       );
     }},
@@ -346,19 +361,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         />
       </div>
     )},
-    { key: 'totalCost', label: 'Fatura Estimada', render: (r: StayRecord) => {
-      if (!selectedSession) return <span className="text-slate-300 font-bold">---</span>;
-      const hours = calculateExceededHoursDecimal(r.scheduledStart, r.departureTime, selectedSession);
-      const total = hours * (selectedSession.costPerHour || 0);
-      return total === 0 ? <span className="text-slate-300 font-bold">---</span> : (
-        <div className="flex flex-col items-end">
-          <span className="text-[11px] font-black text-emerald-700">
-            {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          </span>
-          <span className="text-[6px] text-slate-400 font-bold uppercase">{hours}H x R$ {selectedSession.costPerHour}</span>
-        </div>
-      );
-    }},
     { key: 'actions', label: 'Ações', render: (r: StayRecord) => (
       <div className="flex gap-1 justify-end">
         <button onClick={(e) => { e.stopPropagation(); handleOpenEditRecord(r); }} className="p-2 text-slate-300 hover:text-blue-500 rounded-lg transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg></button>
@@ -437,7 +439,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
               </div>
            </div>
            <div className="stay-table-compact">
-             <SmartOperationTable userId={userId} componentId={`stays-records-v2-${selectedSession.id}`} title={`Registros da Pasta`} data={sessionRecords} columns={recordColumns} />
+             <SmartOperationTable userId={userId} componentId={`stays-records-v3-${selectedSession.id}`} title={`Registros da Pasta`} data={sessionRecords} columns={recordColumns} />
            </div>
         </div>
       )}
@@ -489,7 +491,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       )}
 
       {isCreatingSession && (
-        <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-10 bg-slate-900 text-white text-center">
                  <h3 className="text-xl font-black uppercase tracking-tight">Configurar Pasta</h3>
@@ -513,7 +515,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       )}
 
-      <style>{` .stay-table-compact table td { padding: 0.6rem 0.5rem !important; font-size: 9px !important; } `}</style>
+      <style>{` .stay-table-compact table td { padding: 0.7rem 0.6rem !important; font-size: 9px !important; } `}</style>
     </div>
   );
 };

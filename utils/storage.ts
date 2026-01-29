@@ -223,13 +223,17 @@ export const db = {
     const payload: any = {
       date: record.date || new Date().toISOString().split('T')[0],
       container_number: record.containerNumber,
+      // Fix: Property 'export_ref' does not exist on type 'Partial<AvantidaRecord>'. Did you mean 'exportRef'?
       export_ref: record.exportRef || null,
       requested_price: record.requestedPrice || 0,
+      // Fix: Property 'customer_ref' does not exist on type 'Partial<AvantidaRecord>'. Did you mean 'customerRef'?
       customer_ref: record.customerRef || null,
+      // Fix: Property 'trip_settlement' does not exist on type 'Partial<AvantidaRecord>'. Did you mean 'tripSettlement'?
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
       driver_id: record.driverId || null,
       shipping_line: record.shippingLine || null,
+      // Fix: Property 'import_location' does not exist on type 'Partial<AvantidaRecord>'. Did you mean 'importLocation'?
       import_location: record.importLocation || null,
       reuse_date: (record.reuseDate && record.reuseDate.trim() !== "") ? record.reuseDate : null,
       status: record.status || 'EM ANÁLISE'
@@ -265,7 +269,7 @@ export const db = {
     if (!supabase) return false;
     const payload = {
       id: rule.id || `prc-${Date.now()}`,
-      shipping_line: rule.shippingLine?.toUpperCase(),
+      shipping_line: rule.shipping_line?.toUpperCase(),
       price: Number(rule.price || 0),
       updated_at: new Date().toISOString()
     };
@@ -344,6 +348,7 @@ export const db = {
       sealNumber: r.seal_number,
       containerNumber: r.container_number,
       booking: r.booking,
+      // Fix: use reuseDate and driverName properties from SealRecord interface
       reuseDate: r.reuse_date,
       driverName: r.driver_name
     }));
@@ -401,9 +406,10 @@ export const db = {
       endDate: s.end_date,
       createdAt: s.created_at,
       createdBy: s.created_by,
-      grace_period_hours: s.grace_period_hours,
-      round_up_minutes: s.round_up_minutes,
-      cost_per_hour: s.cost_per_hour
+      // Fix: Map snake_case from DB to camelCase in interface StaySession
+      gracePeriodHours: s.grace_period_hours,
+      roundUpMinutes: s.round_up_minutes,
+      costPerHour: s.cost_per_hour
     }));
   },
 
