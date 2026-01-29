@@ -105,7 +105,6 @@ export interface StayRecord {
   departureTime: string;
   exceededHours: string;
   arrivalStatus?: string;
-  observations?: string;
 }
 
 export interface NotificationPreference {
