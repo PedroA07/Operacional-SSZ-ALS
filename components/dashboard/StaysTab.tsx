@@ -271,7 +271,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     if (!selectedSession) return;
     const updated = { ...record, observations: value };
     
-    // Atualiza o estado local para feedback imediato (sem reload da tabela)
+    // Atualiza o estado local para feedback imediato
     setSessionRecords(prev => prev.map(r => r.id === record.id ? updated : r));
     
     // Salva no banco
@@ -367,7 +367,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       <div className="relative group/obs">
         <textarea 
           className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-300 focus:bg-white transition-all resize-none h-12 leading-tight"
-          placeholder="NOTAS..."
+          placeholder="DIGITAR NOTA..."
           defaultValue={r.observations || ''}
           onBlur={(e) => handleUpdateObservation(r, e.target.value.toUpperCase())}
         />
@@ -458,8 +458,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                  <h3 className="text-sm font-black uppercase text-slate-800 leading-none">{selectedSession.category.replace(/\|/g, ' ')}</h3>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setIsSettingsOpen(true)} className="px-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg flex items-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg><span className="text-[10px] font-black uppercase">Regras</span></button>
-                <input type="file" border-none ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
+                <button onClick={() => setIsSettingsOpen(true)} className="px-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg flex items-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg><span className="text-[10px] font-black uppercase">Regras</span></button>
+                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
                 <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all flex items-center gap-2 active:scale-95">{isImporting ? 'Lendo...' : 'Importar Excel'}</button>
               </div>
            </div>

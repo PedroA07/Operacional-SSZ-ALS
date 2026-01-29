@@ -224,12 +224,9 @@ export const db = {
     const payload: any = {
       date: record.date || new Date().toISOString().split('T')[0],
       container_number: record.containerNumber,
-      /* Fix: Changed record.export_ref to record.exportRef to match interface property name */
       export_ref: record.exportRef || null,
       requested_price: record.requestedPrice || 0,
-      /* Fix: Changed record.customer_ref to record.customerRef to match interface property name */
       customer_ref: record.customerRef || null,
-      /* Fix: Changed record.trip_settlement to record.tripSettlement to match interface property name */
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
       driver_id: record.driverId || null,
@@ -368,12 +365,9 @@ export const db = {
     const recordsToInsert = records.map(r => ({
       batch_id: batchId,
       seal_number: r.sealNumber,
-      /* Fix: Changed r.container_number to r.containerNumber to match interface property name */
       container_number: r.containerNumber,
       booking: r.booking,
-      /* Fix: Changed r.reuse_date to r.reuseDate to match interface property name */
       reuse_date: r.reuseDate,
-      /* Fix: Changed r.driver_name to r.driverName to match interface property name */
       driver_name: r.driverName
     }));
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
@@ -408,9 +402,9 @@ export const db = {
       endDate: s.end_date,
       createdAt: s.created_at,
       createdBy: s.created_by,
-      gracePeriodHours: s.grace_period_hours,
-      roundUpMinutes: s.round_up_minutes,
-      costPerHour: s.cost_per_hour
+      grace_period_hours: s.grace_period_hours,
+      round_up_minutes: s.round_up_minutes,
+      cost_per_hour: s.cost_per_hour
     }));
   },
 
@@ -469,7 +463,7 @@ export const db = {
       scheduled_start: r.scheduledStart || null,
       arrival_time: r.arrivalTime || null,
       departure_time: r.departureTime || null,
-      exceeded_hours: r.exceeded_hours,
+      exceeded_hours: r.exceededHours,
       observations: r.observations
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);
