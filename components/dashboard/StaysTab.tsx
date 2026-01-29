@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Category, StaySession, StayRecord } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
@@ -57,7 +56,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const loadSessionRecords = async (sessionId: string) => {
     try {
       const records = await db.getStayRecords(sessionId);
-      // Ordena por data de previsão (scheduledStart)
       const sorted = records.sort((a, b) => (a.scheduledStart || '').localeCompare(b.scheduledStart || ''));
       setSessionRecords(sorted);
     } catch (e) {
@@ -350,7 +348,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     )},
     { key: 'totalCost', label: 'Fatura Estimada', render: (r: StayRecord) => {
       if (!selectedSession) return <span className="text-slate-300 font-bold">---</span>;
-      // Recalcula dinamicamente para garantir que a UI mostre o valor real baseado na carência da pasta atual
       const hours = calculateExceededHoursDecimal(r.scheduledStart, r.departureTime, selectedSession);
       const total = hours * (selectedSession.costPerHour || 0);
       return total === 0 ? <span className="text-slate-300 font-bold">---</span> : (

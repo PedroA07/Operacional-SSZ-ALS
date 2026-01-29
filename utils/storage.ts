@@ -344,7 +344,7 @@ export const db = {
       sealNumber: r.seal_number,
       containerNumber: r.container_number,
       booking: r.booking,
-      reuse_date: r.reuse_date,
+      reuseDate: r.reuse_date,
       driverName: r.driver_name
     }));
   },
@@ -367,7 +367,6 @@ export const db = {
       container_number: r.containerNumber,
       booking: r.booking,
       reuse_date: r.reuseDate,
-      // Fix: Changed r.driver_name to r.driverName to match Partial<SealRecord> type
       driver_name: r.driverName
     }));
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
