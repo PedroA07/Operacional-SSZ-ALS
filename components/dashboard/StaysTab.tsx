@@ -118,17 +118,11 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }
   };
 
-  /**
-   * Cálculo de Pontualidade Pura (Executado na renderização)
-   */
   const getArrivalStatus = (scheduled: string, actual: string): { text: string; color: string } => {
     if (!scheduled || !actual) return { text: '---', color: 'bg-slate-50 text-slate-400' };
-    
     const schedTime = new Date(scheduled).getTime();
     const actualTime = new Date(actual).getTime();
-    
     if (isNaN(schedTime) || isNaN(actualTime)) return { text: '---', color: 'bg-slate-50 text-slate-400' };
-    
     if (actualTime <= schedTime) {
       return { text: 'NO HORÁRIO', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
     } else {
@@ -136,10 +130,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       const diffMin = Math.floor(diffMs / 60000);
       const h = Math.floor(diffMin / 60);
       const m = diffMin % 60;
-      return { 
-        text: `ATRASADO (+${h}h ${m}m)`, 
-        color: 'bg-red-50 text-red-600 border-red-100' 
-      };
+      return { text: `ATRASADO (+${h}h ${m}m)`, color: 'bg-red-50 text-red-600 border-red-100' };
     }
   };
 
@@ -174,7 +165,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       await db.saveStaySession(selectedSession);
       setIsSettingsOpen(false);
       await loadSessions();
-      
       const updatedRecords = sessionRecords.map(r => ({
         ...r,
         exceededHours: calculateStayExceeded(r.scheduledStart, r.departureTime, selectedSession)
@@ -193,29 +183,23 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setIsImporting(true);
     try {
       const records = await stayImporter.processExcelForStays(file, selectedSession.id);
-      
       if (records.length === 0) {
         setFeedback({ isOpen: true, title: "Erro", message: "Nenhum dado válido localizado.", type: "warning" });
         setIsImporting(false);
         return;
       }
-
       const { unique, duplicateCount, duplicateList } = stayValidator.filterDuplicates(records, sessionRecords);
-
       if (unique.length === 0) {
         setFeedback({ isOpen: true, title: "Importação Ignorada", message: `Todos os ${duplicateCount} registros já existem.`, type: "warning" });
         setIsImporting(false);
         return;
       }
-
       const processed = unique.map(r => ({
         ...r,
         exceededHours: calculateStayExceeded(r.scheduledStart, r.departureTime, selectedSession)
       }));
-      
       await db.saveStayRecords(processed);
       await loadSessionRecords(selectedSession.id);
-
       if (duplicateCount > 0) {
         setFeedback({ 
           isOpen: true, title: "Importação Parcial", 
@@ -249,11 +233,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const handleSaveRecordEdit = async () => {
     if (!editingRecord || !selectedSession) return;
-    
     const scheduledISO = editForm.scheduled ? (editForm.scheduled.includes('T') ? editForm.scheduled : `${editForm.scheduled}:00`) : '';
     const arrivalISO = editForm.arrival ? (editForm.arrival.includes('T') ? editForm.arrival : `${editForm.arrival}:00`) : '';
     const departureISO = editForm.departure ? (editForm.departure.includes('T') ? editForm.departure : `${editForm.departure}:00`) : '';
-
     const updatedRecord: StayRecord = {
       ...editingRecord,
       scheduledStart: scheduledISO,
@@ -261,7 +243,6 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       departureTime: departureISO,
       exceededHours: calculateStayExceeded(scheduledISO, departureISO, selectedSession)
     };
-    
     await db.saveStayRecords([updatedRecord]);
     await loadSessionRecords(selectedSession.id);
     setEditingRecord(null);
@@ -270,11 +251,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const handleUpdateObservation = async (record: StayRecord, value: string) => {
     if (!selectedSession) return;
     const updated = { ...record, observations: value };
-    
-    // Atualiza o estado local para feedback imediato
     setSessionRecords(prev => prev.map(r => r.id === record.id ? updated : r));
-    
-    // Salva no banco
     await db.saveStayRecords([updated]);
   };
 
@@ -316,10 +293,10 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       </div>
     )},
     { key: 'location', label: 'Atendimento', render: (r: StayRecord) => (
-      <span className="text-[9px] font-black uppercase text-slate-600 leading-tight block whitespace-normal break-words max-w-[150px]">{r.location}</span>
+      <span className="text-[9px] font-black uppercase text-slate-600 leading-tight block whitespace-normal break-words max-w-[130px]">{r.location}</span>
     )},
     { key: 'resource', label: 'Recursos', render: (r: StayRecord) => (
-      <div className="flex flex-col min-w-[180px]">
+      <div className="flex flex-col min-w-[160px]">
         <span className="font-black text-[10px] uppercase text-slate-700 truncate">{r.driverName}</span>
         <div className="flex gap-2 items-center mt-1">
            <span className="text-[8px] font-bold text-slate-400 uppercase">{r.ship || '---'}</span>
@@ -329,7 +306,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       </div>
     )},
     { key: 'scheduled', label: 'Previsão (Gatilho)', render: (r: StayRecord) => (
-      <div className="flex flex-col bg-slate-50 px-2 py-1 rounded border border-slate-100 w-[110px]">
+      <div className="flex flex-col bg-slate-50 px-2 py-1 rounded border border-slate-100 w-[105px]">
          <span className="text-[6.5px] font-black text-slate-400 uppercase leading-none mb-0.5">Agendado</span>
          <span className="text-[9px] font-black text-slate-700">{formatFullDateTime(r.scheduledStart)}</span>
       </div>
@@ -343,18 +320,16 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       );
     }},
     { key: 'times', label: 'Janela Realizada', render: (r: StayRecord) => (
-      <div className="flex flex-col gap-1 w-[135px]">
+      <div className="flex flex-col gap-1 w-[125px]">
         <div className="flex flex-col bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
-           <span className="text-[6.5px] font-black text-emerald-600 uppercase leading-none mb-0.5">Entrada Real</span>
-           <span className="text-[9px] font-black text-emerald-700">{formatFullDateTime(r.arrivalTime)}</span>
+           <span className="text-[6.5px] font-black text-emerald-600 uppercase leading-none mb-0.5">In: {formatFullDateTime(r.arrivalTime).split(' ')[1]}</span>
         </div>
         <div className="flex flex-col bg-red-50 px-2 py-1 rounded border border-red-100">
-           <span className="text-[6.5px] font-black text-red-600 uppercase tracking-tight leading-none mb-0.5">Saída Real</span>
-           <span className="text-[9px] font-black text-red-700">{formatFullDateTime(r.departureTime)}</span>
+           <span className="text-[6.5px] font-black text-red-600 uppercase tracking-tight leading-none mb-0.5">Out: {formatFullDateTime(r.departureTime).split(' ')[1]}</span>
         </div>
       </div>
     )},
-    { key: 'stay', label: 'Cobrável (Pós-Carência)', render: (r: StayRecord) => {
+    { key: 'stay', label: 'Cobrável', render: (r: StayRecord) => {
       const text = r.exceededHours;
       return (
         <div className="flex flex-col items-center">
@@ -364,26 +339,27 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       );
     }},
     { key: 'observations', label: 'Observações Internas', render: (r: StayRecord) => (
-      <div className="relative group/obs">
+      <div className="relative group/obs w-[180px]">
         <textarea 
           className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-300 focus:bg-white transition-all resize-none h-12 leading-tight"
-          placeholder="DIGITAR NOTA..."
+          placeholder="NOTAS..."
           defaultValue={r.observations || ''}
           onBlur={(e) => handleUpdateObservation(r, e.target.value.toUpperCase())}
         />
-        <div className="absolute top-1 right-1 opacity-0 group-hover/obs:opacity-100 pointer-events-none transition-opacity">
-           <svg className="w-2.5 h-2.5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732"/></svg>
-        </div>
       </div>
     )},
     { key: 'totalCost', label: 'Fatura Estimada', render: (r: StayRecord) => {
-      if (!selectedSession) return '---';
+      if (!selectedSession) return <span className="text-slate-300 font-bold">---</span>;
+      // Recalcula dinamicamente para garantir que a UI mostre o valor real baseado na carência da pasta atual
       const hours = calculateExceededHoursDecimal(r.scheduledStart, r.departureTime, selectedSession);
       const total = hours * (selectedSession.costPerHour || 0);
       return total === 0 ? <span className="text-slate-300 font-bold">---</span> : (
-        <span className="text-[10px] font-black text-emerald-700">
-          {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-        </span>
+        <div className="flex flex-col items-end">
+          <span className="text-[11px] font-black text-emerald-700">
+            {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </span>
+          <span className="text-[6px] text-slate-400 font-bold uppercase">{hours}H x R$ {selectedSession.costPerHour}</span>
+        </div>
       );
     }},
     { key: 'actions', label: 'Ações', render: (r: StayRecord) => (
@@ -464,7 +440,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
               </div>
            </div>
            <div className="stay-table-compact">
-             <SmartOperationTable userId={userId} componentId={`stays-records-${selectedSession.id}`} title={`Registros da Pasta`} data={sessionRecords} columns={recordColumns} />
+             <SmartOperationTable userId={userId} componentId={`stays-records-v2-${selectedSession.id}`} title={`Registros da Pasta`} data={sessionRecords} columns={recordColumns} />
            </div>
         </div>
       )}
@@ -540,7 +516,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         </div>
       )}
 
-      <style>{` .stay-table-compact table td { padding: 0.75rem 0.6rem !important; font-size: 9px !important; } `}</style>
+      <style>{` .stay-table-compact table td { padding: 0.6rem 0.5rem !important; font-size: 9px !important; } `}</style>
     </div>
   );
 };
