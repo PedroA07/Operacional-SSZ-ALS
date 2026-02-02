@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import ExcelJS from 'exceljs';
 import { StayRecord, StaySession } from '../../../types';
@@ -28,40 +27,47 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session,
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('ESTADIAS');
 
-      // 1. Definição das Colunas (Headers)
+      // 1. Definição das Chaves e Cabeçalhos
+      // As larguras serão ajustadas dinamicamente depois
       worksheet.columns = [
-        { header: 'PROVEDOR', key: 'provedor', width: 25 },
-        { header: 'NUMERO DA OS', key: 'os', width: 15 },
-        { header: 'CLIENTE', key: 'cliente', width: 25 },
-        { header: 'MOTORISTAS', key: 'motorista', width: 30 },
-        { header: 'NAVIO/VIAGEM', key: 'navio', width: 20 },
-        { header: 'CONTAINER', key: 'container', width: 18 },
-        { header: 'HORARIO PROGRAMADO', key: 'programado', width: 22 },
-        { header: 'CHEGADA', key: 'chegada', width: 22 },
-        { header: 'SAIDA', key: 'saida', width: 22 },
-        { header: 'ATENDEU AGENDA', key: 'atendeu', width: 15 },
-        { header: 'FREE-TIME', key: 'freetime', width: 15 },
-        { header: 'HORAS EXCEDENTES', key: 'excedente', width: 18 },
-        { header: 'CUSTO POR HORA OU FRACAO', key: 'custohora', width: 28 },
-        { header: 'CUSTO TOTAL', key: 'custototal', width: 20 },
-        { header: 'OS AVULSA', key: 'avulsa', width: 12 },
-        { header: 'ANÁLISE', key: 'analise', width: 12 },
+        { header: 'PROVEDOR', key: 'provedor' },
+        { header: 'NUMERO DA OS', key: 'os' },
+        { header: 'CLIENTE', key: 'cliente' },
+        { header: 'MOTORISTAS', key: 'motorista' },
+        { header: 'NAVIO/VIAGEM', key: 'navio' },
+        { header: 'CONTAINER', key: 'container' },
+        { header: 'HORARIO PROGRAMADO', key: 'programado' },
+        { header: 'CHEGADA', key: 'chegada' },
+        { header: 'SAIDA', key: 'saida' },
+        { header: 'ATENDEU AGENDA', key: 'atendeu' },
+        { header: 'FREE-TIME', key: 'freetime' },
+        { header: 'HORAS EXCEDENTES', key: 'excedente' },
+        { header: 'CUSTO POR HORA OU FRACAO', key: 'custohora' },
+        { header: 'CUSTO TOTAL', key: 'custototal' },
+        { header: 'OS AVULSA', key: 'avulsa' },
+        { header: 'ANÁLISE', key: 'analise' },
       ];
 
-      // 2. Estilização do Cabeçalho
+      // 2. Estilização do Cabeçalho (Wrap Text + Height + Center)
       const headerRow = worksheet.getRow(1);
+      headerRow.height = 35; // Altura maior para permitir quebra de linha
+      
       headerRow.eachCell((cell) => {
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FF1F4E78' } // Azul Escuro Corporativo
+          fgColor: { argb: 'FF1F4E78' }
         };
         cell.font = {
-          color: { argb: 'FFFFFFFF' }, // Branco
+          color: { argb: 'FFFFFFFF' },
           bold: true,
-          size: 10
+          size: 9
         };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.alignment = { 
+          vertical: 'middle', 
+          horizontal: 'center', 
+          wrapText: true 
+        };
         cell.border = {
           top: { style: 'thin' },
           left: { style: 'thin' },
@@ -70,11 +76,10 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session,
         };
       });
 
-      // 3. Adição de Dados com Zebra e Formatação
+      // 3. Adição de Dados
       records.forEach((r, index) => {
-        const rowIndex = index + 2; // +1 pelo header, base 1 do Excel
-
-        // Lógica Atendeu Agenda
+        const rowIndex = index + 2;
+        
         let atendeuAgenda = 'NAO';
         if (r.scheduledStart && r.arrivalTime) {
           const sched = new Date(r.scheduledStart).getTime();
@@ -82,7 +87,6 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session,
           if (arriv <= sched) atendeuAgenda = 'SIM';
         }
 
-        // Conversão de Horas para Fração de Dia (Excel Time)
         const exceededHoursRaw = r.exceededHours === '---' ? 0 : parseInt(r.exceededHours.split('h')[0]);
         const exceededValue = exceededHoursRaw / 24;
         const freeTimeValue = (session.gracePeriodHours || 0) / 24;
@@ -105,17 +109,17 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session,
           analise: ''
         });
 
-        // Aplicar Fórmula de Custo Total: (Horas * 24) * ValorHora
-        // L = Horas Excedentes, M = Custo por Hora
         const cellCustoTotal = row.getCell('custototal');
         cellCustoTotal.value = {
           formula: `(L${rowIndex}*24)*M${rowIndex}`,
           date1904: false
         };
 
-        // Formatação das Células da Linha
+        // 4. Estilização Individual das Células da Linha
         row.eachCell((cell, colNumber) => {
-          // Borda em todas as células
+          const colKey = worksheet.columns[colNumber - 1].key;
+
+          // Bordas e Zebra
           cell.border = {
             top: { style: 'thin' },
             left: { style: 'thin' },
@@ -123,7 +127,6 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session,
             right: { style: 'thin' }
           };
 
-          // Zebra: Linhas pares com fundo cinza claro
           if (rowIndex % 2 === 0) {
             cell.fill = {
               type: 'pattern',
@@ -132,37 +135,57 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session,
             };
           }
 
-          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          // Lógica de Alinhamento e Formatação
+          const alignCenter: Partial<ExcelJS.Alignment> = { vertical: 'middle', horizontal: 'center' };
+          const alignRight: Partial<ExcelJS.Alignment> = { vertical: 'middle', horizontal: 'right' };
+          const alignLeft: Partial<ExcelJS.Alignment> = { vertical: 'middle', horizontal: 'left' };
 
-          // Formatos Específicos
-          const colKey = worksheet.columns[colNumber - 1].key;
           if (colKey === 'freetime' || colKey === 'excedente') {
             cell.numFmt = '[h]:mm';
+            cell.alignment = alignCenter;
           } else if (colKey === 'custohora' || colKey === 'custototal') {
             cell.numFmt = '"R$ " #,##0.00';
+            cell.alignment = alignRight;
+          } else if (['os', 'container', 'atendeu', 'programado', 'chegada', 'saida'].includes(colKey || '')) {
+            cell.alignment = alignCenter;
+            cell.font = { size: 9 };
+          } else {
+            cell.alignment = alignLeft;
+            cell.font = { size: 9 };
           }
         });
       });
 
-      // 4. Ativar Auto-Filtro
-      worksheet.autoFilter = {
-        from: { row: 1, column: 1 },
-        to: { row: 1, column: 16 }
-      };
-
-      // 5. Ajuste Dinâmico de Colunas (Auto-Fit simplificado)
+      // 5. Ajuste Inteligente de Largura (Focado no Conteúdo)
       worksheet.columns.forEach(column => {
-        let maxColumnLength = 0;
-        column.eachCell?.({ includeEmpty: true }, (cell) => {
-          const columnLength = cell.value ? String(cell.value).length : 0;
-          if (columnLength > maxColumnLength) {
-            maxColumnLength = columnLength;
+        let maxContentLength = 0;
+        
+        // Ignora a célula do header (row 1) para o cálculo da largura, focando nos dados
+        column.eachCell?.({ includeEmpty: true }, (cell, rowNumber) => {
+          if (rowNumber > 1) {
+            let cellValue = '';
+            if (cell.value && typeof cell.value === 'object' && 'formula' in cell.value) {
+              cellValue = 'R$ 0.000,00'; // Placeholder para fórmulas de moeda
+            } else {
+              cellValue = cell.value ? String(cell.value) : '';
+            }
+            
+            // Ajuste para formatos numéricos/moeda que ocupam mais espaço visual
+            if (cell.numFmt?.includes('R$')) cellValue += 'RRRR'; 
+            
+            if (cellValue.length > maxContentLength) {
+              maxContentLength = cellValue.length;
+            }
           }
         });
-        column.width = maxColumnLength < 12 ? 12 : maxColumnLength + 5;
+
+        // Define largura baseada no conteúdo com padding
+        // Se o conteúdo for muito curto e o header longo, o wrapText do header fará o trabalho
+        const finalWidth = Math.max(maxContentLength + 4, 11);
+        column.width = finalWidth > 45 ? 45 : finalWidth; // Limite máximo de 45
       });
 
-      // 6. Geração do Arquivo e Download
+      // 6. Download
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
@@ -175,7 +198,7 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session,
 
     } catch (error) {
       console.error('Erro na exportação Excel:', error);
-      alert('Falha ao gerar a planilha estilizada.');
+      alert('Falha ao gerar a planilha.');
     } finally {
       setIsExporting(false);
     }
