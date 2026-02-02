@@ -40,9 +40,12 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session,
       'ANÁLISE'
     ];
 
-    // Matriz de dados (Array of Arrays) para ter controle total sobre células e fórmulas
+    // Formatos Numéricos do Excel
+    const formatTime = '[h]:mm';
+    const formatCurrency = '"R$" #,##0.00';
+
     const dataRows = records.map((r, index) => {
-      const rowIndex = index + 2; // +1 pelo header, +1 pois o Excel começa em 1
+      const rowIndex = index + 2; // +1 header, +1 base 1 do Excel
       
       // Lógica Atendeu Agenda
       let atendeuAgenda = 'NAO';
@@ -52,46 +55,54 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session,
         if (arriv <= sched) atendeuAgenda = 'SIM';
       }
 
-      // Extrair apenas o número da hora excedente para o Excel
-      // r.exceededHours vem como "5h 00m" ou "---"
-      const exceededNum = r.exceededHours === '---' ? 0 : parseInt(r.exceededHours.split('h')[0]);
+      // No Excel, Tempo é uma fração do dia (1 dia = 1.0)
+      // Portanto, horas excedentes devem ser divididas por 24
+      const exceededHoursRaw = r.exceededHours === '---' ? 0 : parseInt(r.exceededHours.split('h')[0]);
+      const exceededValue = exceededHoursRaw / 24;
+      const freeTimeValue = (session.gracePeriodHours || 0) / 24;
 
       return [
-        'LUARA MEL VIEIRA', // PROVEDOR
-        (r.os || '').toUpperCase(), // NUMERO DA OS
-        categoryName.toUpperCase(), // CLIENTE (Nome da pasta/categoria no contexto operacional)
-        (r.driverName || '').toUpperCase(), // MOTORISTAS
-        (r.ship || '').toUpperCase(), // NAVIO/VIAGEM
-        (r.container || '').toUpperCase(), // CONTAINER
-        formatFullDateTime(r.scheduledStart), // HORARIO PROGRAMADO
-        formatFullDateTime(r.arrivalTime), // CHEGADA
-        formatFullDateTime(r.departureTime), // SAIDA
-        atendeuAgenda, // ATENDEU AGENDA
-        `${session.gracePeriodHours || 0}H`, // FREE-TIME
-        exceededNum, // HORAS EXCEDENTES (Número para cálculo)
-        session.costPerHour || 0, // CUSTO POR HORA
-        { f: `L${rowIndex}*M${rowIndex}` }, // CUSTO TOTAL (Fórmula)
-        '', // OS AVULSA
-        ''  // ANÁLISE
+        { v: 'LUARA MEL VIEIRA', t: 's' },
+        { v: (r.os || '').toUpperCase(), t: 's' },
+        { v: categoryName.toUpperCase(), t: 's' },
+        { v: (r.driverName || '').toUpperCase(), t: 's' },
+        { v: (r.ship || '').toUpperCase(), t: 's' },
+        { v: (r.container || '').toUpperCase(), t: 's' },
+        { v: formatFullDateTime(r.scheduledStart), t: 's' },
+        { v: formatFullDateTime(r.arrivalTime), t: 's' },
+        { v: formatFullDateTime(r.departureTime), t: 's' },
+        { v: atendeuAgenda.toUpperCase(), t: 's' },
+        { v: freeTimeValue, t: 'n', z: formatTime }, // FREE-TIME como Tempo
+        { v: exceededValue, t: 'n', z: formatTime },  // EXCEDENTE como Tempo
+        { v: session.costPerHour || 0, t: 'n', z: formatCurrency }, // CUSTO HORA como Moeda
+        { f: `L${rowIndex}*24*M${rowIndex}`, t: 'n', z: formatCurrency }, // CUSTO TOTAL (Fórmula: Horas*24*Valor)
+        { v: '', t: 's' },
+        { v: '', t: 's' }
       ];
     });
 
-    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+    // Criar planilha a partir da matriz de objetos de célula
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      headers.map(h => ({ v: h, t: 's' })), // Cabeçalhos
+      ...dataRows
+    ]);
 
-    // Configuração de Largura das Colunas
-    const wscols = [
-      { wch: 20 }, { wch: 15 }, { wch: 25 }, { wch: 25 }, 
-      { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, 
-      { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 18 }, 
-      { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 12 }
-    ];
-    worksheet['!cols'] = wscols;
+    // Configurar Filtros
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
 
-    // Ativar Filtros
-    if (dataRows.length > 0) {
-      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-      worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
-    }
+    // Cálculo de AutoFit (Ajuste Automático de Colunas)
+    const colWidths = headers.map((h, i) => {
+      let maxLen = h.length;
+      // Verifica o tamanho do conteúdo em cada linha desta coluna
+      dataRows.forEach(row => {
+        const cell = row[i];
+        const val = cell.v ? String(cell.v) : (cell.f ? 'R$ 0.000,00' : '');
+        if (val.length > maxLen) maxLen = val.length;
+      });
+      return { wch: maxLen + 5 }; // Adiciona margem de respiro
+    });
+    worksheet['!cols'] = colWidths;
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'ESTADIAS');
