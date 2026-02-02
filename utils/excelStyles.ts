@@ -6,10 +6,10 @@ export const excelStyles = {
     fill: {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FF1F4E78' } // Azul Escuro Corporativo
+      fgColor: { argb: 'FF1F4E78' }
     } as ExcelJS.Fill,
     font: {
-      color: { argb: 'FFFFFFFF' }, // Branco
+      color: { argb: 'FFFFFFFF' },
       bold: true,
       name: 'Calibri',
       size: 11
@@ -34,15 +34,30 @@ export const excelStyles = {
     right: { style: 'thin' }
   } as Partial<ExcelJS.Borders>,
 
+  // Estilo padrão centralizado
   DATA_ALIGN_CENTER: {
     vertical: 'middle',
     horizontal: 'center'
   } as ExcelJS.Alignment,
 
+  // Novo: Alinhamento à esquerda com indentação para legibilidade
+  DATA_STYLE_LEFT: {
+    vertical: 'middle',
+    horizontal: 'left',
+    indent: 1
+  } as ExcelJS.Alignment,
+
+  // Novo: Centralizado e Negrito para códigos (OS)
+  FONT_BOLD: {
+    bold: true,
+    name: 'Calibri',
+    size: 10
+  } as Partial<ExcelJS.Font>,
+
   ZEBRA_ROW_EVEN: {
     type: 'pattern',
     pattern: 'solid',
-    fgColor: { argb: 'FFF2F2F2' } // Cinza Claro
+    fgColor: { argb: 'FFF2F2F2' }
   } as ExcelJS.Fill,
 
   FORMATS: {

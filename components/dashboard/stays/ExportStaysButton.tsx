@@ -50,7 +50,7 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session 
 
       // 3. Inserção de Dados
       records.forEach((r, index) => {
-        const rowIndex = index + 2; // Linha 1 é header
+        const rowIndex = index + 2; 
 
         const rowData = {
           provedor: 'LUARA MEL VIEIRA',
@@ -62,9 +62,8 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session 
           programado: parseToExcelDate(r.scheduledStart),
           chegada: parseToExcelDate(r.arrivalTime),
           saida: parseToExcelDate(r.departureTime),
-          // Fix: corrected getAtendeuAgendaAgendaFormula to getAtendeuAgendaFormula
-          atendeu: { formula: excelFormulas.getAtendeuAgendaFormula ? '' : '' }, // Placeholder
-          freetime: (session.gracePeriodHours || 0) / 24, // Fração de dia para o Excel
+          atendeu: { formula: '' }, // Placeholder
+          freetime: (session.gracePeriodHours || 0) / 24,
           excedente: { formula: excelFormulas.getHorasExcedentesFormula(rowIndex) },
           custohora: session.costPerHour || 0,
           custototal: { formula: excelFormulas.getCustoTotalFormula(rowIndex) },
@@ -74,24 +73,34 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session 
 
         const row = worksheet.addRow(rowData);
 
-        // Atribuir fórmulas manualmente para garantir consistência
+        // Atribuir fórmulas
         row.getCell('atendeu').value = { formula: excelFormulas.getAtendeuAgendaFormula(rowIndex) };
         row.getCell('excedente').value = { formula: excelFormulas.getHorasExcedentesFormula(rowIndex) };
         row.getCell('custototal').value = { formula: excelFormulas.getCustoTotalFormula(rowIndex) };
 
-        // 4. Estilização da Linha (Bordas, Zebra e Formatos)
+        // 4. Estilização da Linha baseada na ColumnConfig
         row.eachCell((cell, colNumber) => {
           const colDef = STAY_COLUMNS[colNumber - 1];
           
           cell.border = excelStyles.BORDER_THIN;
-          cell.alignment = excelStyles.DATA_ALIGN_CENTER;
+          cell.font = { name: 'Calibri', size: 10 };
+
+          // Aplicar Alinhamento Dinâmico
+          if (colDef.styleKey === 'left') {
+            cell.alignment = excelStyles.DATA_STYLE_LEFT;
+          } else if (colDef.styleKey === 'boldCenter') {
+            cell.alignment = excelStyles.DATA_ALIGN_CENTER;
+            cell.font = excelStyles.FONT_BOLD;
+          } else {
+            cell.alignment = excelStyles.DATA_ALIGN_CENTER;
+          }
 
           // Zebra
           if (rowIndex % 2 === 0) {
             cell.fill = excelStyles.ZEBRA_ROW_EVEN;
           }
 
-          // Formatação Numérica Nativa
+          // Formatação Numérica
           if (['programado', 'chegada', 'saida'].includes(colDef.key)) {
             cell.numFmt = excelStyles.FORMATS.DATE_TIME;
           } else if (['freetime', 'excedente'].includes(colDef.key)) {
@@ -113,7 +122,7 @@ const ExportStaysButton: React.FC<ExportStaysButtonProps> = ({ records, session 
       const dEnd = new Date(session.endDate);
       const fileName = `ESTADIA ${dStart.getFullYear()} ${getMonthName(dStart)} ${String(dStart.getDate()).padStart(2, '0')} A ${String(dEnd.getDate()).padStart(2, '0')}.xlsx`;
 
-      // 7. Download do Arquivo
+      // 7. Download
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
