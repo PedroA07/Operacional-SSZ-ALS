@@ -72,7 +72,7 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('CONTROLE DE LACRES');
 
-    // 1. Definição das Colunas de Dados
+    // 1. Configuração de Colunas baseadas no Layout A-F
     worksheet.columns = [
       { header: 'STATUS', key: 'status', width: 15 },
       { header: 'Nº LACRE', key: 'sealNumber', width: 15 },
@@ -82,15 +82,15 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
       { header: 'MOTORISTA ALOCADO', key: 'driver', width: 35 }
     ];
 
-    // 2. Criação do Cabeçalho de Contadores (Dashboard de Topo)
+    // 2. Dash de Topo: Contadores Dinâmicos
     worksheet.insertRow(1, ['RESUMO DE ESTOQUE - ' + batch.carrier]);
     worksheet.mergeCells('A1:F1');
     worksheet.getRow(1).font = { bold: true, size: 14, color: { argb: 'FF1E40AF' } };
-    worksheet.getRow(1).alignment = { horizontal: 'center' };
+    worksheet.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getRow(1).height = 30;
 
     const usedRow = worksheet.getRow(2);
     usedRow.getCell(1).value = 'TOTAL UTILIZADOS:';
-    // Fix: correct property name is getSummaryUsedFormula instead of getUsedCountFormula
     usedRow.getCell(2).value = { formula: excelSealFormulas.getSummaryUsedFormula(records.length) };
     Object.assign(usedRow.getCell(1), excelSealStyles.SUMMARY_LABEL);
     Object.assign(usedRow.getCell(2), excelSealStyles.SUMMARY_VALUE_USED);
@@ -101,10 +101,10 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
     Object.assign(availRow.getCell(1), excelSealStyles.SUMMARY_LABEL);
     Object.assign(availRow.getCell(2), excelSealStyles.SUMMARY_VALUE_AVAIL);
 
-    // Linha vazia de separação
-    worksheet.getRow(4).height = 10;
+    // Separador
+    worksheet.getRow(4).height = 12;
 
-    // 3. Cabeçalho Principal (Agora na linha 5)
+    // 3. Cabeçalho Principal (Linha 5)
     const headerRow = worksheet.getRow(5);
     headerRow.values = ['STATUS', 'Nº LACRE', 'Nº CONTAINER', 'BOOKING', 'DATA REUSO', 'MOTORISTA ALOCADO'];
     headerRow.height = 30;
@@ -112,12 +112,12 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
       Object.assign(cell, excelSealStyles.HEADER);
     });
 
-    // 4. Inserção de Dados (Começando na linha 6)
+    // 4. Inserção de Dados (Linha 6 em diante)
     records.forEach((r, index) => {
       const rowIndex = index + 6;
       
       const rowData = [
-        { formula: excelSealFormulas.getRowStatusFormula(rowIndex) }, // Status Dinâmico
+        { formula: excelSealFormulas.getRowStatusFormula(rowIndex) }, // Status monitorando C,D,E,F
         r.sealNumber,
         r.containerNumber?.toUpperCase() || '',
         r.booking?.toUpperCase() || '',
@@ -131,9 +131,11 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
       row.eachCell((cell, colNumber) => {
         cell.border = excelSealStyles.BORDER;
         cell.alignment = excelSealStyles.TEXT_CENTER;
-        if (isEven) { cell.fill = excelSealStyles.ROW_EVEN.fill; }
+        if (isEven) {
+          cell.fill = excelSealStyles.ROW_EVEN.fill;
+        }
         
-        // Estilo Data Reuso
+        // Formatação Data
         if (colNumber === 5 && cell.value) {
           cell.numFmt = 'dd/mm/yyyy';
         }
@@ -142,31 +144,32 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
         if (colNumber === 2) {
           cell.font = { bold: true, color: { argb: 'FF1E40AF' } };
         }
-
-        // Formatação Condicional do Status via Estilo Direto
-        if (colNumber === 1) {
-          cell.font = { bold: true };
-          // Nota: O ExcelJS não aplica estilos baseados no resultado da fórmula em tempo real, 
-          // mas o Excel aplicará a cor via formatação condicional nativa se adicionarmos:
-        }
       });
     });
 
-    // 5. Adicionar Formatação Condicional Nativa do Excel para a Coluna A
+    // 5. Formatação Condicional Nativa (Fixing priority property)
     worksheet.addConditionalFormatting({
       ref: `A6:A${5 + records.length}`,
       rules: [
         {
+          priority: 1,
           type: 'containsText',
           operator: 'containsText',
           text: 'UTILIZADO',
-          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDCFCE7' } }, font: { color: { argb: 'FF166534' } } }
+          style: { 
+            fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDCFCE7' } }, 
+            font: { color: { argb: 'FF166534' }, bold: true } 
+          }
         },
         {
+          priority: 2,
           type: 'containsText',
           operator: 'containsText',
           text: 'DISPONÍVEL',
-          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFF1F5F9' } }, font: { color: { argb: 'FF475569' } } }
+          style: { 
+            fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFF1F5F9' } }, 
+            font: { color: { argb: 'FF475569' }, bold: true } 
+          }
         }
       ]
     });
@@ -174,10 +177,8 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
     // 6. Ativar Filtro
     worksheet.autoFilter = { from: 'A5', to: 'F5' };
 
-    // 7. Nome do Arquivo
+    // 7. Download com nome padronizado
     const fileName = `CONTROLE DE LACRES ${batch.carrier} ${batch.startNumber} A ${batch.endNumber}.xlsx`;
-
-    // 8. Download
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
