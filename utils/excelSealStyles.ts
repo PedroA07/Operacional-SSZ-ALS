@@ -25,6 +25,23 @@ export const excelSealStyles = {
     } as Partial<ExcelJS.Borders>
   },
 
+  SUMMARY_LABEL: {
+    font: { bold: true, size: 10, color: { argb: 'FF475569' } },
+    alignment: { horizontal: 'right', vertical: 'middle' } as ExcelJS.Alignment
+  },
+
+  SUMMARY_VALUE_USED: {
+    font: { bold: true, size: 12, color: { argb: 'FF059669' } },
+    alignment: { horizontal: 'left', vertical: 'middle' } as ExcelJS.Alignment,
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECFDF5' } } as ExcelJS.Fill
+  },
+
+  SUMMARY_VALUE_AVAIL: {
+    font: { bold: true, size: 12, color: { argb: 'FF2563EB' } },
+    alignment: { horizontal: 'left', vertical: 'middle' } as ExcelJS.Alignment,
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } } as ExcelJS.Fill
+  },
+
   ROW_EVEN: {
     fill: {
       type: 'pattern',

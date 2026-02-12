@@ -3,6 +3,7 @@ import { SealBatch, SealRecord, Driver } from '../../../types';
 import { db } from '../../../utils/storage';
 import ExcelJS from 'exceljs';
 import { excelSealStyles } from '../../../utils/excelSealStyles';
+import { excelSealFormulas } from '../../../utils/excelSealFormulas';
 
 interface SealDetailsViewProps {
   batch: SealBatch;
@@ -71,7 +72,7 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('CONTROLE DE LACRES');
 
-    // 1. Configuração de Colunas
+    // 1. Definição das Colunas de Dados
     worksheet.columns = [
       { header: 'STATUS', key: 'status', width: 15 },
       { header: 'Nº LACRE', key: 'sealNumber', width: 15 },
@@ -81,54 +82,102 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
       { header: 'MOTORISTA ALOCADO', key: 'driver', width: 35 }
     ];
 
-    // 2. Estilo do Cabeçalho
-    const headerRow = worksheet.getRow(1);
+    // 2. Criação do Cabeçalho de Contadores (Dashboard de Topo)
+    worksheet.insertRow(1, ['RESUMO DE ESTOQUE - ' + batch.carrier]);
+    worksheet.mergeCells('A1:F1');
+    worksheet.getRow(1).font = { bold: true, size: 14, color: { argb: 'FF1E40AF' } };
+    worksheet.getRow(1).alignment = { horizontal: 'center' };
+
+    const usedRow = worksheet.getRow(2);
+    usedRow.getCell(1).value = 'TOTAL UTILIZADOS:';
+    // Fix: correct property name is getSummaryUsedFormula instead of getUsedCountFormula
+    usedRow.getCell(2).value = { formula: excelSealFormulas.getSummaryUsedFormula(records.length) };
+    Object.assign(usedRow.getCell(1), excelSealStyles.SUMMARY_LABEL);
+    Object.assign(usedRow.getCell(2), excelSealStyles.SUMMARY_VALUE_USED);
+
+    const availRow = worksheet.getRow(3);
+    availRow.getCell(1).value = 'TOTAL DISPONÍVEIS:';
+    availRow.getCell(2).value = { formula: excelSealFormulas.getSummaryAvailableFormula(records.length) };
+    Object.assign(availRow.getCell(1), excelSealStyles.SUMMARY_LABEL);
+    Object.assign(availRow.getCell(2), excelSealStyles.SUMMARY_VALUE_AVAIL);
+
+    // Linha vazia de separação
+    worksheet.getRow(4).height = 10;
+
+    // 3. Cabeçalho Principal (Agora na linha 5)
+    const headerRow = worksheet.getRow(5);
+    headerRow.values = ['STATUS', 'Nº LACRE', 'Nº CONTAINER', 'BOOKING', 'DATA REUSO', 'MOTORISTA ALOCADO'];
     headerRow.height = 30;
     headerRow.eachCell((cell) => {
       Object.assign(cell, excelSealStyles.HEADER);
     });
 
-    // 3. Adição de Dados com Estilo de Linha Alternada (Zebra)
+    // 4. Inserção de Dados (Começando na linha 6)
     records.forEach((r, index) => {
-      const rowData = {
-        status: r.containerNumber ? 'UTILIZADO' : 'DISPONÍVEL',
-        sealNumber: r.sealNumber,
-        container: r.containerNumber?.toUpperCase() || '',
-        booking: r.booking?.toUpperCase() || '',
-        date: r.reuseDate ? new Date(r.reuseDate + 'T12:00:00').toLocaleDateString('pt-BR') : '',
-        driver: r.driverName?.toUpperCase() || ''
-      };
+      const rowIndex = index + 6;
+      
+      const rowData = [
+        { formula: excelSealFormulas.getRowStatusFormula(rowIndex) }, // Status Dinâmico
+        r.sealNumber,
+        r.containerNumber?.toUpperCase() || '',
+        r.booking?.toUpperCase() || '',
+        r.reuseDate ? new Date(r.reuseDate + 'T12:00:00') : '',
+        r.driverName?.toUpperCase() || ''
+      ];
 
       const row = worksheet.addRow(rowData);
-      const isEven = (index + 2) % 2 === 0;
+      const isEven = rowIndex % 2 === 0;
 
-      row.eachCell((cell) => {
+      row.eachCell((cell, colNumber) => {
         cell.border = excelSealStyles.BORDER;
         cell.alignment = excelSealStyles.TEXT_CENTER;
-        if (isEven) {
-          cell.fill = excelSealStyles.ROW_EVEN.fill;
-        }
+        if (isEven) { cell.fill = excelSealStyles.ROW_EVEN.fill; }
         
-        // Destaque para o número do lacre
-        if (cell.address.includes('B')) {
-          cell.font = { ...cell.font, bold: true, color: { argb: 'FF1E40AF' } };
+        // Estilo Data Reuso
+        if (colNumber === 5 && cell.value) {
+          cell.numFmt = 'dd/mm/yyyy';
         }
 
-        // Cor de status
-        if (cell.address.includes('A')) {
-          const isUsed = cell.value === 'UTILIZADO';
-          cell.font = { ...cell.font, bold: true, color: { argb: isUsed ? 'FF059669' : 'FF64748B' } };
+        // Estilo Número Lacre (Negrito Azul)
+        if (colNumber === 2) {
+          cell.font = { bold: true, color: { argb: 'FF1E40AF' } };
+        }
+
+        // Formatação Condicional do Status via Estilo Direto
+        if (colNumber === 1) {
+          cell.font = { bold: true };
+          // Nota: O ExcelJS não aplica estilos baseados no resultado da fórmula em tempo real, 
+          // mas o Excel aplicará a cor via formatação condicional nativa se adicionarmos:
         }
       });
     });
 
-    // 4. Ativar Filtro
-    worksheet.autoFilter = { from: 'A1', to: 'F1' };
+    // 5. Adicionar Formatação Condicional Nativa do Excel para a Coluna A
+    worksheet.addConditionalFormatting({
+      ref: `A6:A${5 + records.length}`,
+      rules: [
+        {
+          type: 'containsText',
+          operator: 'containsText',
+          text: 'UTILIZADO',
+          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDCFCE7' } }, font: { color: { argb: 'FF166534' } } }
+        },
+        {
+          type: 'containsText',
+          operator: 'containsText',
+          text: 'DISPONÍVEL',
+          style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFF1F5F9' } }, font: { color: { argb: 'FF475569' } } }
+        }
+      ]
+    });
 
-    // 5. Nome do Arquivo Conforme Solicitado
+    // 6. Ativar Filtro
+    worksheet.autoFilter = { from: 'A5', to: 'F5' };
+
+    // 7. Nome do Arquivo
     const fileName = `CONTROLE DE LACRES ${batch.carrier} ${batch.startNumber} A ${batch.endNumber}.xlsx`;
 
-    // 6. Download
+    // 8. Download
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
@@ -159,8 +208,7 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
            </div>
         </div>
 
-        {/* CAMPO DE BUSCA DE LACRES */}
-        <div className="flex-1 w-full max-w-md relative group">
+        <div className="flex-1 w-full max-md relative group">
            <input 
              type="text" 
              placeholder="BUSCAR LACRE, CONTAINER OU MOTORISTA..."
@@ -172,7 +220,6 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
         </div>
 
         <div className="flex items-center gap-4">
-           {/* CONTADORES */}
            <div className="px-5 py-2.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-4 shadow-inner">
               <div className="text-center">
                  <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Utilizados</p>
@@ -190,7 +237,7 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
              className="px-6 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95"
            >
              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="3"/></svg>
-             Planilha Estilizada
+             Planilha Inteligente
            </button>
         </div>
       </div>
@@ -249,14 +296,6 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
               </tbody>
            </table>
         </div>
-        {filteredRecords.length === 0 && (
-          <div className="py-24 text-center bg-white border-t border-slate-50">
-             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5"/></svg>
-             </div>
-             <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] italic">Nenhum registro encontrado para "{searchQuery}"</p>
-          </div>
-        )}
       </div>
     </div>
   );
