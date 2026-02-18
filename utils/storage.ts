@@ -239,7 +239,7 @@ export const db = {
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
       driver_id: record.driverId || null,
-      shipping_line: record.shipping_line || null,
+      shipping_line: record.shippingLine || null,
       import_location: record.importLocation || null,
       reuse_date: (record.reuseDate && String(record.reuseDate).trim() !== "") ? record.reuseDate : null,
       status: record.status || 'EM ANÁLISE'
@@ -379,10 +379,10 @@ export const db = {
     const recordsToInsert = records.map(r => ({
       batch_id: batchId,
       seal_number: r.sealNumber,
-      container_number: r.container_number || null,
+      container_number: r.containerNumber || null,
       booking: r.booking || null,
       reuse_date: (r.reuseDate && String(r.reuseDate).trim() !== "") ? r.reuseDate : null,
-      driver_name: r.driver_name || null
+      driver_name: r.driverName || null
     }));
 
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
@@ -482,7 +482,6 @@ export const db = {
       scheduled_start: r.scheduledStart || null,
       arrival_time: r.arrivalTime || null,
       departure_time: r.departureTime || null,
-      // Fix: Corrected property name from exceeded_hours to exceededHours on StayRecord type
       exceeded_hours: r.exceededHours,
       observations: r.observations
     }));
