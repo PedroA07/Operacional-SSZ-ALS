@@ -223,9 +223,9 @@ export const db = {
     const payload: any = {
       date: record.date || new Date().toISOString().split('T')[0],
       container_number: record.containerNumber,
-      export_ref: record.export_ref || null,
+      export_ref: record.exportRef || null,
       requested_price: record.requestedPrice || 0,
-      customer_ref: record.customer_ref || null,
+      customer_ref: record.customerRef || null,
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
       driver_id: record.driverId || null,
@@ -475,7 +475,6 @@ export const db = {
       scheduled_start: r.scheduledStart || null,
       arrival_time: r.arrivalTime || null,
       departure_time: r.departureTime || null,
-      // Fix: Use exceededHours (camelCase) from StayRecord interface instead of exceeded_hours (snake_case)
       exceeded_hours: r.exceededHours,
       observations: r.observations
     }));
