@@ -333,8 +333,12 @@ export const db = {
 
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
+    // Busca todos os lotes ordenados pelo mais recente
     const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });
-    if (error) return [];
+    if (error) {
+      console.error("Erro getSealBatches:", error);
+      return [];
+    }
     return (data || []).map(b => ({
       id: b.id,
       carrier: b.carrier,
@@ -361,10 +365,12 @@ export const db = {
 
   saveSealBatch: async (batch: SealBatch, records: Partial<SealRecord>[]) => {
     if (!supabase) return { success: false, message: 'Supabase não configurado.' };
-    const batchId = batch.id || `batch-${Date.now()}`;
     
-    // 1. Grava o cabeçalho do lote
-    const { error: batchErr } = await supabase.from('seal_batches').upsert({
+    // SEMPRE gera um ID único para novos lotes para evitar sobrescrita acidental
+    const batchId = `batch-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    // 1. Grava o cabeçalho do lote (UPSERT garantindo ID novo)
+    const { error: batchErr } = await supabase.from('seal_batches').insert({
       id: batchId,
       carrier: batch.carrier,
       start_number: batch.startNumber,
@@ -377,7 +383,7 @@ export const db = {
       return { success: false, message: batchErr.message };
     }
 
-    // 2. Prepara e grava os lacres individuais
+    // 2. Prepara e grava os lacres individuais vinculados ao NOVO batchId
     const recordsToInsert = records.map(r => ({
       batch_id: batchId,
       seal_number: r.sealNumber,
@@ -390,6 +396,8 @@ export const db = {
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
     if (recErr) {
       console.error("Erro seal_records:", recErr);
+      // Rollback se falhar a inserção dos itens
+      await supabase.from('seal_batches').delete().eq('id', batchId);
       return { success: false, message: recErr.message };
     }
 
@@ -416,7 +424,7 @@ export const db = {
   getStaySessions: async (): Promise<StaySession[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('stay_sessions').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) return [];
     return (data || []).map((s: any) => ({
       id: s.id,
       category: s.category,
