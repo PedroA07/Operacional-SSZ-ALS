@@ -239,7 +239,7 @@ export const db = {
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
       driver_id: record.driverId || null,
-      shipping_line: record.shippingLine || null, // Corrigido de .shipping_line para .shippingLine
+      shipping_line: record.shippingLine || null,
       import_location: record.importLocation || null,
       reuse_date: (record.reuseDate && String(record.reuseDate).trim() !== "") ? record.reuseDate : null,
       status: record.status || 'EM ANÁLISE'
@@ -334,7 +334,7 @@ export const db = {
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });
-    if (error) return [];
+    if (error) throw error;
     return (data || []).map(b => ({
       id: b.id,
       carrier: b.carrier,
@@ -363,6 +363,7 @@ export const db = {
     if (!supabase) return false;
     const batchId = batch.id || `batch-${Date.now()}`;
     
+    // 1. Grava o cabeçalho do lote
     const { error: batchErr } = await supabase.from('seal_batches').upsert({
       id: batchId,
       carrier: batch.carrier,
@@ -371,19 +372,32 @@ export const db = {
       created_at: new Date().toISOString()
     });
     
-    if (batchErr) return false;
+    if (batchErr) {
+      console.error("ERRO CRÍTICO SUPABASE (seal_batches):", batchErr.message, batchErr.details);
+      return false;
+    }
 
+    // 2. Prepara e grava os lacres individuais
     const recordsToInsert = records.map(r => ({
       batch_id: batchId,
-      seal_number: r.sealNumber, // Corrigido de .seal_number para .sealNumber
-      container_number: r.containerNumber || null, // Corrigido de .container_number para .containerNumber
+      seal_number: r.sealNumber,
+      container_number: r.containerNumber || null,
       booking: r.booking || null,
       reuse_date: (r.reuseDate && String(r.reuseDate).trim() !== "") ? r.reuseDate : null,
-      driver_name: r.driverName || null // Corrigido de .driver_name para .driverName
+      driver_name: r.driverName || null
     }));
 
+    // Inserção em lote para performance
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
-    return !recErr;
+    
+    if (recErr) {
+      console.error("ERRO CRÍTICO SUPABASE (seal_records):", recErr.message, recErr.details);
+      // Rollback manual caso os registros falhem mas o cabeçalho tenha ido
+      await supabase.from('seal_batches').delete().eq('id', batchId);
+      return false;
+    }
+
+    return true;
   },
 
   updateSealRecord: async (record: SealRecord) => {
@@ -394,6 +408,7 @@ export const db = {
       reuse_date: (record.reuseDate && String(record.reuseDate).trim() !== "") ? record.reuseDate : null,
       driver_name: record.driverName || null
     }).eq('id', record.id);
+    if (error) console.error("ERRO AO ATUALIZAR LACRE:", error.message);
     return !error;
   },
 
@@ -406,7 +421,7 @@ export const db = {
   getStaySessions: async (): Promise<StaySession[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('stay_sessions').select('*').order('created_at', { ascending: false });
-    if (error) return [];
+    if (error) throw error;
     return (data || []).map((s: any) => ({
       id: s.id,
       category: s.category,
@@ -422,7 +437,11 @@ export const db = {
 
   getStayRecords: async (sessionId: string): Promise<StayRecord[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('stay_records').select('*').eq('session_id', sessionId).order('os');
+    const { data, error } = await supabase
+      .from('stay_records')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('os');
     if (error) throw error;
     return (data || []).map(r => ({
       id: r.id,
