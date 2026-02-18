@@ -12,8 +12,6 @@ const SealBatchModal: React.FC<SealBatchModalProps> = ({ isOpen, onClose, onSucc
   const [isSaving, setIsSaving] = useState(false);
 
   const generateSequence = (start: string, end: string) => {
-    // Regex aprimorada: O prefixo de letras ([A-Z]*) agora é opcional (?)
-    // Isso permite lacres como "12345" ou "MLBR12345"
     const matchStart = start.trim().match(/^([A-Z]*)(\d+)$/i);
     const matchEnd = end.trim().match(/^([A-Z]*)(\d+)$/i);
 
@@ -63,7 +61,7 @@ const SealBatchModal: React.FC<SealBatchModalProps> = ({ isOpen, onClose, onSucc
     }
 
     try {
-      const success = await db.saveSealBatch({
+      const result = await db.saveSealBatch({
         id: '',
         carrier: form.carrier.toUpperCase().trim(),
         startNumber: form.start.toUpperCase().trim(),
@@ -71,15 +69,15 @@ const SealBatchModal: React.FC<SealBatchModalProps> = ({ isOpen, onClose, onSucc
         createdAt: ''
       }, records);
 
-      if (success) {
+      if (result.success) {
         setForm({ carrier: '', start: '', end: '' });
         onSuccess();
       } else {
-        alert("Erro ao gravar no banco de dados. Verifique a conexão.");
+        alert(`Erro ao gravar no banco: ${result.message || 'Verifique a conexão.'}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro no salvamento do lote:", err);
-      alert("Falha crítica ao processar o lote.");
+      alert(`Falha crítica: ${err.message || 'Erro desconhecido.'}`);
     } finally {
       setIsSaving(false);
     }

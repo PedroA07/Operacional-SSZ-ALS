@@ -334,7 +334,7 @@ export const db = {
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) return [];
     return (data || []).map(b => ({
       id: b.id,
       carrier: b.carrier,
@@ -360,7 +360,7 @@ export const db = {
   },
 
   saveSealBatch: async (batch: SealBatch, records: Partial<SealRecord>[]) => {
-    if (!supabase) return false;
+    if (!supabase) return { success: false, message: 'Supabase não configurado.' };
     const batchId = batch.id || `batch-${Date.now()}`;
     
     // 1. Grava o cabeçalho do lote
@@ -373,8 +373,8 @@ export const db = {
     });
     
     if (batchErr) {
-      console.error("ERRO CRÍTICO SUPABASE (seal_batches):", batchErr.message, batchErr.details);
-      return false;
+      console.error("Erro seal_batches:", batchErr);
+      return { success: false, message: batchErr.message };
     }
 
     // 2. Prepara e grava os lacres individuais
@@ -387,17 +387,13 @@ export const db = {
       driver_name: r.driverName || null
     }));
 
-    // Inserção em lote para performance
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
-    
     if (recErr) {
-      console.error("ERRO CRÍTICO SUPABASE (seal_records):", recErr.message, recErr.details);
-      // Rollback manual caso os registros falhem mas o cabeçalho tenha ido
-      await supabase.from('seal_batches').delete().eq('id', batchId);
-      return false;
+      console.error("Erro seal_records:", recErr);
+      return { success: false, message: recErr.message };
     }
 
-    return true;
+    return { success: true };
   },
 
   updateSealRecord: async (record: SealRecord) => {
@@ -408,7 +404,6 @@ export const db = {
       reuse_date: (record.reuseDate && String(record.reuseDate).trim() !== "") ? record.reuseDate : null,
       driver_name: record.driverName || null
     }).eq('id', record.id);
-    if (error) console.error("ERRO AO ATUALIZAR LACRE:", error.message);
     return !error;
   },
 
