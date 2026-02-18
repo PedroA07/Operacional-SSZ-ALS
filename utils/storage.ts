@@ -223,9 +223,9 @@ export const db = {
     const payload: any = {
       date: record.date || new Date().toISOString().split('T')[0],
       container_number: record.containerNumber,
-      export_ref: record.exportRef || null,
+      export_ref: record.export_ref || null,
       requested_price: record.requestedPrice || 0,
-      customer_ref: record.customerRef || null,
+      customer_ref: record.customer_ref || null,
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
       driver_id: record.driverId || null,
@@ -359,18 +359,31 @@ export const db = {
       end_number: batch.endNumber,
       created_at: new Date().toISOString()
     });
-    if (batchErr) return false;
+    
+    if (batchErr) {
+      console.error("Erro ao salvar lote de lacres:", batchErr);
+      return false;
+    }
 
     const recordsToInsert = records.map(r => ({
       batch_id: batchId,
       seal_number: r.sealNumber,
-      container_number: r.containerNumber,
-      booking: r.booking,
-      reuse_date: r.reuseDate,
-      driver_name: r.driverName
+      container_number: r.containerNumber || null,
+      booking: r.booking || null,
+      reuse_date: (r.reuseDate && r.reuseDate.trim() !== "") ? r.reuseDate : null,
+      driver_name: r.driverName || null
     }));
+
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
-    return !recErr;
+    
+    if (recErr) {
+      console.error("Erro ao salvar registros do lote:", recErr);
+      // Tentamos remover o cabeçalho se os registros falharem para não deixar órfão
+      await supabase.from('seal_batches').delete().eq('id', batchId);
+      return false;
+    }
+
+    return true;
   },
 
   updateSealRecord: async (record: SealRecord) => {
@@ -378,7 +391,7 @@ export const db = {
     const { error } = await supabase.from('seal_records').update({
       container_number: record.containerNumber,
       booking: record.booking,
-      reuse_date: record.reuseDate,
+      reuse_date: (record.reuseDate && record.reuseDate.trim() !== "") ? record.reuseDate : null,
       driver_name: record.driverName
     }).eq('id', record.id);
     return !error;
@@ -462,6 +475,7 @@ export const db = {
       scheduled_start: r.scheduledStart || null,
       arrival_time: r.arrivalTime || null,
       departure_time: r.departureTime || null,
+      // Fix: Use exceededHours (camelCase) from StayRecord interface instead of exceeded_hours (snake_case)
       exceeded_hours: r.exceededHours,
       observations: r.observations
     }));
