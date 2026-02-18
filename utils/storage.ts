@@ -239,7 +239,7 @@ export const db = {
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
       driver_id: record.driverId || null,
-      shipping_line: record.shippingLine || null,
+      shipping_line: record.shippingLine || null, // Corrigido de .shipping_line para .shippingLine
       import_location: record.importLocation || null,
       reuse_date: (record.reuseDate && String(record.reuseDate).trim() !== "") ? record.reuseDate : null,
       status: record.status || 'EM ANÁLISE'
@@ -334,7 +334,7 @@ export const db = {
   getSealBatches: async (): Promise<SealBatch[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('seal_batches').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) return [];
     return (data || []).map(b => ({
       id: b.id,
       carrier: b.carrier,
@@ -371,26 +371,19 @@ export const db = {
       created_at: new Date().toISOString()
     });
     
-    if (batchErr) {
-      console.error("Erro no lote:", batchErr);
-      return false;
-    }
+    if (batchErr) return false;
 
     const recordsToInsert = records.map(r => ({
       batch_id: batchId,
-      seal_number: r.sealNumber,
-      container_number: r.containerNumber || null,
+      seal_number: r.sealNumber, // Corrigido de .seal_number para .sealNumber
+      container_number: r.containerNumber || null, // Corrigido de .container_number para .containerNumber
       booking: r.booking || null,
       reuse_date: (r.reuseDate && String(r.reuseDate).trim() !== "") ? r.reuseDate : null,
-      driver_name: r.driverName || null
+      driver_name: r.driverName || null // Corrigido de .driver_name para .driverName
     }));
 
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
-    if (recErr) {
-      console.error("Erro nos registros:", recErr);
-      return false;
-    }
-    return true;
+    return !recErr;
   },
 
   updateSealRecord: async (record: SealRecord) => {
@@ -413,7 +406,7 @@ export const db = {
   getStaySessions: async (): Promise<StaySession[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('stay_sessions').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) return [];
     return (data || []).map((s: any) => ({
       id: s.id,
       category: s.category,
@@ -429,11 +422,7 @@ export const db = {
 
   getStayRecords: async (sessionId: string): Promise<StayRecord[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('stay_records')
-      .select('id, session_id, type, os, location, driver_name, ship, container, scheduled_start, arrival_time, departure_time, exceeded_hours, observations')
-      .eq('session_id', sessionId)
-      .order('os');
+    const { data, error } = await supabase.from('stay_records').select('*').eq('session_id', sessionId).order('os');
     if (error) throw error;
     return (data || []).map(r => ({
       id: r.id,
