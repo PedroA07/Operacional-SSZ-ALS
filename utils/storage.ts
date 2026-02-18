@@ -154,12 +154,22 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('categories').select('*').order('name');
     if (error) throw error;
-    return data || [];
+    return (data || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      parentId: c.parent_id,
+      createdAt: c.created_at
+    }));
   },
 
   saveCategory: async (c: Partial<Category>, user?: User) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('categories').upsert(c);
+    const { error } = await supabase.from('categories').upsert({
+      id: c.id,
+      name: c.name,
+      parent_id: c.parentId,
+      created_at: new Date().toISOString()
+    });
     return !error;
   },
 
@@ -229,9 +239,9 @@ export const db = {
       trip_settlement: record.tripSettlement || null,
       verified: record.verified || false,
       driver_id: record.driverId || null,
-      shipping_line: record.shippingLine || null,
+      shipping_line: record.shipping_line || null,
       import_location: record.importLocation || null,
-      reuse_date: (record.reuseDate && record.reuseDate.trim() !== "") ? record.reuseDate : null,
+      reuse_date: (record.reuseDate && String(record.reuseDate).trim() !== "") ? record.reuseDate : null,
       status: record.status || 'EM ANÁLISE'
     };
 
@@ -339,12 +349,12 @@ export const db = {
     const { data, error } = await supabase.from('seal_records').select('*').eq('batch_id', batchId).order('seal_number');
     if (error) throw error;
     return (data || []).map(r => ({
-      id: r.id,
+      id: String(r.id),
       batchId: r.batch_id,
       sealNumber: r.seal_number,
       containerNumber: r.container_number,
       booking: r.booking,
-      reuseDate: r.reuse_date,
+      reuseDate: r.reuse_date || '',
       driverName: r.driver_name
     }));
   },
@@ -352,6 +362,7 @@ export const db = {
   saveSealBatch: async (batch: SealBatch, records: Partial<SealRecord>[]) => {
     if (!supabase) return false;
     const batchId = batch.id || `batch-${Date.now()}`;
+    
     const { error: batchErr } = await supabase.from('seal_batches').upsert({
       id: batchId,
       carrier: batch.carrier,
@@ -361,38 +372,34 @@ export const db = {
     });
     
     if (batchErr) {
-      console.error("Erro ao salvar lote de lacres:", batchErr);
+      console.error("Erro no lote:", batchErr);
       return false;
     }
 
     const recordsToInsert = records.map(r => ({
       batch_id: batchId,
       seal_number: r.sealNumber,
-      container_number: r.containerNumber || null,
+      container_number: r.container_number || null,
       booking: r.booking || null,
-      reuse_date: (r.reuseDate && r.reuseDate.trim() !== "") ? r.reuseDate : null,
-      driver_name: r.driverName || null
+      reuse_date: (r.reuseDate && String(r.reuseDate).trim() !== "") ? r.reuseDate : null,
+      driver_name: r.driver_name || null
     }));
 
     const { error: recErr } = await supabase.from('seal_records').insert(recordsToInsert);
-    
     if (recErr) {
-      console.error("Erro ao salvar registros do lote:", recErr);
-      // Tentamos remover o cabeçalho se os registros falharem para não deixar órfão
-      await supabase.from('seal_batches').delete().eq('id', batchId);
+      console.error("Erro nos registros:", recErr);
       return false;
     }
-
     return true;
   },
 
   updateSealRecord: async (record: SealRecord) => {
     if (!supabase) return false;
     const { error } = await supabase.from('seal_records').update({
-      container_number: record.containerNumber,
-      booking: record.booking,
-      reuse_date: (record.reuseDate && record.reuseDate.trim() !== "") ? record.reuseDate : null,
-      driver_name: record.driverName
+      container_number: record.containerNumber || null,
+      booking: record.booking || null,
+      reuse_date: (record.reuseDate && String(record.reuseDate).trim() !== "") ? record.reuseDate : null,
+      driver_name: record.driverName || null
     }).eq('id', record.id);
     return !error;
   },
@@ -407,7 +414,7 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('stay_sessions').select('*').order('created_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map(s => ({
+    return (data || []).map((s: any) => ({
       id: s.id,
       category: s.category,
       startDate: s.start_date,
@@ -475,6 +482,7 @@ export const db = {
       scheduled_start: r.scheduledStart || null,
       arrival_time: r.arrivalTime || null,
       departure_time: r.departureTime || null,
+      // Fix: Corrected property name from exceeded_hours to exceededHours on StayRecord type
       exceeded_hours: r.exceededHours,
       observations: r.observations
     }));
