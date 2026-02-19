@@ -95,8 +95,8 @@ const TripDocsOverviewModal: React.FC<TripDocsOverviewModalProps> = ({ isOpen, o
                   <div className="grid grid-cols-2 gap-4">
                     <InfoItem label="Container" value={trip.container} color="text-blue-700 font-mono text-lg" />
                     <InfoItem label="Tipo / Armador" value={`${trip.containerType || '40HC'} — ${trip.ocFormData?.agencia || 'GERAL'}`} />
-                    <InfoItem label="Lacre" value={trip.seal} />
-                    <InfoItem label="CVA" value={trip.cva} color="text-amber-600" />
+                    <InfoItem label="Lacre" value={trip.seal || ''} />
+                    <InfoItem label="CVA" value={trip.cva || ''} color="text-amber-600" />
                     <InfoItem label="Navio" value={trip.ship} />
                     <InfoItem label="Booking" value={trip.booking} color="text-blue-600" />
                   </div>

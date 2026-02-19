@@ -78,8 +78,8 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                   <div className="space-y-3">
                     <DataItem label="Nº Container" value={trip.container} color="text-blue-700 font-mono" />
                     <DataItem label="Tipo / Tara" value={`${trip.containerType || '40HC'} — ${trip.tara || '---'}`} />
-                    <DataItem label="Lacre Oficial" value={trip.seal} />
-                    <DataItem label="CVA" value={trip.cva} color="text-amber-600" />
+                    <DataItem label="Lacre Oficial" value={trip.seal || ''} />
+                    <DataItem label="CVA" value={trip.cva || ''} color="text-amber-600" />
                   </div>
                </section>
 

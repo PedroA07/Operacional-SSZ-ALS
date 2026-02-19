@@ -126,7 +126,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         createdAt: editingRecord?.createdAt || new Date().toISOString(),
         shippingLine: shippingLine.toUpperCase(),
         importLocation: importLocation.toUpperCase(),
-        reuseDate: (reuseDate && reuseDate.trim() !== "") ? reuseDate : null,
+        reuseDate: (reuseDate && reuseDate.trim() !== "") ? reuseDate : undefined,
         status
       });
 

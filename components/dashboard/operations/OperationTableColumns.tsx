@@ -27,7 +27,7 @@ export const getOperationTableColumns = (
   onLocateDriver: (driverId: string) => void,
   onViewDriverDocs: (t: Trip) => void,
   onOpenHistoryManager: (t: Trip) => void,
-  onSetPriority: (t: Trip) => void,
+  onSetPriority: any,
   allDrivers: Driver[] = []
 ) => {
   

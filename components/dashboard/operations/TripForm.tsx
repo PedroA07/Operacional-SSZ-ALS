@@ -67,7 +67,7 @@ const TripForm: React.FC<TripFormProps> = ({
       });
     } else {
       const defaultCat = initialCategory || (categories.length > 0 ? categories[0].name : '');
-      setFormData(prev => ({
+      setFormData((prev: any) => ({
         ...prev,
         category: defaultCat,
         customer: initialCustomer || prev.customer,
@@ -81,7 +81,7 @@ const TripForm: React.FC<TripFormProps> = ({
   const handleContainerChange = (val: string) => {
     const container = val.toUpperCase();
     const carrier = lookupCarrierByContainer(container);
-    setFormData(prev => ({
+    setFormData((prev: any) => ({
       ...prev,
       container,
       agencia: carrier ? carrier.name : prev.agencia
