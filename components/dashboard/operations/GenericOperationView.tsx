@@ -58,6 +58,27 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
+  const handleSetPriority = async (trip: Trip) => {
+    if (isSavingStatus) return;
+    setIsSavingStatus(true);
+    try {
+      const otherDriverPriorityTrips = allTrips.filter(t => 
+        t.driver.id === trip.driver.id && 
+        t.id !== trip.id && 
+        t.isPriority
+      );
+      for (const t of otherDriverPriorityTrips) {
+        await db.saveTrip({ ...t, isPriority: false }, user);
+      }
+      await db.saveTrip({ ...trip, isPriority: !trip.isPriority }, user);
+      window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+    } catch (e) {
+      alert("Erro ao definir prioridade.");
+    } finally {
+      setIsSavingStatus(false);
+    }
+  };
+
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   const today = new Date().toLocaleDateString('en-CA');
@@ -143,8 +164,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
+    handleSetPriority,
     drivers 
-  ), [user, drivers]);
+  ), [user, drivers, allTrips]);
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
 

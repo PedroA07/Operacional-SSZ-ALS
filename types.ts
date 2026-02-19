@@ -286,6 +286,7 @@ export interface Trip {
   scheduling?: TripScheduling | null;
   driver_docs?: DriverCapturedDoc[];
   stay_session_id?: string;
+  isPriority?: boolean;
 }
 
 export interface Driver {

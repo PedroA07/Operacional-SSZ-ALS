@@ -10,3 +10,7 @@ CREATE INDEX IF NOT EXISTS idx_trips_status_driver ON trips (status, (driver->>'
 
 -- Índice para otimizar filtros da categoria
 CREATE INDEX IF NOT EXISTS idx_trips_category ON trips (category);
+
+-- Adiciona coluna de prioridade para motorista
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS is_priority BOOLEAN DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_trips_priority ON trips (is_priority) WHERE is_priority = true;

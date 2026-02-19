@@ -63,6 +63,31 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
+  const handleSetPriority = async (trip: Trip) => {
+    if (isSavingStatus) return;
+    setIsSavingStatus(true);
+    try {
+      // Desmarca outras prioridades do mesmo motorista
+      const otherDriverPriorityTrips = trips.filter(t => 
+        t.driver.id === trip.driver.id && 
+        t.id !== trip.id && 
+        t.isPriority
+      );
+
+      for (const t of otherDriverPriorityTrips) {
+        await db.saveTrip({ ...t, isPriority: false }, user);
+      }
+
+      // Alterna a prioridade da viagem selecionada
+      await db.saveTrip({ ...trip, isPriority: !trip.isPriority }, user);
+      onRefresh();
+    } catch (e) {
+      alert("Erro ao definir prioridade.");
+    } finally {
+      setIsSavingStatus(false);
+    }
+  };
+
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -155,8 +180,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
+    handleSetPriority,
     drivers 
-  ), [user, onRefresh, onDeleteTrip, drivers]);
+  ), [user, onRefresh, onDeleteTrip, drivers, trips]);
 
   if (activeView.type !== 'list') {
     return (

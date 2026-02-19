@@ -27,6 +27,7 @@ export const getOperationTableColumns = (
   onLocateDriver: (driverId: string) => void,
   onViewDriverDocs: (t: Trip) => void,
   onOpenHistoryManager: (t: Trip) => void,
+  onSetPriority: (t: Trip) => void,
   allDrivers: Driver[] = []
 ) => {
   
@@ -168,6 +169,7 @@ export const getOperationTableColumns = (
           handleFileUpload={handleFileUpload}
           deleteDocument={deleteDocument}
           handlePrint={handlePrint}
+          onSetPriority={onSetPriority}
         />
       ) 
     }
