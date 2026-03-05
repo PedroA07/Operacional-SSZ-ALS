@@ -25,7 +25,7 @@ export const opentechApiService = {
       });
 
       // Se o SIL retornar 200 ou 302, consideramos sucesso de autenticação
-      if (response.status === 200 || response.status === 302 || username === 'operacional_ssz') {
+      if (response.status === 200 || response.status === 302) {
         return { 
           success: true, 
           sessionData: { token: 'session_active_' + btoa(username), user: username } 

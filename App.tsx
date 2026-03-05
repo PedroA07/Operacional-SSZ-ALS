@@ -19,7 +19,7 @@ const App: React.FC = () => {
     sessionStorage.removeItem('als_active_session');
     sessionStorage.removeItem('als_session_start');
     
-    if (oldId && oldId !== 'admin-master') {
+    if (oldId) {
       try {
         await db.updatePresence(oldId, 'offline');
       } catch (e) {}
@@ -35,18 +35,7 @@ const App: React.FC = () => {
         if (saved) {
           const sessionData: User = JSON.parse(saved);
           
-          // Se for o admin master operacional_ssz
-          if (sessionData.username === 'operacional_ssz') {
-            setUser(sessionData);
-            if (!sessionStorage.getItem('als_session_start')) {
-              sessionStorage.setItem('als_session_start', new Date().toISOString());
-            }
-            setCurrentScreen(AppScreen.DASHBOARD);
-            setIsInitializing(false);
-            return;
-          }
-
-          // Para outros usuários, valida no banco se ainda estão ativos
+          // Valida no banco se ainda estão ativos
           const users = await db.getUsers();
           const dbUser = users.find(u => u.id === sessionData.id);
 
@@ -77,7 +66,7 @@ const App: React.FC = () => {
     sessionStorage.setItem('als_session_start', now);
     
     // Atualiza presença no banco
-    await db.updatePresence(userData.id === 'admin-master' ? 'admin-master' : userData.id, 'online');
+    await db.updatePresence(userData.id, 'online');
     
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);

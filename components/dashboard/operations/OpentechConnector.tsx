@@ -56,7 +56,7 @@ const OpentechConnector: React.FC<OpentechConnectorProps> = ({ isOpen, onClose, 
               required
               type="text" 
               className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 font-bold outline-none focus:border-blue-500 transition-all"
-              placeholder="Ex: operacional_ssz"
+              placeholder="usuário"
               value={user}
               onChange={e => setUser(e.target.value)}
             />
