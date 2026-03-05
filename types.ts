@@ -79,6 +79,13 @@ export interface SealRecord {
   driverName: string;
 }
 
+export interface CustomColumn {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'formula';
+  formula?: string;
+}
+
 export interface StaySession {
   id: string;
   category: string;
@@ -89,6 +96,8 @@ export interface StaySession {
   gracePeriodHours?: number;
   roundUpMinutes?: number;
   costPerHour?: number;
+  customColumns?: CustomColumn[];
+  useCustomColumns?: boolean;
 }
 
 export interface StayRecord {
@@ -106,6 +115,7 @@ export interface StayRecord {
   exceededHours: string;
   arrivalStatus?: string;
   observations?: string;
+  customValues?: { [columnId: string]: string | number };
 }
 
 export interface NotificationPreference {

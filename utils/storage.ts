@@ -434,7 +434,9 @@ export const db = {
       createdBy: s.created_by,
       gracePeriodHours: s.grace_period_hours,
       roundUpMinutes: s.round_up_minutes,
-      costPerHour: s.cost_per_hour
+      costPerHour: s.cost_per_hour,
+      customColumns: s.custom_columns,
+      useCustomColumns: s.use_custom_columns
     }));
   },
 
@@ -459,7 +461,8 @@ export const db = {
       arrivalTime: r.arrival_time,
       departureTime: r.departure_time,
       exceededHours: r.exceeded_hours,
-      observations: r.observations
+      observations: r.observations,
+      customValues: r.custom_values
     }));
   },
 
@@ -474,7 +477,9 @@ export const db = {
       created_by: s.createdBy,
       grace_period_hours: s.gracePeriodHours,
       round_up_minutes: s.roundUpMinutes,
-      cost_per_hour: s.costPerHour
+      cost_per_hour: s.costPerHour,
+      custom_columns: s.customColumns,
+      use_custom_columns: s.useCustomColumns
     });
     return !error;
   },
@@ -494,7 +499,8 @@ export const db = {
       arrival_time: r.arrivalTime || null,
       departure_time: r.departureTime || null,
       exceeded_hours: r.exceededHours,
-      observations: r.observations
+      observations: r.observations,
+      custom_values: r.customValues
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);
     return !error;
