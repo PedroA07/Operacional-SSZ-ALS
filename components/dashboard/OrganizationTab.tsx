@@ -10,6 +10,78 @@ interface OrganizationTabProps {
   userId: string;
 }
 
+interface LocationSearchableSelectProps {
+  trip: Trip;
+  locations: any[];
+  onLocationChange: (trip: Trip, locationId: string) => void;
+}
+
+const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ trip, locations, onLocationChange }) => {
+  const selectedLoc = locations.find(l => l.id === trip.scheduledLocationId);
+  const [isSearching, setIsSearching] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filteredLocations = search 
+    ? locations.filter(l => 
+        l.name.toLowerCase().includes(search.toLowerCase()) || 
+        l.legalName?.toLowerCase().includes(search.toLowerCase()) ||
+        l.cnpj?.includes(search)
+      )
+    : locations;
+
+  return (
+    <div className="relative min-w-[200px]">
+      {!isSearching ? (
+        <div 
+          onClick={() => setIsSearching(true)}
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer hover:border-blue-400 transition-all"
+        >
+          {selectedLoc ? (
+            <div className="space-y-0.5">
+              <p className="text-[10px] font-black text-slate-800 uppercase truncate">{selectedLoc.name}</p>
+              <p className="text-[8px] text-slate-400 font-bold truncate">{selectedLoc.legalName || '---'}</p>
+              <p className="text-[7px] text-slate-400 truncate">{selectedLoc.cnpj} • {selectedLoc.city}/{selectedLoc.state}</p>
+            </div>
+          ) : (
+            <span className="text-[9px] font-bold text-slate-400 uppercase">SELECIONE...</span>
+          )}
+        </div>
+      ) : (
+        <div className="absolute top-0 left-0 w-full z-50 bg-white border border-blue-500 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <input 
+            autoFocus
+            type="text"
+            placeholder="BUSCAR LOCAL..."
+            className="w-full px-3 py-2 text-[10px] font-bold uppercase border-b border-slate-100 outline-none"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onBlur={() => setTimeout(() => setIsSearching(false), 200)}
+          />
+          <div className="max-h-48 overflow-y-auto custom-scrollbar">
+            <div 
+              onClick={() => { onLocationChange(trip, ''); setIsSearching(false); }}
+              className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-[9px] font-bold text-red-500 border-b border-slate-50"
+            >
+              LIMPAR SELEÇÃO
+            </div>
+            {filteredLocations.map(loc => (
+              <div 
+                key={loc.id}
+                onClick={() => { onLocationChange(trip, loc.id); setIsSearching(false); }}
+                className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+              >
+                <p className="text-[9px] font-black text-slate-800 uppercase">{loc.name}</p>
+                <p className="text-[7px] text-slate-400 font-bold uppercase">{loc.legalName}</p>
+                <p className="text-[7px] text-slate-500">{loc.cnpj} • {loc.city}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface SchedulingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -150,11 +222,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     }
   }, []);
 
-  const handleConfirmScheduling = async (locationId: string, dateTime: string) => {
+  const handleConfirmScheduling = useCallback(async (locationId: string, dateTime: string) => {
     if (!selectedTripForScheduling) return;
-    
+
     const selectedLoc = locations.find(l => l.id === locationId);
-    
     const updatedTrip: Trip = {
       ...selectedTripForScheduling,
       isScheduled: true,
@@ -175,12 +246,51 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         obs: selectedTripForScheduling.scheduling?.obs || ''
       }
     };
-    
+
     await db.saveTrip(updatedTrip);
-    setTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
+    setTrips(prev => prev.map(t => t.id === selectedTripForScheduling.id ? updatedTrip : t));
     setIsSchedulingModalOpen(false);
     setSelectedTripForScheduling(null);
-  };
+  }, [selectedTripForScheduling, locations]);
+
+  const handleLocationChange = useCallback(async (trip: Trip, locationId: string) => {
+    const selectedLoc = locations.find(l => l.id === locationId);
+    const updatedTrip: Trip = { 
+      ...trip, 
+      scheduledLocationId: locationId,
+      destination: selectedLoc ? {
+        id: selectedLoc.id,
+        name: selectedLoc.name,
+        legalName: selectedLoc.legalName,
+        cnpj: selectedLoc.cnpj,
+        city: selectedLoc.city,
+        state: selectedLoc.state
+      } : trip.destination,
+      scheduling: {
+        locationId: locationId,
+        location: selectedLoc?.name || '',
+        dateTime: trip.scheduledDateTime || '',
+        obs: trip.scheduling?.obs || ''
+      }
+    };
+    await db.saveTrip(updatedTrip);
+    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+  }, [locations]);
+
+  const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
+    const updatedTrip: Trip = { 
+      ...trip, 
+      scheduledDateTime: dateTime,
+      scheduling: {
+        locationId: trip.scheduledLocationId || '',
+        location: trip.scheduling?.location || '',
+        dateTime: dateTime,
+        obs: trip.scheduling?.obs || ''
+      }
+    };
+    await db.saveTrip(updatedTrip);
+    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+  }, []);
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
     const success = await advanceService.toggleAdvance(trip, checked);
@@ -298,28 +408,38 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     },
     { 
       key: 'isScheduled', 
-      label: 'Agendamento', 
-      render: (t: Trip) => {
-        const selectedLoc = locations.find(l => l.id === t.scheduledLocationId);
-        return (
-          <div className="flex items-center gap-3">
-            <input 
-              type="checkbox" 
-              checked={!!t.isScheduled} 
-              onChange={(e) => handleToggleScheduled(t, e.target.checked)}
-              className="w-5 h-5 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all cursor-pointer"
-            />
-            {t.isScheduled && (
-              <div className="flex flex-col">
-                <span className="text-[9px] font-black text-emerald-600 uppercase leading-tight">{selectedLoc?.name || 'Local não definido'}</span>
-                <span className="text-[8px] text-slate-400 font-bold">
-                  {t.scheduledDateTime ? new Date(t.scheduledDateTime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--/-- --:--'}
-                </span>
-              </div>
-            )}
-          </div>
-        );
-      }
+      label: 'Agendado', 
+      render: (t: Trip) => (
+        <input 
+          type="checkbox" 
+          checked={!!t.isScheduled} 
+          onChange={(e) => handleToggleScheduled(t, e.target.checked)}
+          className="w-5 h-5 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all cursor-pointer"
+        />
+      )
+    },
+    { 
+      key: 'scheduledLocationId', 
+      label: 'Local Agendamento', 
+      render: (t: Trip) => (
+        <LocationSearchableSelect 
+          trip={t} 
+          locations={locations} 
+          onLocationChange={handleLocationChange} 
+        />
+      )
+    },
+    { 
+      key: 'scheduledDateTime', 
+      label: 'Data/Hora Agend.', 
+      render: (t: Trip) => (
+        <input 
+          type="datetime-local" 
+          value={t.scheduledDateTime && typeof t.scheduledDateTime === 'string' ? t.scheduledDateTime.substring(0, 16) : ''} 
+          onChange={(e) => handleDateTimeChange(t, e.target.value)}
+          className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[9px] font-bold outline-none focus:border-blue-500 transition-all"
+        />
+      )
     },
     { 
       key: 'hasAdvance', 
@@ -336,7 +456,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleToggleAdvance]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance]);
 
   const coletaTrips = useMemo(() => 
     trips.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase())), 
