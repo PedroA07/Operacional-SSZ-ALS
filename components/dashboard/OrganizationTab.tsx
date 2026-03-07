@@ -10,11 +10,84 @@ interface OrganizationTabProps {
   userId: string;
 }
 
+interface LocationSearchableSelectProps {
+  trip: Trip;
+  locations: any[];
+  onLocationChange: (trip: Trip, locationId: string) => void;
+}
+
+const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ trip, locations, onLocationChange }) => {
+  const selectedLoc = locations.find(l => l.id === trip.scheduledLocationId);
+  const [isSearching, setIsSearching] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filteredLocations = search 
+    ? locations.filter(l => 
+        l.name.toLowerCase().includes(search.toLowerCase()) || 
+        l.legalName?.toLowerCase().includes(search.toLowerCase()) ||
+        l.cnpj?.includes(search)
+      )
+    : locations;
+
+  return (
+    <div className="relative min-w-[200px]">
+      {!isSearching ? (
+        <div 
+          onClick={() => setIsSearching(true)}
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer hover:border-blue-400 transition-all"
+        >
+          {selectedLoc ? (
+            <div className="space-y-0.5">
+              <p className="text-[10px] font-black text-slate-800 uppercase truncate">{selectedLoc.name}</p>
+              <p className="text-[8px] text-slate-400 font-bold truncate">{selectedLoc.legalName || '---'}</p>
+              <p className="text-[7px] text-slate-400 truncate">{selectedLoc.cnpj} • {selectedLoc.city}/{selectedLoc.state} • {selectedLoc.zipCode}</p>
+            </div>
+          ) : (
+            <span className="text-[9px] font-bold text-slate-400 uppercase">SELECIONE...</span>
+          )}
+        </div>
+      ) : (
+        <div className="absolute top-0 left-0 w-full z-50 bg-white border border-blue-500 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <input 
+            autoFocus
+            type="text"
+            placeholder="BUSCAR LOCAL..."
+            className="w-full px-3 py-2 text-[10px] font-bold uppercase border-b border-slate-100 outline-none"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onBlur={() => setTimeout(() => setIsSearching(false), 200)}
+          />
+          <div className="max-h-48 overflow-y-auto custom-scrollbar">
+            <div 
+              onClick={() => { onLocationChange(trip, ''); setIsSearching(false); }}
+              className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-[9px] font-bold text-red-500 border-b border-slate-50"
+            >
+              LIMPAR SELEÇÃO
+            </div>
+            {filteredLocations.map(loc => (
+              <div 
+                key={loc.id}
+                onClick={() => { onLocationChange(trip, loc.id); setIsSearching(false); }}
+                className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+              >
+                <p className="text-[9px] font-black text-slate-800 uppercase">{loc.name}</p>
+                <p className="text-[7px] text-slate-400 font-bold uppercase">{loc.legalName}</p>
+                <p className="text-[7px] text-slate-500">{loc.cnpj} • {loc.city}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
@@ -133,7 +206,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         return (
           <div className={`px-3 py-1.5 rounded-lg font-black text-[10px] text-center ${today ? 'bg-slate-100 text-slate-600' : 'bg-red-100 text-red-600 border border-red-200 animate-pulse'}`}>
             {displayDate}
-            {!today && <span className="block text-[7px] mt-0.5">FORA DE HOJE</span>}
           </div>
         );
       }
@@ -169,16 +241,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
       key: 'scheduledLocationId', 
       label: 'Local Agendamento', 
       render: (t: Trip) => (
-        <select 
-          value={t.scheduledLocationId || ''} 
-          onChange={(e) => handleLocationChange(t, e.target.value)}
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[9px] font-bold uppercase outline-none focus:border-blue-500 transition-all"
-        >
-          <option value="">SELECIONE...</option>
-          {locations.map(loc => (
-            <option key={loc.id} value={loc.id}>{loc.name}</option>
-          ))}
-        </select>
+        <LocationSearchableSelect 
+          trip={t} 
+          locations={locations} 
+          onLocationChange={handleLocationChange} 
+        />
       )
     },
     { 
@@ -239,10 +306,28 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
       />
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Organização Operacional</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Agendamentos e NF • Dados desde 06/03/2026</p>
+        <div className="flex items-center gap-8">
+          <div>
+            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Organização Operacional</h2>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Agendamentos e NF • Dados desde 06/03/2026</p>
+          </div>
+          
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+            <button 
+              onClick={() => setActiveView('COLETA')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'COLETA' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Coleta/Export
+            </button>
+            <button 
+              onClick={() => setActiveView('ENTREGA')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'ENTREGA' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Entrega/Import
+            </button>
+          </div>
         </div>
+        
         <button 
           onClick={handleFinalizeTrips}
           disabled={isFinalizing}
@@ -262,34 +347,36 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 ml-4">
-            <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Coleta, Cabotagem e Exportação</h3>
+      <div className="animate-in slide-in-from-bottom-4 duration-500">
+        {activeView === 'COLETA' ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 ml-4">
+              <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Coleta, Cabotagem e Exportação</h3>
+            </div>
+            <SmartOperationTable 
+              userId={userId} 
+              componentId="org-coleta-export" 
+              columns={columns} 
+              data={coletaTrips} 
+              hideInternalSearch={false}
+            />
           </div>
-          <SmartOperationTable 
-            userId={userId} 
-            componentId="org-coleta-export" 
-            columns={columns} 
-            data={coletaTrips} 
-            hideInternalSearch={false}
-          />
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 ml-4">
-            <div className="w-2 h-8 bg-emerald-600 rounded-full"></div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Entrega, Cabotagem e Importação</h3>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 ml-4">
+              <div className="w-2 h-8 bg-emerald-600 rounded-full"></div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Entrega, Cabotagem e Importação</h3>
+            </div>
+            <SmartOperationTable 
+              userId={userId} 
+              componentId="org-entrega-import" 
+              columns={columns} 
+              data={entregaTrips} 
+              hideInternalSearch={false}
+            />
           </div>
-          <SmartOperationTable 
-            userId={userId} 
-            componentId="org-entrega-import" 
-            columns={columns} 
-            data={entregaTrips} 
-            hideInternalSearch={false}
-          />
-        </div>
+        )}
       </div>
     </div>
   );

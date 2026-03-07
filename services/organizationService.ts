@@ -38,17 +38,37 @@ export const organizationService = {
   },
 
   /**
-   * Busca locais de atendimento (Portos e Pre-Stackings).
+   * Busca locais de atendimento (Portos e Pre-Stackings) com detalhes completos.
    */
-  fetchLocations: async (): Promise<{ id: string; name: string }[]> => {
+  fetchLocations: async (): Promise<any[]> => {
     const [ports, preStackings] = await Promise.all([
       db.getPorts(),
       db.getPreStacking()
     ]);
 
     return [
-      ...ports.map(p => ({ id: p.id, name: p.name })),
-      ...preStackings.map(ps => ({ id: ps.id, name: ps.name }))
+      ...ports.map(p => ({ 
+        id: p.id, 
+        name: p.name, 
+        legalName: p.legalName, 
+        cnpj: p.cnpj, 
+        address: p.address, 
+        zipCode: p.zipCode,
+        city: p.city,
+        state: p.state,
+        type: 'PORTO'
+      })),
+      ...preStackings.map(ps => ({ 
+        id: ps.id, 
+        name: ps.name, 
+        legalName: ps.legalName, 
+        cnpj: ps.cnpj, 
+        address: ps.address, 
+        zipCode: ps.zipCode,
+        city: ps.city,
+        state: ps.state,
+        type: 'UNIDADE'
+      }))
     ].sort((a, b) => a.name.localeCompare(b.name));
   },
 
