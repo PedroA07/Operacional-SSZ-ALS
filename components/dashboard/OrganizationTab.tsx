@@ -187,7 +187,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
       render: (t: Trip) => (
         <input 
           type="datetime-local" 
-          value={t.scheduledDateTime ? t.scheduledDateTime.substring(0, 16) : ''} 
+          value={t.scheduledDateTime && typeof t.scheduledDateTime === 'string' ? t.scheduledDateTime.substring(0, 16) : ''} 
           onChange={(e) => handleDateTimeChange(t, e.target.value)}
           className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[9px] font-bold outline-none focus:border-blue-500 transition-all"
         />
@@ -256,7 +256,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
-              Viagens Finalizadas
+              Finalizar Agendados
             </>
           )}
         </button>

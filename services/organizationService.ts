@@ -21,8 +21,11 @@ export const organizationService = {
       // Se a data estiver no formato DD/MM/YYYY, converte para YYYY-MM-DD para comparação
       let normalizedTripDate = tripDateStr;
       if (tripDateStr.includes('/')) {
-        const [day, month, year] = tripDateStr.split('/');
-        normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        const parts = tripDateStr.split('/');
+        if (parts.length === 3) {
+          const [day, month, year] = parts;
+          normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
       }
 
       const isAfterStartDate = normalizedTripDate >= startDateStr;
