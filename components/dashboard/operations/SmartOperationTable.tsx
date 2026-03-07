@@ -18,6 +18,7 @@ interface SmartOperationTableProps {
   defaultVisibleKeys?: string[];
   onRowClick?: (row: any) => void;
   hideInternalSearch?: boolean;
+  getRowClassName?: (row: any) => string;
 }
 
 const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
@@ -28,7 +29,8 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   title,
   defaultVisibleKeys,
   onRowClick,
-  hideInternalSearch = false
+  hideInternalSearch = false,
+  getRowClassName
 }) => {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -148,7 +150,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
               onClick={() => setIsColumnPickerOpen(!isColumnPickerOpen)}
               className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all ${isColumnPickerOpen ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-200 hover:border-blue-400'}`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 4h18M3 12h18M3 20h18" /></svg>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
               <span className="text-[9px] font-black uppercase tracking-widest">Colunas</span>
             </button>
 
@@ -194,7 +196,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
               <tr 
                 key={row.id || idx} 
                 onClick={() => onRowClick?.(row)}
-                className={`group transition-all ${onRowClick ? 'cursor-pointer hover:bg-blue-50/40' : 'hover:bg-slate-50/50'}`}
+                className={`group transition-all ${onRowClick ? 'cursor-pointer hover:bg-blue-50/40' : 'hover:bg-slate-50/50'} ${getRowClassName ? getRowClassName(row) : ''}`}
               >
                 {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
                   <td key={col.key} className="px-6 py-5 text-slate-600">

@@ -10,74 +10,87 @@ interface OrganizationTabProps {
   userId: string;
 }
 
-interface LocationSearchableSelectProps {
-  trip: Trip;
+interface SchedulingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (locationId: string, dateTime: string) => void;
   locations: any[];
-  onLocationChange: (trip: Trip, locationId: string) => void;
+  initialLocationId?: string;
+  initialDateTime?: string;
 }
 
-const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ trip, locations, onLocationChange }) => {
-  const selectedLoc = locations.find(l => l.id === trip.scheduledLocationId);
-  const [isSearching, setIsSearching] = useState(false);
-  const [search, setSearch] = useState('');
+const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onConfirm, locations, initialLocationId, initialDateTime }) => {
+  const [locationId, setLocationId] = useState(initialLocationId || '');
+  const [dateTime, setDateTime] = useState(initialDateTime || '');
 
-  const filteredLocations = search 
-    ? locations.filter(l => 
-        l.name.toLowerCase().includes(search.toLowerCase()) || 
-        l.legalName?.toLowerCase().includes(search.toLowerCase()) ||
-        l.cnpj?.includes(search)
-      )
-    : locations;
+  useEffect(() => {
+    if (isOpen) {
+      setLocationId(initialLocationId || '');
+      setDateTime(initialDateTime || '');
+    }
+  }, [isOpen, initialLocationId, initialDateTime]);
+
+  if (!isOpen) return null;
 
   return (
-    <div className="relative min-w-[200px]">
-      {!isSearching ? (
-        <div 
-          onClick={() => setIsSearching(true)}
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer hover:border-blue-400 transition-all"
-        >
-          {selectedLoc ? (
-            <div className="space-y-0.5">
-              <p className="text-[10px] font-black text-slate-800 uppercase truncate">{selectedLoc.name}</p>
-              <p className="text-[8px] text-slate-400 font-bold truncate">{selectedLoc.legalName || '---'}</p>
-              <p className="text-[7px] text-slate-400 truncate">{selectedLoc.cnpj} • {selectedLoc.city}/{selectedLoc.state} • {selectedLoc.zipCode}</p>
-            </div>
-          ) : (
-            <span className="text-[9px] font-bold text-slate-400 uppercase">SELECIONE...</span>
-          )}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Detalhes do Agendamento</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Vincule local, data e hora</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white rounded-xl transition-all text-slate-400 hover:text-red-500">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
         </div>
-      ) : (
-        <div className="absolute top-0 left-0 w-full z-50 bg-white border border-blue-500 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-          <input 
-            autoFocus
-            type="text"
-            placeholder="BUSCAR LOCAL..."
-            className="w-full px-3 py-2 text-[10px] font-bold uppercase border-b border-slate-100 outline-none"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onBlur={() => setTimeout(() => setIsSearching(false), 200)}
-          />
-          <div className="max-h-48 overflow-y-auto custom-scrollbar">
-            <div 
-              onClick={() => { onLocationChange(trip, ''); setIsSearching(false); }}
-              className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-[9px] font-bold text-red-500 border-b border-slate-50"
-            >
-              LIMPAR SELEÇÃO
-            </div>
-            {filteredLocations.map(loc => (
-              <div 
-                key={loc.id}
-                onClick={() => { onLocationChange(trip, loc.id); setIsSearching(false); }}
-                className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
+
+        <div className="p-8 space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Local de Agendamento</label>
+            <div className="relative">
+              <select 
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-[11px] font-bold uppercase outline-none focus:border-blue-500 transition-all appearance-none"
               >
-                <p className="text-[9px] font-black text-slate-800 uppercase">{loc.name}</p>
-                <p className="text-[7px] text-slate-400 font-bold uppercase">{loc.legalName}</p>
-                <p className="text-[7px] text-slate-500">{loc.cnpj} • {loc.city}</p>
+                <option value="">SELECIONE UM LOCAL...</option>
+                {locations.map(loc => (
+                  <option key={loc.id} value={loc.id}>{loc.name} - {loc.legalName}</option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
               </div>
-            ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data e Hora</label>
+            <input 
+              type="datetime-local"
+              value={dateTime}
+              onChange={(e) => setDateTime(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-[11px] font-bold outline-none focus:border-blue-500 transition-all"
+            />
           </div>
         </div>
-      )}
+
+        <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex gap-3">
+          <button 
+            onClick={onClose}
+            className="flex-1 px-6 py-4 border border-slate-200 text-slate-500 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-white transition-all active:scale-95"
+          >
+            Cancelar
+          </button>
+          <button 
+            onClick={() => onConfirm(locationId, dateTime)}
+            className="flex-1 px-6 py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -88,6 +101,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
+  const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
+  const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
@@ -119,22 +134,53 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
   }, []);
 
   const handleToggleScheduled = useCallback(async (trip: Trip, checked: boolean) => {
-    const updatedTrip = { ...trip, isScheduled: checked };
-    await db.saveTrip(updatedTrip);
-    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+    if (checked) {
+      setSelectedTripForScheduling(trip);
+      setIsSchedulingModalOpen(true);
+    } else {
+      const updatedTrip: Trip = { 
+        ...trip, 
+        isScheduled: false,
+        scheduledLocationId: '',
+        scheduledDateTime: '',
+        scheduling: trip.scheduling ? { ...trip.scheduling, locationId: '', location: '', dateTime: '' } : null
+      };
+      await db.saveTrip(updatedTrip);
+      setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+    }
   }, []);
 
-  const handleLocationChange = useCallback(async (trip: Trip, locationId: string) => {
-    const updatedTrip = { ...trip, scheduledLocationId: locationId };
+  const handleConfirmScheduling = async (locationId: string, dateTime: string) => {
+    if (!selectedTripForScheduling) return;
+    
+    const selectedLoc = locations.find(l => l.id === locationId);
+    
+    const updatedTrip: Trip = {
+      ...selectedTripForScheduling,
+      isScheduled: true,
+      scheduledLocationId: locationId,
+      scheduledDateTime: dateTime,
+      destination: selectedLoc ? {
+        id: selectedLoc.id,
+        name: selectedLoc.name,
+        legalName: selectedLoc.legalName,
+        cnpj: selectedLoc.cnpj,
+        city: selectedLoc.city,
+        state: selectedLoc.state
+      } : selectedTripForScheduling.destination,
+      scheduling: {
+        locationId: locationId,
+        location: selectedLoc?.name || '',
+        dateTime: dateTime,
+        obs: selectedTripForScheduling.scheduling?.obs || ''
+      }
+    };
+    
     await db.saveTrip(updatedTrip);
-    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-  }, []);
-
-  const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
-    const updatedTrip = { ...trip, scheduledDateTime: dateTime };
-    await db.saveTrip(updatedTrip);
-    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-  }, []);
+    setTrips(prev => prev.map(t => t.id === updatedTrip.id ? updatedTrip : t));
+    setIsSchedulingModalOpen(false);
+    setSelectedTripForScheduling(null);
+  };
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
     const success = await advanceService.toggleAdvance(trip, checked);
@@ -194,17 +240,31 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     return today === date;
   };
 
+  const isPastDate = (dateStr: string) => {
+    const d = parseDate(dateStr);
+    if (!d) return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tripDate = new Date(d);
+    tripDate.setHours(0, 0, 0, 0);
+    
+    return tripDate < today;
+  };
+
   const columns = useMemo(() => [
     { 
       key: 'dateTime', 
       label: 'Data', 
       render: (t: Trip) => {
         const today = isToday(t.dateTime);
+        const past = isPastDate(t.dateTime);
         const d = parseDate(t.dateTime);
         const displayDate = d ? d.toLocaleDateString('pt-BR') : (t.dateTime || '---');
         
         return (
-          <div className={`px-3 py-1.5 rounded-lg font-black text-[10px] text-center ${today ? 'bg-slate-100 text-slate-600' : 'bg-red-100 text-red-600 border border-red-200 animate-pulse'}`}>
+          <div className={`px-3 py-1.5 rounded-lg font-black text-[10px] text-center ${today ? 'bg-slate-100 text-slate-600' : (past ? 'bg-red-100 text-red-600 border border-red-200 animate-pulse' : 'bg-slate-100 text-slate-600')}`}>
             {displayDate}
           </div>
         );
@@ -212,7 +272,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     },
     { key: 'os', label: 'OS', render: (t: Trip) => <span className="font-black text-slate-900">{t.os}</span> },
     { key: 'driver', label: 'Motorista', render: (t: Trip) => <span className="font-bold text-slate-600 uppercase">{t.driver.name}</span> },
-    { key: 'customer', label: 'Local de Atendimento', render: (t: Trip) => <span className="font-bold text-slate-500 uppercase text-[9px]">{t.customer.name}</span> },
+    { 
+      key: 'customer', 
+      label: 'Local de Atendimento', 
+      render: (t: Trip) => (
+        <div className="flex flex-col">
+          <span className="font-black text-slate-800 uppercase text-[10px]">{t.customer.name}</span>
+          <span className="text-[8px] text-slate-400 font-bold uppercase truncate max-w-[150px]">
+            {t.customer.legalName || '---'}
+          </span>
+        </div>
+      ) 
+    },
     { 
       key: 'sentNF', 
       label: 'Mandou NF', 
@@ -227,38 +298,28 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     },
     { 
       key: 'isScheduled', 
-      label: 'Agendado', 
-      render: (t: Trip) => (
-        <input 
-          type="checkbox" 
-          checked={!!t.isScheduled} 
-          onChange={(e) => handleToggleScheduled(t, e.target.checked)}
-          className="w-5 h-5 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all cursor-pointer"
-        />
-      )
-    },
-    { 
-      key: 'scheduledLocationId', 
-      label: 'Local Agendamento', 
-      render: (t: Trip) => (
-        <LocationSearchableSelect 
-          trip={t} 
-          locations={locations} 
-          onLocationChange={handleLocationChange} 
-        />
-      )
-    },
-    { 
-      key: 'scheduledDateTime', 
-      label: 'Data/Hora Agend.', 
-      render: (t: Trip) => (
-        <input 
-          type="datetime-local" 
-          value={t.scheduledDateTime && typeof t.scheduledDateTime === 'string' ? t.scheduledDateTime.substring(0, 16) : ''} 
-          onChange={(e) => handleDateTimeChange(t, e.target.value)}
-          className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[9px] font-bold outline-none focus:border-blue-500 transition-all"
-        />
-      )
+      label: 'Agendamento', 
+      render: (t: Trip) => {
+        const selectedLoc = locations.find(l => l.id === t.scheduledLocationId);
+        return (
+          <div className="flex items-center gap-3">
+            <input 
+              type="checkbox" 
+              checked={!!t.isScheduled} 
+              onChange={(e) => handleToggleScheduled(t, e.target.checked)}
+              className="w-5 h-5 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all cursor-pointer"
+            />
+            {t.isScheduled && (
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black text-emerald-600 uppercase leading-tight">{selectedLoc?.name || 'Local não definido'}</span>
+                <span className="text-[8px] text-slate-400 font-bold">
+                  {t.scheduledDateTime ? new Date(t.scheduledDateTime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--/-- --:--'}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      }
     },
     { 
       key: 'hasAdvance', 
@@ -275,14 +336,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleToggleAdvance]);
 
   const coletaTrips = useMemo(() => 
     trips.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase())), 
   [trips]);
 
   const entregaTrips = useMemo(() => 
-    trips.filter(t => ['ENTREGA', 'CABOTAGEM', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase())), 
+    trips.filter(t => ['ENTREGA', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase())), 
   [trips]);
 
   if (isLoading) {
@@ -303,6 +364,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         type="confirm" 
         onConfirm={confirmModal.onConfirm} 
         onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} 
+      />
+
+      <SchedulingModal 
+        isOpen={isSchedulingModalOpen}
+        onClose={() => { setIsSchedulingModalOpen(false); setSelectedTripForScheduling(null); }}
+        onConfirm={handleConfirmScheduling}
+        locations={locations}
+        initialLocationId={selectedTripForScheduling?.scheduledLocationId}
+        initialDateTime={selectedTripForScheduling?.scheduledDateTime}
       />
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
@@ -360,13 +430,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
               columns={columns} 
               data={coletaTrips} 
               hideInternalSearch={false}
+              getRowClassName={(t: Trip) => t.isScheduled ? 'bg-emerald-50 border-l-4 border-emerald-500' : ''}
             />
           </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-3 ml-4">
               <div className="w-2 h-8 bg-emerald-600 rounded-full"></div>
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Entrega, Cabotagem e Importação</h3>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Entrega e Importação</h3>
             </div>
             <SmartOperationTable 
               userId={userId} 
@@ -374,6 +445,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
               columns={columns} 
               data={entregaTrips} 
               hideInternalSearch={false}
+              getRowClassName={(t: Trip) => t.isScheduled ? 'bg-emerald-50 border-l-4 border-emerald-500' : ''}
             />
           </div>
         )}
