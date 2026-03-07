@@ -82,7 +82,7 @@ export interface SealRecord {
 export interface CustomColumn {
   id: string;
   label: string;
-  type: 'text' | 'number' | 'formula';
+  type: 'text' | 'number' | 'formula' | 'date' | 'time' | 'datetime' | 'currency';
   formula?: string;
 }
 
@@ -191,7 +191,8 @@ export enum DashboardTab {
   ESTADIAS = 'ESTADIAS',
   LOGINS = 'COFRE_DE_LOGINS',
   LACRES = 'CONTROLE_DE_LACRES',
-  AVANTIDA = 'AVANTIDA'
+  AVANTIDA = 'AVANTIDA',
+  ORGANIZACAO = 'ORGANIZACAO'
 }
 
 export type TripStatus = 
@@ -211,7 +212,8 @@ export type TripStatus =
   | 'Saiu do Cragea'
   | 'Chegou na Volkswagen'
   | 'Saiu da Volkswagen'
-  | 'Container sobre rodas';
+  | 'Container sobre rodas'
+  | 'Agendamento realizado';
 
 export type VWStatus = TripStatus;
 
@@ -297,6 +299,11 @@ export interface Trip {
   driver_docs?: DriverCapturedDoc[];
   stay_session_id?: string;
   isPriority?: boolean;
+  sentNF?: boolean;
+  isScheduled?: boolean;
+  scheduledLocationId?: string;
+  scheduledDateTime?: string;
+  hasAdvance?: boolean;
 }
 
 export interface Driver {

@@ -438,7 +438,24 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
               const val = formulaEvaluator.evaluate(col.formula || '', r, selectedSession, calculateExceededHoursDecimal);
               return <span className="text-[10px] font-black text-blue-600">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
             }
-            return <span className="text-[10px] font-bold text-slate-600">{r.customValues?.[col.id] || '---'}</span>;
+            const rawValue = r.customValues?.[col.id];
+            if (!rawValue) return <span className="text-slate-300">---</span>;
+
+            if (col.type === 'currency') {
+              return <span className="text-[10px] font-black text-emerald-600">{Number(rawValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
+            }
+            if (col.type === 'date') {
+              const [y, m, d] = String(rawValue).split('-');
+              return <span className="text-[10px] font-bold text-slate-600">{d}/{m}/{y}</span>;
+            }
+            if (col.type === 'time') {
+              return <span className="text-[10px] font-bold text-slate-600">{String(rawValue)}</span>;
+            }
+            if (col.type === 'datetime') {
+              return <span className="text-[10px] font-bold text-slate-600">{formatFullDateTime(String(rawValue))}</span>;
+            }
+            
+            return <span className="text-[10px] font-bold text-slate-600">{String(rawValue)}</span>;
           }
         });
       });
@@ -572,10 +589,19 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                     <div key={col.id} className="space-y-1">
                       <label className="text-[9px] font-black text-slate-500 uppercase ml-1">{col.label}</label>
                       <input 
-                        type={col.type === 'number' ? 'number' : 'text'} 
+                        type={
+                          col.type === 'number' || col.type === 'currency' ? 'number' : 
+                          col.type === 'date' ? 'date' : 
+                          col.type === 'time' ? 'time' : 
+                          col.type === 'datetime' ? 'datetime-local' : 'text'
+                        } 
+                        step={col.type === 'currency' ? '0.01' : 'any'}
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" 
                         value={editForm.customValues[col.id] || ''} 
-                        onChange={e => setEditForm({...editForm, customValues: { ...editForm.customValues, [col.id]: e.target.value }})} 
+                        onChange={e => {
+                          const val = (col.type === 'number' || col.type === 'currency') ? Number(e.target.value) : e.target.value;
+                          setEditForm({...editForm, customValues: { ...editForm.customValues, [col.id]: val }});
+                        }} 
                       />
                     </div>
                   ))}
@@ -654,10 +680,19 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                       <div key={col.id} className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase ml-1">{col.label}</label>
                         <input 
-                          type={col.type === 'number' ? 'number' : 'text'} 
+                          type={
+                            col.type === 'number' || col.type === 'currency' ? 'number' : 
+                            col.type === 'date' ? 'date' : 
+                            col.type === 'time' ? 'time' : 
+                            col.type === 'datetime' ? 'datetime-local' : 'text'
+                          } 
+                          step={col.type === 'currency' ? '0.01' : 'any'}
                           className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" 
                           value={manualRecordForm.customValues[col.id] || ''} 
-                          onChange={e => setManualRecordForm({...manualRecordForm, customValues: { ...manualRecordForm.customValues, [col.id]: e.target.value }})} 
+                          onChange={e => {
+                            const val = (col.type === 'number' || col.type === 'currency') ? Number(e.target.value) : e.target.value;
+                            setManualRecordForm({...manualRecordForm, customValues: { ...manualRecordForm.customValues, [col.id]: val }});
+                          }} 
                         />
                       </div>
                     ))}

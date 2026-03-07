@@ -75,6 +75,10 @@ const CustomColumnsManager: React.FC<CustomColumnsManagerProps> = ({ session, on
                   <option value="text">TEXTO</option>
                   <option value="number">NÚMERO</option>
                   <option value="formula">FÓRMULA</option>
+                  <option value="date">DATA</option>
+                  <option value="time">HORA</option>
+                  <option value="datetime">DATA E HORA</option>
+                  <option value="currency">MOEDA</option>
                 </select>
               </div>
               {newCol.type === 'formula' && (
@@ -111,7 +115,11 @@ const CustomColumnsManager: React.FC<CustomColumnsManagerProps> = ({ session, on
                   <div key={col.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                     <div className="flex items-center gap-4">
                       <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
-                        <span className="text-[10px] font-black">{col.type[0].toUpperCase()}</span>
+                        <span className="text-[10px] font-black">
+                          {col.type === 'datetime' ? 'DT' : 
+                           col.type === 'currency' ? '$' : 
+                           col.type[0].toUpperCase()}
+                        </span>
                       </div>
                       <div>
                         <p className="text-[11px] font-black text-slate-800 uppercase">{col.label}</p>
@@ -132,11 +140,14 @@ const CustomColumnsManager: React.FC<CustomColumnsManagerProps> = ({ session, on
 
           {/* Dicas de Fórmulas */}
           <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
-            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-2">Variáveis Disponíveis:</p>
-            <div className="grid grid-cols-2 gap-2">
+            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-2">Variáveis e Funções:</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               <div className="text-[8px] font-bold text-slate-500 uppercase"><span className="text-blue-600 font-black">{'{H}'}</span> - Horas Excedentes</div>
               <div className="text-[8px] font-bold text-slate-500 uppercase"><span className="text-blue-600 font-black">{'{V}'}</span> - Valor da Hora</div>
               <div className="text-[8px] font-bold text-slate-500 uppercase"><span className="text-blue-600 font-black">{'{T}'}</span> - Valor Total Estadia</div>
+              <div className="text-[8px] font-bold text-slate-500 uppercase"><span className="text-blue-600 font-black">{'{NOME_COLUNA}'}</span> - Valor de outra coluna</div>
+              <div className="text-[8px] font-bold text-slate-500 uppercase"><span className="text-blue-600 font-black">Math.round()</span> - Arredondar</div>
+              <div className="text-[8px] font-bold text-slate-500 uppercase"><span className="text-blue-600 font-black">Math.max(a, b)</span> - Maior valor</div>
             </div>
           </div>
 

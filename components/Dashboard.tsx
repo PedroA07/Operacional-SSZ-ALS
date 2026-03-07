@@ -16,6 +16,7 @@ import StaysTab from './dashboard/StaysTab';
 import LoginsTab from './dashboard/LoginsTab';
 import LacresTab from './dashboard/LacresTab';
 import AvantidaTab from './dashboard/AvantidaTab';
+import OrganizationTab from './dashboard/OrganizationTab';
 import Sidebar from './dashboard/Sidebar';
 import DatabaseStatus from './dashboard/DatabaseStatus';
 import UserProfile from './dashboard/UserProfile';
@@ -205,6 +206,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.LOGINS && <LoginsTab />}
            {activeTab === DashboardTab.LACRES && <LacresTab />}
            {activeTab === DashboardTab.AVANTIDA && <AvantidaTab userId={user.id} />}
+           {activeTab === DashboardTab.ORGANIZACAO && <OrganizationTab userId={user.id} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(true); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(true); }} availableOps={availableOps} />}
            {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(true); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(true); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(true); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} />}
