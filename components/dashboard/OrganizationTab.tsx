@@ -190,11 +190,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
   ];
 
   const coletaTrips = useMemo(() => 
-    trips.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type)), 
+    trips.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase())), 
   [trips]);
 
   const entregaTrips = useMemo(() => 
-    trips.filter(t => ['ENTREGA', 'CABOTAGEM', 'IMPORTAÇÃO'].includes(t.type)), 
+    trips.filter(t => ['ENTREGA', 'CABOTAGEM', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase())), 
   [trips]);
 
   return (

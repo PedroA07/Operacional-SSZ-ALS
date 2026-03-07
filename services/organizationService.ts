@@ -7,13 +7,30 @@ export const organizationService = {
    */
   fetchOperations: async (): Promise<Trip[]> => {
     const allTrips = await db.getTrips();
-    const startDate = new Date('2026-03-06T00:00:00');
+    // Normaliza a data de início para 06/03/2026 (YYYY-MM-DD)
+    const startDateStr = '2026-03-06';
     
     return allTrips.filter(trip => {
-      const tripDate = new Date(trip.dateTime);
-      // Filtra apenas viagens a partir de 06/03/2026 e que não estejam canceladas ou concluídas (opcional, mas faz sentido para organização)
-      // O usuário pediu para remover do painel após "Viagens Finalizadas", então filtramos por status também.
-      return tripDate >= startDate && trip.status !== 'Viagem concluída' && trip.status !== 'Viagem cancelada' && trip.status !== 'Agendamento realizado';
+      if (!trip.dateTime) return false;
+      
+      // Tenta extrair a data no formato YYYY-MM-DD
+      const tripDateStr = trip.dateTime.includes('T') 
+        ? trip.dateTime.split('T')[0] 
+        : trip.dateTime;
+        
+      // Se a data estiver no formato DD/MM/YYYY, converte para YYYY-MM-DD para comparação
+      let normalizedTripDate = tripDateStr;
+      if (tripDateStr.includes('/')) {
+        const [day, month, year] = tripDateStr.split('/');
+        normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+
+      const isAfterStartDate = normalizedTripDate >= startDateStr;
+      const isNotFinished = trip.status !== 'Viagem concluída' && 
+                           trip.status !== 'Viagem cancelada' && 
+                           trip.status !== 'Agendamento realizado';
+                           
+      return isAfterStartDate && isNotFinished;
     });
   },
 

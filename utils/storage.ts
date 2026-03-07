@@ -85,12 +85,22 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('customers').select('*').order('name');
     if (error) throw error;
-    return data || [];
+    return (data || []).map(c => ({
+      ...c,
+      legalName: c.legal_name || c.legalName,
+      zipCode: c.zip_code || c.zipCode,
+      registrationDate: c.registration_date || c.registrationdate || c.registrationDate
+    }));
   },
 
   saveCustomer: async (c: Partial<Customer>, user?: User) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('customers').upsert(c);
+    const payload: any = { ...c };
+    if (c.legalName) payload.legal_name = c.legalName;
+    if (c.zipCode) payload.zip_code = c.zipCode;
+    if (c.registrationDate) payload.registration_date = c.registrationDate;
+
+    const { error } = await supabase.from('customers').upsert(payload);
     return !error;
   },
 
@@ -104,12 +114,22 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('ports').select('*').order('name');
     if (error) throw error;
-    return data || [];
+    return (data || []).map(p => ({
+      ...p,
+      legalName: p.legal_name || p.legalName,
+      zipCode: p.zip_code || p.zipCode,
+      registrationDate: p.registration_date || p.registrationdate || p.registrationDate
+    }));
   },
 
   savePort: async (p: Partial<Port>, user?: User) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('ports').upsert(p);
+    const payload: any = { ...p };
+    if (p.legalName) payload.legal_name = p.legalName;
+    if (p.zipCode) payload.zip_code = p.zipCode;
+    if (p.registrationDate) payload.registration_date = p.registrationDate;
+    
+    const { error } = await supabase.from('ports').upsert(payload);
     return !error;
   },
 
@@ -123,12 +143,22 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('pre_stacking').select('*').order('name');
     if (error) throw error;
-    return data || [];
+    return (data || []).map(p => ({
+      ...p,
+      legalName: p.legal_name || p.legalName,
+      zipCode: p.zip_code || p.zipCode,
+      registrationDate: p.registration_date || p.registrationdate || p.registrationDate
+    }));
   },
 
   savePreStacking: async (p: Partial<PreStacking>, user?: User) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('pre_stacking').upsert(p);
+    const payload: any = { ...p };
+    if (p.legalName) payload.legal_name = p.legalName;
+    if (p.zipCode) payload.zip_code = p.zipCode;
+    if (p.registrationDate) payload.registration_date = p.registrationDate;
+
+    const { error } = await supabase.from('pre_stacking').upsert(payload);
     return !error;
   },
 

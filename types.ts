@@ -350,6 +350,7 @@ export interface Customer {
   address?: string;
   neighborhood?: string;
   zipCode?: string;
+  registrationDate?: string;
   operations?: string[];
 }
 
@@ -363,6 +364,7 @@ export interface Port {
   address: string; 
   neighborhood?: string; 
   zipCode?: string; 
+  registrationDate?: string;
 }
 
 export interface PreStacking { 
@@ -375,6 +377,7 @@ export interface PreStacking {
   address: string; 
   neighborhood?: string; 
   zipCode?: string; 
+  registrationDate?: string;
 }
 
 export interface Staff { 
