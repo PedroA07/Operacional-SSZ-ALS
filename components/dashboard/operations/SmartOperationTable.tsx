@@ -69,12 +69,25 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   }, []);
 
   const filteredData = useMemo(() => {
+    if (!data || !Array.isArray(data)) return [];
+    
     const base = hideInternalSearch ? data : data.filter(row => {
+      if (!row) return false;
       const searchStr = searchQuery.toLowerCase();
+      
       return Object.values(row).some(val => {
-        if (typeof val === 'object' && val !== null) {
-          return Object.values(val).some(v => String(v).toLowerCase().includes(searchStr));
+        if (val === null || val === undefined) return false;
+        
+        if (typeof val === 'object') {
+          try {
+            return Object.values(val).some(v => 
+              v !== null && v !== undefined && String(v).toLowerCase().includes(searchStr)
+            );
+          } catch (e) {
+            return false;
+          }
         }
+        
         return String(val).toLowerCase().includes(searchStr);
       });
     });

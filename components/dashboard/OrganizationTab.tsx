@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Trip, Port, PreStacking, TripStatus } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
@@ -39,31 +39,31 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     loadData();
   }, []);
 
-  const handleToggleNF = async (trip: Trip, checked: boolean) => {
+  const handleToggleNF = useCallback(async (trip: Trip, checked: boolean) => {
     const updatedTrip = { ...trip, sentNF: checked };
     await db.saveTrip(updatedTrip);
     setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-  };
+  }, []);
 
-  const handleToggleScheduled = async (trip: Trip, checked: boolean) => {
+  const handleToggleScheduled = useCallback(async (trip: Trip, checked: boolean) => {
     const updatedTrip = { ...trip, isScheduled: checked };
     await db.saveTrip(updatedTrip);
     setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-  };
+  }, []);
 
-  const handleLocationChange = async (trip: Trip, locationId: string) => {
+  const handleLocationChange = useCallback(async (trip: Trip, locationId: string) => {
     const updatedTrip = { ...trip, scheduledLocationId: locationId };
     await db.saveTrip(updatedTrip);
     setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-  };
+  }, []);
 
-  const handleDateTimeChange = async (trip: Trip, dateTime: string) => {
+  const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
     const updatedTrip = { ...trip, scheduledDateTime: dateTime };
     await db.saveTrip(updatedTrip);
     setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-  };
+  }, []);
 
-  const handleToggleAdvance = async (trip: Trip, checked: boolean) => {
+  const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
     const success = await advanceService.toggleAdvance(trip, checked);
     if (success) {
       setTrips(prev => prev.map(t => t.id === trip.id ? { 
@@ -72,7 +72,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         advancePayment: { ...t.advancePayment, status: checked ? 'LIBERAR' : 'BLOQUEADO' }
       } : t));
     }
-  };
+  }, []);
 
   const handleFinalizeTrips = () => {
     const scheduledCount = trips.filter(t => t.isScheduled).length;
@@ -97,21 +97,42 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     });
   };
 
+  const parseDate = (dateStr: string) => {
+    if (!dateStr) return null;
+    try {
+      if (dateStr.includes('/')) {
+        const [day, month, year] = dateStr.split('/');
+        const d = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T12:00:00`);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? null : d;
+    } catch (e) {
+      return null;
+    }
+  };
+
   const isToday = (dateStr: string) => {
+    const d = parseDate(dateStr);
+    if (!d) return false;
+    
     const today = new Date().toISOString().split('T')[0];
-    const date = new Date(dateStr).toISOString().split('T')[0];
+    const date = d.toISOString().split('T')[0];
     return today === date;
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { 
       key: 'dateTime', 
       label: 'Data', 
       render: (t: Trip) => {
         const today = isToday(t.dateTime);
+        const d = parseDate(t.dateTime);
+        const displayDate = d ? d.toLocaleDateString('pt-BR') : (t.dateTime || '---');
+        
         return (
           <div className={`px-3 py-1.5 rounded-lg font-black text-[10px] text-center ${today ? 'bg-slate-100 text-slate-600' : 'bg-red-100 text-red-600 border border-red-200 animate-pulse'}`}>
-            {new Date(t.dateTime).toLocaleDateString('pt-BR')}
+            {displayDate}
             {!today && <span className="block text-[7px] mt-0.5">FORA DE HOJE</span>}
           </div>
         );
@@ -187,7 +208,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         </div>
       )
     }
-  ];
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance]);
 
   const coletaTrips = useMemo(() => 
     trips.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase())), 
@@ -196,6 +217,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
   const entregaTrips = useMemo(() => 
     trips.filter(t => ['ENTREGA', 'CABOTAGEM', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase())), 
   [trips]);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 bg-white rounded-[3rem] border border-slate-100 shadow-sm animate-pulse">
+        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Carregando Painel Operacional...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
