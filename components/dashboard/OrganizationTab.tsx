@@ -33,6 +33,11 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
     );
   }, [search, locations]);
 
+  const suggestionLoc = useMemo(() => {
+    const id = trip.destination?.id || trip.customer.id;
+    return locations.find(l => l.id === id);
+  }, [trip, locations]);
+
   return (
     <div className="relative min-w-[220px]">
       {!isSearching ? (
@@ -41,24 +46,41 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
           className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 cursor-pointer hover:border-blue-400 hover:shadow-sm transition-all group"
         >
           {selectedLoc ? (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex justify-between items-start gap-2">
-                <p className="text-[10px] font-black text-slate-800 uppercase break-words flex-1">{selectedLoc.name}</p>
+                <p className="text-[10px] font-black text-slate-800 uppercase break-words flex-1 leading-tight">{selectedLoc.name}</p>
                 <p className="text-[8px] font-black text-blue-500 whitespace-nowrap">{selectedLoc.zipCode || '---'}</p>
               </div>
-              <p className="text-[8px] text-slate-400 font-bold uppercase break-words">{selectedLoc.legalName || '---'}</p>
-              <div className="flex justify-between items-center pt-1 border-t border-slate-50">
-                <p className="text-[7px] text-slate-500 font-medium">{selectedLoc.cnpj}</p>
-                <p className="text-[7px] text-slate-400 font-bold uppercase">{selectedLoc.city}/{selectedLoc.state}</p>
+              <p className="text-[8px] text-slate-400 font-bold uppercase break-words leading-tight">{selectedLoc.legalName || '---'}</p>
+              <div className="flex justify-between items-center pt-1.5 border-t border-slate-50 gap-2">
+                <p className="text-[7px] text-slate-500 font-medium whitespace-nowrap">{selectedLoc.cnpj}</p>
+                <p className="text-[7px] text-slate-400 font-bold uppercase text-right break-words flex-1">{selectedLoc.city}/{selectedLoc.state}</p>
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter">Sugestão (Programação):</span>
-                <span className="text-[9px] font-black text-slate-400 uppercase truncate max-w-[120px]">{trip.destination?.name || trip.customer.name}</span>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter">Sugestão (Programação):</span>
+              <div className="space-y-1">
+                <div className="flex justify-between items-start gap-2">
+                  <p className="text-[9px] font-black text-slate-400 uppercase break-words flex-1 leading-tight">
+                    {suggestionLoc?.name || trip.destination?.name || trip.customer.name}
+                  </p>
+                  <p className="text-[8px] font-black text-slate-300 whitespace-nowrap">
+                    {suggestionLoc?.zipCode || '---'}
+                  </p>
+                </div>
+                <p className="text-[7px] text-slate-300 font-bold uppercase break-words leading-tight">
+                  {suggestionLoc?.legalName || trip.destination?.legalName || trip.customer.legalName || '---'}
+                </p>
+                <div className="flex justify-between items-center pt-1 border-t border-slate-50/50 gap-2">
+                  <p className="text-[7px] text-slate-300 font-medium whitespace-nowrap">
+                    {suggestionLoc?.cnpj || trip.destination?.cnpj || trip.customer.cnpj || '---'}
+                  </p>
+                  <p className="text-[7px] text-slate-300 font-bold uppercase text-right break-words flex-1">
+                    {(suggestionLoc?.city || trip.destination?.city || trip.customer.city)}/{(suggestionLoc?.state || trip.destination?.state || trip.customer.state || '---')}
+                  </p>
+                </div>
               </div>
-              <svg className="w-3 h-3 text-slate-300 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
             </div>
           )}
         </div>
@@ -94,13 +116,13 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
                   className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors break-words flex-1">{loc.name}</p>
+                    <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors break-words flex-1 leading-tight">{loc.name}</p>
                     <p className="text-[8px] font-black text-blue-500 whitespace-nowrap">{loc.zipCode || '---'}</p>
                   </div>
-                  <p className="text-[7px] text-slate-400 font-bold uppercase break-words">{loc.legalName}</p>
-                  <div className="flex justify-between items-center mt-1">
-                    <p className="text-[7px] text-slate-500">{loc.cnpj}</p>
-                    <p className="text-[7px] text-slate-400 font-bold uppercase">{loc.city}</p>
+                  <p className="text-[7px] text-slate-400 font-bold uppercase break-words leading-tight">{loc.legalName}</p>
+                  <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-50/50 gap-2">
+                    <p className="text-[7px] text-slate-500 font-medium whitespace-nowrap">{loc.cnpj}</p>
+                    <p className="text-[7px] text-slate-400 font-bold uppercase text-right break-words flex-1">{loc.city}</p>
                   </div>
                 </div>
               ))
