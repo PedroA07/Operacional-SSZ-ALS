@@ -100,7 +100,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ drivers, customers, onSaveDrive
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl bg-slate-100 border overflow-hidden shrink-0 shadow-inner">
-                          {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-white"><img src="@/public/logo.jfif" alt="ALS" className="w-6 h-6 object-contain" /></div>}
+                          {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-white"><img src="/logo.jfif" alt="ALS" className="w-6 h-6 object-contain" /></div>}
                         </div>
                         <div>
                           <p className="font-black text-slate-800 uppercase text-[11px] leading-none">{d.name}</p>

@@ -30,7 +30,7 @@ const DevolucaoVazioTemplate: React.FC<DevolucaoVazioTemplateProps> = ({
         <div style={{ width: '350px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <div style={{ width: '50px', height: '50px', marginRight: '6px', overflow: 'hidden' }}>
-              <img src="@/public/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <img src="/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <span style={{ fontSize: '9px', fontWeight: 900, color: '#94a3b8', letterSpacing: '2px' }}>TRANSPORTES</span>
           </div>

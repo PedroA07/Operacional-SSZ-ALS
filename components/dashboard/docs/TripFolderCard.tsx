@@ -77,7 +77,7 @@ const TripFolderCard: React.FC<TripFolderCardProps> = ({ trip, onClick }) => {
         <div className="space-y-3 pt-1">
            <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-lg overflow-hidden">
-                <img src="@/public/logo.jfif" alt="ALS" className="w-full h-full object-contain" />
+                <img src="/logo.jfif" alt="ALS" className="w-full h-full object-contain" />
               </div>
               <div className="min-w-0 flex-1">
                  <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Condutor</span>

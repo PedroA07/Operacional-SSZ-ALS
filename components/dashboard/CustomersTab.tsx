@@ -357,7 +357,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
               <div className="flex items-center gap-4">
                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                    <img src="@/public/logo.jfif" alt="ALS" className="w-full h-full object-contain" />
+                    <img src="/logo.jfif" alt="ALS" className="w-full h-full object-contain" />
                  </div>
                  <div>
                     <h3 className="font-black text-slate-800 text-sm uppercase tracking-[0.2em]">{editingId ? 'Editar Cliente' : 'Novo Cliente ALS'}</h3>

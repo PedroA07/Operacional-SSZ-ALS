@@ -42,7 +42,7 @@ const DriverProfileTemplate: React.FC<DriverProfileTemplateProps> = ({ driver, v
           <div>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <div style={{ width: '60px', height: '60px', marginRight: '8px', overflow: 'hidden' }}>
-                <img src="@/public/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                <img src="/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
               <span style={{ fontSize: '12px', fontWeight: 900, color: '#94a3b8', letterSpacing: '3px' }}>TRANSPORTES</span>
             </div>
