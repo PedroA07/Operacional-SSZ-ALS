@@ -36,7 +36,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: `4px solid ${themeColor}`, paddingBottom: '10px', marginBottom: '20px' }}>
         <div style={{ width: '400px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ width: '80px', height: '80px', marginRight: '10px', overflow: 'hidden', borderRadius: '12px' }}>
+            <div style={{ width: '80px', height: '80px', marginRight: '10px', overflow: 'hidden' }}>
               <img src="/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <span style={{ fontSize: '14px', fontWeight: 900, color: '#94a3b8', letterSpacing: '4px' }}>TRANSPORTES</span>
@@ -165,7 +165,7 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
          <div style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 'bold' }}>
            AVENIDA ANA COSTA, 59 - SANTOS SP | CONTATO: 13 99628-0762
          </div>
-         <div style={{ opacity: 0.3, width: '40px', height: '40px', overflow: 'hidden', borderRadius: '8px' }}>
+         <div style={{ opacity: 0.3, width: '40px', height: '40px', overflow: 'hidden' }}>
            <img src="/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
          </div>
       </div>
