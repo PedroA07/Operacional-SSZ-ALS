@@ -29,7 +29,7 @@ const DevolucaoVazioTemplate: React.FC<DevolucaoVazioTemplateProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: `2px solid ${themeColor}`, paddingBottom: '3px', marginBottom: '8px' }}>
         <div style={{ width: '350px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ width: '50px', height: '50px', marginRight: '6px', overflow: 'hidden' }}>
+            <div style={{ width: '50px', height: '50px', marginRight: '6px', overflow: 'hidden', borderRadius: '8px' }}>
               <img src="/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <span style={{ fontSize: '9px', fontWeight: 900, color: '#94a3b8', letterSpacing: '2px' }}>TRANSPORTES</span>
@@ -147,7 +147,7 @@ const DevolucaoVazioTemplate: React.FC<DevolucaoVazioTemplateProps> = ({
          <div style={{ fontSize: '6px', color: '#94a3b8', fontWeight: 'bold' }}>
            AVENIDA ANA COSTA, 59 - SANTOS SP | CONTATO: 13 99628-0762
          </div>
-         <div style={{ opacity: 0.3, width: '30px', height: '30px', overflow: 'hidden' }}>
+         <div style={{ opacity: 0.3, width: '30px', height: '30px', overflow: 'hidden', borderRadius: '6px' }}>
            <img src="/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
          </div>
       </div>
