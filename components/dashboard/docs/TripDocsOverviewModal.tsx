@@ -68,7 +68,7 @@ const TripDocsOverviewModal: React.FC<TripDocsOverviewModalProps> = ({ isOpen, o
         <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0 shadow-xl">
            <div className="flex items-center gap-6">
               <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center shadow-2xl rotate-3 overflow-hidden">
-                <img src="@/logo.jfif" alt="ALS" className="w-full h-full object-contain" />
+                <img src="@/public/logo.jfif" alt="ALS" className="w-full h-full object-contain" />
               </div>
               <div>
                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] mb-1">Central de Documentação Operacional</p>

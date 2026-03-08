@@ -170,7 +170,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
             {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 border-2 border-slate-950 rounded-full text-[8px] font-black flex items-center justify-center text-white animate-bounce">{unreadCount}</span>}
           </button>
           <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl">
-            {driver?.photo ? <img src={driver.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-white"><img src="@/logo.jfif" alt="ALS" className="w-6 h-6 object-contain" /></div>}
+            {driver?.photo ? <img src={driver.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-white"><img src="@/public/logo.jfif" alt="ALS" className="w-6 h-6 object-contain" /></div>}
           </div>
         </div>
       </header>
