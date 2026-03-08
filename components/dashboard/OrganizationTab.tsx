@@ -21,60 +21,91 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
   const [isSearching, setIsSearching] = useState(false);
   const [search, setSearch] = useState('');
 
-  const filteredLocations = search 
-    ? locations.filter(l => 
-        l.name.toLowerCase().includes(search.toLowerCase()) || 
-        l.legalName?.toLowerCase().includes(search.toLowerCase()) ||
-        l.cnpj?.includes(search)
-      )
-    : locations;
+  const filteredLocations = useMemo(() => {
+    if (!search) return locations;
+    const s = search.toLowerCase();
+    return locations.filter(l => 
+      l.name?.toLowerCase().includes(s) || 
+      l.legalName?.toLowerCase().includes(s) || 
+      l.cnpj?.includes(s) ||
+      l.city?.toLowerCase().includes(s) ||
+      l.zipCode?.includes(s)
+    );
+  }, [search, locations]);
 
   return (
-    <div className="relative min-w-[200px]">
+    <div className="relative min-w-[220px]">
       {!isSearching ? (
         <div 
           onClick={() => setIsSearching(true)}
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer hover:border-blue-400 transition-all"
+          className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 cursor-pointer hover:border-blue-400 hover:shadow-sm transition-all group"
         >
           {selectedLoc ? (
-            <div className="space-y-0.5">
-              <p className="text-[10px] font-black text-slate-800 uppercase truncate">{selectedLoc.name}</p>
-              <p className="text-[8px] text-slate-400 font-bold truncate">{selectedLoc.legalName || '---'}</p>
-              <p className="text-[7px] text-slate-400 truncate">{selectedLoc.cnpj} • {selectedLoc.city}/{selectedLoc.state}</p>
+            <div className="space-y-1">
+              <div className="flex justify-between items-center">
+                <p className="text-[10px] font-black text-slate-800 uppercase truncate">{selectedLoc.name}</p>
+                <p className="text-[8px] font-black text-blue-500">{selectedLoc.zipCode || '---'}</p>
+              </div>
+              <p className="text-[8px] text-slate-400 font-bold truncate uppercase">{selectedLoc.legalName || '---'}</p>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-50">
+                <p className="text-[7px] text-slate-500 font-medium">{selectedLoc.cnpj}</p>
+                <p className="text-[7px] text-slate-400 font-bold uppercase">{selectedLoc.city}/{selectedLoc.state}</p>
+              </div>
             </div>
           ) : (
-            <span className="text-[9px] font-bold text-slate-400 uppercase">SELECIONE...</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Selecionar Local...</span>
+              <svg className="w-3 h-3 text-slate-300 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
+            </div>
           )}
         </div>
       ) : (
-        <div className="absolute top-0 left-0 w-full z-50 bg-white border border-blue-500 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-          <input 
-            autoFocus
-            type="text"
-            placeholder="BUSCAR LOCAL..."
-            className="w-full px-3 py-2 text-[10px] font-bold uppercase border-b border-slate-100 outline-none"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onBlur={() => setTimeout(() => setIsSearching(false), 200)}
-          />
-          <div className="max-h-48 overflow-y-auto custom-scrollbar">
+        <div className="absolute top-0 left-0 w-full z-50 bg-white border-2 border-blue-500 rounded-[1.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <input 
+              autoFocus
+              type="text"
+              placeholder="BUSCAR LOCAL..."
+              className="w-full pl-8 pr-3 py-3 text-[10px] font-black uppercase border-b border-slate-100 outline-none bg-slate-50/50 focus:bg-white transition-colors"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onBlur={() => setTimeout(() => setIsSearching(false), 200)}
+            />
+          </div>
+          <div className="max-h-60 overflow-y-auto custom-scrollbar">
             <div 
               onClick={() => { onLocationChange(trip, ''); setIsSearching(false); }}
-              className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-[9px] font-bold text-red-500 border-b border-slate-50"
+              className="px-4 py-2 hover:bg-red-50 cursor-pointer text-[9px] font-black text-red-500 border-b border-slate-50 transition-colors flex items-center gap-2"
             >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               LIMPAR SELEÇÃO
             </div>
-            {filteredLocations.map(loc => (
-              <div 
-                key={loc.id}
-                onClick={() => { onLocationChange(trip, loc.id); setIsSearching(false); }}
-                className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0"
-              >
-                <p className="text-[9px] font-black text-slate-800 uppercase">{loc.name}</p>
-                <p className="text-[7px] text-slate-400 font-bold uppercase">{loc.legalName}</p>
-                <p className="text-[7px] text-slate-500">{loc.cnpj} • {loc.city}</p>
+            {filteredLocations.length > 0 ? (
+              filteredLocations.map(loc => (
+                <div 
+                  key={loc.id}
+                  onClick={() => { onLocationChange(trip, loc.id); setIsSearching(false); }}
+                  className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
+                >
+                  <div className="flex justify-between items-start">
+                    <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors">{loc.name}</p>
+                    <p className="text-[8px] font-black text-blue-500">{loc.zipCode || '---'}</p>
+                  </div>
+                  <p className="text-[7px] text-slate-400 font-bold uppercase truncate">{loc.legalName}</p>
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-[7px] text-slate-500">{loc.cnpj}</p>
+                    <p className="text-[7px] text-slate-400 font-bold uppercase">{loc.city}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center">
+                <p className="text-[8px] font-black text-slate-300 uppercase">Nenhum local encontrado</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
@@ -94,72 +125,149 @@ interface SchedulingModalProps {
 const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onConfirm, locations, initialLocationId, initialDateTime }) => {
   const [locationId, setLocationId] = useState(initialLocationId || '');
   const [dateTime, setDateTime] = useState(initialDateTime || '');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setLocationId(initialLocationId || '');
       setDateTime(initialDateTime || '');
+      setSearch('');
     }
   }, [isOpen, initialLocationId, initialDateTime]);
+
+  const filteredLocations = useMemo(() => {
+    if (!search) return locations;
+    const s = search.toLowerCase();
+    return locations.filter(l => 
+      l.name?.toLowerCase().includes(s) || 
+      l.legalName?.toLowerCase().includes(s) || 
+      l.cnpj?.includes(s) ||
+      l.city?.toLowerCase().includes(s) ||
+      l.zipCode?.includes(s)
+    );
+  }, [search, locations]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-500">
+      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 border border-white/20">
+        <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
           <div>
-            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Detalhes do Agendamento</h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Vincule local, data e hora</p>
+            <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Agendamento Operacional</h3>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Defina o destino e o cronograma da viagem</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white rounded-xl transition-all text-slate-400 hover:text-red-500">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+          <button onClick={onClose} className="p-3 hover:bg-white rounded-2xl transition-all text-slate-300 hover:text-red-500 shadow-sm hover:shadow-md">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
-        <div className="p-8 space-y-6">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Local de Agendamento</label>
-            <div className="relative">
-              <select 
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-[11px] font-bold uppercase outline-none focus:border-blue-500 transition-all appearance-none"
-              >
-                <option value="">SELECIONE UM LOCAL...</option>
-                {locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>{loc.name} - {loc.legalName}</option>
-                ))}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
+        <div className="p-10 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 ml-1">
+                <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Local de Destino</label>
+              </div>
+              
+              <div className="relative group">
+                <div className="absolute left-4 top-4 text-slate-300 group-focus-within:text-blue-500 transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+                <input 
+                  type="text"
+                  placeholder="BUSCAR POR NOME, CNPJ OU CEP..."
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] text-[12px] font-bold uppercase outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="max-h-64 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                {filteredLocations.length > 0 ? (
+                  filteredLocations.map(loc => (
+                    <div 
+                      key={loc.id}
+                      onClick={() => setLocationId(loc.id)}
+                      className={`p-4 rounded-2xl cursor-pointer transition-all border-2 ${locationId === loc.id ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-50 hover:border-slate-200 hover:bg-slate-50/50'}`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{loc.name}</p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase truncate max-w-[250px]">{loc.legalName || '---'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[9px] font-black text-slate-600">{loc.cnpj}</p>
+                          <p className="text-[8px] text-slate-400 font-bold uppercase">{loc.city}/{loc.state}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center">
+                        <p className="text-[8px] text-slate-400 font-medium uppercase truncate max-w-[200px]">{loc.address || 'ENDEREÇO NÃO INFORMADO'}</p>
+                        <p className="text-[8px] font-black text-blue-500">{loc.zipCode || '---'}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-12 text-center">
+                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Nenhum local encontrado</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 ml-1">
+                  <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Data e Hora do Agendamento</label>
+                </div>
+                <div className="relative group">
+                  <div className="absolute left-4 top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  </div>
+                  <input 
+                    type="datetime-local"
+                    value={dateTime}
+                    onChange={(e) => setDateTime(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] text-[12px] font-bold outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-inner"
+                  />
+                </div>
+              </div>
+
+              <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Resumo da Seleção</h4>
+                {locationId ? (
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Destino</span>
+                      <span className="text-[10px] font-black text-slate-700 uppercase">{locations.find(l => l.id === locationId)?.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Cronograma</span>
+                      <span className="text-[10px] font-black text-emerald-600 uppercase">{dateTime ? new Date(dateTime).toLocaleString('pt-BR') : 'NÃO DEFINIDO'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[9px] font-bold text-slate-300 uppercase italic">Aguardando seleção de dados...</p>
+                )}
               </div>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data e Hora</label>
-            <input 
-              type="datetime-local"
-              value={dateTime}
-              onChange={(e) => setDateTime(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-[11px] font-bold outline-none focus:border-blue-500 transition-all"
-            />
-          </div>
         </div>
 
-        <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex gap-3">
+        <div className="p-10 bg-slate-50/50 border-t border-slate-100 flex gap-4">
           <button 
             onClick={onClose}
-            className="flex-1 px-6 py-4 border border-slate-200 text-slate-500 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-white transition-all active:scale-95"
+            className="flex-1 px-6 py-5 border-2 border-slate-200 text-slate-400 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest hover:bg-white hover:text-slate-600 hover:border-slate-300 transition-all active:scale-95"
           >
             Cancelar
           </button>
           <button 
             onClick={() => onConfirm(locationId, dateTime)}
-            className="flex-1 px-6 py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95"
+            disabled={!locationId || !dateTime}
+            className="flex-1 px-6 py-5 bg-slate-900 text-white rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            Confirmar
+            Confirmar Agendamento
           </button>
         </div>
       </div>
@@ -380,8 +488,29 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         );
       }
     },
-    { key: 'os', label: 'OS', render: (t: Trip) => <span className="font-black text-slate-900">{t.os}</span> },
-    { key: 'driver', label: 'Motorista', render: (t: Trip) => <span className="font-bold text-slate-600 uppercase">{t.driver.name}</span> },
+    { 
+      key: 'os', 
+      label: 'OS', 
+      render: (t: Trip) => (
+        <div className="flex flex-col">
+          <span className="font-black text-slate-900">{t.os}</span>
+          <span className="text-[8px] font-bold text-blue-500 uppercase">{t.container || '---'}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'driver', 
+      label: 'Motorista', 
+      render: (t: Trip) => (
+        <div className="flex flex-col">
+          <span className="font-bold text-slate-600 uppercase leading-none">{t.driver.name}</span>
+          <div className="flex gap-1 mt-1">
+            <span className="text-[7px] bg-slate-100 px-1 rounded font-black text-slate-500">{t.driver.plateHorse || '---'}</span>
+            <span className="text-[7px] bg-slate-100 px-1 rounded font-black text-slate-500">{t.driver.plateTrailer || '---'}</span>
+          </div>
+        </div>
+      )
+    },
     { 
       key: 'customer', 
       label: 'Local de Atendimento', 
