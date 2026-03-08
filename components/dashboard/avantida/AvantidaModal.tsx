@@ -149,7 +149,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         <header className="p-8 border-b bg-slate-50 flex justify-between items-center">
           <div className="flex items-center gap-4">
              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain" />
+                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
              </div>
              <div>
                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Lançamento Avantida</h3>

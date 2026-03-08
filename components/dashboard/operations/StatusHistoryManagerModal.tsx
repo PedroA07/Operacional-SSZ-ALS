@@ -127,7 +127,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
         <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-5">
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-               <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain" />
+               <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
             </div>
             <div>
               <h3 className="text-sm font-black uppercase tracking-widest leading-none">Gestão de Histórico Completo</h3>

@@ -189,7 +189,7 @@ const TripForm: React.FC<TripFormProps> = ({
           <div className="bg-slate-900 p-6 rounded-3xl text-white flex items-center justify-between shadow-xl">
              <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center shadow-lg overflow-hidden">
-                  <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain" />
+                  <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
                 </div>
                 <div>
                    <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Motorista Alocado</p>

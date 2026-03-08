@@ -349,7 +349,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                <div className="flex items-center gap-4">
                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                    <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain" />
+                    <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
                  </div>
                  <div>
                     <h3 className="font-black text-slate-800 text-sm uppercase tracking-[0.2em]">{editingId ? 'Editar Cadastro' : 'Novo Pré-Stacking ALS'}</h3>

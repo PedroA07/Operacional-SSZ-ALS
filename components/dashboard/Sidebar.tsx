@@ -81,7 +81,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-6 border-b border-slate-800/50 space-y-4">
         <div className="flex items-center gap-4 mb-2">
           <div className="bg-white w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center shadow-xl shadow-blue-600/10 overflow-hidden">
-            <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover" />
+            <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover rounded-xl" />
           </div>
           {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-[0.2em] text-xs uppercase whitespace-nowrap animate-in fade-in slide-in-from-left-4">ALS LOGÍSTICA</span>}
         </div>
