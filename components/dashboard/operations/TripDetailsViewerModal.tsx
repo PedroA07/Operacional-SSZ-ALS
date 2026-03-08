@@ -40,7 +40,7 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
         <header className="p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg overflow-hidden">
-              <img src="/logo.jfif" alt="ALS" className="w-full h-full object-contain" />
+              <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain" />
             </div>
             <div>
               <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Dossiê Detalhado da Operação</p>

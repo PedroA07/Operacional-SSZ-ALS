@@ -35,7 +35,7 @@ const Logo: React.FC<LogoProps> = ({ className = '', variant = 'light', size = '
       <div 
         className={`${currentSize.box} ${colors[variant]} rounded-[1.2rem] flex items-center justify-center shadow-2xl transition-all shrink-0 overflow-hidden`}
       >
-        <img src="/logo.jfif" alt="ALS" className="w-full h-full object-cover" />
+        <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover" />
       </div>
       
       {showText && (

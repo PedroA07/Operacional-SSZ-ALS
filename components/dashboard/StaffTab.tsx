@@ -109,7 +109,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                       onClick={() => s.photo && setViewerData({ url: s.photo, name: s.name })}
                       className={`w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shadow-inner transition-transform ${s.photo ? 'hover:scale-105 active:scale-95' : 'cursor-default'}`}
                     >
-                        {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <img src="/logo.jfif" alt="ALS" className="w-6 h-6 object-contain" />}
+                        {s.photo ? <img src={s.photo} className="w-full h-full object-cover" /> : <img src="/logo.jpg" alt="ALS" className="w-6 h-6 object-contain" />}
                     </button>
                     <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${s.status === 'Ativo' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
                  </div>

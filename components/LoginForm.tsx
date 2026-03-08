@@ -63,7 +63,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
           <div className="flex flex-col items-center mb-10">
             <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center shadow-[0_15px_40px_rgba(37,99,235,0.4)] mb-8 transform hover:scale-105 transition-transform duration-500 border border-white/10 overflow-hidden">
-               <img src="/logo.jfif" alt="ALS" className="w-full h-full object-cover" />
+               <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-white font-black uppercase text-2xl tracking-[0.2em] text-center">Operacional SSZ</h1>
             <div className="flex items-center gap-3 mt-4 px-4 py-1.5 bg-blue-950/40 rounded-full border border-blue-500/20">

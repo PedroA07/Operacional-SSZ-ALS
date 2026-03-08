@@ -133,7 +133,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
         <div className="p-8 border-b bg-slate-50 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                <img src="/logo.jfif" alt="ALS" className="w-full h-full object-contain" />
+                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain" />
              </div>
              <div>
                 <h3 className="font-black text-slate-800 text-lg uppercase leading-none">{editingDriver ? 'Editar Motorista' : 'Novo Registro de Motorista'}</h3>
