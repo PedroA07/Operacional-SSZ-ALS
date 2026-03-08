@@ -80,7 +80,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     <aside className={`${sidebarState === 'open' ? 'w-80' : 'w-20'} bg-[#0f172a] text-slate-400 flex flex-col shadow-[10px_0_50px_rgba(0,0,0,0.3)] z-50 transition-all duration-500 relative overflow-hidden`}>
       <div className="p-6 border-b border-slate-800/50 space-y-4">
         <div className="flex items-center gap-4 mb-2">
-          <div className="bg-blue-600 w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center text-white font-black italic shadow-xl shadow-blue-600/10">ALS</div>
+          <div className="bg-white w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center shadow-xl shadow-blue-600/10 overflow-hidden">
+            <img src="/logo.jfif" alt="ALS" className="w-full h-full object-cover" />
+          </div>
           {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-[0.2em] text-xs uppercase whitespace-nowrap animate-in fade-in slide-in-from-left-4">ALS LOGÍSTICA</span>}
         </div>
         {sidebarState === 'open' && <WeatherWidget />}

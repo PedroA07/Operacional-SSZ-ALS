@@ -75,9 +75,9 @@ const App: React.FC = () => {
   if (isInitializing) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
-        <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center shadow-[0_0_50px_rgba(37,99,235,0.3)] mb-8 animate-bounce">
-           <span className="text-white font-black italic text-2xl">ALS</span>
-        </div>
+        <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center shadow-[0_0_50px_rgba(37,99,235,0.3)] mb-8 animate-bounce overflow-hidden">
+         <img src="/logo.jfif" alt="ALS" className="w-full h-full object-cover" />
+      </div>
         <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
            <div className="h-full bg-blue-600 animate-[loading_2s_infinite]"></div>
         </div>

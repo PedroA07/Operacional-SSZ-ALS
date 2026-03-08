@@ -29,8 +29,10 @@ const DevolucaoVazioTemplate: React.FC<DevolucaoVazioTemplateProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: `2px solid ${themeColor}`, paddingBottom: '3px', marginBottom: '8px' }}>
         <div style={{ width: '350px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontSize: '28px', fontWeight: 900, fontStyle: 'italic', color: themeColor, lineHeight: '1' }}>ALS</span>
-            <span style={{ fontSize: '9px', fontWeight: 900, color: '#94a3b8', letterSpacing: '2px', marginLeft: '6px' }}>TRANSPORTES</span>
+            <div style={{ width: '50px', height: '50px', marginRight: '6px', overflow: 'hidden' }}>
+              <img src="/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
+            <span style={{ fontSize: '9px', fontWeight: 900, color: '#94a3b8', letterSpacing: '2px' }}>TRANSPORTES</span>
           </div>
           <div style={{ fontSize: '7px', fontWeight: 'bold', color: '#64748b' }}>
             LUARA MEL VIEIRA TRANSPORTES LTDA. | CNPJ: 13.841.647/0004-30
@@ -145,8 +147,8 @@ const DevolucaoVazioTemplate: React.FC<DevolucaoVazioTemplateProps> = ({
          <div style={{ fontSize: '6px', color: '#94a3b8', fontWeight: 'bold' }}>
            AVENIDA ANA COSTA, 59 - SANTOS SP | CONTATO: 13 99628-0762
          </div>
-         <div style={{ opacity: 0.3 }}>
-           <span style={{ fontSize: '16px', fontWeight: 900, fontStyle: 'italic', color: themeColor }}>ALS</span>
+         <div style={{ opacity: 0.3, width: '30px', height: '30px', overflow: 'hidden' }}>
+           <img src="/logo.jfif" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
          </div>
       </div>
     </div>

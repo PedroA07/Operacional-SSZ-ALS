@@ -57,7 +57,9 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ isOpen, onClo
     <div className="fixed inset-0 z-[3000] bg-slate-950 flex flex-col animate-in fade-in duration-300">
       <header className="h-16 bg-slate-900 border-b border-white/10 flex items-center justify-between px-4 sm:px-8 shrink-0 shadow-2xl safe-top">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg font-black italic shrink-0">ALS</div>
+          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-lg overflow-hidden shrink-0">
+            <img src="/logo.jfif" alt="ALS" className="w-full h-full object-contain" />
+          </div>
           <div className="min-w-0">
             <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest leading-none">Visão de Documento</p>
             <h3 className="text-[10px] sm:text-[11px] font-bold text-white uppercase mt-1 truncate">{title}</h3>
