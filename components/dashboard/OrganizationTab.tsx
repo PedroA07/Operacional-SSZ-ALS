@@ -42,11 +42,11 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
         >
           {selectedLoc ? (
             <div className="space-y-1">
-              <div className="flex justify-between items-center">
-                <p className="text-[10px] font-black text-slate-800 uppercase truncate">{selectedLoc.name}</p>
-                <p className="text-[8px] font-black text-blue-500">{selectedLoc.zipCode || '---'}</p>
+              <div className="flex justify-between items-start gap-2">
+                <p className="text-[10px] font-black text-slate-800 uppercase break-words flex-1">{selectedLoc.name}</p>
+                <p className="text-[8px] font-black text-blue-500 whitespace-nowrap">{selectedLoc.zipCode || '---'}</p>
               </div>
-              <p className="text-[8px] text-slate-400 font-bold truncate uppercase">{selectedLoc.legalName || '---'}</p>
+              <p className="text-[8px] text-slate-400 font-bold uppercase break-words">{selectedLoc.legalName || '---'}</p>
               <div className="flex justify-between items-center pt-1 border-t border-slate-50">
                 <p className="text-[7px] text-slate-500 font-medium">{selectedLoc.cnpj}</p>
                 <p className="text-[7px] text-slate-400 font-bold uppercase">{selectedLoc.city}/{selectedLoc.state}</p>
@@ -54,7 +54,10 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
             </div>
           ) : (
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Selecionar Local...</span>
+              <div className="flex flex-col">
+                <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter">Sugestão (Programação):</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase truncate max-w-[120px]">{trip.customer.name}</span>
+              </div>
               <svg className="w-3 h-3 text-slate-300 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
             </div>
           )}
@@ -90,11 +93,11 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
                   onClick={() => { onLocationChange(trip, loc.id); setIsSearching(false); }}
                   className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
                 >
-                  <div className="flex justify-between items-start">
-                    <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors">{loc.name}</p>
-                    <p className="text-[8px] font-black text-blue-500">{loc.zipCode || '---'}</p>
+                  <div className="flex justify-between items-start gap-2">
+                    <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors break-words flex-1">{loc.name}</p>
+                    <p className="text-[8px] font-black text-blue-500 whitespace-nowrap">{loc.zipCode || '---'}</p>
                   </div>
-                  <p className="text-[7px] text-slate-400 font-bold uppercase truncate">{loc.legalName}</p>
+                  <p className="text-[7px] text-slate-400 font-bold uppercase break-words">{loc.legalName}</p>
                   <div className="flex justify-between items-center mt-1">
                     <p className="text-[7px] text-slate-500">{loc.cnpj}</p>
                     <p className="text-[7px] text-slate-400 font-bold uppercase">{loc.city}</p>
@@ -120,20 +123,22 @@ interface SchedulingModalProps {
   locations: any[];
   initialLocationId?: string;
   initialDateTime?: string;
+  defaultLocationId?: string;
 }
 
-const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onConfirm, locations, initialLocationId, initialDateTime }) => {
+const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onConfirm, locations, initialLocationId, initialDateTime, defaultLocationId }) => {
   const [locationId, setLocationId] = useState(initialLocationId || '');
   const [dateTime, setDateTime] = useState(initialDateTime || '');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setLocationId(initialLocationId || '');
+      // Use initialLocationId if exists, otherwise use defaultLocationId (customer)
+      setLocationId(initialLocationId || defaultLocationId || '');
       setDateTime(initialDateTime || '');
       setSearch('');
     }
-  }, [isOpen, initialLocationId, initialDateTime]);
+  }, [isOpen, initialLocationId, initialDateTime, defaultLocationId]);
 
   const filteredLocations = useMemo(() => {
     if (!search) return locations;
@@ -151,7 +156,7 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-500">
-      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 border border-white/20">
+      <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 border border-white/20">
         <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
           <div>
             <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Agendamento Operacional</h3>
@@ -183,7 +188,7 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
                 />
               </div>
 
-              <div className="max-h-64 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+              <div className="max-h-96 overflow-y-auto custom-scrollbar pr-2 space-y-2">
                 {filteredLocations.length > 0 ? (
                   filteredLocations.map(loc => (
                     <div 
@@ -191,19 +196,19 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
                       onClick={() => setLocationId(loc.id)}
                       className={`p-4 rounded-2xl cursor-pointer transition-all border-2 ${locationId === loc.id ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-50 hover:border-slate-200 hover:bg-slate-50/50'}`}
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                          <p className="text-[11px] font-black text-slate-800 uppercase leading-none">{loc.name}</p>
-                          <p className="text-[9px] text-slate-400 font-bold uppercase truncate max-w-[250px]">{loc.legalName || '---'}</p>
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="space-y-1 flex-1">
+                          <p className="text-[11px] font-black text-slate-800 uppercase leading-tight break-words">{loc.name}</p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase break-words">{loc.legalName || '---'}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right whitespace-nowrap">
                           <p className="text-[9px] font-black text-slate-600">{loc.cnpj}</p>
                           <p className="text-[8px] text-slate-400 font-bold uppercase">{loc.city}/{loc.state}</p>
                         </div>
                       </div>
-                      <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center">
-                        <p className="text-[8px] text-slate-400 font-medium uppercase truncate max-w-[200px]">{loc.address || 'ENDEREÇO NÃO INFORMADO'}</p>
-                        <p className="text-[8px] font-black text-blue-500">{loc.zipCode || '---'}</p>
+                      <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center gap-4">
+                        <p className="text-[8px] text-slate-400 font-medium uppercase break-words flex-1">{loc.address || 'ENDEREÇO NÃO INFORMADO'}</p>
+                        <p className="text-[8px] font-black text-blue-500 whitespace-nowrap">{loc.zipCode || '---'}</p>
                       </div>
                     </div>
                   ))
@@ -504,9 +509,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
       render: (t: Trip) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-600 uppercase leading-none">{t.driver.name}</span>
-          <div className="flex gap-1 mt-1">
-            <span className="text-[7px] bg-slate-100 px-1 rounded font-black text-slate-500">{t.driver.plateHorse || '---'}</span>
-            <span className="text-[7px] bg-slate-100 px-1 rounded font-black text-slate-500">{t.driver.plateTrailer || '---'}</span>
+          <div className="flex flex-col gap-1 mt-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">Cavalo:</span>
+              <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded-md font-black text-slate-600 border border-slate-200">{t.driver.plateHorse || '---'}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">Carreta:</span>
+              <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded-md font-black text-slate-600 border border-slate-200">{t.driver.plateTrailer || '---'}</span>
+            </div>
           </div>
         </div>
       )
@@ -622,6 +633,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         locations={locations}
         initialLocationId={selectedTripForScheduling?.scheduledLocationId}
         initialDateTime={selectedTripForScheduling?.scheduledDateTime}
+        defaultLocationId={selectedTripForScheduling?.customer?.id}
       />
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
