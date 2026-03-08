@@ -56,7 +56,7 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter">Sugestão (Programação):</span>
-                <span className="text-[9px] font-black text-slate-400 uppercase truncate max-w-[120px]">{trip.customer.name}</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase truncate max-w-[120px]">{trip.destination?.name || trip.customer.name}</span>
               </div>
               <svg className="w-3 h-3 text-slate-300 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
             </div>
@@ -633,7 +633,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         locations={locations}
         initialLocationId={selectedTripForScheduling?.scheduledLocationId}
         initialDateTime={selectedTripForScheduling?.scheduledDateTime}
-        defaultLocationId={selectedTripForScheduling?.customer?.id}
+        defaultLocationId={selectedTripForScheduling?.destination?.id || selectedTripForScheduling?.customer?.id}
       />
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
