@@ -234,7 +234,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   };
 
   const formatISOToInput = (isoString: string) => {
-    if (!isoString) return '';
+    if (!isoString || isoString === '---') return '';
     return isoString.substring(0, 16);
   };
 
@@ -288,7 +288,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setIsAddingManualRecord(false);
     setManualRecordForm({
       type: 'IMPORTAÇÃO', os: '', location: '', driverName: '', ship: '', container: '',
-      scheduledStart: '', arrival_time: '', departure_time: '', customValues: {}
+      scheduledStart: '', arrivalTime: '', departureTime: '', customValues: {}
     });
   };
 

@@ -33,8 +33,34 @@ export const stayImporter = {
           const excelSerialToLocalString = (serial: any): string => {
             if (serial === undefined || serial === null || serial === '') return '';
             
-            if (typeof serial === 'string') return serial.trim();
-            if (typeof serial !== 'number') return String(serial);
+            const pad = (n: number) => String(n).padStart(2, '0');
+
+            if (typeof serial === 'string') {
+              let str = serial.trim();
+              if (str === '---' || str === '-' || str.toLowerCase() === 'n/a') return '';
+              
+              // Handle DD/MM/YYYY
+              if (str.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+                const parts = str.split(/[\s/:]+/);
+                if (parts.length >= 3) {
+                  const [day, month, year, hh = '00', mm = '00', ss = '00'] = parts;
+                  str = `${year}-${month}-${day}T${hh}:${mm}:${ss}`;
+                }
+              }
+
+              const d = new Date(str);
+              if (isNaN(d.getTime())) return '';
+              
+              const y = d.getFullYear();
+              const m = pad(d.getMonth() + 1);
+              const day = pad(d.getDate());
+              const h = pad(d.getHours());
+              const min = pad(d.getMinutes());
+              const s = pad(d.getSeconds());
+              return `${y}-${m}-${day}T${h}:${min}:${s}`;
+            }
+            
+            if (typeof serial !== 'number') return '';
 
             const days = Math.floor(serial);
             const fraction = serial - days;
@@ -47,17 +73,15 @@ export const stayImporter = {
 
             const date = new Date(1899, 11, 30);
             date.setDate(date.getDate() + days);
-
-            const pad = (n: number) => String(n).padStart(2, '0');
             
             const y = date.getFullYear();
             const m = pad(date.getMonth() + 1);
-            const d = pad(date.getDate());
+            const day = pad(date.getDate());
             const hh = pad(hours);
             const mm = pad(minutes);
             const ss = pad(seconds);
 
-            return `${y}-${m}-${d}T${hh}:${mm}:${ss}`;
+            return `${y}-${m}-${day}T${hh}:${mm}:${ss}`;
           };
 
           // Inicia rigorosamente no índice 1 (Linha 2 do Excel)

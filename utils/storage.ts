@@ -219,6 +219,33 @@ export const db = {
     return !error;
   },
 
+  getContainerTypes: async (): Promise<any[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('container_types').select('*').order('name');
+    if (error) return [];
+    return (data || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      createdAt: c.created_at
+    }));
+  },
+
+  saveContainerType: async (c: any) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('container_types').upsert({
+      id: c.id,
+      name: c.name,
+      created_at: c.createdAt || new Date().toISOString()
+    });
+    return !error;
+  },
+
+  deleteContainerType: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('container_types').delete().eq('id', id);
+    return !error;
+  },
+
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false });
@@ -541,14 +568,15 @@ export const db = {
       driver_name: r.driverName,
       ship: r.ship,
       container: r.container,
-      scheduled_start: r.scheduledStart || null,
-      arrival_time: r.arrivalTime || null,
-      departure_time: r.departureTime || null,
+      scheduled_start: (!r.scheduledStart || r.scheduledStart === '---') ? null : r.scheduledStart,
+      arrival_time: (!r.arrivalTime || r.arrivalTime === '---') ? null : r.arrivalTime,
+      departure_time: (!r.departureTime || r.departureTime === '---') ? null : r.departureTime,
       exceeded_hours: r.exceededHours,
       observations: r.observations,
-      custom_values: r.customValues
+      custom_values: r.customValues || {}
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);
+    if (error) console.error("Error saving stay records:", error);
     return !error;
   },
 

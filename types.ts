@@ -264,6 +264,12 @@ export interface Category {
   parentId?: string;
 }
 
+export interface ContainerType {
+  id: string;
+  name: string;
+  createdAt?: string;
+}
+
 export interface TripScheduling {
   dateTime: string;
   location: string;

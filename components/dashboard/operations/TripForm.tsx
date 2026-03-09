@@ -5,6 +5,7 @@ import { lookupCarrierByContainer } from '../../../utils/carrierService';
 import { maskSeal, maskCNPJ } from '../../../utils/masks';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
+import { db } from '../../../utils/storage';
 
 interface TripFormProps {
   editTrip?: Trip | null;
@@ -22,6 +23,17 @@ interface TripFormProps {
 const TripForm: React.FC<TripFormProps> = ({ 
   editTrip, initialCategory, initialCustomer, drivers, customers, categories, ports, onCancel, onSave, isSaving 
 }) => {
+  const [containerTypes, setContainerTypes] = useState<any[]>([]);
+
+  useEffect(() => {
+    db.getContainerTypes().then(types => {
+      if (types && types.length > 0) {
+        setContainerTypes(types);
+      } else {
+        setContainerTypes([{id: 'default-1', name: '40HC'}, {id: 'default-2', name: '20DC'}, {id: 'default-3', name: '40HR'}]);
+      }
+    });
+  }, []);
   const getLocalISOTime = () => {
     const now = new Date();
     const offset = now.getTimezoneOffset() * 60000;
@@ -231,7 +243,9 @@ const TripForm: React.FC<TripFormProps> = ({
            <div className="md:col-span-2 space-y-1">
               <label className={labelClass}>Tipo Unidade</label>
               <select className={inputClass} value={formData.containerType} onChange={e => setFormData({...formData, containerType: e.target.value})}>
-                 <option value="40HC">40HC</option><option value="20DC">20DC</option><option value="40HR">40HR</option>
+                 {containerTypes.map(type => (
+                   <option key={type.id} value={type.name}>{type.name}</option>
+                 ))}
               </select>
            </div>
         </div>
