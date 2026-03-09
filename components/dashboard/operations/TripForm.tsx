@@ -67,7 +67,7 @@ const TripForm: React.FC<TripFormProps> = ({
       });
     } else {
       const defaultCat = initialCategory || (categories.length > 0 ? categories[0].name : '');
-      setFormData(prev => ({
+      setFormData((prev: any) => ({
         ...prev,
         category: defaultCat,
         customer: initialCustomer || prev.customer,
@@ -81,7 +81,7 @@ const TripForm: React.FC<TripFormProps> = ({
   const handleContainerChange = (val: string) => {
     const container = val.toUpperCase();
     const carrier = lookupCarrierByContainer(container);
-    setFormData(prev => ({
+    setFormData((prev: any) => ({
       ...prev,
       container,
       agencia: carrier ? carrier.name : prev.agencia
@@ -188,7 +188,9 @@ const TripForm: React.FC<TripFormProps> = ({
         {formData.driver ? (
           <div className="bg-slate-900 p-6 rounded-3xl text-white flex items-center justify-between shadow-xl">
              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-xl italic shadow-lg">ALS</div>
+                <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center shadow-lg overflow-hidden">
+                  <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+                </div>
                 <div>
                    <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Motorista Alocado</p>
                    <h5 className="text-sm font-black uppercase leading-none">{formData.driver.name}</h5>

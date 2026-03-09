@@ -73,7 +73,9 @@ const DriverDossierModal: React.FC<DriverDossierModalProps> = ({ isOpen, onClose
         
         <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-5">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic shadow-lg">ALS</div>
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+               <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+            </div>
             <div>
               <h3 className="text-lg font-black uppercase tracking-tight">Gerador de Dossiê Digital</h3>
               <p className="text-[9px] font-bold text-blue-400 uppercase mt-1">Selecione os módulos que compõem o documento</p>

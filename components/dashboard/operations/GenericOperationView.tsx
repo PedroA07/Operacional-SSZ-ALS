@@ -16,7 +16,6 @@ import OperationFilters from './OperationFilters';
 import OrdemColetaForm from '../forms/OrdemColetaForm';
 import PreStackingForm from '../forms/PreStackingForm';
 import DriverLocationModal from './DriverLocationModal';
-import CopyAllStatusesAction from './CopyAllStatusesAction';
 import { statusService } from '../../../utils/statusService';
 
 interface GenericOperationViewProps {
@@ -58,6 +57,27 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
+  const handleSetPriority = async (trip: Trip) => {
+    if (isSavingStatus) return;
+    setIsSavingStatus(true);
+    try {
+      const otherDriverPriorityTrips = allTrips.filter(t => 
+        t.driver.id === trip.driver.id && 
+        t.id !== trip.id && 
+        t.isPriority
+      );
+      for (const t of otherDriverPriorityTrips) {
+        await db.saveTrip({ ...t, isPriority: false }, user);
+      }
+      await db.saveTrip({ ...trip, isPriority: !trip.isPriority }, user);
+      window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+    } catch (e) {
+      alert("Erro ao definir prioridade.");
+    } finally {
+      setIsSavingStatus(false);
+    }
+  };
+
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   const today = new Date().toLocaleDateString('en-CA');
@@ -143,8 +163,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
+    handleSetPriority,
     drivers 
-  ), [user, drivers]);
+  ), [user, drivers, allTrips]);
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
 
@@ -166,7 +187,6 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
               <button onClick={() => setLocalDensity('compact')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${localDensity === 'compact' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Compacto</button>
               <button onClick={() => setLocalDensity('comfortable')} className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase transition-all ${localDensity === 'comfortable' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Amplo</button>
            </div>
-           <CopyAllStatusesAction trips={filteredTrips} allTrips={allTrips} />
            <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} initialCategory={categoryName} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} variant="primary" />
         </div>
       </header>

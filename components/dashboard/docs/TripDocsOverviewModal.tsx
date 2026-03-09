@@ -67,7 +67,9 @@ const TripDocsOverviewModal: React.FC<TripDocsOverviewModalProps> = ({ isOpen, o
         
         <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0 shadow-xl">
            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center text-white font-black italic text-2xl shadow-2xl rotate-3">ALS</div>
+              <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center shadow-2xl rotate-3 overflow-hidden">
+                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+              </div>
               <div>
                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] mb-1">Central de Documentação Operacional</p>
                  <h2 className="text-3xl font-black uppercase tracking-tighter">Pasta OS {trip.os}</h2>
@@ -95,8 +97,8 @@ const TripDocsOverviewModal: React.FC<TripDocsOverviewModalProps> = ({ isOpen, o
                   <div className="grid grid-cols-2 gap-4">
                     <InfoItem label="Container" value={trip.container} color="text-blue-700 font-mono text-lg" />
                     <InfoItem label="Tipo / Armador" value={`${trip.containerType || '40HC'} — ${trip.ocFormData?.agencia || 'GERAL'}`} />
-                    <InfoItem label="Lacre" value={trip.seal} />
-                    <InfoItem label="CVA" value={trip.cva} color="text-amber-600" />
+                    <InfoItem label="Lacre" value={trip.seal || ''} />
+                    <InfoItem label="CVA" value={trip.cva || ''} color="text-amber-600" />
                     <InfoItem label="Navio" value={trip.ship} />
                     <InfoItem label="Booking" value={trip.booking} color="text-blue-600" />
                   </div>
@@ -199,9 +201,9 @@ const TripDocsOverviewModal: React.FC<TripDocsOverviewModalProps> = ({ isOpen, o
              
              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
                 <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Histórico da Pasta</h5>
-                {(trip.statusHistory || []).map((step, idx) => (
+                {[...(trip.statusHistory || [])].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((step, idx, arr) => (
                   <div key={idx} className="flex gap-3 relative">
-                     {idx < (trip.statusHistory?.length || 0) - 1 && (
+                     {idx < arr.length - 1 && (
                        <div className="absolute left-[4.5px] top-4 bottom-[-20px] w-[1.5px] bg-slate-100"></div>
                      )}
                      <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 border border-white shadow-md ${idx === 0 ? 'bg-blue-600 ring-2 ring-blue-50 animate-pulse' : 'bg-slate-300'}`}></div>

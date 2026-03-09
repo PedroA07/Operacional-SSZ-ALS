@@ -37,7 +37,7 @@ const SILLoginView: React.FC<SILLoginViewProps> = ({ onLogin }) => {
               required
               type="text" 
               className="w-full px-5 py-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-bold outline-none focus:border-[#001e50] transition-all"
-              placeholder="Ex: operacional_ssz"
+              placeholder="usuário"
               value={u}
               onChange={e => setU(e.target.value)}
             />

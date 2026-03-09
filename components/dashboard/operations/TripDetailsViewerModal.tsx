@@ -39,7 +39,9 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
         {/* HEADER COMPACTO */}
         <header className="p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black italic text-base shadow-lg">ALS</div>
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg overflow-hidden">
+              <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+            </div>
             <div>
               <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Dossiê Detalhado da Operação</p>
               <h3 className="text-lg font-black uppercase leading-none">OS {trip.os} › {trip.type}</h3>
@@ -78,8 +80,8 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                   <div className="space-y-3">
                     <DataItem label="Nº Container" value={trip.container} color="text-blue-700 font-mono" />
                     <DataItem label="Tipo / Tara" value={`${trip.containerType || '40HC'} — ${trip.tara || '---'}`} />
-                    <DataItem label="Lacre Oficial" value={trip.seal} />
-                    <DataItem label="CVA" value={trip.cva} color="text-amber-600" />
+                    <DataItem label="Lacre Oficial" value={trip.seal || ''} />
+                    <DataItem label="CVA" value={trip.cva || ''} color="text-amber-600" />
                   </div>
                </section>
 
@@ -186,9 +188,9 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                 )}
              </div>
              <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4">
-                {(trip.statusHistory || []).map((step, idx) => (
+                {[...(trip.statusHistory || [])].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((step, idx, arr) => (
                   <div key={idx} className="flex gap-3 relative">
-                     {idx < (trip.statusHistory?.length || 0) - 1 && (
+                     {idx < arr.length - 1 && (
                        <div className="absolute left-[4.5px] top-4 bottom-[-16px] w-[1.5px] bg-slate-200"></div>
                      )}
                      <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 border border-white shadow-sm ${idx === 0 ? 'bg-blue-600 ring-2 ring-blue-50 animate-pulse' : 'bg-slate-300'}`}></div>

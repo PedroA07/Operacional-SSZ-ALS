@@ -116,7 +116,9 @@ const TripModal: React.FC<TripModalProps> = ({
         
         <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
           <div className="flex items-center gap-4">
-             <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg font-black italic">ALS</div>
+             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+             </div>
              <div>
                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-[0.2em]">{editTrip ? 'Edição de Viagem' : 'Nova Programação Operacional'}</h3>
                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Painel de Gerenciamento de Cargas</p>

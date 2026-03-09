@@ -39,7 +39,13 @@ export const tripRepository = {
     oc_form_data: trip.ocFormData || null,
     pre_stacking_form_data: trip.preStackingFormData || null,
     scheduling: trip.scheduling || null,
-    driver_docs: trip.driver_docs || []
+    driver_docs: trip.driver_docs || [],
+    is_priority: trip.isPriority || false,
+    sent_nf: trip.sentNF || false,
+    is_scheduled: trip.isScheduled || false,
+    scheduled_location_id: trip.scheduledLocationId || null,
+    scheduled_date_time: trip.scheduledDateTime || null,
+    has_advance: trip.hasAdvance || false
   }),
 
   mapFromDb: (d: any): Trip => {
@@ -97,7 +103,13 @@ export const tripRepository = {
       ocFormData: safeParse(d.oc_form_data, null),
       preStackingFormData: safeParse(d.pre_stacking_form_data, null),
       scheduling: safeParse(d.scheduling, null),
-      driver_docs: normalizedDriverDocs
+      driver_docs: normalizedDriverDocs,
+      isPriority: d.is_priority ?? false,
+      sentNF: d.sent_nf ?? false,
+      isScheduled: d.is_scheduled ?? false,
+      scheduledLocationId: d.scheduled_location_id || null,
+      scheduledDateTime: d.scheduled_date_time || null,
+      hasAdvance: d.has_advance ?? false
     };
   },
 

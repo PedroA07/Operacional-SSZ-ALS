@@ -59,8 +59,10 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: `4px solid ${themeColor}`, paddingBottom: '10px', marginBottom: '20px' }}>
         <div style={{ width: '400px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontSize: '48px', fontWeight: 900, fontStyle: 'italic', color: themeColor, lineHeight: '1' }}>ALS</span>
-            <span style={{ fontSize: '14px', fontWeight: 900, color: '#94a3b8', letterSpacing: '4px', marginLeft: '10px' }}>TRANSPORTES</span>
+            <div style={{ width: '80px', height: '80px', marginRight: '10px', overflow: 'hidden' }}>
+              <img src="/logo.jpg" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }} />
+            </div>
+            <span style={{ fontSize: '14px', fontWeight: 900, color: '#94a3b8', letterSpacing: '4px' }}>TRANSPORTES</span>
           </div>
           <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b', marginTop: '5px' }}>
             LUARA MEL VIEIRA TRANSPORTES LTDA. | CNPJ: 13.841.647/0004-30

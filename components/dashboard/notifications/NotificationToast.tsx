@@ -61,7 +61,7 @@ const NotificationToast: React.FC = () => {
 
   useEffect(() => {
     if (!supabase) return;
-    
+
     // Nome de canal único evita conflitos entre abas
     const channelId = `toast-${Math.random().toString(36).substr(2, 9)}`;
     const channel = supabase.channel(channelId)
@@ -71,7 +71,7 @@ const NotificationToast: React.FC = () => {
     return () => { 
       // LIMPEZA CRÍTICA: Desinscreve e remove o canal para não fritar a CPU da instância Small
       channel.unsubscribe();
-      supabase.removeChannel(channel);
+      if (supabase) supabase.removeChannel(channel);
       
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);

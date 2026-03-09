@@ -119,11 +119,11 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-3">
-                        {s.statusHistory?.map((step, idx) => (
+                        {[...(s.statusHistory || [])].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((step, idx) => (
                           <div key={idx} className="flex items-start gap-2 border-l-2 border-slate-100 pl-3 py-0.5 ml-1">
-                            <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${idx === s.statusHistory.length - 1 ? 'bg-blue-600 ring-4 ring-blue-50' : 'bg-slate-300'}`}></div>
+                            <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${idx === 0 ? 'bg-blue-600 ring-4 ring-blue-50' : 'bg-slate-300'}`}></div>
                             <div>
-                              <p className={`font-black uppercase text-[9px] leading-none ${idx === s.statusHistory.length - 1 ? 'text-blue-600' : 'text-slate-400'}`}>{step.status}</p>
+                              <p className={`font-black uppercase text-[9px] leading-none ${idx === 0 ? 'text-blue-600' : 'text-slate-400'}`}>{step.status}</p>
                               <p className="text-[8px] text-slate-300 font-bold mt-1">
                                 {new Date(step.dateTime).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}
                               </p>

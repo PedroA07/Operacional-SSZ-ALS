@@ -348,7 +348,9 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
           <div className="bg-white w-full max-w-3xl rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95 h-[90vh] flex flex-col">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                <div className="flex items-center gap-4">
-                 <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-lg font-black italic">ALS</div>
+                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                    <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+                 </div>
                  <div>
                     <h3 className="font-black text-slate-800 text-sm uppercase tracking-[0.2em]">{editingId ? 'Editar Cadastro' : 'Novo Pré-Stacking ALS'}</h3>
                     <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Base de Dados de Terminais de Carga</p>

@@ -26,10 +26,10 @@ export const emailFormatter = {
    */
   renderTripCard: (trip: Trip, allTrips: Trip[], override?: ReportOverride, showCustomer: boolean = false): string => {
     const history = override 
-      ? [...override.history].sort((a, b) => new Date(a.dateTime).getTime() - new Date(a.dateTime).getTime())
+      ? [...override.history].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
       : [...(trip.statusHistory || [])]
           .filter(entry => entry.status !== 'Pendente')
-          .sort((a, b) => new Date(a.dateTime).getTime() - new Date(a.dateTime).getTime());
+          .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
     const prediction = override 
       ? override.prediction 

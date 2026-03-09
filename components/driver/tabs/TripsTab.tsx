@@ -99,7 +99,6 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
       const timeA = new Date(a.dateTime).getTime();
       const timeB = new Date(b.dateTime).getTime();
 
-      if (priorityA === 3) return timeB - timeA; 
       return timeA - timeB; 
     });
   }, [trips]);

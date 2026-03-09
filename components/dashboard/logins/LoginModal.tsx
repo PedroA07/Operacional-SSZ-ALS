@@ -83,7 +83,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess, edi
       <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col h-[90vh]">
         <header className="p-8 border-b bg-slate-50 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
-             <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-blue-400 font-black italic shadow-lg">ALS</div>
+             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+             </div>
              <div>
                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingLogin ? 'Editar Acesso' : 'Novo Login Externo'}</h3>
                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Cofre de Senhas Criptografado</p>

@@ -45,6 +45,9 @@ export const tripSyncService = {
       ship: formData.ship,
       dateTime: tripStartTime,
       isLate: false,
+      isScheduled: !!terminalTime,
+      scheduledLocationId: destination?.id || '',
+      scheduledDateTime: terminalTime || '',
       type: (formData.type || formData.tipoOperacao || 'EXPORTAÇÃO').toUpperCase() as any,
       category: category, 
       container: formData.container,
@@ -79,12 +82,18 @@ export const tripSyncService = {
       statusHistory: [{ status: 'Pendente' as TripStatus, dateTime: now, createdAt: now }],
       advancePayment: { status: 'BLOQUEADO' },
       balancePayment: { status: 'AGUARDANDO_DOCS' },
-      ocFormData: {
+      ocFormData: category !== 'Pre-Stacking' ? {
         ...formData,
         dateTime: tripStartTime,
         schedulingDate: terminalTime,
         category: category
-      },
+      } : undefined,
+      preStackingFormData: category === 'Pre-Stacking' ? {
+        ...formData,
+        dateTime: tripStartTime,
+        schedulingDate: terminalTime,
+        category: category
+      } : undefined,
       scheduling: scheduling
     };
   },

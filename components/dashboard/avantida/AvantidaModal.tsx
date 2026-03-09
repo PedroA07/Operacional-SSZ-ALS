@@ -126,7 +126,7 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         createdAt: editingRecord?.createdAt || new Date().toISOString(),
         shippingLine: shippingLine.toUpperCase(),
         importLocation: importLocation.toUpperCase(),
-        reuseDate: (reuseDate && reuseDate.trim() !== "") ? reuseDate : null,
+        reuseDate: (reuseDate && reuseDate.trim() !== "") ? reuseDate : undefined,
         status
       });
 
@@ -148,7 +148,9 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
       <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
         <header className="p-8 border-b bg-slate-50 flex justify-between items-center">
           <div className="flex items-center gap-4">
-             <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-blue-400 font-black italic shadow-lg">ALS</div>
+             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+             </div>
              <div>
                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Lançamento Avantida</h3>
                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Gestão Automática de Preços</p>

@@ -16,12 +16,14 @@ import StaysTab from './components/dashboard/StaysTab';
 import LoginsTab from './components/dashboard/LoginsTab';
 import LacresTab from './components/dashboard/LacresTab';
 import AvantidaTab from './components/dashboard/AvantidaTab';
+import OrganizationTab from './components/dashboard/OrganizationTab';
 import Sidebar from './components/dashboard/Sidebar';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
 import DatabaseStatus from './components/dashboard/DatabaseStatus';
 import UserProfile from './components/dashboard/UserProfile';
 import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
+import EmailCenter from './components/dashboard/email/EmailCenter';
 import NotificationToast from './components/dashboard/notifications/NotificationToast';
 import FeedbackModal from './components/shared/FeedbackModal';
 import { db, supabase } from './utils/storage';
@@ -226,6 +228,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </div>
            <div className="flex items-center gap-4">
               <DatabaseStatus />
+              <EmailCenter user={user} trips={trips} />
               <NotificationCenter user={user} />
               <UserProfile user={user} />
            </div>
@@ -273,6 +276,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(false); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(false); } }} />}
            {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(false); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
+           {activeTab === DashboardTab.ORGANIZACAO && (
+             <OrganizationTab 
+               userId={user.id} 
+               trips={trips} 
+               ports={ports} 
+               preStacking={preStacking}
+               onRefresh={() => loadAllData(false)} 
+             />
+           )}
         </div>
       </main>
 

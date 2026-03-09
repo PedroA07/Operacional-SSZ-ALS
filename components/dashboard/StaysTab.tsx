@@ -9,6 +9,8 @@ import StayFeedbackModal from '../shared/StayFeedbackModal';
 import FeedbackModal from '../shared/FeedbackModal';
 import StayFolderCard from './stays/StayFolderCard';
 import ExportStaysButton from './stays/ExportStaysButton';
+import CustomColumnsManager from './stays/CustomColumnsManager';
+import { formulaEvaluator } from '../../utils/formulaEvaluator';
 
 interface StaysTabProps {
   categories: Category[];
@@ -26,6 +28,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   const [sessionRecords, setSessionRecords] = useState<StayRecord[]>([]);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCustomColumnsOpen, setIsCustomColumnsOpen] = useState(false);
+  const [isAddingManualRecord, setIsAddingManualRecord] = useState(false);
   
   const [feedback, setFeedback] = useState<{ isOpen: boolean; title: string; message: string; type: 'success' | 'warning' | 'error'; details?: string[] }>({
     isOpen: false, title: '', message: '', type: 'success'
@@ -36,7 +40,20 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
   });
 
   const [editingRecord, setEditingRecord] = useState<StayRecord | null>(null);
-  const [editForm, setEditForm] = useState({ scheduled: '', arrival: '', departure: '' });
+  const [editForm, setEditForm] = useState<any>({ scheduled: '', arrival: '', departure: '', customValues: {} });
+
+  const [manualRecordForm, setManualRecordForm] = useState<any>({
+    type: 'IMPORTAÇÃO',
+    os: '',
+    location: '',
+    driverName: '',
+    ship: '',
+    container: '',
+    scheduledStart: '',
+    arrivalTime: '',
+    departureTime: '',
+    customValues: {}
+  });
 
   const [newSessionForm, setNewSessionForm] = useState({
     startDate: new Date().toISOString().split('T')[0],
@@ -226,7 +243,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     setEditForm({ 
       scheduled: formatISOToInput(r.scheduledStart),
       arrival: formatISOToInput(r.arrivalTime), 
-      departure: formatISOToInput(r.departureTime) 
+      departure: formatISOToInput(r.departureTime),
+      customValues: r.customValues || {}
     });
   };
 
@@ -240,11 +258,38 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       scheduledStart: scheduledISO,
       arrivalTime: arrivalISO,
       departureTime: departureISO,
-      exceededHours: calculateStayExceeded(scheduledISO, departureISO, selectedSession)
+      exceededHours: calculateStayExceeded(scheduledISO, departureISO, selectedSession),
+      customValues: editForm.customValues
     };
     await db.saveStayRecords([updatedRecord]);
     await loadSessionRecords(selectedSession.id);
     setEditingRecord(null);
+  };
+
+  const handleAddManualRecord = async () => {
+    if (!selectedSession) return;
+    const newRecord: StayRecord = {
+      id: `stay-rec-${Date.now()}`,
+      sessionId: selectedSession.id,
+      type: manualRecordForm.type,
+      os: manualRecordForm.os,
+      location: manualRecordForm.location,
+      driverName: manualRecordForm.driverName,
+      ship: manualRecordForm.ship,
+      container: manualRecordForm.container,
+      scheduledStart: manualRecordForm.scheduledStart,
+      arrivalTime: manualRecordForm.arrivalTime,
+      departureTime: manualRecordForm.departureTime,
+      exceededHours: calculateStayExceeded(manualRecordForm.scheduledStart, manualRecordForm.departureTime, selectedSession),
+      customValues: manualRecordForm.customValues
+    };
+    await db.saveStayRecords([newRecord]);
+    await loadSessionRecords(selectedSession.id);
+    setIsAddingManualRecord(false);
+    setManualRecordForm({
+      type: 'IMPORTAÇÃO', os: '', location: '', driverName: '', ship: '', container: '',
+      scheduledStart: '', arrival_time: '', departure_time: '', customValues: {}
+    });
   };
 
   const handleUpdateObservation = async (record: StayRecord, value: string) => {
@@ -381,6 +426,43 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     )}
   ];
 
+  const dynamicColumns = useMemo(() => {
+    const base = [...recordColumns];
+    if (selectedSession?.customColumns) {
+      selectedSession.customColumns.forEach(col => {
+        base.splice(base.length - 2, 0, {
+          key: col.id,
+          label: col.label,
+          render: (r: StayRecord) => {
+            if (col.type === 'formula') {
+              const val = formulaEvaluator.evaluate(col.formula || '', r, selectedSession, calculateExceededHoursDecimal);
+              return <span className="text-[10px] font-black text-blue-600">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
+            }
+            const rawValue = r.customValues?.[col.id];
+            if (!rawValue) return <span className="text-slate-300">---</span>;
+
+            if (col.type === 'currency') {
+              return <span className="text-[10px] font-black text-emerald-600">{Number(rawValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>;
+            }
+            if (col.type === 'date') {
+              const [y, m, d] = String(rawValue).split('-');
+              return <span className="text-[10px] font-bold text-slate-600">{d}/{m}/{y}</span>;
+            }
+            if (col.type === 'time') {
+              return <span className="text-[10px] font-bold text-slate-600">{String(rawValue)}</span>;
+            }
+            if (col.type === 'datetime') {
+              return <span className="text-[10px] font-bold text-slate-600">{formatFullDateTime(String(rawValue))}</span>;
+            }
+            
+            return <span className="text-[10px] font-bold text-slate-600">{String(rawValue)}</span>;
+          }
+        });
+      });
+    }
+    return base;
+  }, [selectedSession, sessionRecords, recordColumns]);
+
   return (
     <div className="space-y-6 pb-20">
       <StayFeedbackModal isOpen={feedback.isOpen} title={feedback.title} message={feedback.message} type={feedback.type} details={feedback.details} onClose={() => setFeedback({ ...feedback, isOpen: false })} />
@@ -434,15 +516,29 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                  <h3 className="text-sm font-black uppercase text-slate-800 leading-none">{selectedSession.category.replace(/\|/g, ' ')}</h3>
               </div>
               <div className="flex gap-3">
-                <ExportStaysButton records={sessionRecords} session={selectedSession} />
-                <button onClick={() => setIsSettingsOpen(true)} className="px-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg flex items-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg><span className="text-[10px] font-black uppercase">Regras</span></button>
-                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
-                <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all flex items-center gap-2 active:scale-95">{isImporting ? 'Lendo...' : 'Importar Excel'}</button>
-              </div>
-           </div>
-           <div className="stay-table-compact">
-             <SmartOperationTable userId={userId} componentId={`stays-records-v3-${selectedSession.id}`} title={`Registros da Pasta`} data={sessionRecords} columns={recordColumns} />
-           </div>
+                 <ExportStaysButton records={sessionRecords} session={selectedSession} />
+                 <button onClick={() => setIsSettingsOpen(true)} className="px-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg flex items-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg><span className="text-[10px] font-black uppercase">Regras</span></button>
+                 <button onClick={() => setIsCustomColumnsOpen(true)} className="px-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg flex items-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2m0 10V7"/></svg><span className="text-[10px] font-black uppercase">Colunas</span></button>
+                 <button onClick={() => setIsAddingManualRecord(true)} className="px-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg flex items-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg><span className="text-[10px] font-black uppercase">Manual</span></button>
+                 <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleFileImport} />
+                 <button 
+                  onClick={() => {
+                    if (selectedSession.useCustomColumns) {
+                      setFeedback({ isOpen: true, title: "Ação Bloqueada", message: "Importação desativada quando colunas personalizadas estão em uso.", type: "warning" });
+                    } else {
+                      fileInputRef.current?.click();
+                    }
+                  }} 
+                  disabled={isImporting} 
+                  className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase shadow-xl transition-all flex items-center gap-2 active:scale-95 ${selectedSession.useCustomColumns ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                 >
+                  {isImporting ? 'Lendo...' : 'Importar Excel'}
+                 </button>
+               </div>
+            </div>
+            <div className="stay-table-compact">
+              <SmartOperationTable userId={userId} componentId={`stays-records-v3-${selectedSession.id}`} title={`Registros da Pasta`} data={sessionRecords} columns={dynamicColumns} />
+            </div>
         </div>
       )}
 
@@ -484,9 +580,130 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
               <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Check-in Real</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.arrival} onChange={e => setEditForm({...editForm, arrival: e.target.value})} /></div>
               <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Check-out Real</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={editForm.departure} onChange={e => setEditForm({...editForm, departure: e.target.value})} /></div>
             </div>
+            
+            {selectedSession?.customColumns && selectedSession.customColumns.filter(c => c.type !== 'formula').length > 0 && (
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Campos Personalizados</p>
+                <div className="grid grid-cols-1 gap-3">
+                  {selectedSession.customColumns.filter(c => c.type !== 'formula').map(col => (
+                    <div key={col.id} className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-500 uppercase ml-1">{col.label}</label>
+                      <input 
+                        type={
+                          col.type === 'number' || col.type === 'currency' ? 'number' : 
+                          col.type === 'date' ? 'date' : 
+                          col.type === 'time' ? 'time' : 
+                          col.type === 'datetime' ? 'datetime-local' : 'text'
+                        } 
+                        step={col.type === 'currency' ? '0.01' : 'any'}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" 
+                        value={editForm.customValues[col.id] || ''} 
+                        onChange={e => {
+                          const val = (col.type === 'number' || col.type === 'currency') ? Number(e.target.value) : e.target.value;
+                          setEditForm({...editForm, customValues: { ...editForm.customValues, [col.id]: val }});
+                        }} 
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 pt-4">
               <button onClick={() => setEditingRecord(null)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase">Cancelar</button>
               <button onClick={handleSaveRecordEdit} className="py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCustomColumnsOpen && selectedSession && (
+        <CustomColumnsManager 
+          session={selectedSession} 
+          onUpdate={async (updated) => {
+            await db.saveStaySession(updated);
+            setSelectedSession(updated);
+            await loadSessions();
+          }}
+          onClose={() => setIsCustomColumnsOpen(false)}
+        />
+      )}
+
+      {isAddingManualRecord && selectedSession && (
+        <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-8 bg-slate-900 text-white text-center">
+              <h3 className="text-xl font-black uppercase tracking-tight">Inserção Manual</h3>
+              <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">Adicionar registro à pasta</p>
+            </div>
+            <div className="p-10 max-h-[70vh] overflow-y-auto custom-scrollbar space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Tipo</label>
+                  <select className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={manualRecordForm.type} onChange={e => setManualRecordForm({...manualRecordForm, type: e.target.value})}>
+                    <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
+                    <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
+                    <option value="COLETA">COLETA</option>
+                    <option value="ENTREGA">ENTREGA</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">OS</label>
+                  <input type="text" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={manualRecordForm.os} onChange={e => setManualRecordForm({...manualRecordForm, os: e.target.value.toUpperCase()})} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Local de Atendimento</label>
+                <input type="text" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={manualRecordForm.location} onChange={e => setManualRecordForm({...manualRecordForm, location: e.target.value.toUpperCase()})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Motorista</label>
+                  <input type="text" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={manualRecordForm.driverName} onChange={e => setManualRecordForm({...manualRecordForm, driverName: e.target.value.toUpperCase()})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Container</label>
+                  <input type="text" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={manualRecordForm.container} onChange={e => setManualRecordForm({...manualRecordForm, container: e.target.value.toUpperCase()})} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Previsão</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={manualRecordForm.scheduledStart} onChange={e => setManualRecordForm({...manualRecordForm, scheduledStart: e.target.value})} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Chegada</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={manualRecordForm.arrivalTime} onChange={e => setManualRecordForm({...manualRecordForm, arrivalTime: e.target.value})} /></div>
+                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase ml-1">Saída</label><input type="datetime-local" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={manualRecordForm.departureTime} onChange={e => setManualRecordForm({...manualRecordForm, departureTime: e.target.value})} /></div>
+              </div>
+
+              {selectedSession.customColumns && selectedSession.customColumns.filter(c => c.type !== 'formula').length > 0 && (
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Campos Personalizados</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedSession.customColumns.filter(c => c.type !== 'formula').map(col => (
+                      <div key={col.id} className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-500 uppercase ml-1">{col.label}</label>
+                        <input 
+                          type={
+                            col.type === 'number' || col.type === 'currency' ? 'number' : 
+                            col.type === 'date' ? 'date' : 
+                            col.type === 'time' ? 'time' : 
+                            col.type === 'datetime' ? 'datetime-local' : 'text'
+                          } 
+                          step={col.type === 'currency' ? '0.01' : 'any'}
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" 
+                          value={manualRecordForm.customValues[col.id] || ''} 
+                          onChange={e => {
+                            const val = (col.type === 'number' || col.type === 'currency') ? Number(e.target.value) : e.target.value;
+                            setManualRecordForm({...manualRecordForm, customValues: { ...manualRecordForm.customValues, [col.id]: val }});
+                          }} 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 pt-6">
+                <button onClick={() => setIsAddingManualRecord(false)} className="py-5 bg-slate-100 text-slate-500 rounded-2xl text-[11px] font-black uppercase tracking-widest">Cancelar</button>
+                <button onClick={handleAddManualRecord} className="py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl">Salvar Registro</button>
+              </div>
             </div>
           </div>
         </div>

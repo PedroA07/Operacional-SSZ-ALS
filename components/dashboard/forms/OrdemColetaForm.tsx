@@ -66,7 +66,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       setCategories(c);
       
       if (initialData?.category) {
-        setFormData(prev => ({ ...prev, category: initialData.category.toUpperCase() }));
+        setFormData((prev: any) => ({ ...prev, category: initialData.category.toUpperCase() }));
         setUserHasChosenCategory(true);
       }
     };
@@ -98,7 +98,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       setUserHasChosenCategory(true);
     }
 
-    setFormData(prev => {
+    setFormData((prev: any) => {
       let next = { ...prev, [field]: upValue };
       
       // Detecção automática (apenas se o usuário não tiver selecionado manualmente ainda)
@@ -330,7 +330,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                 <option value="40HC">40HC</option>
                 <option value="40HR">40HR</option>
                 <option value="40DC">40DC</option>
-                <option value="40OC">40OC</option>
                 <option value="20DC">20DC</option>
                 <option value="20RF">20RF</option>
               </select>

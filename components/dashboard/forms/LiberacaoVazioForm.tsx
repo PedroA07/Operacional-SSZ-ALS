@@ -157,7 +157,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
                     <option value="40HC">40HC</option>
                     <option value="40HR">40HR</option>
                     <option value="40DC">40DC</option>
-                    <option value="40OT">40OT</option> 
+                    <option value="40OT">40OT</option>
                     <option value="20DC">20DC</option>
                  </select>
               </div>
