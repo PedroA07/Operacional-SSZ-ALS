@@ -621,11 +621,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
   ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance]);
 
   const coletaTrips = useMemo(() => 
-    trips.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase())), 
+    trips
+      .filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase()))
+      .sort((a, b) => a.dateTime.localeCompare(b.dateTime)), 
   [trips]);
 
   const entregaTrips = useMemo(() => 
-    trips.filter(t => ['ENTREGA', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase())), 
+    trips
+      .filter(t => ['ENTREGA', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase()))
+      .sort((a, b) => a.dateTime.localeCompare(b.dateTime)), 
   [trips]);
 
   if (isLoading) {
