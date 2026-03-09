@@ -95,7 +95,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         const matchId = targetDriverIdClean !== '' && tripDrvIdClean === targetDriverIdClean;
         const matchCpf = userCPFOnlyNumbers !== '' && tripDrvCpfClean === userCPFOnlyNumbers;
         return matchId || matchCpf;
-      }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+      }).sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
       // SÓ ATUALIZA SE TROUXER DADOS (Evita flickering de lista vazia por timeout)
       if (driversResp.status === 'fulfilled') setDriver(currentDriver || null);

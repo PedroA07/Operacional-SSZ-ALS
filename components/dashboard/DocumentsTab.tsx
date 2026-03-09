@@ -114,7 +114,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
       );
     }
 
-    return list.sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+    return list.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [trips, activeTab, startDate, endDate, searchQuery]);
 
   // Lógica de Paginação

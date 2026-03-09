@@ -69,10 +69,10 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     // 2. Lógica de sequência: mostrar a próxima após a última concluída
     const concludedTrips = [...trips]
       .filter(t => t.status === 'Viagem concluída')
-      .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()); // Mais recente primeiro
+      .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
     if (concludedTrips.length > 0) {
-      const lastConcluded = concludedTrips[0];
+      const lastConcluded = concludedTrips[concludedTrips.length - 1];
       // Busca a primeira pendente que seja igual ou posterior à última concluída
       const nextInSequence = pendingTrips.find(t => 
         new Date(t.dateTime).getTime() >= new Date(lastConcluded.dateTime).getTime()
