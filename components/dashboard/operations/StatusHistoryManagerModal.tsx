@@ -40,7 +40,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
   useEffect(() => {
     if (isOpen && trip) {
       const sorted = [...(trip.statusHistory || [])].sort((a, b) => 
-        new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+        new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
       );
       setLocalHistory(sorted);
     }
@@ -84,10 +84,10 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
 
     try {
       const finalHistory = [...localHistory].sort((a, b) => 
-        new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+        new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
       );
 
-      const latest = finalHistory[finalHistory.length - 1];
+      const latest = finalHistory[0];
 
       const updatedTrip: Trip = {
         ...trip,

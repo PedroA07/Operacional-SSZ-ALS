@@ -14,9 +14,10 @@ interface LocationSearchableSelectProps {
   trip: Trip;
   locations: any[];
   onLocationChange: (trip: Trip, locationId: string) => void;
+  isScheduled?: boolean;
 }
 
-const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ trip, locations, onLocationChange }) => {
+const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ trip, locations, onLocationChange, isScheduled }) => {
   const selectedLoc = locations.find(l => l.id === trip.scheduledLocationId);
   const [isSearching, setIsSearching] = useState(false);
   const [search, setSearch] = useState('');
@@ -43,7 +44,7 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
       {!isSearching ? (
         <div 
           onClick={() => setIsSearching(true)}
-          className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 cursor-pointer hover:border-blue-400 hover:shadow-sm transition-all group"
+          className={`w-full border rounded-2xl px-4 py-3 cursor-pointer transition-all group ${isScheduled ? 'bg-emerald-100/50 border-emerald-300 shadow-sm hover:border-emerald-500' : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-sm'}`}
         >
           {selectedLoc ? (
             <div className="space-y-1.5">
@@ -464,7 +465,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
   }, []);
 
   const handleFinalizeTrips = () => {
-    const scheduledCount = trips.filter(t => t.isScheduled).length;
+    const scheduledCount = trips.filter(t => isTripScheduled(t)).length;
     if (scheduledCount === 0) {
       alert("Nenhuma viagem marcada como 'Agendado'.");
       return;
@@ -476,7 +477,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
       message: `Você está prestes a alterar o status de ${scheduledCount} viagens para "Agendamento realizado". Elas serão removidas deste painel. Deseja continuar?`,
       onConfirm: async () => {
         setIsFinalizing(true);
-        const success = await organizationService.finalizeScheduledTrips(trips);
+        const tripsToFinalize = trips.filter(t => isTripScheduled(t));
+        const success = await organizationService.finalizeScheduledTrips(tripsToFinalize);
         if (success) {
           await loadData();
         }
@@ -522,6 +524,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     
     return tripDate < today;
   };
+
+  const isTripScheduled = useCallback((t: Trip) => {
+    return !!t.isScheduled || !!t.preStackingFormData;
+  }, []);
 
   const columns = useMemo(() => [
     { 
@@ -596,14 +602,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     { 
       key: 'isScheduled', 
       label: 'Agendado', 
-      render: (t: Trip) => (
-        <input 
-          type="checkbox" 
-          checked={!!t.isScheduled} 
-          onChange={(e) => handleToggleScheduled(t, e.target.checked)}
-          className="w-5 h-5 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all cursor-pointer"
-        />
-      )
+      render: (t: Trip) => {
+        const hasMinuta = !!t.preStackingFormData;
+        return (
+          <input 
+            type="checkbox" 
+            checked={isTripScheduled(t)} 
+            disabled={hasMinuta}
+            onChange={(e) => handleToggleScheduled(t, e.target.checked)}
+            className={`w-5 h-5 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${hasMinuta ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            title={hasMinuta ? "Agendamento automático via Minuta" : ""}
+          />
+        );
+      }
     },
     { 
       key: 'scheduledLocationId', 
@@ -613,6 +624,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
           trip={t} 
           locations={locations} 
           onLocationChange={handleLocationChange} 
+          isScheduled={isTripScheduled(t)}
         />
       )
     },
@@ -624,7 +636,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
           type="datetime-local" 
           value={t.scheduledDateTime && typeof t.scheduledDateTime === 'string' ? t.scheduledDateTime.substring(0, 16) : ''} 
           onChange={(e) => handleDateTimeChange(t, e.target.value)}
-          className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[9px] font-bold outline-none focus:border-blue-500 transition-all"
+          className={`bg-slate-50 border rounded-xl px-3 py-2 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}
         />
       )
     },
@@ -643,7 +655,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, isTripScheduled]);
 
   const coletaTrips = useMemo(() => 
     trips
@@ -742,7 +754,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
               columns={columns} 
               data={coletaTrips} 
               hideInternalSearch={false}
-              getRowClassName={(t: Trip) => t.isScheduled ? 'bg-emerald-50 border-l-4 border-emerald-500' : ''}
+              getRowClassName={(t: Trip) => isTripScheduled(t) ? 'bg-emerald-50 border-l-4 border-emerald-500' : ''}
             />
           </div>
         ) : (
@@ -757,7 +769,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
               columns={columns} 
               data={entregaTrips} 
               hideInternalSearch={false}
-              getRowClassName={(t: Trip) => t.isScheduled ? 'bg-emerald-50 border-l-4 border-emerald-500' : ''}
+              getRowClassName={(t: Trip) => isTripScheduled(t) ? 'bg-emerald-50 border-l-4 border-emerald-500' : ''}
             />
           </div>
         )}

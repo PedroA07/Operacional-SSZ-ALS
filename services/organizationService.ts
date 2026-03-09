@@ -75,21 +75,19 @@ export const organizationService = {
   /**
    * Finaliza as viagens agendadas.
    */
-  finalizeScheduledTrips: async (trips: Trip[]): Promise<boolean> => {
-    const scheduledTrips = trips.filter(t => t.isScheduled);
-    
+  finalizeScheduledTrips: async (scheduledTrips: Trip[]): Promise<boolean> => {
     if (scheduledTrips.length === 0) return true;
 
     const updatedTrips = scheduledTrips.map(t => ({
       ...t,
       status: 'Agendamento realizado' as TripStatus,
       statusHistory: [
-        ...(t.statusHistory || []),
         {
           status: 'Agendamento realizado' as TripStatus,
           dateTime: new Date().toISOString(),
           createdAt: new Date().toISOString()
-        }
+        },
+        ...(t.statusHistory || [])
       ]
     }));
 

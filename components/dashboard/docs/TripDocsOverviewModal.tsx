@@ -201,9 +201,9 @@ const TripDocsOverviewModal: React.FC<TripDocsOverviewModalProps> = ({ isOpen, o
              
              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
                 <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Histórico da Pasta</h5>
-                {(trip.statusHistory || []).map((step, idx) => (
+                {[...(trip.statusHistory || [])].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((step, idx, arr) => (
                   <div key={idx} className="flex gap-3 relative">
-                     {idx < (trip.statusHistory?.length || 0) - 1 && (
+                     {idx < arr.length - 1 && (
                        <div className="absolute left-[4.5px] top-4 bottom-[-20px] w-[1.5px] bg-slate-100"></div>
                      )}
                      <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 border border-white shadow-md ${idx === 0 ? 'bg-blue-600 ring-2 ring-blue-50 animate-pulse' : 'bg-slate-300'}`}></div>

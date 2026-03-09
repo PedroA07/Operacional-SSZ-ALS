@@ -13,9 +13,9 @@ export const StatusColumn = (
     return isLatest ? 'bg-blue-600 text-white shadow-xl scale-105 border-blue-400' : 'bg-white text-slate-400 border-slate-100';
   };
 
-  // Ordena o histórico: o mais antigo (menor dateTime) fica no início, o mais recente no fim
+  // Ordena o histórico: o mais recente (maior dateTime) fica no início
   const sortedHistory = [...(t.statusHistory || [])].sort((a, b) => 
-    new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+    new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
   );
 
   return (
@@ -45,10 +45,10 @@ export const StatusColumn = (
                 e.stopPropagation();
                 openStatusEditor(t, step.status);
               }}
-              className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase border-2 cursor-pointer flex justify-between items-center transition-all ${getStatusStyle(step.status, idx === sortedHistory.length - 1)}`}
+              className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase border-2 cursor-pointer flex justify-between items-center transition-all ${getStatusStyle(step.status, idx === 0)}`}
             >
               <span className="truncate pr-2">{step.status}</span>
-              <span className={`opacity-80 text-[9px] font-mono whitespace-nowrap ${idx === sortedHistory.length - 1 ? 'text-white' : 'text-slate-400'}`}>
+              <span className={`opacity-80 text-[9px] font-mono whitespace-nowrap ${idx === 0 ? 'text-white' : 'text-slate-400'}`}>
                 {new Date(step.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
               </span>
             </div>
