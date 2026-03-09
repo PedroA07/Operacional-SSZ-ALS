@@ -330,6 +330,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
                 <option value="40HC">40HC</option>
                 <option value="40HR">40HR</option>
                 <option value="40DC">40DC</option>
+                <option value="40OC">40OC</option>
                 <option value="20DC">20DC</option>
                 <option value="20RF">20RF</option>
               </select>
