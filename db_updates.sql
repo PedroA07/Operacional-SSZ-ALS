@@ -6,6 +6,7 @@ ALTER TABLE trips ADD COLUMN IF NOT EXISTS sent_nf BOOLEAN DEFAULT FALSE;
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE;
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS scheduled_location_id UUID;
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS scheduled_date_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS scheduling JSONB;
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS has_advance BOOLEAN DEFAULT FALSE;
 
 -- 2. Criar índices para otimizar as buscas por data e status (usados na aba Organização)
