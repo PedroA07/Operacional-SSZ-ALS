@@ -40,40 +40,40 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
   }, [trip, locations]);
 
   return (
-    <div className="relative min-w-[220px]">
+    <div className="relative min-w-[180px]">
       {!isSearching ? (
         <div 
           onClick={() => setIsSearching(true)}
-          className={`w-full border rounded-2xl px-4 py-3 cursor-pointer transition-all group ${isScheduled ? 'bg-emerald-100/50 border-emerald-300 shadow-sm hover:border-emerald-500' : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-sm'}`}
+          className={`w-full border rounded-lg px-2 py-1.5 cursor-pointer transition-all group ${isScheduled ? 'bg-emerald-100/50 border-emerald-300 shadow-sm hover:border-emerald-500' : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-sm'}`}
         >
           {selectedLoc ? (
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-start gap-2">
-                <p className="text-[10px] font-black text-slate-800 uppercase break-words flex-1 leading-tight">{selectedLoc.name}</p>
-                <p className="text-[8px] font-black text-blue-500 whitespace-nowrap">{selectedLoc.zipCode || '---'}</p>
+            <div className="space-y-0.5">
+              <div className="flex justify-between items-start gap-1">
+                <p className="text-[9px] font-black text-slate-800 uppercase break-words flex-1 leading-tight">{selectedLoc.name}</p>
+                <p className="text-[7px] font-black text-blue-500 whitespace-nowrap">{selectedLoc.zipCode || '---'}</p>
               </div>
-              <p className="text-[8px] text-slate-400 font-bold uppercase break-words leading-tight">{selectedLoc.legalName || '---'}</p>
-              <div className="flex justify-between items-center pt-1.5 border-t border-slate-50 gap-2">
+              <p className="text-[7px] text-slate-400 font-bold uppercase break-words leading-tight">{selectedLoc.legalName || '---'}</p>
+              <div className="flex justify-between items-center pt-0.5 border-t border-slate-50 gap-1">
                 <p className="text-[7px] text-slate-500 font-medium whitespace-nowrap">{selectedLoc.cnpj}</p>
                 <p className="text-[7px] text-slate-400 font-bold uppercase text-right break-words flex-1">{selectedLoc.city}/{selectedLoc.state}</p>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-0.5">
               <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter">Sugestão (Programação):</span>
-              <div className="space-y-1">
-                <div className="flex justify-between items-start gap-2">
-                  <p className="text-[9px] font-black text-slate-400 uppercase break-words flex-1 leading-tight">
+              <div className="space-y-0.5">
+                <div className="flex justify-between items-start gap-1">
+                  <p className="text-[8px] font-black text-slate-400 uppercase break-words flex-1 leading-tight">
                     {suggestionLoc?.name || trip.destination?.name || trip.customer.name}
                   </p>
-                  <p className="text-[8px] font-black text-slate-300 whitespace-nowrap">
+                  <p className="text-[7px] font-black text-slate-300 whitespace-nowrap">
                     {suggestionLoc?.zipCode || '---'}
                   </p>
                 </div>
                 <p className="text-[7px] text-slate-300 font-bold uppercase break-words leading-tight">
                   {suggestionLoc?.legalName || trip.destination?.legalName || trip.customer.legalName || '---'}
                 </p>
-                <div className="flex justify-between items-center pt-1 border-t border-slate-50/50 gap-2">
+                <div className="flex justify-between items-center pt-0.5 border-t border-slate-50/50 gap-1">
                   <p className="text-[7px] text-slate-300 font-medium whitespace-nowrap">
                     {suggestionLoc?.cnpj || trip.destination?.cnpj || trip.customer.cnpj || '---'}
                   </p>
@@ -86,25 +86,25 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
           )}
         </div>
       ) : (
-        <div className="absolute top-0 left-0 w-full z-50 bg-white border-2 border-blue-500 rounded-[1.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute top-0 left-0 w-full z-50 bg-white border-2 border-blue-500 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
           <div className="relative">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500">
+            <div className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-500">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             </div>
             <input 
               autoFocus
               type="text"
               placeholder="BUSCAR LOCAL..."
-              className="w-full pl-8 pr-3 py-3 text-[10px] font-black uppercase border-b border-slate-100 outline-none bg-slate-50/50 focus:bg-white transition-colors"
+              className="w-full pl-6 pr-2 py-2 text-[9px] font-black uppercase border-b border-slate-100 outline-none bg-slate-50/50 focus:bg-white transition-colors"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onBlur={() => setTimeout(() => setIsSearching(false), 200)}
             />
           </div>
-          <div className="max-h-60 overflow-y-auto custom-scrollbar">
+          <div className="max-h-48 overflow-y-auto custom-scrollbar">
             <div 
               onClick={() => { onLocationChange(trip, ''); setIsSearching(false); }}
-              className="px-4 py-2 hover:bg-red-50 cursor-pointer text-[9px] font-black text-red-500 border-b border-slate-50 transition-colors flex items-center gap-2"
+              className="px-2 py-1.5 hover:bg-red-50 cursor-pointer text-[8px] font-black text-red-500 border-b border-slate-50 transition-colors flex items-center gap-1.5"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               LIMPAR SELEÇÃO
@@ -114,21 +114,21 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
                 <div 
                   key={loc.id}
                   onClick={() => { onLocationChange(trip, loc.id); setIsSearching(false); }}
-                  className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
+                  className="px-2 py-1.5 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors group"
                 >
-                  <div className="flex justify-between items-start gap-2">
+                  <div className="flex justify-between items-start gap-1">
                     <p className="text-[9px] font-black text-slate-800 uppercase group-hover:text-blue-600 transition-colors break-words flex-1 leading-tight">{loc.name}</p>
-                    <p className="text-[8px] font-black text-blue-500 whitespace-nowrap">{loc.zipCode || '---'}</p>
+                    <p className="text-[7px] font-black text-blue-500 whitespace-nowrap">{loc.zipCode || '---'}</p>
                   </div>
                   <p className="text-[7px] text-slate-400 font-bold uppercase break-words leading-tight">{loc.legalName}</p>
-                  <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-50/50 gap-2">
+                  <div className="flex justify-between items-center mt-0.5 pt-0.5 border-t border-slate-50/50 gap-1">
                     <p className="text-[7px] text-slate-500 font-medium whitespace-nowrap">{loc.cnpj}</p>
                     <p className="text-[7px] text-slate-400 font-bold uppercase text-right break-words flex-1">{loc.city}</p>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="p-4 text-center">
+              <div className="p-2 text-center">
                 <p className="text-[8px] font-black text-slate-300 uppercase">Nenhum local encontrado</p>
               </div>
             )}
@@ -540,7 +540,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
         const displayDate = d ? d.toLocaleDateString('pt-BR') : (t.dateTime || '---');
         
         return (
-          <div className={`px-3 py-1.5 rounded-lg font-black text-[10px] text-center ${today ? 'bg-slate-100 text-slate-600' : (past ? 'bg-red-100 text-red-600 border border-red-200 animate-pulse' : 'bg-slate-100 text-slate-600')}`}>
+          <div className={`px-2 py-1 rounded-md font-black text-[9px] text-center ${today ? 'bg-slate-100 text-slate-600' : (past ? 'bg-red-100 text-red-600 border border-red-200 animate-pulse' : 'bg-slate-100 text-slate-600')}`}>
             {displayDate}
           </div>
         );
@@ -551,8 +551,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
       label: 'OS', 
       render: (t: Trip) => (
         <div className="flex flex-col">
-          <span className="font-black text-slate-900">{t.os}</span>
-          <span className="text-[8px] font-bold text-blue-500 uppercase">{t.container || '---'}</span>
+          <span className="font-black text-slate-900 text-[9px]">{t.os}</span>
+          <span className="text-[7px] font-bold text-blue-500 uppercase">{t.container || '---'}</span>
         </div>
       )
     },
@@ -561,15 +561,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
       label: 'Motorista', 
       render: (t: Trip) => (
         <div className="flex flex-col">
-          <span className="font-bold text-slate-600 uppercase leading-none">{t.driver.name}</span>
-          <div className="flex flex-col gap-1 mt-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">Cavalo:</span>
-              <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded-md font-black text-slate-600 border border-slate-200">{t.driver.plateHorse || '---'}</span>
+          <span className="font-bold text-slate-600 uppercase leading-none text-[9px]">{t.driver.name}</span>
+          <div className="flex flex-col gap-0.5 mt-1">
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] font-black text-slate-400 uppercase tracking-tighter">Cavalo:</span>
+              <span className="text-[7px] bg-slate-100 px-1 py-0.5 rounded font-black text-slate-600 border border-slate-200">{t.driver.plateHorse || '---'}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[7px] font-black text-slate-400 uppercase tracking-tighter">Carreta:</span>
-              <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded-md font-black text-slate-600 border border-slate-200">{t.driver.plateTrailer || '---'}</span>
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] font-black text-slate-400 uppercase tracking-tighter">Carreta:</span>
+              <span className="text-[7px] bg-slate-100 px-1 py-0.5 rounded font-black text-slate-600 border border-slate-200">{t.driver.plateTrailer || '---'}</span>
             </div>
           </div>
         </div>
@@ -580,8 +580,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
       label: 'Local de Atendimento', 
       render: (t: Trip) => (
         <div className="flex flex-col">
-          <span className="font-black text-slate-800 uppercase text-[10px]">{t.customer.name}</span>
-          <span className="text-[8px] text-slate-400 font-bold uppercase truncate max-w-[150px]">
+          <span className="font-black text-slate-800 uppercase text-[9px]">{t.customer.name}</span>
+          <span className="text-[7px] text-slate-400 font-bold uppercase truncate max-w-[120px]">
             {t.customer.legalName || '---'}
           </span>
         </div>
@@ -595,7 +595,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
           type="checkbox" 
           checked={!!t.sentNF} 
           onChange={(e) => handleToggleNF(t, e.target.checked)}
-          className="w-5 h-5 rounded-lg border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+          className="w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
         />
       )
     },
@@ -610,7 +610,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
             checked={isTripScheduled(t)} 
             disabled={hasMinuta}
             onChange={(e) => handleToggleScheduled(t, e.target.checked)}
-            className={`w-5 h-5 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${hasMinuta ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${hasMinuta ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             title={hasMinuta ? "Agendamento automático via Minuta" : ""}
           />
         );
@@ -636,7 +636,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
           type="datetime-local" 
           value={t.scheduledDateTime && typeof t.scheduledDateTime === 'string' ? t.scheduledDateTime.substring(0, 16) : ''} 
           onChange={(e) => handleDateTimeChange(t, e.target.value)}
-          className={`bg-slate-50 border rounded-xl px-3 py-2 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}
+          className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}
         />
       )
     },
@@ -644,12 +644,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
       key: 'hasAdvance', 
       label: 'Adiantamento', 
       render: (t: Trip) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <input 
             type="checkbox" 
             checked={!!t.hasAdvance} 
             onChange={(e) => handleToggleAdvance(t, e.target.checked)}
-            className="w-5 h-5 rounded-lg border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer"
+            className="w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer"
           />
           {t.hasAdvance && <span className="text-[7px] font-black text-orange-600 uppercase">70% LIB</span>}
         </div>

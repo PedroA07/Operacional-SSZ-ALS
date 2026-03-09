@@ -182,16 +182,16 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[calc(100vh-250px)] custom-scrollbar border-y border-slate-200">
         <table className="w-full text-left text-[10px] border-collapse min-w-[1000px]">
-          <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-400 font-black uppercase tracking-widest">
+          <thead className="bg-slate-100 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20 shadow-sm">
             <tr>
               {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
-                <th key={col.key} className="px-6 py-5 whitespace-nowrap">{col.label}</th>
+                <th key={col.key} className="px-3 py-2 whitespace-nowrap border border-slate-200 bg-slate-100">{col.label}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-slate-200 bg-white">
             {paginatedData.map((row, idx) => (
               <tr 
                 key={row.id || idx} 
@@ -199,7 +199,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
                 className={`group transition-all ${onRowClick ? 'cursor-pointer hover:bg-blue-50/40' : 'hover:bg-slate-50/50'} ${getRowClassName ? getRowClassName(row) : ''}`}
               >
                 {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
-                  <td key={col.key} className="px-6 py-5 text-slate-600">
+                  <td key={col.key} className="px-3 py-1.5 text-slate-600 border border-slate-200 align-middle">
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}
@@ -207,7 +207,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
             ))}
             {filteredData.length === 0 && (
               <tr>
-                <td colSpan={visibleColumns.length} className="px-6 py-20 text-center text-slate-300 font-bold uppercase italic bg-white">
+                <td colSpan={visibleColumns.length} className="px-3 py-10 text-center text-slate-400 font-bold uppercase italic bg-white border border-slate-200">
                   Nenhum registro localizado para os critérios atuais.
                 </td>
               </tr>
