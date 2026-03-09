@@ -180,6 +180,22 @@ export const db = {
     return !error;
   },
 
+  subscribeToTrips: (callback: (trips: Trip[]) => void) => {
+    if (!supabase) return () => {};
+    
+    const channel = supabase
+      .channel('trips-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, async () => {
+        const trips = await tripRepository.getAll(supabase!);
+        callback(trips);
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
   getCategories: async (): Promise<Category[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('categories').select('*').order('name');

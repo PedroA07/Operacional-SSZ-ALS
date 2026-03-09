@@ -8,6 +8,10 @@ import FeedbackModal from '../shared/FeedbackModal';
 
 interface OrganizationTabProps {
   userId: string;
+  trips: Trip[];
+  ports: Port[];
+  preStacking: PreStacking[];
+  onRefresh: () => void;
 }
 
 interface LocationSearchableSelectProps {
@@ -303,10 +307,10 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
   );
 };
 
-const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
-  const [trips, setTrips] = useState<Trip[]>([]);
+const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, onRefresh }) => {
+  const [trips, setTrips] = useState<Trip[]>(propTrips);
   const [locations, setLocations] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(propTrips.length === 0);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
@@ -315,20 +319,69 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId }) => {
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
 
+  // Sincroniza o estado local com as props quando elas mudam
+  useEffect(() => {
+    // Aplica o filtro da organização (a partir de 06/03/2026 e não finalizadas)
+    const startDateStr = '2026-03-06';
+    const filtered = propTrips.filter(trip => {
+      if (!trip.dateTime) return false;
+      
+      const tripDateStr = trip.dateTime.includes('T') 
+        ? trip.dateTime.split('T')[0] 
+        : trip.dateTime;
+        
+      let normalizedTripDate = tripDateStr;
+      if (tripDateStr.includes('/')) {
+        const parts = tripDateStr.split('/');
+        if (parts.length === 3) {
+          const [day, month, year] = parts;
+          normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+      }
+
+      const isAfterStartDate = normalizedTripDate >= startDateStr;
+      const isNotFinished = trip.status !== 'Viagem concluída' && 
+                           trip.status !== 'Viagem cancelada' && 
+                           trip.status !== 'Agendamento realizado';
+                           
+      return isAfterStartDate && isNotFinished;
+    });
+    setTrips(filtered);
+    setIsLoading(false);
+  }, [propTrips]);
+
+  // Processa locais a partir das props
+  useEffect(() => {
+    const processedLocations = [
+      ...ports.map(p => ({ 
+        id: p.id, 
+        name: p.name, 
+        legalName: p.legalName, 
+        cnpj: p.cnpj, 
+        address: p.address, 
+        zipCode: p.zipCode,
+        city: p.city,
+        state: p.state,
+        type: 'PORTO'
+      })),
+      ...preStacking.map(ps => ({ 
+        id: ps.id, 
+        name: ps.name, 
+        legalName: ps.legalName, 
+        cnpj: ps.cnpj, 
+        address: ps.address, 
+        zipCode: ps.zipCode,
+        city: ps.city,
+        state: ps.state,
+        type: 'UNIDADE'
+      }))
+    ].sort((a, b) => a.name.localeCompare(b.name));
+    
+    setLocations(processedLocations);
+  }, [ports, preStacking]);
+
   const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const [fetchedTrips, fetchedLocations] = await Promise.all([
-        organizationService.fetchOperations(),
-        organizationService.fetchLocations()
-      ]);
-      setTrips(fetchedTrips);
-      setLocations(fetchedLocations);
-    } catch (error) {
-      console.error("Erro ao carregar dados da organização:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    onRefresh();
   };
 
   useEffect(() => {
