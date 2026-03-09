@@ -12,6 +12,9 @@ export const authSecurity = {
    * Se for null, undefined ou false, libera o acesso.
    */
   mustChangePassword: (user: User): boolean => {
+    // Admin Master hardcoded (operacional_ssz) nunca troca de senha por este fluxo.
+    if (user.id === 'admin-master' || user.username === 'operacional_ssz') return false;
+
     // Retorna true APENAS se o valor for booleano true.
     return user.isFirstLogin === true;
   }

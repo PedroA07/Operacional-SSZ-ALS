@@ -80,9 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     <aside className={`${sidebarState === 'open' ? 'w-80' : 'w-20'} bg-[#0f172a] text-slate-400 flex flex-col shadow-[10px_0_50px_rgba(0,0,0,0.3)] z-50 transition-all duration-500 relative overflow-hidden`}>
       <div className="p-6 border-b border-slate-800/50 space-y-4">
         <div className="flex items-center gap-4 mb-2">
-          <div className="bg-white w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center shadow-xl shadow-blue-600/10 overflow-hidden">
-            <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover rounded-xl" />
-          </div>
+          <div className="bg-blue-600 w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center text-white font-black italic shadow-xl shadow-blue-600/10">ALS</div>
           {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-[0.2em] text-xs uppercase whitespace-nowrap animate-in fade-in slide-in-from-left-4">ALS LOGÍSTICA</span>}
         </div>
         {sidebarState === 'open' && <WeatherWidget />}
@@ -104,7 +102,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
           ))}
         </MenuItem>
-        <MenuItem tab={DashboardTab.ORGANIZACAO} label="Organização" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" strokeLinecap="round" strokeLinejoin="round" /></svg>} />
         <MenuItem tab={DashboardTab.DOCUMENTOS} label="Documentação" icon={<Icons.Formularios />} />
         <MenuItem tab={DashboardTab.ADMINISTRATIVO} label="Financeiro" icon={<Icons.Clientes />} />
         <MenuItem tab={DashboardTab.ESTADIAS} label="Estadias" icon={<Icons.Estadias />} />

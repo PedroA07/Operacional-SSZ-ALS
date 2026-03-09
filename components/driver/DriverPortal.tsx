@@ -95,7 +95,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
         const matchId = targetDriverIdClean !== '' && tripDrvIdClean === targetDriverIdClean;
         const matchCpf = userCPFOnlyNumbers !== '' && tripDrvCpfClean === userCPFOnlyNumbers;
         return matchId || matchCpf;
-      }).sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+      }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
       // SÓ ATUALIZA SE TROUXER DADOS (Evita flickering de lista vazia por timeout)
       if (driversResp.status === 'fulfilled') setDriver(currentDriver || null);
@@ -170,7 +170,7 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
             {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 border-2 border-slate-950 rounded-full text-[8px] font-black flex items-center justify-center text-white animate-bounce">{unreadCount}</span>}
           </button>
           <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl">
-            {driver?.photo ? <img src={driver.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-white"><img src="/logo.jpg" alt="ALS" className="w-6 h-6 object-contain" /></div>}
+            {driver?.photo ? <img src={driver.photo} className="w-full h-full object-cover" /> : <div className="text-xs font-black text-blue-400 italic">ALS</div>}
           </div>
         </div>
       </header>

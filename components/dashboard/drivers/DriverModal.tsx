@@ -132,9 +132,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
       <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[95vh] animate-in zoom-in-95">
         <div className="p-8 border-b bg-slate-50 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
-             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
-             </div>
+             <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black italic shadow-lg">ALS</div>
              <div>
                 <h3 className="font-black text-slate-800 text-lg uppercase leading-none">{editingDriver ? 'Editar Motorista' : 'Novo Registro de Motorista'}</h3>
                 <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Controle de Frota e Vínculos</p>

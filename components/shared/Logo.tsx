@@ -33,9 +33,9 @@ const Logo: React.FC<LogoProps> = ({ className = '', variant = 'light', size = '
   return (
     <div className={`flex items-center gap-4 ${className}`}>
       <div 
-        className={`${currentSize.box} ${colors[variant]} rounded-[1.2rem] flex items-center justify-center shadow-2xl transition-all shrink-0 overflow-hidden`}
+        className={`${currentSize.box} ${colors[variant]} rounded-[1.2rem] flex items-center justify-center font-black italic shadow-2xl transition-all shrink-0`}
       >
-        <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover rounded-xl" />
+        <span className={textColors[variant]}>ALS</span>
       </div>
       
       {showText && (

@@ -56,32 +56,10 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   }, [trips, todayStr]);
 
   const activeTrip = useMemo(() => {
-    const pendingTrips = [...trips]
+    const sorted = [...trips]
       .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
       .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-
-    if (pendingTrips.length === 0) return null;
-
-    // 1. Prioridade manual definida pelo operacional
-    const priorityTrip = pendingTrips.find(t => t.isPriority);
-    if (priorityTrip) return priorityTrip;
-
-    // 2. Lógica de sequência: mostrar a próxima após a última concluída
-    const concludedTrips = [...trips]
-      .filter(t => t.status === 'Viagem concluída')
-      .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-
-    if (concludedTrips.length > 0) {
-      const lastConcluded = concludedTrips[concludedTrips.length - 1];
-      // Busca a primeira pendente que seja igual ou posterior à última concluída
-      const nextInSequence = pendingTrips.find(t => 
-        new Date(t.dateTime).getTime() >= new Date(lastConcluded.dateTime).getTime()
-      );
-      if (nextInSequence) return nextInSequence;
-    }
-
-    // 3. Fallback: se não houver sequência clara ou prioridade, mostra a mais antiga pendente
-    return pendingTrips[0];
+    return sorted[0];
   }, [trips]);
 
   const safeFormatDate = (isoString: string) => {
@@ -123,7 +101,6 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
       ...activeTrip,
       status: pendingStatus,
       statusTime: dateTime,
-      isPriority: pendingStatus === 'Viagem concluída' ? false : activeTrip.isPriority,
       statusHistory: [
         { status: pendingStatus, dateTime: dateTime, createdAt: nowISO },
         ...(activeTrip.statusHistory || [])

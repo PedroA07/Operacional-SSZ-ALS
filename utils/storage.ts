@@ -3,7 +3,7 @@ import {
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category, 
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession, 
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus, 
-  LoginCredential, EmailTemplate 
+  LoginCredential 
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -85,22 +85,12 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('customers').select('*').order('name');
     if (error) throw error;
-    return (data || []).map(c => ({
-      ...c,
-      legalName: c.legal_name || c.legalName,
-      zipCode: c.zip_code || c.zipCode,
-      registrationDate: c.registration_date || c.registrationdate || c.registrationDate
-    }));
+    return data || [];
   },
 
   saveCustomer: async (c: Partial<Customer>, user?: User) => {
     if (!supabase) return false;
-    const payload: any = { ...c };
-    if (c.legalName) payload.legal_name = c.legalName;
-    if (c.zipCode) payload.zip_code = c.zipCode;
-    if (c.registrationDate) payload.registration_date = c.registrationDate;
-
-    const { error } = await supabase.from('customers').upsert(payload);
+    const { error } = await supabase.from('customers').upsert(c);
     return !error;
   },
 
@@ -114,22 +104,12 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('ports').select('*').order('name');
     if (error) throw error;
-    return (data || []).map(p => ({
-      ...p,
-      legalName: p.legal_name || p.legalName,
-      zipCode: p.zip_code || p.zipCode,
-      registrationDate: p.registration_date || p.registrationdate || p.registrationDate
-    }));
+    return data || [];
   },
 
   savePort: async (p: Partial<Port>, user?: User) => {
     if (!supabase) return false;
-    const payload: any = { ...p };
-    if (p.legalName) payload.legal_name = p.legalName;
-    if (p.zipCode) payload.zip_code = p.zipCode;
-    if (p.registrationDate) payload.registration_date = p.registrationDate;
-    
-    const { error } = await supabase.from('ports').upsert(payload);
+    const { error } = await supabase.from('ports').upsert(p);
     return !error;
   },
 
@@ -143,22 +123,12 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('pre_stacking').select('*').order('name');
     if (error) throw error;
-    return (data || []).map(p => ({
-      ...p,
-      legalName: p.legal_name || p.legalName,
-      zipCode: p.zip_code || p.zipCode,
-      registrationDate: p.registration_date || p.registrationdate || p.registrationDate
-    }));
+    return data || [];
   },
 
   savePreStacking: async (p: Partial<PreStacking>, user?: User) => {
     if (!supabase) return false;
-    const payload: any = { ...p };
-    if (p.legalName) payload.legal_name = p.legalName;
-    if (p.zipCode) payload.zip_code = p.zipCode;
-    if (p.registrationDate) payload.registration_date = p.registrationDate;
-
-    const { error } = await supabase.from('pre_stacking').upsert(payload);
+    const { error } = await supabase.from('pre_stacking').upsert(p);
     return !error;
   },
 
@@ -178,22 +148,6 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('trips').delete().eq('id', id);
     return !error;
-  },
-
-  subscribeToTrips: (callback: (trips: Trip[]) => void) => {
-    if (!supabase) return () => {};
-    
-    const channel = supabase
-      .channel('trips-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, async () => {
-        const trips = await tripRepository.getAll(supabase!);
-        callback(trips);
-      })
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
   },
 
   getCategories: async (): Promise<Category[]> => {
@@ -480,9 +434,7 @@ export const db = {
       createdBy: s.created_by,
       gracePeriodHours: s.grace_period_hours,
       roundUpMinutes: s.round_up_minutes,
-      costPerHour: s.cost_per_hour,
-      customColumns: s.custom_columns,
-      useCustomColumns: s.use_custom_columns
+      costPerHour: s.cost_per_hour
     }));
   },
 
@@ -507,8 +459,7 @@ export const db = {
       arrivalTime: r.arrival_time,
       departureTime: r.departure_time,
       exceededHours: r.exceeded_hours,
-      observations: r.observations,
-      customValues: r.custom_values
+      observations: r.observations
     }));
   },
 
@@ -523,9 +474,7 @@ export const db = {
       created_by: s.createdBy,
       grace_period_hours: s.gracePeriodHours,
       round_up_minutes: s.roundUpMinutes,
-      cost_per_hour: s.costPerHour,
-      custom_columns: s.customColumns,
-      use_custom_columns: s.useCustomColumns
+      cost_per_hour: s.costPerHour
     });
     return !error;
   },
@@ -545,8 +494,7 @@ export const db = {
       arrival_time: r.arrivalTime || null,
       departure_time: r.departureTime || null,
       exceeded_hours: r.exceededHours,
-      observations: r.observations,
-      custom_values: r.customValues
+      observations: r.observations
     }));
     const { error } = await supabase.from('stay_records').upsert(payload);
     return !error;
@@ -564,55 +512,9 @@ export const db = {
     return !error;
   },
 
-  getEmailTemplates: async (): Promise<EmailTemplate[]> => {
-    if (!supabase) return [];
-    const { data } = await supabase.from('email_templates').select('*').order('name');
-    return (data || []).map(t => ({
-      id: t.id,
-      name: t.name,
-      to: t.to,
-      cc: t.cc,
-      subject: t.subject,
-      body: t.body,
-      config: t.config,
-      createdAt: t.created_at,
-      updatedAt: t.updated_at
-    }));
-  },
-
-  saveEmailTemplate: async (template: EmailTemplate, user?: User) => {
-    if (!supabase) return false;
-    const { error } = await supabase.from('email_templates').upsert({
-      id: template.id,
-      name: template.name,
-      to: template.to,
-      cc: template.cc,
-      subject: template.subject,
-      body: template.body,
-      config: template.config,
-      created_at: template.createdAt,
-      updated_at: template.updatedAt
-    });
-    if (!error && user) {
-      await db.addNotification(
-        user,
-        template.createdAt === template.updatedAt ? 'EMAIL_TEMPLATE_CREATED' : 'EMAIL_TEMPLATE_UPDATED',
-        `Modelo de E-mail: ${template.name}`,
-        `O modelo de e-mail "${template.name}" foi salvo por ${user.displayName}.`
-      );
-    }
-    return !error;
-  },
-
-  deleteEmailTemplate: async (id: string) => {
-    if (!supabase) return false;
-    const { error } = await supabase.from('email_templates').delete().eq('id', id);
-    return !error;
-  },
-
   exportBackup: async () => {
     if (!supabase) return;
-    const tables = ['users', 'drivers', 'customers', 'ports', 'pre_stacking', 'staff', 'trips', 'categories', 'notifications', 'avantida_records', 'avantida_prices', 'logins', 'seal_batches', 'seal_records', 'stay_sessions', 'stay_records', 'email_templates'];
+    const tables = ['users', 'drivers', 'customers', 'ports', 'pre_stacking', 'staff', 'trips', 'categories', 'notifications', 'avantida_records', 'avantida_prices', 'logins', 'seal_batches', 'seal_records', 'stay_sessions', 'stay_records'];
     const backup: any = {};
     for (const table of tables) {
       const { data } = await supabase.from(table).select('*');

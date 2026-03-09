@@ -19,6 +19,7 @@ import PreStackingForm from './forms/PreStackingForm';
 import StatusHistoryManagerModal from './operations/StatusHistoryManagerModal';
 import TripModal from './operations/TripModal';
 import TripDetailsViewerModal from './operations/TripDetailsViewerModal';
+import CopyAllStatusesAction from './operations/CopyAllStatusesAction';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 import { statusService } from '../../utils/statusService';
 
@@ -62,31 +63,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
-  const handleSetPriority = async (trip: Trip) => {
-    if (isSavingStatus) return;
-    setIsSavingStatus(true);
-    try {
-      // Desmarca outras prioridades do mesmo motorista
-      const otherDriverPriorityTrips = trips.filter(t => 
-        t.driver.id === trip.driver.id && 
-        t.id !== trip.id && 
-        t.isPriority
-      );
-
-      for (const t of otherDriverPriorityTrips) {
-        await db.saveTrip({ ...t, isPriority: false }, user);
-      }
-
-      // Alterna a prioridade da viagem selecionada
-      await db.saveTrip({ ...trip, isPriority: !trip.isPriority }, user);
-      onRefresh();
-    } catch (e) {
-      alert("Erro ao definir prioridade.");
-    } finally {
-      setIsSavingStatus(false);
-    }
-  };
-
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -179,9 +155,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     (id) => { setLocationDriverId(id); setIsLocationModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
-    handleSetPriority,
     drivers 
-  ), [user, onRefresh, onDeleteTrip, drivers, trips]);
+  ), [user, onRefresh, onDeleteTrip, drivers]);
 
   if (activeView.type !== 'list') {
     return (
@@ -206,6 +181,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
            </div>
            <div className="flex gap-3">
               <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
+              <CopyAllStatusesAction trips={filteredTrips} allTrips={trips} />
               <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
            </div>
         </div>

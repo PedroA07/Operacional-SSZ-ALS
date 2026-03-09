@@ -19,7 +19,7 @@ const App: React.FC = () => {
     sessionStorage.removeItem('als_active_session');
     sessionStorage.removeItem('als_session_start');
     
-    if (oldId) {
+    if (oldId && oldId !== 'admin-master') {
       try {
         await db.updatePresence(oldId, 'offline');
       } catch (e) {}
@@ -35,7 +35,18 @@ const App: React.FC = () => {
         if (saved) {
           const sessionData: User = JSON.parse(saved);
           
-          // Valida no banco se ainda estão ativos
+          // Se for o admin master operacional_ssz
+          if (sessionData.username === 'operacional_ssz') {
+            setUser(sessionData);
+            if (!sessionStorage.getItem('als_session_start')) {
+              sessionStorage.setItem('als_session_start', new Date().toISOString());
+            }
+            setCurrentScreen(AppScreen.DASHBOARD);
+            setIsInitializing(false);
+            return;
+          }
+
+          // Para outros usuários, valida no banco se ainda estão ativos
           const users = await db.getUsers();
           const dbUser = users.find(u => u.id === sessionData.id);
 
@@ -66,7 +77,7 @@ const App: React.FC = () => {
     sessionStorage.setItem('als_session_start', now);
     
     // Atualiza presença no banco
-    await db.updatePresence(userData.id, 'online');
+    await db.updatePresence(userData.id === 'admin-master' ? 'admin-master' : userData.id, 'online');
     
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
     setCurrentScreen(AppScreen.DASHBOARD);
@@ -75,9 +86,9 @@ const App: React.FC = () => {
   if (isInitializing) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
-        <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center shadow-[0_0_50px_rgba(37,99,235,0.3)] mb-8 animate-bounce overflow-hidden">
-         <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover rounded-xl" />
-      </div>
+        <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center shadow-[0_0_50px_rgba(37,99,235,0.3)] mb-8 animate-bounce">
+           <span className="text-white font-black italic text-2xl">ALS</span>
+        </div>
         <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
            <div className="h-full bg-blue-600 animate-[loading_2s_infinite]"></div>
         </div>

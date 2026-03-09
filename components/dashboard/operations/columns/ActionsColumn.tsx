@@ -15,7 +15,6 @@ interface ActionsColumnProps {
   handleFileUpload: (trip: Trip, type: any, e: React.ChangeEvent<HTMLInputElement>) => void;
   deleteDocument: (trip: Trip, type: any) => void;
   handlePrint: (url: string, fileName: string) => void;
-  onSetPriority?: (t: Trip) => void;
 }
 
 export const ActionsColumn: React.FC<ActionsColumnProps> = (props) => {
@@ -35,7 +34,6 @@ export const ActionsColumn: React.FC<ActionsColumnProps> = (props) => {
         deleteDocument={props.deleteDocument}
         onViewDoc={props.onViewDoc}
         handlePrint={props.handlePrint}
-        onSetPriority={props.onSetPriority}
       />
     </div>
   );

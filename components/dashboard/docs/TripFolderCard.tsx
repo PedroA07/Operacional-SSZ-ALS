@@ -76,9 +76,7 @@ const TripFolderCard: React.FC<TripFolderCardProps> = ({ trip, onClick }) => {
         {/* BLOCO 3: MOTORISTA */}
         <div className="space-y-3 pt-1">
            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-lg overflow-hidden">
-                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
-              </div>
+              <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center font-black italic text-blue-400 text-[10px] shadow-lg">ALS</div>
               <div className="min-w-0 flex-1">
                  <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Condutor</span>
                  <p className="text-[11px] font-black text-slate-700 uppercase truncate mt-0.5">{trip.driver.name}</p>

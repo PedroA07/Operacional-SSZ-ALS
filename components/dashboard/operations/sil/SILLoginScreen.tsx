@@ -6,7 +6,7 @@ interface SILLoginScreenProps {
 }
 
 const SILLoginScreen: React.FC<SILLoginScreenProps> = ({ onLogin }) => {
-  const [user, setUser] = useState('');
+  const [user, setUser] = useState('operacional_ssz');
   const [pass, setPass] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 

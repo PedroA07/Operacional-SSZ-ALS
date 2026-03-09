@@ -43,7 +43,7 @@ const DelayedTrips: React.FC<DelayedTripsProps> = ({ trips }) => {
       const actual = new Date(firstArrival.dateTime).getTime();
       
       return actual > (scheduled + 59000);
-    }).sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+    }).sort((a, b) => b.dateTime.localeCompare(a.dateTime));
   }, [trips]);
 
   return (

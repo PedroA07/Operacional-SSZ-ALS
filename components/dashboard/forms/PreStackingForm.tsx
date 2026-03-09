@@ -67,21 +67,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
   const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
 
   const [formData, setFormData] = useState({
-    os: '', 
-    nf: '', 
-    container: '', 
-    tipo: '40HC', 
-    tara: '', 
-    seal: '', 
-    booking: '', 
-    autColeta: '', 
-    ship: '', 
-    driverId: '', 
-    remetenteId: '', 
-    destinatarioId: '', 
-    displayDate: new Date().toLocaleDateString('pt-BR'),
-    schedulingDate: new Date().toISOString().split('T')[0],
-    schedulingTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    os: '', nf: '', container: '', tipo: '40HC', tara: '', seal: '', booking: '', autColeta: '', ship: '', driverId: '', remetenteId: '', destinatarioId: '', displayDate: new Date().toLocaleDateString('pt-BR')
   });
 
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
@@ -182,14 +168,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
       }
 
       if (selectedDriver && selectedRemetente) {
-         const schedulingDateTime = `${formData.schedulingDate}T${formData.schedulingTime}:00`;
-         const tripData = tripSyncService.mapOCtoTrip(
-           { ...formData, schedulingDate: schedulingDateTime }, 
-           selectedDriver, 
-           selectedRemetente, 
-           'Pre-Stacking', 
-           selectedDestinatario
-         );
+         const tripData = tripSyncService.mapOCtoTrip(formData, selectedDriver, selectedRemetente, 'Geral', selectedDestinatario);
          await tripSyncService.sync(tripData, existingId || undefined);
       }
 
@@ -301,26 +280,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         </div>
 
         <div className="space-y-4 bg-white p-6 rounded-[2.2rem] border border-slate-200 shadow-sm">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className={labelClass}>Data Agendamento</label>
-              <input 
-                type="date" 
-                className={inputClass} 
-                value={formData.schedulingDate} 
-                onChange={e => setFormData({...formData, schedulingDate: e.target.value})} 
-              />
-            </div>
-            <div className="space-y-1">
-              <label className={labelClass}>Hora Agendamento</label>
-              <input 
-                type="time" 
-                className={inputClass} 
-                value={formData.schedulingTime} 
-                onChange={e => setFormData({...formData, schedulingTime: e.target.value})} 
-              />
-            </div>
-          </div>
           <div className="space-y-1">
             <label className={labelClass}>Navio / Embarcação</label>
             <input className={inputClass} value={formData.ship} onChange={e => setFormData({...formData, ship: e.target.value.toUpperCase()})} placeholder="NOME DO NAVIO" />

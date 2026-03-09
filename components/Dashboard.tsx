@@ -1,31 +1,27 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch } from './types';
-import OverviewTab from './components/dashboard/OverviewTab';
-import DriversTab from './components/dashboard/DriversTab';
-import FormsTab from './components/dashboard/FormsTab';
-import CustomersTab from './components/dashboard/CustomersTab';
-import PortsTab from './components/dashboard/PortsTab';
-import PreStackingTab from './components/dashboard/PreStackingTab';
-import OperationsTab from './components/dashboard/OperationsTab';
-import AdminTab from './components/dashboard/AdminTab';
-import StaffTab from './components/dashboard/StaffTab';
-import SystemTab from './components/dashboard/SystemTab';
-import DocumentsTab from './components/dashboard/DocumentsTab';
-import StaysTab from './components/dashboard/StaysTab';
-import LoginsTab from './components/dashboard/LoginsTab';
-import LacresTab from './components/dashboard/LacresTab';
-import AvantidaTab from './components/dashboard/AvantidaTab';
-import Sidebar from './components/dashboard/Sidebar';
-import WeatherWidget from './components/dashboard/WeatherWidget';
-import OnlineStatus from './components/dashboard/OnlineStatus';
-import DatabaseStatus from './components/dashboard/DatabaseStatus';
-import UserProfile from './components/dashboard/UserProfile';
-import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
-import NotificationToast from './components/dashboard/notifications/NotificationToast';
-import FeedbackModal from './components/shared/FeedbackModal';
-import { db, supabase } from './utils/storage';
-import { Icons } from './constants/icons';
+import React, { useState, useEffect, useCallback } from 'react';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch } from '../types';
+import OverviewTab from './dashboard/OverviewTab';
+import DriversTab from './dashboard/DriversTab';
+import FormsTab from './dashboard/FormsTab';
+import CustomersTab from './dashboard/CustomersTab';
+import PortsTab from './dashboard/PortsTab';
+import PreStackingTab from './dashboard/PreStackingTab';
+import OperationsTab from './dashboard/OperationsTab';
+import AdminTab from './dashboard/AdminTab';
+import StaffTab from './dashboard/StaffTab';
+import SystemTab from './dashboard/SystemTab';
+import DocumentsTab from './dashboard/DocumentsTab';
+import StaysTab from './dashboard/StaysTab';
+import LoginsTab from './dashboard/LoginsTab';
+import LacresTab from './dashboard/LacresTab';
+import AvantidaTab from './dashboard/AvantidaTab';
+import Sidebar from './dashboard/Sidebar';
+import DatabaseStatus from './dashboard/DatabaseStatus';
+import UserProfile from './dashboard/UserProfile';
+import NotificationCenter from './dashboard/notifications/NotificationCenter';
+import { DEFAULT_OPERATIONS } from '../constants/operations';
+import { db } from '../utils/storage';
 
 interface DashboardProps {
   user: User;
@@ -46,15 +42,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [avantidaRecords, setAvantidaRecords] = useState<AvantidaRecord[]>([]);
   const [sealBatches, setSealBatches] = useState<SealBatch[]>([]);
+  const [availableOps] = useState<OperationDefinition[]>(DEFAULT_OPERATIONS);
   
-  const [isLoadingInitial, setIsLoadingInitial] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString('pt-BR'));
-
-  const [feedback, setFeedback] = useState<{ show: boolean; title: string; message: string; type: any; onConfirm?: () => void }>({
-    show: false, title: '', message: '', type: 'info'
-  });
 
   const [isDeleteTripModalOpen, setIsDeleteTripModalOpen] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
@@ -62,27 +54,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
-  // CONSTRUÇÃO DINÂMICA DAS OPERAÇÕES BASEADA NO BANCO DE DADOS
-  const availableOps = useMemo<OperationDefinition[]>(() => {
-    return categories
-      .filter(cat => !cat.parentId) // Apenas categorias principais
-      .map(cat => {
-        // Busca clientes que possuem esta categoria vinculada em seu perfil
-        const linkedClients = customers
-          .filter(c => c.operations?.some(op => op.toUpperCase() === cat.name.toUpperCase()))
-          .map(c => ({ name: c.name, hasDedicatedPage: true }));
-
-        return {
-          id: cat.id,
-          category: cat.name,
-          clients: linkedClients
-        };
-      })
-      .sort((a, b) => a.category.localeCompare(b.category));
-  }, [categories, customers]);
-
-  const loadAllData = useCallback(async (isInitial = false) => {
-    if (isInitial) setIsLoadingInitial(true);
+  const loadAllData = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     setIsSyncing(true);
     
     try {
@@ -98,48 +71,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         db.getSealBatches()
       ]);
 
-      if (responses[0].status === 'fulfilled') setDrivers(responses[0].value);
-      if (responses[1].status === 'fulfilled') setCustomers(responses[1].value);
-      if (responses[2].status === 'fulfilled') setPorts(responses[2].value);
-      if (responses[3].status === 'fulfilled') setPreStacking(responses[3].value);
-      if (responses[4].status === 'fulfilled') setStaffList(responses[4].value);
-      if (responses[5].status === 'fulfilled') setTrips(responses[5].value);
-      if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
-      if (responses[7].status === 'fulfilled') setAvantidaRecords(responses[7].value);
-      if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value);
-
+      if (responses[0].status === 'fulfilled') setDrivers(responses[0].value || []);
+      if (responses[1].status === 'fulfilled') setCustomers(responses[1].value || []);
+      if (responses[2].status === 'fulfilled') setPorts(responses[2].value || []);
+      if (responses[3].status === 'fulfilled') setPreStacking(responses[3].value || []);
+      if (responses[4].status === 'fulfilled') setStaffList(responses[4].value || []);
+      if (responses[5].status === 'fulfilled') setTrips(responses[5].value || []);
+      if (responses[6].status === 'fulfilled') setCategories(responses[6].value || []);
+      if (responses[7].status === 'fulfilled') setAvantidaRecords(responses[7].value || []);
+      if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value || []);
+      
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
     } catch (e) {
       console.error("Erro na sincronização ALS:", e);
     } finally {
-      setIsLoadingInitial(false);
+      setIsLoading(false);
       setIsSyncing(false);
     }
   }, []);
 
   useEffect(() => { 
-    loadAllData(true);
-
-    const refreshDataInterval = setInterval(() => loadAllData(false), 30000);
-
-    let channel: any = null;
-    if (supabase) {
-      channel = supabase
-        .channel('db-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
-          loadAllData(false);
-        })
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') setIsRealtimeActive(true);
-        });
-    }
-
-    const handleGlobalRefresh = () => loadAllData(false);
+    loadAllData();
+    const refreshDataInterval = setInterval(() => loadAllData(true), 20000);
+    const handleGlobalRefresh = () => loadAllData(true);
     window.addEventListener('als_force_global_refresh', handleGlobalRefresh);
-
     return () => {
       clearInterval(refreshDataInterval);
-      if (channel) supabase?.removeChannel(channel);
       window.removeEventListener('als_force_global_refresh', handleGlobalRefresh);
     };
   }, [loadAllData]);
@@ -158,48 +115,30 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     try {
       const success = await db.deleteTrip(tripToDelete.id, user);
       if (success) {
-        await loadAllData(false);
+        await loadAllData(true);
         setIsDeleteTripModalOpen(false);
         setTripToDelete(null);
+      } else {
+        alert("Não foi possível excluir. Verifique sua conexão com o banco.");
       }
     } catch (e) {
-      setFeedback({ show: true, title: 'Erro Crítico', message: 'Falha na comunicação.', type: 'error' });
+      alert('Erro crítico de comunicação.');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  if (isLoadingInitial) {
+  if (isLoading) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6">ALS Transportes...</p>
+        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6">Sincronizando com a nuvem ALS...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900 relative">
-      <NotificationToast />
-      
-      <FeedbackModal 
-        isOpen={feedback.show} 
-        onClose={() => setFeedback({ ...feedback, show: false })}
-        title={feedback.title}
-        message={feedback.message}
-        type={feedback.type}
-        onConfirm={feedback.onConfirm}
-      />
-      
-      {(isSyncing || isRealtimeActive) && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4">
-           <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-50 animate-pulse' : 'bg-emerald-50'}`}></div>
-           <span className="text-[8px] font-black text-white uppercase tracking-widest">
-             {isSyncing ? 'Sincronizando...' : 'Tempo Real Ativo'}
-           </span>
-        </div>
-      )}
-
+    <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
       <Sidebar 
         user={user}
         onLogout={onLogout}
@@ -222,7 +161,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   <path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{activeTab}</h2>
+              <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">{activeTab}</h2>
            </div>
            <div className="flex items-center gap-4">
               <DatabaseStatus />
@@ -238,7 +177,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                drivers={drivers} 
                avantidaRecords={avantidaRecords}
                sealBatches={sealBatches}
-               onRefresh={() => loadAllData(false)} 
+               onRefresh={() => loadAllData(true)} 
                lastSyncTime={lastSyncTime} 
                isSyncing={isSyncing} 
                user={user}
@@ -257,22 +196,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                activeView={opsView} 
                setActiveView={setOpsView} 
                onDeleteTrip={handleDeleteTripRequest}
-               onRefresh={() => loadAllData(false)}
+               onRefresh={() => loadAllData(true)}
              />
            )}
            {activeTab === DashboardTab.ESTADIAS && <StaysTab categories={categories} userId={user.id} />}
-           {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(false); }} />}
+           {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(true); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.LOGINS && <LoginsTab />}
            {activeTab === DashboardTab.LACRES && <LacresTab />}
            {activeTab === DashboardTab.AVANTIDA && <AvantidaTab userId={user.id} />}
-           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
-           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(false); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
-           {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} />}
+           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(true); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(true); }} availableOps={availableOps} />}
+           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(true); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(true); } }} isAdmin={user.role === 'admin'} />}
+           {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(true); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
-           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(false); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(false); } }} />}
-           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(false); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
-           {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
+           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(true); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(true); } }} />}
+           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(true); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(true); } }} />}
+           {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(true)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
         </div>
       </main>
 

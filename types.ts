@@ -79,13 +79,6 @@ export interface SealRecord {
   driverName: string;
 }
 
-export interface CustomColumn {
-  id: string;
-  label: string;
-  type: 'text' | 'number' | 'formula' | 'date' | 'time' | 'datetime' | 'currency';
-  formula?: string;
-}
-
 export interface StaySession {
   id: string;
   category: string;
@@ -96,8 +89,6 @@ export interface StaySession {
   gracePeriodHours?: number;
   roundUpMinutes?: number;
   costPerHour?: number;
-  customColumns?: CustomColumn[];
-  useCustomColumns?: boolean;
 }
 
 export interface StayRecord {
@@ -115,7 +106,6 @@ export interface StayRecord {
   exceededHours: string;
   arrivalStatus?: string;
   observations?: string;
-  customValues?: { [columnId: string]: string | number };
 }
 
 export interface NotificationPreference {
@@ -151,28 +141,7 @@ export type NotificationType =
   | 'DOC_ATTACHED'
   | 'CONTRACT_UPLOADED'
   | 'DRIVER_DOC_UPLOADED'
-  | 'DRIVER_PROFILE_UPDATED'
-  | 'EMAIL_TEMPLATE_CREATED'
-  | 'EMAIL_TEMPLATE_UPDATED';
-
-export interface EmailTemplate {
-  id: string;
-  name: string;
-  to: string;
-  cc: string;
-  subject: string;
-  body: string;
-  config: {
-    headerColor: string;
-    headerOrientation: 'horizontal' | 'vertical';
-    alternateRowColor: boolean;
-    columns: string[];
-    fontSize?: string;
-    fontFamily?: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
+  | 'DRIVER_PROFILE_UPDATED';
 
 export interface Notification {
   id: string;
@@ -212,8 +181,7 @@ export enum DashboardTab {
   ESTADIAS = 'ESTADIAS',
   LOGINS = 'COFRE_DE_LOGINS',
   LACRES = 'CONTROLE_DE_LACRES',
-  AVANTIDA = 'AVANTIDA',
-  ORGANIZACAO = 'ORGANIZACAO'
+  AVANTIDA = 'AVANTIDA'
 }
 
 export type TripStatus = 
@@ -233,8 +201,7 @@ export type TripStatus =
   | 'Saiu do Cragea'
   | 'Chegou na Volkswagen'
   | 'Saiu da Volkswagen'
-  | 'Container sobre rodas'
-  | 'Agendamento realizado';
+  | 'Container sobre rodas';
 
 export type VWStatus = TripStatus;
 
@@ -319,12 +286,6 @@ export interface Trip {
   scheduling?: TripScheduling | null;
   driver_docs?: DriverCapturedDoc[];
   stay_session_id?: string;
-  isPriority?: boolean;
-  sentNF?: boolean;
-  isScheduled?: boolean;
-  scheduledLocationId?: string;
-  scheduledDateTime?: string;
-  hasAdvance?: boolean;
 }
 
 export interface Driver {
@@ -371,7 +332,6 @@ export interface Customer {
   address?: string;
   neighborhood?: string;
   zipCode?: string;
-  registrationDate?: string;
   operations?: string[];
 }
 
@@ -385,7 +345,6 @@ export interface Port {
   address: string; 
   neighborhood?: string; 
   zipCode?: string; 
-  registrationDate?: string;
 }
 
 export interface PreStacking { 
@@ -398,7 +357,6 @@ export interface PreStacking {
   address: string; 
   neighborhood?: string; 
   zipCode?: string; 
-  registrationDate?: string;
 }
 
 export interface Staff { 

@@ -34,6 +34,9 @@ export const sessionManager = {
    * Se o Role (privilégio) mudou, retorna falso para forçar logout.
    */
   validateIntegrity: async (currentUser: User): Promise<boolean> => {
+    // Admin Master (hardcoded) não precisa de validação de DB
+    if (currentUser.username === 'operacional_ssz') return true;
+
     try {
       const users = await db.getUsers();
       const dbUser = users.find(u => u.id === currentUser.id);

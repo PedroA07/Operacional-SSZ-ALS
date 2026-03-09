@@ -39,55 +39,6 @@ export const staffRepository = {
       const payload = this.mapToDb(staff);
       const { error } = await supabase.from('staff').upsert(payload);
       if (error) throw error;
-
-      // Sincroniza com a tabela de usuários
-      if (staff.username) {
-        // Prepara o payload do usuário
-        const userPayload: any = {
-          username: staff.username.toLowerCase(),
-          display_name: staff.name.toUpperCase(),
-          role: staff.role,
-          position: staff.position.toUpperCase(),
-          photo: staff.photo || null,
-          staff_id: staff.id,
-          status: staff.status
-        };
-
-        // Se uma senha foi fornecida, inclui no payload
-        if (password) {
-          userPayload.password = password;
-        }
-
-        // Busca se já existe um usuário para este staff_id
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('id, password')
-          .eq('staff_id', staff.id)
-          .maybeSingle();
-
-        if (existingUser) {
-          // Atualiza usuário existente
-          const { error: updateError } = await supabase
-            .from('users')
-            .update(userPayload)
-            .eq('id', existingUser.id);
-          if (updateError) throw updateError;
-        } else {
-          // Cria novo usuário se não existir
-          // Garante uma senha inicial se não foi enviada
-          if (!userPayload.password) {
-            userPayload.password = '12345678';
-          }
-          userPayload.id = `usr-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-          userPayload.isfirstlogin = true;
-          
-          const { error: insertError } = await supabase
-            .from('users')
-            .insert(userPayload);
-          if (insertError) throw insertError;
-        }
-      }
-
       return true;
     } catch (error: any) {
       console.error("Erro no repositório Staff:", error);
@@ -102,10 +53,6 @@ export const staffRepository = {
   },
 
   async delete(supabase: SupabaseClient, id: string) {
-    // Primeiro remove o usuário vinculado
-    await supabase.from('users').delete().eq('staff_id', id);
-    
-    // Depois remove o colaborador
     const { error } = await supabase.from('staff').delete().eq('id', id);
     if (error) throw error;
     return true;

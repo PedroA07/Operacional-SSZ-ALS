@@ -61,7 +61,7 @@ const OnlineStatus: React.FC<OnlineStatusProps> = ({ staffList, currentUser }) =
   const staffWithStatus = useMemo(() => {
     return staffList.map(s => {
       const isSelf = (s.username === currentUser.username || s.id === currentUser.staffId);
-      const u = users.find(user => (user.staffId === s.id));
+      const u = users.find(user => (user.staffId === s.id) || (s.username === 'operacional_ssz' && user.id === 'admin-master'));
       const info = u ? getStatusInfo(u, isSelf) : getStatusInfo({} as User, isSelf);
       
       // Timer do próprio usuário usa o session_start da aba
