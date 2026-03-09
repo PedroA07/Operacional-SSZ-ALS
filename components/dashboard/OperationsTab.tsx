@@ -19,7 +19,6 @@ import PreStackingForm from './forms/PreStackingForm';
 import StatusHistoryManagerModal from './operations/StatusHistoryManagerModal';
 import TripModal from './operations/TripModal';
 import TripDetailsViewerModal from './operations/TripDetailsViewerModal';
-import CopyAllStatusesAction from './operations/CopyAllStatusesAction';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 import { statusService } from '../../utils/statusService';
 
@@ -207,7 +206,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
            </div>
            <div className="flex gap-3">
               <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
-              <CopyAllStatusesAction trips={filteredTrips} allTrips={trips} />
               <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
            </div>
         </div>

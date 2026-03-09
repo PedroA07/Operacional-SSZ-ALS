@@ -151,7 +151,28 @@ export type NotificationType =
   | 'DOC_ATTACHED'
   | 'CONTRACT_UPLOADED'
   | 'DRIVER_DOC_UPLOADED'
-  | 'DRIVER_PROFILE_UPDATED';
+  | 'DRIVER_PROFILE_UPDATED'
+  | 'EMAIL_TEMPLATE_CREATED'
+  | 'EMAIL_TEMPLATE_UPDATED';
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  to: string;
+  cc: string;
+  subject: string;
+  body: string;
+  config: {
+    headerColor: string;
+    headerOrientation: 'horizontal' | 'vertical';
+    alternateRowColor: boolean;
+    columns: string[];
+    fontSize?: string;
+    fontFamily?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Notification {
   id: string;

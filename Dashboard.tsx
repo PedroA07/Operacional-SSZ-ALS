@@ -23,6 +23,7 @@ import OnlineStatus from './components/dashboard/OnlineStatus';
 import DatabaseStatus from './components/dashboard/DatabaseStatus';
 import UserProfile from './components/dashboard/UserProfile';
 import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
+import EmailCenter from './components/dashboard/email/EmailCenter';
 import NotificationToast from './components/dashboard/notifications/NotificationToast';
 import FeedbackModal from './components/shared/FeedbackModal';
 import { db, supabase } from './utils/storage';
@@ -227,6 +228,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </div>
            <div className="flex items-center gap-4">
               <DatabaseStatus />
+              <EmailCenter user={user} trips={trips} />
               <NotificationCenter user={user} />
               <UserProfile user={user} />
            </div>

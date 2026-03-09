@@ -3,7 +3,7 @@ import {
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category, 
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession, 
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus, 
-  LoginCredential 
+  LoginCredential, EmailTemplate 
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -564,9 +564,55 @@ export const db = {
     return !error;
   },
 
+  getEmailTemplates: async (): Promise<EmailTemplate[]> => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('email_templates').select('*').order('name');
+    return (data || []).map(t => ({
+      id: t.id,
+      name: t.name,
+      to: t.to,
+      cc: t.cc,
+      subject: t.subject,
+      body: t.body,
+      config: t.config,
+      createdAt: t.created_at,
+      updatedAt: t.updated_at
+    }));
+  },
+
+  saveEmailTemplate: async (template: EmailTemplate, user?: User) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('email_templates').upsert({
+      id: template.id,
+      name: template.name,
+      to: template.to,
+      cc: template.cc,
+      subject: template.subject,
+      body: template.body,
+      config: template.config,
+      created_at: template.createdAt,
+      updated_at: template.updatedAt
+    });
+    if (!error && user) {
+      await db.addNotification(
+        user,
+        template.createdAt === template.updatedAt ? 'EMAIL_TEMPLATE_CREATED' : 'EMAIL_TEMPLATE_UPDATED',
+        `Modelo de E-mail: ${template.name}`,
+        `O modelo de e-mail "${template.name}" foi salvo por ${user.displayName}.`
+      );
+    }
+    return !error;
+  },
+
+  deleteEmailTemplate: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('email_templates').delete().eq('id', id);
+    return !error;
+  },
+
   exportBackup: async () => {
     if (!supabase) return;
-    const tables = ['users', 'drivers', 'customers', 'ports', 'pre_stacking', 'staff', 'trips', 'categories', 'notifications', 'avantida_records', 'avantida_prices', 'logins', 'seal_batches', 'seal_records', 'stay_sessions', 'stay_records'];
+    const tables = ['users', 'drivers', 'customers', 'ports', 'pre_stacking', 'staff', 'trips', 'categories', 'notifications', 'avantida_records', 'avantida_prices', 'logins', 'seal_batches', 'seal_records', 'stay_sessions', 'stay_records', 'email_templates'];
     const backup: any = {};
     for (const table of tables) {
       const { data } = await supabase.from(table).select('*');
