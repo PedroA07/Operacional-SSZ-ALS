@@ -79,7 +79,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
 
       {/* BLOCO CONTAINER / BARCODES / GENSET */}
       <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '115px', overflow: 'hidden' }}>
-        <div style={{ width: '400px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '350px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>CONTAINER</div>
           <div style={{ fontSize: '20px', fontWeight: 900, lineHeight: '1.2', whiteSpace: 'nowrap', marginBottom: '2px' }}>{formData.container || '---'}</div>
           
@@ -102,7 +102,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
           </div>
         </div>
 
-        <div style={{ width: '157px', padding: '10px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+        <div style={{ width: '185px', padding: '10px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textAlign: 'left' }}>LACRE</div>
           <div style={{ fontSize: '12px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', marginTop: '2px' }}>{formData.seal || '---'}</div>
           <div style={{ marginTop: 'auto', height: '32px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
