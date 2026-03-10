@@ -27,9 +27,17 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   const [podSearch, setPodSearch] = useState('');
   const [showPodResults, setShowPodResults] = useState(false);
 
+  const [containerTypes, setContainerTypes] = useState<any[]>([]);
+
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) setCurrentUser(JSON.parse(saved));
+
+    const loadContainerTypes = async () => {
+      const types = await db.getContainerTypes();
+      setContainerTypes(types);
+    };
+    loadContainerTypes();
 
     const handleClickOutside = (e: MouseEvent) => {
       if (podRef.current && !podRef.current.contains(e.target as Node)) {
@@ -154,11 +162,9 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
               <div className="space-y-1">
                  <label className={labelClass}>Tipo</label>
                  <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
-                    <option value="40HC">40HC</option>
-                    <option value="40HR">40HR</option>
-                    <option value="40DC">40DC</option>
-                    <option value="40OT">40OT</option>
-                    <option value="20DC">20DC</option>
+                    {containerTypes.map(t => (
+                      <option key={t.id} value={t.name}>{t.name}</option>
+                    ))}
                  </select>
               </div>
            </div>

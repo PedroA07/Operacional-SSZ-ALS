@@ -80,8 +80,8 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     remetenteId: '', 
     destinatarioId: '', 
     displayDate: new Date().toLocaleDateString('pt-BR'),
-    schedulingDate: new Date().toISOString().split('T')[0],
-    schedulingTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    schedulingDate: '',
+    schedulingTime: ''
   });
 
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
@@ -182,7 +182,9 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
       }
 
       if (selectedDriver && selectedRemetente) {
-         const schedulingDateTime = `${formData.schedulingDate}T${formData.schedulingTime}:00`;
+         const schedulingDateTime = formData.schedulingDate && formData.schedulingTime 
+           ? `${formData.schedulingDate}T${formData.schedulingTime}:00` 
+           : undefined;
          const tripData = tripSyncService.mapOCtoTrip(
            { ...formData, schedulingDate: schedulingDateTime }, 
            selectedDriver, 
@@ -303,7 +305,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         <div className="space-y-4 bg-white p-6 rounded-[2.2rem] border border-slate-200 shadow-sm">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className={labelClass}>Data Agendamento</label>
+              <label className={labelClass}>Data Agendamento (Opcional)</label>
               <input 
                 type="date" 
                 className={inputClass} 
@@ -312,7 +314,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
               />
             </div>
             <div className="space-y-1">
-              <label className={labelClass}>Hora Agendamento</label>
+              <label className={labelClass}>Hora Agendamento (Opcional)</label>
               <input 
                 type="time" 
                 className={inputClass} 

@@ -155,6 +155,15 @@ export type NotificationType =
   | 'EMAIL_TEMPLATE_CREATED'
   | 'EMAIL_TEMPLATE_UPDATED';
 
+export interface EmailTableConfig {
+  id: string;
+  title: string;
+  headerColor: string;
+  headerOrientation: 'horizontal' | 'vertical';
+  alternateRowColor: boolean;
+  columns: string[];
+}
+
 export interface EmailTemplate {
   id: string;
   name: string;
@@ -163,10 +172,12 @@ export interface EmailTemplate {
   subject: string;
   body: string;
   config: {
-    headerColor: string;
-    headerOrientation: 'horizontal' | 'vertical';
-    alternateRowColor: boolean;
-    columns: string[];
+    tables?: EmailTableConfig[];
+    // Legacy support
+    headerColor?: string;
+    headerOrientation?: 'horizontal' | 'vertical';
+    alternateRowColor?: boolean;
+    columns?: string[];
     fontSize?: string;
     fontFamily?: string;
   };

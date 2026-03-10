@@ -28,6 +28,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userHasChosenCategory, setUserHasChosenCategory] = useState(false);
+  const [containerTypes, setContainerTypes] = useState<any[]>([]);
   
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
@@ -64,6 +65,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     const loadCats = async () => {
       const c = await db.getCategories();
       setCategories(c);
+      
+      const types = await db.getContainerTypes();
+      setContainerTypes(types);
       
       if (initialData?.category) {
         setFormData((prev: any) => ({ ...prev, category: initialData.category.toUpperCase() }));
@@ -327,11 +331,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
             <div className="space-y-1">
               <label className={labelClass}>Tipo Container</label>
               <select className={selectClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
-                <option value="40HC">40HC</option>
-                <option value="40HR">40HR</option>
-                <option value="40DC">40DC</option>
-                <option value="20DC">20DC</option>
-                <option value="20RF">20RF</option>
+                {containerTypes.map(t => (
+                  <option key={t.id} value={t.name}>{t.name}</option>
+                ))}
               </select>
             </div>
           </div>

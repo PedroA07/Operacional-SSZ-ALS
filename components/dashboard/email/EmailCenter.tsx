@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, EmailTemplate, Trip } from '../../../types';
 import { db } from '../../../utils/storage';
 import EmailTemplateModal from './EmailTemplateModal';
+import EmailGeneratorModal from './EmailGeneratorModal';
 import { reportGenerator } from '../../../utils/reportGenerator';
 
 interface EmailCenterProps {
@@ -15,6 +16,7 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isGeneratorModalOpen, setIsGeneratorModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -45,113 +47,10 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, loadTemplates]);
 
-  const handleCopyTemplate = async (template: EmailTemplate) => {
-    try {
-      // Se for o modelo Volkswagen (ou similar), usamos a lógica específica se necessário
-      // Mas aqui vamos gerar uma tabela genérica baseada na config do template
-      
-      const now = new Date();
-      const hour = now.getHours();
-      let saudacao = 'Bom dia';
-      if (hour >= 12 && hour < 18) saudacao = 'Boa tarde';
-      else if (hour >= 18) saudacao = 'Boa noite';
-
-      const dataAtual = now.toLocaleDateString('pt-BR');
-      const horaAtual = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-      const replaceVars = (text: string) => {
-        if (!text) return '';
-        return text
-          .replace(/\{\{SAUDACAO\}\}/gi, saudacao)
-          .replace(/\{\{DATA_ATUAL\}\}/gi, dataAtual)
-          .replace(/\{\{HORA_ATUAL\}\}/gi, horaAtual);
-      };
-
-      const finalSubject = replaceVars(template.subject).toUpperCase();
-      const finalBody = replaceVars(template.body);
-
-      const headerStyle = `background-color: ${template.config.headerColor}; color: #ffffff; font-weight: bold; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; text-transform: uppercase;`;
-      const cellStyle = `background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; font-weight: bold; text-transform: uppercase;`;
-      const altCellStyle = `background-color: #f8fafc; color: #000000; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; font-weight: bold; text-transform: uppercase;`;
-
-      let tableHtml = '';
-
-      if (template.config.headerOrientation === 'horizontal') {
-        tableHtml = `
-          <table style="border-collapse: collapse; width: 100%; margin-top: 20px;">
-            <thead>
-              <tr>
-                ${template.config.columns.map(col => `<th style="${headerStyle}">${col}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${trips.slice(0, 10).map((trip, idx) => `
-                <tr>
-                  ${template.config.columns.map(col => {
-                    const style = template.config.alternateRowColor && idx % 2 !== 0 ? altCellStyle : cellStyle;
-                    let value = '---';
-                    if (col.toLowerCase().includes('motorista')) value = trip.driver.name;
-                    if (col.toLowerCase().includes('placa')) value = trip.driver.plateHorse;
-                    if (col.toLowerCase().includes('container')) value = trip.container || '---';
-                    if (col.toLowerCase().includes('status')) value = trip.status;
-                    if (col.toLowerCase().includes('data')) value = new Date(trip.dateTime).toLocaleDateString('pt-BR');
-                    if (col.toLowerCase().includes('os')) value = trip.os;
-                    if (col.toLowerCase().includes('cliente')) value = trip.customer.name;
-                    return `<td style="${style}">${value.toUpperCase()}</td>`;
-                  }).join('')}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        `;
-      } else {
-        // Vertical orientation (like the VW one)
-        tableHtml = trips.slice(0, 5).map(trip => `
-          <table style="border-collapse: collapse; width: 400px; margin-bottom: 25px; table-layout: fixed;">
-            ${template.config.columns.map((col, idx) => {
-              const style = cellStyle;
-              let value = '---';
-              if (col.toLowerCase().includes('motorista')) value = trip.driver.name;
-              if (col.toLowerCase().includes('placa')) value = trip.driver.plateHorse;
-              if (col.toLowerCase().includes('container')) value = trip.container || '---';
-              if (col.toLowerCase().includes('status')) value = trip.status;
-              if (col.toLowerCase().includes('data')) value = new Date(trip.dateTime).toLocaleDateString('pt-BR');
-              if (col.toLowerCase().includes('os')) value = trip.os;
-              if (col.toLowerCase().includes('cliente')) value = trip.customer.name;
-              
-              return `
-                <tr>
-                  <td style="${headerStyle}; width: 140px;">${col.toUpperCase()}</td>
-                  <td style="${style}">${value.toUpperCase()}</td>
-                </tr>
-              `;
-            }).join('')}
-          </table>
-        `).join('');
-      }
-
-      const fullHtml = `
-        <div style="font-family: Arial, sans-serif; color: #334155;">
-          <p style="margin-bottom: 15px; font-weight: bold;">ASSUNTO: ${finalSubject}</p>
-          <div style="white-space: pre-wrap; margin-bottom: 20px;">${finalBody}</div>
-          ${tableHtml}
-          <p style="margin-top: 30px; font-size: 10px; color: #94a3b8; font-weight: bold; text-transform: uppercase;">Relatório gerado via ALS TRANSPORTES - ${new Date().toLocaleString('pt-BR')}</p>
-        </div>
-      `;
-
-      const blobHtml = new Blob([fullHtml], { type: 'text/html' });
-      const plainText = `${finalSubject}\n\n${finalBody}\n\n(Tabela de dados omitida no modo texto)`;
-      const blobPlain = new Blob([plainText], { type: 'text/plain' });
-
-      const clipboardData = [new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobPlain })];
-      await navigator.clipboard.write(clipboardData);
-      
-      alert('Modelo copiado com sucesso para o clipboard!');
-      setIsOpen(false);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao copiar modelo.');
-    }
+  const handleOpenGenerator = (template: EmailTemplate) => {
+    setSelectedTemplate(template);
+    setIsGeneratorModalOpen(true);
+    setIsOpen(false);
   };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -305,7 +204,7 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
                   {templates.map(t => (
                     <div 
                       key={t.id} 
-                      onClick={() => handleCopyTemplate(t)}
+                      onClick={() => handleOpenGenerator(t)}
                       className="w-full text-left p-5 bg-slate-50 border border-slate-100 rounded-[2rem] transition-all hover:bg-slate-100/80 group relative overflow-hidden cursor-pointer active:scale-[0.98]"
                     >
                       <div className="flex justify-between items-start mb-2">
@@ -322,7 +221,7 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
                       <p className="text-[9px] text-slate-500 font-medium mt-1 leading-snug line-clamp-1">{t.subject}</p>
                       
                       <div className="mt-4 pt-3 border-t border-slate-200/50 flex items-center justify-between">
-                        <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-tighter">Colunas: <span className="text-slate-600">{t.config.columns.length}</span></span>
+                        <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-tighter">Colunas: <span className="text-slate-600">{t.config.tables ? t.config.tables[0]?.columns.length : t.config.columns?.length || 0}</span></span>
                         <div className="flex items-center gap-1">
                           <span className="text-[8px] font-black text-blue-500 uppercase">Clique para Copiar</span>
                           <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" strokeWidth="3"/></svg>
@@ -344,6 +243,15 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
         template={selectedTemplate}
         user={user}
       />
+
+      {selectedTemplate && (
+        <EmailGeneratorModal
+          isOpen={isGeneratorModalOpen}
+          onClose={() => { setIsGeneratorModalOpen(false); setSelectedTemplate(null); }}
+          template={selectedTemplate}
+          trips={trips}
+        />
+      )}
     </div>
   );
 };
