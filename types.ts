@@ -162,6 +162,7 @@ export interface EmailTableConfig {
   headerOrientation: 'horizontal' | 'vertical';
   alternateRowColor: boolean;
   columns: string[];
+  customCells?: Record<string, string>;
 }
 
 export interface EmailTemplate {

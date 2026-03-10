@@ -36,7 +36,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     }
   }, [isOpen, template]);
 
-  const replaceVars = (text: string) => {
+  const replaceVars = (text: string, trip?: Trip) => {
     if (!text) return '';
     const now = new Date();
     const hour = now.getHours();
@@ -47,10 +47,19 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     const dataAtual = now.toLocaleDateString('pt-BR');
     const horaAtual = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    return text
+    let result = text
       .replace(/\{\{SAUDACAO\}\}/gi, saudacao)
       .replace(/\{\{DATA_ATUAL\}\}/gi, dataAtual)
       .replace(/\{\{HORA_ATUAL\}\}/gi, horaAtual);
+
+    if (trip) {
+      result = result.replace(/\{\{([^}]+)\}\}/g, (match, p1) => {
+        const val = getCellValue(p1.trim(), trip);
+        return val !== '---' ? val : match;
+      });
+    }
+
+    return result;
   };
 
   const handleAddTrip = (tableId: string, trip: Trip) => {
@@ -141,7 +150,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
   };
 
   const generateHtml = () => {
-    const finalBody = replaceVars(body);
+    const firstTrip = Object.values(tableData).flat()[0];
+    const finalBody = replaceVars(body, firstTrip);
 
     let tablesHtml = '';
 
@@ -170,7 +180,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                 <tr>
                   ${table.columns.map(col => {
                     const style = table.alternateRowColor && idx % 2 !== 0 ? altCellStyle : cellStyle;
-                    const value = getCellValue(col, trip);
+                    const customCell = table.customCells?.[col];
+                    const value = customCell ? replaceVars(customCell, trip) : getCellValue(col, trip);
                     return `<td style="${style}">${value}</td>`;
                   }).join('')}
                 </tr>
@@ -183,7 +194,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
           <table style="border-collapse: collapse; width: 400px; margin-bottom: 25px; table-layout: fixed;">
             ${table.columns.map((col, idx) => {
               const style = cellStyle;
-              const value = getCellValue(col, trip);
+              const customCell = table.customCells?.[col];
+              const value = customCell ? replaceVars(customCell, trip) : getCellValue(col, trip);
               
               return `
                 <tr>
@@ -207,7 +219,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
   const handleCopySubject = async () => {
     try {
-      const finalSubject = replaceVars(subject).toUpperCase();
+      const firstTrip = Object.values(tableData).flat()[0];
+      const finalSubject = replaceVars(subject, firstTrip).toUpperCase();
       await navigator.clipboard.writeText(finalSubject);
       alert('Assunto copiado com sucesso!');
     } catch (err) {

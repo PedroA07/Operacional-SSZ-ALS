@@ -34,6 +34,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
 
   const [newColumn, setNewColumn] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [showFormulas, setShowFormulas] = useState(false);
 
   useEffect(() => {
     if (template) {
@@ -244,8 +245,52 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                   value={formData.body}
                   onChange={e => setFormData({...formData, body: e.target.value})}
                 />
-                <div className="mt-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2">
-                  <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Variáveis Inteligentes (Copie e Cole)</p>
+                <div className="mt-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2 relative">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Variáveis Inteligentes (Copie e Cole)</p>
+                    <button 
+                      onClick={() => setShowFormulas(!showFormulas)}
+                      className="text-[9px] font-black text-blue-600 uppercase bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded transition-colors"
+                    >
+                      {showFormulas ? 'Ocultar Fórmulas da Viagem' : 'Ver Fórmulas da Viagem'}
+                    </button>
+                  </div>
+                  
+                  {showFormulas && (
+                    <div className="absolute z-10 top-full left-0 right-0 mt-2 bg-white border border-blue-200 rounded-xl shadow-xl p-4 max-h-64 overflow-y-auto">
+                      <p className="text-[10px] text-slate-600 mb-3">
+                        Use estas variáveis no formato <code className="font-mono font-bold text-blue-700 bg-blue-50 px-1 rounded">{"{{NOME}}"}</code> no assunto, corpo ou nas células da tabela. O sistema substituirá pelos dados da primeira viagem selecionada.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { name: 'MOTORISTA', desc: 'Nome do motorista' },
+                          { name: 'PLACA', desc: 'Placa do cavalo' },
+                          { name: 'CONTAINER', desc: 'Número do container' },
+                          { name: 'STATUS', desc: 'Status atual da viagem' },
+                          { name: 'DATA', desc: 'Data da viagem' },
+                          { name: 'OS', desc: 'Número da OS' },
+                          { name: 'CLIENTE', desc: 'Nome do cliente' },
+                          { name: 'BOOKING', desc: 'Número do booking/reserva' },
+                          { name: 'NAVIO', desc: 'Nome do navio' },
+                          { name: 'NF', desc: 'Número da nota fiscal' },
+                          { name: 'TARA', desc: 'Tara do container' },
+                          { name: 'LACRE', desc: 'Número do lacre' },
+                          { name: 'TIPO', desc: 'Tipo do container' },
+                          { name: 'ORIGEM', desc: 'Local de coleta/origem' },
+                          { name: 'DESTINO', desc: 'Local de entrega/destino' },
+                          { name: 'STATUS ATUAL', desc: 'Status atual com data/hora' },
+                          { name: 'STATUS: [NOME]', desc: 'Data/hora de um status específico' },
+                          { name: 'PREVISÃO: [NOME] + [X]h', desc: 'Previsão somando horas a um status' }
+                        ].map(v => (
+                          <div key={v.name} className="flex flex-col bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+                            <code className="text-[10px] font-mono font-bold text-blue-700">{"{{"}{v.name}{"}}"}</code>
+                            <span className="text-[8px] font-bold text-slate-500 uppercase mt-1">{v.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 gap-2">
                     <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
                       <code className="text-[10px] font-mono font-bold text-blue-700">{"{{SAUDACAO}}"}</code>
@@ -392,8 +437,19 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                             {[1, 2].map(row => (
                               <tr key={row}>
                                 {table.columns.map((col, i) => (
-                                  <td key={i} style={{ backgroundColor: table.alternateRowColor && row % 2 === 0 ? '#f8fafc' : '#ffffff' }} className="border border-slate-300 px-3 py-2 text-[10px] font-medium text-slate-700 whitespace-nowrap">
-                                    DADO EXEMPLO
+                                  <td 
+                                    key={i} 
+                                    style={{ backgroundColor: table.alternateRowColor && row % 2 === 0 ? '#f8fafc' : '#ffffff' }} 
+                                    className="border border-slate-300 px-3 py-2 text-[10px] font-medium text-slate-700 whitespace-nowrap outline-none focus:ring-2 focus:ring-blue-500"
+                                    contentEditable
+                                    suppressContentEditableWarning
+                                    onBlur={(e) => {
+                                      const newCustomCells = { ...(table.customCells || {}) };
+                                      newCustomCells[col] = e.currentTarget.textContent || '';
+                                      updateTable(table.id, { customCells: newCustomCells });
+                                    }}
+                                  >
+                                    {table.customCells?.[col] || 'DADO EXEMPLO'}
                                   </td>
                                 ))}
                               </tr>
@@ -410,8 +466,18 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                                     <th style={{ backgroundColor: table.headerColor || '#1e293b', color: '#fff', width: '140px' }} className="border border-slate-300 px-3 py-2 text-[10px] uppercase font-bold whitespace-nowrap">
                                       {col}
                                     </th>
-                                    <td style={{ backgroundColor: '#ffffff' }} className="border border-slate-300 px-3 py-2 text-[10px] font-medium text-slate-700 whitespace-nowrap">
-                                      DADO EXEMPLO
+                                    <td 
+                                      style={{ backgroundColor: '#ffffff' }} 
+                                      className="border border-slate-300 px-3 py-2 text-[10px] font-medium text-slate-700 whitespace-nowrap outline-none focus:ring-2 focus:ring-blue-500"
+                                      contentEditable
+                                      suppressContentEditableWarning
+                                      onBlur={(e) => {
+                                        const newCustomCells = { ...(table.customCells || {}) };
+                                        newCustomCells[col] = e.currentTarget.textContent || '';
+                                        updateTable(table.id, { customCells: newCustomCells });
+                                      }}
+                                    >
+                                      {table.customCells?.[col] || 'DADO EXEMPLO'}
                                     </td>
                                   </tr>
                                 ))}
