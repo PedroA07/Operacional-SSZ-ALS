@@ -186,7 +186,24 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                   value={formData.body}
                   onChange={e => setFormData({...formData, body: e.target.value})}
                 />
-                <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 italic">* O sistema inserirá a tabela de dados automaticamente ao final.</p>
+                <div className="mt-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2">
+                  <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Variáveis Inteligentes (Copie e Cole)</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
+                      <code className="text-[10px] font-mono font-bold text-blue-700">{"{{SAUDACAO}}"}</code>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">Bom dia / Boa tarde / Boa noite</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
+                      <code className="text-[10px] font-mono font-bold text-blue-700">{"{{DATA_ATUAL}}"}</code>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">Data de hoje (ex: 15/08/2023)</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
+                      <code className="text-[10px] font-mono font-bold text-blue-700">{"{{HORA_ATUAL}}"}</code>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">Hora atual (ex: 14:30)</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[8px] text-slate-400 font-bold uppercase mt-2 italic">* O sistema inserirá a tabela de dados automaticamente ao final.</p>
               </div>
             </div>
 

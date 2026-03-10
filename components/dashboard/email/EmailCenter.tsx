@@ -50,6 +50,26 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
       // Se for o modelo Volkswagen (ou similar), usamos a lógica específica se necessário
       // Mas aqui vamos gerar uma tabela genérica baseada na config do template
       
+      const now = new Date();
+      const hour = now.getHours();
+      let saudacao = 'Bom dia';
+      if (hour >= 12 && hour < 18) saudacao = 'Boa tarde';
+      else if (hour >= 18) saudacao = 'Boa noite';
+
+      const dataAtual = now.toLocaleDateString('pt-BR');
+      const horaAtual = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      const replaceVars = (text: string) => {
+        if (!text) return '';
+        return text
+          .replace(/\{\{SAUDACAO\}\}/gi, saudacao)
+          .replace(/\{\{DATA_ATUAL\}\}/gi, dataAtual)
+          .replace(/\{\{HORA_ATUAL\}\}/gi, horaAtual);
+      };
+
+      const finalSubject = replaceVars(template.subject).toUpperCase();
+      const finalBody = replaceVars(template.body);
+
       const headerStyle = `background-color: ${template.config.headerColor}; color: #ffffff; font-weight: bold; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; text-transform: uppercase;`;
       const cellStyle = `background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; font-weight: bold; text-transform: uppercase;`;
       const altCellStyle = `background-color: #f8fafc; color: #000000; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; font-weight: bold; text-transform: uppercase;`;
@@ -112,15 +132,15 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
 
       const fullHtml = `
         <div style="font-family: Arial, sans-serif; color: #334155;">
-          <p style="margin-bottom: 15px; font-weight: bold;">ASSUNTO: ${template.subject.toUpperCase()}</p>
-          <div style="white-space: pre-wrap; margin-bottom: 20px;">${template.body}</div>
+          <p style="margin-bottom: 15px; font-weight: bold;">ASSUNTO: ${finalSubject}</p>
+          <div style="white-space: pre-wrap; margin-bottom: 20px;">${finalBody}</div>
           ${tableHtml}
           <p style="margin-top: 30px; font-size: 10px; color: #94a3b8; font-weight: bold; text-transform: uppercase;">Relatório gerado via ALS TRANSPORTES - ${new Date().toLocaleString('pt-BR')}</p>
         </div>
       `;
 
       const blobHtml = new Blob([fullHtml], { type: 'text/html' });
-      const plainText = `${template.subject}\n\n${template.body}\n\n(Tabela de dados omitida no modo texto)`;
+      const plainText = `${finalSubject}\n\n${finalBody}\n\n(Tabela de dados omitida no modo texto)`;
       const blobPlain = new Blob([plainText], { type: 'text/plain' });
 
       const clipboardData = [new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobPlain })];

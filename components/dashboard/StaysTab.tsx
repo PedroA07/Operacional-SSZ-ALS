@@ -235,7 +235,11 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const formatISOToInput = (isoString: string) => {
     if (!isoString || isoString === '---') return '';
-    return isoString.substring(0, 16);
+    // Handle both YYYY-MM-DDTHH:mm:ss and YYYY-MM-DDTHH:mm
+    if (isoString.includes('T')) {
+      return isoString.substring(0, 16);
+    }
+    return isoString;
   };
 
   const handleOpenEditRecord = (r: StayRecord) => {
@@ -250,9 +254,18 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
 
   const handleSaveRecordEdit = async () => {
     if (!editingRecord || !selectedSession) return;
-    const scheduledISO = editForm.scheduled ? (editForm.scheduled.includes('T') ? editForm.scheduled : `${editForm.scheduled}:00`) : '';
-    const arrivalISO = editForm.arrival ? (editForm.arrival.includes('T') ? editForm.arrival : `${editForm.arrival}:00`) : '';
-    const departureISO = editForm.departure ? (editForm.departure.includes('T') ? editForm.departure : `${editForm.departure}:00`) : '';
+    
+    // Ensure we append seconds if they are missing from datetime-local input
+    const formatForSave = (val: string) => {
+      if (!val) return '';
+      if (val.length === 16 && val.includes('T')) return `${val}:00`;
+      return val;
+    };
+
+    const scheduledISO = formatForSave(editForm.scheduled);
+    const arrivalISO = formatForSave(editForm.arrival);
+    const departureISO = formatForSave(editForm.departure);
+    
     const updatedRecord: StayRecord = {
       ...editingRecord,
       scheduledStart: scheduledISO,
