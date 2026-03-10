@@ -359,7 +359,8 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                       Dicas de colunas especiais:<br/>
                       • <strong className="text-blue-600">Status Atual</strong>: Mostra o status atual com data e hora.<br/>
                       • <strong className="text-blue-600">Status: [Nome]</strong>: Mostra a data/hora de um status específico (ex: <span className="font-mono bg-slate-100 px-1 rounded">Status: Chegou no cliente</span>).<br/>
-                      • <strong className="text-amber-600">Previsão: [Nome] + [X]h</strong>: Calcula uma previsão somando horas (ex: <span className="font-mono bg-slate-100 px-1 rounded">Previsão: Chegou no cliente + 2h</span>).
+                      • <strong className="text-amber-600">Previsão: [Nome] + [X]h</strong>: Calcula uma previsão somando horas (ex: <span className="font-mono bg-slate-100 px-1 rounded">Previsão: Chegou no cliente + 2h</span>).<br/>
+                      • <strong className="text-emerald-600">Fórmulas Múltiplas</strong>: Use "ou" ou "|" para tentar várias opções (ex: <span className="font-mono bg-slate-100 px-1 rounded">Status: Retirada de Cheio ou Previsão: Chegada + 45m</span>).
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {table.columns.map(col => (

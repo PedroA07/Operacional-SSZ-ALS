@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { EmailTemplate, Trip, EmailTableConfig } from '../../../types';
 
 interface EmailGeneratorModalProps {
@@ -13,6 +13,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
   const [body, setBody] = useState(template.body);
   const [tableData, setTableData] = useState<{ [tableId: string]: Trip[] }>({});
   const [searchTerm, setSearchTerm] = useState<{ [tableId: string]: string }>({});
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // Ensure template has tables
   const tables: EmailTableConfig[] = template.config.tables || [{
@@ -30,6 +32,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       setBody(template.body);
       setTableData({});
       setSearchTerm({});
+      setAttachments([]);
     }
   }, [isOpen, template]);
 
@@ -67,63 +70,77 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
   };
 
   const getCellValue = (col: string, trip: Trip) => {
-    let value = '---';
-    const c = col.toLowerCase();
+    const formulas = col.split(/\s+ou\s+|\|/i).map(s => s.trim());
     
-    // Status com data e hora: "Status: [Nome do Status]"
-    if (c.startsWith('status:')) {
-      const targetStatus = col.substring(7).trim().toLowerCase();
-      const historyEntry = trip.statusHistory?.find(h => h.status.toLowerCase() === targetStatus);
-      if (historyEntry) {
-        value = `${historyEntry.status} - ${new Date(historyEntry.dateTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
-      }
-    } 
-    // Previsão automática: "Previsão: [Nome do Status] + [X]h" ou "Previsão: [Nome do Status] + [X]m"
-    else if (c.startsWith('previsão:') || c.startsWith('previsao:')) {
-      const content = col.substring(9).trim();
-      const plusIndex = content.lastIndexOf('+');
-      if (plusIndex !== -1) {
-        const targetStatus = content.substring(0, plusIndex).trim().toLowerCase();
-        const addAmountStr = content.substring(plusIndex + 1).trim().toLowerCase();
+    for (const formula of formulas) {
+      const c = formula.toLowerCase();
+      let value = '';
+
+      // Status com data e hora: "Status: [Nome do Status]"
+      if (c.startsWith('status:')) {
+        const targetStatus = formula.substring(7).trim().toLowerCase();
         const historyEntry = trip.statusHistory?.find(h => h.status.toLowerCase() === targetStatus);
         if (historyEntry) {
-          const baseDate = new Date(historyEntry.dateTime);
-          let addMs = 0;
-          if (addAmountStr.endsWith('h')) {
-            addMs = parseFloat(addAmountStr.replace('h', '')) * 60 * 60 * 1000;
-          } else if (addAmountStr.endsWith('m')) {
-            addMs = parseFloat(addAmountStr.replace('m', '')) * 60 * 1000;
-          }
-          if (addMs > 0) {
-            const predictedDate = new Date(baseDate.getTime() + addMs);
-            value = predictedDate.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+          value = `${historyEntry.status} - ${new Date(historyEntry.dateTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
+        }
+      } 
+      // Previsão automática: "Previsão: [Nome do Status] + [X]h" ou "Previsão: [Nome do Status] + [X]m"
+      else if (c.startsWith('previsão:') || c.startsWith('previsao:')) {
+        const content = formula.substring(9).trim();
+        const plusIndex = content.lastIndexOf('+');
+        if (plusIndex !== -1) {
+          const targetStatus = content.substring(0, plusIndex).trim().toLowerCase();
+          const addAmountStr = content.substring(plusIndex + 1).trim().toLowerCase();
+          const historyEntry = trip.statusHistory?.find(h => h.status.toLowerCase() === targetStatus);
+          if (historyEntry) {
+            const baseDate = new Date(historyEntry.dateTime);
+            let addMs = 0;
+            if (addAmountStr.endsWith('h')) {
+              addMs = parseFloat(addAmountStr.replace('h', '')) * 60 * 60 * 1000;
+            } else if (addAmountStr.endsWith('m')) {
+              addMs = parseFloat(addAmountStr.replace('m', '')) * 60 * 1000;
+            }
+            if (addMs > 0) {
+              const predictedDate = new Date(baseDate.getTime() + addMs);
+              value = predictedDate.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+            }
           }
         }
       }
-    }
-    // Status Atual com data e hora
-    else if (c === 'status atual') {
-      const lastHistory = trip.statusHistory?.[trip.statusHistory.length - 1];
-      if (lastHistory) {
-        value = `${trip.status} - ${new Date(lastHistory.dateTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
-      } else {
-        value = trip.status || '---';
+      // Status Atual com data e hora
+      else if (c === 'status atual') {
+        const lastHistory = trip.statusHistory?.[trip.statusHistory.length - 1];
+        if (lastHistory) {
+          value = `${trip.status} - ${new Date(lastHistory.dateTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
+        } else {
+          value = trip.status || '';
+        }
+      }
+      else if (c.includes('motorista')) value = trip.driver?.name || '';
+      else if (c.includes('placa')) value = trip.driver?.plateHorse || '';
+      else if (c.includes('container')) value = trip.container || '';
+      else if (c.includes('status') || c.includes('programação') || c.includes('programaçao') || c.includes('programacao')) value = trip.status || '';
+      else if (c.includes('data')) value = new Date(trip.dateTime).toLocaleDateString('pt-BR');
+      else if (c.includes('os')) value = trip.os || '';
+      else if (c.includes('cliente')) value = trip.customer?.name || '';
+      else if (c.includes('booking') || c.includes('reserva')) value = trip.booking || trip.ocFormData?.booking || trip.preStackingFormData?.booking || '';
+      else if (c.includes('navio')) value = trip.ship || trip.ocFormData?.ship || trip.preStackingFormData?.ship || '';
+      else if (c.includes('nf') || c.includes('nota')) value = trip.ocFormData?.nf || trip.preStackingFormData?.nf || '';
+      else if (c.includes('tara')) value = trip.tara || trip.ocFormData?.tara || trip.preStackingFormData?.tara || '';
+      else if (c.includes('lacre') || c.includes('seal')) value = trip.seal || trip.ocFormData?.seal || trip.preStackingFormData?.seal || '';
+      else if (c.includes('tipo')) value = trip.containerType || trip.ocFormData?.tipo || trip.preStackingFormData?.tipo || '';
+      else if (c.includes('destino') || c.includes('entrega')) value = trip.destination?.name || trip.scheduling?.location || '';
+      else if (c.includes('origem') || c.includes('coleta')) value = trip.customer?.name || '';
+
+      if (value && value !== '---') {
+        return value.toUpperCase();
       }
     }
-    else if (c.includes('motorista')) value = trip.driver?.name || '---';
-    else if (c.includes('placa')) value = trip.driver?.plateHorse || '---';
-    else if (c.includes('container')) value = trip.container || '---';
-    else if (c.includes('status') || c.includes('programação') || c.includes('programaçao') || c.includes('programacao')) value = trip.status || '---';
-    else if (c.includes('data')) value = new Date(trip.dateTime).toLocaleDateString('pt-BR');
-    else if (c.includes('os')) value = trip.os || '---';
-    else if (c.includes('cliente')) value = trip.customer?.name || '---';
-    else if (c.includes('booking') || c.includes('reserva')) value = trip.booking || '---';
     
-    return value.toUpperCase();
+    return '---';
   };
 
   const generateHtml = () => {
-    const finalSubject = replaceVars(subject).toUpperCase();
     const finalBody = replaceVars(body);
 
     let tablesHtml = '';
@@ -182,29 +199,49 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
     return `
       <div style="font-family: Arial, sans-serif; color: #334155;">
-        <p style="margin-bottom: 15px; font-weight: bold;">ASSUNTO: ${finalSubject}</p>
         <div style="white-space: pre-wrap; margin-bottom: 20px;">${finalBody}</div>
         ${tablesHtml}
-        <p style="margin-top: 30px; font-size: 10px; color: #94a3b8; font-weight: bold; text-transform: uppercase;">Relatório gerado via ALS TRANSPORTES - ${new Date().toLocaleString('pt-BR')}</p>
       </div>
     `;
   };
 
-  const handleCopy = async () => {
+  const handleCopySubject = async () => {
     try {
-      const html = generateHtml();
-      const plainText = `${replaceVars(subject).toUpperCase()}\n\n${replaceVars(body)}\n\n(Tabelas omitidas no modo texto)`;
+      const finalSubject = replaceVars(subject).toUpperCase();
+      await navigator.clipboard.writeText(finalSubject);
+      alert('Assunto copiado com sucesso!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao copiar assunto.');
+    }
+  };
+
+  const handleCopyBody = async () => {
+    try {
+      if (!previewRef.current) return;
+      const html = previewRef.current.innerHTML;
+      const plainText = previewRef.current.innerText;
       
       const blobHtml = new Blob([html], { type: 'text/html' });
       const blobPlain = new Blob([plainText], { type: 'text/plain' });
       
       await navigator.clipboard.write([new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobPlain })]);
-      alert('E-mail copiado com sucesso!');
+      alert('Corpo do e-mail copiado com sucesso!');
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Erro ao copiar e-mail.');
+      alert('Erro ao copiar corpo do e-mail.');
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   if (!isOpen) return null;
@@ -228,7 +265,10 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
             <div className="space-y-6">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Assunto Final</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Assunto Final</label>
+                    <button onClick={handleCopySubject} className="text-[9px] font-bold text-blue-600 uppercase hover:underline">Copiar Assunto</button>
+                  </div>
                   <input 
                     type="text" 
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 uppercase focus:border-blue-500 outline-none"
@@ -244,6 +284,29 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                     value={body}
                     onChange={e => setBody(e.target.value)}
                   />
+                </div>
+                
+                {/* Attachments */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Anexos (Apenas visualização)</label>
+                  <input 
+                    type="file" 
+                    multiple 
+                    onChange={handleFileChange}
+                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  />
+                  {attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {attachments.map((file, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                          <span className="text-[10px] font-bold text-slate-600 truncate max-w-[150px]">{file.name}</span>
+                          <button onClick={() => removeAttachment(idx)} className="text-slate-400 hover:text-red-500">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -315,7 +378,13 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                 <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Pré-visualização do E-mail</h4>
               </div>
               <div className="p-6 flex-1 overflow-y-auto custom-scrollbar bg-white">
-                <div dangerouslySetInnerHTML={{ __html: generateHtml() }} />
+                <div 
+                  ref={previewRef}
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
+                  className="outline-none"
+                  dangerouslySetInnerHTML={{ __html: generateHtml() }} 
+                />
               </div>
             </div>
           </div>
@@ -329,11 +398,18 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
             Cancelar
           </button>
           <button 
-            onClick={handleCopy}
+            onClick={handleCopySubject}
+            className="px-8 py-4 bg-slate-800 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-slate-900 transition-all active:scale-95 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            Copiar Assunto
+          </button>
+          <button 
+            onClick={handleCopyBody}
             className="px-12 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-            Copiar E-mail
+            Copiar Corpo
           </button>
         </footer>
       </div>
