@@ -36,7 +36,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '4px solid #1e40af', paddingBottom: '10px', marginBottom: '20px' }}>
         <div style={{ width: '400px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ width: '80px', height: '80px', marginRight: '10px', overflow: 'hidden' }}>
+            <div style={{ width: '50px', height: '50px', marginRight: '10px', overflow: 'hidden' }}>
               <img src="/logo.jpg" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }} />
             </div>
             <span style={{ fontSize: '14px', fontWeight: 900, color: '#94a3b8', letterSpacing: '4px' }}>TRANSPORTES</span>
@@ -78,7 +78,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
       </div>
 
       {/* BLOCO CONTAINER / BARCODES / GENSET */}
-      <div style={{ display: 'flex', border: borderStyle, marginBottom: '5px', height: '115px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '115px', overflow: 'hidden' }}>
         <div style={{ width: '400px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>CONTAINER</div>
           <div style={{ fontSize: '20px', fontWeight: 900, lineHeight: '1.2', whiteSpace: 'nowrap', marginBottom: '2px' }}>{formData.container || '---'}</div>
