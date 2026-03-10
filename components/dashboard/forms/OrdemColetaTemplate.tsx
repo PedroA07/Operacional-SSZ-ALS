@@ -78,7 +78,7 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
       </div>
 
       {/* BLOCO CONTAINER / BARCODES / GENSET */}
-      <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '115px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', border: borderStyle, marginBottom: '5px', height: '115px', overflow: 'hidden' }}>
         <div style={{ width: '400px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>CONTAINER</div>
           <div style={{ fontSize: '20px', fontWeight: 900, lineHeight: '1.2', whiteSpace: 'nowrap', marginBottom: '2px' }}>{formData.container || '---'}</div>
