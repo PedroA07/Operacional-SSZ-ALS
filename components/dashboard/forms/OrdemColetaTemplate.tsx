@@ -90,11 +90,11 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
           )}
 
           <div style={{ marginTop: 'auto', height: '32px', overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
-            <svg id="barcode-container" style={{ width: '300px', height: '22px' }}></svg>
+            <svg id="barcode-container" style={{ width: '330px', height: '22px' }}></svg>
           </div>
         </div>
 
-        <div style={{ width: '157px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+        <div style={{ width: '150px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textAlign: 'left' }}>TARA</div>
           <div style={{ fontSize: '12px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', marginTop: '2px' }}>{formData.tara || '---'}</div>
           <div style={{ marginTop: 'auto', height: '32px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -102,11 +102,11 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
           </div>
         </div>
 
-        <div style={{ width: '185px', padding: '10px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+        <div style={{ width: '214px', padding: '10px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textAlign: 'left' }}>LACRE</div>
           <div style={{ fontSize: '12px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', marginTop: '2px' }}>{formData.seal || '---'}</div>
           <div style={{ marginTop: 'auto', height: '32px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg id="barcode-lacre" style={{ width: '145px', height: '22px' }}></svg>
+            <svg id="barcode-lacre" style={{ width: '130px', height: '22px' }}></svg>
           </div>
         </div>
       </div>

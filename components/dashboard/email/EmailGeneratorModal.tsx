@@ -36,7 +36,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     }
   }, [isOpen, template]);
 
-  const replaceVars = (text: string, trip?: Trip) => {
+  const replaceVars = (text: string, trip?: Trip, rowIndex?: number, totalRows?: number) => {
     if (!text) return '';
     const now = new Date();
     const hour = now.getHours();
@@ -53,8 +53,26 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       .replace(/\{\{HORA_ATUAL\}\}/gi, horaAtual);
 
     if (trip) {
+      // Process SE conditions first
+      // Syntax: {{SE(condicao) texto_se_sim SENAO texto_se_nao}}
+      // Example: {{SE(MOTORISTA) O motorista é {{MOTORISTA}} SENAO Sem motorista}}
+      const seRegex = /\{\{SE\(([^)]+)\)(.*?)(?:SENAO(.*?))?\}\}/gi;
+      let match;
+      while ((match = seRegex.exec(result)) !== null) {
+        const conditionVar = match[1].trim();
+        const trueText = match[2].trim();
+        const falseText = match[3] ? match[3].trim() : '';
+        
+        const conditionValue = getCellValue(conditionVar, trip, rowIndex, totalRows);
+        const isTrue = conditionValue && conditionValue !== '---' && conditionValue.trim() !== '';
+        
+        const replacement = isTrue ? trueText : falseText;
+        result = result.substring(0, match.index) + replacement + result.substring(match.index + match[0].length);
+        seRegex.lastIndex = 0; // Reset regex since string changed
+      }
+
       result = result.replace(/\{\{([^}]+)\}\}/g, (match, p1) => {
-        const val = getCellValue(p1.trim(), trip);
+        const val = getCellValue(p1.trim(), trip, rowIndex, totalRows);
         return val !== '---' ? val : match;
       });
     }
@@ -78,7 +96,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     }));
   };
 
-  const getCellValue = (col: string, trip: Trip) => {
+  const getCellValue = (col: string, trip: Trip, rowIndex?: number, totalRows?: number) => {
     const formulas = col.split(/\s+ou\s+|\|/i).map(s => s.trim());
     
     for (const formula of formulas) {
@@ -125,13 +143,17 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
           value = trip.status || '';
         }
       }
+      else if (c.includes('cpf motorista') || c.includes('cpf')) value = trip.driver?.cpf || '';
+      else if (c.includes('placa cavalo') || c.includes('cavalo') || c === 'placa') value = trip.driver?.plateHorse || '';
+      else if (c.includes('placa carreta') || c.includes('carreta')) value = trip.driver?.plateTrailer || '';
       else if (c.includes('motorista')) value = trip.driver?.name || '';
-      else if (c.includes('placa')) value = trip.driver?.plateHorse || '';
       else if (c.includes('container')) value = trip.container || '';
       else if (c.includes('status') || c.includes('programação') || c.includes('programaçao') || c.includes('programacao')) value = trip.status || '';
       else if (c.includes('data')) value = new Date(trip.dateTime).toLocaleDateString('pt-BR');
-      else if (c.includes('os')) value = trip.os || '';
+      else if (c === 'os' || c === 'o.s' || c === 'ordem de serviço' || c === 'ordem de servico') value = trip.os || '';
+      else if (c.includes('cnpj cliente')) value = trip.customer?.cnpj || '';
       else if (c.includes('cliente')) value = trip.customer?.name || '';
+      else if (c.includes('cnpj porto') || c.includes('cnpj prestacking') || c.includes('cnpj terminal')) value = trip.destination?.cnpj || trip.preStackingFormData?.cnpj || '';
       else if (c.includes('booking') || c.includes('reserva')) value = trip.booking || trip.ocFormData?.booking || trip.preStackingFormData?.booking || '';
       else if (c.includes('navio')) value = trip.ship || trip.ocFormData?.ship || trip.preStackingFormData?.ship || '';
       else if (c.includes('nf') || c.includes('nota')) value = trip.ocFormData?.nf || trip.preStackingFormData?.nf || '';
@@ -140,6 +162,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       else if (c.includes('tipo')) value = trip.containerType || trip.ocFormData?.tipo || trip.preStackingFormData?.tipo || '';
       else if (c.includes('destino') || c.includes('entrega')) value = trip.destination?.name || trip.scheduling?.location || '';
       else if (c.includes('origem') || c.includes('coleta')) value = trip.customer?.name || '';
+      else if (c === 'quantidade linhas' || c === 'quantidade de linhas' || c === 'qtd linhas') value = totalRows !== undefined ? String(totalRows).padStart(2, '0') : '';
+      else if (c === 'linha') value = rowIndex !== undefined ? String(rowIndex + 1).padStart(2, '0') : '';
 
       if (value && value !== '---') {
         return value.toUpperCase();
@@ -151,7 +175,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
   const generateHtml = () => {
     const firstTrip = Object.values(tableData).flat()[0];
-    const finalBody = replaceVars(body, firstTrip);
+    const totalRows = Object.values(tableData).flat().length;
+    const finalBody = replaceVars(body, firstTrip, undefined, totalRows);
 
     let tablesHtml = '';
 
@@ -181,7 +206,9 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                   ${table.columns.map(col => {
                     const style = table.alternateRowColor && idx % 2 !== 0 ? altCellStyle : cellStyle;
                     const customCell = table.customCells?.[col];
-                    const value = customCell ? replaceVars(customCell, trip) : getCellValue(col, trip);
+                    const value = customCell 
+                      ? (customCell.includes('{{') ? replaceVars(customCell, trip, idx, totalRows) : getCellValue(customCell, trip, idx, totalRows))
+                      : getCellValue(col, trip, idx, totalRows);
                     return `<td style="${style}">${value}</td>`;
                   }).join('')}
                 </tr>
@@ -190,12 +217,14 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
           </table>
         `;
       } else {
-        tablesHtml += data.map(trip => `
+        tablesHtml += data.map((trip, idx) => `
           <table style="border-collapse: collapse; width: 400px; margin-bottom: 25px; table-layout: fixed;">
-            ${table.columns.map((col, idx) => {
+            ${table.columns.map((col) => {
               const style = cellStyle;
               const customCell = table.customCells?.[col];
-              const value = customCell ? replaceVars(customCell, trip) : getCellValue(col, trip);
+              const value = customCell 
+                ? (customCell.includes('{{') ? replaceVars(customCell, trip, idx, totalRows) : getCellValue(customCell, trip, idx, totalRows))
+                : getCellValue(col, trip, idx, totalRows);
               
               return `
                 <tr>
@@ -220,7 +249,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
   const handleCopySubject = async () => {
     try {
       const firstTrip = Object.values(tableData).flat()[0];
-      const finalSubject = replaceVars(subject, firstTrip).toUpperCase();
+      const totalRows = Object.values(tableData).flat().length;
+      const finalSubject = replaceVars(subject, firstTrip, undefined, totalRows).toUpperCase();
       await navigator.clipboard.writeText(finalSubject);
       alert('Assunto copiado com sucesso!');
     } catch (err) {
@@ -333,7 +363,18 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                   </div>
                   
                   <div className="space-y-2 relative">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Adicionar Viagem (OS ou Container)</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Adicionar Viagem (OS ou Container)</label>
+                      <button 
+                        onClick={() => {
+                          const dummyTrip = { id: `dummy-${Date.now()}`, os: '', container: '', status: '', dateTime: new Date().toISOString() } as any;
+                          handleAddTrip(table.id, dummyTrip);
+                        }}
+                        className="text-[9px] font-bold text-blue-600 uppercase hover:underline"
+                      >
+                        + Linha Vazia
+                      </button>
+                    </div>
                     <input 
                       type="text" 
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 uppercase focus:border-blue-500 outline-none"
@@ -371,7 +412,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                       {(tableData[table.id] || []).map(trip => (
                         <div key={trip.id} className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
                           <div>
-                            <span className="text-[10px] font-black text-slate-700 uppercase">{trip.os}</span>
+                            <span className="text-[10px] font-black text-slate-700 uppercase">{trip.os || 'LINHA VAZIA'}</span>
                             <span className="text-[9px] font-bold text-slate-400 uppercase ml-2">{trip.status}</span>
                           </div>
                           <button onClick={() => handleRemoveTrip(table.id, trip.id)} className="text-slate-400 hover:text-red-500">

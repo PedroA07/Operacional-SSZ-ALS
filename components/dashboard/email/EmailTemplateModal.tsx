@@ -33,6 +33,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
   });
 
   const [newColumn, setNewColumn] = useState<Record<string, string>>({});
+  const [newColumnFormula, setNewColumnFormula] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [showFormulas, setShowFormulas] = useState(false);
 
@@ -154,12 +155,22 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
 
   const addColumn = (tableId: string) => {
     const colName = newColumn[tableId];
+    const colFormula = newColumnFormula[tableId];
     const tables = formData.config?.tables || [];
     const table = tables.find(t => t.id === tableId);
     
     if (colName && table && !table.columns.includes(colName)) {
-      updateTable(tableId, { columns: [...table.columns, colName] });
+      const newCustomCells = { ...(table.customCells || {}) };
+      if (colFormula) {
+        newCustomCells[colName] = `{{${colFormula}}}`;
+      }
+      
+      updateTable(tableId, { 
+        columns: [...table.columns, colName],
+        customCells: newCustomCells
+      });
       setNewColumn({ ...newColumn, [tableId]: '' });
+      setNewColumnFormula({ ...newColumnFormula, [tableId]: '' });
     }
   };
 
@@ -168,6 +179,21 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
     const table = tables.find(t => t.id === tableId);
     if (table) {
       updateTable(tableId, { columns: table.columns.filter(c => c !== col) });
+    }
+  };
+
+  const updateColumnName = (tableId: string, oldCol: string, newCol: string) => {
+    if (!newCol || newCol === oldCol) return;
+    const tables = formData.config?.tables || [];
+    const table = tables.find(t => t.id === tableId);
+    if (table) {
+      const newColumns = table.columns.map(c => c === oldCol ? newCol : c);
+      const newCustomCells = { ...(table.customCells || {}) };
+      if (newCustomCells[oldCol]) {
+        newCustomCells[newCol] = newCustomCells[oldCol];
+        delete newCustomCells[oldCol];
+      }
+      updateTable(tableId, { columns: newColumns, customCells: newCustomCells });
     }
   };
 
@@ -264,12 +290,16 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                       <div className="grid grid-cols-2 gap-2">
                         {[
                           { name: 'MOTORISTA', desc: 'Nome do motorista' },
-                          { name: 'PLACA', desc: 'Placa do cavalo' },
+                          { name: 'CPF MOTORISTA', desc: 'CPF do motorista' },
+                          { name: 'PLACA CAVALO', desc: 'Placa do cavalo' },
+                          { name: 'PLACA CARRETA', desc: 'Placa da carreta' },
                           { name: 'CONTAINER', desc: 'Número do container' },
                           { name: 'STATUS', desc: 'Status atual da viagem' },
                           { name: 'DATA', desc: 'Data da viagem' },
                           { name: 'OS', desc: 'Número da OS' },
                           { name: 'CLIENTE', desc: 'Nome do cliente' },
+                          { name: 'CNPJ CLIENTE', desc: 'CNPJ do cliente' },
+                          { name: 'CNPJ PORTO', desc: 'CNPJ do porto/terminal' },
                           { name: 'BOOKING', desc: 'Número do booking/reserva' },
                           { name: 'NAVIO', desc: 'Nome do navio' },
                           { name: 'NF', desc: 'Número da nota fiscal' },
@@ -280,7 +310,9 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                           { name: 'DESTINO', desc: 'Local de entrega/destino' },
                           { name: 'STATUS ATUAL', desc: 'Status atual com data/hora' },
                           { name: 'STATUS: [NOME]', desc: 'Data/hora de um status específico' },
-                          { name: 'PREVISÃO: [NOME] + [X]h', desc: 'Previsão somando horas a um status' }
+                          { name: 'PREVISÃO: [NOME] + [X]h', desc: 'Previsão somando horas a um status' },
+                          { name: 'QUANTIDADE LINHAS', desc: 'Contador de linhas (ex: 01, 02)' },
+                          { name: 'SE(VAR) SIM SENAO NAO', desc: 'Ex: SE(MOTORISTA) {{MOTORISTA}} SENAO Sem motorista' }
                         ].map(v => (
                           <div key={v.name} className="flex flex-col bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
                             <code className="text-[10px] font-mono font-bold text-blue-700">{"{{"}{v.name}{"}}"}</code>
@@ -393,6 +425,33 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                         onChange={e => setNewColumn({ ...newColumn, [table.id]: e.target.value })}
                         onKeyPress={e => e.key === 'Enter' && addColumn(table.id)}
                       />
+                      <select
+                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-white text-[10px] font-bold uppercase outline-none focus:border-blue-500"
+                        value={newColumnFormula[table.id] || ''}
+                        onChange={e => setNewColumnFormula({ ...newColumnFormula, [table.id]: e.target.value })}
+                      >
+                        <option value="">FÓRMULA (OPCIONAL)</option>
+                        <option value="OS">OS</option>
+                        <option value="CLIENTE">CLIENTE</option>
+                        <option value="CNPJ CLIENTE">CNPJ CLIENTE</option>
+                        <option value="CNPJ PORTO">CNPJ PORTO</option>
+                        <option value="MOTORISTA">MOTORISTA</option>
+                        <option value="CPF MOTORISTA">CPF MOTORISTA</option>
+                        <option value="PLACA CAVALO">PLACA CAVALO</option>
+                        <option value="PLACA CARRETA">PLACA CARRETA</option>
+                        <option value="CONTAINER">CONTAINER</option>
+                        <option value="TIPO">TIPO</option>
+                        <option value="TARA">TARA</option>
+                        <option value="LACRE">LACRE</option>
+                        <option value="STATUS">STATUS</option>
+                        <option value="DATA">DATA</option>
+                        <option value="BOOKING">BOOKING/RESERVA</option>
+                        <option value="NAVIO">NAVIO</option>
+                        <option value="NF">NOTA FISCAL</option>
+                        <option value="ORIGEM">ORIGEM/COLETA</option>
+                        <option value="DESTINO">DESTINO/ENTREGA</option>
+                        <option value="QUANTIDADE LINHAS">QUANTIDADE LINHAS</option>
+                      </select>
                       <button 
                         onClick={() => addColumn(table.id)}
                         className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all active:scale-90"
@@ -405,7 +464,8 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                       • <strong className="text-blue-600">Status Atual</strong>: Mostra o status atual com data e hora.<br/>
                       • <strong className="text-blue-600">Status: [Nome]</strong>: Mostra a data/hora de um status específico (ex: <span className="font-mono bg-slate-100 px-1 rounded">Status: Chegou no cliente</span>).<br/>
                       • <strong className="text-amber-600">Previsão: [Nome] + [X]h</strong>: Calcula uma previsão somando horas (ex: <span className="font-mono bg-slate-100 px-1 rounded">Previsão: Chegou no cliente + 2h</span>).<br/>
-                      • <strong className="text-emerald-600">Fórmulas Múltiplas</strong>: Use "ou" ou "|" para tentar várias opções (ex: <span className="font-mono bg-slate-100 px-1 rounded">Status: Retirada de Cheio ou Previsão: Chegada + 45m</span>).
+                      • <strong className="text-emerald-600">Fórmulas Múltiplas</strong>: Use "ou" ou "|" para tentar várias opções (ex: <span className="font-mono bg-slate-100 px-1 rounded">Status: Retirada de Cheio ou Previsão: Chegada + 45m</span>).<br/>
+                      • <strong className="text-purple-600">Condicionais (SE)</strong>: Use <span className="font-mono bg-slate-100 px-1 rounded">{'{{SE(VARIAVEL) texto se sim SENAO texto se não}}'}</span>. Ex: <span className="font-mono bg-slate-100 px-1 rounded">{'{{SE(MOTORISTA) Mot: {{MOTORISTA}} SENAO Sem motorista}}'}</span>.
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {table.columns.map(col => (
@@ -427,7 +487,14 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                           <thead>
                             <tr>
                               {table.columns.map((col, i) => (
-                                <th key={i} style={{ backgroundColor: table.headerColor || '#1e293b', color: '#fff' }} className="border border-slate-300 px-3 py-2 text-[10px] uppercase font-bold whitespace-nowrap">
+                                <th 
+                                  key={i} 
+                                  style={{ backgroundColor: table.headerColor || '#1e293b', color: '#fff' }} 
+                                  className="border border-slate-300 px-3 py-2 text-[10px] uppercase font-bold whitespace-nowrap outline-none focus:ring-2 focus:ring-blue-500"
+                                  contentEditable
+                                  suppressContentEditableWarning
+                                  onBlur={(e) => updateColumnName(table.id, col, e.currentTarget.textContent || col)}
+                                >
                                   {col}
                                 </th>
                               ))}
@@ -463,7 +530,13 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                               <tbody>
                                 {table.columns.map((col, i) => (
                                   <tr key={i}>
-                                    <th style={{ backgroundColor: table.headerColor || '#1e293b', color: '#fff', width: '140px' }} className="border border-slate-300 px-3 py-2 text-[10px] uppercase font-bold whitespace-nowrap">
+                                    <th 
+                                      style={{ backgroundColor: table.headerColor || '#1e293b', color: '#fff', width: '140px' }} 
+                                      className="border border-slate-300 px-3 py-2 text-[10px] uppercase font-bold whitespace-nowrap outline-none focus:ring-2 focus:ring-blue-500"
+                                      contentEditable
+                                      suppressContentEditableWarning
+                                      onBlur={(e) => updateColumnName(table.id, col, e.currentTarget.textContent || col)}
+                                    >
                                       {col}
                                     </th>
                                     <td 

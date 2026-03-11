@@ -59,7 +59,7 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: `4px solid ${themeColor}`, paddingBottom: '10px', marginBottom: '20px' }}>
         <div style={{ width: '400px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ width: '80px', height: '80px', marginRight: '10px', overflow: 'hidden' }}>
+            <div style={{ width: '50px', height: '50px', marginRight: '10px', overflow: 'hidden' }}>
               <img src="/logo.jpg" alt="ALS" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }} />
             </div>
             <span style={{ fontSize: '14px', fontWeight: 900, color: '#94a3b8', letterSpacing: '4px' }}>TRANSPORTES</span>
@@ -93,21 +93,21 @@ const PreStackingTemplate: React.FC<PreStackingTemplateProps> = ({
 
       {/* BLOCO EQUIPAMENTO COM CÓDIGO DE BARRAS */}
       <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '100px', overflow: 'hidden' }}>
-        <div style={{ width: '300px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '330px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>CONTAINER</div>
           <div style={{ fontSize: '22px', fontWeight: 900, lineHeight: '1.1' }}>{formData.container || '---'}</div>
           <div style={{ marginTop: 'auto', height: '28px', display: 'flex', alignItems: 'center' }}>
-            <svg id="ps-barcode-container" style={{ width: '250px', height: '20px' }}></svg>
+            <svg id="ps-barcode-container" style={{ width: '310px', height: '20px' }}></svg>
           </div>
         </div>
-        <div style={{ width: '130px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+        <div style={{ width: '125px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textAlign: 'left' }}>TARA</div>
           <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.tara || '---'}</div>
           <div style={{ marginTop: 'auto', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg id="ps-barcode-tara" style={{ width: '100px', height: '20px' }}></svg>
           </div>
         </div>
-        <div style={{ width: '130px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
+        <div style={{ width: '125px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textAlign: 'left' }}>LACRE</div>
           <div style={{ fontSize: '14px', fontWeight: 900 }}>{formData.seal || '---'}</div>
           <div style={{ marginTop: 'auto', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

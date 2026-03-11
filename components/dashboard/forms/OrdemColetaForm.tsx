@@ -260,8 +260,16 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
       )}
 
-      <div className="w-full lg:min-w-[560px] lg:w-[560px] p-10 overflow-y-auto space-y-8 bg-slate-50 border-r border-slate-100 custom-scrollbar">
-        <div className="bg-blue-50 p-8 rounded-[2.5rem] border border-blue-100 shadow-sm space-y-6">
+      <div className="w-full lg:min-w-[560px] lg:w-[560px] p-10 overflow-y-auto space-y-8 bg-slate-50 border-r border-slate-100 custom-scrollbar relative">
+        <button 
+          onClick={onClose}
+          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full shadow-sm border border-slate-200 transition-colors z-10"
+          title="Fechar"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+
+        <div className="bg-blue-50 p-8 rounded-[2.5rem] border border-blue-100 shadow-sm space-y-6 mt-4">
            <div className="space-y-1">
               <label className={labelBlueClass}>Identificação da Viagem (OS)</label>
               <input 

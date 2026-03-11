@@ -17,6 +17,7 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isGeneratorModalOpen, setIsGeneratorModalOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -55,9 +56,14 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (confirm('Deseja excluir este modelo?')) {
-      const success = await db.deleteEmailTemplate(id);
+    setTemplateToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (templateToDelete) {
+      const success = await db.deleteEmailTemplate(templateToDelete);
       if (success) loadTemplates();
+      setTemplateToDelete(null);
     }
   };
 
@@ -116,89 +122,6 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
               </div>
             ) : (
               <>
-                {/* Modelo Especial Volkswagen (Migrado) */}
-                <div className="p-1 mb-6 bg-blue-50 rounded-3xl border border-blue-100">
-                  <div className="px-4 py-2 border-b border-blue-100">
-                    <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">Operações Especiais</span>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      // Aqui chamamos a lógica original do CopyAllStatusesAction
-                      // Para manter a compatibilidade total com o que o usuário já usa
-                      const active = trips.filter(t => 
-                        t.status !== 'Viagem concluída' && 
-                        t.status !== 'Viagem cancelada' &&
-                        t.status !== 'Container sobre rodas' &&
-                        t.status !== 'Saiu da Volkswagen'
-                      ).map(t => {
-                        const history = [...(t.statusHistory || [])].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-                        const getVal = (terms: string[]) => {
-                          const h = [...history].reverse().find(entry => terms.some(term => entry.status.toLowerCase().trim() === term.toLowerCase().trim()));
-                          return h ? reportGenerator.formatFullDate(h.dateTime) : "";
-                        };
-                        const predTime = new Date(Date.now() + 45 * 60000);
-                        const formatFullPrediction = (date: Date) => `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                        let baixaValue = t.status === 'Viagem concluída' ? getVal(['Viagem concluída']) : (t.status === 'Container sobre rodas' || t.status === 'Saiu da Volkswagen' ? `CONTAINER SOBRE RODAS | PREVISÃO BAIXA: ${formatFullPrediction(predTime)}` : "");
-                        
-                        return {
-                          id: t.id,
-                          motorista: t.driver.name.toUpperCase(),
-                          container: (t.container || "A DEFINIR").toUpperCase(),
-                          retiradaCragea: getVal(['Saiu do Cragea', 'Chegou no Cragea', 'Retirada do cheio']),
-                          chegadaVolks: getVal(['Chegou na Volkswagen', 'Chegada na Volkswagen']),
-                          saidaVolks: getVal(['Saiu da Volkswagen', 'Saída da Volkswagen']),
-                          baixaCragea: baixaValue
-                        };
-                      });
-
-                      const finished = trips.filter(t => 
-                        t.status === 'Viagem concluída' || 
-                        t.status === 'Container sobre rodas' ||
-                        t.status === 'Saiu da Volkswagen'
-                      ).map(t => {
-                        const history = [...(t.statusHistory || [])].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-                        const getVal = (terms: string[]) => {
-                          const h = [...history].reverse().find(entry => terms.some(term => entry.status.toLowerCase().trim() === term.toLowerCase().trim()));
-                          return h ? reportGenerator.formatFullDate(h.dateTime) : "";
-                        };
-                        const predTime = new Date(Date.now() + 45 * 60000);
-                        const formatFullPrediction = (date: Date) => `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                        let baixaValue = t.status === 'Viagem concluída' ? getVal(['Viagem concluída']) : (t.status === 'Container sobre rodas' || t.status === 'Saiu da Volkswagen' ? `CONTAINER SOBRE RODAS | PREVISÃO BAIXA: ${formatFullPrediction(predTime)}` : "");
-                        
-                        return {
-                          id: t.id,
-                          motorista: t.driver.name.toUpperCase(),
-                          container: (t.container || "A DEFINIR").toUpperCase(),
-                          retiradaCragea: getVal(['Saiu do Cragea', 'Chegou no Cragea', 'Retirada do cheio']),
-                          chegadaVolks: getVal(['Chegou na Volkswagen', 'Chegada na Volkswagen']),
-                          saidaVolks: getVal(['Saiu da Volkswagen', 'Saída da Volkswagen']),
-                          baixaCragea: baixaValue
-                        };
-                      });
-
-                      const html = reportGenerator.generateFullReportHTML(active, finished);
-                      const plain = reportGenerator.generatePlainText(active, finished);
-                      const blobHtml = new Blob([html], { type: 'text/html' });
-                      const blobPlain = new Blob([plain], { type: 'text/plain' });
-                      navigator.clipboard.write([new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobPlain })]);
-                      alert('Relatório Volkswagen copiado com sucesso!');
-                      setIsOpen(false);
-                    }}
-                    className="w-full text-left p-5 hover:bg-white rounded-[1.5rem] transition-all group flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-[#001e50] rounded-xl flex items-center justify-center p-2 shadow-sm">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" alt="VW" className="brightness-0 invert" />
-                      </div>
-                      <div>
-                        <h5 className="text-[11px] font-black text-slate-800 uppercase leading-tight">Relatório Volkswagen</h5>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Cópia e Cola Padrão da Operação</p>
-                      </div>
-                    </div>
-                    <svg className="w-5 h-5 text-slate-300 group-hover:text-blue-600 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                  </button>
-                </div>
-
                 <div className="space-y-3">
                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-4">Meus Modelos</span>
                   {templates.map(t => (
@@ -251,6 +174,36 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
           template={selectedTemplate}
           trips={trips}
         />
+      )}
+
+      {templateToDelete && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </div>
+              <h3 className="text-lg font-black text-slate-800 mb-2">Excluir Modelo?</h3>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                Tem certeza que deseja excluir este modelo de e-mail? Esta ação não pode ser desfeita.
+              </p>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+              <button
+                onClick={() => setTemplateToDelete(null)}
+                className="flex-1 px-4 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-3 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
