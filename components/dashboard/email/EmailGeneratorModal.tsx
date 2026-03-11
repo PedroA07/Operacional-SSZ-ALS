@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EmailTemplate, Trip, EmailTableConfig } from '../../../types';
+import { showToast } from '../../shared/SimpleToast';
 
 interface EmailGeneratorModalProps {
   isOpen: boolean;
@@ -53,24 +54,83 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       .replace(/\{\{HORA_ATUAL\}\}/gi, horaAtual);
 
     if (trip) {
-      // Process SE conditions first
-      // Syntax: {{SE(condicao) texto_se_sim SENAO texto_se_nao}}
-      // Example: {{SE(MOTORISTA) O motorista é {{MOTORISTA}} SENAO Sem motorista}}
-      const seRegex = /\{\{SE\(([^)]+)\)(.*?)(?:SENAO(.*?))?\}\}/gi;
-      let match;
-      while ((match = seRegex.exec(result)) !== null) {
-        const conditionVar = match[1].trim();
-        const trueText = match[2].trim();
-        const falseText = match[3] ? match[3].trim() : '';
+      // Processamento de condições SE aninhadas (de dentro para fora)
+      // Suporta: {{SE(condicao) texto_se_sim SENAO SE(condicao2) texto2 SENAO texto_final}}
+      let hasSe = true;
+      let safetyCounter = 0;
+      while (hasSe && safetyCounter < 50) {
+        safetyCounter++;
+        // Busca o SE mais interno (aquele que não contém outro {{SE( dentro de si)
+        const innermostSeRegex = /\{\{SE\(([^)]+)\)((?:(?!\{\{SE\()[\s\S])*?)\}\}/i;
+        const match = result.match(innermostSeRegex);
         
-        const conditionValue = getCellValue(conditionVar, trip, rowIndex, totalRows);
-        const isTrue = conditionValue && conditionValue !== '---' && conditionValue.trim() !== '';
+        if (!match) {
+          hasSe = false;
+          break;
+        }
+
+        const initialCondition = match[1].trim();
+        const fullContent = match[2];
         
-        const replacement = isTrue ? trueText : falseText;
-        result = result.substring(0, match.index) + replacement + result.substring(match.index + match[0].length);
-        seRegex.lastIndex = 0; // Reset regex since string changed
+        // Divide o conteúdo em blocos por SENAO
+        const blocks: { condition?: string, text: string }[] = [];
+        let remaining = fullContent;
+        let currentCond = initialCondition;
+        
+        while (true) {
+          // Busca o próximo SENAO
+          const senaoMatch = remaining.match(/SENAO\s+/i);
+          if (!senaoMatch) {
+            blocks.push({ condition: currentCond, text: remaining });
+            break;
+          }
+          
+          const senaoIndex = senaoMatch.index!;
+          blocks.push({ condition: currentCond, text: remaining.substring(0, senaoIndex) });
+          
+          remaining = remaining.substring(senaoIndex + senaoMatch[0].length).trim();
+          
+          // Verifica se é um SENAO SE(...)
+          if (remaining.toUpperCase().startsWith('SE(')) {
+            const nextSeMatch = remaining.match(/^SE\(([^)]+)\)/i);
+            if (nextSeMatch) {
+              currentCond = nextSeMatch[1];
+              remaining = remaining.substring(nextSeMatch[0].length).trim();
+            } else {
+              blocks.push({ text: remaining });
+              break;
+            }
+          } else {
+            // É o SENAO final
+            blocks.push({ text: remaining });
+            break;
+          }
+        }
+        
+        // Avalia qual bloco deve ser usado
+        let replacement = '';
+        for (const block of blocks) {
+          if (!block.condition) {
+            replacement = block.text;
+            break;
+          }
+          // Resolve variáveis dentro da condição se houver (ex: SE({{MOTORISTA}}))
+          const resolvedCondition = block.condition.replace(/\{\{([^}]+)\}\}/g, (m, p1) => {
+            return getCellValue(p1.trim(), trip, rowIndex, totalRows);
+          });
+          
+          const condValue = getCellValue(resolvedCondition, trip, rowIndex, totalRows);
+          if (condValue && condValue !== '---' && condValue.trim() !== '') {
+            replacement = block.text;
+            break;
+          }
+        }
+        
+        // Substitui o bloco SE processado no resultado
+        result = result.substring(0, match.index) + replacement + result.substring(match.index! + match[0].length);
       }
 
+      // Processa as variáveis restantes que não estão em blocos SE
       result = result.replace(/\{\{([^}]+)\}\}/g, (match, p1) => {
         const val = getCellValue(p1.trim(), trip, rowIndex, totalRows);
         return val !== '---' ? val : match;
@@ -103,22 +163,56 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       const c = formula.toLowerCase();
       let value = '';
 
-      // Status com data e hora: "Status: [Nome do Status]"
+      // Status com data e hora: "Status: [Nome do Status]" ou "Status: [Nome] [Index]"
       if (c.startsWith('status:')) {
-        const targetStatus = formula.substring(7).trim().toLowerCase();
-        const historyEntry = trip.statusHistory?.find(h => h.status.toLowerCase() === targetStatus);
+        let targetStatusFull = formula.substring(7).trim();
+        let index = 1;
+        
+        // Verifica se há um índice no final (ex: "Status: Chegou no cliente 2")
+        const parts = targetStatusFull.split(/\s+/);
+        const lastPart = parts[parts.length - 1];
+        if (parts.length > 1 && /^\d+$/.test(lastPart)) {
+          index = parseInt(lastPart);
+          targetStatusFull = parts.slice(0, -1).join(' ');
+        }
+
+        const targetStatus = targetStatusFull.toLowerCase();
+        const matches = trip.statusHistory?.filter(h => h.status.toLowerCase() === targetStatus) || [];
+        
+        // Ordena por data (mais antigo primeiro) para respeitar a prioridade solicitada
+        const sortedMatches = [...matches].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+        
+        const historyEntry = sortedMatches[index - 1];
         if (historyEntry) {
           value = `${historyEntry.status} - ${new Date(historyEntry.dateTime).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
         }
       } 
-      // Previsão automática: "Previsão: [Nome do Status] + [X]h" ou "Previsão: [Nome do Status] + [X]m"
+      // Previsão automática: "Previsão: [Nome do Status] + [X]h" ou "Previsão: Status: [Nome] + [X]m"
       else if (c.startsWith('previsão:') || c.startsWith('previsao:')) {
         const content = formula.substring(9).trim();
         const plusIndex = content.lastIndexOf('+');
         if (plusIndex !== -1) {
-          const targetStatus = content.substring(0, plusIndex).trim().toLowerCase();
+          let statusPart = content.substring(0, plusIndex).trim();
           const addAmountStr = content.substring(plusIndex + 1).trim().toLowerCase();
-          const historyEntry = trip.statusHistory?.find(h => h.status.toLowerCase() === targetStatus);
+          
+          // Remove prefixo "Status:" se existir dentro da previsão
+          if (statusPart.toLowerCase().startsWith('status:')) {
+            statusPart = statusPart.substring(7).trim();
+          }
+
+          let index = 1;
+          const parts = statusPart.split(/\s+/);
+          const lastPart = parts[parts.length - 1];
+          if (parts.length > 1 && /^\d+$/.test(lastPart)) {
+            index = parseInt(lastPart);
+            statusPart = parts.slice(0, -1).join(' ');
+          }
+
+          const targetStatus = statusPart.toLowerCase();
+          const matches = trip.statusHistory?.filter(h => h.status.toLowerCase() === targetStatus) || [];
+          const sortedMatches = [...matches].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+          
+          const historyEntry = sortedMatches[index - 1];
           if (historyEntry) {
             const baseDate = new Date(historyEntry.dateTime);
             let addMs = 0;
@@ -252,10 +346,10 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       const totalRows = Object.values(tableData).flat().length;
       const finalSubject = replaceVars(subject, firstTrip, undefined, totalRows).toUpperCase();
       await navigator.clipboard.writeText(finalSubject);
-      alert('Assunto copiado com sucesso!');
+      showToast('Assunto copiado com sucesso!', 'success');
     } catch (err) {
       console.error(err);
-      alert('Erro ao copiar assunto.');
+      showToast('Erro ao copiar assunto.', 'error');
     }
   };
 
@@ -269,11 +363,11 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       const blobPlain = new Blob([plainText], { type: 'text/plain' });
       
       await navigator.clipboard.write([new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobPlain })]);
-      alert('Corpo do e-mail copiado com sucesso!');
+      showToast('Corpo do e-mail copiado com sucesso!', 'success');
       onClose();
     } catch (err) {
       console.error(err);
-      alert('Erro ao copiar corpo do e-mail.');
+      showToast('Erro ao copiar corpo do e-mail.', 'error');
     }
   };
 
@@ -291,7 +385,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
   return (
     <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="bg-white w-full max-w-[95vw] max-h-[90vh] rounded-[2.5rem] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
         <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
           <div>
             <h3 className="text-xl font-black uppercase tracking-tight">Gerar E-mail: {template.name}</h3>

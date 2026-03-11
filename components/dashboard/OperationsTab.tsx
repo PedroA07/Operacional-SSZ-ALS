@@ -190,6 +190,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         categoryName={activeView.categoryName || ''} clientName={activeView.clientName} 
         drivers={drivers} customers={customers} availableOps={availableOps} onNavigate={setActiveView}
         onLocateDriver={(id) => { setLocationDriverId(id); setIsLocationModalOpen(true); }} allTrips={trips} categories={categories}
+        onDeleteTrip={onDeleteTrip}
         density={density}
       />
     );
@@ -280,6 +281,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       {isOCFormOpen && selectedTrip && (
         <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
           <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); onRefresh(); }} initialData={selectedTrip.ocFormData} tripId={selectedTrip.id} />
+        </div>
+      )}
+
+      {isMinutaFormOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+          <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsMinutaFormOpen(false); onRefresh(); }} initialOS={selectedTrip.os} />
         </div>
       )}
 

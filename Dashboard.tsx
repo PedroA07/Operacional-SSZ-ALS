@@ -25,6 +25,7 @@ import UserProfile from './components/dashboard/UserProfile';
 import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
 import EmailCenter from './components/dashboard/email/EmailCenter';
 import NotificationToast from './components/dashboard/notifications/NotificationToast';
+import SimpleToast from './components/shared/SimpleToast';
 import FeedbackModal from './components/shared/FeedbackModal';
 import { db, supabase } from './utils/storage';
 import { Icons } from './constants/icons';
@@ -180,9 +181,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     );
   }
 
+  const cycleSidebar = () => {
+    setSidebarState(current => {
+      if (current === 'open') return 'collapsed';
+      if (current === 'collapsed') return 'hidden';
+      return 'open';
+    });
+  };
+
   return (
-    <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900 relative">
+    <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
       <NotificationToast />
+      <SimpleToast />
       
       <FeedbackModal 
         isOpen={feedback.show} 
@@ -219,7 +229,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-10 shadow-sm z-40">
            <div className="flex items-center gap-5">
-              <button onClick={() => setSidebarState(s => s === 'open' ? 'collapsed' : 'open')} className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90 border border-transparent hover:border-slate-200">
+              <button onClick={cycleSidebar} className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 transition-all active:scale-90 border border-transparent hover:border-slate-200">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d="M4 6h16M4 12h16m-7 6h7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>

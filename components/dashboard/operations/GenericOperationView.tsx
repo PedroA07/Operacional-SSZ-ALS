@@ -17,6 +17,7 @@ import OrdemColetaForm from '../forms/OrdemColetaForm';
 import PreStackingForm from '../forms/PreStackingForm';
 import DriverLocationModal from './DriverLocationModal';
 import { statusService } from '../../../utils/statusService';
+import { showToast } from '../../shared/SimpleToast';
 
 interface GenericOperationViewProps {
   user: User;
@@ -30,13 +31,14 @@ interface GenericOperationViewProps {
   categories: Category[];
   onNavigate: (view: { type: 'list' | 'category' | 'client', id?: string, categoryName: string, clientName?: string }) => void;
   onLocateDriver: (driverId: string) => void;
+  onDeleteTrip: (id: string) => void;
   density?: 'compact' | 'comfortable';
 }
 
 const MODALITIES = ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
 
 const GenericOperationView: React.FC<GenericOperationViewProps> = ({ 
-  user, type, categoryName, clientName, drivers, customers, allTrips, availableOps, categories, onNavigate, onLocateDriver, density: initialDensity
+  user, type, categoryName, clientName, drivers, customers, allTrips, availableOps, categories, onNavigate, onLocateDriver, onDeleteTrip, density: initialDensity
 }) => {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
@@ -55,6 +57,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [tempStatus, setTempStatus] = useState<TripStatus>('Pendente');
   const [statusTime, setStatusTime] = useState('');
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
+  const [ports, setPorts] = useState<Port[]>([]);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
   const handleSetPriority = async (trip: Trip) => {
@@ -71,8 +74,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       }
       await db.saveTrip({ ...trip, isPriority: !trip.isPriority }, user);
       window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+      showToast('Prioridade atualizada com sucesso!', 'success');
     } catch (e) {
-      alert("Erro ao definir prioridade.");
+      showToast('Erro ao definir prioridade.', 'error');
     } finally {
       setIsSavingStatus(false);
     }
@@ -91,6 +95,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
 
   const loadAuxData = useCallback(async () => {
     const [p, ps] = await Promise.all([db.getPorts(), db.getPreStacking()]);
+    setPorts(p);
     setPreStackingUnits([...p, ...ps]);
   }, []);
 
@@ -110,8 +115,13 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       if (await db.saveTrip(updatedTrip, user)) {
         setIsStatusModalOpen(false);
         window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+        showToast('Status atualizado com sucesso!', 'success');
       }
-    } catch (e) { alert("Erro."); } finally { setIsSavingStatus(false); }
+    } catch (e) { 
+      showToast('Erro ao salvar status.', 'error'); 
+    } finally { 
+      setIsSavingStatus(false); 
+    }
   };
 
   const categoryCustomers = useMemo(() => {
@@ -156,7 +166,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (t) => { setSelectedTrip(t); setIsOCFormOpen(true); },
     (t) => { setSelectedTrip(t); setIsMinutaFormOpen(true); },
     (url, title) => { setPreviewDocData({ url, title }); setIsDocViewerOpen(true); },
-    async (id) => { if(confirm('Excluir?')) { await db.deleteTrip(id, user); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); } },
+    async (id) => { onDeleteTrip(id); },
     () => window.dispatchEvent(new CustomEvent('als_force_global_refresh')),
     (t) => { setSelectedTrip(t); setIsSchedulingModalOpen(true); },
     user,
@@ -257,6 +267,70 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       <SchedulingEditModal isOpen={isSchedulingModalOpen} onClose={() => setIsSchedulingModalOpen(false)} trip={selectedTrip} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} preStackingUnits={preStackingUnits} />
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
+
+      {isOCFormOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+          <OrdemColetaForm 
+            drivers={drivers} 
+            customers={customers} 
+            ports={ports} 
+            onClose={() => { setIsOCFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} 
+            initialData={selectedTrip.ocFormData} 
+            tripId={selectedTrip.id} 
+          />
+        </div>
+      )}
+
+      {isMinutaFormOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
+          <PreStackingForm 
+            drivers={drivers} 
+            customers={customers} 
+            ports={ports} 
+            onClose={() => { setIsMinutaFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} 
+            initialOS={selectedTrip.os} 
+          />
+        </div>
+      )}
+
+      {isStatusModalOpen && selectedTrip && (
+        <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">
+             <div className="text-center">
+               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Registro de Status</p>
+               <p className="text-xl font-black text-slate-800 uppercase">OS: {selectedTrip.os}</p>
+             </div>
+             <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status</label>
+                  <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
+                    {statusService.getOptions(selectedTrip).map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora Real</label>
+                  <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
+                </div>
+             </div>
+             <div className="grid gap-3 pt-4">
+                <button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700">Confirmar Registro</button>
+                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isTripModalOpen && (
+        <TripModal isOpen={isTripModalOpen} onClose={() => setIsTripModalOpen(false)} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} drivers={drivers} customers={customers} categories={categories} editTrip={selectedTrip} />
+      )}
+
+      {isHistoryModalOpen && selectedTrip && (
+        <StatusHistoryManagerModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} trip={selectedTrip} allTrips={allTrips} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />
+      )}
+
+      {isDriverDocsModalOpen && selectedTrip && (
+        <DriverDocsViewerModal isOpen={isDriverDocsModalOpen} onClose={() => setIsDriverDocsModalOpen(false)} trip={selectedTrip} user={user} onSuccess={() => window.dispatchEvent(new CustomEvent('als_force_global_refresh'))} />
+      )}
 
       <style>{` .table-compact table td { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; font-size: 9px !important; } `}</style>
     </div>

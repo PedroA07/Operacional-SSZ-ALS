@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Trip, User, StatusHistoryEntry, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 import { statusService } from '../../../utils/statusService';
+import { showToast } from '../../shared/SimpleToast';
 
 interface StatusHistoryManagerModalProps {
   isOpen: boolean;
@@ -59,7 +60,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
 
   const handleRemoveEntry = (index: number) => {
     if (localHistory.length <= 1) {
-      alert("A viagem precisa ter pelo menos um status no histórico.");
+      showToast('A viagem precisa ter pelo menos um status no histórico.', 'warning');
       return;
     }
     if (confirm("Deseja realmente remover este registro do histórico?")) {
@@ -106,11 +107,13 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
           `O histórico da OS ${trip.os} foi editado manualmente por ${user.displayName}.`,
           { os: trip.os }
         );
+        showToast('Histórico atualizado com sucesso!', 'success');
         onSuccess();
         onClose();
       }
     } catch (err) {
-      alert("Falha ao sincronizar histórico.");
+      console.error(err);
+      showToast('Falha ao sincronizar histórico.', 'error');
     } finally {
       setIsSaving(false);
     }

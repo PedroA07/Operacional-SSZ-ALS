@@ -4,6 +4,7 @@ import { AvantidaRecord, AvantidaStatus, AvantidaPriceRule } from '../../../type
 import { db } from '../../../utils/storage';
 import { lookupCarrierByContainer } from '../../../utils/carrierService';
 import { CARRIERS } from '../../../constants/carriers';
+import { showToast } from '../../shared/SimpleToast';
 
 interface AvantidaModalProps {
   isOpen: boolean;
@@ -130,9 +131,12 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
         status
       });
 
-      if (success) onSuccess();
+      if (success) {
+        showToast('Registro Avantida salvo com sucesso!', 'success');
+        onSuccess();
+      }
     } catch (err: any) {
-      alert(`Falha ao salvar: ${err.message}`);
+      showToast(`Falha ao salvar: ${err.message}`, 'error');
     } finally {
       setIsSaving(false);
     }

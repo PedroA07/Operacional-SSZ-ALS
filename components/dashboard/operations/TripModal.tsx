@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trip, Driver, Customer, Category, Port, PreStacking, User, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
+import { showToast } from '../../shared/SimpleToast';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import TripForm from './TripForm';
 
@@ -96,13 +97,14 @@ const TripModal: React.FC<TripModalProps> = ({
           onSuccess();
           window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
         }, 300);
+        showToast('Viagem salva com sucesso!', 'success');
         onClose();
       } else {
-        alert("Falha ao salvar no servidor.");
+        showToast('Falha ao salvar no servidor.', 'error');
       }
     } catch (err) {
       console.error("Erro crítico no cadastro:", err);
-      alert("Erro ao processar dados.");
+      showToast('Erro ao processar dados.', 'error');
     } finally {
       setIsSaving(false);
     }

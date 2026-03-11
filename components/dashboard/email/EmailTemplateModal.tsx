@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { EmailTemplate, User } from '../../../types';
 import { db } from '../../../utils/storage';
+import { showToast } from '../../shared/SimpleToast';
 
 interface EmailTemplateModalProps {
   isOpen: boolean;
@@ -10,6 +11,15 @@ interface EmailTemplateModalProps {
   template?: EmailTemplate | null;
   user: User;
 }
+
+const TRIP_STATUSES = [
+  'Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 
+  'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 
+  'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 
+  'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 
+  'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas', 
+  'Agendamento realizado'
+];
 
 const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose, onSuccess, template, user }) => {
   const [formData, setFormData] = useState<Partial<EmailTemplate>>({
@@ -34,6 +44,13 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
 
   const [newColumn, setNewColumn] = useState<Record<string, string>>({});
   const [newColumnFormula, setNewColumnFormula] = useState<Record<string, string>>({});
+  const [selectedStatusForFormula, setSelectedStatusForFormula] = useState<Record<string, string>>({});
+  const [selectedStatusIndex, setSelectedStatusIndex] = useState<Record<string, string>>({});
+  const [bodyStatusFormula, setBodyStatusFormula] = useState('');
+  const [bodyStatusIndex, setBodyStatusIndex] = useState('1');
+  const [bodyPrevisaoStatus, setBodyPrevisaoStatus] = useState('');
+  const [bodyPrevisaoAmount, setBodyPrevisaoAmount] = useState('45');
+  const [bodyPrevisaoUnit, setBodyPrevisaoUnit] = useState('m');
   const [isSaving, setIsSaving] = useState(false);
   const [showFormulas, setShowFormulas] = useState(false);
 
@@ -76,7 +93,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
 
   const handleSave = async () => {
     if (!formData.name || !formData.subject) {
-      alert('Nome e Assunto são obrigatórios.');
+      showToast('Nome e Assunto são obrigatórios.', 'warning');
       return;
     }
 
@@ -98,13 +115,14 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
       const success = await db.saveEmailTemplate(finalTemplate, user);
       if (success) {
         onSuccess();
+        showToast('Modelo salvo com sucesso!', 'success');
         onClose();
       } else {
-        alert('Erro ao salvar modelo.');
+        showToast('Erro ao salvar modelo.', 'error');
       }
     } catch (e) {
       console.error(e);
-      alert('Erro crítico ao salvar.');
+      showToast('Erro crítico ao salvar.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -162,7 +180,18 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
     if (colName && table && !table.columns.includes(colName)) {
       const newCustomCells = { ...(table.customCells || {}) };
       if (colFormula) {
-        newCustomCells[colName] = `{{${colFormula}}}`;
+        if (colFormula === 'STATUS_ESPECIFICO') {
+          const status = selectedStatusForFormula[tableId];
+          const index = selectedStatusIndex[tableId] || '1';
+          if (status) {
+            const indexStr = index !== '1' ? ` ${index}` : '';
+            newCustomCells[colName] = `{{Status: ${status}${indexStr}}}`;
+          } else {
+            newCustomCells[colName] = `{{STATUS}}`;
+          }
+        } else {
+          newCustomCells[colName] = `{{${colFormula}}}`;
+        }
       }
       
       updateTable(tableId, { 
@@ -171,6 +200,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
       });
       setNewColumn({ ...newColumn, [tableId]: '' });
       setNewColumnFormula({ ...newColumnFormula, [tableId]: '' });
+      setSelectedStatusIndex({ ...selectedStatusIndex, [tableId]: '1' });
     }
   };
 
@@ -197,11 +227,27 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
     }
   };
 
+  const insertStatusInBody = (status: string, index: string) => {
+    if (!status) return;
+    const indexStr = index !== '1' ? ` ${index}` : '';
+    const formula = `{{Status: ${status}${indexStr}}}`;
+    setFormData({ ...formData, body: (formData.body || '') + formula });
+    setBodyStatusFormula('');
+    setBodyStatusIndex('1');
+  };
+
+  const insertPrevisaoInBody = () => {
+    if (!bodyPrevisaoStatus) return;
+    const formula = `{{Previsão: ${bodyPrevisaoStatus} + ${bodyPrevisaoAmount}${bodyPrevisaoUnit}}}`;
+    setFormData({ ...formData, body: (formData.body || '') + formula });
+    setBodyPrevisaoStatus('');
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="bg-white w-full max-w-[95vw] max-h-[90vh] rounded-[2.5rem] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
         <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
           <div>
             <h3 className="text-xl font-black uppercase tracking-tight">
@@ -309,14 +355,92 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                           { name: 'ORIGEM', desc: 'Local de coleta/origem' },
                           { name: 'DESTINO', desc: 'Local de entrega/destino' },
                           { name: 'STATUS ATUAL', desc: 'Status atual com data/hora' },
-                          { name: 'STATUS: [NOME]', desc: 'Data/hora de um status específico' },
-                          { name: 'PREVISÃO: [NOME] + [X]h', desc: 'Previsão somando horas a um status' },
+                          { name: 'STATUS_ESPECIFICO', desc: 'Data/hora de um status específico' },
+                          { name: 'PREVISAO_ESPECIFICA', desc: 'Previsão baseada em um status' },
                           { name: 'QUANTIDADE LINHAS', desc: 'Contador de linhas (ex: 01, 02)' },
                           { name: 'SE(VAR) SIM SENAO NAO', desc: 'Ex: SE(MOTORISTA) {{MOTORISTA}} SENAO Sem motorista' }
                         ].map(v => (
                           <div key={v.name} className="flex flex-col bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
-                            <code className="text-[10px] font-mono font-bold text-blue-700">{"{{"}{v.name}{"}}"}</code>
-                            <span className="text-[8px] font-bold text-slate-500 uppercase mt-1">{v.desc}</span>
+                            {v.name === 'STATUS_ESPECIFICO' ? (
+                              <div className="space-y-2">
+                                <span className="text-[8px] font-bold text-slate-500 uppercase">{v.desc}</span>
+                                <div className="flex gap-1">
+                                  <select 
+                                    className="flex-1 px-2 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold uppercase outline-none focus:border-blue-500"
+                                    value={bodyStatusFormula}
+                                    onChange={e => setBodyStatusFormula(e.target.value)}
+                                  >
+                                    <option value="">STATUS...</option>
+                                    {TRIP_STATUSES.map(s => (
+                                      <option key={s} value={s}>{s}</option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    className="w-16 px-1 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold outline-none focus:border-blue-500"
+                                    value={bodyStatusIndex}
+                                    onChange={e => setBodyStatusIndex(e.target.value)}
+                                    title="Ocorrência (1ª, 2ª, 3ª...)"
+                                  >
+                                    <option value="1">1ª</option>
+                                    <option value="2">2ª</option>
+                                    <option value="3">3ª</option>
+                                    <option value="4">4ª</option>
+                                  </select>
+                                  <button 
+                                    onClick={() => insertStatusInBody(bodyStatusFormula, bodyStatusIndex)}
+                                    disabled={!bodyStatusFormula}
+                                    className="px-2 py-1.5 bg-blue-600 text-white rounded text-[9px] font-bold disabled:opacity-50"
+                                  >
+                                    ADD
+                                  </button>
+                                </div>
+                              </div>
+                            ) : v.name === 'PREVISAO_ESPECIFICA' ? (
+                              <div className="space-y-2">
+                                <span className="text-[8px] font-bold text-slate-500 uppercase">{v.desc}</span>
+                                <div className="flex flex-col gap-1">
+                                  <select 
+                                    className="w-full px-2 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold uppercase outline-none focus:border-blue-500"
+                                    value={bodyPrevisaoStatus}
+                                    onChange={e => setBodyPrevisaoStatus(e.target.value)}
+                                  >
+                                    <option value="">STATUS BASE...</option>
+                                    {TRIP_STATUSES.map(s => (
+                                      <option key={s} value={s}>{s}</option>
+                                    ))}
+                                  </select>
+                                  <div className="flex gap-1">
+                                    <input 
+                                      type="number" 
+                                      className="flex-1 px-2 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold outline-none focus:border-blue-500"
+                                      value={bodyPrevisaoAmount}
+                                      onChange={e => setBodyPrevisaoAmount(e.target.value)}
+                                      placeholder="Qtd"
+                                    />
+                                    <select
+                                      className="w-14 px-1 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold outline-none focus:border-blue-500"
+                                      value={bodyPrevisaoUnit}
+                                      onChange={e => setBodyPrevisaoUnit(e.target.value)}
+                                    >
+                                      <option value="m">min</option>
+                                      <option value="h">hrs</option>
+                                    </select>
+                                    <button 
+                                      onClick={insertPrevisaoInBody}
+                                      disabled={!bodyPrevisaoStatus}
+                                      className="px-2 py-1.5 bg-amber-600 text-white rounded text-[9px] font-bold disabled:opacity-50"
+                                    >
+                                      ADD
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <code className="text-[10px] font-mono font-bold text-blue-700">{"{{"}{v.name}{"}}"}</code>
+                                <span className="text-[8px] font-bold text-slate-500 uppercase mt-1">{v.desc}</span>
+                              </>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -451,7 +575,35 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                         <option value="ORIGEM">ORIGEM/COLETA</option>
                         <option value="DESTINO">DESTINO/ENTREGA</option>
                         <option value="QUANTIDADE LINHAS">QUANTIDADE LINHAS</option>
+                        <option value="STATUS_ESPECIFICO">STATUS ESPECÍFICO (DATA/HORA)</option>
                       </select>
+                      
+                      {newColumnFormula[table.id] === 'STATUS_ESPECIFICO' && (
+                        <div className="flex flex-1 gap-1 animate-in fade-in zoom-in-95">
+                          <select
+                            className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-blue-50 text-[10px] font-bold uppercase outline-none focus:border-blue-500"
+                            value={selectedStatusForFormula[table.id] || ''}
+                            onChange={e => setSelectedStatusForFormula({ ...selectedStatusForFormula, [table.id]: e.target.value })}
+                          >
+                            <option value="">STATUS...</option>
+                            {TRIP_STATUSES.map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                          <select
+                            className="w-20 px-2 py-3 rounded-xl border border-slate-200 bg-blue-50 text-[10px] font-bold outline-none focus:border-blue-500"
+                            value={selectedStatusIndex[table.id] || '1'}
+                            onChange={e => setSelectedStatusIndex({ ...selectedStatusIndex, [table.id]: e.target.value })}
+                            title="Ocorrência"
+                          >
+                            <option value="1">1ª</option>
+                            <option value="2">2ª</option>
+                            <option value="3">3ª</option>
+                            <option value="4">4ª</option>
+                          </select>
+                        </div>
+                      )}
+                      
                       <button 
                         onClick={() => addColumn(table.id)}
                         className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all active:scale-90"
