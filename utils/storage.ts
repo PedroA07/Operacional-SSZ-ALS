@@ -649,6 +649,7 @@ export const db = {
       id: s.id,
       name: s.name,
       customerId: s.customer_id,
+      modality: s.modality,
       orderIndex: s.order_index,
       color: s.color
     }));
@@ -660,6 +661,7 @@ export const db = {
       id: status.id,
       name: status.name,
       customer_id: status.customerId,
+      modality: status.modality,
       order_index: status.orderIndex,
       color: status.color
     });

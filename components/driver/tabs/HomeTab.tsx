@@ -123,23 +123,42 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const availableStatuses = useMemo(() => {
     if (!activeTrip) return [];
 
-    // 1. Status específicos do cliente
-    const clientStatuses = customStatuses.filter(s => s.customerId === activeTrip.customer.id);
-    if (clientStatuses.length > 0) {
-      return clientStatuses
+    const tripModality = activeTrip.type?.toUpperCase();
+
+    // 1. Status específicos do cliente e modalidade
+    let filtered = customStatuses.filter(s => 
+      s.customerId === activeTrip.customer.id && 
+      s.modality === tripModality
+    );
+
+    // 2. Se não houver, status específicos do cliente sem modalidade
+    if (filtered.length === 0) {
+      filtered = customStatuses.filter(s => 
+        s.customerId === activeTrip.customer.id && !s.modality
+      );
+    }
+
+    // 3. Se não houver, status gerais da modalidade
+    if (filtered.length === 0) {
+      filtered = customStatuses.filter(s => 
+        !s.customerId && s.modality === tripModality
+      );
+    }
+
+    // 4. Se não houver, status gerais sem modalidade
+    if (filtered.length === 0) {
+      filtered = customStatuses.filter(s => 
+        !s.customerId && !s.modality
+      );
+    }
+
+    if (filtered.length > 0) {
+      return filtered
         .sort((a, b) => a.orderIndex - b.orderIndex)
         .map(s => ({ label: s.name, value: s.name as TripStatus }));
     }
 
-    // 2. Status gerais (sem customerId)
-    const generalStatuses = customStatuses.filter(s => !s.customerId);
-    if (generalStatuses.length > 0) {
-      return generalStatuses
-        .sort((a, b) => a.orderIndex - b.orderIndex)
-        .map(s => ({ label: s.name, value: s.name as TripStatus }));
-    }
-
-    // 3. Fallback para os padrões do sistema (incluindo lógica VW)
+    // 5. Fallback para os padrões do sistema (incluindo lógica VW)
     if (isVWCrageaTrip) {
       return VW_CRAGEA_STATUSES;
     }

@@ -321,6 +321,7 @@ export interface CustomStatus {
   id: string;
   name: string;
   customerId?: string; // Se vazio, é status geral
+  modality?: string; // EXPORTAÇÃO, IMPORTAÇÃO, etc.
   orderIndex: number;
   color?: string;
 }

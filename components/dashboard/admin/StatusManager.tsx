@@ -15,9 +15,12 @@ const StatusManager: React.FC = () => {
   const [formData, setFormData] = useState<Partial<CustomStatus>>({
     name: '',
     customerId: '',
+    modality: '',
     orderIndex: 0,
     color: '#3b82f6'
   });
+
+  const MODALITIES = ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
 
   useEffect(() => {
     loadData();
@@ -46,9 +49,10 @@ const StatusManager: React.FC = () => {
     }
 
     const status: CustomStatus = {
-      id: editingId || crypto.randomUUID(),
+      id: editingId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15)),
       name: formData.name!,
       customerId: formData.customerId || undefined,
+      modality: formData.modality || undefined,
       orderIndex: formData.orderIndex || statuses.length,
       color: formData.color || '#3b82f6'
     };
@@ -58,7 +62,7 @@ const StatusManager: React.FC = () => {
       showToast('Status salvo com sucesso', 'success');
       setIsAdding(false);
       setEditingId(null);
-      setFormData({ name: '', customerId: '', orderIndex: 0, color: '#3b82f6' });
+      setFormData({ name: '', customerId: '', modality: '', orderIndex: 0, color: '#3b82f6' });
       loadData();
     } else {
       showToast('Erro ao salvar status', 'error');
@@ -98,7 +102,7 @@ const StatusManager: React.FC = () => {
           onClick={() => {
             setIsAdding(true);
             setEditingId(null);
-            setFormData({ name: '', customerId: '', orderIndex: statuses.length, color: '#3b82f6' });
+            setFormData({ name: '', customerId: '', modality: '', orderIndex: statuses.length, color: '#3b82f6' });
           }}
           className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all"
         >
@@ -140,6 +144,19 @@ const StatusManager: React.FC = () => {
                 mapToAutocomplete={mapCustomerToAutocomplete}
                 initialValue={customers.find(c => c.id === formData.customerId)?.name || ''}
               />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Modalidade (Opcional)</label>
+              <select 
+                className="w-full px-6 py-4 rounded-2xl border-2 border-white bg-white font-bold text-slate-800 uppercase focus:border-blue-500 transition-all outline-none shadow-sm"
+                value={formData.modality || ''}
+                onChange={e => setFormData({ ...formData, modality: e.target.value })}
+              >
+                <option value="">Todas as Modalidades</option>
+                {MODALITIES.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Ordem de Exibição</label>
@@ -184,7 +201,10 @@ const StatusManager: React.FC = () => {
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }}></div>
                     <div>
                       <p className="text-[11px] font-black text-slate-800 uppercase">{status.name}</p>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Ordem: {status.orderIndex}</p>
+                      <div className="flex gap-2">
+                        <p className="text-[8px] text-slate-400 font-bold uppercase">Ordem: {status.orderIndex}</p>
+                        {status.modality && <p className="text-[8px] text-blue-500 font-bold uppercase">• {status.modality}</p>}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -228,7 +248,10 @@ const StatusManager: React.FC = () => {
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }}></div>
                       <div>
                         <p className="text-[11px] font-black text-slate-800 uppercase">{status.name}</p>
-                        <p className="text-[8px] text-emerald-600 font-bold uppercase">{customer?.name || 'Cliente não encontrado'}</p>
+                        <div className="flex gap-2">
+                          <p className="text-[8px] text-emerald-600 font-bold uppercase">{customer?.name || 'Cliente não encontrado'}</p>
+                          {status.modality && <p className="text-[8px] text-blue-500 font-bold uppercase">• {status.modality}</p>}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

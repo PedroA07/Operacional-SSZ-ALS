@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking } from '../../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking, CustomStatus } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db } from '../../utils/storage';
 import OperationRegisterAction from './operations/OperationRegisterAction';
@@ -53,6 +53,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
+  const [customStatuses, setCustomStatuses] = useState<CustomStatus[]>([]);
   
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
@@ -99,6 +100,18 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
   const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
 
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      try {
+        const statuses = await db.getCustomStatuses();
+        setCustomStatuses(statuses);
+      } catch (error) {
+        console.error('Erro ao buscar status personalizados:', error);
+      }
+    };
+    fetchStatuses();
+  }, []);
+
   // Converte data ISO para local no formato do input datetime-local
   const formatISOToInput = (isoString?: string) => {
     const date = isoString ? new Date(isoString) : new Date();
@@ -113,6 +126,48 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     setStatusTime(formatISOToInput()); // Pega a hora local agora
     setIsStatusModalOpen(true);
   };
+
+  const availableStatusesForSelectedTrip = useMemo(() => {
+    if (!selectedTrip) return [];
+
+    const tripModality = selectedTrip.type?.toUpperCase();
+
+    // 1. Status específicos do cliente e modalidade
+    let filtered = customStatuses.filter(s => 
+      s.customerId === selectedTrip.customer.id && 
+      s.modality === tripModality
+    );
+
+    // 2. Se não houver, status específicos do cliente sem modalidade
+    if (filtered.length === 0) {
+      filtered = customStatuses.filter(s => 
+        s.customerId === selectedTrip.customer.id && !s.modality
+      );
+    }
+
+    // 3. Se não houver, status gerais da modalidade
+    if (filtered.length === 0) {
+      filtered = customStatuses.filter(s => 
+        !s.customerId && s.modality === tripModality
+      );
+    }
+
+    // 4. Se não houver, status gerais sem modalidade
+    if (filtered.length === 0) {
+      filtered = customStatuses.filter(s => 
+        !s.customerId && !s.modality
+      );
+    }
+
+    if (filtered.length > 0) {
+      return filtered
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map(s => ({ label: s.name, value: s.name as TripStatus }));
+    }
+
+    // 5. Fallback para os padrões do sistema
+    return statusService.getOptions(selectedTrip);
+  }, [selectedTrip, customStatuses]);
 
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
@@ -317,7 +372,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status</label>
                   <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                    {statusService.getOptions(selectedTrip).map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    {availableStatusesForSelectedTrip.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
