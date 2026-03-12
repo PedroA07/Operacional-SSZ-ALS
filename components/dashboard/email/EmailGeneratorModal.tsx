@@ -166,6 +166,10 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       // Status com data e hora: "Status: [Nome do Status]" ou "Status: [Nome] [Index]"
       if (c.startsWith('status:')) {
         let targetStatusFull = formula.substring(7).trim();
+        
+        // Remove colchetes se existirem: [Status] -> Status ou [Status] 2 -> Status 2
+        targetStatusFull = targetStatusFull.replace(/\[|\]/g, '').trim();
+
         let index = 1;
         
         // Verifica se há um índice no final (ex: "Status: Chegou no cliente 2")
@@ -191,41 +195,45 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       else if (c.startsWith('previsão:') || c.startsWith('previsao:')) {
         const content = formula.substring(9).trim();
         const plusIndex = content.lastIndexOf('+');
+        
+        let statusPart = content;
+        let addAmountStr = '';
+
         if (plusIndex !== -1) {
-          let statusPart = content.substring(0, plusIndex).trim();
-          const addAmountStr = content.substring(plusIndex + 1).trim().toLowerCase();
-          
-          // Remove prefixo "Status:" se existir dentro da previsão
-          if (statusPart.toLowerCase().startsWith('status:')) {
-            statusPart = statusPart.substring(7).trim();
-          }
+          statusPart = content.substring(0, plusIndex).trim();
+          addAmountStr = content.substring(plusIndex + 1).trim().toLowerCase();
+        }
+        
+        // Remove colchetes e prefixo "Status:" se existirem
+        statusPart = statusPart.replace(/\[|\]/g, '').trim();
+        if (statusPart.toLowerCase().startsWith('status:')) {
+          statusPart = statusPart.substring(7).trim();
+        }
 
-          let index = 1;
-          const parts = statusPart.split(/\s+/);
-          const lastPart = parts[parts.length - 1];
-          if (parts.length > 1 && /^\d+$/.test(lastPart)) {
-            index = parseInt(lastPart);
-            statusPart = parts.slice(0, -1).join(' ');
-          }
+        let index = 1;
+        const parts = statusPart.split(/\s+/);
+        const lastPart = parts[parts.length - 1];
+        if (parts.length > 1 && /^\d+$/.test(lastPart)) {
+          index = parseInt(lastPart);
+          statusPart = parts.slice(0, -1).join(' ');
+        }
 
-          const targetStatus = statusPart.toLowerCase();
-          const matches = trip.statusHistory?.filter(h => h.status.toLowerCase() === targetStatus) || [];
-          const sortedMatches = [...matches].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-          
-          const historyEntry = sortedMatches[index - 1];
-          if (historyEntry) {
-            const baseDate = new Date(historyEntry.dateTime);
-            let addMs = 0;
-            if (addAmountStr.endsWith('h')) {
-              addMs = parseFloat(addAmountStr.replace('h', '')) * 60 * 60 * 1000;
-            } else if (addAmountStr.endsWith('m')) {
-              addMs = parseFloat(addAmountStr.replace('m', '')) * 60 * 1000;
-            }
-            if (addMs > 0) {
-              const predictedDate = new Date(baseDate.getTime() + addMs);
-              value = predictedDate.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-            }
+        const targetStatus = statusPart.toLowerCase();
+        const matches = trip.statusHistory?.filter(h => h.status.toLowerCase() === targetStatus) || [];
+        const sortedMatches = [...matches].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+        
+        const historyEntry = sortedMatches[index - 1];
+        if (historyEntry) {
+          const baseDate = new Date(historyEntry.dateTime);
+          let addMs = 0;
+          if (addAmountStr.endsWith('h')) {
+            addMs = parseFloat(addAmountStr.replace('h', '')) * 60 * 60 * 1000;
+          } else if (addAmountStr.endsWith('m')) {
+            addMs = parseFloat(addAmountStr.replace('m', '')) * 60 * 1000;
           }
+          
+          const finalDate = new Date(baseDate.getTime() + addMs);
+          return finalDate.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
         }
       }
       // Status Atual com data e hora
@@ -385,7 +393,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
   return (
     <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-[95vw] max-h-[90vh] rounded-[2.5rem] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="bg-white w-full max-w-[85vw] max-h-[90vh] rounded-[2.5rem] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
         <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
           <div>
             <h3 className="text-xl font-black uppercase tracking-tight">Gerar E-mail: {template.name}</h3>

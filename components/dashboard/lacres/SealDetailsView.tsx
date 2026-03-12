@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { SealBatch, SealRecord, Driver } from '../../../types';
+import { SealBatch, SealRecord, Driver, Trip } from '../../../types';
 import { db } from '../../../utils/storage';
 import ExcelJS from 'exceljs';
 import { excelSealStyles } from '../../../utils/excelSealStyles';
@@ -13,19 +13,23 @@ interface SealDetailsViewProps {
 const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
   const [records, setRecords] = useState<SealRecord[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [recordsData, driversData] = await Promise.all([
+      const [recordsData, driversData, tripsData] = await Promise.all([
         db.getSealRecords(batch.id),
-        db.getDrivers()
+        db.getDrivers(),
+        db.getTrips()
       ]);
       setRecords(recordsData);
       setDrivers(driversData);
+      setTrips(tripsData);
     } catch (e) {
       console.error("Erro ao carregar detalhes do lote:", e);
     } finally {
@@ -49,6 +53,64 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
       }
     }
     setTimeout(() => setSavingId(null), 500);
+  };
+
+  const handleSmartSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    
+    let updatedCount = 0;
+    const newRecords = [...records];
+
+    for (let i = 0; i < newRecords.length; i++) {
+      const record = newRecords[i];
+      
+      // Só tenta sincronizar se os campos principais estiverem vazios
+      if (!record.containerNumber || !record.booking || !record.driverName) {
+        // Busca viagem que tenha este número de lacre
+        const matchingTrip = trips.find(t => t.seal && t.seal.trim() === record.sealNumber.trim());
+        
+        if (matchingTrip) {
+          let hasChanges = false;
+          
+          if (!record.containerNumber && matchingTrip.container) {
+            record.containerNumber = matchingTrip.container.toUpperCase();
+            hasChanges = true;
+          }
+          
+          if (!record.booking && matchingTrip.booking) {
+            record.booking = matchingTrip.booking.toUpperCase();
+            hasChanges = true;
+          }
+          
+          if (!record.driverName && matchingTrip.driver?.name) {
+            record.driverName = matchingTrip.driver.name.toUpperCase();
+            hasChanges = true;
+          }
+
+          if (!record.reuseDate && matchingTrip.dateTime) {
+            record.reuseDate = matchingTrip.dateTime.split('T')[0];
+            hasChanges = true;
+          }
+
+          if (hasChanges) {
+            try {
+              await db.updateSealRecord(record);
+              updatedCount++;
+            } catch (err) {
+              console.error(`Erro ao sincronizar lacre ${record.sealNumber}:`, err);
+            }
+          }
+        }
+      }
+    }
+
+    if (updatedCount > 0) {
+      setRecords([...newRecords]);
+      // Opcional: mostrar toast de sucesso (se disponível)
+    }
+    
+    setIsSyncing(false);
   };
 
   const filteredRecords = useMemo(() => {
@@ -232,6 +294,23 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
                  <p className="text-lg font-black text-blue-600 leading-none">{stats.available}</p>
               </div>
            </div>
+
+            <button 
+              onClick={handleSmartSync}
+              disabled={isSyncing}
+              className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase shadow-xl transition-all flex items-center gap-2 active:scale-95 ${
+                isSyncing 
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {isSyncing ? (
+                <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeWidth="3"/></svg>
+              )}
+              {isSyncing ? 'Sincronizando...' : 'Sincronização Inteligente'}
+            </button>
 
            <button 
              onClick={exportToExcel}
