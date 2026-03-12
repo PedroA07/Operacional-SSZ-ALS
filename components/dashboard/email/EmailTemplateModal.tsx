@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { EmailTemplate, User, Driver, Staff, Customer, Port, PreStacking } from '../../../types';
+import { EmailTemplate, Trip, EmailTableConfig, User, Driver, Staff, Customer, Port, PreStacking } from '../../../types';
 import { db } from '../../../utils/storage';
 import { showToast } from '../../shared/SimpleToast';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
@@ -12,6 +12,7 @@ interface EmailTemplateModalProps {
   onSuccess: () => void;
   template?: EmailTemplate | null;
   user: User;
+  trips?: Trip[];
 }
 
 const TRIP_STATUSES = [
@@ -23,7 +24,7 @@ const TRIP_STATUSES = [
   'Agendamento realizado'
 ];
 
-const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose, onSuccess, template, user }) => {
+const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose, onSuccess, template, user, trips = [] }) => {
   const [formData, setFormData] = useState<Partial<EmailTemplate>>({
     name: '',
     to: '',
@@ -60,6 +61,33 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
   const [users, setUsers] = useState<User[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [destinations, setDestinations] = useState<(Port | PreStacking)[]>([]);
+
+  const uniqueShips = useMemo(() => {
+    const ships = new Set<string>();
+    trips.forEach(t => {
+      if (t.ship) ships.add(t.ship);
+      if (t.ocFormData?.ship) ships.add(t.ocFormData.ship);
+      if (t.preStackingFormData?.ship) ships.add(t.preStackingFormData.ship);
+    });
+    return Array.from(ships);
+  }, [trips]);
+
+  const uniqueBookings = useMemo(() => {
+    const bookings = new Set<string>();
+    trips.forEach(t => {
+      if (t.booking) bookings.add(t.booking);
+      if (t.ocFormData?.booking) bookings.add(t.ocFormData.booking);
+      if (t.preStackingFormData?.booking) bookings.add(t.preStackingFormData.booking);
+    });
+    return Array.from(bookings);
+  }, [trips]);
+
+  const mapStringItem = (item: string): any => ({
+    id: item,
+    type: 'PORT',
+    mainText: item,
+    originalData: item
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -839,21 +867,30 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                               initialValue={table.defaultFilters?.destination || ''}
                             />
                           </div>
-                          {[
-                            { label: 'Navio', key: 'ship', placeholder: 'Nome do navio...' },
-                            { label: 'Booking', key: 'booking', placeholder: 'Número do booking...' }
-                          ].map(field => (
-                            <div key={field.key}>
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1 mb-1 block">{field.label}</label>
-                              <input 
-                                type="text" 
-                                placeholder={field.placeholder} 
-                                className="w-full px-5 py-4 text-[12px] font-bold text-slate-700 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all outline-none shadow-inner" 
-                                value={(table.defaultFilters as any)?.[field.key] || ''}
-                                onChange={e => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, [field.key]: e.target.value } })}
-                              />
-                            </div>
-                          ))}
+                          <div className="col-span-1">
+                            <AutocompleteSearch 
+                              label="Navio"
+                              placeholder="Nome do navio..."
+                              data={uniqueShips}
+                              onSelect={(s) => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, ship: s } })}
+                              onChange={(val) => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, ship: val } })}
+                              mapToAutocomplete={mapStringItem}
+                              icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v8l9-11h-7z" /></svg>}
+                              initialValue={table.defaultFilters?.ship || ''}
+                            />
+                          </div>
+                          <div className="col-span-1">
+                            <AutocompleteSearch 
+                              label="Booking"
+                              placeholder="Número do booking..."
+                              data={uniqueBookings}
+                              onSelect={(b) => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, booking: b } })}
+                              onChange={(val) => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, booking: val } })}
+                              mapToAutocomplete={mapStringItem}
+                              icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                              initialValue={table.defaultFilters?.booking || ''}
+                            />
+                          </div>
                         </div>
                       </div>
                     )}

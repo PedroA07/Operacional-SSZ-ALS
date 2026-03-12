@@ -317,6 +317,14 @@ export interface DriverCapturedDoc {
   extractedKey?: string; 
 }
 
+export interface CustomStatus {
+  id: string;
+  name: string;
+  customerId?: string; // Se vazio, é status geral
+  orderIndex: number;
+  color?: string;
+}
+
 export interface Trip {
   id: string;
   os: string;

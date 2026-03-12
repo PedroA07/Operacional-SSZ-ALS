@@ -23,9 +23,11 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       destination?: string;
       ship?: string;
       booking?: string;
+      useTodayDate?: boolean;
     }
   }>({});
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [finalHtml, setFinalHtml] = useState('');
   const previewRef = useRef<HTMLDivElement>(null);
 
   const uniqueCustomers = useMemo(() => {
@@ -557,6 +559,17 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
+  // Sincroniza o HTML final quando os dados de origem mudam
+  useEffect(() => {
+    if (isOpen) {
+      const newHtml = generateHtml();
+      setFinalHtml(newHtml);
+      if (previewRef.current) {
+        previewRef.current.innerHTML = newHtml;
+      }
+    }
+  }, [body, tableData, template, isOpen]);
+
   const generateHtml = () => {
     const firstTrip = Object.values(tableData).flat()[0];
     const totalRows = Object.values(tableData).flat().length;
@@ -847,19 +860,47 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                   <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                     <h5 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-2">Filtros da Tabela</h5>
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block">Data Programada</label>
-                        <div className="relative group">
-                          <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      <div className="col-span-2">
+                        <label className="flex items-center gap-3 cursor-pointer group w-fit">
+                          <div className="relative">
+                            <input 
+                              type="checkbox" 
+                              className="hidden"
+                              checked={tableFilters[table.id]?.useTodayDate || false}
+                              onChange={e => {
+                                const isChecked = e.target.checked;
+                                const today = new Date().toISOString().split('T')[0];
+                                setTableFilters(prev => ({ 
+                                  ...prev, 
+                                  [table.id]: { 
+                                    ...prev[table.id], 
+                                    useTodayDate: isChecked,
+                                    date: isChecked ? today : prev[table.id]?.date 
+                                  } 
+                                }));
+                              }}
+                            />
+                            <div className={`w-10 h-6 rounded-full transition-all duration-300 ${tableFilters[table.id]?.useTodayDate ? 'bg-blue-600' : 'bg-slate-200'}`}></div>
+                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${tableFilters[table.id]?.useTodayDate ? 'translate-x-4' : ''}`}></div>
                           </div>
-                          <input type="date" className="w-full pl-12 pr-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-[12px] font-bold uppercase focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm placeholder:text-slate-300" 
-                            value={tableFilters[table.id]?.date || ''}
-                            onChange={e => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], date: e.target.value } }))}
-                          />
-                        </div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-blue-600 transition-colors">Usar data de hoje automaticamente</span>
+                        </label>
                       </div>
-                      <div>
+                      {!tableFilters[table.id]?.useTodayDate && (
+                        <div className="animate-in fade-in zoom-in-95">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block">Data Programada</label>
+                          <div className="relative group">
+                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            </div>
+                            <input type="date" className="w-full pl-12 pr-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-[12px] font-bold uppercase focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm placeholder:text-slate-300" 
+                              value={tableFilters[table.id]?.date || ''}
+                              onChange={e => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], date: e.target.value } }))}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      <div className={tableFilters[table.id]?.useTodayDate ? 'col-span-2' : ''}>
                         <AutocompleteSearch 
                           label="Cliente" 
                           placeholder="Nome do cliente..." 
@@ -908,12 +949,23 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
                           />
                         </div>
-                        <div className="flex items-end pb-1">
+                        <div className="flex items-end pb-1 gap-2">
                           <button 
                             onClick={() => handleApplyFilters(table.id)}
-                            className="px-6 py-4 bg-blue-600 text-white text-[12px] font-black uppercase tracking-widest rounded-[1.5rem] hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/30 h-[56px] flex items-center justify-center"
+                            className="flex-1 px-6 py-4 bg-blue-600 text-white text-[12px] font-black uppercase tracking-widest rounded-[1.5rem] hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/30 h-[56px] flex items-center justify-center"
                           >
                             Filtrar e Preencher
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setTableFilters(prev => ({ ...prev, [table.id]: {} }));
+                              setTableData(prev => ({ ...prev, [table.id]: [] }));
+                              showToast('Filtros limpos', 'info');
+                            }}
+                            className="px-4 py-4 bg-slate-200 text-slate-500 rounded-[1.5rem] hover:bg-slate-300 transition-all h-[56px] flex items-center justify-center"
+                            title="Limpar Filtros"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                           </button>
                         </div>
                       </div>
@@ -986,8 +1038,23 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
             {/* Right Column: Preview */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-              <div className="p-4 bg-slate-900 border-b border-slate-800">
+              <div className="p-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
                 <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Pré-visualização do E-mail</h4>
+                <button 
+                  onClick={() => {
+                    const newHtml = generateHtml();
+                    setFinalHtml(newHtml);
+                    if (previewRef.current) {
+                      previewRef.current.innerHTML = newHtml;
+                    }
+                    showToast('Visualização resetada para o padrão', 'info');
+                  }}
+                  className="text-[9px] font-bold text-slate-400 hover:text-white transition-colors flex items-center gap-1 uppercase"
+                  title="Resetar para o conteúdo gerado automaticamente"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  Resetar Alterações
+                </button>
               </div>
               <div className="p-6 flex-1 overflow-y-auto custom-scrollbar bg-white">
                 <div 
@@ -995,7 +1062,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                   contentEditable={true}
                   suppressContentEditableWarning={true}
                   className="outline-none"
-                  dangerouslySetInnerHTML={{ __html: generateHtml() }} 
+                  onInput={(e) => setFinalHtml(e.currentTarget.innerHTML)}
                 />
               </div>
             </div>

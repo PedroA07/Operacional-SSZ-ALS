@@ -1,6 +1,6 @@
 
-import React, { useMemo, useState, useRef } from 'react';
-import { Trip, User, TripStatus, DriverCapturedDoc } from '../../../types';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { Trip, User, TripStatus, DriverCapturedDoc, CustomStatus } from '../../../types';
 import ScannerModal from '../ScannerModal';
 import { db } from '../../../utils/storage';
 import ImageViewer from '../../shared/ImageViewer';
@@ -40,8 +40,21 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const [scannerInitialImages, setScannerInitialImages] = useState<string[]>([]);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<TripStatus | null>(null);
+  const [customStatuses, setCustomStatuses] = useState<CustomStatus[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      try {
+        const statuses = await db.getCustomStatuses();
+        setCustomStatuses(statuses);
+      } catch (error) {
+        console.error('Erro ao buscar status personalizados:', error);
+      }
+    };
+    fetchStatuses();
+  }, []);
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -106,6 +119,32 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
                      activeTrip.scheduling?.location?.toUpperCase().includes('CRAGEA');
     return isVW && isCragea;
   }, [activeTrip]);
+
+  const availableStatuses = useMemo(() => {
+    if (!activeTrip) return [];
+
+    // 1. Status específicos do cliente
+    const clientStatuses = customStatuses.filter(s => s.customerId === activeTrip.customer.id);
+    if (clientStatuses.length > 0) {
+      return clientStatuses
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map(s => ({ label: s.name, value: s.name as TripStatus }));
+    }
+
+    // 2. Status gerais (sem customerId)
+    const generalStatuses = customStatuses.filter(s => !s.customerId);
+    if (generalStatuses.length > 0) {
+      return generalStatuses
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map(s => ({ label: s.name, value: s.name as TripStatus }));
+    }
+
+    // 3. Fallback para os padrões do sistema (incluindo lógica VW)
+    if (isVWCrageaTrip) {
+      return VW_CRAGEA_STATUSES;
+    }
+    return DEFAULT_STATUSES.map(s => ({ label: s, value: s }));
+  }, [activeTrip, customStatuses, isVWCrageaTrip]);
 
   const handleStatusSelect = (status: TripStatus) => {
     if (isUpdating || activeTrip?.status === status) return;
@@ -277,7 +316,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               
               {showPicker && (
                 <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 duration-300">
-                  {(isVWCrageaTrip ? VW_CRAGEA_STATUSES : DEFAULT_STATUSES.map(s => ({label: s, value: s}))).map((st: any) => (
+                  {availableStatuses.map((st: any) => (
                     <button 
                       key={st.value} 
                       disabled={isUpdating} 

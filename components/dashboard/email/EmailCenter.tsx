@@ -167,6 +167,7 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
           onSuccess={loadTemplates}
           template={selectedTemplate}
           user={user}
+          trips={trips}
         />,
         document.body
       )}

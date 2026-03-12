@@ -3,7 +3,7 @@ import {
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category, 
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession, 
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus, 
-  LoginCredential, EmailTemplate 
+  LoginCredential, EmailTemplate, CustomStatus 
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -638,9 +638,43 @@ export const db = {
     return !error;
   },
 
+  getCustomStatuses: async (): Promise<CustomStatus[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('trip_statuses').select('*').order('order_index');
+    if (error) {
+      console.error('Erro ao buscar status:', error);
+      return [];
+    }
+    return (data || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      customerId: s.customer_id,
+      orderIndex: s.order_index,
+      color: s.color
+    }));
+  },
+
+  saveCustomStatus: async (status: CustomStatus) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('trip_statuses').upsert({
+      id: status.id,
+      name: status.name,
+      customer_id: status.customerId,
+      order_index: status.orderIndex,
+      color: status.color
+    });
+    return !error;
+  },
+
+  deleteCustomStatus: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('trip_statuses').delete().eq('id', id);
+    return !error;
+  },
+
   exportBackup: async () => {
     if (!supabase) return;
-    const tables = ['users', 'drivers', 'customers', 'ports', 'pre_stacking', 'staff', 'trips', 'categories', 'notifications', 'avantida_records', 'avantida_prices', 'logins', 'seal_batches', 'seal_records', 'stay_sessions', 'stay_records', 'email_templates'];
+    const tables = ['users', 'drivers', 'customers', 'ports', 'pre_stacking', 'staff', 'trips', 'categories', 'notifications', 'avantida_records', 'avantida_prices', 'logins', 'seal_batches', 'seal_records', 'stay_sessions', 'stay_records', 'email_templates', 'trip_statuses'];
     const backup: any = {};
     for (const table of tables) {
       const { data } = await supabase.from(table).select('*');
