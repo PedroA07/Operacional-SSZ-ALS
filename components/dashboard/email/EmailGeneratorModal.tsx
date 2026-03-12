@@ -54,7 +54,13 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       .replace(/\{\{HORA_ATUAL\}\}/gi, horaAtual);
 
     if (trip) {
-      // Processamento de condições SE aninhadas (de dentro para fora)
+      // 1. Processa todas as variáveis normais (que não são SE) primeiro
+      result = result.replace(/\{\{(?!SE\()([^}]+)\}\}/gi, (match, p1) => {
+        const val = getCellValue(p1.trim(), trip, rowIndex, totalRows);
+        return val !== '---' ? val : '';
+      });
+
+      // 2. Processamento de condições SE aninhadas (de dentro para fora)
       // Suporta: {{SE(condicao) texto_se_sim SENAO SE(condicao2) texto2 SENAO texto_final}}
       let hasSe = true;
       let safetyCounter = 0;
@@ -114,13 +120,15 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
             replacement = block.text;
             break;
           }
-          // Resolve variáveis dentro da condição se houver (ex: SE({{MOTORISTA}}))
+          
+          // A condição pode já ter sido resolvida no passo 1, ou pode ser uma fórmula complexa
+          // Resolvemos novamente caso tenha sobrado algo
           const resolvedCondition = block.condition.replace(/\{\{([^}]+)\}\}/g, (m, p1) => {
             return getCellValue(p1.trim(), trip, rowIndex, totalRows);
           });
           
           const condValue = getCellValue(resolvedCondition, trip, rowIndex, totalRows);
-          if (condValue && condValue !== '---' && condValue.trim() !== '') {
+          if (condValue && condValue !== '---' && condValue.trim() !== '' && condValue.trim().toUpperCase() !== 'NAO') {
             replacement = block.text;
             break;
           }
@@ -129,12 +137,6 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
         // Substitui o bloco SE processado no resultado
         result = result.substring(0, match.index) + replacement + result.substring(match.index! + match[0].length);
       }
-
-      // Processa as variáveis restantes que não estão em blocos SE
-      result = result.replace(/\{\{([^}]+)\}\}/g, (match, p1) => {
-        const val = getCellValue(p1.trim(), trip, rowIndex, totalRows);
-        return val !== '---' ? val : match;
-      });
     }
 
     return result;
@@ -246,6 +248,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
         }
       }
       else if (c.includes('cpf motorista') || c.includes('cpf')) value = trip.driver?.cpf || '';
+      else if (c.includes('telefone') || c.includes('celular') || c.includes('contato')) value = trip.driver?.phone || '';
       else if (c.includes('placa cavalo') || c.includes('cavalo') || c === 'placa') value = trip.driver?.plateHorse || '';
       else if (c.includes('placa carreta') || c.includes('carreta')) value = trip.driver?.plateTrailer || '';
       else if (c.includes('motorista')) value = trip.driver?.name || '';
@@ -266,6 +269,16 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       else if (c.includes('origem') || c.includes('coleta')) value = trip.customer?.name || '';
       else if (c === 'quantidade linhas' || c === 'quantidade de linhas' || c === 'qtd linhas') value = totalRows !== undefined ? String(totalRows).padStart(2, '0') : '';
       else if (c === 'linha') value = rowIndex !== undefined ? String(rowIndex + 1).padStart(2, '0') : '';
+      else if (c === 'viagem atual' || c === 'viagem atual count') {
+        const driverTrips = trips.filter(t => t.driver?.id === trip.driver?.id && t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
+                                 .sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+        const tripIndex = driverTrips.findIndex(t => t.id === trip.id);
+        if (c === 'viagem atual') {
+          value = tripIndex === 0 ? 'SIM' : '';
+        } else {
+          value = tripIndex >= 0 ? String(tripIndex + 1) : '';
+        }
+      }
 
       if (value && value !== '---') {
         return value.toUpperCase();

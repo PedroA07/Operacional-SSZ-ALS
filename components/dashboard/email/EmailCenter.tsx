@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { User, EmailTemplate, Trip } from '../../../types';
 import { db } from '../../../utils/storage';
 import EmailTemplateModal from './EmailTemplateModal';
@@ -92,7 +93,7 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
                 <p className="text-[7px] text-slate-400 font-bold uppercase mt-1 tracking-tighter">Gestão de Comunicação ALS</p>
               </div>
               <button 
-                onClick={() => { setSelectedTemplate(null); setIsTemplateModalOpen(true); }}
+                onClick={() => { setSelectedTemplate(null); setIsTemplateModalOpen(true); setIsOpen(false); }}
                 className="p-2.5 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-all active:scale-90"
                 title="Novo Modelo"
               >
@@ -159,24 +160,28 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
         </div>
       )}
 
-      <EmailTemplateModal 
-        isOpen={isTemplateModalOpen} 
-        onClose={() => { setIsTemplateModalOpen(false); setSelectedTemplate(null); }} 
-        onSuccess={loadTemplates}
-        template={selectedTemplate}
-        user={user}
-      />
+      {isTemplateModalOpen && createPortal(
+        <EmailTemplateModal 
+          isOpen={isTemplateModalOpen} 
+          onClose={() => { setIsTemplateModalOpen(false); setSelectedTemplate(null); }} 
+          onSuccess={loadTemplates}
+          template={selectedTemplate}
+          user={user}
+        />,
+        document.body
+      )}
 
-      {selectedTemplate && (
+      {selectedTemplate && isGeneratorModalOpen && createPortal(
         <EmailGeneratorModal
           isOpen={isGeneratorModalOpen}
           onClose={() => { setIsGeneratorModalOpen(false); setSelectedTemplate(null); }}
           template={selectedTemplate}
           trips={trips}
-        />
+        />,
+        document.body
       )}
 
-      {templateToDelete && (
+      {templateToDelete && createPortal(
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6">
@@ -203,7 +208,8 @@ const EmailCenter: React.FC<EmailCenterProps> = ({ user, trips }) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

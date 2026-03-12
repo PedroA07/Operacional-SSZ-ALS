@@ -68,7 +68,10 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
       // Só tenta sincronizar se os campos principais estiverem vazios
       if (!record.containerNumber || !record.booking || !record.driverName) {
         // Busca viagem que tenha este número de lacre
-        const matchingTrip = trips.find(t => t.seal && t.seal.trim() === record.sealNumber.trim());
+        const matchingTrip = trips.find(t => {
+          const tripSeal = t.seal || t.ocFormData?.seal || t.preStackingFormData?.seal;
+          return tripSeal && tripSeal.trim() === record.sealNumber.trim();
+        });
         
         if (matchingTrip) {
           let hasChanges = false;
@@ -78,8 +81,9 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
             hasChanges = true;
           }
           
-          if (!record.booking && matchingTrip.booking) {
-            record.booking = matchingTrip.booking.toUpperCase();
+          const tripBooking = matchingTrip.booking || matchingTrip.ocFormData?.booking || matchingTrip.preStackingFormData?.booking;
+          if (!record.booking && tripBooking) {
+            record.booking = tripBooking.toUpperCase();
             hasChanges = true;
           }
           

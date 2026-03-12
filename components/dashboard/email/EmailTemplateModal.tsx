@@ -561,6 +561,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                         <option value="CNPJ PORTO">CNPJ PORTO</option>
                         <option value="MOTORISTA">MOTORISTA</option>
                         <option value="CPF MOTORISTA">CPF MOTORISTA</option>
+                        <option value="TELEFONE MOTORISTA">TELEFONE MOTORISTA</option>
                         <option value="PLACA CAVALO">PLACA CAVALO</option>
                         <option value="PLACA CARRETA">PLACA CARRETA</option>
                         <option value="CONTAINER">CONTAINER</option>
@@ -575,6 +576,8 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                         <option value="ORIGEM">ORIGEM/COLETA</option>
                         <option value="DESTINO">DESTINO/ENTREGA</option>
                         <option value="QUANTIDADE LINHAS">QUANTIDADE LINHAS</option>
+                        <option value="VIAGEM ATUAL">VIAGEM ATUAL (SIM/NÃO)</option>
+                        <option value="VIAGEM ATUAL COUNT">CONTAGEM DA VIAGEM ATUAL</option>
                         <option value="STATUS_ESPECIFICO">STATUS ESPECÍFICO (DATA/HORA)</option>
                       </select>
                       
