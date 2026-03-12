@@ -23,6 +23,8 @@ export interface User {
   isOnlineVisible?: boolean;
   notificationPrefs?: NotificationPreference;
   presence_status?: PresenceStatus;
+  emailCorp?: string;
+  phoneCorp?: string;
 }
 
 export interface LoginCredential {
@@ -158,12 +160,29 @@ export type NotificationType =
 export interface EmailTableConfig {
   id: string;
   title: string;
+  hideTitle?: boolean;
+  hideHeaders?: boolean;
   headerColor: string;
   headerOrientation: 'horizontal' | 'vertical';
   alternateRowColor: boolean;
   columns: string[];
+  columnLabels?: Record<string, string>;
   customCells?: Record<string, string>;
   autoFilter?: string; // Formula to filter trips automatically
+  splitTable?: boolean;
+  splitLeftCondition?: string;
+  splitRightCondition?: string;
+  splitLeftTitle?: string;
+  splitRightTitle?: string;
+  defaultFilters?: {
+    enabled?: boolean;
+    useTodayDate?: boolean;
+    date?: string;
+    customer?: string;
+    destination?: string;
+    ship?: string;
+    booking?: string;
+  };
 }
 
 export interface EmailTemplate {

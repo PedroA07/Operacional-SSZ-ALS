@@ -84,9 +84,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       .sort((a, b) => a.category.localeCompare(b.category));
   }, [categories, customers]);
 
-  const loadAllData = useCallback(async (isInitial = false) => {
+  const loadAllData = useCallback(async (isInitial = false, silent = false) => {
     if (isInitial) setIsLoadingInitial(true);
-    setIsSyncing(true);
+    if (!silent) setIsSyncing(true);
     
     try {
       const responses = await Promise.allSettled([
@@ -116,21 +116,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       console.error("Erro na sincronização ALS:", e);
     } finally {
       setIsLoadingInitial(false);
-      setIsSyncing(false);
+      if (!silent) setIsSyncing(false);
     }
   }, []);
 
   useEffect(() => { 
     loadAllData(true);
 
-    const refreshDataInterval = setInterval(() => loadAllData(false), 30000);
+    const refreshDataInterval = setInterval(() => loadAllData(false, true), 30000);
 
     let channel: any = null;
     if (supabase) {
       channel = supabase
         .channel('db-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
-          loadAllData(false);
+          loadAllData(false, true);
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') setIsRealtimeActive(true);

@@ -7,6 +7,7 @@ interface AutocompleteSearchProps {
   placeholder: string;
   data: any[];
   onSelect: (item: any) => void;
+  onChange?: (value: string) => void;
   mapToAutocomplete: (item: any) => AutocompleteItem;
   icon?: React.ReactNode;
   required?: boolean;
@@ -14,7 +15,7 @@ interface AutocompleteSearchProps {
 }
 
 const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({ 
-  label, placeholder, data, onSelect, mapToAutocomplete, icon, required, initialValue = ''
+  label, placeholder, data, onSelect, onChange, mapToAutocomplete, icon, required, initialValue = ''
 }) => {
   const [query, setQuery] = useState(initialValue);
   const [isOpen, setIsOpen] = useState(false);
@@ -37,6 +38,7 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
 
   const handleSearch = (val: string) => {
     setQuery(val);
+    if (onChange) onChange(val);
     if (val.length < 1) {
       setResults([]);
       setIsOpen(false);
@@ -62,7 +64,9 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
   };
 
   const handleSelectItem = (item: AutocompleteItem) => {
-    setQuery(item.type === 'DRIVER' ? item.mainText : (item.subText || item.mainText));
+    const val = item.type === 'DRIVER' ? item.mainText : (item.subText || item.mainText);
+    setQuery(val);
+    if (onChange) onChange(val);
     onSelect(item.originalData);
     setIsOpen(false);
   };
@@ -101,20 +105,22 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
                 {/* Cabeçalho do Item */}
                 <div className="flex justify-between items-start w-full">
                   <div className="flex-1 min-w-0">
-                    <span className="text-[12px] font-black text-slate-900 uppercase leading-none block truncate group-hover:text-blue-600 transition-colors">
+                    <span className="text-[12px] font-black text-slate-900 uppercase leading-tight block whitespace-normal break-words group-hover:text-blue-600 transition-colors">
                       {item.mainText}
                     </span>
                     {item.type !== 'DRIVER' && item.subText && (
-                      <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 block">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 block whitespace-normal break-words">
                         FAN: {item.subText}
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-col items-end shrink-0 ml-4">
-                    <span className="text-[9px] font-mono font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
-                      {item.document}
-                    </span>
-                  </div>
+                  {item.document && (
+                    <div className="flex flex-col items-end shrink-0 ml-4">
+                      <span className="text-[9px] font-mono font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                        {item.document}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Layout Condicional para Motorista */}
@@ -129,14 +135,14 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
                        <span className="text-[10px] font-mono font-bold text-emerald-700">{item.location}</span>
                     </div>
                   </div>
-                ) : (
+                ) : item.location ? (
                   <div className="flex items-center gap-2 pt-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500/40"></div>
                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-tight">
                       {item.location}
                     </span>
                   </div>
-                )}
+                ) : null}
               </button>
             ))}
           </div>

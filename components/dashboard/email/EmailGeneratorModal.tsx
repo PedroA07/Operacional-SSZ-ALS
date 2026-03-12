@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { EmailTemplate, Trip, EmailTableConfig } from '../../../types';
 import { showToast } from '../../shared/SimpleToast';
+import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import { AutocompleteItem } from '../../../utils/searchService';
 
 interface EmailGeneratorModalProps {
   isOpen: boolean;
@@ -14,8 +16,63 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
   const [body, setBody] = useState(template.body);
   const [tableData, setTableData] = useState<{ [tableId: string]: Trip[] }>({});
   const [searchTerm, setSearchTerm] = useState<{ [tableId: string]: string }>({});
+  const [tableFilters, setTableFilters] = useState<{
+    [tableId: string]: {
+      date?: string;
+      customer?: string;
+      destination?: string;
+      ship?: string;
+      booking?: string;
+    }
+  }>({});
   const [attachments, setAttachments] = useState<File[]>([]);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  const uniqueCustomers = useMemo(() => {
+    const customers = new Map();
+    trips.forEach(t => {
+      if (t.customer && t.customer.name) {
+        customers.set(t.customer.name, t.customer.name);
+      }
+    });
+    return Array.from(customers.values());
+  }, [trips]);
+
+  const uniqueDestinations = useMemo(() => {
+    const dests = new Set<string>();
+    trips.forEach(t => {
+      if (t.destination?.name) dests.add(t.destination.name);
+      if (t.scheduling?.location) dests.add(t.scheduling.location);
+    });
+    return Array.from(dests);
+  }, [trips]);
+
+  const uniqueShips = useMemo(() => {
+    const ships = new Set<string>();
+    trips.forEach(t => {
+      if (t.ship) ships.add(t.ship);
+      if (t.ocFormData?.ship) ships.add(t.ocFormData.ship);
+      if (t.preStackingFormData?.ship) ships.add(t.preStackingFormData.ship);
+    });
+    return Array.from(ships);
+  }, [trips]);
+
+  const uniqueBookings = useMemo(() => {
+    const bookings = new Set<string>();
+    trips.forEach(t => {
+      if (t.booking) bookings.add(t.booking);
+      if (t.ocFormData?.booking) bookings.add(t.ocFormData.booking);
+      if (t.preStackingFormData?.booking) bookings.add(t.preStackingFormData.booking);
+    });
+    return Array.from(bookings);
+  }, [trips]);
+
+  const mapStringItem = (item: string): AutocompleteItem => ({
+    id: item,
+    type: 'PORT', // Reusing PORT type as it has a simple layout
+    mainText: item,
+    originalData: item
+  });
 
   // Ensure template has tables
   const tables: EmailTableConfig[] = template.config.tables || [{
@@ -44,8 +101,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       .replace(/\{\{HORA_ATUAL\}\}/gi, horaAtual);
 
     if (trip) {
-      // 1. Processa todas as variáveis normais (que não são SE) primeiro
-      result = result.replace(/\{\{(?!SE\()([^}]+)\}\}/gi, (match, p1) => {
+      // 1. Processa todas as variáveis normais (que não são SE, TABELA ou COLUNAS) primeiro
+      result = result.replace(/\{\{(?!SE\(|TABELA:|COLUNAS:)([^}]+)\}\}/gi, (match, p1) => {
         const val = getCellValue(p1.trim(), trip, rowIndex, totalRows);
         return val !== '---' ? val : '';
       });
@@ -148,7 +205,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     }));
   };
 
-  const getCellValue = (col: string, trip: Trip, rowIndex?: number, totalRows?: number) => {
+  const getCellValue = (col: string, trip: Trip, rowIndex?: number, totalRows?: number, fallback: string = '---') => {
     const formulas = col.split(/\s+ou\s+|\|/i).map(s => s.trim());
     
     for (const formula of formulas) {
@@ -275,7 +332,124 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       }
     }
     
-    return '---';
+    return fallback;
+  };
+
+  const evaluateCondition = (conditionStr: string, trip: Trip, rowIndex?: number, totalRows?: number): boolean => {
+    if (!conditionStr || conditionStr.trim() === '') return true;
+    
+    // Suporte para múltiplas condições com ' ou ' (OR) ou '|' - Regex mais robusta
+    const orRegex = /\s+ou\s+|\|/i;
+    if (orRegex.test(conditionStr)) {
+      const conditions = conditionStr.split(orRegex);
+      return conditions.some(cond => {
+        const trimmed = cond.trim();
+        if (!trimmed) return false;
+        return evaluateSingleCondition(trimmed, trip, rowIndex, totalRows);
+      });
+    }
+    
+    return evaluateSingleCondition(conditionStr, trip, rowIndex, totalRows);
+  };
+
+  const evaluateSingleCondition = (conditionStr: string, trip: Trip, rowIndex?: number, totalRows?: number): boolean => {
+    const filterStr = conditionStr.trim();
+    let operator = '';
+    if (filterStr.includes('!=')) operator = '!=';
+    else if (filterStr.includes('=')) operator = '=';
+    else if (filterStr.toLowerCase().includes(' contém ')) operator = 'contém';
+    else if (filterStr.toLowerCase().includes(' contem ')) operator = 'contem';
+    else if (filterStr.toLowerCase().includes(' em ')) operator = 'em';
+
+    if (!operator) return false;
+
+    const parts = filterStr.split(new RegExp(`\\s*(?:!=|=|contém|contem|em)\\s*`, 'i'));
+    if (parts.length !== 2) return false;
+
+    const normalize = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+    const leftExpr = parts[0].trim();
+    const rightValue = normalize(parts[1].trim());
+
+    let leftValue = '';
+    if (leftExpr.startsWith('{{') && leftExpr.endsWith('}}')) {
+      const varName = leftExpr.substring(2, leftExpr.length - 2);
+      leftValue = normalize(getCellValue(varName, trip, rowIndex, totalRows, ''));
+    } else if (!leftExpr.includes('{{')) {
+      // Se não tem chaves, assume que é o nome da variável diretamente
+      leftValue = normalize(getCellValue(leftExpr, trip, rowIndex, totalRows, ''));
+      // Se getCellValue retornar vazio (não encontrou), tenta replaceVars
+      if (leftValue === '') {
+        leftValue = normalize(replaceVars(leftExpr, trip, rowIndex, totalRows));
+      }
+    } else {
+      leftValue = normalize(replaceVars(leftExpr, trip, rowIndex, totalRows));
+    }
+
+    if (operator === '=') return leftValue === rightValue;
+    if (operator === '!=') return leftValue !== rightValue;
+    if (operator === 'contém' || operator === 'contem') return leftValue.includes(rightValue);
+    if (operator === 'em') {
+      const options = rightValue.split(',').map(s => normalize(s.trim()));
+      return options.includes(leftValue);
+    }
+    return false;
+  };
+
+  const handleApplyFilters = (tableId: string) => {
+    const filters = tableFilters[tableId];
+    if (!filters) return;
+
+    let filteredTrips = [...trips];
+
+    if (filters.date) {
+      filteredTrips = filteredTrips.filter(t => {
+        const tripDate = t.dateTime ? new Date(t.dateTime).toISOString().split('T')[0] : null;
+        const scheduledDate = t.scheduledDateTime ? new Date(t.scheduledDateTime).toISOString().split('T')[0] : null;
+        const schedulingDate = t.scheduling?.dateTime ? new Date(t.scheduling.dateTime).toISOString().split('T')[0] : null;
+        
+        return tripDate === filters.date || scheduledDate === filters.date || schedulingDate === filters.date;
+      });
+    }
+
+    if (filters.customer) {
+      filteredTrips = filteredTrips.filter(t => 
+        t.customer?.name?.toLowerCase().includes(filters.customer!.toLowerCase())
+      );
+    }
+
+    if (filters.destination) {
+      filteredTrips = filteredTrips.filter(t => 
+        t.destination?.name?.toLowerCase().includes(filters.destination!.toLowerCase()) ||
+        t.scheduling?.location?.toLowerCase().includes(filters.destination!.toLowerCase())
+      );
+    }
+
+    if (filters.ship) {
+      filteredTrips = filteredTrips.filter(t => {
+        const ship = t.ship || t.ocFormData?.ship || t.preStackingFormData?.ship || '';
+        return ship.toLowerCase().includes(filters.ship!.toLowerCase());
+      });
+    }
+
+    if (filters.booking) {
+      filteredTrips = filteredTrips.filter(t => {
+        const booking = t.booking || t.ocFormData?.booking || t.preStackingFormData?.booking || '';
+        return booking.toLowerCase().includes(filters.booking!.toLowerCase());
+      });
+    }
+
+    const table = tables.find(t => t.id === tableId);
+    if (table?.autoFilter && table.autoFilter.trim() !== '') {
+      filteredTrips = filteredTrips.filter(t => evaluateCondition(table.autoFilter!, t));
+    }
+
+    setTableData(prev => ({
+      ...prev,
+      [tableId]: filteredTrips
+    }));
+    
+    showToast(`${filteredTrips.length} viagens encontradas e adicionadas à tabela.`, 'success');
   };
 
   useEffect(() => {
@@ -286,73 +460,81 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       setAttachments([]);
 
       const initialTableData: { [tableId: string]: Trip[] } = {};
+      const initialTableFilters: { [tableId: string]: any } = {};
       
       tables.forEach(table => {
-        initialTableData[table.id] = [];
+        let filteredTrips = [...trips];
+        
+        if (table.defaultFilters && table.defaultFilters.enabled) {
+          const filters = { ...table.defaultFilters };
+          
+          if (filters.useTodayDate) {
+            filters.date = new Date().toISOString().split('T')[0];
+          }
+          
+          initialTableFilters[table.id] = filters;
+
+          if (filters.date) {
+            filteredTrips = filteredTrips.filter(t => t.dateTime.startsWith(filters.date!));
+          }
+
+          if (filters.customer) {
+            filteredTrips = filteredTrips.filter(t => 
+              t.customer?.name?.toLowerCase().includes(filters.customer!.toLowerCase())
+            );
+          }
+
+          if (filters.destination) {
+            filteredTrips = filteredTrips.filter(t => 
+              t.destination?.name?.toLowerCase().includes(filters.destination!.toLowerCase()) ||
+              t.scheduling?.location?.toLowerCase().includes(filters.destination!.toLowerCase())
+            );
+          }
+
+          if (filters.ship) {
+            filteredTrips = filteredTrips.filter(t => {
+              const ship = t.ship || t.ocFormData?.ship || t.preStackingFormData?.ship || '';
+              return ship.toLowerCase().includes(filters.ship!.toLowerCase());
+            });
+          }
+
+          if (filters.booking) {
+            filteredTrips = filteredTrips.filter(t => {
+              const booking = t.booking || t.ocFormData?.booking || t.preStackingFormData?.booking || '';
+              return booking.toLowerCase().includes(filters.booking!.toLowerCase());
+            });
+          }
+        }
         
         if (table.autoFilter && table.autoFilter.trim() !== '') {
-          const filterStr = table.autoFilter.trim();
-          let operator = '';
-          if (filterStr.includes('!=')) operator = '!=';
-          else if (filterStr.includes('=')) operator = '=';
-          else if (filterStr.toLowerCase().includes(' contém ')) operator = 'contém';
-          else if (filterStr.toLowerCase().includes(' contem ')) operator = 'contem';
-          else if (filterStr.toLowerCase().includes(' em ')) operator = 'em';
-
-          if (operator) {
-            const parts = filterStr.split(new RegExp(`\\s*(?:!=|=|contém|contem|em)\\s*`, 'i'));
-            if (parts.length === 2) {
-              const leftExpr = parts[0].trim();
-              const rightValue = parts[1].trim().toLowerCase();
-
-              trips.forEach(trip => {
-                let leftValue = '';
-                if (leftExpr.startsWith('{{') && leftExpr.endsWith('}}')) {
-                  const varName = leftExpr.substring(2, leftExpr.length - 2);
-                  leftValue = getCellValue(varName, trip).toLowerCase();
-                } else {
-                  leftValue = replaceVars(leftExpr, trip).toLowerCase();
-                }
-
-                let matches = false;
-                if (operator === '=') matches = leftValue === rightValue;
-                else if (operator === '!=') matches = leftValue !== rightValue;
-                else if (operator === 'contém' || operator === 'contem') matches = leftValue.includes(rightValue);
-                else if (operator === 'em') {
-                  const options = rightValue.split(',').map(s => s.trim());
-                  matches = options.includes(leftValue);
-                }
-
-                if (matches) {
-                  initialTableData[table.id].push(trip);
-                }
-              });
-            }
-          }
-        } else {
-          // If no autoFilter, add all selected trips to this table
-          initialTableData[table.id] = [...trips];
+          filteredTrips = filteredTrips.filter(trip => evaluateCondition(table.autoFilter!, trip));
+        } else if (!table.defaultFilters?.enabled) {
+          // Se não tem autoFilter nem defaultFilters habilitado, não preenche nada automaticamente
+          filteredTrips = [];
         }
+
+        initialTableData[table.id] = filteredTrips;
       });
 
+      setTableFilters(initialTableFilters);
       setTableData(initialTableData);
     }
-  }, [isOpen, template, trips]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const generateHtml = () => {
     const firstTrip = Object.values(tableData).flat()[0];
     const totalRows = Object.values(tableData).flat().length;
     let finalBody = replaceVars(body, firstTrip, undefined, totalRows);
 
-    let tablesHtml = '';
+    const generatedTables: Record<string, string> = {};
+    const usedTables = new Set<string>();
 
     tables.forEach(table => {
       const data = tableData[table.id] || [];
       
-      // If table has no data, remove its placeholder from the body and skip
       if (data.length === 0) {
-        const placeholderRegex = new RegExp(`\\{\\{TABELA:\\s*${table.title}\\}\\}`, 'gi');
-        finalBody = finalBody.replace(placeholderRegex, '');
+        generatedTables[table.title.toLowerCase()] = '';
         return;
       }
 
@@ -360,70 +542,152 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       const cellStyle = `background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; font-weight: bold; text-transform: uppercase;`;
       const altCellStyle = `background-color: #f8fafc; color: #000000; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; font-weight: bold; text-transform: uppercase;`;
 
-      let tableHtml = '';
+      const renderSubTable = (subData: Trip[], subTitle?: string) => {
+        let html = '';
+        if (subTitle && !table.hideTitle) {
+          html += `<h4 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 10px; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; text-align: center;">${subTitle}</h4>`;
+        }
 
-      if (table.title) {
-        tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase;">${table.title}</h3>`;
-      }
-
-      if (table.headerOrientation === 'horizontal') {
-        tableHtml += `
-          <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
-            <thead>
-              <tr>
-                ${table.columns.map(col => `<th style="${headerStyle}">${col}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${data.map((trip, idx) => `
+        if (table.headerOrientation === 'horizontal') {
+          html += `
+            <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
+              ${!table.hideHeaders ? `
+              <thead>
                 <tr>
                   ${table.columns.map(col => {
-                    const style = table.alternateRowColor && idx % 2 !== 0 ? altCellStyle : cellStyle;
-                    const customCell = table.customCells?.[col];
-                    const value = customCell 
-                      ? (customCell.includes('{{') ? replaceVars(customCell, trip, idx, totalRows) : getCellValue(customCell, trip, idx, totalRows))
-                      : getCellValue(col, trip, idx, totalRows);
-                    return `<td style="${style}">${value}</td>`;
+                    const label = table.columnLabels?.[col] || col;
+                    return `<th style="${headerStyle}">${label}</th>`;
                   }).join('')}
                 </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        `;
+              </thead>
+              ` : ''}
+              <tbody>
+                ${subData.length > 0 ? subData.map((trip, idx) => `
+                  <tr>
+                    ${table.columns.map(col => {
+                      const style = table.alternateRowColor && idx % 2 !== 0 ? altCellStyle : cellStyle;
+                      const customCell = table.customCells?.[col];
+                      const value = customCell 
+                        ? (customCell.includes('{{') ? replaceVars(customCell, trip, idx, totalRows) : getCellValue(customCell, trip, idx, totalRows))
+                        : getCellValue(col, trip, idx, totalRows);
+                      return `<td style="${style}">${value}</td>`;
+                    }).join('')}
+                  </tr>
+                `).join('') : `
+                  <tr>
+                    <td colspan="${table.columns.length}" style="${cellStyle}">Nenhum registro encontrado</td>
+                  </tr>
+                `}
+              </tbody>
+            </table>
+          `;
+        } else {
+          if (subData.length === 0) {
+            html += `<p style="font-family: Arial, sans-serif; color: #64748b; font-size: 12px; text-align: center; margin-bottom: 20px;">Nenhum registro encontrado</p>`;
+          } else {
+            html += subData.map((trip, idx) => `
+              <table style="border-collapse: collapse; width: 100%; max-width: 400px; margin-bottom: 25px; table-layout: fixed;">
+                ${table.columns.map((col) => {
+                  const style = cellStyle;
+                  const customCell = table.customCells?.[col];
+                  const label = table.columnLabels?.[col] || col;
+                  const value = customCell 
+                    ? (customCell.includes('{{') ? replaceVars(customCell, trip, idx, totalRows) : getCellValue(customCell, trip, idx, totalRows))
+                    : getCellValue(col, trip, idx, totalRows);
+                  
+                  return `
+                    <tr>
+                      ${!table.hideHeaders ? `<td style="${headerStyle}; width: 140px;">${label.toUpperCase()}</td>` : ''}
+                      <td style="${style}">${value}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </table>
+            `).join('');
+          }
+        }
+        return html;
+      };
+
+      let tableHtml = '';
+
+      if (table.splitTable) {
+        const leftData = data.filter(trip => evaluateCondition(table.splitLeftCondition || '', trip));
+        const rightData = data.filter(trip => evaluateCondition(table.splitRightCondition || '', trip));
+
+        const leftHtml = renderSubTable(leftData, table.splitLeftTitle);
+        const rightHtml = renderSubTable(rightData, table.splitRightTitle);
+
+        if (table.title && !table.hideTitle) {
+          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase;">${table.title}</h3>`;
+        }
+
+        if (leftHtml && rightHtml) {
+          tableHtml += `
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+              <tr>
+                <td style="width: 50%; vertical-align: top; padding-right: 10px;">${leftHtml}</td>
+                <td style="width: 50%; vertical-align: top; padding-left: 10px;">${rightHtml}</td>
+              </tr>
+            </table>
+          `;
+        } else {
+          tableHtml += leftHtml || rightHtml;
+        }
       } else {
-        tableHtml += data.map((trip, idx) => `
-          <table style="border-collapse: collapse; width: 400px; margin-bottom: 25px; table-layout: fixed;">
-            ${table.columns.map((col) => {
-              const style = cellStyle;
-              const customCell = table.customCells?.[col];
-              const value = customCell 
-                ? (customCell.includes('{{') ? replaceVars(customCell, trip, idx, totalRows) : getCellValue(customCell, trip, idx, totalRows))
-                : getCellValue(col, trip, idx, totalRows);
-              
-              return `
-                <tr>
-                  <td style="${headerStyle}; width: 140px;">${col.toUpperCase()}</td>
-                  <td style="${style}">${value}</td>
-                </tr>
-              `;
-            }).join('')}
-          </table>
-        `).join('');
+        if (table.title && !table.hideTitle) {
+          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase;">${table.title}</h3>`;
+        }
+        tableHtml += renderSubTable(data);
       }
 
-      // Check if there is a placeholder for this table in the body
-      const placeholderRegex = new RegExp(`\\{\\{TABELA:\\s*${table.title}\\}\\}`, 'gi');
-      if (placeholderRegex.test(finalBody)) {
-        finalBody = finalBody.replace(placeholderRegex, tableHtml);
-      } else {
-        tablesHtml += tableHtml;
+      generatedTables[table.title.trim().toLowerCase()] = tableHtml;
+    });
+
+    // Process {{COLUNAS: Tabela 1 | Tabela 2}}
+    finalBody = finalBody.replace(/\{\{COLUNAS:\s*([^}]+)\}\}/gi, (match, p1) => {
+      const tableNames = p1.split('|').map((s: string) => s.trim());
+      const validHtmls = tableNames.map((name: string) => {
+        const lowerName = name.toLowerCase();
+        usedTables.add(lowerName);
+        return generatedTables[lowerName] || '';
+      }).filter((html: string) => html !== '');
+
+      if (validHtmls.length === 0) return '';
+      if (validHtmls.length === 1) return validHtmls[0];
+
+      const width = Math.floor(100 / validHtmls.length);
+      
+      let colsHtml = `<table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;"><tr>`;
+      validHtmls.forEach((html: string, idx: number) => {
+        const padding = idx === 0 ? 'padding-right: 10px;' : idx === validHtmls.length - 1 ? 'padding-left: 10px;' : 'padding: 0 10px;';
+        colsHtml += `<td style="width: ${width}%; vertical-align: top; ${padding}">${html}</td>`;
+      });
+      colsHtml += `</tr></table>`;
+      
+      return colsHtml;
+    });
+
+    // Process {{TABELA: Nome}}
+    finalBody = finalBody.replace(/\{\{TABELA:\s*([^}]+)\}\}/gi, (match, p1) => {
+      const name = p1.trim().toLowerCase();
+      usedTables.add(name);
+      return generatedTables[name] || '';
+    });
+
+    // Append unused tables
+    let leftoverTablesHtml = '';
+    tables.forEach(table => {
+      const name = table.title.toLowerCase();
+      if (!usedTables.has(name) && generatedTables[name]) {
+        leftoverTablesHtml += generatedTables[name];
       }
     });
 
     return `
       <div style="font-family: Arial, sans-serif; color: #334155;">
         <div style="white-space: pre-wrap; margin-bottom: 20px;">${finalBody}</div>
-        ${tablesHtml}
+        ${leftoverTablesHtml}
       </div>
     `;
   };
@@ -543,6 +807,83 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                       {(tableData[table.id] || []).length} Registros
                     </span>
                   </div>
+
+                  {/* Filtros da Tabela */}
+                  <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <h5 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-2">Filtros da Tabela</h5>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block">Data Programada</label>
+                        <div className="relative group">
+                          <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          </div>
+                          <input type="date" className="w-full pl-12 pr-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-[12px] font-bold uppercase focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm placeholder:text-slate-300" 
+                            value={tableFilters[table.id]?.date || ''}
+                            onChange={e => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], date: e.target.value } }))}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <AutocompleteSearch 
+                          label="Cliente" 
+                          placeholder="Nome do cliente..." 
+                          data={uniqueCustomers} 
+                          onSelect={(c) => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], customer: c } }))} 
+                          onChange={(val) => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], customer: val } }))}
+                          mapToAutocomplete={mapStringItem} 
+                          initialValue={tableFilters[table.id]?.customer || ''}
+                          icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
+                        />
+                      </div>
+                      <div>
+                        <AutocompleteSearch 
+                          label="Destino" 
+                          placeholder="Destino..." 
+                          data={uniqueDestinations} 
+                          onSelect={(d) => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], destination: d } }))} 
+                          onChange={(val) => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], destination: val } }))}
+                          mapToAutocomplete={mapStringItem} 
+                          initialValue={tableFilters[table.id]?.destination || ''}
+                          icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
+                        />
+                      </div>
+                      <div>
+                        <AutocompleteSearch 
+                          label="Navio" 
+                          placeholder="Nome do navio..." 
+                          data={uniqueShips} 
+                          onSelect={(s) => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], ship: s } }))} 
+                          onChange={(val) => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], ship: val } }))}
+                          mapToAutocomplete={mapStringItem} 
+                          initialValue={tableFilters[table.id]?.ship || ''}
+                          icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v8l9-11h-7z" /></svg>}
+                        />
+                      </div>
+                      <div className="col-span-2 flex gap-4">
+                        <div className="flex-1">
+                          <AutocompleteSearch 
+                            label="Booking" 
+                            placeholder="Número do booking..." 
+                            data={uniqueBookings} 
+                            onSelect={(b) => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], booking: b } }))} 
+                            onChange={(val) => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], booking: val } }))}
+                            mapToAutocomplete={mapStringItem} 
+                            initialValue={tableFilters[table.id]?.booking || ''}
+                            icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                          />
+                        </div>
+                        <div className="flex items-end pb-1">
+                          <button 
+                            onClick={() => handleApplyFilters(table.id)}
+                            className="px-6 py-4 bg-blue-600 text-white text-[12px] font-black uppercase tracking-widest rounded-[1.5rem] hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/30 h-[56px] flex items-center justify-center"
+                          >
+                            Filtrar e Preencher
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   
                   <div className="space-y-2 relative">
                     <div className="flex justify-between items-center">
@@ -595,7 +936,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                         <div key={trip.id} className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
                           <div>
                             <span className="text-[10px] font-black text-slate-700 uppercase">{trip.os || 'LINHA VAZIA'}</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase ml-2">{trip.status}</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase ml-2">{trip.container || 'SEM CONTAINER'} - {trip.status}</span>
                           </div>
                           <button onClick={() => handleRemoveTrip(table.id, trip.id)} className="text-slate-400 hover:text-red-500">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>

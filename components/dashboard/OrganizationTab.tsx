@@ -296,7 +296,7 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
           </button>
           <button 
             onClick={() => onConfirm(locationId, dateTime)}
-            disabled={!locationId || !dateTime}
+            disabled={!locationId}
             className="flex-1 px-6 py-5 bg-slate-900 text-white rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             Confirmar Agendamento
@@ -315,6 +315,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
@@ -346,9 +347,20 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                            
       return isAfterStartDate && isNotFinished;
     });
-    setTrips(filtered);
+
+    // Mescla com o estado local, preservando viagens que estão sendo salvas
+    setTrips(prev => {
+      return filtered.map(newTrip => {
+        if (savingIds.has(newTrip.id)) {
+          const localTrip = prev.find(t => t.id === newTrip.id);
+          return localTrip || newTrip;
+        }
+        return newTrip;
+      });
+    });
+    
     setIsLoading(false);
-  }, [propTrips]);
+  }, [propTrips, savingIds]);
 
   // Processa locais a partir das props
   useEffect(() => {
@@ -389,13 +401,33 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, []);
 
   const handleToggleNF = useCallback(async (trip: Trip, checked: boolean) => {
+    const originalTrip = { ...trip };
     const updatedTrip = { ...trip, sentNF: checked };
+    
+    // Atualização otimista
+    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+    setSavingIds(prev => new Set(prev).add(trip.id));
+
     try {
       await db.saveTrip(updatedTrip);
-      setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+      // Remove do set de salvamento após sucesso
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(trip.id);
+        return next;
+      });
     } catch (error) {
+      // Reverte em caso de erro
+      setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(trip.id);
+        return next;
+      });
       console.error("Erro ao salvar NF:", error);
-      alert("Erro ao salvar status da NF. Verifique se a coluna sent_nf existe no banco de dados.");
+      window.dispatchEvent(new CustomEvent('als_show_toast', { 
+        detail: { message: 'Erro ao salvar NF no banco de dados', type: 'error' } 
+      }));
     }
   }, []);
 
@@ -404,6 +436,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       setSelectedTripForScheduling(trip);
       setIsSchedulingModalOpen(true);
     } else {
+      const originalTrip = { ...trip };
       const updatedTrip: Trip = { 
         ...trip, 
         isScheduled: false,
@@ -411,12 +444,30 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         scheduledDateTime: '',
         scheduling: trip.scheduling ? { ...trip.scheduling, locationId: '', location: '', dateTime: '' } : null
       };
+
+      // Atualização otimista
+      setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+      setSavingIds(prev => new Set(prev).add(trip.id));
+
       try {
         await db.saveTrip(updatedTrip);
-        setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+        setSavingIds(prev => {
+          const next = new Set(prev);
+          next.delete(trip.id);
+          return next;
+        });
       } catch (error) {
+        // Reverte em caso de erro
+        setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
+        setSavingIds(prev => {
+          const next = new Set(prev);
+          next.delete(trip.id);
+          return next;
+        });
         console.error("Erro ao remover agendamento:", error);
-        alert("Erro ao remover agendamento. Verifique se as colunas necessárias existem no banco de dados.");
+        window.dispatchEvent(new CustomEvent('als_show_toast', { 
+          detail: { message: 'Erro ao remover agendamento', type: 'error' } 
+        }));
       }
     }
   }, []);
@@ -424,6 +475,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const handleConfirmScheduling = useCallback(async (locationId: string, dateTime: string) => {
     if (!selectedTripForScheduling) return;
 
+    const originalTrip = { ...selectedTripForScheduling };
     const selectedLoc = locations.find(l => l.id === locationId);
     const updatedTrip: Trip = {
       ...selectedTripForScheduling,
@@ -446,18 +498,37 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       }
     };
 
+    // Atualização otimista e fecha o modal imediatamente
+    const tripId = selectedTripForScheduling.id;
+    setTrips(prev => prev.map(t => t.id === tripId ? updatedTrip : t));
+    setSavingIds(prev => new Set(prev).add(tripId));
+    setIsSchedulingModalOpen(false);
+    setSelectedTripForScheduling(null);
+
     try {
       await db.saveTrip(updatedTrip);
-      setTrips(prev => prev.map(t => t.id === selectedTripForScheduling.id ? updatedTrip : t));
-      setIsSchedulingModalOpen(false);
-      setSelectedTripForScheduling(null);
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(tripId);
+        return next;
+      });
     } catch (error) {
+      // Reverte em caso de erro
+      setTrips(prev => prev.map(t => t.id === tripId ? originalTrip : t));
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(tripId);
+        return next;
+      });
       console.error("Erro ao salvar agendamento:", error);
-      alert("Erro ao salvar agendamento. Verifique se as colunas necessárias existem no banco de dados.");
+      window.dispatchEvent(new CustomEvent('als_show_toast', { 
+        detail: { message: 'Erro ao salvar agendamento', type: 'error' } 
+      }));
     }
   }, [selectedTripForScheduling, locations]);
 
   const handleLocationChange = useCallback(async (trip: Trip, locationId: string) => {
+    const originalTrip = { ...trip };
     const selectedLoc = locations.find(l => l.id === locationId);
     const updatedTrip: Trip = { 
       ...trip, 
@@ -477,16 +548,35 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         obs: trip.scheduling?.obs || ''
       }
     };
+
+    // Atualização otimista
+    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+    setSavingIds(prev => new Set(prev).add(trip.id));
+
     try {
       await db.saveTrip(updatedTrip);
-      setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(trip.id);
+        return next;
+      });
     } catch (error) {
+      // Reverte em caso de erro
+      setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(trip.id);
+        return next;
+      });
       console.error("Erro ao salvar local de agendamento:", error);
-      alert("Erro ao salvar local de agendamento. Verifique se as colunas necessárias existem no banco de dados.");
+      window.dispatchEvent(new CustomEvent('als_show_toast', { 
+        detail: { message: 'Erro ao salvar local de agendamento', type: 'error' } 
+      }));
     }
   }, [locations]);
 
   const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
+    const originalTrip = { ...trip };
     const updatedTrip: Trip = { 
       ...trip, 
       scheduledDateTime: dateTime,
@@ -497,23 +587,59 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         obs: trip.scheduling?.obs || ''
       }
     };
+
+    // Atualização otimista
+    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+    setSavingIds(prev => new Set(prev).add(trip.id));
+
     try {
       await db.saveTrip(updatedTrip);
-      setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(trip.id);
+        return next;
+      });
     } catch (error) {
+      // Reverte em caso de erro
+      setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(trip.id);
+        return next;
+      });
       console.error("Erro ao salvar data/hora de agendamento:", error);
-      alert("Erro ao salvar data/hora de agendamento. Verifique se as colunas necessárias existem no banco de dados.");
+      window.dispatchEvent(new CustomEvent('als_show_toast', { 
+        detail: { message: 'Erro ao salvar data/hora de agendamento', type: 'error' } 
+      }));
     }
   }, []);
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
+    const originalTrip = { ...trip };
+    const updatedTrip: Trip = { 
+      ...trip, 
+      hasAdvance: checked,
+      advancePayment: { ...trip.advancePayment, status: (checked ? 'LIBERAR' : 'BLOQUEADO') as 'LIBERAR' | 'BLOQUEADO' }
+    };
+
+    // Atualização otimista
+    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
+    setSavingIds(prev => new Set(prev).add(trip.id));
+
     const success = await advanceService.toggleAdvance(trip, checked);
-    if (success) {
-      setTrips(prev => prev.map(t => t.id === trip.id ? { 
-        ...t, 
-        hasAdvance: checked,
-        advancePayment: { ...t.advancePayment, status: checked ? 'LIBERAR' : 'BLOQUEADO' }
-      } : t));
+    
+    setSavingIds(prev => {
+      const next = new Set(prev);
+      next.delete(trip.id);
+      return next;
+    });
+
+    if (!success) {
+      // Reverte em caso de erro
+      setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
+      window.dispatchEvent(new CustomEvent('als_show_toast', { 
+        detail: { message: 'Erro ao processar adiantamento', type: 'error' } 
+      }));
     }
   }, []);
 
@@ -530,21 +656,28 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       message: `Você está prestes a alterar o status de ${scheduledCount} viagens para "Agendamento realizado". Elas serão removidas deste painel. Deseja continuar?`,
       onConfirm: async () => {
         setIsFinalizing(true);
+        const originalTrips = [...trips];
+        
+        // Atualização otimista: remove as viagens da lista local
+        setTrips(prev => prev.filter(t => !isTripScheduled(t)));
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
         try {
-          const tripsToFinalize = trips.filter(t => isTripScheduled(t));
+          const tripsToFinalize = originalTrips.filter(t => isTripScheduled(t));
           const success = await organizationService.finalizeScheduledTrips(tripsToFinalize);
           if (success) {
-            await loadData();
-            alert("Viagens agendadas finalizadas com sucesso!");
+            onRefresh();
           } else {
+            // Reverte em caso de erro
+            setTrips(originalTrips);
             alert("Erro ao finalizar viagens agendadas. Verifique o console.");
           }
         } catch (error) {
+          setTrips(originalTrips);
           console.error("Erro no handleFinalizeTrips:", error);
           alert("Erro inesperado ao finalizar viagens.");
         } finally {
           setIsFinalizing(false);
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
       }
     });
@@ -612,9 +745,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       key: 'os', 
       label: 'OS', 
       render: (t: Trip) => (
-        <div className="flex flex-col">
-          <span className="font-black text-slate-900 text-[9px]">{t.os}</span>
-          <span className="text-[7px] font-bold text-blue-500 uppercase">{t.container || '---'}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col">
+            <span className="font-black text-slate-900 text-[9px]">{t.os}</span>
+            <span className="text-[7px] font-bold text-blue-500 uppercase">{t.container || '---'}</span>
+          </div>
+          {savingIds.has(t.id) && (
+            <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" title="Salvando alterações..."></div>
+          )}
         </div>
       )
     },

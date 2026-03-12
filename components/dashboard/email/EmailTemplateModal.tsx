@@ -212,6 +212,20 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
     }
   };
 
+  const updateColumnLabel = (tableId: string, col: string, label: string) => {
+    const tables = formData.config?.tables || [];
+    const table = tables.find(t => t.id === tableId);
+    if (table) {
+      const newLabels = { ...(table.columnLabels || {}) };
+      if (label) {
+        newLabels[col] = label;
+      } else {
+        delete newLabels[col];
+      }
+      updateTable(tableId, { columnLabels: newLabels });
+    }
+  };
+
   const updateColumnName = (tableId: string, oldCol: string, newCol: string) => {
     if (!newCol || newCol === oldCol) return;
     const tables = formData.config?.tables || [];
@@ -223,7 +237,12 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
         newCustomCells[newCol] = newCustomCells[oldCol];
         delete newCustomCells[oldCol];
       }
-      updateTable(tableId, { columns: newColumns, customCells: newCustomCells });
+      const newLabels = { ...(table.columnLabels || {}) };
+      if (newLabels[oldCol]) {
+        newLabels[newCol] = newLabels[oldCol];
+        delete newLabels[oldCol];
+      }
+      updateTable(tableId, { columns: newColumns, customCells: newCustomCells, columnLabels: newLabels });
     }
   };
 
@@ -464,9 +483,13 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                       <code className="text-[10px] font-mono font-bold text-blue-700">{"{{TABELA: Nome da Tabela}}"}</code>
                       <span className="text-[9px] font-bold text-slate-500 uppercase">Posicionar a tabela no corpo do e-mail</span>
                     </div>
+                    <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
+                      <code className="text-[10px] font-mono font-bold text-blue-700">{"{{COLUNAS: Tabela 1 | Tabela 2}}"}</code>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">Colocar tabelas lado a lado</span>
+                    </div>
                   </div>
                 </div>
-                <p className="text-[8px] text-slate-400 font-bold uppercase mt-2 italic">* O sistema inserirá a tabela de dados automaticamente ao final, a menos que você use {'{{TABELA: Nome}}'} no corpo do e-mail.</p>
+                <p className="text-[8px] text-slate-400 font-bold uppercase mt-2 italic">* O sistema inserirá a tabela de dados automaticamente ao final, a menos que você use {'{{TABELA: Nome}}'} ou {'{{COLUNAS: Nome1 | Nome2}}'} no corpo do e-mail.</p>
               </div>
             </div>
 
@@ -489,7 +512,29 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                   </button>
                   
                   <div className="space-y-1 pr-12">
-                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Título da Tabela {index + 1}</label>
+                    <div className="flex items-center justify-between ml-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase">Título da Tabela {index + 1}</label>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            checked={table.hideTitle || false}
+                            onChange={e => updateTable(table.id, { hideTitle: e.target.checked })}
+                          />
+                          <span className="text-[9px] font-bold text-slate-500 uppercase">Ocultar título</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            checked={table.hideHeaders || false}
+                            onChange={e => updateTable(table.id, { hideHeaders: e.target.checked })}
+                          />
+                          <span className="text-[9px] font-bold text-slate-500 uppercase">Ocultar cabeçalhos</span>
+                        </label>
+                      </div>
+                    </div>
                     <input 
                       type="text" 
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-[11px] font-bold text-slate-800 uppercase focus:border-blue-500 transition-all outline-none"
@@ -504,12 +549,12 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                     <input 
                       type="text" 
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-600 focus:border-blue-500 transition-all outline-none"
-                      placeholder="Ex: {{Status}} = Viagem concluída"
+                      placeholder="Ex: Status contém concluída"
                       value={table.autoFilter || ''}
                       onChange={e => updateTable(table.id, { autoFilter: e.target.value })}
                     />
                     <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 ml-1">
-                      Use variáveis como {'{{Status}}'} ou {'{{Categoria}}'} e operadores (=, !=, contém, em). Ex: {'{{Status}}'} em Viagem concluída, Container sobre rodas
+                      Use o nome da coluna e operadores (=, !=, contém, em). Ex: Status em Viagem concluída, Container sobre rodas
                     </p>
                   </div>
 
@@ -556,7 +601,142 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                     </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        checked={table.splitTable || false}
+                        onChange={e => updateTable(table.id, { splitTable: e.target.checked })}
+                      />
+                      <span className="text-[11px] font-bold text-slate-700 uppercase">Dividir tabela em duas colunas?</span>
+                    </label>
+
+                    {table.splitTable && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Título Coluna 1 (Esquerda)</label>
+                          <input 
+                            type="text" 
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-600 focus:border-blue-500 outline-none"
+                            placeholder="Ex: Em Andamento"
+                            value={table.splitLeftTitle || ''}
+                            onChange={e => updateTable(table.id, { splitLeftTitle: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Condição Coluna 1</label>
+                          <input 
+                            type="text" 
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-600 focus:border-blue-500 outline-none"
+                            placeholder="Ex: Status contém andamento"
+                            value={table.splitLeftCondition || ''}
+                            onChange={e => updateTable(table.id, { splitLeftCondition: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Título Coluna 2 (Direita)</label>
+                          <input 
+                            type="text" 
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-600 focus:border-blue-500 outline-none"
+                            placeholder="Ex: Finalizadas"
+                            value={table.splitRightTitle || ''}
+                            onChange={e => updateTable(table.id, { splitRightTitle: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Condição Coluna 2</label>
+                          <input 
+                            type="text" 
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-600 focus:border-blue-500 outline-none"
+                            placeholder="Ex: Status contém concluída"
+                            value={table.splitRightCondition || ''}
+                            onChange={e => updateTable(table.id, { splitRightCondition: e.target.value })}
+                          />
+                        </div>
+                        <div className="col-span-full">
+                          <p className="text-[8px] text-slate-500 font-bold uppercase">
+                            * As viagens serão divididas nas colunas de acordo com as condições acima. Se deixar vazio, puxa todas.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Default Filters */}
+                  <div className="space-y-6 pt-8 border-t border-slate-100">
+                    <div className="flex items-center justify-between bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                      <div>
+                        <h5 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Filtros Automáticos</h5>
+                        <p className="text-[9px] text-slate-500 mt-0.5">Defina critérios que serão aplicados ao abrir este modelo.</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer"
+                          checked={table.defaultFilters?.enabled || false}
+                          onChange={e => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, enabled: e.target.checked } })}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        <span className="ml-3 text-[10px] font-black text-slate-700 uppercase">Habilitar</span>
+                      </label>
+                    </div>
+
+                    {table.defaultFilters?.enabled && (
+                      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-50">
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                            <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Data da Viagem</label>
+                          </div>
+                          <label className="flex items-center gap-3 cursor-pointer group">
+                            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${table.defaultFilters?.useTodayDate ? 'bg-blue-600 border-blue-600' : 'border-slate-200 group-hover:border-blue-300'}`}>
+                              {table.defaultFilters?.useTodayDate && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </div>
+                            <input 
+                              type="checkbox" 
+                              className="hidden"
+                              checked={table.defaultFilters?.useTodayDate || false}
+                              onChange={e => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, useTodayDate: e.target.checked, date: e.target.checked ? '' : table.defaultFilters?.date } })}
+                            />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-blue-600 transition-colors">Usar data de hoje automaticamente</span>
+                          </label>
+                        </div>
+
+                        {!table.defaultFilters?.useTodayDate && (
+                          <div className="animate-in fade-in zoom-in-95">
+                            <label className="text-[9px] font-black text-slate-400 uppercase ml-1 mb-1 block">Data Específica</label>
+                            <input type="date" className="w-full px-5 py-4 text-[12px] font-bold text-slate-700 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all outline-none shadow-inner" 
+                              value={table.defaultFilters?.date || ''}
+                              onChange={e => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, date: e.target.value } })}
+                            />
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          {[
+                            { label: 'Cliente', key: 'customer', placeholder: 'Nome do cliente...' },
+                            { label: 'Destino', key: 'destination', placeholder: 'Destino...' },
+                            { label: 'Navio', key: 'ship', placeholder: 'Nome do navio...' },
+                            { label: 'Booking', key: 'booking', placeholder: 'Número do booking...' }
+                          ].map(field => (
+                            <div key={field.key}>
+                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1 mb-1 block">{field.label}</label>
+                              <input 
+                                type="text" 
+                                placeholder={field.placeholder} 
+                                className="w-full px-5 py-4 text-[12px] font-bold text-slate-700 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all outline-none shadow-inner" 
+                                value={(table.defaultFilters as any)?.[field.key] || ''}
+                                onChange={e => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, [field.key]: e.target.value } })}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Colunas da Tabela</label>
                     <div className="flex gap-2">
                       <input 
@@ -640,13 +820,44 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                       • <strong className="text-emerald-600">Fórmulas Múltiplas</strong>: Use "ou" ou "|" para tentar várias opções (ex: <span className="font-mono bg-slate-100 px-1 rounded">Status: Retirada de Cheio ou Previsão: Chegada + 45m</span>).<br/>
                       • <strong className="text-purple-600">Condicionais (SE)</strong>: Use <span className="font-mono bg-slate-100 px-1 rounded">{'{{SE(VARIAVEL) texto se sim SENAO texto se não}}'}</span>. Ex: <span className="font-mono bg-slate-100 px-1 rounded">{'{{SE(MOTORISTA) Mot: {{MOTORISTA}} SENAO Sem motorista}}'}</span>.
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      {table.columns.map(col => (
-                        <div key={col} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm group">
-                          <span className="text-[9px] font-black text-slate-600 uppercase">{col}</span>
-                          <button onClick={() => removeColumn(table.id, col)} className="text-slate-300 hover:text-red-500 transition-colors">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
-                          </button>
+                    <div className="space-y-3">
+                      {table.columns.map((col, cIdx) => (
+                        <div key={cIdx} className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm group">
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[8px] font-black text-slate-400 uppercase">Variável/ID</span>
+                              <input 
+                                type="text" 
+                                className="flex-1 bg-transparent text-[10px] font-bold text-slate-400 uppercase outline-none focus:text-blue-600"
+                                value={col}
+                                onChange={e => updateColumnName(table.id, col, e.target.value)}
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[8px] font-black text-blue-400 uppercase">Rótulo Exibido</span>
+                              <input 
+                                type="text" 
+                                className="flex-1 bg-transparent text-[11px] font-black text-slate-800 uppercase outline-none border-b border-transparent focus:border-blue-200"
+                                placeholder={col}
+                                value={table.columnLabels?.[col] || ''}
+                                onChange={e => updateColumnLabel(table.id, col, e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {table.customCells?.[col] && (
+                              <div className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-[8px] font-bold truncate max-w-[100px]" title={table.customCells[col]}>
+                                FX: {table.customCells[col]}
+                              </div>
+                            )}
+                            <button 
+                              onClick={() => removeColumn(table.id, col)}
+                              className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -664,11 +875,8 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                                   key={i} 
                                   style={{ backgroundColor: table.headerColor || '#1e293b', color: '#fff' }} 
                                   className="border border-slate-300 px-3 py-2 text-[10px] uppercase font-bold whitespace-nowrap outline-none focus:ring-2 focus:ring-blue-500"
-                                  contentEditable
-                                  suppressContentEditableWarning
-                                  onBlur={(e) => updateColumnName(table.id, col, e.currentTarget.textContent || col)}
                                 >
-                                  {col}
+                                  {table.columnLabels?.[col] || col}
                                 </th>
                               ))}
                             </tr>
@@ -706,11 +914,8 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                                     <th 
                                       style={{ backgroundColor: table.headerColor || '#1e293b', color: '#fff', width: '140px' }} 
                                       className="border border-slate-300 px-3 py-2 text-[10px] uppercase font-bold whitespace-nowrap outline-none focus:ring-2 focus:ring-blue-500"
-                                      contentEditable
-                                      suppressContentEditableWarning
-                                      onBlur={(e) => updateColumnName(table.id, col, e.currentTarget.textContent || col)}
                                     >
-                                      {col}
+                                      {table.columnLabels?.[col] || col}
                                     </th>
                                     <td 
                                       style={{ backgroundColor: '#ffffff' }} 
