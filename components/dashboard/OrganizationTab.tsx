@@ -780,8 +780,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           type="checkbox" 
           checked={!!t.sentNF} 
           onChange={(e) => handleToggleNF(t, e.target.checked)}
-          disabled={!!pendingUpdates[t.id]}
-          className={`w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer ${!!pendingUpdates[t.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className="w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
         />
       )
     },
@@ -790,15 +789,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       label: 'Agendado', 
       render: (t: Trip) => {
         const hasMinuta = !!t.preStackingFormData;
-        const isSaving = !!pendingUpdates[t.id];
         return (
           <input 
             type="checkbox" 
             checked={isTripScheduled(t)} 
-            disabled={hasMinuta || isSaving}
+            disabled={hasMinuta}
             onChange={(e) => handleToggleScheduled(t, e.target.checked)}
-            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${(hasMinuta || isSaving) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            title={hasMinuta ? "Agendamento automático via Minuta" : isSaving ? "Salvando..." : ""}
+            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${hasMinuta ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            title={hasMinuta ? "Agendamento automático via Minuta" : ""}
           />
         );
       }
@@ -823,8 +821,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           type="datetime-local" 
           value={t.scheduledDateTime && typeof t.scheduledDateTime === 'string' ? t.scheduledDateTime.substring(0, 16) : ''} 
           onChange={(e) => handleDateTimeChange(t, e.target.value)}
-          disabled={!!pendingUpdates[t.id]}
-          className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'} ${!!pendingUpdates[t.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}
         />
       )
     },
@@ -837,8 +834,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             type="checkbox" 
             checked={!!t.hasAdvance} 
             onChange={(e) => handleToggleAdvance(t, e.target.checked)}
-            disabled={!!pendingUpdates[t.id]}
-            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer ${!!pendingUpdates[t.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className="w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer"
           />
           {t.hasAdvance && <span className="text-[7px] font-black text-orange-600 uppercase">70% LIB</span>}
         </div>
