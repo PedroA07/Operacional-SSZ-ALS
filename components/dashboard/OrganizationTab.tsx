@@ -315,22 +315,20 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
-  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [pendingUpdates, setPendingUpdates] = useState<Record<string, { trip: Trip, timestamp: number }>>({});
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
 
   // Sincroniza o estado local com as props quando elas mudam
   useEffect(() => {
-    // Aplica o filtro da organização (a partir de 06/03/2026 e não finalizadas)
     const startDateStr = '2026-03-06';
+    const now = Date.now();
+    const STABILITY_DURATION = 5000; // 5 segundos de "trava" para evitar flicker
+
     const filtered = propTrips.filter(trip => {
       if (!trip.dateTime) return false;
-      
-      const tripDateStr = trip.dateTime.includes('T') 
-        ? trip.dateTime.split('T')[0] 
-        : trip.dateTime;
-        
+      const tripDateStr = trip.dateTime.includes('T') ? trip.dateTime.split('T')[0] : trip.dateTime;
       let normalizedTripDate = tripDateStr;
       if (tripDateStr.includes('/')) {
         const parts = tripDateStr.split('/');
@@ -339,28 +337,44 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         }
       }
-
-      const isAfterStartDate = normalizedTripDate >= startDateStr;
-      const isNotFinished = trip.status !== 'Viagem concluída' && 
-                           trip.status !== 'Viagem cancelada' && 
-                           trip.status !== 'Agendamento realizado';
-                           
-      return isAfterStartDate && isNotFinished;
+      return normalizedTripDate >= startDateStr && 
+             trip.status !== 'Viagem concluída' && 
+             trip.status !== 'Viagem cancelada' && 
+             trip.status !== 'Agendamento realizado';
     });
 
-    // Mescla com o estado local, preservando viagens que estão sendo salvas
-    setTrips(prev => {
-      return filtered.map(newTrip => {
-        if (savingIds.has(newTrip.id)) {
-          const localTrip = prev.find(t => t.id === newTrip.id);
-          return localTrip || newTrip;
-        }
-        return newTrip;
-      });
+    // Aplica as atualizações pendentes sobre os dados que vieram do servidor
+    const mergedTrips = filtered.map(serverTrip => {
+      const pending = pendingUpdates[serverTrip.id];
+      // Se houver uma atualização local feita há menos de 5 segundos, ela tem prioridade total
+      if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
+        return pending.trip;
+      }
+      return serverTrip;
     });
-    
+
+    setTrips(mergedTrips);
     setIsLoading(false);
-  }, [propTrips, savingIds]);
+  }, [propTrips, pendingUpdates]);
+
+  // Limpeza periódica de atualizações expiradas para liberar memória
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setPendingUpdates(prev => {
+        const next = { ...prev };
+        let changed = false;
+        Object.keys(next).forEach(id => {
+          if (now - next[id].timestamp > 10000) { // Limpa após 10s por segurança
+            delete next[id];
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Processa locais a partir das props
   useEffect(() => {
@@ -401,30 +415,22 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, []);
 
   const handleToggleNF = useCallback(async (trip: Trip, checked: boolean) => {
-    const originalTrip = { ...trip };
     const updatedTrip = { ...trip, sentNF: checked };
+    const now = Date.now();
     
-    // Atualização otimista
-    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-    setSavingIds(prev => new Set(prev).add(trip.id));
+    // Registra a atualização pendente imediatamente (Trava a UI)
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { trip: updatedTrip, timestamp: now }
+    }));
 
     try {
       await db.saveTrip(updatedTrip);
-      // Aguarda um pequeno delay antes de remover do set de salvamento
-      // Isso evita a "piscada" onde o estado volta ao antigo antes da prop atualizar
-      setTimeout(() => {
-        setSavingIds(prev => {
-          const next = new Set(prev);
-          next.delete(trip.id);
-          return next;
-        });
-      }, 2000);
     } catch (error) {
-      // Reverte em caso de erro
-      setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
-      setSavingIds(prev => {
-        const next = new Set(prev);
-        next.delete(trip.id);
+      // Em caso de erro, remove a trava para permitir que o dado original volte
+      setPendingUpdates(prev => {
+        const next = { ...prev };
+        delete next[trip.id];
         return next;
       });
       console.error("Erro ao salvar NF:", error);
@@ -439,7 +445,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       setSelectedTripForScheduling(trip);
       setIsSchedulingModalOpen(true);
     } else {
-      const originalTrip = { ...trip };
       const updatedTrip: Trip = { 
         ...trip, 
         isScheduled: false,
@@ -448,25 +453,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         scheduling: trip.scheduling ? { ...trip.scheduling, locationId: '', location: '', dateTime: '' } : null
       };
 
-      // Atualização otimista
-      setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-      setSavingIds(prev => new Set(prev).add(trip.id));
+      const now = Date.now();
+      setPendingUpdates(prev => ({
+        ...prev,
+        [trip.id]: { trip: updatedTrip, timestamp: now }
+      }));
 
       try {
         await db.saveTrip(updatedTrip);
-        setTimeout(() => {
-          setSavingIds(prev => {
-            const next = new Set(prev);
-            next.delete(trip.id);
-            return next;
-          });
-        }, 2000);
       } catch (error) {
-        // Reverte em caso de erro
-        setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
-        setSavingIds(prev => {
-          const next = new Set(prev);
-          next.delete(trip.id);
+        setPendingUpdates(prev => {
+          const next = { ...prev };
+          delete next[trip.id];
           return next;
         });
         console.error("Erro ao remover agendamento:", error);
@@ -480,7 +478,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const handleConfirmScheduling = useCallback(async (locationId: string, dateTime: string) => {
     if (!selectedTripForScheduling) return;
 
-    const originalTrip = { ...selectedTripForScheduling };
     const selectedLoc = locations.find(l => l.id === locationId);
     const updatedTrip: Trip = {
       ...selectedTripForScheduling,
@@ -503,28 +500,23 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       }
     };
 
-    // Atualização otimista e fecha o modal imediatamente
     const tripId = selectedTripForScheduling.id;
-    setTrips(prev => prev.map(t => t.id === tripId ? updatedTrip : t));
-    setSavingIds(prev => new Set(prev).add(tripId));
+    const now = Date.now();
+    
+    setPendingUpdates(prev => ({
+      ...prev,
+      [tripId]: { trip: updatedTrip, timestamp: now }
+    }));
+    
     setIsSchedulingModalOpen(false);
     setSelectedTripForScheduling(null);
 
     try {
       await db.saveTrip(updatedTrip);
-      setTimeout(() => {
-        setSavingIds(prev => {
-          const next = new Set(prev);
-          next.delete(tripId);
-          return next;
-        });
-      }, 2000);
     } catch (error) {
-      // Reverte em caso de erro
-      setTrips(prev => prev.map(t => t.id === tripId ? originalTrip : t));
-      setSavingIds(prev => {
-        const next = new Set(prev);
-        next.delete(tripId);
+      setPendingUpdates(prev => {
+        const next = { ...prev };
+        delete next[tripId];
         return next;
       });
       console.error("Erro ao salvar agendamento:", error);
@@ -535,7 +527,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, [selectedTripForScheduling, locations]);
 
   const handleLocationChange = useCallback(async (trip: Trip, locationId: string) => {
-    const originalTrip = { ...trip };
     const selectedLoc = locations.find(l => l.id === locationId);
     const updatedTrip: Trip = { 
       ...trip, 
@@ -556,25 +547,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       }
     };
 
-    // Atualização otimista
-    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-    setSavingIds(prev => new Set(prev).add(trip.id));
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { trip: updatedTrip, timestamp: now }
+    }));
 
     try {
       await db.saveTrip(updatedTrip);
-      setTimeout(() => {
-        setSavingIds(prev => {
-          const next = new Set(prev);
-          next.delete(trip.id);
-          return next;
-        });
-      }, 2000);
     } catch (error) {
-      // Reverte em caso de erro
-      setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
-      setSavingIds(prev => {
-        const next = new Set(prev);
-        next.delete(trip.id);
+      setPendingUpdates(prev => {
+        const next = { ...prev };
+        delete next[trip.id];
         return next;
       });
       console.error("Erro ao salvar local de agendamento:", error);
@@ -585,7 +569,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, [locations]);
 
   const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
-    const originalTrip = { ...trip };
     const updatedTrip: Trip = { 
       ...trip, 
       scheduledDateTime: dateTime,
@@ -597,25 +580,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       }
     };
 
-    // Atualização otimista
-    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-    setSavingIds(prev => new Set(prev).add(trip.id));
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { trip: updatedTrip, timestamp: now }
+    }));
 
     try {
       await db.saveTrip(updatedTrip);
-      setTimeout(() => {
-        setSavingIds(prev => {
-          const next = new Set(prev);
-          next.delete(trip.id);
-          return next;
-        });
-      }, 2000);
     } catch (error) {
-      // Reverte em caso de erro
-      setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
-      setSavingIds(prev => {
-        const next = new Set(prev);
-        next.delete(trip.id);
+      setPendingUpdates(prev => {
+        const next = { ...prev };
+        delete next[trip.id];
         return next;
       });
       console.error("Erro ao salvar data/hora de agendamento:", error);
@@ -626,30 +602,26 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, []);
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
-    const originalTrip = { ...trip };
     const updatedTrip: Trip = { 
       ...trip, 
       hasAdvance: checked,
       advancePayment: { ...trip.advancePayment, status: (checked ? 'LIBERAR' : 'BLOQUEADO') as 'LIBERAR' | 'BLOQUEADO' }
     };
 
-    // Atualização otimista
-    setTrips(prev => prev.map(t => t.id === trip.id ? updatedTrip : t));
-    setSavingIds(prev => new Set(prev).add(trip.id));
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { trip: updatedTrip, timestamp: now }
+    }));
 
     const success = await advanceService.toggleAdvance(trip, checked);
     
-    setTimeout(() => {
-      setSavingIds(prev => {
-        const next = new Set(prev);
-        next.delete(trip.id);
+    if (!success) {
+      setPendingUpdates(prev => {
+        const next = { ...prev };
+        delete next[trip.id];
         return next;
       });
-    }, 2000);
-
-    if (!success) {
-      // Reverte em caso de erro
-      setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
       window.dispatchEvent(new CustomEvent('als_show_toast', { 
         detail: { message: 'Erro ao processar adiantamento', type: 'error' } 
       }));
@@ -763,7 +735,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             <span className="font-black text-slate-900 text-[9px]">{t.os}</span>
             <span className="text-[7px] font-bold text-blue-500 uppercase">{t.container || '---'}</span>
           </div>
-          {savingIds.has(t.id) && (
+          {pendingUpdates[t.id] && (
             <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" title="Salvando alterações..."></div>
           )}
         </div>
@@ -808,8 +780,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           type="checkbox" 
           checked={!!t.sentNF} 
           onChange={(e) => handleToggleNF(t, e.target.checked)}
-          disabled={savingIds.has(t.id)}
-          className={`w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer ${savingIds.has(t.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
+          disabled={!!pendingUpdates[t.id]}
+          className={`w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer ${!!pendingUpdates[t.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
       )
     },
@@ -818,7 +790,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       label: 'Agendado', 
       render: (t: Trip) => {
         const hasMinuta = !!t.preStackingFormData;
-        const isSaving = savingIds.has(t.id);
+        const isSaving = !!pendingUpdates[t.id];
         return (
           <input 
             type="checkbox" 
@@ -851,8 +823,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           type="datetime-local" 
           value={t.scheduledDateTime && typeof t.scheduledDateTime === 'string' ? t.scheduledDateTime.substring(0, 16) : ''} 
           onChange={(e) => handleDateTimeChange(t, e.target.value)}
-          disabled={savingIds.has(t.id)}
-          className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'} ${savingIds.has(t.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
+          disabled={!!pendingUpdates[t.id]}
+          className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'} ${!!pendingUpdates[t.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
       )
     },
@@ -865,8 +837,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             type="checkbox" 
             checked={!!t.hasAdvance} 
             onChange={(e) => handleToggleAdvance(t, e.target.checked)}
-            disabled={savingIds.has(t.id)}
-            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer ${savingIds.has(t.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!!pendingUpdates[t.id]}
+            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer ${!!pendingUpdates[t.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
           />
           {t.hasAdvance && <span className="text-[7px] font-black text-orange-600 uppercase">70% LIB</span>}
         </div>
