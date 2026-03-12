@@ -1,8 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
-import { EmailTemplate, User } from '../../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { EmailTemplate, User, Driver, Staff, Customer, Port, PreStacking } from '../../../types';
 import { db } from '../../../utils/storage';
 import { showToast } from '../../shared/SimpleToast';
+import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import { searchService } from '../../../utils/searchService';
 
 interface EmailTemplateModalProps {
   isOpen: boolean;
@@ -53,6 +55,97 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
   const [bodyPrevisaoUnit, setBodyPrevisaoUnit] = useState('m');
   const [isSaving, setIsSaving] = useState(false);
   const [showFormulas, setShowFormulas] = useState(false);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [destinations, setDestinations] = useState<(Port | PreStacking)[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [driversData, staffData, usersData, customersData, portsData, preStackingData] = await Promise.all([
+          db.getDrivers(),
+          db.getStaff(),
+          db.getUsers(),
+          db.getCustomers(),
+          db.getPorts(),
+          db.getPreStacking()
+        ]);
+        setDrivers(driversData);
+        setStaff(staffData);
+        setUsers(usersData);
+        setCustomers(customersData);
+        setDestinations([...portsData, ...preStackingData]);
+      } catch (error) {
+        console.error('Erro ao carregar dados para autocomplete:', error);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const allContacts = useMemo(() => {
+    return [
+      ...drivers.map(d => ({ ...d, type: 'DRIVER' })),
+      ...staff.map(s => ({ ...s, type: 'STAFF' })),
+      ...users.map(u => ({ ...u, name: u.displayName, type: 'USER' }))
+    ];
+  }, [drivers, staff, users]);
+
+  const mapContactToAutocomplete = (item: any) => {
+    if (item.type === 'DRIVER') {
+      return searchService.mapDriver(item);
+    }
+    if (item.type === 'STAFF') {
+      return searchService.mapStaff(item);
+    }
+    return {
+      id: item.id,
+      type: 'STAFF' as const, // Reutiliza estilo de staff para usuários
+      mainText: item.displayName,
+      subText: item.role,
+      location: item.emailCorp,
+      originalData: item
+    };
+  };
+
+  const mapCustomerToAutocomplete = (item: Customer) => {
+    return {
+      id: item.id,
+      type: 'CUSTOMER' as const,
+      mainText: item.name,
+      subText: item.cnpj || '',
+      location: item.city || '',
+      originalData: item
+    };
+  };
+
+  const mapDestinationToAutocomplete = (item: Port | PreStacking) => {
+    return {
+      id: item.id,
+      type: 'PORT' as const,
+      mainText: item.name,
+      subText: item.address || '',
+      location: '',
+      originalData: item
+    };
+  };
+
+  const handleContactSelect = (contact: any) => {
+    const email = contact.email || contact.emailCorp || contact.beneficiary_email;
+    if (email) {
+      const currentTo = formData.to || '';
+      const emails = currentTo.split(',').map(e => e.trim()).filter(e => e !== '');
+      if (!emails.includes(email)) {
+        setFormData({ ...formData, to: emails.length > 0 ? `${currentTo}, ${email}` : email });
+        showToast(`${contact.name} adicionado ao campo Para`, 'success');
+      } else {
+        showToast('Este e-mail já está na lista.', 'info');
+      }
+    } else {
+      showToast('Este contato não possui e-mail cadastrado.', 'warning');
+    }
+  };
 
   useEffect(() => {
     if (template) {
@@ -305,6 +398,16 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
               </div>
 
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <AutocompleteSearch 
+                    label="Preenchimento Automático (Nome Completo)"
+                    placeholder="Busque por nome do motorista ou colaborador..."
+                    data={allContacts}
+                    onSelect={handleContactSelect}
+                    mapToAutocomplete={mapContactToAutocomplete}
+                    icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+                  />
+                </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Para (E-mails)</label>
                   <input 
@@ -714,9 +817,29 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div className="col-span-1">
+                            <AutocompleteSearch 
+                              label="Cliente"
+                              placeholder="Nome do cliente..."
+                              data={customers}
+                              onSelect={(c) => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, customer: c.name } })}
+                              mapToAutocomplete={mapCustomerToAutocomplete}
+                              icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
+                              initialValue={table.defaultFilters?.customer || ''}
+                            />
+                          </div>
+                          <div className="col-span-1">
+                            <AutocompleteSearch 
+                              label="Destino"
+                              placeholder="Destino..."
+                              data={destinations}
+                              onSelect={(d) => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, destination: d.name } })}
+                              mapToAutocomplete={mapDestinationToAutocomplete}
+                              icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
+                              initialValue={table.defaultFilters?.destination || ''}
+                            />
+                          </div>
                           {[
-                            { label: 'Cliente', key: 'customer', placeholder: 'Nome do cliente...' },
-                            { label: 'Destino', key: 'destination', placeholder: 'Destino...' },
                             { label: 'Navio', key: 'ship', placeholder: 'Nome do navio...' },
                             { label: 'Booking', key: 'booking', placeholder: 'Número do booking...' }
                           ].map(field => (

@@ -396,6 +396,39 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     return false;
   };
 
+  const isSameDate = (date1: string | null | undefined, date2: string | null | undefined) => {
+    if (!date1 || !date2) return false;
+    try {
+      // Normaliza date1 para YYYY-MM-DD
+      let d1 = date1;
+      if (date1.includes('/')) {
+        const parts = date1.split('/');
+        if (parts.length === 3) {
+          const [day, month, year] = parts;
+          d1 = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+      } else if (date1.includes('T')) {
+        d1 = date1.split('T')[0];
+      }
+      
+      // Normaliza date2 para YYYY-MM-DD
+      let d2 = date2;
+      if (date2.includes('/')) {
+        const parts = date2.split('/');
+        if (parts.length === 3) {
+          const [day, month, year] = parts;
+          d2 = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+      } else if (date2.includes('T')) {
+        d2 = date2.split('T')[0];
+      }
+      
+      return d1 === d2;
+    } catch {
+      return false;
+    }
+  };
+
   const handleApplyFilters = (tableId: string) => {
     const filters = tableFilters[tableId];
     if (!filters) return;
@@ -404,11 +437,9 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
     if (filters.date) {
       filteredTrips = filteredTrips.filter(t => {
-        const tripDate = t.dateTime ? new Date(t.dateTime).toISOString().split('T')[0] : null;
-        const scheduledDate = t.scheduledDateTime ? new Date(t.scheduledDateTime).toISOString().split('T')[0] : null;
-        const schedulingDate = t.scheduling?.dateTime ? new Date(t.scheduling.dateTime).toISOString().split('T')[0] : null;
-        
-        return tripDate === filters.date || scheduledDate === filters.date || schedulingDate === filters.date;
+        return isSameDate(t.dateTime, filters.date) || 
+               isSameDate(t.scheduledDateTime, filters.date) || 
+               isSameDate(t.scheduling?.dateTime, filters.date);
       });
     }
 
@@ -475,7 +506,11 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
           initialTableFilters[table.id] = filters;
 
           if (filters.date) {
-            filteredTrips = filteredTrips.filter(t => t.dateTime.startsWith(filters.date!));
+            filteredTrips = filteredTrips.filter(t => {
+              return isSameDate(t.dateTime, filters.date) || 
+                     isSameDate(t.scheduledDateTime, filters.date) || 
+                     isSameDate(t.scheduling?.dateTime, filters.date);
+            });
           }
 
           if (filters.customer) {

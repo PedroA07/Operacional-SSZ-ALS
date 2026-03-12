@@ -4,7 +4,7 @@ import { maskCNPJ, maskCPF, maskPhone } from './masks';
 
 export interface AutocompleteItem {
   id: string;
-  type: 'DRIVER' | 'CUSTOMER' | 'PORT';
+  type: 'DRIVER' | 'CUSTOMER' | 'PORT' | 'STAFF';
   mainText: string;    // Nome ou Razão Social
   subText?: string;     // Nome Fantasia ou Placas
   document?: string;    // CNPJ ou CPF
@@ -63,5 +63,18 @@ export const searchService = {
     document: maskCNPJ(p.cnpj),
     location: `${p.city} - ${p.state}`,
     originalData: p
+  }),
+
+  /**
+   * Mapeia um objeto Colaborador para o formato de Autocomplete
+   */
+  mapStaff: (s: any): AutocompleteItem => ({
+    id: s.id,
+    type: 'STAFF',
+    mainText: s.name,
+    subText: s.position,
+    document: s.phoneCorp ? maskPhone(s.phoneCorp) : undefined,
+    location: s.emailCorp,
+    originalData: s
   })
 };
