@@ -27,16 +27,6 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     columns: template.config.columns || []
   }];
 
-  useEffect(() => {
-    if (isOpen) {
-      setSubject(template.subject);
-      setBody(template.body);
-      setTableData({});
-      setSearchTerm({});
-      setAttachments([]);
-    }
-  }, [isOpen, template]);
-
   const replaceVars = (text: string, trip?: Trip, rowIndex?: number, totalRows?: number) => {
     if (!text) return '';
     const now = new Date();
@@ -288,27 +278,96 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     return '---';
   };
 
+  useEffect(() => {
+    if (isOpen) {
+      setSubject(template.subject);
+      setBody(template.body);
+      setSearchTerm({});
+      setAttachments([]);
+
+      const initialTableData: { [tableId: string]: Trip[] } = {};
+      
+      tables.forEach(table => {
+        initialTableData[table.id] = [];
+        
+        if (table.autoFilter && table.autoFilter.trim() !== '') {
+          const filterStr = table.autoFilter.trim();
+          let operator = '';
+          if (filterStr.includes('!=')) operator = '!=';
+          else if (filterStr.includes('=')) operator = '=';
+          else if (filterStr.toLowerCase().includes(' contém ')) operator = 'contém';
+          else if (filterStr.toLowerCase().includes(' contem ')) operator = 'contem';
+          else if (filterStr.toLowerCase().includes(' em ')) operator = 'em';
+
+          if (operator) {
+            const parts = filterStr.split(new RegExp(`\\s*(?:!=|=|contém|contem|em)\\s*`, 'i'));
+            if (parts.length === 2) {
+              const leftExpr = parts[0].trim();
+              const rightValue = parts[1].trim().toLowerCase();
+
+              trips.forEach(trip => {
+                let leftValue = '';
+                if (leftExpr.startsWith('{{') && leftExpr.endsWith('}}')) {
+                  const varName = leftExpr.substring(2, leftExpr.length - 2);
+                  leftValue = getCellValue(varName, trip).toLowerCase();
+                } else {
+                  leftValue = replaceVars(leftExpr, trip).toLowerCase();
+                }
+
+                let matches = false;
+                if (operator === '=') matches = leftValue === rightValue;
+                else if (operator === '!=') matches = leftValue !== rightValue;
+                else if (operator === 'contém' || operator === 'contem') matches = leftValue.includes(rightValue);
+                else if (operator === 'em') {
+                  const options = rightValue.split(',').map(s => s.trim());
+                  matches = options.includes(leftValue);
+                }
+
+                if (matches) {
+                  initialTableData[table.id].push(trip);
+                }
+              });
+            }
+          }
+        } else {
+          // If no autoFilter, add all selected trips to this table
+          initialTableData[table.id] = [...trips];
+        }
+      });
+
+      setTableData(initialTableData);
+    }
+  }, [isOpen, template, trips]);
+
   const generateHtml = () => {
     const firstTrip = Object.values(tableData).flat()[0];
     const totalRows = Object.values(tableData).flat().length;
-    const finalBody = replaceVars(body, firstTrip, undefined, totalRows);
+    let finalBody = replaceVars(body, firstTrip, undefined, totalRows);
 
     let tablesHtml = '';
 
     tables.forEach(table => {
       const data = tableData[table.id] || [];
-      if (data.length === 0) return;
+      
+      // If table has no data, remove its placeholder from the body and skip
+      if (data.length === 0) {
+        const placeholderRegex = new RegExp(`\\{\\{TABELA:\\s*${table.title}\\}\\}`, 'gi');
+        finalBody = finalBody.replace(placeholderRegex, '');
+        return;
+      }
 
       const headerStyle = `background-color: ${table.headerColor}; color: #ffffff; font-weight: bold; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; text-transform: uppercase;`;
       const cellStyle = `background-color: #ffffff; color: #000000; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; font-weight: bold; text-transform: uppercase;`;
       const altCellStyle = `background-color: #f8fafc; color: #000000; border: 1px solid #000000; padding: 8px 12px; text-align: center; font-size: ${template.config.fontSize || '12px'}; font-family: ${template.config.fontFamily || 'Arial, sans-serif'}; font-weight: bold; text-transform: uppercase;`;
 
+      let tableHtml = '';
+
       if (table.title) {
-        tablesHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase;">${table.title}</h3>`;
+        tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase;">${table.title}</h3>`;
       }
 
       if (table.headerOrientation === 'horizontal') {
-        tablesHtml += `
+        tableHtml += `
           <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
             <thead>
               <tr>
@@ -332,7 +391,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
           </table>
         `;
       } else {
-        tablesHtml += data.map((trip, idx) => `
+        tableHtml += data.map((trip, idx) => `
           <table style="border-collapse: collapse; width: 400px; margin-bottom: 25px; table-layout: fixed;">
             ${table.columns.map((col) => {
               const style = cellStyle;
@@ -350,6 +409,14 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
             }).join('')}
           </table>
         `).join('');
+      }
+
+      // Check if there is a placeholder for this table in the body
+      const placeholderRegex = new RegExp(`\\{\\{TABELA:\\s*${table.title}\\}\\}`, 'gi');
+      if (placeholderRegex.test(finalBody)) {
+        finalBody = finalBody.replace(placeholderRegex, tableHtml);
+      } else {
+        tablesHtml += tableHtml;
       }
     });
 

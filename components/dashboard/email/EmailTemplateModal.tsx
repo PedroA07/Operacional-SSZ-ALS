@@ -460,9 +460,13 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                       <code className="text-[10px] font-mono font-bold text-blue-700">{"{{HORA_ATUAL}}"}</code>
                       <span className="text-[9px] font-bold text-slate-500 uppercase">Hora atual (ex: 14:30)</span>
                     </div>
+                    <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
+                      <code className="text-[10px] font-mono font-bold text-blue-700">{"{{TABELA: Nome da Tabela}}"}</code>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">Posicionar a tabela no corpo do e-mail</span>
+                    </div>
                   </div>
                 </div>
-                <p className="text-[8px] text-slate-400 font-bold uppercase mt-2 italic">* O sistema inserirá a tabela de dados automaticamente ao final.</p>
+                <p className="text-[8px] text-slate-400 font-bold uppercase mt-2 italic">* O sistema inserirá a tabela de dados automaticamente ao final, a menos que você use {'{{TABELA: Nome}}'} no corpo do e-mail.</p>
               </div>
             </div>
 
@@ -493,6 +497,20 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                       value={table.title}
                       onChange={e => updateTable(table.id, { title: e.target.value })}
                     />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Filtro Automático (Opcional)</label>
+                    <input 
+                      type="text" 
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-600 focus:border-blue-500 transition-all outline-none"
+                      placeholder="Ex: {{Status}} = Viagem concluída"
+                      value={table.autoFilter || ''}
+                      onChange={e => updateTable(table.id, { autoFilter: e.target.value })}
+                    />
+                    <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 ml-1">
+                      Use variáveis como {'{{Status}}'} ou {'{{Categoria}}'} e operadores (=, !=, contém, em). Ex: {'{{Status}}'} em Viagem concluída, Container sobre rodas
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-6">

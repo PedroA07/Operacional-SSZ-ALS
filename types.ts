@@ -163,6 +163,7 @@ export interface EmailTableConfig {
   alternateRowColor: boolean;
   columns: string[];
   customCells?: Record<string, string>;
+  autoFilter?: string; // Formula to filter trips automatically
 }
 
 export interface EmailTemplate {

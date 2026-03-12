@@ -91,6 +91,10 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                   <div className="space-y-3">
                     <DataItem label="Motorista" value={trip.driver.name} />
                     <div className="flex gap-4">
+                      <DataItem label="CPF" value={trip.driver.cpf || '---'} />
+                      <DataItem label="Telefone" value={trip.driver.phone || '---'} />
+                    </div>
+                    <div className="flex gap-4">
                       <DataItem label="Cavalo" value={trip.driver.plateHorse} color="text-slate-900 font-bold" />
                       <DataItem label="Carreta" value={trip.driver.plateTrailer} color="text-slate-500 font-bold" />
                     </div>
