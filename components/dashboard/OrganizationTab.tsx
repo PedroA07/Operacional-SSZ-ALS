@@ -410,12 +410,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     try {
       await db.saveTrip(updatedTrip);
-      // Remove do set de salvamento após sucesso
-      setSavingIds(prev => {
-        const next = new Set(prev);
-        next.delete(trip.id);
-        return next;
-      });
+      // Aguarda um pequeno delay antes de remover do set de salvamento
+      // Isso evita a "piscada" onde o estado volta ao antigo antes da prop atualizar
+      setTimeout(() => {
+        setSavingIds(prev => {
+          const next = new Set(prev);
+          next.delete(trip.id);
+          return next;
+        });
+      }, 2000);
     } catch (error) {
       // Reverte em caso de erro
       setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
@@ -451,11 +454,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
       try {
         await db.saveTrip(updatedTrip);
-        setSavingIds(prev => {
-          const next = new Set(prev);
-          next.delete(trip.id);
-          return next;
-        });
+        setTimeout(() => {
+          setSavingIds(prev => {
+            const next = new Set(prev);
+            next.delete(trip.id);
+            return next;
+          });
+        }, 2000);
       } catch (error) {
         // Reverte em caso de erro
         setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
@@ -507,11 +512,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     try {
       await db.saveTrip(updatedTrip);
-      setSavingIds(prev => {
-        const next = new Set(prev);
-        next.delete(tripId);
-        return next;
-      });
+      setTimeout(() => {
+        setSavingIds(prev => {
+          const next = new Set(prev);
+          next.delete(tripId);
+          return next;
+        });
+      }, 2000);
     } catch (error) {
       // Reverte em caso de erro
       setTrips(prev => prev.map(t => t.id === tripId ? originalTrip : t));
@@ -555,11 +562,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     try {
       await db.saveTrip(updatedTrip);
-      setSavingIds(prev => {
-        const next = new Set(prev);
-        next.delete(trip.id);
-        return next;
-      });
+      setTimeout(() => {
+        setSavingIds(prev => {
+          const next = new Set(prev);
+          next.delete(trip.id);
+          return next;
+        });
+      }, 2000);
     } catch (error) {
       // Reverte em caso de erro
       setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
@@ -594,11 +603,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     try {
       await db.saveTrip(updatedTrip);
-      setSavingIds(prev => {
-        const next = new Set(prev);
-        next.delete(trip.id);
-        return next;
-      });
+      setTimeout(() => {
+        setSavingIds(prev => {
+          const next = new Set(prev);
+          next.delete(trip.id);
+          return next;
+        });
+      }, 2000);
     } catch (error) {
       // Reverte em caso de erro
       setTrips(prev => prev.map(t => t.id === trip.id ? originalTrip : t));
@@ -628,11 +639,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     const success = await advanceService.toggleAdvance(trip, checked);
     
-    setSavingIds(prev => {
-      const next = new Set(prev);
-      next.delete(trip.id);
-      return next;
-    });
+    setTimeout(() => {
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(trip.id);
+        return next;
+      });
+    }, 2000);
 
     if (!success) {
       // Reverte em caso de erro
@@ -795,7 +808,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           type="checkbox" 
           checked={!!t.sentNF} 
           onChange={(e) => handleToggleNF(t, e.target.checked)}
-          className="w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+          disabled={savingIds.has(t.id)}
+          className={`w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer ${savingIds.has(t.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
       )
     },
@@ -804,14 +818,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       label: 'Agendado', 
       render: (t: Trip) => {
         const hasMinuta = !!t.preStackingFormData;
+        const isSaving = savingIds.has(t.id);
         return (
           <input 
             type="checkbox" 
             checked={isTripScheduled(t)} 
-            disabled={hasMinuta}
+            disabled={hasMinuta || isSaving}
             onChange={(e) => handleToggleScheduled(t, e.target.checked)}
-            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${hasMinuta ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            title={hasMinuta ? "Agendamento automático via Minuta" : ""}
+            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${(hasMinuta || isSaving) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            title={hasMinuta ? "Agendamento automático via Minuta" : isSaving ? "Salvando..." : ""}
           />
         );
       }
@@ -836,7 +851,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           type="datetime-local" 
           value={t.scheduledDateTime && typeof t.scheduledDateTime === 'string' ? t.scheduledDateTime.substring(0, 16) : ''} 
           onChange={(e) => handleDateTimeChange(t, e.target.value)}
-          className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}
+          disabled={savingIds.has(t.id)}
+          className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'} ${savingIds.has(t.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
       )
     },
@@ -849,7 +865,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             type="checkbox" 
             checked={!!t.hasAdvance} 
             onChange={(e) => handleToggleAdvance(t, e.target.checked)}
-            className="w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer"
+            disabled={savingIds.has(t.id)}
+            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer ${savingIds.has(t.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
           />
           {t.hasAdvance && <span className="text-[7px] font-black text-orange-600 uppercase">70% LIB</span>}
         </div>
