@@ -212,9 +212,9 @@ const StatusManager: React.FC = () => {
 
   const getDestinationOptions = () => {
     const options: any[] = [];
-    customers.forEach(c => options.push({ id: c.id, type: 'CUSTOMER', mainText: c.name, subText: 'Cliente' }));
-    ports.forEach(p => options.push({ id: p.id, type: 'PORT', mainText: p.name, subText: 'Porto' }));
-    preStacking.forEach(p => options.push({ id: p.id, type: 'PRE_STACKING', mainText: p.name, subText: 'Pre-Stacking' }));
+    customers.forEach(c => options.push({ id: c.id, type: 'CUSTOMER', mainText: c.name, subText: 'Cliente', originalData: { id: c.id } }));
+    ports.forEach(p => options.push({ id: p.id, type: 'PORT', mainText: p.name, subText: 'Porto', originalData: { id: p.id } }));
+    preStacking.forEach(p => options.push({ id: p.id, type: 'PRE_STACKING', mainText: p.name, subText: 'Pre-Stacking', originalData: { id: p.id } }));
     return options;
   };
 
@@ -258,6 +258,9 @@ const StatusManager: React.FC = () => {
               data={customers}
               mapToAutocomplete={mapCustomerToAutocomplete}
               onSelect={(item) => setCurrentFlow({ ...currentFlow, customerId: item?.id || '' })}
+              onChange={(val) => {
+                if (!val) setCurrentFlow({ ...currentFlow, customerId: '' });
+              }}
               placeholder="Todos os Clientes"
               initialValue={currentFlow.customerId ? customers.find(c => c.id === currentFlow.customerId)?.name : ''}
             />
@@ -283,6 +286,9 @@ const StatusManager: React.FC = () => {
               data={getDestinationOptions()}
               mapToAutocomplete={(item: any) => item}
               onSelect={(item) => setCurrentFlow({ ...currentFlow, destinationId: item?.id || '' })}
+              onChange={(val) => {
+                if (!val) setCurrentFlow({ ...currentFlow, destinationId: '' });
+              }}
               placeholder="Todos os Destinos"
               initialValue={currentFlow.destinationId ? getDestinationName(currentFlow.destinationId) : ''}
             />

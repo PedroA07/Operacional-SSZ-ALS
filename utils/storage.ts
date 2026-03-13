@@ -204,6 +204,7 @@ export const db = {
       id: c.id,
       name: c.name,
       parentId: c.parent_id,
+      color: c.color,
       createdAt: c.created_at
     }));
   },
@@ -214,6 +215,7 @@ export const db = {
       id: c.id,
       name: c.name,
       parent_id: c.parentId,
+      color: c.color,
       created_at: new Date().toISOString()
     });
     return !error;

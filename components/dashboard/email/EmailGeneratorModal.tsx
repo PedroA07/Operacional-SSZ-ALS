@@ -361,11 +361,13 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     else if (filterStr.includes('=')) operator = '=';
     else if (filterStr.toLowerCase().includes(' contém ')) operator = 'contém';
     else if (filterStr.toLowerCase().includes(' contem ')) operator = 'contem';
+    else if (filterStr.toLowerCase().includes(' não contém ')) operator = 'não contém';
+    else if (filterStr.toLowerCase().includes(' nao contem ')) operator = 'nao contem';
     else if (filterStr.toLowerCase().includes(' em ')) operator = 'em';
 
     if (!operator) return false;
 
-    const parts = filterStr.split(new RegExp(`\\s*(?:!=|=|contém|contem|em)\\s*`, 'i'));
+    const parts = filterStr.split(new RegExp(`\\s*(?:!=|=|não contém|nao contem|contém|contem|em)\\s*`, 'i'));
     if (parts.length !== 2) return false;
 
     const normalize = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -391,6 +393,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     if (operator === '=') return leftValue === rightValue;
     if (operator === '!=') return leftValue !== rightValue;
     if (operator === 'contém' || operator === 'contem') return leftValue.includes(rightValue);
+    if (operator === 'não contém' || operator === 'nao contem') return !leftValue.includes(rightValue);
     if (operator === 'em') {
       const options = rightValue.split(',').map(s => normalize(s.trim()));
       return options.includes(leftValue);

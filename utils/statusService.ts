@@ -79,9 +79,13 @@ export const statusService = {
     }
 
     if (bestStatuses.length > 0) {
-      return bestStatuses
-        .sort((a, b) => a.orderIndex - b.orderIndex)
-        .map(s => ({ label: s.name, value: s.name as TripStatus, color: s.color || 'bg-blue-500', isFinal: s.isFinal }));
+      const sorted = [...bestStatuses].sort((a, b) => a.orderIndex - b.orderIndex);
+      return sorted.map((s, index) => ({ 
+        label: s.name, 
+        value: s.name as TripStatus, 
+        color: s.color || 'bg-blue-500', 
+        isFinal: s.isFinal || index === sorted.length - 1 
+      }));
     }
 
     return statusService.getOptions(trip);

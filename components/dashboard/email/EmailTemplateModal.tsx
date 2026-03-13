@@ -677,12 +677,12 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                     <input 
                       type="text" 
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-600 focus:border-blue-500 transition-all outline-none"
-                      placeholder="Ex: Status contém concluída"
+                      placeholder="Ex: Status não contém concluída"
                       value={table.autoFilter || ''}
                       onChange={e => updateTable(table.id, { autoFilter: e.target.value })}
                     />
                     <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 ml-1">
-                      Use o nome da coluna e operadores (=, !=, contém, em). Ex: Status em Viagem concluída, Container sobre rodas
+                      Use o nome da coluna e operadores (=, !=, contém, não contém, em). Ex: Status em Viagem concluída, Container sobre rodas
                     </p>
                   </div>
 
@@ -757,7 +757,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                           <input 
                             type="text" 
                             className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-600 focus:border-blue-500 outline-none"
-                            placeholder="Ex: Status contém andamento"
+                            placeholder="Ex: Status não contém andamento"
                             value={table.splitLeftCondition || ''}
                             onChange={e => updateTable(table.id, { splitLeftCondition: e.target.value })}
                           />

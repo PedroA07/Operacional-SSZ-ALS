@@ -184,8 +184,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
     handleSetPriority,
-    drivers 
-  ), [user, drivers, allTrips]);
+    drivers,
+    categories
+  ), [user, drivers, allTrips, categories]);
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
 

@@ -187,7 +187,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
           <thead className="bg-slate-100 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20 shadow-sm">
             <tr>
               {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
-                <th key={col.key} className="px-3 py-2 whitespace-nowrap border border-slate-200 bg-slate-100">{col.label}</th>
+                <th key={col.key} className="px-3 py-2 whitespace-nowrap border border-slate-200 bg-slate-100 text-left">{col.label}</th>
               ))}
             </tr>
           </thead>

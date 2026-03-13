@@ -45,7 +45,8 @@ export const tripRepository = {
     is_scheduled: trip.isScheduled || false,
     scheduled_location_id: trip.scheduledLocationId || null,
     scheduled_date_time: trip.scheduledDateTime || null,
-    has_advance: trip.hasAdvance || false
+    has_advance: trip.hasAdvance || false,
+    is_completed: trip.isCompleted || false
   }),
 
   mapFromDb: (d: any): Trip => {
