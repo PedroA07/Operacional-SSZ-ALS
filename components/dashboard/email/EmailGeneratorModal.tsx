@@ -593,7 +593,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       const renderSubTable = (subData: Trip[], subTitle?: string) => {
         let html = '';
         if (subTitle && !table.hideTitle) {
-          html += `<h4 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 10px; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; text-align: center;">${subTitle}</h4>`;
+          html += `<h4 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 10px; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; text-align: left;">${subTitle}</h4>`;
         }
 
         if (table.headerOrientation === 'horizontal') {
@@ -667,7 +667,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
         const rightHtml = renderSubTable(rightData, table.splitRightTitle);
 
         if (table.title && !table.hideTitle) {
-          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase;">${table.title}</h3>`;
+          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; text-align: left;">${table.title}</h3>`;
         }
 
         if (leftHtml && rightHtml) {
@@ -684,7 +684,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
         }
       } else {
         if (table.title && !table.hideTitle) {
-          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase;">${table.title}</h3>`;
+          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; text-align: left;">${table.title}</h3>`;
         }
         tableHtml += renderSubTable(data);
       }
