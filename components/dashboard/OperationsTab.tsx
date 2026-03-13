@@ -135,21 +135,35 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     setIsSavingStatus(true);
-    const eventTime = new Date(statusTime).toISOString();
-    const isCompleted = statusService.isTripCompleted(tempStatus, selectedTrip, customStatuses);
-    const updatedTrip: Trip = { 
-      ...selectedTrip, 
-      status: tempStatus, 
-      statusTime: eventTime, 
-      isCompleted: isCompleted,
-      statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: new Date().toISOString() }, ...(selectedTrip.statusHistory || [])] 
-    };
+    
     try {
+      let eventTime = new Date().toISOString();
+      if (statusTime) {
+        const parsedDate = new Date(statusTime);
+        if (!isNaN(parsedDate.getTime())) {
+          eventTime = parsedDate.toISOString();
+        }
+      }
+
+      const isCompleted = statusService.isTripCompleted(tempStatus, selectedTrip, customStatuses);
+      const updatedTrip: Trip = { 
+        ...selectedTrip, 
+        status: tempStatus, 
+        statusTime: eventTime, 
+        isCompleted: isCompleted,
+        statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: new Date().toISOString() }, ...(selectedTrip.statusHistory || [])] 
+      };
+      
       if (await db.saveTrip(updatedTrip, user)) {
         setIsStatusModalOpen(false);
         onRefresh();
       }
-    } catch (e) { alert("Erro de rede."); } finally { setIsSavingStatus(false); }
+    } catch (e: any) { 
+      alert(`Erro ao salvar status: ${e.message || 'Erro desconhecido'}`); 
+      console.error("Erro ao salvar status:", e);
+    } finally { 
+      setIsSavingStatus(false); 
+    }
   };
 
   const filteredTrips = useMemo(() => {

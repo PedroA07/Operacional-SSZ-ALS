@@ -26,28 +26,43 @@ export const driverAuthService = {
 
     const defaults = driverAuthService.generateDefaults(driverData);
     const username = defaults.username.toLowerCase();
+    
+    if (!username) {
+      console.warn(`[syncUserRecord] Motorista ${driverId} sem CPF válido para gerar username.`);
+      return { username: '', password: '' };
+    }
+
     const password = (customPassword || defaults.password).trim();
 
     // CRÍTICO: Garantimos que o driverId da tabela 'drivers' seja gravado aqui no 'users'
     const users = await db.getUsers();
-    const existingUser = users.find(u => u.username.toLowerCase() === username);
+    
+    // Busca por driverId primeiro (mais seguro) ou por username
+    const existingUser = users.find(u => 
+      (u.driverId && String(u.driverId) === String(driverId)) || 
+      (u.username && u.username.toLowerCase() === username)
+    );
 
     const userPayload: User = {
       ...(existingUser || {}),
       id: existingUser?.id || `u-${driverId}`,
       username: username,
       password: password,
-      displayName: driverData.name || 'Motorista',
+      displayName: driverData.name || existingUser?.displayName || 'Motorista',
       role: driverData.driverType === 'Motoboy' ? 'motoboy' : 'driver',
       driverId: driverId,
       lastLogin: existingUser?.lastLogin || new Date().toISOString(),
-      position: driverData.driverType || 'Motorista',
-      status: driverData.status || 'Ativo',
+      position: driverData.driverType || existingUser?.position || 'Motorista',
+      status: driverData.status || existingUser?.status || 'Ativo',
       photo: driverData.photo || existingUser?.photo,
-      isFirstLogin: existingUser ? (existingUser.isFirstLogin === true) : false 
+      isFirstLogin: existingUser ? (existingUser.isFirstLogin === true) : true 
     };
 
-    await db.saveUser(userPayload);
+    const success = await db.saveUser(userPayload);
+    if (!success) {
+      throw new Error("Falha ao sincronizar registro de usuário no banco de dados.");
+    }
+    
     return { username, password };
   },
 

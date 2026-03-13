@@ -105,7 +105,13 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
         finalCnh = await fileStorage.uploadDriverCNH(finalCnh, drvId);
       }
 
-      const updatedForm = { ...form, photo: finalPhoto, cnhPdfUrl: finalCnh };
+      const updatedForm = { 
+        ...form, 
+        photo: finalPhoto, 
+        cnhPdfUrl: finalCnh,
+        registrationDate: form.registrationDate || editingDriver?.registrationDate || new Date().toISOString(),
+        statusLastChangeDate: form.statusLastChangeDate || editingDriver?.statusLastChangeDate || new Date().toISOString()
+      };
       const { password } = await driverAuthService.syncUserRecord(drvId, updatedForm, form.generatedPassword);
       
       await onSave({ 
@@ -169,7 +175,14 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                   <option value="Frota">FROTA ALS</option>
                   <option value="Motoboy">MOTOBOY</option>
                 </select>
-                <select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}>
+                <select className={inputClasses} value={form.status} onChange={e => {
+                  const newStatus = e.target.value as any;
+                  setForm({
+                    ...form, 
+                    status: newStatus,
+                    statusLastChangeDate: new Date().toISOString()
+                  });
+                }}>
                   <option value="Ativo">SISTEMA ATIVO</option>
                   <option value="Inativo">SISTEMA INATIVO</option>
                 </select>

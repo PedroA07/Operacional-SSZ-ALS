@@ -112,11 +112,11 @@ const StaffModal: React.FC<StaffModalProps> = ({
         username: (form.username || '').toLowerCase(),
         role: (form.role as 'admin' | 'staff') || 'staff',
         photo: finalPhotoUrl,
-        registrationDate: form.registrationDate ? new Date(form.registrationDate).toISOString() : new Date().toISOString(),
+        registrationDate: form.registrationDate ? new Date(form.registrationDate).toISOString() : (editingStaff?.registrationDate || new Date().toISOString()),
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
         status: (form.status as 'Ativo' | 'Inativo') || 'Ativo',
-        statusSince: editingStaff?.statusSince || new Date().toISOString()
+        statusSince: form.statusSince || editingStaff?.statusSince || new Date().toISOString()
       };
       
       const passwordToSave = isEditingPassword ? form.password : undefined;
@@ -183,10 +183,17 @@ const StaffModal: React.FC<StaffModalProps> = ({
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Status</label>
-                    <select className={inputClasses} value={form.status} onChange={e => setForm({...form, status: e.target.value as any})}>
-                      <option value="Ativo">ATIVO / LIBERADO</option>
-                      <option value="Inativo">INATIVO / BLOQUEADO</option>
-                    </select>
+                  <select className={inputClasses} value={form.status} onChange={e => {
+                    const newStatus = e.target.value as any;
+                    setForm({
+                      ...form, 
+                      status: newStatus,
+                      statusSince: new Date().toISOString()
+                    });
+                  }}>
+                    <option value="Ativo">ATIVO / LIBERADO</option>
+                    <option value="Inativo">INATIVO / BLOQUEADO</option>
+                  </select>
                   </div>
                 </div>
               </div>

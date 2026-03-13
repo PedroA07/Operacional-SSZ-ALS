@@ -44,7 +44,7 @@ export const authService = {
         isFirstLogin: data.isfirstlogin
       };
 
-      await supabase.from('users').update({ last_login: nowISO, presence_status: 'online' }).eq('id', user.id);
+      await supabase.from('users').update({ lastlogin: nowISO, presence_status: 'online' }).eq('id', user.id);
       return { success: true, user };
 
     } catch (err: any) {

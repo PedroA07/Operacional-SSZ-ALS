@@ -41,7 +41,6 @@ export const tripRepository = {
     scheduling: trip.scheduling || null,
     driver_docs: trip.driver_docs || [],
     is_priority: trip.isPriority || false,
-    is_completed: trip.isCompleted || false,
     sent_nf: trip.sentNF || false,
     is_scheduled: trip.isScheduled || false,
     scheduled_location_id: trip.scheduledLocationId || null,

@@ -31,18 +31,18 @@ export const db = {
     if (error) throw error;
     return (data || []).map(u => ({
       id: u.id,
-      username: u.username,
+      username: u.username || '',
       password: u.password,
-      displayName: u.display_name || u.displayname || u.username,
+      displayName: u.display_name || u.displayname || u.username || 'Usuário',
       role: u.role,
-      lastLogin: u.last_login || u.lastLogin,
+      lastLogin: u.lastlogin || u.lastLogin,
       photo: u.photo,
       position: u.position,
       driverId: u.driver_id || u.driverid,
       staffId: u.staff_id || u.staffid,
       status: u.status,
       isFirstLogin: u.isfirstlogin,
-      lastSeen: u.last_seen || u.lastSeen,
+      lastSeen: u.last_seen || u.lastseen,
       presence_status: u.presence_status
     }));
   },
@@ -55,7 +55,7 @@ export const db = {
       password: user.password,
       display_name: user.displayName,
       role: user.role,
-      last_login: user.lastLogin,
+      lastlogin: user.lastLogin,
       photo: user.photo,
       position: user.position,
       driver_id: user.driverId,
