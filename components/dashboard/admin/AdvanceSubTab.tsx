@@ -16,7 +16,7 @@ const AdvanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
   // REGRA: Aparecem adiantamentos se iniciou a viagem OU se já concluiu
   const pendingTrips = trips.filter(t => {
     const isNotPaidOrLiberated = t.advancePayment?.status !== 'PAGO' && t.advancePayment?.status !== 'LIBERAR';
-    const isRelevantStatus = [
+    const isRelevantStatus = t.isCompleted || [
       'Retirada de vazio', 
       'Retirada do cheio', 
       'Em viagem', 

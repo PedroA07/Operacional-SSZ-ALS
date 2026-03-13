@@ -3,6 +3,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Trip, User, TripStatus, DriverCapturedDoc, CustomStatus } from '../../../types';
 import ScannerModal from '../ScannerModal';
 import { db } from '../../../utils/storage';
+import { statusService } from '../../../utils/statusService';
 import ImageViewer from '../../shared/ImageViewer';
 import DriverDocsGallery from '../DriverDocsGallery';
 import StatusConfirmModal from '../StatusConfirmModal';
@@ -19,17 +20,6 @@ const DEFAULT_STATUSES: TripStatus[] = [
   'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 
   'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 
   'Chegou no destino', 'Devolução do cheio', 'Viagem concluída'
-];
-
-const VW_CRAGEA_STATUSES: { label: string; value: TripStatus }[] = [
-  { label: 'Retirou o Cheio', value: 'Retirada do cheio' },
-  { label: 'Chegou no Cragea', value: 'Chegou no Cragea' },
-  { label: 'Aguardando Carregar', value: 'Aguardando carregar' },
-  { label: 'Saiu do Cragea', value: 'Saiu do Cragea' },
-  { label: 'Chegou na Volkswagen', value: 'Chegou na Volkswagen' },
-  { label: 'Saiu da Volkswagen', value: 'Saiu da Volkswagen' },
-  { label: 'Container sobre Rodas', value: 'Container sobre rodas' },
-  { label: 'Baixa Cragea', value: 'Viagem concluída' },
 ];
 
 const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
@@ -63,14 +53,14 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     const todayTrips = trips.filter(t => t.dateTime.split('T')[0] === todayStr && t.status !== 'Viagem cancelada');
     return {
       total: todayTrips.length,
-      done: todayTrips.filter(t => t.status === 'Viagem concluída').length,
-      pending: todayTrips.filter(t => t.status !== 'Viagem concluída').length,
+      done: todayTrips.filter(t => t.isCompleted || t.status === 'Viagem concluída').length,
+      pending: todayTrips.filter(t => !t.isCompleted && t.status !== 'Viagem concluída').length,
     };
   }, [trips, todayStr]);
 
   const activeTrip = useMemo(() => {
     const pendingTrips = [...trips]
-      .filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
+      .filter(t => !t.isCompleted && t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
       .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
     if (pendingTrips.length === 0) return null;
@@ -81,7 +71,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
     // 2. Lógica de sequência: mostrar a próxima após a última concluída
     const concludedTrips = [...trips]
-      .filter(t => t.status === 'Viagem concluída')
+      .filter(t => t.isCompleted || t.status === 'Viagem concluída')
       .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
     if (concludedTrips.length > 0) {
@@ -111,59 +101,10 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const isVWCrageaTrip = useMemo(() => {
-    if (!activeTrip) return false;
-    const isVW = activeTrip.customer?.name?.toUpperCase().includes('VOLKSWAGEN') || 
-                 activeTrip.customer?.legalName?.toUpperCase().includes('VOLKSWAGEN');
-    const isCragea = activeTrip.destination?.name?.toUpperCase().includes('CRAGEA') || 
-                     activeTrip.scheduling?.location?.toUpperCase().includes('CRAGEA');
-    return isVW && isCragea;
-  }, [activeTrip]);
-
   const availableStatuses = useMemo(() => {
     if (!activeTrip) return [];
-
-    const tripModality = activeTrip.type?.toUpperCase();
-
-    // 1. Status específicos do cliente e modalidade
-    let filtered = customStatuses.filter(s => 
-      s.customerId === activeTrip.customer.id && 
-      s.modality === tripModality
-    );
-
-    // 2. Se não houver, status específicos do cliente sem modalidade
-    if (filtered.length === 0) {
-      filtered = customStatuses.filter(s => 
-        s.customerId === activeTrip.customer.id && !s.modality
-      );
-    }
-
-    // 3. Se não houver, status gerais da modalidade
-    if (filtered.length === 0) {
-      filtered = customStatuses.filter(s => 
-        !s.customerId && s.modality === tripModality
-      );
-    }
-
-    // 4. Se não houver, status gerais sem modalidade
-    if (filtered.length === 0) {
-      filtered = customStatuses.filter(s => 
-        !s.customerId && !s.modality
-      );
-    }
-
-    if (filtered.length > 0) {
-      return filtered
-        .sort((a, b) => a.orderIndex - b.orderIndex)
-        .map(s => ({ label: s.name, value: s.name as TripStatus }));
-    }
-
-    // 5. Fallback para os padrões do sistema (incluindo lógica VW)
-    if (isVWCrageaTrip) {
-      return VW_CRAGEA_STATUSES;
-    }
-    return DEFAULT_STATUSES.map(s => ({ label: s, value: s }));
-  }, [activeTrip, customStatuses, isVWCrageaTrip]);
+    return statusService.getCustomOptions(activeTrip, customStatuses);
+  }, [activeTrip, customStatuses]);
 
   const handleStatusSelect = (status: TripStatus) => {
     if (isUpdating || activeTrip?.status === status) return;
@@ -177,11 +118,14 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
     setIsUpdating(true);
     const nowISO = new Date().toISOString();
     
+    const isCompleted = statusService.isTripCompleted(pendingStatus, activeTrip, customStatuses);
+    
     const updatedTrip: Trip = {
       ...activeTrip,
       status: pendingStatus,
       statusTime: dateTime,
-      isPriority: pendingStatus === 'Viagem concluída' ? false : activeTrip.isPriority,
+      isPriority: isCompleted ? false : activeTrip.isPriority,
+      isCompleted: isCompleted,
       statusHistory: [
         { status: pendingStatus, dateTime: dateTime, createdAt: nowISO },
         ...(activeTrip.statusHistory || [])

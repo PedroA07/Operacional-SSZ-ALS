@@ -1,15 +1,17 @@
 
 import React, { useState, useMemo } from 'react';
-import { Trip } from '../../../types';
+import { Trip, CustomStatus } from '../../../types';
 import { statsCalculator } from '../../../utils/statsCalculator';
+import { statusService } from '../../../utils/statusService';
 import RichEntityFilter from './RichEntityFilter';
 import MultiCheckboxFilter from '../../shared/MultiCheckboxFilter';
 
 interface TripsTodayProps {
   trips: Trip[];
+  customStatuses?: CustomStatus[];
 }
 
-const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
+const TripsToday: React.FC<TripsTodayProps> = ({ trips, customStatuses = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selTypes, setSelTypes] = useState<string[]>([]);
   const [selClients, setSelClients] = useState<string[]>([]);
@@ -30,7 +32,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const stats = useMemo(() => {
     const active = filteredBase.filter(t => t.status !== 'Viagem cancelada');
     const canceled = filteredBase.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = active.filter(t => t.status === 'Viagem concluída').length;
+    const completed = active.filter(t => t.isCompleted || statusService.isTripCompleted(t.status, t, customStatuses)).length;
     const delays = active.filter(t => statsCalculator.isDelayed(t)).length;
     const typeCounts: Record<string, number> = {};
     active.forEach(t => {
@@ -38,7 +40,7 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
     return { total: active.length, typeCounts, canceled, delays, completed };
-  }, [filteredBase]);
+  }, [filteredBase, customStatuses]);
 
   const displayTrips = useMemo(() => {
     return filteredBase.filter(t => {
@@ -52,9 +54,9 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
   const allOpTypes = useMemo(() => Array.from(new Set(todayRaw.map(t => t.type?.toUpperCase() || 'OUTROS'))).sort(), [todayRaw]);
 
   // Função auxiliar para definir a cor do item na lista de hoje
-  const getTripItemStyle = (status: string) => {
-    if (status === 'Viagem concluída') return 'bg-emerald-50/50 border-emerald-100 text-emerald-700';
-    if (['Em viagem', 'Chegou no cliente', 'Saiu do cliente'].includes(status)) return 'bg-blue-50 border-blue-200 text-blue-800 shadow-sm';
+  const getTripItemStyle = (trip: Trip) => {
+    if (trip.isCompleted || statusService.isTripCompleted(trip.status, trip, customStatuses)) return 'bg-emerald-50/50 border-emerald-100 text-emerald-700';
+    if (['Em viagem', 'Chegou no cliente', 'Saiu do cliente'].includes(trip.status)) return 'bg-blue-50 border-blue-200 text-blue-800 shadow-sm';
     return 'bg-amber-50/30 border-amber-100 text-amber-700'; // Pendentes
   };
 
@@ -104,11 +106,11 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips }) => {
           </div>
           <div className="overflow-y-auto custom-scrollbar p-5 space-y-3 flex-1 bg-slate-50/30 min-h-[300px] rounded-b-[2.5rem]">
             {displayTrips.map(trip => (
-              <div key={trip.id} className={`p-4 border rounded-[2rem] shadow-sm flex items-center justify-between transition-all ${getTripItemStyle(trip.status)}`}>
+              <div key={trip.id} className={`p-4 border rounded-[2rem] shadow-sm flex items-center justify-between transition-all ${getTripItemStyle(trip)}`}>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                      <span className="text-[10px] font-black">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-                     <div className={`w-1 h-1 rounded-full ${trip.status === 'Viagem concluída' ? 'bg-emerald-400' : 'bg-blue-400'}`}></div>
+                     <div className={`w-1 h-1 rounded-full ${trip.isCompleted || statusService.isTripCompleted(trip.status, trip, customStatuses) ? 'bg-emerald-400' : 'bg-blue-400'}`}></div>
                   </div>
                   <h4 className="text-[11px] font-black uppercase truncate leading-none mt-1">{trip.driver.name}</h4>
                   <p className="text-[9px] font-bold opacity-60 uppercase mt-0.5 truncate">{trip.customer.name}</p>

@@ -14,7 +14,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) =>
   
   // Regra: Apenas viagens concluídas e que já tiveram saldo liberado ou pago
   const eligibleTrips = trips.filter(t => 
-    t.status === 'Viagem concluída' && 
+    (t.isCompleted || t.status === 'Viagem concluída') && 
     (t.balancePayment?.status === 'LIBERAR' || t.balancePayment?.status === 'PAGO')
   );
 

@@ -322,8 +322,10 @@ export interface CustomStatus {
   name: string;
   customerId?: string; // Se vazio, é status geral
   modality?: string; // EXPORTAÇÃO, IMPORTAÇÃO, etc.
+  destinationId?: string; // ID do porto, pre-stacking ou cliente de destino
   orderIndex: number;
   color?: string;
+  isFinal?: boolean;
 }
 
 export interface Trip {
@@ -349,6 +351,7 @@ export interface Trip {
   destination?: { id: string; name: string; legalName?: string; cnpj?: string; city: string; state?: string };
   driver: { id: string; name: string; plateHorse: string; plateTrailer: string; status: string; cpf?: string; phone?: string };
   status: TripStatus;
+  isCompleted?: boolean;
   statusHistory: StatusHistoryEntry[];
   balancePayment: PaymentStatus;
   advancePayment: PaymentStatus;

@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, PreStacking, Port, Category } from '../../../types';
+import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, PreStacking, Port, Category, CustomStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 import { getOperationTableColumns } from './OperationTableColumns';
 import SmartOperationTable from './SmartOperationTable';
@@ -58,6 +58,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [statusTime, setStatusTime] = useState('');
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [ports, setPorts] = useState<Port[]>([]);
+  const [customStatuses, setCustomStatuses] = useState<CustomStatus[]>([]);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
   const handleSetPriority = async (trip: Trip) => {
@@ -94,9 +95,10 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
 
   const loadAuxData = useCallback(async () => {
-    const [p, ps] = await Promise.all([db.getPorts(), db.getPreStacking()]);
+    const [p, ps, cs] = await Promise.all([db.getPorts(), db.getPreStacking(), db.getCustomStatuses()]);
     setPorts(p);
     setPreStackingUnits([...p, ...ps]);
+    setCustomStatuses(cs);
   }, []);
 
   useEffect(() => { loadAuxData(); }, [loadAuxData]);
@@ -105,10 +107,12 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     if (!selectedTrip || isSavingStatus) return;
     setIsSavingStatus(true);
     const eventTime = new Date(statusTime).toISOString();
+    const isCompleted = statusService.isTripCompleted(tempStatus, selectedTrip, customStatuses);
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
       statusTime: eventTime, 
+      isCompleted: isCompleted,
       statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: new Date().toISOString() }, ...(selectedTrip.statusHistory || [])] 
     };
     try {
@@ -137,11 +141,17 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
 
     if (activeStatusTab === 'ativas') {
-      const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
-      result = result.filter(t => active.includes(t.status));
-    } else if (activeStatusTab === 'concluida') result = result.filter(t => t.status === 'Viagem concluída');
-    else if (activeStatusTab === 'cancelada') result = result.filter(t => t.status === 'Viagem cancelada');
-    else if (activeStatusTab === 'geral') result = result.filter(t => t.status !== 'Viagem cancelada');
+      result = result.filter(t => {
+        const isComp = t.isCompleted || statusService.isTripCompleted(t.status, t, customStatuses);
+        return !isComp && t.status !== 'Viagem cancelada';
+      });
+    } else if (activeStatusTab === 'concluida') {
+      result = result.filter(t => t.isCompleted || statusService.isTripCompleted(t.status, t, customStatuses));
+    } else if (activeStatusTab === 'cancelada') {
+      result = result.filter(t => t.status === 'Viagem cancelada');
+    } else if (activeStatusTab === 'geral') {
+      result = result.filter(t => t.status !== 'Viagem cancelada');
+    }
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -158,7 +168,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       });
     }
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [allTrips, categoryName, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient, filterTypes, filterDriverNames]);
+  }, [allTrips, categoryName, activeStatusTab, searchQuery, startDate, endDate, selectedFilterClient, filterTypes, filterDriverNames, customStatuses]);
 
   const tripColumns = useMemo(() => getOperationTableColumns(
     (t, s) => { setSelectedTrip(t); setTempStatus(s); setStatusTime(new Date().toISOString().slice(0,16)); setIsStatusModalOpen(true); },
@@ -304,7 +314,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status</label>
                   <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                    {statusService.getOptions(selectedTrip).map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    {statusService.getCustomOptions(selectedTrip, customStatuses).map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">

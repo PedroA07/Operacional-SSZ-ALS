@@ -8,7 +8,7 @@ export const StatusColumn = (
   onOpenHistoryManager: (t: Trip) => void
 ) => {
   const getStatusStyle = (status: TripStatus, isLatest: boolean) => {
-    if (status === 'Viagem concluída') return isLatest ? 'bg-emerald-600 text-white shadow-lg scale-105' : 'bg-emerald-50 text-emerald-600';
+    if (status === 'Viagem concluída' || t.isCompleted) return isLatest ? 'bg-emerald-600 text-white shadow-lg scale-105' : 'bg-emerald-50 text-emerald-600';
     if (status === 'Viagem cancelada') return isLatest ? 'bg-red-600 text-white shadow-lg' : 'bg-red-50 text-red-600';
     return isLatest ? 'bg-blue-600 text-white shadow-xl scale-105 border-blue-400' : 'bg-white text-slate-400 border-slate-100';
   };

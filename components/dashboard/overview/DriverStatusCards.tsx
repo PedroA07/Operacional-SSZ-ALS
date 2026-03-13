@@ -1,24 +1,29 @@
 
 import React, { useMemo, useState } from 'react';
-import { Trip, Driver } from '../../../types';
+import { Trip, Driver, CustomStatus } from '../../../types';
+import { statusService } from '../../../utils/statusService';
 
 interface DriverStatusCardsProps {
   trips: Trip[];
   drivers: Driver[];
+  customStatuses?: CustomStatus[];
 }
 
-const DriverStatusCards: React.FC<DriverStatusCardsProps> = ({ trips, drivers }) => {
+const DriverStatusCards: React.FC<DriverStatusCardsProps> = ({ trips, drivers, customStatuses = [] }) => {
   const [searchQuery, setSearchQuery] = useState('');
   
   const baseData = useMemo(() => {
-    const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
+    const activeTrips = trips.filter(t => {
+      const isComp = t.isCompleted || statusService.isTripCompleted(t.status, t, customStatuses);
+      return !isComp && t.status !== 'Viagem cancelada';
+    });
     const inTripIds = new Set(activeTrips.map(t => t.driver.id));
     
     const driversInTrip = drivers.filter(d => inTripIds.has(d.id));
     const driversAvailable = drivers.filter(d => d.status === 'Ativo' && !inTripIds.has(d.id));
 
     return { driversInTrip, driversAvailable, activeTrips };
-  }, [trips, drivers]);
+  }, [trips, drivers, customStatuses]);
 
   const filteredInTrip = useMemo(() => {
     if (!searchQuery) return baseData.driversInTrip;

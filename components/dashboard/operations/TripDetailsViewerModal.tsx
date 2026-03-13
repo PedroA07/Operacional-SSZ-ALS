@@ -48,7 +48,7 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase border ${trip.status === 'Viagem concluída' ? 'bg-emerald-600 border-emerald-500' : 'bg-blue-600 border-blue-500'}`}>
+            <span className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase border ${trip.isCompleted || trip.status === 'Viagem concluída' ? 'bg-emerald-600 border-emerald-500' : 'bg-blue-600 border-blue-500'}`}>
               {trip.status}
             </span>
             <button onClick={onClose} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">

@@ -129,54 +129,19 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
 
   const availableStatusesForSelectedTrip = useMemo(() => {
     if (!selectedTrip) return [];
-
-    const tripModality = selectedTrip.type?.toUpperCase();
-
-    // 1. Status específicos do cliente e modalidade
-    let filtered = customStatuses.filter(s => 
-      s.customerId === selectedTrip.customer.id && 
-      s.modality === tripModality
-    );
-
-    // 2. Se não houver, status específicos do cliente sem modalidade
-    if (filtered.length === 0) {
-      filtered = customStatuses.filter(s => 
-        s.customerId === selectedTrip.customer.id && !s.modality
-      );
-    }
-
-    // 3. Se não houver, status gerais da modalidade
-    if (filtered.length === 0) {
-      filtered = customStatuses.filter(s => 
-        !s.customerId && s.modality === tripModality
-      );
-    }
-
-    // 4. Se não houver, status gerais sem modalidade
-    if (filtered.length === 0) {
-      filtered = customStatuses.filter(s => 
-        !s.customerId && !s.modality
-      );
-    }
-
-    if (filtered.length > 0) {
-      return filtered
-        .sort((a, b) => a.orderIndex - b.orderIndex)
-        .map(s => ({ label: s.name, value: s.name as TripStatus }));
-    }
-
-    // 5. Fallback para os padrões do sistema
-    return statusService.getOptions(selectedTrip);
+    return statusService.getCustomOptions(selectedTrip, customStatuses);
   }, [selectedTrip, customStatuses]);
 
   const handleUpdateStatus = async () => {
     if (!selectedTrip || isSavingStatus) return;
     setIsSavingStatus(true);
     const eventTime = new Date(statusTime).toISOString();
+    const isCompleted = statusService.isTripCompleted(tempStatus, selectedTrip, customStatuses);
     const updatedTrip: Trip = { 
       ...selectedTrip, 
       status: tempStatus, 
       statusTime: eventTime, 
+      isCompleted: isCompleted,
       statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: new Date().toISOString() }, ...(selectedTrip.statusHistory || [])] 
     };
     try {
@@ -190,11 +155,17 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const filteredTrips = useMemo(() => {
     let result = [...trips];
     if (activeStatusTab === 'ativas') {
-      const active = ['Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 'Devolução do cheio', 'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas'];
-      result = result.filter(t => active.includes(t.status));
-    } else if (activeStatusTab === 'concluida') result = result.filter(t => t.status === 'Viagem concluída');
-    else if (activeStatusTab === 'cancelada') result = result.filter(t => t.status === 'Viagem cancelada');
-    else if (activeStatusTab === 'geral') result = result.filter(t => t.status !== 'Viagem cancelada');
+      result = result.filter(t => {
+        const isComp = t.isCompleted || statusService.isTripCompleted(t.status, t, customStatuses);
+        return !isComp && t.status !== 'Viagem cancelada';
+      });
+    } else if (activeStatusTab === 'concluida') {
+      result = result.filter(t => t.isCompleted || statusService.isTripCompleted(t.status, t, customStatuses));
+    } else if (activeStatusTab === 'cancelada') {
+      result = result.filter(t => t.status === 'Viagem cancelada');
+    } else if (activeStatusTab === 'geral') {
+      result = result.filter(t => t.status !== 'Viagem cancelada');
+    }
 
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
@@ -219,7 +190,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       );
     }
     return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery]);
+  }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery, customStatuses]);
 
   const columns = useMemo(() => getOperationTableColumns(
     handleOpenStatusEditor,

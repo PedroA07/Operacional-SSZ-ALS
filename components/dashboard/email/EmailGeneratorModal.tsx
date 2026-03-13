@@ -319,7 +319,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       else if (c === 'quantidade linhas' || c === 'quantidade de linhas' || c === 'qtd linhas') value = totalRows !== undefined ? String(totalRows).padStart(2, '0') : '';
       else if (c === 'linha') value = rowIndex !== undefined ? String(rowIndex + 1).padStart(2, '0') : '';
       else if (c === 'viagem atual' || c === 'viagem atual count') {
-        const driverTrips = trips.filter(t => t.driver?.id === trip.driver?.id && t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
+        const driverTrips = trips.filter(t => t.driver?.id === trip.driver?.id && !t.isCompleted && t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
                                  .sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
         const tripIndex = driverTrips.findIndex(t => t.id === trip.id);
         if (c === 'viagem atual') {

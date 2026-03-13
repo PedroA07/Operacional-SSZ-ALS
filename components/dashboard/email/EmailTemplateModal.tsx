@@ -15,15 +15,6 @@ interface EmailTemplateModalProps {
   trips?: Trip[];
 }
 
-const TRIP_STATUSES = [
-  'Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 
-  'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 
-  'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 
-  'Chegou no Cragea', 'Aguardando carregar', 'Saiu do Cragea', 
-  'Chegou na Volkswagen', 'Saiu da Volkswagen', 'Container sobre rodas', 
-  'Agendamento realizado'
-];
-
 const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose, onSuccess, template, user, trips = [] }) => {
   const [formData, setFormData] = useState<Partial<EmailTemplate>>({
     name: '',
@@ -61,6 +52,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
   const [users, setUsers] = useState<User[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [destinations, setDestinations] = useState<(Port | PreStacking)[]>([]);
+  const [customStatuses, setCustomStatuses] = useState<string[]>([]);
 
   const uniqueShips = useMemo(() => {
     const ships = new Set<string>();
@@ -92,19 +84,24 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [driversData, staffData, usersData, customersData, portsData, preStackingData] = await Promise.all([
+        const [driversData, staffData, usersData, customersData, portsData, preStackingData, customStatusesData] = await Promise.all([
           db.getDrivers(),
           db.getStaff(),
           db.getUsers(),
           db.getCustomers(),
           db.getPorts(),
-          db.getPreStacking()
+          db.getPreStacking(),
+          db.getCustomStatuses()
         ]);
         setDrivers(driversData);
         setStaff(staffData);
         setUsers(usersData);
         setCustomers(customersData);
         setDestinations([...portsData, ...preStackingData]);
+        
+        // Extrair nomes únicos dos status personalizados
+        const uniqueStatusNames = Array.from(new Set(customStatusesData.map(s => s.name)));
+        setCustomStatuses(uniqueStatusNames);
       } catch (error) {
         console.error('Erro ao carregar dados para autocomplete:', error);
       }
@@ -521,7 +518,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                                     onChange={e => setBodyStatusFormula(e.target.value)}
                                   >
                                     <option value="">STATUS...</option>
-                                    {TRIP_STATUSES.map(s => (
+                                    {customStatuses.map(s => (
                                       <option key={s} value={s}>{s}</option>
                                     ))}
                                   </select>
@@ -555,7 +552,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                                     onChange={e => setBodyPrevisaoStatus(e.target.value)}
                                   >
                                     <option value="">STATUS BASE...</option>
-                                    {TRIP_STATUSES.map(s => (
+                                    {customStatuses.map(s => (
                                       <option key={s} value={s}>{s}</option>
                                     ))}
                                   </select>
@@ -947,7 +944,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                             onChange={e => setSelectedStatusForFormula({ ...selectedStatusForFormula, [table.id]: e.target.value })}
                           >
                             <option value="">STATUS...</option>
-                            {TRIP_STATUSES.map(s => (
+                            {customStatuses.map(s => (
                               <option key={s} value={s}>{s}</option>
                             ))}
                           </select>

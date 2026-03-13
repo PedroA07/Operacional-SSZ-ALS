@@ -8,7 +8,7 @@ interface VWStatusSelectorProps {
 }
 
 const VWStatusSelector: React.FC<VWStatusSelectorProps> = ({ currentStatus, onSelect }) => {
-  const options: { label: string; value: TripStatus; color: string }[] = [
+  const options: { label: string; value: TripStatus; color: string; isFinal?: boolean }[] = [
     { label: 'Retirou o Cheio', value: 'Retirada do cheio', color: 'bg-blue-600' },
     { label: 'Chegou no Cragea', value: 'Chegou no Cragea', color: 'bg-indigo-600' },
     { label: 'Aguardando Carregar', value: 'Aguardando carregar', color: 'bg-amber-500' },
@@ -16,7 +16,7 @@ const VWStatusSelector: React.FC<VWStatusSelectorProps> = ({ currentStatus, onSe
     { label: 'Chegou na Volkswagen', value: 'Chegou na Volkswagen', color: 'bg-cyan-600' },
     { label: 'Saiu da Volkswagen', value: 'Saiu da Volkswagen', color: 'bg-slate-700' },
     { label: 'Container sobre Rodas', value: 'Container sobre rodas', color: 'bg-emerald-500' },
-    { label: 'Baixa Cragea (Concluir)', value: 'Viagem concluída', color: 'bg-emerald-800' },
+    { label: 'Baixa Cragea (Concluir)', value: 'Viagem concluída', color: 'bg-emerald-800', isFinal: true },
   ];
 
   return (

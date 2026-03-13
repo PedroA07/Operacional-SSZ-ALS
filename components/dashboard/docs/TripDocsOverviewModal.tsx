@@ -194,7 +194,7 @@ const TripDocsOverviewModal: React.FC<TripDocsOverviewModalProps> = ({ isOpen, o
           <div className="w-72 bg-white border-l border-slate-200 flex flex-col shrink-0">
              <div className="p-8 bg-slate-900 text-white shadow-lg">
                 <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-2">Situação Atual</p>
-                <div className={`px-4 py-2 rounded-xl border-2 font-black uppercase text-center text-[10px] ${trip.status === 'Viagem concluída' ? 'bg-emerald-600 border-emerald-500' : 'bg-blue-600 border-blue-500'}`}>
+                <div className={`px-4 py-2 rounded-xl border-2 font-black uppercase text-center text-[10px] ${trip.isCompleted || trip.status === 'Viagem concluída' ? 'bg-emerald-600 border-emerald-500' : 'bg-blue-600 border-blue-500'}`}>
                    {trip.status}
                 </div>
              </div>

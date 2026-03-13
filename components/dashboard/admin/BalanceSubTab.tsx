@@ -38,7 +38,7 @@ const BalanceSubTab: React.FC<Props> = ({ trips, onUpdate, userId }) => {
   const pendingTrips = trips.filter(t => {
     const isNotPaidOrLiberated = t.balancePayment?.status !== 'PAGO' && t.balancePayment?.status !== 'LIBERAR';
     // O saldo geralmente só é pago após conclusão ou em casos específicos de adiantamento já processado
-    const canShowForBalance = t.status === 'Viagem concluída' || (t.advancePayment?.status === 'PAGO' || t.advancePayment?.status === 'LIBERAR');
+    const canShowForBalance = t.isCompleted || t.status === 'Viagem concluída' || (t.advancePayment?.status === 'PAGO' || t.advancePayment?.status === 'LIBERAR');
     
     return isNotPaidOrLiberated && canShowForBalance;
   });

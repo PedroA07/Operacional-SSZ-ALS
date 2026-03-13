@@ -97,8 +97,8 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
   const filteredList = useMemo(() => {
     let list = trips;
     
-    if (activeTab === 'pendentes') list = list.filter(t => t.status === 'Viagem concluída' && !t.completoDoc);
-    else if (activeTab === 'concluidas') list = list.filter(t => t.status === 'Viagem concluída' && t.completoDoc);
+    if (activeTab === 'pendentes') list = list.filter(t => (t.isCompleted || t.status === 'Viagem concluída') && !t.completoDoc);
+    else if (activeTab === 'concluidas') list = list.filter(t => (t.isCompleted || t.status === 'Viagem concluída') && t.completoDoc);
     else list = list.filter(t => t.status === 'Viagem cancelada');
 
     if (startDate) list = list.filter(t => t.dateTime.substring(0, 10) >= startDate);
@@ -129,7 +129,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
       {/* HEADER DE FILTROS */}
       <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-center gap-6">
         <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit shrink-0">
-          <button onClick={() => setActiveTab('pendentes')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'pendentes' ? 'bg-white text-blue-600 shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>Pendentes ({trips.filter(t => t.status === 'Viagem concluída' && !t.completoDoc).length})</button>
+          <button onClick={() => setActiveTab('pendentes')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'pendentes' ? 'bg-white text-blue-600 shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>Pendentes ({trips.filter(t => (t.isCompleted || t.status === 'Viagem concluída') && !t.completoDoc).length})</button>
           <button onClick={() => setActiveTab('concluidas')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'concluidas' ? 'bg-white text-emerald-600 shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>Arquivados</button>
           <button onClick={() => setActiveTab('canceladas')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'canceladas' ? 'bg-white text-red-600 shadow-lg' : 'text-slate-400 hover:bg-slate-200'}`}>Canceladas</button>
         </div>

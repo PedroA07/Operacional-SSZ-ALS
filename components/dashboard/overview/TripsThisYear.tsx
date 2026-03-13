@@ -1,15 +1,17 @@
 
 import React, { useState, useMemo } from 'react';
-import { Trip } from '../../../types';
+import { Trip, CustomStatus } from '../../../types';
 import { statsCalculator } from '../../../utils/statsCalculator';
+import { statusService } from '../../../utils/statusService';
 import RichEntityFilter from './RichEntityFilter';
 import MultiCheckboxFilter from '../../shared/MultiCheckboxFilter';
 
 interface TripsThisYearProps {
   trips: Trip[];
+  customStatuses?: CustomStatus[];
 }
 
-const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
+const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips, customStatuses = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selTypes, setSelTypes] = useState<string[]>([]);
   const [selClients, setSelClients] = useState<string[]>([]);
@@ -30,7 +32,7 @@ const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
   const stats = useMemo(() => {
     const active = filteredBase.filter(t => t.status !== 'Viagem cancelada');
     const canceled = filteredBase.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = active.filter(t => t.status === 'Viagem concluída').length;
+    const completed = active.filter(t => t.isCompleted || statusService.isTripCompleted(t.status, t, customStatuses)).length;
     const delays = active.filter(t => statsCalculator.isDelayed(t)).length;
 
     const typeCounts: Record<string, number> = {};
@@ -40,7 +42,7 @@ const TripsThisYear: React.FC<TripsThisYearProps> = ({ trips }) => {
     });
 
     return { total: active.length, typeCounts, canceled, delays, completed };
-  }, [filteredBase]);
+  }, [filteredBase, customStatuses]);
 
   const displayTrips = useMemo(() => {
     return filteredBase.filter(t => {

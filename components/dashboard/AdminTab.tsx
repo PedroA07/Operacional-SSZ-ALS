@@ -29,15 +29,15 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
   const stats = {
     pendingAdvances: trips.filter(t => {
       const isNotPaid = t.advancePayment?.status !== 'PAGO' && t.advancePayment?.status !== 'LIBERAR';
-      const isRelevant = ['Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Viagem concluída'].includes(t.status);
+      const isRelevant = ['Retirada de vazio', 'Retirada do cheio', 'Em viagem', 'Viagem concluída'].includes(t.status) || t.isCompleted;
       return isNotPaid && isRelevant;
     }).length,
     pendingBalances: trips.filter(t => {
        const isNotPaid = t.balancePayment?.status !== 'PAGO' && t.balancePayment?.status !== 'LIBERAR';
-       const isFinished = t.status === 'Viagem concluída';
+       const isFinished = t.isCompleted || t.status === 'Viagem concluída';
        return isNotPaid && isFinished;
     }).length,
-    pendingContracts: trips.filter(t => t.status === 'Viagem concluída' && (t.balancePayment?.status === 'LIBERAR' || t.balancePayment?.status === 'PAGO') && !t.freightContractDoc).length
+    pendingContracts: trips.filter(t => (t.isCompleted || t.status === 'Viagem concluída') && (t.balancePayment?.status === 'LIBERAR' || t.balancePayment?.status === 'PAGO') && !t.freightContractDoc).length
   };
 
   return (

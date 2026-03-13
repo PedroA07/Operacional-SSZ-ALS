@@ -338,7 +338,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         }
       }
       return normalizedTripDate >= startDateStr && 
-             trip.status !== 'Viagem concluída' && 
+             !trip.isCompleted && trip.status !== 'Viagem concluída' && 
              trip.status !== 'Viagem cancelada' && 
              trip.status !== 'Agendamento realizado';
     });

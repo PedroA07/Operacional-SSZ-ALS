@@ -39,7 +39,7 @@ export interface DashboardStats {
 
 export const statsCalculator = {
   isDelayed: (trip: Trip): boolean => {
-    if (trip.status === 'Viagem cancelada' || trip.status === 'Viagem concluída') return false;
+    if (trip.status === 'Viagem cancelada' || trip.isCompleted || trip.status === 'Viagem concluída') return false;
     const scheduled = new Date(trip.dateTime).getTime();
     const now = new Date().getTime();
     return now > (scheduled + 900000); 
@@ -72,7 +72,7 @@ export const statsCalculator = {
 
       const updateStat = (stat: any, trip: Trip) => {
         stat.total++;
-        if (trip.status === 'Viagem concluída') stat.completed++;
+        if (trip.isCompleted || trip.status === 'Viagem concluída') stat.completed++;
         if (trip.status === 'Viagem cancelada') stat.canceled++;
         if (statsCalculator.isDelayed(trip)) stat.delayed++;
         stat.opTypes.add((trip.type || 'OUTROS').toUpperCase());
@@ -125,7 +125,7 @@ export const statsCalculator = {
       terminalDistribution: terminalMap,
       operationTypes: typeMap,
       metrics: {
-        efficiencyRate: trips.length > 0 ? Math.round((trips.filter(t => t.status === 'Viagem concluída').length / trips.length) * 100) : 0,
+        efficiencyRate: trips.length > 0 ? Math.round((trips.filter(t => t.isCompleted || t.status === 'Viagem concluída').length / trips.length) * 100) : 0,
         activeResources: new Set(trips.map(t => t.driver.id)).size
       }
     };

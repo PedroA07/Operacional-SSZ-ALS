@@ -41,6 +41,7 @@ export const tripRepository = {
     scheduling: trip.scheduling || null,
     driver_docs: trip.driver_docs || [],
     is_priority: trip.isPriority || false,
+    is_completed: trip.isCompleted || false,
     sent_nf: trip.sentNF || false,
     is_scheduled: trip.isScheduled || false,
     scheduled_location_id: trip.scheduledLocationId || null,
@@ -105,6 +106,7 @@ export const tripRepository = {
       scheduling: safeParse(d.scheduling, null),
       driver_docs: normalizedDriverDocs,
       isPriority: d.is_priority ?? false,
+      isCompleted: d.is_completed ?? false,
       sentNF: d.sent_nf ?? false,
       isScheduled: d.is_scheduled ?? false,
       scheduledLocationId: d.scheduled_location_id || null,
@@ -128,6 +130,51 @@ export const tripRepository = {
     const payload = this.mapToDb(trip);
     const { error } = await supabase.from('trips').upsert(payload);
     if (error) throw error;
+
+    // Sincronização automática do cofre de lacres
+    try {
+      const tripSeal = trip.seal || trip.ocFormData?.seal || trip.preStackingFormData?.seal;
+      if (tripSeal && tripSeal.trim() !== '') {
+        const { data: sealRecords } = await supabase
+          .from('seal_records')
+          .select('*')
+          .eq('seal_number', tripSeal.trim());
+
+        if (sealRecords && sealRecords.length > 0) {
+          const record = sealRecords[0];
+          let hasChanges = false;
+          const updates: any = {};
+
+          if (!record.container_number && trip.container) {
+            updates.container_number = trip.container.toUpperCase();
+            hasChanges = true;
+          }
+
+          const tripBooking = trip.booking || trip.ocFormData?.booking || trip.preStackingFormData?.booking;
+          if (!record.booking && tripBooking) {
+            updates.booking = tripBooking.toUpperCase();
+            hasChanges = true;
+          }
+
+          if (!record.driver_name && trip.driver?.name) {
+            updates.driver_name = trip.driver.name.toUpperCase();
+            hasChanges = true;
+          }
+
+          if (!record.reuse_date && trip.dateTime) {
+            updates.reuse_date = trip.dateTime.split('T')[0];
+            hasChanges = true;
+          }
+
+          if (hasChanges) {
+            await supabase.from('seal_records').update(updates).eq('id', record.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Erro na sincronização automática de lacres:", e);
+    }
+
     return true;
   }
 };

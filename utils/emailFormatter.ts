@@ -35,7 +35,7 @@ export const emailFormatter = {
       ? override.prediction 
       : predictionService.getNextStatusPrediction(trip, allTrips);
 
-    const isFinished = trip.status === 'Viagem concluída';
+    const isFinished = trip.isCompleted || trip.status === 'Viagem concluída';
     const mainColor = isFinished ? '#059669' : '#2563eb';
     const headerBg = '#0f172a';
 
@@ -107,8 +107,8 @@ export const emailFormatter = {
   allTripsToRichText: (trips: Trip[], allContextTrips: Trip[] = [], overrides: Record<string, ReportOverride> = {}, showCustomer: boolean = false): string => {
     if (trips.length === 0) return "";
     
-    const activeTrips = trips.filter(t => t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
-    const finishedTrips = trips.filter(t => t.status === 'Viagem concluída');
+    const activeTrips = trips.filter(t => !t.isCompleted && t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada');
+    const finishedTrips = trips.filter(t => t.isCompleted || t.status === 'Viagem concluída');
 
     return `
       <div style="background-color: #f8fafc; padding: 20px; font-family: sans-serif; text-align: left;">

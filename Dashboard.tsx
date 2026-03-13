@@ -132,6 +132,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
           loadAllData(false, true);
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'seal_records' }, () => {
+          loadAllData(false, true);
+        })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') setIsRealtimeActive(true);
         });

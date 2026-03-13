@@ -30,7 +30,16 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'CARDS' | 'ANALYTICS'>('CARDS');
   const [sealStats, setSealStats] = useState({ used: 0, available: 0, total: 0 });
+  const [customStatuses, setCustomStatuses] = useState<any[]>([]);
   const [isLoadingSeals, setIsLoadingSeals] = useState(false);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const statuses = await db.getCustomStatuses();
+      setCustomStatuses(statuses);
+    };
+    loadData();
+  }, []);
 
   useEffect(() => {
     const countSeals = async () => {
@@ -92,8 +101,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
       {viewMode === 'CARDS' ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <TripsYesterday trips={trips} />
-            <TripsToday trips={trips} />
+            <TripsYesterday trips={trips} customStatuses={customStatuses} />
+            <TripsToday trips={trips} customStatuses={customStatuses} />
             <TripsTomorrow trips={trips} />
           </div>
 
@@ -177,14 +186,14 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <TripsThisWeek trips={trips} />
-            <TripsThisMonth trips={trips} />
-            <TripsThisYear trips={trips} />
+            <TripsThisWeek trips={trips} customStatuses={customStatuses} />
+            <TripsThisMonth trips={trips} customStatuses={customStatuses} />
+            <TripsThisYear trips={trips} customStatuses={customStatuses} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
              <div className="lg:col-span-8">
-                <DriverStatusCards trips={trips} drivers={drivers} />
+                <DriverStatusCards trips={trips} drivers={drivers} customStatuses={customStatuses} />
              </div>
              <div className="lg:col-span-4 space-y-8">
                 <DelayedTrips trips={trips} />

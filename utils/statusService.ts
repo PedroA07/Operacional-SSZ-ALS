@@ -1,10 +1,11 @@
 
-import { Trip, TripStatus } from '../types';
+import { Trip, TripStatus, CustomStatus } from '../types';
 
 export interface StatusOption {
   label: string;
   value: TripStatus;
   color: string;
+  isFinal?: boolean;
 }
 
 export const statusService = {
@@ -22,34 +23,81 @@ export const statusService = {
     { label: 'Viagem Cancelada', value: 'Viagem cancelada', color: 'bg-red-600' },
   ] as StatusOption[],
 
-  VW_STATUSES: [
-    { label: 'Pendente', value: 'Pendente', color: 'bg-slate-500' },
-    { label: 'Retirou o Cheio', value: 'Retirada do cheio', color: 'bg-blue-600' },
-    { label: 'Chegou no Cragea', value: 'Chegou no Cragea', color: 'bg-indigo-600' },
-    { label: 'Aguardando Carregar', value: 'Aguardando carregar', color: 'bg-amber-500' },
-    { label: 'Saiu do Cragea', value: 'Saiu do Cragea', color: 'bg-blue-800' },
-    { label: 'Chegou na Volkswagen', value: 'Chegou na Volkswagen', color: 'bg-cyan-600' },
-    { label: 'Saiu da Volkswagen', value: 'Saiu da Volkswagen', color: 'bg-slate-700' },
-    { label: 'Container sobre Rodas', value: 'Container sobre rodas', color: 'bg-emerald-500' },
-    { label: 'Baixa Cragea (Concluir)', value: 'Viagem concluída', color: 'bg-emerald-800' },
-    { label: 'Viagem Cancelada', value: 'Viagem cancelada', color: 'bg-red-600' },
-  ] as StatusOption[],
-
-  isVWOperation: (trip: Trip): boolean => {
-    const name = (trip.customer?.name || '').toUpperCase();
-    const legal = (trip.customer?.legalName || '').toUpperCase();
-    const dest = (trip.scheduling?.location || '').toUpperCase();
-    const destOrig = (trip.destination?.name || '').toUpperCase();
-    
-    return name.includes('VOLKSWAGEN') || 
-           legal.includes('VOLKSWAGEN') || 
-           dest.includes('CRAGEA') || 
-           destOrig.includes('CRAGEA');
+  getOptions: (trip: Trip): StatusOption[] => {
+    return statusService.STANDARD_STATUSES;
   },
 
-  getOptions: (trip: Trip): StatusOption[] => {
-    return statusService.isVWOperation(trip) 
-      ? statusService.VW_STATUSES 
-      : statusService.STANDARD_STATUSES;
+  getCustomOptions: (trip: Trip, allStatuses: CustomStatus[]): StatusOption[] => {
+    if (!trip || !allStatuses || allStatuses.length === 0) {
+      return statusService.getOptions(trip);
+    }
+
+    const tripCustomer = trip.customer?.id;
+    const tripModality = trip.type?.toUpperCase();
+    const tripDest = trip.destination?.id || trip.scheduledLocationId;
+
+    let bestScore = -1;
+    let bestStatuses: CustomStatus[] = [];
+
+    // Agrupar status por regra (Cliente + Modalidade + Destino)
+    const groupedByRule = new Map<string, CustomStatus[]>();
+    allStatuses.forEach(s => {
+      const key = `${s.customerId || 'ANY'}-${s.modality || 'ANY'}-${s.destinationId || 'ANY'}`;
+      if (!groupedByRule.has(key)) groupedByRule.set(key, []);
+      groupedByRule.get(key)!.push(s);
+    });
+
+    for (const [key, statuses] of groupedByRule.entries()) {
+      const sample = statuses[0];
+      let score = 0;
+      let isValid = true;
+
+      // Se a regra exige um cliente, ele deve bater exato
+      if (sample.customerId) {
+        if (sample.customerId === tripCustomer) score += 100;
+        else isValid = false;
+      }
+      
+      // Se a regra exige um destino, ele deve bater exato
+      if (sample.destinationId) {
+        if (sample.destinationId === tripDest) score += 10;
+        else isValid = false;
+      }
+      
+      // Se a regra exige uma modalidade, ela deve bater exato
+      if (sample.modality) {
+        if (sample.modality === tripModality) score += 1;
+        else isValid = false;
+      }
+
+      if (isValid) {
+        if (score > bestScore) {
+          bestScore = score;
+          bestStatuses = statuses;
+        }
+      }
+    }
+
+    if (bestStatuses.length > 0) {
+      return bestStatuses
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map(s => ({ label: s.name, value: s.name as TripStatus, color: s.color || 'bg-blue-500', isFinal: s.isFinal }));
+    }
+
+    return statusService.getOptions(trip);
+  },
+
+  isTripCompleted: (status: string, trip: Trip | null, customStatuses: CustomStatus[]): boolean => {
+    if (status === 'Viagem concluída') return true;
+    if (!trip) return false;
+    
+    // Check if the status is the final one in the custom flow
+    const options = statusService.getCustomOptions(trip, customStatuses);
+    const selectedOption = options.find(o => o.value === status);
+    if (selectedOption && selectedOption.isFinal) {
+      return true;
+    }
+    
+    return false;
   }
 };

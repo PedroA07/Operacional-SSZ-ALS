@@ -23,6 +23,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
 }) => {
   const [localHistory, setLocalHistory] = useState<StatusHistoryEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [customStatuses, setCustomStatuses] = useState<any[]>([]);
 
   // Função para formatar data ISO para o input datetime-local (YYYY-MM-DDTHH:mm)
   const formatForInput = (isoString: string) => {
@@ -44,6 +45,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
         new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
       );
       setLocalHistory(sorted);
+      db.getCustomStatuses().then(setCustomStatuses);
     }
   }, [isOpen, trip]);
 
@@ -89,11 +91,13 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
       );
 
       const latest = finalHistory[0];
+      const isCompleted = statusService.isTripCompleted(latest.status, trip, customStatuses);
 
       const updatedTrip: Trip = {
         ...trip,
         status: latest.status,
         statusTime: latest.dateTime,
+        isCompleted: isCompleted,
         statusHistory: finalHistory
       };
 
@@ -121,7 +125,7 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
 
   if (!isOpen) return null;
 
-  const statusOptions = statusService.getOptions(trip);
+  const statusOptions = statusService.getCustomOptions(trip, customStatuses);
 
   return (
     <div className="fixed inset-0 z-[4500] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in">

@@ -650,22 +650,30 @@ export const db = {
       name: s.name,
       customerId: s.customer_id,
       modality: s.modality,
+      destinationId: s.destination_id,
       orderIndex: s.order_index,
-      color: s.color
+      color: s.color,
+      isFinal: s.is_final
     }));
   },
 
   saveCustomStatus: async (status: CustomStatus) => {
-    if (!supabase) return false;
+    if (!supabase) return { success: false, error: 'Supabase não inicializado' };
     const { error } = await supabase.from('trip_statuses').upsert({
       id: status.id,
       name: status.name,
-      customer_id: status.customerId,
-      modality: status.modality,
+      customer_id: status.customerId || null,
+      modality: status.modality || null,
+      destination_id: status.destinationId || null,
       order_index: status.orderIndex,
-      color: status.color
+      color: status.color || null,
+      is_final: status.isFinal || false
     });
-    return !error;
+    if (error) {
+      console.error('Erro ao salvar status customizado:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
   },
 
   deleteCustomStatus: async (id: string) => {

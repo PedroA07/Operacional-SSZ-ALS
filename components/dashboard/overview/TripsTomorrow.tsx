@@ -35,7 +35,7 @@ const TripsTomorrow: React.FC<TripsTomorrowProps> = ({ trips }) => {
   const stats = useMemo(() => {
     const active = filteredBase.filter(t => t.status !== 'Viagem cancelada');
     const canceled = filteredBase.filter(t => t.status === 'Viagem cancelada').length;
-    const completed = active.filter(t => t.status === 'Viagem concluída').length;
+    const completed = active.filter(t => t.isCompleted || t.status === 'Viagem concluída').length;
     const delays = active.filter(t => statsCalculator.isDelayed(t)).length;
     const typeCounts: Record<string, number> = {};
     active.forEach(t => {
