@@ -790,6 +790,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return tripDate < today;
   };
 
+  const isFutureDate = (dateStr: string) => {
+    const d = parseDate(dateStr);
+    if (!d) return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dDate = new Date(d);
+    dDate.setHours(0, 0, 0, 0);
+    
+    return dDate > today;
+  };
+
   const isTripScheduled = useCallback((t: Trip) => {
     return !!t.isScheduled || !!t.preStackingFormData;
   }, []);
@@ -805,11 +818,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       render: (t: Trip) => {
         const today = isToday(t.dateTime);
         const past = isPastDate(t.dateTime);
+        const future = isFutureDate(t.dateTime);
         const d = parseDate(t.dateTime);
         const displayDate = d ? d.toLocaleDateString('pt-BR') : (t.dateTime || '---');
         
         return (
-          <div className={`px-2 py-1 rounded-md font-black text-[9px] text-center ${today ? 'bg-slate-100 text-slate-600' : (past ? 'bg-red-100 text-red-600 border border-red-200 animate-pulse' : 'bg-slate-100 text-slate-600')}`}>
+          <div className={`px-2 py-1 rounded-md font-black text-[9px] text-center ${today ? 'bg-slate-100 text-slate-600' : (past ? 'bg-red-100 text-red-600 border border-red-200 animate-pulse' : (future ? 'bg-blue-100 text-blue-600 border border-blue-200' : 'bg-slate-100 text-slate-600'))}`}>
             {displayDate}
           </div>
         );

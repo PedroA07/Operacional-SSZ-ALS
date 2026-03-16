@@ -285,11 +285,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.LACRES && <LacresTab />}
            {activeTab === DashboardTab.AVANTIDA && <AvantidaTab userId={user.id} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
-           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); await loadAllData(false); }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
+           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { 
+              const success = await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); 
+              if (success) {
+                await loadAllData(false);
+                setFeedback({ show: true, title: 'Sucesso', message: 'Cliente salvo com sucesso!', type: 'success' });
+              } else {
+                setFeedback({ show: true, title: 'Erro', message: 'Falha ao salvar cliente. Verifique o console.', type: 'error' });
+              }
+            }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
-           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(false); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(false); } }} />}
-           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(false); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
+           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { 
+              const success = await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); 
+              if (success) {
+                await loadAllData(false);
+                setFeedback({ show: true, title: 'Sucesso', message: 'Porto salvo com sucesso!', type: 'success' });
+              } else {
+                setFeedback({ show: true, title: 'Erro', message: 'Falha ao salvar porto. Verifique o console.', type: 'error' });
+              }
+            }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(false); } }} />}
+           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { 
+              const success = await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); 
+              if (success) {
+                await loadAllData(false);
+                setFeedback({ show: true, title: 'Sucesso', message: 'Unidade salva com sucesso!', type: 'success' });
+              } else {
+                setFeedback({ show: true, title: 'Erro', message: 'Falha ao salvar unidade. Verifique o console.', type: 'error' });
+              }
+            }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
            {activeTab === DashboardTab.AUTOMACOES && <AutomationsTab />}
            {activeTab === DashboardTab.ORGANIZACAO && (

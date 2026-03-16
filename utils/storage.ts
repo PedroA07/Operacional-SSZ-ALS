@@ -96,14 +96,36 @@ export const db = {
   },
 
   saveCustomer: async (c: Partial<Customer>, user?: User) => {
-    if (!supabase) return false;
-    const payload: any = { ...c };
-    if (c.legalName) payload.legal_name = c.legalName;
-    if (c.zipCode) payload.zip_code = c.zipCode;
-    if (c.registrationDate) payload.registration_date = c.registrationDate;
+    if (!supabase) {
+      console.error("Supabase não inicializado. Verifique as variáveis de ambiente.");
+      return false;
+    }
+    
+    const payload: any = {
+      id: c.id,
+      name: c.name,
+      address: c.address,
+      neighborhood: c.neighborhood,
+      city: c.city,
+      state: c.state,
+      cnpj: c.cnpj,
+      operations: c.operations,
+      legal_name: c.legalName,
+      legalName: c.legalName,
+      zip_code: c.zipCode,
+      zipCode: c.zipCode,
+      registrationDate: c.registrationDate
+    };
 
+    Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+    console.log("Salvando cliente:", payload);
     const { error } = await supabase.from('customers').upsert(payload);
-    return !error;
+    if (error) {
+      console.error("Erro ao salvar cliente no Supabase:", error);
+      return false;
+    }
+    return true;
   },
 
   deleteCustomer: async (id: string) => {
@@ -125,14 +147,36 @@ export const db = {
   },
 
   savePort: async (p: Partial<Port>, user?: User) => {
-    if (!supabase) return false;
-    const payload: any = { ...p };
-    if (p.legalName) payload.legal_name = p.legalName;
-    if (p.zipCode) payload.zip_code = p.zipCode;
-    if (p.registrationDate) payload.registration_date = p.registrationDate;
+    if (!supabase) {
+      console.error("Supabase não inicializado.");
+      return false;
+    }
     
+    const payload: any = {
+      id: p.id,
+      name: p.name,
+      address: p.address,
+      neighborhood: p.neighborhood,
+      city: p.city,
+      state: p.state,
+      cnpj: p.cnpj,
+      legal_name: p.legalName,
+      legalName: p.legalName,
+      zip_code: p.zipCode,
+      zipCode: p.zipCode,
+      registrationDate: p.registrationDate,
+      registrationdate: p.registrationDate
+    };
+
+    Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+    
+    console.log("Salvando porto:", payload);
     const { error } = await supabase.from('ports').upsert(payload);
-    return !error;
+    if (error) {
+      console.error("Erro ao salvar porto no Supabase:", error);
+      return false;
+    }
+    return true;
   },
 
   deletePort: async (id: string) => {
@@ -154,14 +198,36 @@ export const db = {
   },
 
   savePreStacking: async (p: Partial<PreStacking>, user?: User) => {
-    if (!supabase) return false;
-    const payload: any = { ...p };
-    if (p.legalName) payload.legal_name = p.legalName;
-    if (p.zipCode) payload.zip_code = p.zipCode;
-    if (p.registrationDate) payload.registration_date = p.registrationDate;
+    if (!supabase) {
+      console.error("Supabase não inicializado.");
+      return false;
+    }
+    
+    const payload: any = {
+      id: p.id,
+      name: p.name,
+      cnpj: p.cnpj,
+      address: p.address,
+      neighborhood: p.neighborhood,
+      city: p.city,
+      state: p.state,
+      legal_name: p.legalName,
+      legalName: p.legalName,
+      zip_code: p.zipCode,
+      zipCode: p.zipCode,
+      registrationDate: p.registrationDate,
+      registrationdate: p.registrationDate
+    };
 
+    Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+    console.log("Salvando pré-stacking:", payload);
     const { error } = await supabase.from('pre_stacking').upsert(payload);
-    return !error;
+    if (error) {
+      console.error("Erro ao salvar pré-stacking no Supabase:", error);
+      return false;
+    }
+    return true;
   },
 
   deletePreStacking: async (id: string) => {

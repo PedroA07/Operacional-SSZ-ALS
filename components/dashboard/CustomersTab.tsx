@@ -43,6 +43,7 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
     state: '',
     zipCode: '',
     cnpj: '',
+    registrationDate: new Date().toISOString().split('T')[0],
     operations: []
   };
 
@@ -393,6 +394,16 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
                   </button>
                 </div>
                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-2 ml-1 italic">* Digite os 14 números para buscar automaticamente.</p>
+              </div>
+
+              <div className="space-y-1">
+                <label className={labelClass}>Data de Registro</label>
+                <input 
+                  type="date" 
+                  className={inputClasses} 
+                  value={form.registrationDate} 
+                  onChange={e => setForm({...form, registrationDate: e.target.value})} 
+                />
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

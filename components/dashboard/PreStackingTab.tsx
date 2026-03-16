@@ -40,7 +40,8 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
     address: '',
     neighborhood: '',
     city: '',
-    state: ''
+    state: '',
+    registrationDate: new Date().toISOString().split('T')[0]
   };
 
   const [form, setForm] = useState<Partial<PreStacking>>(initialForm);
@@ -385,6 +386,16 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
                   </button>
                 </div>
                 <p className="text-[8px] font-bold text-slate-400 uppercase mt-2 ml-1 italic">* Digite os 14 números para preenchimento automático.</p>
+              </div>
+
+              <div className="space-y-1">
+                <label className={labelClass}>Data de Registro</label>
+                <input 
+                  type="date" 
+                  className={inputClasses} 
+                  value={form.registrationDate} 
+                  onChange={e => setForm({...form, registrationDate: e.target.value})} 
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
