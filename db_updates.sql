@@ -8,7 +8,6 @@ ALTER TABLE trips ADD COLUMN IF NOT EXISTS scheduled_location_id TEXT;
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS scheduled_date_time TIMESTAMP WITH TIME ZONE;
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS scheduling JSONB;
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS has_advance BOOLEAN DEFAULT FALSE;
-ALTER TABLE trips ADD COLUMN IF NOT EXISTS bu TEXT;
 
 -- Se a coluna scheduled_location_id já existir como UUID, mude para TEXT
 ALTER TABLE trips ALTER COLUMN scheduled_location_id TYPE TEXT USING scheduled_location_id::TEXT;
@@ -32,48 +31,3 @@ COMMENT ON COLUMN trips.is_scheduled IS 'Indica se a viagem está agendada';
 COMMENT ON COLUMN trips.scheduled_location_id IS 'ID do local de agendamento (Porto ou Pre-Stacking)';
 COMMENT ON COLUMN trips.scheduled_date_time IS 'Data e hora do agendamento realizado';
 COMMENT ON COLUMN trips.has_advance IS 'Indica se o adiantamento de 70% foi realizado';
-
--- 4. Tabela para Tipos de Viagem da Coleta do Dia
-CREATE TABLE IF NOT EXISTS coleta_tipos_viagem (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    color TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Habilitar RLS
-ALTER TABLE coleta_tipos_viagem ENABLE ROW LEVEL SECURITY;
-
--- Políticas de acesso
-CREATE POLICY "Permitir leitura para todos os usuários autenticados" ON coleta_tipos_viagem
-    FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Permitir inserção para usuários autenticados" ON coleta_tipos_viagem
-    FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Permitir atualização para usuários autenticados" ON coleta_tipos_viagem
-    FOR UPDATE USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Permitir exclusão para usuários autenticados" ON coleta_tipos_viagem
-    FOR DELETE USING (auth.role() = 'authenticated');
-
--- 5. Tabela para Configurações do Sistema
-CREATE TABLE IF NOT EXISTS system_settings (
-    id TEXT PRIMARY KEY,
-    key TEXT UNIQUE NOT NULL,
-    value JSONB NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Habilitar RLS
-ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
-
--- Políticas de acesso
-CREATE POLICY "Permitir leitura para todos os usuários autenticados" ON system_settings
-    FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Permitir inserção para usuários autenticados" ON system_settings
-    FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Permitir atualização para usuários autenticados" ON system_settings
-    FOR UPDATE USING (auth.role() = 'authenticated');
