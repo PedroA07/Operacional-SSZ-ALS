@@ -279,6 +279,24 @@ export const db = {
     return !error;
   },
 
+  getSystemSetting: async (key: string): Promise<any> => {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('system_settings').select('value').eq('key', key).single();
+    if (error || !data) return null;
+    return data.value;
+  },
+
+  saveSystemSetting: async (key: string, value: any) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('system_settings').upsert({
+      id: key,
+      key: key,
+      value: value,
+      updated_at: new Date().toISOString()
+    });
+    return !error;
+  },
+
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false });

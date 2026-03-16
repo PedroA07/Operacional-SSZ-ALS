@@ -346,6 +346,7 @@ export interface Trip {
   os: string;
   booking: string;
   ship: string;
+  bu?: string;
   autColeta?: string;
   embarcador?: string;
   dateTime: string;
