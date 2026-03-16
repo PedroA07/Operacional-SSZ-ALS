@@ -4,6 +4,7 @@ import { db } from '../../utils/storage';
 import FeedbackModal from '../shared/FeedbackModal';
 import ContainerTypesManager from './admin/ContainerTypesManager';
 import StatusManager from './admin/StatusManager';
+import ColetaTiposViagemManager from './admin/ColetaTiposViagemManager';
 
 interface SystemTabProps {
   onRefresh: () => Promise<void>;
@@ -136,6 +137,8 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
       <ContainerTypesManager />
 
       <StatusManager />
+
+      <ColetaTiposViagemManager />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-6">

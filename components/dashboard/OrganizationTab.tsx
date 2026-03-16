@@ -308,54 +308,99 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
 };
 
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, onRefresh }) => {
-  const [trips, setTrips] = useState<Trip[]>(propTrips);
   const [locations, setLocations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(propTrips.length === 0);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
-  const [pendingUpdates, setPendingUpdates] = useState<Record<string, { trip: Trip, timestamp: number }>>({});
+  const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
+  const [finalizingIds, setFinalizingIds] = useState<Set<string>>(new Set());
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
 
-  // Sincroniza o estado local com as props quando elas mudam
-  useEffect(() => {
-    const startDateStr = '2026-03-06';
-    const now = Date.now();
-    const STABILITY_DURATION = 5000; // 5 segundos de "trava" para evitar flicker
+  // Constantes de estabilidade
+  const STABILITY_DURATION = 30000; // Aumentado para 30s pois agora temos auto-limpeza ao confirmar
 
-    const filtered = propTrips.filter(trip => {
-      if (!trip.dateTime) return false;
-      const tripDateStr = trip.dateTime.includes('T') ? trip.dateTime.split('T')[0] : trip.dateTime;
-      let normalizedTripDate = tripDateStr;
-      if (tripDateStr.includes('/')) {
-        const parts = tripDateStr.split('/');
-        if (parts.length === 3) {
-          const [day, month, year] = parts;
-          normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  // Auto-limpeza de atualizações que já foram confirmadas pelo servidor
+  useEffect(() => {
+    const toRemove: string[] = [];
+    Object.entries(pendingUpdates).forEach(([id, pending]) => {
+      const serverTrip = propTrips.find(t => t.id === id);
+      if (serverTrip) {
+        // Verifica se todos os campos pendentes já batem com o servidor
+        const matches = Object.entries(pending.data).every(([key, value]) => {
+          const serverValue = serverTrip[key as keyof Trip];
+          // Comparação profunda simples para objetos (como scheduling ou destination)
+          if (typeof value === 'object' && value !== null) {
+            return JSON.stringify(serverValue) === JSON.stringify(value);
+          }
+          return serverValue === value;
+        });
+
+        if (matches) {
+          toRemove.push(id);
         }
       }
-      return normalizedTripDate >= startDateStr && 
-             !trip.isCompleted && trip.status !== 'Viagem concluída' && 
-             trip.status !== 'Viagem cancelada' && 
-             trip.status !== 'Agendamento realizado';
     });
 
-    // Aplica as atualizações pendentes sobre os dados que vieram do servidor
-    const mergedTrips = filtered.map(serverTrip => {
-      const pending = pendingUpdates[serverTrip.id];
-      // Se houver uma atualização local feita há menos de 5 segundos, ela tem prioridade total
-      if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
-        return pending.trip;
-      }
-      return serverTrip;
-    });
-
-    setTrips(mergedTrips);
-    setIsLoading(false);
+    if (toRemove.length > 0) {
+      setPendingUpdates(prev => {
+        const next = { ...prev };
+        let changed = false;
+        toRemove.forEach(id => {
+          if (next[id]) {
+            delete next[id];
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
   }, [propTrips, pendingUpdates]);
+
+  // Memoização das viagens filtradas e estabilizadas
+  const trips = useMemo(() => {
+    const startDateStr = '2026-03-06';
+    const now = Date.now();
+
+    return propTrips
+      .filter(trip => {
+        // Remove viagens que estão sendo finalizadas
+        if (finalizingIds.has(trip.id)) return false;
+
+        if (!trip.dateTime) return false;
+        const tripDateStr = trip.dateTime.includes('T') ? trip.dateTime.split('T')[0] : trip.dateTime;
+        let normalizedTripDate = tripDateStr;
+        if (tripDateStr.includes('/')) {
+          const parts = tripDateStr.split('/');
+          if (parts.length === 3) {
+            const [day, month, year] = parts;
+            normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+        return normalizedTripDate >= startDateStr && 
+               !trip.isCompleted && trip.status !== 'Viagem concluída' && 
+               trip.status !== 'Viagem cancelada' && 
+               trip.status !== 'Agendamento realizado';
+      })
+      .map(serverTrip => {
+        const pending = pendingUpdates[serverTrip.id];
+        // Se houver uma atualização local feita há menos de STABILITY_DURATION, ela tem prioridade
+        if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
+          return { ...serverTrip, ...pending.data };
+        }
+        return serverTrip;
+      });
+  }, [propTrips, pendingUpdates, finalizingIds]);
+
+  // Sincroniza isLoading
+  useEffect(() => {
+    if (propTrips.length > 0) {
+      setIsLoading(false);
+    }
+  }, [propTrips]);
 
   // Limpeza periódica de atualizações expiradas para liberar memória
   useEffect(() => {
@@ -365,7 +410,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         const next = { ...prev };
         let changed = false;
         Object.keys(next).forEach(id => {
-          if (now - next[id].timestamp > 10000) { // Limpa após 10s por segurança
+          if (now - next[id].timestamp > 30000) { // Limpa após 30s para dar tempo do servidor responder
             delete next[id];
             changed = true;
           }
@@ -415,17 +460,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, []);
 
   const handleToggleNF = useCallback(async (trip: Trip, checked: boolean) => {
-    const updatedTrip = { ...trip, sentNF: checked };
     const now = Date.now();
     
     // Registra a atualização pendente imediatamente (Trava a UI)
     setPendingUpdates(prev => ({
       ...prev,
-      [trip.id]: { trip: updatedTrip, timestamp: now }
+      [trip.id]: { 
+        data: { ...(prev[trip.id]?.data || {}), sentNF: checked }, 
+        timestamp: now 
+      }
     }));
 
     try {
-      await db.saveTrip(updatedTrip);
+      await db.saveTrip({ ...trip, sentNF: checked });
     } catch (error) {
       // Em caso de erro, remove a trava para permitir que o dado original volte
       setPendingUpdates(prev => {
@@ -445,22 +492,24 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       setSelectedTripForScheduling(trip);
       setIsSchedulingModalOpen(true);
     } else {
-      const updatedTrip: Trip = { 
-        ...trip, 
+      const now = Date.now();
+      const schedulingData = { 
         isScheduled: false,
         scheduledLocationId: '',
         scheduledDateTime: '',
         scheduling: trip.scheduling ? { ...trip.scheduling, locationId: '', location: '', dateTime: '' } : null
       };
 
-      const now = Date.now();
       setPendingUpdates(prev => ({
         ...prev,
-        [trip.id]: { trip: updatedTrip, timestamp: now }
+        [trip.id]: { 
+          data: { ...(prev[trip.id]?.data || {}), ...schedulingData }, 
+          timestamp: now 
+        }
       }));
 
       try {
-        await db.saveTrip(updatedTrip);
+        await db.saveTrip({ ...trip, ...schedulingData });
       } catch (error) {
         setPendingUpdates(prev => {
           const next = { ...prev };
@@ -479,8 +528,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     if (!selectedTripForScheduling) return;
 
     const selectedLoc = locations.find(l => l.id === locationId);
-    const updatedTrip: Trip = {
-      ...selectedTripForScheduling,
+    const schedulingData = {
       isScheduled: true,
       scheduledLocationId: locationId,
       scheduledDateTime: dateTime,
@@ -505,14 +553,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     
     setPendingUpdates(prev => ({
       ...prev,
-      [tripId]: { trip: updatedTrip, timestamp: now }
+      [tripId]: { 
+        data: { ...(prev[tripId]?.data || {}), ...schedulingData }, 
+        timestamp: now 
+      }
     }));
     
     setIsSchedulingModalOpen(false);
     setSelectedTripForScheduling(null);
 
     try {
-      await db.saveTrip(updatedTrip);
+      await db.saveTrip({ ...selectedTripForScheduling, ...schedulingData });
     } catch (error) {
       setPendingUpdates(prev => {
         const next = { ...prev };
@@ -528,8 +579,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   const handleLocationChange = useCallback(async (trip: Trip, locationId: string) => {
     const selectedLoc = locations.find(l => l.id === locationId);
-    const updatedTrip: Trip = { 
-      ...trip, 
+    const locationData = { 
       scheduledLocationId: locationId,
       destination: selectedLoc ? {
         id: selectedLoc.id,
@@ -550,11 +600,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const now = Date.now();
     setPendingUpdates(prev => ({
       ...prev,
-      [trip.id]: { trip: updatedTrip, timestamp: now }
+      [trip.id]: { 
+        data: { ...(prev[trip.id]?.data || {}), ...locationData }, 
+        timestamp: now 
+      }
     }));
 
     try {
-      await db.saveTrip(updatedTrip);
+      await db.saveTrip({ ...trip, ...locationData });
     } catch (error) {
       setPendingUpdates(prev => {
         const next = { ...prev };
@@ -569,8 +622,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, [locations]);
 
   const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
-    const updatedTrip: Trip = { 
-      ...trip, 
+    const dateTimeData = { 
       scheduledDateTime: dateTime,
       scheduling: {
         locationId: trip.scheduledLocationId || '',
@@ -583,11 +635,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const now = Date.now();
     setPendingUpdates(prev => ({
       ...prev,
-      [trip.id]: { trip: updatedTrip, timestamp: now }
+      [trip.id]: { 
+        data: { ...(prev[trip.id]?.data || {}), ...dateTimeData }, 
+        timestamp: now 
+      }
     }));
 
     try {
-      await db.saveTrip(updatedTrip);
+      await db.saveTrip({ ...trip, ...dateTimeData });
     } catch (error) {
       setPendingUpdates(prev => {
         const next = { ...prev };
@@ -602,8 +657,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, []);
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
-    const updatedTrip: Trip = { 
-      ...trip, 
+    const advanceData = { 
       hasAdvance: checked,
       advancePayment: { ...trip.advancePayment, status: (checked ? 'LIBERAR' : 'BLOQUEADO') as 'LIBERAR' | 'BLOQUEADO' }
     };
@@ -611,7 +665,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const now = Date.now();
     setPendingUpdates(prev => ({
       ...prev,
-      [trip.id]: { trip: updatedTrip, timestamp: now }
+      [trip.id]: { 
+        data: { ...(prev[trip.id]?.data || {}), ...advanceData }, 
+        timestamp: now 
+      }
     }));
 
     const success = await advanceService.toggleAdvance(trip, checked);
@@ -629,36 +686,64 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, []);
 
   const handleFinalizeTrips = () => {
-    const scheduledCount = trips.filter(t => isTripScheduled(t)).length;
-    if (scheduledCount === 0) {
+    const allScheduled = trips.filter(t => isTripScheduled(t));
+    const readyTrips = allScheduled.filter(t => isTripReadyToFinalize(t));
+    const notReadyCount = allScheduled.length - readyTrips.length;
+
+    if (allScheduled.length === 0) {
       alert("Nenhuma viagem marcada como 'Agendado'.");
       return;
     }
 
+    if (readyTrips.length === 0) {
+      alert("Nenhuma viagem está pronta para finalizar. Certifique-se de que 'Mandou NF' e 'Adiantamento' também estão marcados.");
+      return;
+    }
+
+    if (notReadyCount > 0) {
+      alert(`Não é possível finalizar. Existem ${notReadyCount} viagens agendadas que ainda não têm todas as marcações (NF ou Adiantamento).`);
+      return;
+    }
+
+    let message = `Você está prestes a finalizar ${readyTrips.length} viagens que estão com todas as marcações completas. Deseja continuar?`;
+
     setConfirmModal({
       isOpen: true,
-      title: "Finalizar Viagens Agendadas?",
-      message: `Você está prestes a alterar o status de ${scheduledCount} viagens para "Agendamento realizado". Elas serão removidas deste painel. Deseja continuar?`,
+      title: "Finalizar Viagens?",
+      message: message,
       onConfirm: async () => {
         setIsFinalizing(true);
-        const originalTrips = [...trips];
+        const tripsToFinalize = readyTrips;
+        const finalizingIdsArray = tripsToFinalize.map(t => t.id);
         
-        // Atualização otimista: remove as viagens da lista local
-        setTrips(prev => prev.filter(t => !isTripScheduled(t)));
+        // Atualização otimista: marca como finalizando
+        setFinalizingIds(prev => {
+          const next = new Set(prev);
+          finalizingIdsArray.forEach(id => next.add(id));
+          return next;
+        });
+        
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
         try {
-          const tripsToFinalize = originalTrips.filter(t => isTripScheduled(t));
           const success = await organizationService.finalizeScheduledTrips(tripsToFinalize);
           if (success) {
             onRefresh();
           } else {
             // Reverte em caso de erro
-            setTrips(originalTrips);
+            setFinalizingIds(prev => {
+              const next = new Set(prev);
+              finalizingIdsArray.forEach(id => next.delete(id));
+              return next;
+            });
             alert("Erro ao finalizar viagens agendadas. Verifique o console.");
           }
         } catch (error) {
-          setTrips(originalTrips);
+          setFinalizingIds(prev => {
+            const next = new Set(prev);
+            finalizingIdsArray.forEach(id => next.delete(id));
+            return next;
+          });
           console.error("Erro no handleFinalizeTrips:", error);
           alert("Erro inesperado ao finalizar viagens.");
         } finally {
@@ -708,6 +793,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const isTripScheduled = useCallback((t: Trip) => {
     return !!t.isScheduled || !!t.preStackingFormData;
   }, []);
+
+  const isTripReadyToFinalize = useCallback((t: Trip) => {
+    return isTripScheduled(t) && !!t.sentNF && !!t.hasAdvance;
+  }, [isTripScheduled]);
 
   const columns = useMemo(() => [
     { 
@@ -776,12 +865,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       key: 'sentNF', 
       label: 'Mandou NF', 
       render: (t: Trip) => (
-        <input 
-          type="checkbox" 
-          checked={!!t.sentNF} 
-          onChange={(e) => handleToggleNF(t, e.target.checked)}
-          className="w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
-        />
+        <div className="flex items-center justify-center gap-2">
+          <input 
+            type="checkbox" 
+            checked={!!t.sentNF} 
+            onChange={(e) => handleToggleNF(t, e.target.checked)}
+            className="w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+          />
+          {pendingUpdates[t.id]?.data.hasOwnProperty('sentNF') && (
+            <div className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+          )}
+        </div>
       )
     },
     { 
@@ -789,15 +883,21 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       label: 'Agendado', 
       render: (t: Trip) => {
         const hasMinuta = !!t.preStackingFormData;
+        const isPending = pendingUpdates[t.id]?.data.hasOwnProperty('isScheduled');
         return (
-          <input 
-            type="checkbox" 
-            checked={isTripScheduled(t)} 
-            disabled={hasMinuta}
-            onChange={(e) => handleToggleScheduled(t, e.target.checked)}
-            className={`w-4 h-4 rounded-md border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${hasMinuta ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            title={hasMinuta ? "Agendamento automático via Minuta" : ""}
-          />
+          <div className="flex items-center justify-center gap-2">
+            <input 
+              type="checkbox" 
+              checked={isTripScheduled(t)} 
+              disabled={hasMinuta || isPending}
+              onChange={(e) => handleToggleScheduled(t, e.target.checked)}
+              className={`w-4 h-4 rounded-md border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${hasMinuta || isPending ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              title={hasMinuta ? "Agendamento automático via Minuta" : (isPending ? "Salvando..." : "")}
+            />
+            {isPending && (
+              <div className="w-2.5 h-2.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+            )}
+          </div>
         );
       }
     },
@@ -830,12 +930,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       label: 'Adiantamento', 
       render: (t: Trip) => (
         <div className="flex items-center gap-1.5">
-          <input 
-            type="checkbox" 
-            checked={!!t.hasAdvance} 
-            onChange={(e) => handleToggleAdvance(t, e.target.checked)}
-            className="w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer"
-          />
+          <div className="flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              checked={!!t.hasAdvance} 
+              onChange={(e) => handleToggleAdvance(t, e.target.checked)}
+              className="w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer"
+            />
+            {pendingUpdates[t.id]?.data.hasOwnProperty('hasAdvance') && (
+              <div className="w-2.5 h-2.5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
+            )}
+          </div>
           {t.hasAdvance && <span className="text-[7px] font-black text-orange-600 uppercase">70% LIB</span>}
         </div>
       )
@@ -909,7 +1014,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         
         <button 
           onClick={handleFinalizeTrips}
-          disabled={isFinalizing}
+          disabled={isFinalizing || trips.filter(t => isTripScheduled(t)).length === 0 || trips.filter(t => isTripScheduled(t) && !isTripReadyToFinalize(t)).length > 0}
           className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
         >
           {isFinalizing ? (
@@ -920,7 +1025,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
-              Finalizar Agendados
+              Finalizar Agendados ({trips.filter(t => isTripReadyToFinalize(t)).length})
             </>
           )}
         </button>
@@ -939,7 +1044,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               columns={columns} 
               data={coletaTrips} 
               hideInternalSearch={false}
-              getRowClassName={(t: Trip) => isTripScheduled(t) ? 'bg-emerald-50 border-l-4 border-emerald-500' : ''}
+              getRowClassName={(t: Trip) => {
+                if (isTripReadyToFinalize(t)) return 'bg-emerald-50 border-l-4 border-emerald-500';
+                if (isTripScheduled(t)) return 'bg-amber-50/50 border-l-4 border-amber-400/50';
+                return '';
+              }}
             />
           </div>
         ) : (
@@ -954,7 +1063,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               columns={columns} 
               data={entregaTrips} 
               hideInternalSearch={false}
-              getRowClassName={(t: Trip) => isTripScheduled(t) ? 'bg-emerald-50 border-l-4 border-emerald-500' : ''}
+              getRowClassName={(t: Trip) => {
+                if (isTripReadyToFinalize(t)) return 'bg-emerald-50 border-l-4 border-emerald-500';
+                if (isTripScheduled(t)) return 'bg-amber-50/50 border-l-4 border-amber-400/50';
+                return '';
+              }}
             />
           </div>
         )}

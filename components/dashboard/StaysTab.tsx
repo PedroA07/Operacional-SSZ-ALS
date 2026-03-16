@@ -150,13 +150,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     }
   };
 
-  const calculateExceededHoursDecimal = (scheduledStartTime: string, departureTime: string, session: StaySession): number => {
+  const calculateExceededHoursDecimal = useCallback((scheduledStartTime: string, departureTime: string, session: StaySession): number => {
     if (!scheduledStartTime || !departureTime) return 0;
     const schedule = new Date(scheduledStartTime).getTime();
     const departure = new Date(departureTime).getTime();
     if (isNaN(schedule) || isNaN(departure)) return 0;
     
-    const graceMs = (session.gracePeriodHours || 8) * 3600000;
+    // Se gracePeriodHours for 0, deve ser 0. Se for undefined/null, usa 8 como padrão.
+    const graceMs = (session.gracePeriodHours ?? 8) * 3600000;
     const triggerPoint = schedule + graceMs; 
     if (departure <= triggerPoint) return 0;
     
@@ -164,15 +165,17 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     const totalMinutes = Math.floor(billableMs / 60000);
     const wholeHours = Math.floor(totalMinutes / 60);
     const remainingMinutes = totalMinutes % 60;
-    const roundUpTrigger = session.roundUpMinutes || 30;
+    
+    // Se roundUpMinutes for 0, deve ser 0. Se for undefined/null, usa 30 como padrão.
+    const roundUpTrigger = session.roundUpMinutes ?? 30;
     
     return remainingMinutes >= roundUpTrigger ? wholeHours + 1 : wholeHours;
-  };
+  }, []);
 
-  const calculateStayExceeded = (scheduledStartTime: string, departureTime: string, session: StaySession): string => {
+  const calculateStayExceeded = useCallback((scheduledStartTime: string, departureTime: string, session: StaySession): string => {
     const hours = calculateExceededHoursDecimal(scheduledStartTime, departureTime, session);
     return hours === 0 ? '---' : `${hours}h 00m`;
-  };
+  }, [calculateExceededHoursDecimal]);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -342,7 +345,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
     });
   }, [sessions, activeCategory, filterYear, filterMonth]);
 
-  const recordColumns = [
+  const recordColumns = useMemo(() => [
     { key: 'os', label: 'Tipo / OS', render: (r: StayRecord) => (
       <div className="flex flex-col">
         <span className="text-[7px] font-black text-blue-600 uppercase leading-none">{r.type}</span>
@@ -389,7 +392,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       </div>
     )},
     { key: 'stay', label: 'Cobrável', render: (r: StayRecord) => {
-      const text = r.exceededHours;
+      const text = calculateStayExceeded(r.scheduledStart, r.departureTime, selectedSession!);
       return (
         <div className="flex flex-col items-center">
           <span className={`text-[10px] font-black ${text !== '---' ? 'text-red-600' : 'text-slate-400'}`}>{text}</span>
@@ -437,7 +440,7 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         }} className="p-2 text-slate-300 hover:text-red-500 rounded-lg transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
       </div>
     )}
-  ];
+  ], [selectedSession, calculateExceededHoursDecimal, handleUpdateObservation, handleOpenEditRecord, loadSessionRecords]);
 
   const dynamicColumns = useMemo(() => {
     const base = [...recordColumns];

@@ -17,6 +17,8 @@ import LoginsTab from './components/dashboard/LoginsTab';
 import LacresTab from './components/dashboard/LacresTab';
 import AvantidaTab from './components/dashboard/AvantidaTab';
 import OrganizationTab from './components/dashboard/OrganizationTab';
+import ColetaDoDiaTab from './components/dashboard/ColetaDoDiaTab';
+import AutomationsTab from './components/dashboard/AutomationsTab';
 import Sidebar from './components/dashboard/Sidebar';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
@@ -289,12 +291,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); await loadAllData(false); }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(false); } }} />}
            {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); await loadAllData(false); }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
+           {activeTab === DashboardTab.AUTOMACOES && <AutomationsTab />}
            {activeTab === DashboardTab.ORGANIZACAO && (
              <OrganizationTab 
                userId={user.id} 
                trips={trips} 
                ports={ports} 
                preStacking={preStacking}
+               onRefresh={() => loadAllData(false)} 
+             />
+           )}
+           {activeTab === DashboardTab.COLETA_DIA && (
+             <ColetaDoDiaTab 
+               userId={user.id} 
+               trips={trips} 
                onRefresh={() => loadAllData(false)} 
              />
            )}

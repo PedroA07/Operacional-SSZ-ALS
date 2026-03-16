@@ -3,14 +3,16 @@ import {
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category, 
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession, 
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus, 
-  LoginCredential, EmailTemplate, CustomStatus 
+  LoginCredential, EmailTemplate, CustomStatus, Automation 
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
 import { tripRepository } from './tripRepository';
 
-const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-const SUPABASE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+import { getEnv } from './env';
+
+const SUPABASE_URL = getEnv('VITE_SUPABASE_URL');
+const SUPABASE_KEY = getEnv('VITE_SUPABASE_ANON_KEY');
 
 export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_KEY) 
@@ -245,6 +247,35 @@ export const db = {
   deleteContainerType: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('container_types').delete().eq('id', id);
+    return !error;
+  },
+
+  getColetaTiposViagem: async (): Promise<any[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('coleta_tipos_viagem').select('*').order('name');
+    if (error) return [];
+    return (data || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      createdAt: c.created_at
+    }));
+  },
+
+  saveColetaTipoViagem: async (c: any) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('coleta_tipos_viagem').upsert({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      created_at: c.createdAt || new Date().toISOString()
+    });
+    return !error;
+  },
+
+  deleteColetaTipoViagem: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('coleta_tipos_viagem').delete().eq('id', id);
     return !error;
   },
 
@@ -684,9 +715,58 @@ export const db = {
     return !error;
   },
 
+  getAutomations: async (): Promise<Automation[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('automations').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.error('Erro ao buscar automações:', error);
+      return [];
+    }
+    return (data || []).map(a => ({
+      id: a.id,
+      status: a.status,
+      emailTemplateId: a.email_template_id,
+      whatsappGroupId: a.whatsapp_group_id,
+      isActive: a.is_active,
+      createdAt: a.created_at,
+      updatedAt: a.updated_at
+    }));
+  },
+
+  saveAutomation: async (automation: Partial<Automation>) => {
+    if (!supabase) return { success: false, error: 'Supabase não inicializado' };
+    
+    const payload: any = {
+      status: automation.status,
+      email_template_id: automation.emailTemplateId || null,
+      whatsapp_group_id: automation.whatsappGroupId || null,
+      is_active: automation.isActive !== undefined ? automation.isActive : true,
+      updated_at: new Date().toISOString()
+    };
+
+    if (automation.id && !automation.id.startsWith('new-')) {
+      payload.id = automation.id;
+    } else {
+      payload.created_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase.from('automations').upsert(payload);
+    if (error) {
+      console.error('Erro ao salvar automação:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  },
+
+  deleteAutomation: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('automations').delete().eq('id', id);
+    return !error;
+  },
+
   exportBackup: async () => {
     if (!supabase) return;
-    const tables = ['users', 'drivers', 'customers', 'ports', 'pre_stacking', 'staff', 'trips', 'categories', 'notifications', 'avantida_records', 'avantida_prices', 'logins', 'seal_batches', 'seal_records', 'stay_sessions', 'stay_records', 'email_templates', 'trip_statuses'];
+    const tables = ['users', 'drivers', 'customers', 'ports', 'pre_stacking', 'staff', 'trips', 'categories', 'notifications', 'avantida_records', 'avantida_prices', 'logins', 'seal_batches', 'seal_records', 'stay_sessions', 'stay_records', 'email_templates', 'trip_statuses', 'automations'];
     const backup: any = {};
     for (const table of tables) {
       const { data } = await supabase.from(table).select('*');

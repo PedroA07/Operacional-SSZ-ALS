@@ -245,7 +245,19 @@ export enum DashboardTab {
   LOGINS = 'COFRE_DE_LOGINS',
   LACRES = 'CONTROLE_DE_LACRES',
   AVANTIDA = 'AVANTIDA',
-  ORGANIZACAO = 'ORGANIZACAO'
+  ORGANIZACAO = 'ORGANIZACAO',
+  COLETA_DIA = 'COLETA_DIA',
+  AUTOMACOES = 'AUTOMACOES'
+}
+
+export interface Automation {
+  id: string;
+  status: string;
+  emailTemplateId?: string;
+  whatsappGroupId?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type TripStatus = 
@@ -376,6 +388,16 @@ export interface Trip {
   scheduledLocationId?: string;
   scheduledDateTime?: string;
   hasAdvance?: boolean;
+  coletaTipoViagem?: string;
+  coletaEmailSent?: boolean;
+  coletaDocGenerated?: boolean;
+  coletaEmissaoSolicitada?: boolean;
+}
+
+export interface ColetaTipoViagemOption {
+  id: string;
+  name: string;
+  color: string;
 }
 
 export interface Driver {

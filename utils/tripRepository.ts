@@ -46,6 +46,10 @@ export const tripRepository = {
     scheduled_location_id: trip.scheduledLocationId || null,
     scheduled_date_time: trip.scheduledDateTime || null,
     has_advance: trip.hasAdvance || false,
+    coleta_tipo_viagem: trip.coletaTipoViagem || null,
+    coleta_email_sent: trip.coletaEmailSent || false,
+    coleta_doc_generated: trip.coletaDocGenerated || false,
+    coleta_emissao_solicitada: trip.coletaEmissaoSolicitada || false,
     is_completed: trip.isCompleted || false
   }),
 
@@ -111,7 +115,11 @@ export const tripRepository = {
       isScheduled: d.is_scheduled ?? false,
       scheduledLocationId: d.scheduled_location_id || null,
       scheduledDateTime: d.scheduled_date_time || null,
-      hasAdvance: d.has_advance ?? false
+      hasAdvance: d.has_advance ?? false,
+      coletaTipoViagem: d.coleta_tipo_viagem || undefined,
+      coletaEmailSent: d.coleta_email_sent ?? false,
+      coletaDocGenerated: d.coleta_doc_generated ?? false,
+      coletaEmissaoSolicitada: d.coleta_emissao_solicitada ?? false,
     };
   },
 
@@ -127,9 +135,29 @@ export const tripRepository = {
   },
 
   async save(supabase: SupabaseClient, trip: Trip, actingUser?: User) {
+    // Busca status antigo para detectar mudança
+    let oldStatus: string | null = null;
+    if (trip.id && !trip.id.startsWith('new-')) {
+      try {
+        const { data } = await supabase.from('trips').select('status').eq('id', trip.id).single();
+        if (data) oldStatus = data.status;
+      } catch (e) {}
+    }
+
     const payload = this.mapToDb(trip);
     const { error } = await supabase.from('trips').upsert(payload);
     if (error) throw error;
+
+    // Dispara automação se o status mudou ou se é uma nova viagem
+    if (oldStatus !== trip.status) {
+      try {
+        // Import dinâmico para evitar dependências circulares
+        const { automationService } = await import('../services/automationService');
+        await automationService.triggerAutomation(trip, trip.status);
+      } catch (autoError) {
+        console.error("Erro ao disparar automação no repositório:", autoError);
+      }
+    }
 
     // Sincronização automática do cofre de lacres
     try {
