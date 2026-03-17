@@ -1,9 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Trip, ColetaTipoViagemOption, EmailTemplate } from '../../types';
+import { Trip, ColetaTipoViagemOption } from '../../types';
 import { db } from '../../utils/storage';
 import SmartOperationTable from './operations/SmartOperationTable';
 import FeedbackModal from '../shared/FeedbackModal';
-import EmailGeneratorModal from './email/EmailGeneratorModal';
 
 interface ColetaDoDiaTabProps {
   userId: string;
@@ -17,10 +16,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
   const [finalizingIds, setFinalizingIds] = useState<Set<string>>(new Set());
   const [tiposViagem, setTiposViagem] = useState<ColetaTipoViagemOption[]>([]);
-  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [emailModalData, setEmailModalData] = useState<{ isOpen: boolean; template: EmailTemplate | null; trip: Trip | null }>({ isOpen: false, template: null, trip: null });
-  const [allowedCategories, setAllowedCategories] = useState<string[]>([]);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
@@ -28,19 +23,11 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const STABILITY_DURATION = 30000;
 
   useEffect(() => {
-    const loadData = async () => {
-      const [tipos, templates, defaultTemplateId, allowedCats] = await Promise.all([
-        db.getColetaTiposViagem(),
-        db.getEmailTemplates(),
-        db.getSystemSetting('coleta_do_dia_email_template'),
-        db.getSystemSetting('coleta_do_dia_allowed_categories')
-      ]);
+    const loadTipos = async () => {
+      const tipos = await db.getColetaTiposViagem();
       setTiposViagem(tipos);
-      setEmailTemplates(templates);
-      if (defaultTemplateId) setSelectedTemplateId(defaultTemplateId);
-      if (allowedCats) setAllowedCategories(allowedCats);
     };
-    loadData();
+    loadTipos();
   }, []);
 
   useEffect(() => {
@@ -67,15 +54,32 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   const trips = useMemo(() => {
     const now = Date.now();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     return propTrips
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada)
+      .filter(trip => {
+        const dt = trip.scheduledDateTime || trip.dateTime;
+        if (!dt) return true; // Se não tem data, mantém (ou decide se oculta)
+        const tripDate = new Date(dt);
+        if (isNaN(tripDate.getTime())) return true;
+        tripDate.setHours(0, 0, 0, 0);
+        return tripDate >= today;
+      })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
         if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
           return { ...serverTrip, ...pending.data };
         }
         return serverTrip;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.scheduledDateTime || a.dateTime || 0).getTime();
+        const dateB = new Date(b.scheduledDateTime || b.dateTime || 0).getTime();
+        if (dateA !== dateB) return dateA - dateB;
+        return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
   }, [propTrips, pendingUpdates, finalizingIds]);
 
@@ -127,37 +131,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   }, []);
 
   const removePunctuation = (str?: string) => str ? str.replace(/[^\w\s]/gi, '') : '---';
-
-  const isToday = (dateStr: string) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return false;
-    const today = new Date().toISOString().split('T')[0];
-    const date = d.toISOString().split('T')[0];
-    return today === date;
-  };
-
-  const isPastDate = (dateStr: string) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dDate = new Date(d);
-    dDate.setHours(0, 0, 0, 0);
-    return dDate < today;
-  };
-
-  const isFutureDate = (dateStr: string) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dDate = new Date(d);
-    dDate.setHours(0, 0, 0, 0);
-    return dDate > today;
-  };
 
   const columns = useMemo(() => [
     { 
@@ -224,14 +197,19 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           const d = new Date(dt);
           if (isNaN(d.getTime())) return <span className="text-[9px] text-slate-400">{dt}</span>;
           
-          const today = isToday(dt);
-          const past = isPastDate(dt);
-          const future = isFutureDate(dt);
-          
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tripDate = new Date(d);
+          tripDate.setHours(0, 0, 0, 0);
+
+          let colorClass = 'text-slate-700';
+          if (tripDate < today) colorClass = 'text-red-600 font-black';
+          else if (tripDate > today) colorClass = 'text-blue-600 font-black';
+
           return (
-            <div className={`flex flex-col px-2 py-1 rounded-md text-center ${today ? 'bg-slate-100 text-slate-600' : (past ? 'bg-red-100 text-red-600 border border-red-200 animate-pulse' : (future ? 'bg-blue-100 text-blue-600 border border-blue-200' : 'bg-slate-100 text-slate-600'))}`}>
-              <span className="font-bold text-[10px]">{d.toLocaleDateString('pt-BR')}</span>
-              <span className="text-[8px] opacity-80">{d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+            <div className="flex flex-col">
+              <span className={`text-[10px] ${colorClass}`}>{d.toLocaleDateString('pt-BR')}</span>
+              <span className="text-[8px] text-slate-500">{d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
           );
         } catch {
@@ -282,7 +260,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'driverName', 
       label: 'Motorista', 
-      render: (t: Trip) => <span className="font-bold text-slate-600 text-[9px] uppercase break-words whitespace-normal max-w-[120px] block" title={t.driver.name}>{t.driver.name || '---'}</span>
+      render: (t: Trip) => <span className="font-bold text-slate-600 text-[9px] uppercase truncate max-w-[120px] block" title={t.driver.name}>{t.driver.name || '---'}</span>
     },
     { 
       key: 'plateHorse', 
@@ -297,7 +275,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'customerName', 
       label: 'Local Atendimento', 
-      render: (t: Trip) => <span className="font-bold text-slate-600 text-[9px] uppercase break-words whitespace-normal max-w-[120px] block" title={t.customer.name}>{t.customer.name || '---'}</span>
+      render: (t: Trip) => <span className="font-bold text-slate-600 text-[9px] uppercase truncate max-w-[120px] block" title={t.customer.name}>{t.customer.name || '---'}</span>
     },
     { 
       key: 'customerCity', 
@@ -305,14 +283,9 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       render: (t: Trip) => <span className="font-bold text-slate-600 text-[9px] uppercase">{t.customer.city || '---'}</span>
     },
     { 
-      key: 'navio', 
-      label: 'Navio', 
-      render: (t: Trip) => <span className="font-bold text-slate-600 text-[9px] uppercase">{t.ship || '---'}</span>
-    },
-    { 
-      key: 'bu', 
-      label: 'BU', 
-      render: (t: Trip) => <span className="font-bold text-slate-600 text-[9px] uppercase">{t.bu || 'SSZ'}</span>
+      key: 'navioBU', 
+      label: 'Navio BU', 
+      render: () => <span className="font-bold text-slate-600 text-[9px] uppercase">SSZ</span>
     }
   ], [tiposViagem, handleUpdateTrip, pendingUpdates]);
 
@@ -341,7 +314,11 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
         try {
-          const promises = readyTrips.map(trip => db.saveTrip({ ...trip, coletaEmissaoSolicitada: true }));
+          const promises = readyTrips.map(trip => db.saveTrip({ 
+        ...trip, 
+        coletaEmissaoSolicitada: true,
+        status: 'Emissão Solicitada' // Atualiza o status para disparar automações
+      }));
           await Promise.all(promises);
           onRefresh();
         } catch (error) {

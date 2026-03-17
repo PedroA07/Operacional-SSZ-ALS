@@ -29,7 +29,8 @@ export const organizationService = {
       }
 
       const isAfterStartDate = normalizedTripDate >= startDateStr;
-      const isNotFinished = trip.status !== 'Viagem concluída' && 
+      const isNotFinished = !trip.isCompleted &&
+                           trip.status !== 'Viagem concluída' && 
                            trip.status !== 'Viagem cancelada' && 
                            trip.status !== 'Agendamento realizado';
                            
@@ -80,23 +81,15 @@ export const organizationService = {
 
     const updatedTrips = scheduledTrips.map(t => ({
       ...t,
-      status: 'Agendamento realizado' as TripStatus,
-      statusHistory: [
-        {
-          status: 'Agendamento realizado' as TripStatus,
-          dateTime: new Date().toISOString(),
-          createdAt: new Date().toISOString()
-        },
-        ...(Array.isArray(t.statusHistory) ? t.statusHistory : [])
-      ]
+      isCompleted: true
     }));
 
     try {
-      // Salva todas as viagens atualizadas
+      // Salva todas as viagens atualizadas apenas com a flag de remoção do painel
       const results = await Promise.all(updatedTrips.map(t => db.saveTrip(t)));
       return results.every(r => r === true);
     } catch (error) {
-      console.error("Erro ao finalizar viagens agendadas:", error);
+      console.error("Erro ao processar finalização no painel:", error);
       return false;
     }
   }

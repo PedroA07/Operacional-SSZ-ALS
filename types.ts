@@ -278,7 +278,8 @@ export type TripStatus =
   | 'Chegou na Volkswagen'
   | 'Saiu da Volkswagen'
   | 'Container sobre rodas'
-  | 'Agendamento realizado';
+  | 'Agendamento realizado'
+  | 'Emissão Solicitada';
 
 export type VWStatus = TripStatus;
 
@@ -346,7 +347,6 @@ export interface Trip {
   os: string;
   booking: string;
   ship: string;
-  bu?: string;
   autColeta?: string;
   embarcador?: string;
   dateTime: string;
@@ -393,6 +393,7 @@ export interface Trip {
   coletaEmailSent?: boolean;
   coletaDocGenerated?: boolean;
   coletaEmissaoSolicitada?: boolean;
+  isRemovedFromOrg?: boolean;
 }
 
 export interface ColetaTipoViagemOption {

@@ -685,31 +685,49 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
+  const handleToggleCompleted = useCallback(async (trip: Trip, completed: boolean) => {
+    const now = Date.now();
+    
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { 
+        data: { ...(prev[trip.id]?.data || {}), isCompleted: completed }, 
+        timestamp: now 
+      }
+    }));
+
+    try {
+      await db.saveTrip({ ...trip, isCompleted: completed });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { 
+        detail: { message: completed ? 'Viagem limpa do painel' : 'Viagem restaurada', type: 'success' } 
+      }));
+    } catch (error) {
+      setPendingUpdates(prev => {
+        const next = { ...prev };
+        delete next[trip.id];
+        return next;
+      });
+      console.error("Erro ao alterar status de conclusão:", error);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { 
+        detail: { message: 'Erro ao processar alteração', type: 'error' } 
+      }));
+    }
+  }, []);
+
   const handleFinalizeTrips = () => {
     const allScheduled = trips.filter(t => isTripScheduled(t));
     const readyTrips = allScheduled.filter(t => isTripReadyToFinalize(t));
-    const notReadyCount = allScheduled.length - readyTrips.length;
-
-    if (allScheduled.length === 0) {
-      alert("Nenhuma viagem marcada como 'Agendado'.");
-      return;
-    }
 
     if (readyTrips.length === 0) {
       alert("Nenhuma viagem está pronta para finalizar. Certifique-se de que 'Mandou NF' e 'Adiantamento' também estão marcados.");
       return;
     }
 
-    if (notReadyCount > 0) {
-      alert(`Não é possível finalizar. Existem ${notReadyCount} viagens agendadas que ainda não têm todas as marcações (NF ou Adiantamento).`);
-      return;
-    }
-
-    let message = `Você está prestes a finalizar ${readyTrips.length} viagens que estão com todas as marcações completas. Deseja continuar?`;
+    let message = `Você está prestes a remover ${readyTrips.length} viagens prontas deste painel. As viagens que ainda não possuem todas as marcações continuarão visíveis. Deseja continuar?`;
 
     setConfirmModal({
       isOpen: true,
-      title: "Finalizar Viagens?",
+      title: "Limpar Viagens?",
       message: message,
       onConfirm: async () => {
         setIsFinalizing(true);
@@ -790,19 +808,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return tripDate < today;
   };
 
-  const isFutureDate = (dateStr: string) => {
-    const d = parseDate(dateStr);
-    if (!d) return false;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const dDate = new Date(d);
-    dDate.setHours(0, 0, 0, 0);
-    
-    return dDate > today;
-  };
-
   const isTripScheduled = useCallback((t: Trip) => {
     return !!t.isScheduled || !!t.preStackingFormData;
   }, []);
@@ -818,12 +823,24 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       render: (t: Trip) => {
         const today = isToday(t.dateTime);
         const past = isPastDate(t.dateTime);
-        const future = isFutureDate(t.dateTime);
         const d = parseDate(t.dateTime);
         const displayDate = d ? d.toLocaleDateString('pt-BR') : (t.dateTime || '---');
         
+        let colorClass = 'bg-slate-100 text-slate-600';
+        if (past) {
+          colorClass = 'bg-red-100 text-red-600 border border-red-200 animate-pulse';
+        } else if (d) {
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const tripDate = new Date(d);
+          tripDate.setHours(0, 0, 0, 0);
+          if (tripDate > now) {
+            colorClass = 'bg-blue-100 text-blue-600 border border-blue-200';
+          }
+        }
+        
         return (
-          <div className={`px-2 py-1 rounded-md font-black text-[9px] text-center ${today ? 'bg-slate-100 text-slate-600' : (past ? 'bg-red-100 text-red-600 border border-red-200 animate-pulse' : (future ? 'bg-blue-100 text-blue-600 border border-blue-200' : 'bg-slate-100 text-slate-600'))}`}>
+          <div className={`px-2 py-1 rounded-md font-black text-[9px] text-center ${colorClass}`}>
             {displayDate}
           </div>
         );
@@ -958,19 +975,50 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           {t.hasAdvance && <span className="text-[7px] font-black text-orange-600 uppercase">70% LIB</span>}
         </div>
       )
+    },
+    {
+      key: 'actions',
+      label: 'Ações',
+      render: (t: Trip) => (
+        <div className="flex items-center justify-center">
+          <button 
+            onClick={() => {
+              if (window.confirm(`Deseja remover a OS ${t.os} deste painel?`)) {
+                handleToggleCompleted(t, true);
+              }
+            }}
+            className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
+            title="Limpar deste painel"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, isTripScheduled]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleToggleCompleted, isTripScheduled]);
 
   const coletaTrips = useMemo(() => 
     trips
       .filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase()))
-      .sort((a, b) => a.dateTime.localeCompare(b.dateTime)), 
+      .sort((a, b) => {
+        const dateA = new Date(a.dateTime || 0).getTime();
+        const dateB = new Date(b.dateTime || 0).getTime();
+        if (dateA !== dateB) return dateA - dateB;
+        return (a.driver.name || '').localeCompare(b.driver.name || '');
+      }), 
   [trips]);
 
   const entregaTrips = useMemo(() => 
     trips
       .filter(t => ['ENTREGA', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase()))
-      .sort((a, b) => a.dateTime.localeCompare(b.dateTime)), 
+      .sort((a, b) => {
+        const dateA = new Date(a.dateTime || 0).getTime();
+        const dateB = new Date(b.dateTime || 0).getTime();
+        if (dateA !== dateB) return dateA - dateB;
+        return (a.driver.name || '').localeCompare(b.driver.name || '');
+      }), 
   [trips]);
 
   if (isLoading) {
@@ -1028,18 +1076,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         
         <button 
           onClick={handleFinalizeTrips}
-          disabled={isFinalizing || trips.filter(t => isTripScheduled(t)).length === 0 || trips.filter(t => isTripScheduled(t) && !isTripReadyToFinalize(t)).length > 0}
+          disabled={isFinalizing || trips.filter(t => isTripReadyToFinalize(t)).length === 0}
           className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
         >
           {isFinalizing ? (
             <>
               <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              Processando...
+              Limpando...
             </>
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
-              Finalizar Agendados ({trips.filter(t => isTripReadyToFinalize(t)).length})
+              Limpar ({trips.filter(t => isTripReadyToFinalize(t)).length})
             </>
           )}
         </button>

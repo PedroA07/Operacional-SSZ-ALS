@@ -347,12 +347,17 @@ export const db = {
 
   saveColetaTipoViagem: async (c: any) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('coleta_tipos_viagem').upsert({
-      id: c.id,
+    const payload: any = {
       name: c.name,
       color: c.color,
       created_at: c.createdAt || new Date().toISOString()
-    });
+    };
+    
+    if (c.id) {
+      payload.id = c.id;
+    }
+
+    const { error } = await supabase.from('coleta_tipos_viagem').upsert(payload);
     return !error;
   },
 

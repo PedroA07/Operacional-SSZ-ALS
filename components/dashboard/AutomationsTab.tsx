@@ -69,7 +69,7 @@ const AutomationsTab: React.FC = () => {
   const allStatuses = [
     'Pendente', 'Retirada de vazio', 'Retirada do cheio', 'Em viagem', 
     'Chegou no cliente', 'Pegou NF', 'Saiu do cliente', 'Chegou no destino', 
-    'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada',
+    'Devolução do cheio', 'Viagem concluída', 'Viagem cancelada', 'Emissão Solicitada',
     ...customStatuses.map(s => s.name)
   ].filter((v, i, a) => a.indexOf(v) === i); // Remove duplicatas
 
