@@ -381,7 +381,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           }
         }
         return normalizedTripDate >= startDateStr && 
-               !trip.isCompleted && !trip.isRemovedFromOrg && trip.status !== 'Viagem concluída' && 
+               !trip.isCompleted && trip.status !== 'Viagem concluída' && 
                trip.status !== 'Viagem cancelada' && 
                trip.status !== 'Agendamento realizado';
       })
@@ -685,21 +685,21 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
-  const handleRemoveFromOrg = useCallback(async (trip: Trip) => {
+  const handleToggleCompleted = useCallback(async (trip: Trip, completed: boolean) => {
     const now = Date.now();
     
     setPendingUpdates(prev => ({
       ...prev,
       [trip.id]: { 
-        data: { ...(prev[trip.id]?.data || {}), isRemovedFromOrg: true }, 
+        data: { ...(prev[trip.id]?.data || {}), isCompleted: completed }, 
         timestamp: now 
       }
     }));
 
     try {
-      await db.saveTrip({ ...trip, isRemovedFromOrg: true });
+      await db.saveTrip({ ...trip, isCompleted: completed });
       window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Viagem limpa do painel', type: 'success' } 
+        detail: { message: completed ? 'Viagem limpa do painel' : 'Viagem restaurada', type: 'success' } 
       }));
     } catch (error) {
       setPendingUpdates(prev => {
@@ -707,7 +707,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         delete next[trip.id];
         return next;
       });
-      console.error("Erro ao remover do painel:", error);
+      console.error("Erro ao alterar status de conclusão:", error);
       window.dispatchEvent(new CustomEvent('als_show_toast', { 
         detail: { message: 'Erro ao processar alteração', type: 'error' } 
       }));
@@ -821,39 +821,27 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       key: 'dateTime', 
       label: 'Data', 
       render: (t: Trip) => {
+        const today = isToday(t.dateTime);
+        const past = isPastDate(t.dateTime);
         const d = parseDate(t.dateTime);
-        const displayDate = d ? new Intl.DateTimeFormat('pt-BR', { 
-          day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        }).format(d) : (t.dateTime || '---');
+        const displayDate = d ? d.toLocaleDateString('pt-BR') : (t.dateTime || '---');
         
-        let colorClass = 'bg-slate-100 text-slate-600 border-slate-200';
-        let alertLabel = '';
-        
-        if (d) {
+        let colorClass = 'bg-slate-100 text-slate-600';
+        if (past) {
+          colorClass = 'bg-red-100 text-red-600 border border-red-200 animate-pulse';
+        } else if (d) {
           const now = new Date();
           now.setHours(0, 0, 0, 0);
           const tripDate = new Date(d);
           tripDate.setHours(0, 0, 0, 0);
-          
-          if (tripDate < now) {
-            colorClass = 'bg-red-100 text-red-700 border-red-300 animate-pulse';
-            alertLabel = 'ATRASADA';
-          } else if (tripDate > now) {
-            colorClass = 'bg-blue-100 text-blue-700 border-blue-300';
-            alertLabel = 'FUTURA';
+          if (tripDate > now) {
+            colorClass = 'bg-blue-100 text-blue-600 border border-blue-200';
           }
         }
         
         return (
-          <div className="flex flex-col gap-1 items-center">
-            {alertLabel && (
-              <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${colorClass.replace('bg-', 'text-').replace('text-', 'bg-')}`}>
-                {alertLabel}
-              </span>
-            )}
-            <div className={`px-2 py-1 rounded-md border font-black text-[9px] text-center ${colorClass}`}>
-              {displayDate}
-            </div>
+          <div className={`px-2 py-1 rounded-md font-black text-[9px] text-center ${colorClass}`}>
+            {displayDate}
           </div>
         );
       }
@@ -996,7 +984,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           <button 
             onClick={() => {
               if (window.confirm(`Deseja remover a OS ${t.os} deste painel?`)) {
-                handleRemoveFromOrg(t);
+                handleToggleCompleted(t, true);
               }
             }}
             className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
@@ -1009,7 +997,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleToggleCompleted, isTripScheduled]);
 
   const coletaTrips = useMemo(() => 
     trips

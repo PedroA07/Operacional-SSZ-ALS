@@ -353,20 +353,12 @@ export const db = {
       created_at: c.createdAt || new Date().toISOString()
     };
     
-    let error;
     if (c.id) {
-      const { error: updateError } = await supabase.from('coleta_tipos_viagem').update(payload).eq('id', c.id);
-      error = updateError;
-    } else {
-      const { error: insertError } = await supabase.from('coleta_tipos_viagem').insert(payload);
-      error = insertError;
+      payload.id = c.id;
     }
 
-    if (error) {
-      console.error("ERRO DETALHADO COLETA TIPO VIAGEM:", error);
-      return false;
-    }
-    return true;
+    const { error } = await supabase.from('coleta_tipos_viagem').upsert(payload);
+    return !error;
   },
 
   deleteColetaTipoViagem: async (id: string) => {

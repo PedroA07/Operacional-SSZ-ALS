@@ -16,7 +16,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
   const [finalizingIds, setFinalizingIds] = useState<Set<string>>(new Set());
   const [tiposViagem, setTiposViagem] = useState<ColetaTipoViagemOption[]>([]);
-  const [defaultTipoViagemId, setDefaultTipoViagemId] = useState<string>('');
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
@@ -29,9 +28,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       setTiposViagem(tipos);
     };
     loadTipos();
-    
-    const savedDefault = localStorage.getItem('defaultColetaTipoViagem');
-    if (savedDefault) setDefaultTipoViagemId(savedDefault);
   }, []);
 
   useEffect(() => {
@@ -63,7 +59,15 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
     return propTrips
       .filter(trip => !finalizingIds.has(trip.id))
-      .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
+      .filter(trip => !trip.coletaEmissaoSolicitada)
+      .filter(trip => {
+        const dt = trip.scheduledDateTime || trip.dateTime;
+        if (!dt) return true; // Se não tem data, mantém (ou decide se oculta)
+        const tripDate = new Date(dt);
+        if (isNaN(tripDate.getTime())) return true;
+        tripDate.setHours(0, 0, 0, 0);
+        return tripDate >= today;
+      })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
         if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
@@ -103,23 +107,16 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   const handleUpdateTrip = useCallback(async (trip: Trip, data: Partial<Trip>) => {
     const now = Date.now();
-    
-    // Se está atualizando algo e o tipo de viagem não está definido, salva o padrão junto
-    const updateData = { ...data };
-    if (!trip.coletaTipoViagem && !data.hasOwnProperty('coletaTipoViagem') && defaultTipoViagemId) {
-      updateData.coletaTipoViagem = defaultTipoViagemId;
-    }
-
     setPendingUpdates(prev => ({
       ...prev,
       [trip.id]: { 
-        data: { ...(prev[trip.id]?.data || {}), ...updateData }, 
+        data: { ...(prev[trip.id]?.data || {}), ...data }, 
         timestamp: now 
       }
     }));
 
     try {
-      await db.saveTrip({ ...trip, ...updateData });
+      await db.saveTrip({ ...trip, ...data });
     } catch (error) {
       setPendingUpdates(prev => {
         const next = { ...prev };
@@ -131,7 +128,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         detail: { message: 'Erro ao salvar alterações', type: 'error' } 
       }));
     }
-  }, [defaultTipoViagemId]);
+  }, []);
 
   const removePunctuation = (str?: string) => str ? str.replace(/[^\w\s]/gi, '') : '---';
 
@@ -139,27 +136,22 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'coletaTipoViagem', 
       label: 'Tipo de Viagem', 
-      render: (t: Trip) => {
-        const selectedValue = t.coletaTipoViagem || defaultTipoViagemId || '';
-        const selectedColor = tiposViagem.find(tv => tv.id === selectedValue)?.color || 'inherit';
-        
-        return (
-          <select
-            value={selectedValue}
-            onChange={(e) => handleUpdateTrip(t, { coletaTipoViagem: e.target.value })}
-            className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all"
-            style={{
-              color: selectedColor,
-              borderColor: selectedColor
-            }}
-          >
-            <option value="">Selecione...</option>
-            {tiposViagem.map(tv => (
-              <option key={tv.id} value={tv.id} style={{ color: tv.color }}>{tv.name}</option>
-            ))}
-          </select>
-        );
-      }
+      render: (t: Trip) => (
+        <select
+          value={t.coletaTipoViagem || ''}
+          onChange={(e) => handleUpdateTrip(t, { coletaTipoViagem: e.target.value })}
+          className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all"
+          style={{
+            color: tiposViagem.find(tv => tv.id === t.coletaTipoViagem)?.color || 'inherit',
+            borderColor: tiposViagem.find(tv => tv.id === t.coletaTipoViagem)?.color || 'inherit'
+          }}
+        >
+          <option value="">Selecione...</option>
+          {tiposViagem.map(tv => (
+            <option key={tv.id} value={tv.id} style={{ color: tv.color }}>{tv.name}</option>
+          ))}
+        </select>
+      )
     },
     { 
       key: 'coletaEmailSent', 
@@ -210,30 +202,14 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           const tripDate = new Date(d);
           tripDate.setHours(0, 0, 0, 0);
 
-          let colorClass = 'text-slate-700 bg-slate-100 border-slate-200';
-          let alertLabel = '';
-          if (tripDate < today) {
-            colorClass = 'text-red-700 bg-red-100 border-red-300 animate-pulse';
-            alertLabel = 'ATRASADA';
-          } else if (tripDate > today) {
-            colorClass = 'text-blue-700 bg-blue-100 border-blue-300';
-            alertLabel = 'FUTURA';
-          }
-
-          const extenso = new Intl.DateTimeFormat('pt-BR', { 
-            day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
-          }).format(d);
+          let colorClass = 'text-slate-700';
+          if (tripDate < today) colorClass = 'text-red-600 font-black';
+          else if (tripDate > today) colorClass = 'text-blue-600 font-black';
 
           return (
-            <div className="flex flex-col gap-1 items-center">
-              {alertLabel && (
-                <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${colorClass.replace('text-', 'bg-').replace('bg-', 'text-')}`}>
-                  {alertLabel}
-                </span>
-              )}
-              <div className={`px-2 py-1 rounded-md border font-black text-[9px] text-center ${colorClass}`}>
-                {extenso}
-              </div>
+            <div className="flex flex-col">
+              <span className={`text-[10px] ${colorClass}`}>{d.toLocaleDateString('pt-BR')}</span>
+              <span className="text-[8px] text-slate-500">{d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
           );
         } catch {
@@ -310,23 +286,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       key: 'navioBU', 
       label: 'Navio BU', 
       render: () => <span className="font-bold text-slate-600 text-[9px] uppercase">SSZ</span>
-    },
-    {
-      key: 'actions',
-      label: '',
-      render: (t: Trip) => (
-        <button
-          onClick={() => {
-            if (window.confirm('Deseja remover esta viagem do painel de Coleta do Dia?')) {
-              handleUpdateTrip(t, { isRemovedFromColeta: true });
-            }
-          }}
-          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-          title="Remover do painel"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-        </button>
-      )
     }
   ], [tiposViagem, handleUpdateTrip, pendingUpdates]);
 
