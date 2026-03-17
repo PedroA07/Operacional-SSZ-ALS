@@ -6,9 +6,6 @@ import { showToast } from '../../shared/SimpleToast';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
 
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
-
 interface EmailTemplateModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -460,15 +457,13 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Corpo do E-mail (Texto Base)</label>
-                <div className="h-64 mb-12">
-                  <ReactQuill 
-                    theme="snow"
-                    value={formData.body}
-                    onChange={(content) => setFormData({...formData, body: content})}
-                    className="h-full rounded-2xl overflow-hidden border-2 border-slate-50 bg-slate-50"
-                    placeholder="Olá equipe, segue relatório..."
-                  />
-                </div>
+                <textarea 
+                  rows={4}
+                  className="w-full px-6 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-medium text-slate-800 focus:border-blue-500 transition-all outline-none resize-none"
+                  placeholder="Olá equipe, segue relatório..."
+                  value={formData.body}
+                  onChange={e => setFormData({...formData, body: e.target.value})}
+                />
                 <div className="mt-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2 relative">
                   <div className="flex items-center justify-between">
                     <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Variáveis Inteligentes (Copie e Cole)</p>
@@ -512,8 +507,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                           { name: 'STATUS_ESPECIFICO', desc: 'Data/hora de um status específico' },
                           { name: 'PREVISAO_ESPECIFICA', desc: 'Previsão baseada em um status' },
                           { name: 'QUANTIDADE LINHAS', desc: 'Contador de linhas (ex: 01, 02)' },
-                          { name: 'SE(VAR) SIM SENAO NAO', desc: 'Ex: SE(MOTORISTA) {{MOTORISTA}} SENAO Sem motorista' },
-                          { name: 'CHAVES_ACESSO', desc: 'Números das chaves de acesso dos anexos' }
+                          { name: 'SE(VAR) SIM SENAO NAO', desc: 'Ex: SE(MOTORISTA) {{MOTORISTA}} SENAO Sem motorista' }
                         ].map(v => (
                           <div key={v.name} className="flex flex-col bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
                             {v.name === 'STATUS_ESPECIFICO' ? (

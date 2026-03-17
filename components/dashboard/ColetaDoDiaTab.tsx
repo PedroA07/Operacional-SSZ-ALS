@@ -3,7 +3,6 @@ import { Trip, ColetaTipoViagemOption, EmailTemplate } from '../../types';
 import { db } from '../../utils/storage';
 import SmartOperationTable from './operations/SmartOperationTable';
 import FeedbackModal from '../shared/FeedbackModal';
-import EmailGeneratorModal from './email/EmailGeneratorModal';
 import { Mail, Settings, Send, X, Copy } from 'lucide-react';
 
 interface ColetaDoDiaTabProps {
@@ -183,7 +182,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const handleSaveSettings = () => {
     localStorage.setItem('coletaDefaultTemplateId', selectedTemplateId);
     localStorage.setItem('coletaHiddenTripTypes', JSON.stringify(hiddenTripTypes));
-    localStorage.setItem('defaultColetaTipoViagem', defaultTipoViagemId);
     setSettingsModal(false);
     window.dispatchEvent(new CustomEvent('als_show_toast', { 
       detail: { message: 'Configurações salvas!', type: 'success' } 
@@ -193,6 +191,25 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const activeTemplate = useMemo(() => {
     return emailTemplates.find(t => t.id === selectedTemplateId) || emailTemplates[0] || { subject: '', body: '' };
   }, [emailTemplates, selectedTemplateId]);
+
+  const replacePlaceholders = (text: string, trip: Trip) => {
+    if (!text) return '';
+    return text
+      .replace(/{os}/g, trip.os || '')
+      .replace(/{booking}/g, trip.booking || '')
+      .replace(/{ship}/g, trip.ship || '')
+      .replace(/{container}/g, trip.container || '')
+      .replace(/{tara}/g, trip.tara || '')
+      .replace(/{seal}/g, trip.seal || '')
+      .replace(/{bu}/g, trip.bu || 'SSZ')
+      .replace(/{driver_name}/g, trip.driver.name || '')
+      .replace(/{driver_cpf}/g, trip.driver.cpf || '')
+      .replace(/{plate_horse}/g, trip.driver.plateHorse || '')
+      .replace(/{plate_trailer}/g, trip.driver.plateTrailer || '')
+      .replace(/{customer_name}/g, trip.customer.name || '')
+      .replace(/{customer_city}/g, trip.customer.city || '')
+      .replace(/{customer_cnpj}/g, trip.customer.cnpj || '');
+  };
 
   const columns = useMemo(() => [
     { 
@@ -520,9 +537,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             
             <div className="p-8 space-y-8">
               {/* Seleção de Template de E-mail */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Modelo de E-mail</h4>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Modelo de E-mail Padrão</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Selecione o Modelo Padrão</label>
                   <select 
                     value={selectedTemplateId} 
                     onChange={e => setSelectedTemplateId(e.target.value)}
@@ -533,20 +551,9 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                       <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                   </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo de Viagem Padrão</label>
-                  <select 
-                    value={defaultTipoViagemId} 
-                    onChange={e => setDefaultTipoViagemId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="">Selecione um tipo...</option>
-                    {tiposViagem.map(tv => (
-                      <option key={tv.id} value={tv.id} style={{ color: tv.color }}>{tv.name}</option>
-                    ))}
-                  </select>
+                  <p className="text-[9px] font-medium text-slate-400 ml-1">
+                    Crie ou edite modelos na aba "Administrativo &gt; Modelos de E-mail".
+                  </p>
                 </div>
               </div>
 
@@ -584,22 +591,66 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         </div>
       )}
 
-      {/* Modal de Gerador de E-mail Vinculado */}
+      {/* Modal de Envio de E-mail */}
       {emailSendModal.isOpen && emailSendModal.trip && (
-        <EmailGeneratorModal
-          isOpen={emailSendModal.isOpen}
-          onClose={() => setEmailSendModal({ isOpen: false })}
-          template={activeTemplate}
-          trips={propTrips}
-          initialTrip={emailSendModal.trip}
-          onMarkAsSent={async () => {
-            if (emailSendModal.trip) {
-              await handleUpdateTrip(emailSendModal.trip, { coletaEmailSent: true });
-              setEmailSendModal({ isOpen: false });
-              window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'E-mail marcado como enviado!', type: 'success' } }));
-            }
-          }}
-        />
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-blue-50/30">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Enviar Dados de Coleta</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">OS: {emailSendModal.trip.os}</p>
+              </div>
+              <button onClick={() => setEmailSendModal({ isOpen: false })} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Assunto</label>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-bold text-slate-700">
+                    {replacePlaceholders(activeTemplate.subject || '', emailSendModal.trip)}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mensagem</label>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 whitespace-pre-wrap h-64 overflow-y-auto">
+                    {replacePlaceholders(activeTemplate.body || '', emailSendModal.trip)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+              <button 
+                onClick={() => {
+                  const text = replacePlaceholders(activeTemplate.body || '', emailSendModal.trip!);
+                  navigator.clipboard.writeText(text);
+                  window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Texto copiado!', type: 'success' } }));
+                }}
+                className="flex items-center gap-2 px-6 py-3 text-[10px] font-black uppercase text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+              >
+                <Copy className="w-4 h-4" /> Copiar Texto
+              </button>
+              
+              <div className="flex gap-4">
+                <button onClick={() => setEmailSendModal({ isOpen: false })} className="px-6 py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">Fechar</button>
+                <button 
+                  onClick={async () => {
+                    await handleUpdateTrip(emailSendModal.trip!, { coletaEmailSent: true });
+                    setEmailSendModal({ isOpen: false });
+                    window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'E-mail marcado como enviado!', type: 'success' } }));
+                  }}
+                  className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
+                >
+                  <Send className="w-4 h-4" /> Marcar como Enviado
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
