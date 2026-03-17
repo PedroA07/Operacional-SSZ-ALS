@@ -347,6 +347,7 @@ export interface Trip {
   os: string;
   booking: string;
   ship: string;
+  bu?: string;
   autColeta?: string;
   embarcador?: string;
   dateTime: string;
@@ -393,6 +394,7 @@ export interface Trip {
   coletaEmailSent?: boolean;
   coletaDocGenerated?: boolean;
   coletaEmissaoSolicitada?: boolean;
+  isRemovedFromColeta?: boolean;
   isRemovedFromOrg?: boolean;
 }
 
@@ -400,6 +402,7 @@ export interface ColetaTipoViagemOption {
   id: string;
   name: string;
   color: string;
+  isDefault?: boolean;
 }
 
 export interface Driver {
