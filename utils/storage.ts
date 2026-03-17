@@ -111,18 +111,21 @@ export const db = {
       cnpj: c.cnpj,
       operations: c.operations,
       legal_name: c.legalName,
-      legalName: c.legalName,
       zip_code: c.zipCode,
-      zipCode: c.zipCode,
       registrationDate: c.registrationDate
     };
 
     Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
-    console.log("Salvando cliente:", payload);
+    console.log("Tentando salvar cliente (Payload):", payload);
     const { error } = await supabase.from('customers').upsert(payload);
     if (error) {
-      console.error("Erro ao salvar cliente no Supabase:", error);
+      console.error("ERRO DETALHADO CLIENTE:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       return false;
     }
     return true;
@@ -138,6 +141,11 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('ports').select('*').order('name');
     if (error) throw error;
+    
+    if (data && data.length > 0) {
+      console.log("Schema Discovery - Colunas da tabela 'ports':", Object.keys(data[0]));
+    }
+
     return (data || []).map(p => ({
       ...p,
       legalName: p.legal_name || p.legalName,
@@ -161,19 +169,21 @@ export const db = {
       state: p.state,
       cnpj: p.cnpj,
       legal_name: p.legalName,
-      legalName: p.legalName,
       zip_code: p.zipCode,
-      zipCode: p.zipCode,
-      registrationDate: p.registrationDate,
-      registrationdate: p.registrationDate
+      registrationDate: p.registrationDate
     };
 
     Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
     
-    console.log("Salvando porto:", payload);
+    console.log("Tentando salvar porto (Payload):", payload);
     const { error } = await supabase.from('ports').upsert(payload);
     if (error) {
-      console.error("Erro ao salvar porto no Supabase:", error);
+      console.error("ERRO DETALHADO PORTO:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       return false;
     }
     return true;
@@ -189,6 +199,11 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase.from('pre_stacking').select('*').order('name');
     if (error) throw error;
+
+    if (data && data.length > 0) {
+      console.log("Schema Discovery - Colunas da tabela 'pre_stacking':", Object.keys(data[0]));
+    }
+
     return (data || []).map(p => ({
       ...p,
       legalName: p.legal_name || p.legalName,
@@ -212,19 +227,21 @@ export const db = {
       city: p.city,
       state: p.state,
       legal_name: p.legalName,
-      legalName: p.legalName,
       zip_code: p.zipCode,
-      zipCode: p.zipCode,
-      registrationDate: p.registrationDate,
-      registrationdate: p.registrationDate
+      registrationDate: p.registrationDate
     };
 
     Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
-    console.log("Salvando pré-stacking:", payload);
+    console.log("Tentando salvar pré-stacking (Payload):", payload);
     const { error } = await supabase.from('pre_stacking').upsert(payload);
     if (error) {
-      console.error("Erro ao salvar pré-stacking no Supabase:", error);
+      console.error("ERRO DETALHADO UNIDADE:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       return false;
     }
     return true;
