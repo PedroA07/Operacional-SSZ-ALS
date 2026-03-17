@@ -488,6 +488,8 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                           { name: 'PLACA CARRETA', desc: 'Placa da carreta' },
                           { name: 'CONTAINER', desc: 'Número do container' },
                           { name: 'STATUS', desc: 'Status atual da viagem' },
+                          { name: 'TIPO DE PROGRAMAÇÃO', desc: 'Tipo de programação da viagem' },
+                          { name: 'BU', desc: 'BU da viagem' },
                           { name: 'DATA', desc: 'Data da viagem' },
                           { name: 'OS', desc: 'Número da OS' },
                           { name: 'CLIENTE', desc: 'Nome do cliente' },

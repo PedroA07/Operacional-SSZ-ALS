@@ -376,7 +376,9 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       label: 'Local Atendimento / Cidade', 
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words" title={t.customer.name}>{t.customer.name || '---'}</span>
+          <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words" title={t.customer.name}>
+            {t.customer.legalName ? `${t.customer.legalName} (${t.customer.name})` : t.customer.name || '---'}
+          </span>
           <div className="flex items-center gap-2">
             <span className="text-[8px] font-medium text-slate-400">{t.customer.cnpj || '---'}</span>
             <span className="text-[8px] font-black text-slate-600 uppercase">{t.customer.city || '---'}</span>

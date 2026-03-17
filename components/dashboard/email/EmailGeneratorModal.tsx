@@ -302,6 +302,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       else if (c.includes('placa carreta') || c.includes('carreta')) value = trip.driver?.plateTrailer || '';
       else if (c.includes('motorista')) value = trip.driver?.name || '';
       else if (c.includes('container')) value = trip.container || '';
+      else if (c.includes('tipo de programação') || c.includes('tipo de programacao')) value = trip.type || '';
+      else if (c === 'bu' || c === 'b.u' || c === 'b.u.') value = trip.bu || 'SSZ';
       else if (c.includes('status') || c.includes('programação') || c.includes('programaçao') || c.includes('programacao')) value = trip.status || '';
       else if (c.includes('data')) value = new Date(trip.dateTime).toLocaleDateString('pt-BR');
       else if (c === 'os' || c === 'o.s' || c === 'ordem de serviço' || c === 'ordem de servico') value = trip.os || '';
