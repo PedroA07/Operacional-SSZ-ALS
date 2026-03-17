@@ -21,17 +21,11 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
-  const [emailConfigModal, setEmailConfigModal] = useState(false);
+  const [settingsModal, setSettingsModal] = useState(false);
   const [emailSendModal, setEmailSendModal] = useState<{ isOpen: boolean; trip?: Trip }>({ isOpen: false });
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [editingTemplate, setEditingTemplate] = useState<Partial<EmailTemplate>>({
-    name: 'Modelo Coleta',
-    subject: 'Coleta - OS {os}',
-    body: 'Olá,\n\nSegue dados para coleta:\nOS: {os}\nBooking: {booking}\nNavio: {ship}\nContainer: {container}\nMotorista: {driver_name}\nPlaca: {plate_horse}',
-    to: '',
-    cc: ''
-  });
+  const [hiddenTripTypes, setHiddenTripTypes] = useState<string[]>([]);
 
   const STABILITY_DURATION = 30000;
 
@@ -44,16 +38,29 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       setTiposViagem(tipos);
       setEmailTemplates(templates);
       
-      const coletaTemplate = templates.find(t => t.name === 'Modelo Coleta' || t.config?.isColetaDefault);
-      if (coletaTemplate) {
-        setSelectedTemplateId(coletaTemplate.id);
-        setEditingTemplate(coletaTemplate);
+      const savedTemplateId = localStorage.getItem('coletaDefaultTemplateId');
+      if (savedTemplateId && templates.some(t => t.id === savedTemplateId)) {
+        setSelectedTemplateId(savedTemplateId);
+      } else {
+        const coletaTemplate = templates.find(t => t.name === 'Modelo Coleta' || t.config?.isColetaDefault);
+        if (coletaTemplate) {
+          setSelectedTemplateId(coletaTemplate.id);
+        }
       }
     };
     loadTipos();
     
     const savedDefault = localStorage.getItem('defaultColetaTipoViagem');
     if (savedDefault) setDefaultTipoViagemId(savedDefault);
+
+    const savedHiddenTypes = localStorage.getItem('coletaHiddenTripTypes');
+    if (savedHiddenTypes) {
+      try {
+        setHiddenTripTypes(JSON.parse(savedHiddenTypes));
+      } catch (e) {
+        console.error('Erro ao carregar tipos ocultos', e);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -86,6 +93,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return propTrips
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
+      .filter(trip => !hiddenTripTypes.includes(trip.type))
       .filter(trip => {
         const dt = trip.scheduledDateTime || trip.dateTime;
         if (!dt) return false;
@@ -171,33 +179,18 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   const removePunctuation = (str?: string) => str ? str.replace(/[^\w\s]/gi, '') : '---';
 
-  const handleSaveEmailTemplate = async () => {
-    try {
-      const templateToSave: EmailTemplate = {
-        id: editingTemplate.id || `tpl-${Date.now()}`,
-        name: editingTemplate.name || 'Modelo Coleta',
-        subject: editingTemplate.subject || '',
-        body: editingTemplate.body || '',
-        to: editingTemplate.to || '',
-        cc: editingTemplate.cc || '',
-        config: { ...(editingTemplate.config || {}), isColetaDefault: true },
-        createdAt: editingTemplate.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      if (await db.saveEmailTemplate(templateToSave)) {
-        const updated = await db.getEmailTemplates();
-        setEmailTemplates(updated);
-        setSelectedTemplateId(templateToSave.id);
-        setEmailConfigModal(false);
-        window.dispatchEvent(new CustomEvent('als_show_toast', { 
-          detail: { message: 'Modelo de e-mail salvo!', type: 'success' } 
-        }));
-      }
-    } catch (error) {
-      console.error("Erro ao salvar template:", error);
-    }
+  const handleSaveSettings = () => {
+    localStorage.setItem('coletaDefaultTemplateId', selectedTemplateId);
+    localStorage.setItem('coletaHiddenTripTypes', JSON.stringify(hiddenTripTypes));
+    setSettingsModal(false);
+    window.dispatchEvent(new CustomEvent('als_show_toast', { 
+      detail: { message: 'Configurações salvas!', type: 'success' } 
+    }));
   };
+
+  const activeTemplate = useMemo(() => {
+    return emailTemplates.find(t => t.id === selectedTemplateId) || emailTemplates[0] || { subject: '', body: '' };
+  }, [emailTemplates, selectedTemplateId]);
 
   const replacePlaceholders = (text: string, trip: Trip) => {
     if (!text) return '';
@@ -369,7 +362,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       label: 'Motorista / Veículo', 
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-black text-slate-900 text-[10px] truncate max-w-[150px] uppercase">{t.driver.name || '---'}</span>
+          <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words">{t.driver.name || '---'}</span>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="text-[8px] font-medium text-slate-500">{removePunctuation(t.driver.cpf)}</span>
             <span className="text-[8px] font-black text-slate-700 bg-slate-100 px-1 rounded">{removePunctuation(t.driver.plateHorse)}</span>
@@ -383,7 +376,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       label: 'Local Atendimento / Cidade', 
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-black text-slate-900 text-[10px] truncate max-w-[180px] uppercase" title={t.customer.name}>{t.customer.name || '---'}</span>
+          <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words" title={t.customer.name}>{t.customer.name || '---'}</span>
           <div className="flex items-center gap-2">
             <span className="text-[8px] font-medium text-slate-400">{t.customer.cnpj || '---'}</span>
             <span className="text-[8px] font-black text-slate-600 uppercase">{t.customer.city || '---'}</span>
@@ -486,9 +479,9 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => setEmailConfigModal(true)}
+            onClick={() => setSettingsModal(true)}
             className="p-4 bg-white text-slate-600 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-95"
-            title="Configurar Modelo de E-mail"
+            title="Configurações da Coleta do Dia"
           >
             <Settings className="w-5 h-5" />
           </button>
@@ -526,67 +519,71 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         </div>
       </div>
 
-      {/* Modal de Configuração de E-mail */}
-      {emailConfigModal && (
+      {/* Modal de Configurações */}
+      {settingsModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Configurar Modelo de E-mail</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Defina o padrão para envio de coletas</p>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Configurações da Coleta</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Personalize sua visualização e e-mails</p>
               </div>
-              <button onClick={() => setEmailConfigModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+              <button onClick={() => setSettingsModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                 <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
             
-            <div className="p-8 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="p-8 space-y-8">
+              {/* Seleção de Template de E-mail */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Modelo de E-mail</h4>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assunto</label>
-                  <input 
-                    type="text" 
-                    value={editingTemplate.subject} 
-                    onChange={e => setEditingTemplate(prev => ({ ...prev, subject: e.target.value }))}
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Selecione o Modelo Padrão</label>
+                  <select 
+                    value={selectedTemplateId} 
+                    onChange={e => setSelectedTemplateId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Ex: Coleta - OS {os}"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Destinatário Padrão</label>
-                  <input 
-                    type="text" 
-                    value={editingTemplate.to} 
-                    onChange={e => setEditingTemplate(prev => ({ ...prev, to: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="email@exemplo.com"
-                  />
+                  >
+                    <option value="">Selecione um modelo...</option>
+                    {emailTemplates.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[9px] font-medium text-slate-400 ml-1">
+                    Crie ou edite modelos na aba "Administrativo &gt; Modelos de E-mail".
+                  </p>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Corpo do E-mail</label>
-                <textarea 
-                  value={editingTemplate.body} 
-                  onChange={e => setEditingTemplate(prev => ({ ...prev, body: e.target.value }))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none h-48 resize-none"
-                  placeholder="Use {os}, {booking}, {ship}, {container}, {driver_name}, etc."
-                />
-              </div>
-
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <p className="text-[9px] font-black text-blue-600 uppercase mb-2">Variáveis Disponíveis:</p>
-                <div className="flex flex-wrap gap-2">
-                  {['{os}', '{booking}', '{ship}', '{container}', '{tara}', '{seal}', '{bu}', '{driver_name}', '{plate_horse}', '{customer_name}'].map(v => (
-                    <span key={v} className="bg-white px-2 py-1 rounded text-[8px] font-black text-blue-500 border border-blue-200">{v}</span>
+              {/* Filtro de Tipos de Programação */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Ocultar Tipos de Programação</h4>
+                <p className="text-[10px] font-medium text-slate-400">Selecione os tipos de viagem que você <strong>não</strong> deseja ver neste painel:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'].map(type => (
+                    <label key={type} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                      <input 
+                        type="checkbox"
+                        checked={hiddenTripTypes.includes(type)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setHiddenTripTypes(prev => [...prev, type]);
+                          } else {
+                            setHiddenTripTypes(prev => prev.filter(t => t !== type));
+                          }
+                        }}
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{type}</span>
+                    </label>
                   ))}
                 </div>
               </div>
             </div>
 
             <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4">
-              <button onClick={() => setEmailConfigModal(false)} className="px-6 py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">Cancelar</button>
-              <button onClick={handleSaveEmailTemplate} className="px-8 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all">Salvar Modelo</button>
+              <button onClick={() => setSettingsModal(false)} className="px-6 py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">Cancelar</button>
+              <button onClick={handleSaveSettings} className="px-8 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all">Salvar Configurações</button>
             </div>
           </div>
         </div>
@@ -611,14 +608,14 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                 <div className="flex flex-col gap-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Assunto</label>
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-bold text-slate-700">
-                    {replacePlaceholders(editingTemplate.subject || '', emailSendModal.trip)}
+                    {replacePlaceholders(activeTemplate.subject || '', emailSendModal.trip)}
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mensagem</label>
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 whitespace-pre-wrap h-64 overflow-y-auto">
-                    {replacePlaceholders(editingTemplate.body || '', emailSendModal.trip)}
+                    {replacePlaceholders(activeTemplate.body || '', emailSendModal.trip)}
                   </div>
                 </div>
               </div>
@@ -627,7 +624,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
               <button 
                 onClick={() => {
-                  const text = replacePlaceholders(editingTemplate.body || '', emailSendModal.trip!);
+                  const text = replacePlaceholders(activeTemplate.body || '', emailSendModal.trip!);
                   navigator.clipboard.writeText(text);
                   window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Texto copiado!', type: 'success' } }));
                 }}
