@@ -137,6 +137,11 @@ export const tripRepository = {
       .limit(5000); 
 
     if (error) throw error;
+    
+    if (data && data.length > 0) {
+      console.log("Schema Discovery - Colunas da tabela 'trips':", Object.keys(data[0]));
+    }
+
     return (data || []).map(d => this.mapFromDb(d));
   },
 
@@ -152,7 +157,16 @@ export const tripRepository = {
 
     const payload = this.mapToDb(trip);
     const { error } = await supabase.from('trips').upsert(payload);
-    if (error) throw error;
+    if (error) {
+      console.error("ERRO DETALHADO AO SALVAR TRIP:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        payload: payload
+      });
+      throw error;
+    }
 
     // Dispara automação se o status mudou ou se é uma nova viagem
     if (oldStatus !== trip.status) {
