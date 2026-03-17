@@ -201,6 +201,7 @@ export interface EmailTemplate {
     columns?: string[];
     fontSize?: string;
     fontFamily?: string;
+    isColetaDefault?: boolean;
   };
   createdAt: string;
   updatedAt: string;
