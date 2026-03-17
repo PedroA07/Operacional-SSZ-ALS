@@ -223,22 +223,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
           }).format(d);
 
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const tripDate = new Date(d);
-          tripDate.setHours(0, 0, 0, 0);
-
-          let colorClass = 'text-slate-700 bg-slate-100 border-slate-200';
-          if (tripDate < today) {
-            colorClass = 'text-red-700 bg-red-100 border-red-300';
-          } else if (tripDate > today) {
-            colorClass = 'text-blue-700 bg-blue-100 border-blue-300';
-          }
-
           return (
-            <div className={`px-2 py-1 rounded-md border font-black text-[10px] text-center ${colorClass}`}>
+            <span className="text-[10px] text-slate-600 font-medium">
               {extenso}
-            </div>
+            </span>
           );
         } catch {
           return <span className="text-[9px] text-slate-400">{dt}</span>;

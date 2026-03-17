@@ -826,25 +826,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
         }).format(d) : (t.dateTime || '---');
         
-        let colorClass = 'bg-slate-100 text-slate-700 border-slate-200';
-        
-        if (d) {
-          const now = new Date();
-          now.setHours(0, 0, 0, 0);
-          const tripDate = new Date(d);
-          tripDate.setHours(0, 0, 0, 0);
-          
-          if (tripDate < now) {
-            colorClass = 'bg-red-100 text-red-700 border-red-300';
-          } else if (tripDate > now) {
-            colorClass = 'bg-blue-100 text-blue-700 border-blue-300';
-          }
-        }
-        
         return (
-          <div className={`px-2 py-1 rounded-md border font-black text-[10px] text-center ${colorClass}`}>
+          <span className="text-[10px] text-slate-600 font-medium">
             {displayDate}
-          </div>
+          </span>
         );
       }
     },
