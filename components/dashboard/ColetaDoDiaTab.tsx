@@ -54,9 +54,20 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   const trips = useMemo(() => {
     const now = Date.now();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     return propTrips
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada)
+      .filter(trip => {
+        const dt = trip.scheduledDateTime || trip.dateTime;
+        if (!dt) return true; // Se não tem data, mantém (ou decide se oculta)
+        const tripDate = new Date(dt);
+        if (isNaN(tripDate.getTime())) return true;
+        tripDate.setHours(0, 0, 0, 0);
+        return tripDate >= today;
+      })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
         if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
