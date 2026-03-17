@@ -29,8 +29,7 @@ export const organizationService = {
       }
 
       const isAfterStartDate = normalizedTripDate >= startDateStr;
-      const isNotFinished = !trip.isCompleted &&
-                           trip.status !== 'Viagem concluída' && 
+      const isNotFinished = trip.status !== 'Viagem concluída' && 
                            trip.status !== 'Viagem cancelada' && 
                            trip.status !== 'Agendamento realizado';
                            
@@ -81,7 +80,7 @@ export const organizationService = {
 
     const updatedTrips = scheduledTrips.map(t => ({
       ...t,
-      isCompleted: true
+      isRemovedFromOrg: true
     }));
 
     try {

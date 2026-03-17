@@ -32,6 +32,7 @@ export default function ColetaTiposViagemManager() {
     setIsSaving(true);
     try {
       const newType = {
+        id: `ctv-${Date.now()}`,
         name: newTypeName.trim(),
         color: newTypeColor
       };

@@ -383,7 +383,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return normalizedTripDate >= startDateStr && 
                !trip.isCompleted && trip.status !== 'Viagem concluída' && 
                trip.status !== 'Viagem cancelada' && 
-               trip.status !== 'Agendamento realizado';
+               trip.status !== 'Agendamento realizado' &&
+               !trip.isRemovedFromOrg;
       })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
@@ -685,21 +686,21 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
-  const handleToggleCompleted = useCallback(async (trip: Trip, completed: boolean) => {
+  const handleRemoveFromOrg = useCallback(async (trip: Trip) => {
     const now = Date.now();
     
     setPendingUpdates(prev => ({
       ...prev,
       [trip.id]: { 
-        data: { ...(prev[trip.id]?.data || {}), isCompleted: completed }, 
+        data: { ...(prev[trip.id]?.data || {}), isRemovedFromOrg: true }, 
         timestamp: now 
       }
     }));
 
     try {
-      await db.saveTrip({ ...trip, isCompleted: completed });
+      await db.saveTrip({ ...trip, isRemovedFromOrg: true });
       window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: completed ? 'Viagem limpa do painel' : 'Viagem restaurada', type: 'success' } 
+        detail: { message: 'Viagem removida do painel de organização', type: 'success' } 
       }));
     } catch (error) {
       setPendingUpdates(prev => {
@@ -707,9 +708,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         delete next[trip.id];
         return next;
       });
-      console.error("Erro ao alterar status de conclusão:", error);
+      console.error("Erro ao remover da organização:", error);
       window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Erro ao processar alteração', type: 'error' } 
+        detail: { message: 'Erro ao remover viagem', type: 'error' } 
       }));
     }
   }, []);
@@ -727,7 +728,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     setConfirmModal({
       isOpen: true,
-      title: "Limpar Viagens?",
+      title: "Finalizar Viagens?",
       message: message,
       onConfirm: async () => {
         setIsFinalizing(true);
@@ -984,11 +985,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           <button 
             onClick={() => {
               if (window.confirm(`Deseja remover a OS ${t.os} deste painel?`)) {
-                handleToggleCompleted(t, true);
+                handleRemoveFromOrg(t);
               }
             }}
             className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
-            title="Limpar deste painel"
+            title="Remover deste painel"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -997,7 +998,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleToggleCompleted, isTripScheduled]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled]);
 
   const coletaTrips = useMemo(() => 
     trips
@@ -1082,12 +1083,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           {isFinalizing ? (
             <>
               <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              Limpando...
+              Processando...
             </>
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
-              Limpar ({trips.filter(t => isTripReadyToFinalize(t)).length})
+              Finalizar Agendados ({trips.filter(t => isTripReadyToFinalize(t)).length})
             </>
           )}
         </button>
