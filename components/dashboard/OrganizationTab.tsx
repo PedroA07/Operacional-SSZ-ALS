@@ -823,13 +823,38 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       render: (t: Trip) => {
         const d = parseDate(t.dateTime);
         const displayDate = d ? new Intl.DateTimeFormat('pt-BR', { 
-          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+          day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
         }).format(d) : (t.dateTime || '---');
         
+        let colorClass = 'bg-slate-100 text-slate-600 border-slate-200';
+        let alertLabel = '';
+        
+        if (d) {
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const tripDate = new Date(d);
+          tripDate.setHours(0, 0, 0, 0);
+          
+          if (tripDate < now) {
+            colorClass = 'bg-red-100 text-red-700 border-red-300 animate-pulse';
+            alertLabel = 'ATRASADA';
+          } else if (tripDate > now) {
+            colorClass = 'bg-blue-100 text-blue-700 border-blue-300';
+            alertLabel = 'FUTURA';
+          }
+        }
+        
         return (
-          <span className="text-[10px] text-slate-600 font-medium">
-            {displayDate}
-          </span>
+          <div className="flex flex-col gap-1 items-center">
+            {alertLabel && (
+              <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${colorClass.replace('bg-', 'text-').replace('text-', 'bg-')}`}>
+                {alertLabel}
+              </span>
+            )}
+            <div className={`px-2 py-1 rounded-md border font-black text-[9px] text-center ${colorClass}`}>
+              {displayDate}
+            </div>
+          </div>
         );
       }
     },

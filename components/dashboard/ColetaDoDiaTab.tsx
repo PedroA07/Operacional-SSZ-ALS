@@ -64,20 +64,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return propTrips
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
-      .filter(trip => {
-        const dt = trip.scheduledDateTime || trip.dateTime;
-        if (!dt) return false;
-        const tripDateStr = dt.includes('T') ? dt.split('T')[0] : dt;
-        let normalizedTripDate = tripDateStr;
-        if (tripDateStr.includes('/')) {
-          const parts = tripDateStr.split('/');
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          }
-        }
-        return normalizedTripDate >= '2026-03-16';
-      })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
         if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
@@ -219,14 +205,36 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           const d = new Date(dt);
           if (isNaN(d.getTime())) return <span className="text-[9px] text-slate-400">{dt}</span>;
           
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tripDate = new Date(d);
+          tripDate.setHours(0, 0, 0, 0);
+
+          let colorClass = 'text-slate-700 bg-slate-100 border-slate-200';
+          let alertLabel = '';
+          if (tripDate < today) {
+            colorClass = 'text-red-700 bg-red-100 border-red-300 animate-pulse';
+            alertLabel = 'ATRASADA';
+          } else if (tripDate > today) {
+            colorClass = 'text-blue-700 bg-blue-100 border-blue-300';
+            alertLabel = 'FUTURA';
+          }
+
           const extenso = new Intl.DateTimeFormat('pt-BR', { 
-            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+            day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
           }).format(d);
 
           return (
-            <span className="text-[10px] text-slate-600 font-medium">
-              {extenso}
-            </span>
+            <div className="flex flex-col gap-1 items-center">
+              {alertLabel && (
+                <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${colorClass.replace('text-', 'bg-').replace('bg-', 'text-')}`}>
+                  {alertLabel}
+                </span>
+              )}
+              <div className={`px-2 py-1 rounded-md border font-black text-[9px] text-center ${colorClass}`}>
+                {extenso}
+              </div>
+            </div>
           );
         } catch {
           return <span className="text-[9px] text-slate-400">{dt}</span>;
