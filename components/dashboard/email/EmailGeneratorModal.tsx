@@ -9,9 +9,11 @@ interface EmailGeneratorModalProps {
   onClose: () => void;
   template: EmailTemplate;
   trips: Trip[];
+  initialTrip?: Trip;
+  onMarkAsSent?: () => void;
 }
 
-const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClose, template, trips }) => {
+const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClose, template, trips, initialTrip, onMarkAsSent }) => {
   const [subject, setSubject] = useState(template.subject);
   const [body, setBody] = useState(template.body);
   const [tableData, setTableData] = useState<{ [tableId: string]: Trip[] }>({});
@@ -330,6 +332,21 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
           value = tripIndex >= 0 ? String(tripIndex + 1) : '';
         }
       }
+      else if (c === 'chaves_acesso' || c === 'chaves de acesso') {
+        const allDocs = [
+          ...(trip.documents || []),
+          ...(trip.driver_docs || []).map(d => ({ fileName: d.fileName || '', url: d.url }))
+        ];
+        
+        const keys = allDocs
+          .map(doc => doc.fileName)
+          .filter(name => !!name)
+          .map(name => name.replace(/\D/g, ''))
+          .filter(key => key.length > 0)
+          .sort();
+        
+        value = keys.join('\n');
+      }
 
       if (value && value !== '---') {
         return value.toUpperCase();
@@ -500,7 +517,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       const initialTableData: { [tableId: string]: Trip[] } = {};
       const initialTableFilters: { [tableId: string]: any } = {};
       
-      tables.forEach(table => {
+      tables.forEach((table, index) => {
         let filteredTrips = [...trips];
         
         if (table.defaultFilters && table.defaultFilters.enabled) {
@@ -553,6 +570,13 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
         } else if (!table.defaultFilters?.enabled) {
           // Se não tem autoFilter nem defaultFilters habilitado, não preenche nada automaticamente
           filteredTrips = [];
+        }
+
+        // Se houver uma viagem inicial vinculada, garante que ela esteja na primeira tabela
+        if (initialTrip && index === 0) {
+          if (!filteredTrips.find(t => t.id === initialTrip.id)) {
+            filteredTrips = [initialTrip, ...filteredTrips];
+          }
         }
 
         initialTableData[table.id] = filteredTrips;
@@ -1095,6 +1119,15 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
             Copiar Corpo
           </button>
+          {onMarkAsSent && (
+            <button 
+              onClick={onMarkAsSent}
+              className="px-8 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+              Marcar como Enviado
+            </button>
+          )}
         </footer>
       </div>
     </div>
