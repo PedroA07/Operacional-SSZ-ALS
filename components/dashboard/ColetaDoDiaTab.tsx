@@ -9,10 +9,11 @@ import EmailGeneratorModal from './email/EmailGeneratorModal';
 interface ColetaDoDiaTabProps {
   userId: string;
   trips: Trip[];
+  emailTemplates: EmailTemplate[];
   onRefresh: () => Promise<void>;
 }
 
-const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrips, onRefresh }) => {
+const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrips, emailTemplates: propTemplates, onRefresh }) => {
   const [isLoading, setIsLoading] = useState(propTrips.length === 0);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
@@ -24,21 +25,22 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   });
   const [settingsModal, setSettingsModal] = useState(false);
   const [emailSendModal, setEmailSendModal] = useState<{ isOpen: boolean; trip?: Trip }>({ isOpen: false });
-  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>(propTemplates);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [hiddenTripTypes, setHiddenTripTypes] = useState<string[]>([]);
 
   const STABILITY_DURATION = 30000;
 
   useEffect(() => {
+    setEmailTemplates(propTemplates);
+  }, [propTemplates]);
+
+  useEffect(() => {
     const loadTipos = async () => {
-      const [tipos, templates] = await Promise.all([
-        db.getColetaTiposViagem(),
-        db.getEmailTemplates()
-      ]);
+      const tipos = await db.getColetaTiposViagem();
       setTiposViagem(tipos);
-      setEmailTemplates(templates);
       
+      const templates = propTemplates;
       const savedTemplateId = localStorage.getItem('coletaDefaultTemplateId');
       if (savedTemplateId && templates.some(t => t.id === savedTemplateId)) {
         setSelectedTemplateId(savedTemplateId);
@@ -62,7 +64,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         console.error('Erro ao carregar tipos ocultos', e);
       }
     }
-  }, []);
+  }, [propTemplates]);
 
   useEffect(() => {
     const toRemove: string[] = [];

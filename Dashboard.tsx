@@ -49,9 +49,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
   const [avantidaRecords, setAvantidaRecords] = useState<AvantidaRecord[]>([]);
   const [sealBatches, setSealBatches] = useState<SealBatch[]>([]);
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
   
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -88,12 +88,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   }, [categories, customers]);
 
   const loadAllData = useCallback(async (isInitial = false, silent = false) => {
-    console.log(`[Dashboard] loadAllData called: isInitial=${isInitial}, silent=${silent}`);
     if (isInitial) setIsLoadingInitial(true);
     if (!silent) setIsSyncing(true);
     
     try {
-      console.log("[Dashboard] Fetching all data from DB...");
       const responses = await Promise.allSettled([
         db.getDrivers(),
         db.getCustomers(),
@@ -102,9 +100,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         db.getStaff(),
         db.getTrips(),
         db.getCategories(),
-        db.getEmailTemplates(),
         db.getAvantidaRecords(),
-        db.getSealBatches()
+        db.getSealBatches(),
+        db.getEmailTemplates()
       ]);
 
       if (responses[0].status === 'fulfilled') setDrivers(responses[0].value);
@@ -114,9 +112,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[4].status === 'fulfilled') setStaffList(responses[4].value);
       if (responses[5].status === 'fulfilled') setTrips(responses[5].value);
       if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
-      if (responses[7].status === 'fulfilled') setEmailTemplates(responses[7].value);
-      if (responses[8].status === 'fulfilled') setAvantidaRecords(responses[8].value);
-      if (responses[9].status === 'fulfilled') setSealBatches(responses[9].value);
+      if (responses[7].status === 'fulfilled') setAvantidaRecords(responses[7].value);
+      if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value);
+      if (responses[9].status === 'fulfilled') setEmailTemplates(responses[9].value);
 
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
     } catch (e) {
