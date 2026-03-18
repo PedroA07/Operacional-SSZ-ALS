@@ -3,15 +3,17 @@ import { EmailTemplate, Trip, EmailTableConfig } from '../../../types';
 import { showToast } from '../../shared/SimpleToast';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { AutocompleteItem } from '../../../utils/searchService';
+import Editor from 'react-simple-wysiwyg';
 
 interface EmailGeneratorModalProps {
   isOpen: boolean;
   onClose: () => void;
   template: EmailTemplate;
   trips: Trip[];
+  initialTrip?: Trip;
 }
 
-const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClose, template, trips }) => {
+const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClose, template, trips, initialTrip }) => {
   const [subject, setSubject] = useState(template.subject);
   const [body, setBody] = useState(template.body);
   const [tableData, setTableData] = useState<{ [tableId: string]: Trip[] }>({});
@@ -308,6 +310,11 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       else if (c.includes('data')) value = new Date(trip.dateTime).toLocaleDateString('pt-BR');
       else if (c === 'os' || c === 'o.s' || c === 'ordem de serviço' || c === 'ordem de servico') value = trip.os || '';
       else if (c.includes('cnpj cliente')) value = trip.customer?.cnpj || '';
+      else if (c.includes('cidade cliente') || c.includes('cidade_cliente')) {
+        const city = trip.customer?.city || '';
+        const state = trip.customer?.state || '';
+        value = city && state ? `${city}-${state}` : city || state || '';
+      }
       else if (c.includes('cliente')) value = trip.customer?.name || '';
       else if (c.includes('cnpj porto') || c.includes('cnpj prestacking') || c.includes('cnpj terminal')) value = trip.destination?.cnpj || trip.preStackingFormData?.cnpj || '';
       else if (c.includes('booking') || c.includes('reserva')) value = trip.booking || trip.ocFormData?.booking || trip.preStackingFormData?.booking || '';
@@ -500,9 +507,14 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       const initialTableData: { [tableId: string]: Trip[] } = {};
       const initialTableFilters: { [tableId: string]: any } = {};
       
-      tables.forEach(table => {
+      tables.forEach((table, index) => {
         let filteredTrips = [...trips];
         
+        if (initialTrip && index === 0) {
+          initialTableData[table.id] = [initialTrip];
+          return;
+        }
+
         if (table.defaultFilters && table.defaultFilters.enabled) {
           const filters = { ...table.defaultFilters };
           
@@ -580,6 +592,19 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     const totalRows = Object.values(tableData).flat().length;
     let finalBody = replaceVars(body, firstTrip, undefined, totalRows);
 
+    // Replace newlines with <br/> to preserve line breaks
+    finalBody = finalBody.replace(/\n/g, '<br/>');
+
+    // Also strip wrapping divs or p tags if the placeholder is the only content
+    finalBody = finalBody.replace(/<div>\s*\{\{TABELA:\s*([^}]+)\}\}\s*<\/div>/gi, '{{TABELA: $1}}');
+    finalBody = finalBody.replace(/<p>\s*\{\{TABELA:\s*([^}]+)\}\}\s*<\/p>/gi, '{{TABELA: $1}}');
+    finalBody = finalBody.replace(/<div>\s*\{\{COLUNAS:\s*([^}]+)\}\}\s*<\/div>/gi, '{{COLUNAS: $1}}');
+    finalBody = finalBody.replace(/<p>\s*\{\{COLUNAS:\s*([^}]+)\}\}\s*<\/p>/gi, '{{COLUNAS: $1}}');
+
+    // Remove <br/> tags, empty divs, and whitespace immediately preceding or following table placeholders
+    finalBody = finalBody.replace(/(?:<br\s*\/?>|<div><br\s*\/?><\/div>|<p><br\s*\/?><\/p>|\s)*\{\{TABELA:\s*([^}]+)\}\}(?:<br\s*\/?>|<div><br\s*\/?><\/div>|<p><br\s*\/?><\/p>|\s)*/gi, '{{TABELA: $1}}');
+    finalBody = finalBody.replace(/(?:<br\s*\/?>|<div><br\s*\/?><\/div>|<p><br\s*\/?><\/p>|\s)*\{\{COLUNAS:\s*([^}]+)\}\}(?:<br\s*\/?>|<div><br\s*\/?><\/div>|<p><br\s*\/?><\/p>|\s)*/gi, '{{COLUNAS: $1}}');
+
     const generatedTables: Record<string, string> = {};
     const usedTables = new Set<string>();
 
@@ -598,12 +623,12 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
       const renderSubTable = (subData: Trip[], subTitle?: string) => {
         let html = '';
         if (subTitle && !table.hideTitle) {
-          html += `<h4 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 10px; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; text-align: left;">${subTitle}</h4>`;
+          html += `<h4 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 5px; margin-bottom: 5px; font-size: 13px; text-transform: uppercase; text-align: left;">${subTitle}</h4>`;
         }
 
         if (table.headerOrientation === 'horizontal') {
           html += `
-            <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
+            <table style="border-collapse: collapse; width: 100%; margin-bottom: 10px;">
               ${!table.hideHeaders ? `
               <thead>
                 <tr>
@@ -636,10 +661,10 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
           `;
         } else {
           if (subData.length === 0) {
-            html += `<p style="font-family: Arial, sans-serif; color: #64748b; font-size: 12px; text-align: center; margin-bottom: 20px;">Nenhum registro encontrado</p>`;
+            html += `<p style="font-family: Arial, sans-serif; color: #64748b; font-size: 12px; text-align: center; margin-bottom: 10px;">Nenhum registro encontrado</p>`;
           } else {
             html += subData.map((trip, idx) => `
-              <table style="border-collapse: collapse; width: 100%; max-width: 400px; margin-bottom: 25px; table-layout: fixed;">
+              <table style="border-collapse: collapse; width: 100%; max-width: 400px; margin-bottom: 15px; table-layout: fixed;">
                 ${table.columns.map((col) => {
                   const style = cellStyle;
                   const customCell = table.customCells?.[col];
@@ -672,12 +697,12 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
         const rightHtml = renderSubTable(rightData, table.splitRightTitle);
 
         if (table.title && !table.hideTitle) {
-          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; text-align: left;">${table.title}</h3>`;
+          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 15px; margin-bottom: 5px; font-size: 14px; text-transform: uppercase; text-align: left;">${table.title}</h3>`;
         }
 
         if (leftHtml && rightHtml) {
           tableHtml += `
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
               <tr>
                 <td style="width: 50%; vertical-align: top; padding-right: 10px;">${leftHtml}</td>
                 <td style="width: 50%; vertical-align: top; padding-left: 10px;">${rightHtml}</td>
@@ -689,7 +714,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
         }
       } else {
         if (table.title && !table.hideTitle) {
-          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 25px; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; text-align: left;">${table.title}</h3>`;
+          tableHtml += `<h3 style="font-family: Arial, sans-serif; color: #1e293b; margin-top: 15px; margin-bottom: 5px; font-size: 14px; text-transform: uppercase; text-align: left;">${table.title}</h3>`;
         }
         tableHtml += renderSubTable(data);
       }
@@ -711,7 +736,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
       const width = Math.floor(100 / validHtmls.length);
       
-      let colsHtml = `<table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;"><tr>`;
+      let colsHtml = `<table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;"><tr>`;
       validHtmls.forEach((html: string, idx: number) => {
         const padding = idx === 0 ? 'padding-right: 10px;' : idx === validHtmls.length - 1 ? 'padding-left: 10px;' : 'padding: 0 10px;';
         colsHtml += `<td style="width: ${width}%; vertical-align: top; ${padding}">${html}</td>`;
@@ -739,7 +764,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
     return `
       <div style="font-family: Arial, sans-serif; color: #334155;">
-        <div style="white-space: pre-wrap; margin-bottom: 20px;">${finalBody}</div>
+        <div style="margin-bottom: 10px; white-space: pre-wrap;">${finalBody}</div>
         ${leftoverTablesHtml}
       </div>
     `;
@@ -820,12 +845,14 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Corpo do E-mail</label>
-                  <textarea 
-                    rows={6}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:border-blue-500 outline-none resize-none"
-                    value={body}
-                    onChange={e => setBody(e.target.value)}
-                  />
+                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus-within:border-blue-500 overflow-hidden">
+                    <Editor 
+                      value={body}
+                      onChange={e => setBody(e.target.value)}
+                      containerProps={{ style: { minHeight: '200px', border: 'none', whiteSpace: 'pre-wrap' } }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 ml-1">Dica: Use <strong>Shift + Enter</strong> para pular linha de forma simples, ou <strong>Enter</strong> para criar um novo parágrafo.</p>
                 </div>
                 
                 {/* Attachments */}
@@ -1066,7 +1093,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                   ref={previewRef}
                   contentEditable={true}
                   suppressContentEditableWarning={true}
-                  className="outline-none"
+                  className="outline-none whitespace-pre-wrap"
                   onInput={(e) => setFinalHtml(e.currentTarget.innerHTML)}
                 />
               </div>

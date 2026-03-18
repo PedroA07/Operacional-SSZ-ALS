@@ -4,6 +4,7 @@ import { db } from '../../utils/storage';
 import SmartOperationTable from './operations/SmartOperationTable';
 import FeedbackModal from '../shared/FeedbackModal';
 import { Mail, Settings, Send, X, Copy } from 'lucide-react';
+import EmailGeneratorModal from './email/EmailGeneratorModal';
 
 interface ColetaDoDiaTabProps {
   userId: string;
@@ -592,62 +593,21 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       )}
 
       {/* Modal de Envio de E-mail */}
-      {emailSendModal.isOpen && emailSendModal.trip && (
+      {emailSendModal.isOpen && emailSendModal.trip && activeTemplate && (activeTemplate as EmailTemplate).id ? (
+        <EmailGeneratorModal
+          isOpen={emailSendModal.isOpen}
+          onClose={() => setEmailSendModal({ isOpen: false })}
+          template={activeTemplate as EmailTemplate}
+          trips={propTrips}
+          initialTrip={emailSendModal.trip}
+        />
+      ) : emailSendModal.isOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-blue-50/30">
-              <div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Enviar Dados de Coleta</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">OS: {emailSendModal.trip.os}</p>
-              </div>
-              <button onClick={() => setEmailSendModal({ isOpen: false })} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
-
-            <div className="p-8 space-y-6">
-              <div className="space-y-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Assunto</label>
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-bold text-slate-700">
-                    {replacePlaceholders(activeTemplate.subject || '', emailSendModal.trip)}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mensagem</label>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 whitespace-pre-wrap h-64 overflow-y-auto">
-                    {replacePlaceholders(activeTemplate.body || '', emailSendModal.trip)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-              <button 
-                onClick={() => {
-                  const text = replacePlaceholders(activeTemplate.body || '', emailSendModal.trip!);
-                  navigator.clipboard.writeText(text);
-                  window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Texto copiado!', type: 'success' } }));
-                }}
-                className="flex items-center gap-2 px-6 py-3 text-[10px] font-black uppercase text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-              >
-                <Copy className="w-4 h-4" /> Copiar Texto
-              </button>
-              
-              <div className="flex gap-4">
-                <button onClick={() => setEmailSendModal({ isOpen: false })} className="px-6 py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">Fechar</button>
-                <button 
-                  onClick={async () => {
-                    await handleUpdateTrip(emailSendModal.trip!, { coletaEmailSent: true });
-                    setEmailSendModal({ isOpen: false });
-                    window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'E-mail marcado como enviado!', type: 'success' } }));
-                  }}
-                  className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
-                >
-                  <Send className="w-4 h-4" /> Marcar como Enviado
-                </button>
-              </div>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-black text-slate-800 mb-2">Nenhum Modelo Encontrado</h3>
+            <p className="text-sm text-slate-600 mb-6">Crie um modelo de e-mail na aba Administrativo &gt; Modelos de E-mail para utilizar esta função.</p>
+            <div className="flex justify-end">
+              <button onClick={() => setEmailSendModal({ isOpen: false })} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold">Fechar</button>
             </div>
           </div>
         </div>

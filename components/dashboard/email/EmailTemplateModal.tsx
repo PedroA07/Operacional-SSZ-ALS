@@ -5,6 +5,7 @@ import { db } from '../../../utils/storage';
 import { showToast } from '../../shared/SimpleToast';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
+import Editor from 'react-simple-wysiwyg';
 
 interface EmailTemplateModalProps {
   isOpen: boolean;
@@ -457,13 +458,14 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Corpo do E-mail (Texto Base)</label>
-                <textarea 
-                  rows={4}
-                  className="w-full px-6 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-medium text-slate-800 focus:border-blue-500 transition-all outline-none resize-none"
-                  placeholder="Olá equipe, segue relatório..."
-                  value={formData.body}
-                  onChange={e => setFormData({...formData, body: e.target.value})}
-                />
+                <div className="w-full rounded-2xl border-2 border-slate-50 bg-slate-50 font-medium text-slate-800 focus-within:border-blue-500 transition-all overflow-hidden">
+                  <Editor 
+                    value={formData.body || ''}
+                    onChange={e => setFormData({...formData, body: e.target.value})}
+                    containerProps={{ style: { minHeight: '150px', border: 'none', whiteSpace: 'pre-wrap' } }}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1 ml-1">Dica: Use <strong>Shift + Enter</strong> para pular linha de forma simples, ou <strong>Enter</strong> para criar um novo parágrafo.</p>
                 <div className="mt-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2 relative">
                   <div className="flex items-center justify-between">
                     <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Variáveis Inteligentes (Copie e Cole)</p>
@@ -493,6 +495,7 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                           { name: 'DATA', desc: 'Data da viagem' },
                           { name: 'OS', desc: 'Número da OS' },
                           { name: 'CLIENTE', desc: 'Nome do cliente' },
+                          { name: 'CIDADE_CLIENTE', desc: 'Cidade e UF do cliente' },
                           { name: 'CNPJ CLIENTE', desc: 'CNPJ do cliente' },
                           { name: 'CNPJ PORTO', desc: 'CNPJ do porto/terminal' },
                           { name: 'BOOKING', desc: 'Número do booking/reserva' },

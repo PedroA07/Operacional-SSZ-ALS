@@ -20,8 +20,10 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = async () => {
+    console.log(`[SealDetailsView] loadData INICIADO para lote: ${batch.id}`);
     setIsLoading(true);
     try {
+      console.log(`[SealDetailsView] Buscando records, drivers e trips para lote: ${batch.id}`);
       const [recordsData, driversData, tripsData] = await Promise.all([
         db.getSealRecords(batch.id),
         db.getDrivers(),
@@ -30,6 +32,7 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
       setRecords(recordsData);
       setDrivers(driversData);
       setTrips(tripsData);
+      console.log(`[SealDetailsView] Dados carregados com sucesso para lote: ${batch.id}`);
     } catch (e) {
       console.error("Erro ao carregar detalhes do lote:", e);
     } finally {
