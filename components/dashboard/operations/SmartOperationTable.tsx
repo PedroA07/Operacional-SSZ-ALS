@@ -196,7 +196,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
               <tr 
                 key={row.id || idx} 
                 onClick={() => onRowClick?.(row)}
-                className={`group transition-all ${onRowClick ? 'cursor-pointer hover:bg-blue-50/40' : 'hover:bg-slate-50/50'} ${getRowClassName ? getRowClassName(row) : ''}`}
+                className={`group transition-all ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} ${onRowClick ? 'cursor-pointer hover:bg-blue-50/40' : 'hover:bg-slate-50/50'} ${getRowClassName ? getRowClassName(row) : ''}`}
               >
                 {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
                   <td key={col.key} className="px-3 py-1.5 text-slate-600 border border-slate-200 align-middle">

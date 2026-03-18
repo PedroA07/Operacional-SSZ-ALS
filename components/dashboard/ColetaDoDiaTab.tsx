@@ -248,7 +248,14 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           <input 
             type="checkbox" 
             checked={!!t.coletaEmailSent} 
-            onChange={(e) => handleUpdateTrip(t, { coletaEmailSent: e.target.checked })}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              const updateData: Partial<Trip> = { coletaEmailSent: checked };
+              if (checked) {
+                updateData.sentNF = true;
+              }
+              handleUpdateTrip(t, updateData);
+            }}
             className="w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
           />
           {pendingUpdates[t.id]?.data.hasOwnProperty('coletaEmailSent') && (

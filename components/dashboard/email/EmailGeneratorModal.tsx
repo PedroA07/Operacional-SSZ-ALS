@@ -592,8 +592,10 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
     const totalRows = Object.values(tableData).flat().length;
     let finalBody = replaceVars(body, firstTrip, undefined, totalRows);
 
-    // Replace newlines with <br/> to preserve line breaks
-    finalBody = finalBody.replace(/\n/g, '<br/>');
+    // Replace newlines with <br/> to preserve line breaks only if it doesn't look like HTML
+    if (!finalBody.includes('<br') && !finalBody.includes('<p') && !finalBody.includes('<div')) {
+      finalBody = finalBody.replace(/\n/g, '<br/>');
+    }
 
     // Also strip wrapping divs or p tags if the placeholder is the only content
     finalBody = finalBody.replace(/<div>\s*\{\{TABELA:\s*([^}]+)\}\}\s*<\/div>/gi, '{{TABELA: $1}}');
@@ -627,45 +629,22 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
         }
 
         if (table.headerOrientation === 'horizontal') {
-          html += `
-            <table style="border-collapse: collapse; width: 100%; margin-bottom: 10px;">
-              ${!table.hideHeaders ? `
-              <thead>
-                <tr>
-                  ${table.columns.map(col => {
+          html += `<table style="border-collapse: collapse; width: 100%; margin-bottom: 10px;">${!table.hideHeaders ? `<thead><tr>${table.columns.map(col => {
                     const label = table.columnLabels?.[col] || col;
                     return `<th style="${headerStyle}">${label}</th>`;
-                  }).join('')}
-                </tr>
-              </thead>
-              ` : ''}
-              <tbody>
-                ${subData.length > 0 ? subData.map((trip, idx) => `
-                  <tr>
-                    ${table.columns.map(col => {
+                  }).join('')}</tr></thead>` : ''}<tbody>${subData.length > 0 ? subData.map((trip, idx) => `<tr>${table.columns.map(col => {
                       const style = table.alternateRowColor && idx % 2 !== 0 ? altCellStyle : cellStyle;
                       const customCell = table.customCells?.[col];
                       const value = customCell 
                         ? (customCell.includes('{{') ? replaceVars(customCell, trip, idx, totalRows) : getCellValue(customCell, trip, idx, totalRows))
                         : getCellValue(col, trip, idx, totalRows);
                       return `<td style="${style}">${value}</td>`;
-                    }).join('')}
-                  </tr>
-                `).join('') : `
-                  <tr>
-                    <td colspan="${table.columns.length}" style="${cellStyle}">Nenhum registro encontrado</td>
-                  </tr>
-                `}
-              </tbody>
-            </table>
-          `;
+                    }).join('')}</tr>`).join('') : `<tr><td colspan="${table.columns.length}" style="${cellStyle}">Nenhum registro encontrado</td></tr>`}</tbody></table>`;
         } else {
           if (subData.length === 0) {
             html += `<p style="font-family: Arial, sans-serif; color: #64748b; font-size: 12px; text-align: center; margin-bottom: 10px;">Nenhum registro encontrado</p>`;
           } else {
-            html += subData.map((trip, idx) => `
-              <table style="border-collapse: collapse; width: 100%; max-width: 400px; margin-bottom: 15px; table-layout: fixed;">
-                ${table.columns.map((col) => {
+            html += subData.map((trip, idx) => `<table style="border-collapse: collapse; width: 100%; max-width: 400px; margin-bottom: 15px; table-layout: fixed;">${table.columns.map((col) => {
                   const style = cellStyle;
                   const customCell = table.customCells?.[col];
                   const label = table.columnLabels?.[col] || col;
@@ -673,15 +652,8 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                     ? (customCell.includes('{{') ? replaceVars(customCell, trip, idx, totalRows) : getCellValue(customCell, trip, idx, totalRows))
                     : getCellValue(col, trip, idx, totalRows);
                   
-                  return `
-                    <tr>
-                      ${!table.hideHeaders ? `<td style="${headerStyle}; width: 140px;">${label.toUpperCase()}</td>` : ''}
-                      <td style="${style}">${value}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </table>
-            `).join('');
+                  return `<tr>${!table.hideHeaders ? `<td style="${headerStyle}; width: 140px;">${label.toUpperCase()}</td>` : ''}<td style="${style}">${value}</td></tr>`;
+                }).join('')}</table>`).join('');
           }
         }
         return html;
@@ -764,7 +736,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
 
     return `
       <div style="font-family: Arial, sans-serif; color: #334155;">
-        <div style="margin-bottom: 10px; white-space: pre-wrap;">${finalBody}</div>
+        <div>${finalBody}</div>
         ${leftoverTablesHtml}
       </div>
     `;
