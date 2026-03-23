@@ -30,6 +30,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'CARDS' | 'ANALYTICS'>('CARDS');
   const [sealStats, setSealStats] = useState({ used: 0, available: 0, total: 0 });
+  const [carrierStats, setCarrierStats] = useState<{ carrier: string; available: number; total: number }[]>([]);
   const [customStatuses, setCustomStatuses] = useState<any[]>([]);
   const [isLoadingSeals, setIsLoadingSeals] = useState(false);
 
@@ -47,14 +48,33 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
       try {
         let used = 0;
         let available = 0;
+        const statsMap: Record<string, { used: number; available: number }> = {};
+
         for (const batch of sealBatches) {
           const records = await db.getSealRecords(batch.id);
           const batchUsed = records.filter(r => r.containerNumber && r.containerNumber.trim() !== '').length;
           const batchAvail = records.length - batchUsed;
+          
           used += batchUsed;
           available += batchAvail;
+
+          const carrier = batch.carrier || 'N/A';
+          if (!statsMap[carrier]) {
+            statsMap[carrier] = { used: 0, available: 0 };
+          }
+          statsMap[carrier].used += batchUsed;
+          statsMap[carrier].available += batchAvail;
         }
+        
         setSealStats({ used, available, total: used + available });
+        
+        const statsArray = Object.entries(statsMap).map(([carrier, stats]) => ({
+          carrier,
+          available: stats.available,
+          total: stats.used + stats.available
+        })).sort((a, b) => b.available - a.available);
+        
+        setCarrierStats(statsArray);
       } catch (e) {
         console.error("Erro no processamento de estoque:", e);
       } finally {
@@ -62,7 +82,10 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
       }
     };
     if (sealBatches.length > 0) countSeals();
-    else setSealStats({ used: 0, available: 0, total: 0 });
+    else {
+      setSealStats({ used: 0, available: 0, total: 0 });
+      setCarrierStats([]);
+    }
   }, [sealBatches]);
 
   const avantidaStats = React.useMemo(() => {
@@ -159,27 +182,49 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                          <span className="px-3 py-1 bg-white/5 rounded-lg text-[9px] font-black text-slate-400 uppercase border border-white/5">{sealBatches.length} Lotes</span>
                       </div>
                    </div>
-                   <div className="space-y-4">
-                      <div className="space-y-1.5">
-                         <div className="flex justify-between text-[8px] font-black uppercase tracking-widest px-1">
-                            <span className="text-slate-500">Utilizados: {sealStats.used}</span>
-                            <span className="text-blue-400">Total: {sealStats.total}</span>
-                         </div>
-                         <div className="h-3 bg-white/5 rounded-full overflow-hidden flex border border-white/5">
-                            <div className="h-full bg-slate-700 transition-all duration-1000" style={{ width: `${(sealStats.used / (sealStats.total || 1)) * 100}%` }}></div>
-                            <div className="h-full bg-blue-500 animate-pulse transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${(sealStats.available / (sealStats.total || 1)) * 100}%` }}></div>
-                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                         <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
-                            <p className="text-[7px] font-black text-slate-500 uppercase">Saíram p/ Viagem</p>
-                            <p className="text-lg font-black text-white">{sealStats.used}</p>
-                         </div>
-                         <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
-                            <p className="text-[7px] font-black text-slate-500 uppercase">Prontos p/ Uso</p>
-                            <p className="text-lg font-black text-blue-400">{sealStats.available}</p>
-                         </div>
-                      </div>
+                   <div className="space-y-4 max-h-[180px] overflow-y-auto pr-2">
+                      {carrierStats.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-2">
+                          {carrierStats.map((stat, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="w-1.5 h-8 bg-blue-500 rounded-full"></div>
+                                <div>
+                                  <p className="text-[9px] font-black text-white uppercase tracking-wider">{stat.carrier}</p>
+                                  <p className="text-[7px] text-slate-500 font-bold uppercase">Disponível: {stat.available} / {stat.total}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-black text-blue-400 leading-none">{stat.available}</p>
+                                <p className="text-[7px] font-black text-slate-500 uppercase mt-1">Unid.</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-1.5">
+                             <div className="flex justify-between text-[8px] font-black uppercase tracking-widest px-1">
+                                <span className="text-slate-500">Utilizados: {sealStats.used}</span>
+                                <span className="text-blue-400">Total: {sealStats.total}</span>
+                             </div>
+                             <div className="h-3 bg-white/5 rounded-full overflow-hidden flex border border-white/5">
+                                <div className="h-full bg-slate-700 transition-all duration-1000" style={{ width: `${(sealStats.used / (sealStats.total || 1)) * 100}%` }}></div>
+                                <div className="h-full bg-blue-500 animate-pulse transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${(sealStats.available / (sealStats.total || 1)) * 100}%` }}></div>
+                             </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                             <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                                <p className="text-[7px] font-black text-slate-500 uppercase">Saíram p/ Viagem</p>
+                                <p className="text-lg font-black text-white">{sealStats.used}</p>
+                             </div>
+                             <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                                <p className="text-[7px] font-black text-slate-500 uppercase">Prontos p/ Uso</p>
+                                <p className="text-lg font-black text-blue-400">{sealStats.available}</p>
+                             </div>
+                          </div>
+                        </>
+                      )}
                    </div>
                 </div>
              </div>
