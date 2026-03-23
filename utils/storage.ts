@@ -117,7 +117,7 @@ export const db = {
 
     Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
-    console.log("Tentando salvar cliente (Payload):", payload);
+    // Log removed
     const { error } = await supabase.from('customers').upsert(payload);
     if (error) {
       console.error("ERRO DETALHADO CLIENTE:", {
@@ -143,7 +143,7 @@ export const db = {
     if (error) throw error;
     
     if (data && data.length > 0) {
-      console.log("Schema Discovery - Colunas da tabela 'ports':", Object.keys(data[0]));
+      // Schema discovery log removed
     }
 
     return (data || []).map(p => ({
@@ -175,7 +175,7 @@ export const db = {
 
     Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
     
-    console.log("Tentando salvar porto (Payload):", payload);
+    // Log removed
     const { error } = await supabase.from('ports').upsert(payload);
     if (error) {
       console.error("ERRO DETALHADO PORTO:", {
@@ -201,7 +201,7 @@ export const db = {
     if (error) throw error;
 
     if (data && data.length > 0) {
-      console.log("Schema Discovery - Colunas da tabela 'pre_stacking':", Object.keys(data[0]));
+      // Schema discovery log removed
     }
 
     return (data || []).map(p => ({
@@ -233,7 +233,7 @@ export const db = {
 
     Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
-    console.log("Tentando salvar pré-stacking (Payload):", payload);
+    // Log removed
     const { error } = await supabase.from('pre_stacking').upsert(payload);
     if (error) {
       console.error("ERRO DETALHADO UNIDADE:", {
@@ -296,6 +296,8 @@ export const db = {
 
   saveCategory: async (c: Partial<Category>, user?: User) => {
     if (!supabase) return false;
+    
+    // Tentativa inicial com a coluna color
     const { error } = await supabase.from('categories').upsert({
       id: c.id,
       name: c.name,
@@ -303,7 +305,29 @@ export const db = {
       color: c.color,
       created_at: new Date().toISOString()
     });
-    return !error;
+
+    if (error) {
+      // Se o erro for de coluna inexistente (PGRST204), tenta salvar sem a cor
+      if (error.code === 'PGRST204' || error.message.includes('color')) {
+        console.warn('Coluna "color" não encontrada na tabela "categories". Tentando salvar sem cor...');
+        const { error: retryError } = await supabase.from('categories').upsert({
+          id: c.id,
+          name: c.name,
+          parent_id: c.parentId,
+          created_at: new Date().toISOString()
+        });
+        
+        if (retryError) {
+          console.error('Error saving category (retry):', retryError);
+          return false;
+        }
+        return true;
+      }
+      
+      console.error('Error saving category:', error);
+      return false;
+    }
+    return true;
   },
 
   getContainerTypes: async (): Promise<any[]> => {
@@ -372,6 +396,48 @@ export const db = {
   deleteColetaTipoViagem: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('coleta_tipos_viagem').delete().eq('id', id);
+    return !error;
+  },
+
+  getOperationTypes: async (): Promise<any[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('operation_types').select('*').order('name');
+    if (error) return [];
+    return (data || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      createdAt: c.created_at
+    }));
+  },
+
+  saveOperationType: async (c: any) => {
+    if (!supabase) return false;
+    const payload: any = {
+      name: c.name,
+      color: c.color,
+      created_at: c.createdAt || new Date().toISOString()
+    };
+    
+    let error;
+    if (c.id) {
+      const { error: updateError } = await supabase.from('operation_types').update(payload).eq('id', c.id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase.from('operation_types').insert(payload);
+      error = insertError;
+    }
+
+    if (error) {
+      console.error("ERRO DETALHADO TIPO OPERACAO:", error);
+      return false;
+    }
+    return true;
+  },
+
+  deleteOperationType: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('operation_types').delete().eq('id', id);
     return !error;
   },
 

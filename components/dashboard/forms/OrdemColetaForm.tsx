@@ -29,6 +29,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userHasChosenCategory, setUserHasChosenCategory] = useState(false);
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
   
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
@@ -68,6 +69,26 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       
       const types = await db.getContainerTypes();
       setContainerTypes(types);
+
+      const opTypes = await db.getOperationTypes();
+      if (opTypes && opTypes.length > 0) {
+        setOperationTypes(opTypes);
+        if (!initialData) {
+          const savedDefault = localStorage.getItem('defaultOperationType');
+          if (savedDefault) {
+            const found = opTypes.find(t => t.id === savedDefault);
+            if (found) setFormData((prev: any) => ({ ...prev, tipoOperacao: found.name }));
+          }
+        }
+      } else {
+        setOperationTypes([
+          {id: '1', name: 'EXPORTAÇÃO'},
+          {id: '2', name: 'IMPORTAÇÃO'},
+          {id: '3', name: 'COLETA'},
+          {id: '4', name: 'ENTREGA'},
+          {id: '5', name: 'CABOTAGEM'}
+        ]);
+      }
       
       if (initialData?.category) {
         setFormData((prev: any) => ({ ...prev, category: initialData.category.toUpperCase() }));
@@ -285,11 +306,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
               <div className="space-y-1">
                  <label className={labelClass}>Tipo de Operação</label>
                  <select className={selectClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)}>
-                    <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
-                    <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
-                    <option value="COLETA">COLETA</option>
-                    <option value="ENTREGA">ENTREGA</option>
-                    <option value="CABOTAGEM">CABOTAGEM</option>
+                    {operationTypes.map(op => (
+                      <option key={op.id} value={op.name}>{op.name}</option>
+                    ))}
                  </select>
               </div>
               <div className="space-y-1">

@@ -15,7 +15,7 @@ interface EmailGeneratorModalProps {
 
 const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClose, template, trips, initialTrip }) => {
   const [subject, setSubject] = useState(template.subject);
-  const [body, setBody] = useState(template.body);
+  const [body, setBody] = useState(template.body || '');
   const [tableData, setTableData] = useState<{ [tableId: string]: Trip[] }>({});
   const [searchTerm, setSearchTerm] = useState<{ [tableId: string]: string }>({});
   const [tableFilters, setTableFilters] = useState<{
@@ -298,6 +298,44 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
           value = trip.status || '';
         }
       }
+      else if (c.startsWith('limpar(') && c.endsWith(')')) {
+        const innerVar = c.substring(7, c.length - 1).trim();
+        const innerValue = getCellValue(innerVar, trip, rowIndex, totalRows, '');
+        value = innerValue.replace(/[^\w\s]/gi, '');
+      }
+      else if (c.startsWith('cpf(') && c.endsWith(')')) {
+        const innerVar = c.substring(4, c.length - 1).trim();
+        const innerValue = getCellValue(innerVar, trip, rowIndex, totalRows, '');
+        value = innerValue.replace(/\D/g, '');
+      }
+      else if (c.includes('chave de acesso') || c.includes('chaves de acesso') || c.includes('chave_acesso') || c.includes('chaves_acesso')) {
+        const docs = trip.documents || [];
+        const keys = docs.map(d => {
+          const nameWithoutExt = d.fileName.replace(/\.[^/.]+$/, "");
+          return nameWithoutExt.replace(/\D/g, '');
+        }).filter(k => k.length > 0);
+        value = keys.join('<br/>');
+      }
+      else if (c.includes('anexos') || c.includes('links dos anexos') || c.includes('documentos')) {
+        const docs = trip.documents || [];
+        if (docs.length > 0) {
+          value = docs.map(d => `<a href="${d.url}" target="_blank" style="color: #2563eb; text-decoration: underline;">${d.fileName}</a>`).join('<br/>');
+        } else {
+          value = 'Sem anexos';
+        }
+      }
+      else if (c.includes('razao social') || c.includes('razão social') || c.includes('razao_social')) {
+        value = trip.customer?.legalName || trip.customer?.name || '';
+      }
+      else if (c.includes('cliente inteligente') || c.includes('cliente_inteligente')) {
+        const name = trip.customer?.name || '';
+        const legalName = trip.customer?.legalName || '';
+        if (!name || name.includes('*') || name.trim().split(' ').length === 1) {
+          value = legalName || name;
+        } else {
+          value = name;
+        }
+      }
       else if (c.includes('cpf motorista') || c.includes('cpf')) value = trip.driver?.cpf || '';
       else if (c.includes('telefone') || c.includes('celular') || c.includes('contato')) value = trip.driver?.phone || '';
       else if (c.includes('placa cavalo') || c.includes('cavalo') || c === 'placa') value = trip.driver?.plateHorse || '';
@@ -500,7 +538,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
   useEffect(() => {
     if (isOpen) {
       setSubject(template.subject);
-      setBody(template.body);
+      setBody(template.body || '');
       setSearchTerm({});
       setAttachments([]);
 
@@ -590,22 +628,15 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
   const generateHtml = () => {
     const firstTrip = Object.values(tableData).flat()[0];
     const totalRows = Object.values(tableData).flat().length;
-    let finalBody = replaceVars(body, firstTrip, undefined, totalRows);
-
-    // Replace newlines with <br/> to preserve line breaks only if it doesn't look like HTML
-    if (!finalBody.includes('<br') && !finalBody.includes('<p') && !finalBody.includes('<div')) {
-      finalBody = finalBody.replace(/\n/g, '<br/>');
-    }
+    
+    let finalBody = body;
+    finalBody = replaceVars(finalBody, firstTrip, undefined, totalRows);
 
     // Also strip wrapping divs or p tags if the placeholder is the only content
     finalBody = finalBody.replace(/<div>\s*\{\{TABELA:\s*([^}]+)\}\}\s*<\/div>/gi, '{{TABELA: $1}}');
     finalBody = finalBody.replace(/<p>\s*\{\{TABELA:\s*([^}]+)\}\}\s*<\/p>/gi, '{{TABELA: $1}}');
     finalBody = finalBody.replace(/<div>\s*\{\{COLUNAS:\s*([^}]+)\}\}\s*<\/div>/gi, '{{COLUNAS: $1}}');
     finalBody = finalBody.replace(/<p>\s*\{\{COLUNAS:\s*([^}]+)\}\}\s*<\/p>/gi, '{{COLUNAS: $1}}');
-
-    // Remove <br/> tags, empty divs, and whitespace immediately preceding or following table placeholders
-    finalBody = finalBody.replace(/(?:<br\s*\/?>|<div><br\s*\/?><\/div>|<p><br\s*\/?><\/p>|\s)*\{\{TABELA:\s*([^}]+)\}\}(?:<br\s*\/?>|<div><br\s*\/?><\/div>|<p><br\s*\/?><\/p>|\s)*/gi, '{{TABELA: $1}}');
-    finalBody = finalBody.replace(/(?:<br\s*\/?>|<div><br\s*\/?><\/div>|<p><br\s*\/?><\/p>|\s)*\{\{COLUNAS:\s*([^}]+)\}\}(?:<br\s*\/?>|<div><br\s*\/?><\/div>|<p><br\s*\/?><\/p>|\s)*/gi, '{{COLUNAS: $1}}');
 
     const generatedTables: Record<string, string> = {};
     const usedTables = new Set<string>();
@@ -821,33 +852,51 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                     <Editor 
                       value={body}
                       onChange={e => setBody(e.target.value)}
-                      containerProps={{ style: { minHeight: '200px', border: 'none', whiteSpace: 'pre-wrap' } }}
+                      containerProps={{ style: { minHeight: '200px', border: 'none' } }}
                     />
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1 ml-1">Dica: Use <strong>Shift + Enter</strong> para pular linha de forma simples, ou <strong>Enter</strong> para criar um novo parágrafo.</p>
+                  <p className="text-[10px] text-slate-500 mt-1 ml-1">Dica: Use <strong>Enter</strong> para pular linha.</p>
+                </div>
+                
+                {/* Subject Preview */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Preview do Assunto</label>
+                  <div className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 font-bold text-slate-600 uppercase text-xs">
+                    {replaceVars(subject, initialTrip)}
+                  </div>
                 </div>
                 
                 {/* Attachments */}
                 <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Anexos (Apenas visualização)</label>
-                  <input 
-                    type="file" 
-                    multiple 
-                    onChange={handleFileChange}
-                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                  />
-                  {attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {attachments.map((file, idx) => (
-                        <div key={idx} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                          <span className="text-[10px] font-bold text-slate-600 truncate max-w-[150px]">{file.name}</span>
-                          <button onClick={() => removeAttachment(idx)} className="text-slate-400 hover:text-red-500">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Anexos da Viagem</label>
+                    {trips.some(t => t.documents && t.documents.length > 0) && (
+                      <button 
+                        onClick={() => {
+                          trips.forEach(t => {
+                            if (t.documents) {
+                              t.documents.forEach(d => {
+                                window.open(d.url, '_blank');
+                              });
+                            }
+                          });
+                        }}
+                        className="text-[9px] font-bold text-blue-600 uppercase hover:underline"
+                      >
+                        Baixar Anexos
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {trips.map(t => t.documents?.map((d, i) => (
+                      <a key={`${t.id}-${i}`} href={d.url} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline truncate">
+                        {d.fileName}
+                      </a>
+                    )))}
+                    {trips.every(t => !t.documents || t.documents.length === 0) && (
+                      <p className="text-[10px] text-slate-500 italic ml-1">Nenhum anexo encontrado nas viagens selecionadas.</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1065,7 +1114,7 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                   ref={previewRef}
                   contentEditable={true}
                   suppressContentEditableWarning={true}
-                  className="outline-none whitespace-pre-wrap"
+                  className="outline-none"
                   onInput={(e) => setFinalHtml(e.currentTarget.innerHTML)}
                 />
               </div>

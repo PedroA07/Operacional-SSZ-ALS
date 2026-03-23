@@ -316,6 +316,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
   const [finalizingIds, setFinalizingIds] = useState<Set<string>>(new Set());
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
@@ -362,7 +364,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   // Memoização das viagens filtradas e estabilizadas
   const trips = useMemo(() => {
-    const startDateStr = '2026-03-06';
+    const defaultStartDateStr = '2026-03-06';
     const now = Date.now();
 
     return propTrips
@@ -380,8 +382,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
           }
         }
-        return normalizedTripDate >= startDateStr && 
-               !trip.isCompleted && !trip.isRemovedFromOrg && trip.status !== 'Viagem concluída' && 
+        
+        if (startDate && normalizedTripDate < startDate) return false;
+        if (endDate && normalizedTripDate > endDate) return false;
+        if (!startDate && !endDate && normalizedTripDate < defaultStartDateStr) return false;
+
+        return !trip.isCompleted && !trip.isRemovedFromOrg && trip.status !== 'Viagem concluída' && 
                trip.status !== 'Viagem cancelada' && 
                trip.status !== 'Agendamento realizado';
       })
@@ -851,6 +857,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     { 
       key: 'os', 
       label: 'OS', 
+      sortValue: (t: Trip) => t.os,
       render: (t: Trip) => (
         <div className="flex items-center gap-2">
           <div className="flex flex-col">
@@ -866,6 +873,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     { 
       key: 'driver', 
       label: 'Motorista', 
+      sortValue: (t: Trip) => t.driver?.name || '',
       render: (t: Trip) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-600 uppercase leading-none text-[9px]">{t.driver.name}</span>
@@ -885,6 +893,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     { 
       key: 'customer', 
       label: 'Local de Atendimento', 
+      sortValue: (t: Trip) => t.customer?.name || '',
       render: (t: Trip) => (
         <div className="flex flex-col">
           <span className="font-black text-slate-800 uppercase text-[9px]">{t.customer.name}</span>
@@ -981,6 +990,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     {
       key: 'actions',
       label: 'Ações',
+      sortable: false,
       render: (t: Trip) => (
         <div className="flex items-center justify-center">
           <button 
@@ -1001,27 +1011,41 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled]);
 
-  const coletaTrips = useMemo(() => 
-    trips
-      .filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase()))
-      .sort((a, b) => {
-        const dateA = new Date(a.dateTime || 0).getTime();
-        const dateB = new Date(b.dateTime || 0).getTime();
-        if (dateA !== dateB) return dateA - dateB;
-        return (a.driver.name || '').localeCompare(b.driver.name || '');
-      }), 
-  [trips]);
+  const coletaTrips = useMemo(() => {
+    let filtered = trips.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase()));
+    
+    if (startDate) {
+      filtered = filtered.filter(t => t.dateTime && t.dateTime.substring(0, 10) >= startDate);
+    }
+    if (endDate) {
+      filtered = filtered.filter(t => t.dateTime && t.dateTime.substring(0, 10) <= endDate);
+    }
 
-  const entregaTrips = useMemo(() => 
-    trips
-      .filter(t => ['ENTREGA', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase()))
-      .sort((a, b) => {
-        const dateA = new Date(a.dateTime || 0).getTime();
-        const dateB = new Date(b.dateTime || 0).getTime();
-        if (dateA !== dateB) return dateA - dateB;
-        return (a.driver.name || '').localeCompare(b.driver.name || '');
-      }), 
-  [trips]);
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.dateTime || 0).getTime();
+      const dateB = new Date(b.dateTime || 0).getTime();
+      if (dateA !== dateB) return dateA - dateB;
+      return (a.driver.name || '').localeCompare(b.driver.name || '');
+    });
+  }, [trips, startDate, endDate]);
+
+  const entregaTrips = useMemo(() => {
+    let filtered = trips.filter(t => ['ENTREGA', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase()));
+    
+    if (startDate) {
+      filtered = filtered.filter(t => t.dateTime && t.dateTime.substring(0, 10) >= startDate);
+    }
+    if (endDate) {
+      filtered = filtered.filter(t => t.dateTime && t.dateTime.substring(0, 10) <= endDate);
+    }
+
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.dateTime || 0).getTime();
+      const dateB = new Date(b.dateTime || 0).getTime();
+      if (dateA !== dateB) return dateA - dateB;
+      return (a.driver.name || '').localeCompare(b.driver.name || '');
+    });
+  }, [trips, startDate, endDate]);
 
   if (isLoading) {
     return (
@@ -1073,6 +1097,33 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             >
               Entrega/Import
             </button>
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
+            <input 
+              type="date" 
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+              title="Data Inicial"
+            />
+            <span className="text-[10px] font-black text-slate-400 uppercase">até</span>
+            <input 
+              type="date" 
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+              title="Data Final"
+            />
+            {(startDate || endDate) && (
+              <button 
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                title="Limpar Filtro"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            )}
           </div>
         </div>
         

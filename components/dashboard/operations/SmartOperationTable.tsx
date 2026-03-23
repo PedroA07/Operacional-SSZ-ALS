@@ -7,6 +7,7 @@ interface Column {
   label: string;
   render?: (row: any) => React.ReactNode;
   sortable?: boolean;
+  sortValue?: (row: any) => any;
 }
 
 interface SmartOperationTableProps {
@@ -19,6 +20,7 @@ interface SmartOperationTableProps {
   onRowClick?: (row: any) => void;
   hideInternalSearch?: boolean;
   getRowClassName?: (row: any) => string;
+  getRowStyle?: (row: any) => React.CSSProperties;
 }
 
 const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
@@ -30,11 +32,13 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   defaultVisibleKeys,
   onRowClick,
   hideInternalSearch = false,
-  getRowClassName
+  getRowClassName,
+  getRowStyle
 }) => {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   // Estados de Paginação
@@ -60,6 +64,17 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
     db.savePreference(userId, componentId, newCols);
   };
 
+  const handleSort = (key: string) => {
+    const column = columns.find(c => c.key === key);
+    if (column && column.sortable === false) return;
+
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
@@ -73,7 +88,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   const filteredData = useMemo(() => {
     if (!data || !Array.isArray(data)) return [];
     
-    const base = hideInternalSearch ? data : data.filter(row => {
+    let base = hideInternalSearch ? [...data] : data.filter(row => {
       if (!row) return false;
       const searchStr = searchQuery.toLowerCase();
       
@@ -93,8 +108,40 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
         return String(val).toLowerCase().includes(searchStr);
       });
     });
+
+    if (sortConfig) {
+      const column = columns.find(c => c.key === sortConfig.key);
+      base.sort((a, b) => {
+        let aValue = column?.sortValue ? column.sortValue(a) : a[sortConfig.key];
+        let bValue = column?.sortValue ? column.sortValue(b) : b[sortConfig.key];
+
+        // Se for objeto aninhado (ex: customer.name), tenta extrair um valor representativo
+        if (typeof aValue === 'object' && aValue !== null) {
+          aValue = aValue.name || aValue.id || JSON.stringify(aValue);
+        }
+        if (typeof bValue === 'object' && bValue !== null) {
+          bValue = bValue.name || bValue.id || JSON.stringify(bValue);
+        }
+
+        if (aValue === bValue) return 0;
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+
+        const aString = String(aValue).toLowerCase();
+        const bString = String(bValue).toLowerCase();
+
+        if (aString < bString) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aString > bString) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
     return base;
-  }, [data, searchQuery, hideInternalSearch]);
+  }, [data, searchQuery, hideInternalSearch, sortConfig]);
 
   // Lógica de Paginação
   const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
@@ -187,7 +234,21 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
           <thead className="bg-slate-100 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20 shadow-sm">
             <tr>
               {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
-                <th key={col.key} className="px-3 py-2 whitespace-nowrap border border-slate-200 bg-slate-100 text-left">{col.label}</th>
+                <th 
+                  key={col.key} 
+                  className={`px-3 py-2 whitespace-nowrap border border-slate-200 bg-slate-100 text-left ${col.sortable !== false ? 'cursor-pointer hover:bg-slate-200 transition-colors' : ''}`}
+                  onClick={() => col.sortable !== false && handleSort(col.key)}
+                >
+                  <div className="flex items-center gap-1">
+                    {col.label}
+                    {col.sortable !== false && (
+                      <div className="flex flex-col opacity-50">
+                        <svg className={`w-2 h-2 ${sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'text-blue-600 opacity-100' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7"/></svg>
+                        <svg className={`w-2 h-2 -mt-0.5 ${sortConfig?.key === col.key && sortConfig.direction === 'desc' ? 'text-blue-600 opacity-100' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
+                      </div>
+                    )}
+                  </div>
+                </th>
               ))}
             </tr>
           </thead>
@@ -197,6 +258,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
                 key={row.id || idx} 
                 onClick={() => onRowClick?.(row)}
                 className={`group transition-all ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} ${onRowClick ? 'cursor-pointer hover:bg-blue-50/40' : 'hover:bg-slate-50/50'} ${getRowClassName ? getRowClassName(row) : ''}`}
+                style={getRowStyle ? getRowStyle(row) : {}}
               >
                 {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
                   <td key={col.key} className="px-3 py-1.5 text-slate-600 border border-slate-200 align-middle">

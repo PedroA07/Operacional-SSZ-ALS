@@ -186,7 +186,11 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
           columns: migratedConfig.columns || ['Motorista', 'Placa', 'Container', 'Status', 'Data/Hora']
         }];
       }
-      setFormData({ ...template, config: migratedConfig });
+      setFormData({ 
+        ...template, 
+        body: template.body || '',
+        config: migratedConfig 
+      });
     } else {
       setFormData({
         name: '',
@@ -381,6 +385,34 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
     setBodyPrevisaoStatus('');
   };
 
+  const previewSubject = (subject: string) => {
+    if (!subject) return '';
+    const trip = trips && trips.length > 0 ? trips[0] : null;
+    if (!trip) return subject;
+
+    let result = subject;
+    const dataAtual = new Intl.DateTimeFormat('pt-BR').format(new Date());
+    const horaAtual = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date());
+    
+    result = result
+      .replace(/\{\{DATA_ATUAL\}\}/gi, dataAtual)
+      .replace(/\{\{HORA_ATUAL\}\}/gi, horaAtual);
+
+    result = result.replace(/\{\{([^}]+)\}\}/gi, (match, p1) => {
+      const key = p1.trim().toUpperCase();
+      if (key === 'OS') return trip.os || '';
+      if (key === 'CONTAINER') return trip.container || '';
+      if (key === 'MOTORISTA') return trip.driver?.name || '';
+      if (key === 'PLACA') return trip.driver?.plateHorse || '';
+      if (key === 'CLIENTE') return trip.customer?.name || '';
+      if (key === 'NAVIO') return trip.ship || '';
+      if (key === 'BOOKING') return trip.booking || '';
+      return match;
+    });
+
+    return result.toUpperCase();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -421,6 +453,11 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                   value={formData.subject}
                   onChange={e => setFormData({...formData, subject: e.target.value})}
                 />
+                {formData.subject && (
+                  <p className="text-[10px] text-slate-500 mt-1 ml-1">
+                    Pré-visualização: <span className="font-bold text-slate-700">{previewSubject(formData.subject)}</span>
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -459,13 +496,13 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Corpo do E-mail (Texto Base)</label>
                 <div className="w-full rounded-2xl border-2 border-slate-50 bg-slate-50 font-medium text-slate-800 focus-within:border-blue-500 transition-all overflow-hidden">
-                  <Editor 
+                  <Editor
                     value={formData.body || ''}
                     onChange={e => setFormData({...formData, body: e.target.value})}
-                    containerProps={{ style: { minHeight: '150px', border: 'none', whiteSpace: 'pre-wrap' } }}
+                    containerProps={{ style: { minHeight: '150px', border: 'none' } }}
                   />
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 ml-1">Dica: Use <strong>Shift + Enter</strong> para pular linha de forma simples, ou <strong>Enter</strong> para criar um novo parágrafo.</p>
+                <p className="text-[10px] text-slate-500 mt-1 ml-1">Dica: Use <strong>Enter</strong> para pular linha.</p>
                 <div className="mt-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-2 relative">
                   <div className="flex items-center justify-between">
                     <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Variáveis Inteligentes (Copie e Cole)</p>
@@ -619,6 +656,18 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                     <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
                       <code className="text-[10px] font-mono font-bold text-blue-700">{"{{COLUNAS: Tabela 1 | Tabela 2}}"}</code>
                       <span className="text-[9px] font-bold text-slate-500 uppercase">Colocar tabelas lado a lado</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
+                      <code className="text-[10px] font-mono font-bold text-blue-700">{"{{ANEXOS}}"}</code>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">Links dos PDFs anexados</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
+                      <code className="text-[10px] font-mono font-bold text-blue-700">{"{{LIMPAR(variável)}}"}</code>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">Remove pontuações (ex: CPF)</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-blue-50">
+                      <code className="text-[10px] font-mono font-bold text-blue-700">{"{{CLIENTE_INTELIGENTE}}"}</code>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">Razão Social se Fantasia for inválido</span>
                     </div>
                   </div>
                 </div>

@@ -37,8 +37,6 @@ interface OperationsTabProps {
   onRefresh: () => void;
 }
 
-const MODALITIES = ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
-
 const OperationsTab: React.FC<OperationsTabProps> = ({ 
   user, drivers, customers, ports, trips, categories, preStacking, availableOps, activeView, setActiveView, onDeleteTrip, onRefresh 
 }) => {
@@ -54,6 +52,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
   const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
   const [customStatuses, setCustomStatuses] = useState<CustomStatus[]>([]);
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
   
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
@@ -67,7 +66,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     if (isSavingStatus) return;
     setIsSavingStatus(true);
     try {
-      // Desmarca outras prioridades do mesmo motorista
       const otherDriverPriorityTrips = trips.filter(t => 
         t.driver.id === trip.driver.id && 
         t.id !== trip.id && 
@@ -78,7 +76,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         await db.saveTrip({ ...t, isPriority: false }, user);
       }
 
-      // Alterna a prioridade da viagem selecionada
       await db.saveTrip({ ...trip, isPriority: !trip.isPriority }, user);
       onRefresh();
     } catch (e) {
@@ -105,6 +102,19 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       try {
         const statuses = await db.getCustomStatuses();
         setCustomStatuses(statuses);
+        
+        const opTypes = await db.getOperationTypes();
+        if (opTypes && opTypes.length > 0) {
+          setOperationTypes(opTypes);
+        } else {
+          setOperationTypes([
+            {id: '1', name: 'EXPORTAÇÃO'},
+            {id: '2', name: 'IMPORTAÇÃO'},
+            {id: '3', name: 'COLETA'},
+            {id: '4', name: 'ENTREGA'},
+            {id: '5', name: 'CABOTAGEM'}
+          ]);
+        }
       } catch (error) {
         console.error('Erro ao buscar status personalizados:', error);
       }
@@ -112,7 +122,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     fetchStatuses();
   }, []);
 
-  // Converte data ISO para local no formato do input datetime-local
   const formatISOToInput = (isoString?: string) => {
     const date = isoString ? new Date(isoString) : new Date();
     if (isNaN(date.getTime())) return '';
@@ -123,7 +132,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const handleOpenStatusEditor = (t: Trip, s: TripStatus) => {
     setSelectedTrip(t);
     setTempStatus(s);
-    setStatusTime(formatISOToInput()); // Pega a hora local agora
+    setStatusTime(formatISOToInput());
     setIsStatusModalOpen(true);
   };
 
@@ -220,8 +229,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
     handleSetPriority,
-    drivers 
-  ), [user, onRefresh, onDeleteTrip, drivers, trips]);
+    drivers,
+    categories
+  ), [user, onRefresh, onDeleteTrip, drivers, trips, categories]);
 
   if (activeView.type !== 'list') {
     return (
@@ -246,7 +256,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
               <button onClick={() => setDensity('comfortable')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${density === 'comfortable' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Amplo</button>
            </div>
            <div className="flex gap-3">
-              <CategoryControl onOpenManager={() => setIsCategoryModalOpen(true)} />
               <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
            </div>
         </div>
@@ -284,13 +293,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
                  >
                    Todas as Modalidades
                  </button>
-                 {MODALITIES.map(m => (
+                 {operationTypes.map(op => (
                    <button 
-                     key={m}
-                     onClick={() => setFilterTypes(prev => prev.includes(m) ? prev.filter(t => t !== m) : [...prev, m])}
-                     className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${filterTypes.includes(m) ? 'bg-slate-900 border-slate-900 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-500 hover:text-blue-600'}`}
+                     key={op.id}
+                     onClick={() => setFilterTypes(prev => prev.includes(op.name) ? prev.filter(t => t !== op.name) : [...prev, op.name])}
+                     className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${filterTypes.includes(op.name) ? 'bg-slate-900 border-slate-900 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-500 hover:text-blue-600'}`}
                    >
-                     {m}
+                     {op.name}
                    </button>
                  ))}
               </div>

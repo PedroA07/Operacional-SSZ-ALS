@@ -23,7 +23,7 @@ export const tripSyncService = {
     return diffs.some(d => d === true);
   },
 
-  mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port): Partial<Trip> => {
+  mapOCtoTrip: (formData: any, driver: Driver, customer: Customer, category: string, destination?: Port, formType: 'OC' | 'Pre-Stacking' = 'OC'): Partial<Trip> => {
     const now = new Date().toISOString();
     
     const rawDateTime = formData.horarioAgendado || formData.dateTime;
@@ -82,13 +82,13 @@ export const tripSyncService = {
       statusHistory: [{ status: 'Pendente' as TripStatus, dateTime: now, createdAt: now }],
       advancePayment: { status: 'BLOQUEADO' },
       balancePayment: { status: 'AGUARDANDO_DOCS' },
-      ocFormData: category !== 'Pre-Stacking' ? {
+      ocFormData: formType === 'OC' ? {
         ...formData,
         dateTime: tripStartTime,
         schedulingDate: terminalTime,
         category: category
       } : undefined,
-      preStackingFormData: category === 'Pre-Stacking' ? {
+      preStackingFormData: formType === 'Pre-Stacking' ? {
         ...formData,
         dateTime: tripStartTime,
         schedulingDate: terminalTime,
@@ -99,10 +99,36 @@ export const tripSyncService = {
   },
 
   sync: async (tripData: Partial<Trip>, existingId?: string, actingUser?: User) => {
-    const finalTrip = {
-      ...tripData,
-      id: existingId || `trip-sync-${Date.now()}`
-    } as Trip;
+    let finalTrip: Trip;
+    
+    if (existingId) {
+      const existing = await db.getTrips().then(trips => trips.find(t => t.id === existingId));
+      if (existing) {
+        // Remove undefined fields from tripData so they don't overwrite existing values
+        const cleanTripData = Object.fromEntries(
+          Object.entries(tripData).filter(([_, v]) => v !== undefined)
+        );
+        
+        finalTrip = {
+          ...existing,
+          ...cleanTripData,
+          id: existingId,
+          // Preserve status and payments if they already exist
+          status: existing.status || tripData.status || 'Pendente',
+          statusHistory: existing.statusHistory?.length ? existing.statusHistory : (tripData.statusHistory || []),
+          advancePayment: existing.advancePayment || tripData.advancePayment,
+          balancePayment: existing.balancePayment || tripData.balancePayment
+        } as Trip;
+      } else {
+        finalTrip = { ...tripData, id: existingId } as Trip;
+      }
+    } else {
+      finalTrip = {
+        ...tripData,
+        id: `trip-sync-${Date.now()}`
+      } as Trip;
+    }
+    
     return await db.saveTrip(finalTrip, actingUser);
   }
 };

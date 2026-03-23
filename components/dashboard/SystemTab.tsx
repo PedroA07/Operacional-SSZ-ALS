@@ -5,6 +5,8 @@ import FeedbackModal from '../shared/FeedbackModal';
 import ContainerTypesManager from './admin/ContainerTypesManager';
 import StatusManager from './admin/StatusManager';
 import ColetaTiposViagemManager from './admin/ColetaTiposViagemManager';
+import CategoryManager from './admin/CategoryManager';
+import OperationTypesManager from './admin/OperationTypesManager';
 
 interface SystemTabProps {
   onRefresh: () => Promise<void>;
@@ -135,6 +137,10 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
       </div>
 
       <ContainerTypesManager />
+
+      <OperationTypesManager />
+
+      <CategoryManager />
 
       <StatusManager />
 

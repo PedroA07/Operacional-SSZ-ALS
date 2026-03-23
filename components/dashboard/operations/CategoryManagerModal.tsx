@@ -48,7 +48,11 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
       color
     };
 
-    await db.saveCategory(categoryData, actingUser);
+    const success = await db.saveCategory(categoryData, actingUser);
+    if (!success) {
+      alert('Erro ao salvar categoria. Verifique as permissões ou se a coluna "color" existe na tabela.');
+      return;
+    }
     resetForm();
     onSuccess();
   };

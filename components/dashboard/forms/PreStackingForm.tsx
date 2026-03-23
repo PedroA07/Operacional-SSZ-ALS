@@ -7,6 +7,7 @@ import PreStackingTemplate from './PreStackingTemplate';
 import { db } from '../../../utils/storage';
 import { maskCNPJ, maskCEP } from '../../../utils/masks';
 import { tripSyncService } from '../../../utils/tripSyncService';
+import { osCategoryService } from '../../../utils/osCategoryService';
 
 interface PreStackingFormProps {
   drivers: Driver[];
@@ -81,7 +82,8 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     destinatarioId: '', 
     displayDate: new Date().toLocaleDateString('pt-BR'),
     schedulingDate: '',
-    schedulingTime: ''
+    schedulingTime: '',
+    category: ''
   });
 
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
@@ -119,7 +121,8 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
           autColeta: trip.ocFormData?.autColeta || '', 
           ship: trip.ship || '', 
           driverId: trip.driver.id, 
-          remetenteId: trip.customer.id 
+          remetenteId: trip.customer.id,
+          category: trip.category || ''
         }));
         setSelectedDriver(drivers.find(d => d.id === trip.driver.id));
         setSelectedRemetente(customers.find(c => c.id === trip.customer.id));
@@ -185,12 +188,15 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
          const schedulingDateTime = formData.schedulingDate && formData.schedulingTime 
            ? `${formData.schedulingDate}T${formData.schedulingTime}:00` 
            : undefined;
+         const finalCategory = formData.category || osCategoryService.detectCategoryFromOS(formData.os) || 'Geral';
+         
          const tripData = tripSyncService.mapOCtoTrip(
            { ...formData, schedulingDate: schedulingDateTime }, 
            selectedDriver, 
            selectedRemetente, 
-           'Pre-Stacking', 
-           selectedDestinatario
+           finalCategory, 
+           selectedDestinatario,
+           'Pre-Stacking'
          );
          await tripSyncService.sync(tripData, existingId || undefined);
       }

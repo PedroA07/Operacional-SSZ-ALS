@@ -354,7 +354,7 @@ export interface Trip {
   dateTime: string;
   statusTime?: string;
   isLate: boolean;
-  type: 'EXPORTAÇÃO' | 'IMPORTAÇÃO' | 'COLETA' | 'ENTREGA' | 'CABOTAGEM';
+  type: string;
   containerType?: string; 
   category: string;
   subCategory?: string;
@@ -397,6 +397,13 @@ export interface Trip {
   coletaEmissaoSolicitada?: boolean;
   isRemovedFromColeta?: boolean;
   isRemovedFromOrg?: boolean;
+}
+
+export interface OperationType {
+  id: string;
+  name: string;
+  color?: string;
+  createdAt?: string;
 }
 
 export interface ColetaTipoViagemOption {

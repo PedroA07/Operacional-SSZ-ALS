@@ -24,6 +24,7 @@ const TripForm: React.FC<TripFormProps> = ({
   editTrip, initialCategory, initialCustomer, drivers, customers, categories, ports, onCancel, onSave, isSaving 
 }) => {
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
 
   useEffect(() => {
     db.getContainerTypes().then(types => {
@@ -31,6 +32,20 @@ const TripForm: React.FC<TripFormProps> = ({
         setContainerTypes(types);
       } else {
         setContainerTypes([{id: 'default-1', name: '40HC'}, {id: 'default-2', name: '20DC'}, {id: 'default-3', name: '40HR'}]);
+      }
+    });
+
+    db.getOperationTypes().then(types => {
+      if (types && types.length > 0) {
+        setOperationTypes(types);
+      } else {
+        setOperationTypes([
+          {id: '1', name: 'EXPORTAÇÃO'},
+          {id: '2', name: 'IMPORTAÇÃO'},
+          {id: '3', name: 'COLETA'},
+          {id: '4', name: 'ENTREGA'},
+          {id: '5', name: 'CABOTAGEM'}
+        ]);
       }
     });
   }, []);
@@ -79,16 +94,27 @@ const TripForm: React.FC<TripFormProps> = ({
       });
     } else {
       const defaultCat = initialCategory || (categories.length > 0 ? categories[0].name : '');
+      const savedDefaultOp = localStorage.getItem('defaultColetaTipoViagem');
+      let defaultOpType = 'EXPORTAÇÃO';
+      
+      if (savedDefaultOp && operationTypes.length > 0) {
+        const found = operationTypes.find(t => t.id === savedDefaultOp);
+        if (found) defaultOpType = found.name;
+      } else if (operationTypes.length > 0) {
+        defaultOpType = operationTypes[0].name;
+      }
+
       setFormData((prev: any) => ({
         ...prev,
         category: defaultCat,
         customer: initialCustomer || prev.customer,
         dateTime: getLocalISOTime(),
+        type: defaultOpType,
         scheduling: null
       }));
     }
     hasInitialized.current = currentId;
-  }, [editTrip, initialCategory, initialCustomer, categories]);
+  }, [editTrip, initialCategory, initialCustomer, categories, operationTypes]);
 
   const handleContainerChange = (val: string) => {
     const container = val.toUpperCase();
@@ -137,11 +163,9 @@ const TripForm: React.FC<TripFormProps> = ({
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Tipo de Operação</label>
             <select className={inputClass} value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-              <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
-              <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
-              <option value="COLETA">COLETA</option>
-              <option value="ENTREGA">ENTREGA</option>
-              <option value="CABOTAGEM">CABOTAGEM</option>
+              {operationTypes.map(op => (
+                <option key={op.id} value={op.name}>{op.name}</option>
+              ))}
             </select>
           </div>
           <div className="md:col-span-4 space-y-1">

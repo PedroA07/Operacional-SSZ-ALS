@@ -1,37 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../utils/storage';
-import { ColetaTipoViagemOption } from '../../../types';
 
-export default function ColetaTiposViagemManager() {
-  const [types, setTypes] = useState<ColetaTipoViagemOption[]>([]);
+export default function OperationTypesManager() {
+  const [types, setTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTypeName, setNewTypeName] = useState('');
-  const [newTypeColor, setNewTypeColor] = useState('#3B82F6'); // Default blue
+  const [newTypeColor, setNewTypeColor] = useState('#3B82F6');
   const [isSaving, setIsSaving] = useState(false);
-  const [defaultTypeId, setDefaultTypeId] = useState<string>('');
-
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [defaultTypeId, setDefaultTypeId] = useState<string>('');
 
   useEffect(() => {
     loadTypes();
-    const savedDefault = localStorage.getItem('defaultColetaTipoViagem');
+    const savedDefault = localStorage.getItem('defaultOperationType');
     if (savedDefault) setDefaultTypeId(savedDefault);
   }, []);
 
   const handleSetDefault = (id: string) => {
     if (defaultTypeId === id) {
       setDefaultTypeId('');
-      localStorage.removeItem('defaultColetaTipoViagem');
+      localStorage.removeItem('defaultOperationType');
     } else {
       setDefaultTypeId(id);
-      localStorage.setItem('defaultColetaTipoViagem', id);
+      localStorage.setItem('defaultOperationType', id);
     }
   };
 
   const loadTypes = async () => {
     setLoading(true);
     try {
-      const data = await db.getColetaTiposViagem();
+      const data = await db.getOperationTypes();
       setTypes(data);
     } catch (e) {
       console.error(e);
@@ -40,7 +39,7 @@ export default function ColetaTiposViagemManager() {
     }
   };
 
-  const handleEdit = (type: ColetaTipoViagemOption) => {
+  const handleEdit = (type: any) => {
     setEditingId(type.id);
     setNewTypeName(type.name);
     setNewTypeColor(type.color || '#3B82F6');
@@ -60,17 +59,17 @@ export default function ColetaTiposViagemManager() {
     try {
       const newType = {
         id: editingId || undefined,
-        name: newTypeName.trim(),
+        name: newTypeName.trim().toUpperCase(),
         color: newTypeColor
       };
-      const success = await db.saveColetaTipoViagem(newType);
+      const success = await db.saveOperationType(newType);
       if (success) {
         setEditingId(null);
         setNewTypeName('');
         setNewTypeColor('#3B82F6');
         await loadTypes();
       } else {
-        alert('Erro ao salvar tipo de operação. Verifique as permissões do banco de dados (RLS).');
+        alert('Erro ao salvar tipo de operação.');
       }
     } catch (e) {
       console.error(e);
@@ -83,15 +82,11 @@ export default function ColetaTiposViagemManager() {
     if (!window.confirm('Tem certeza que deseja remover este tipo de operação?')) return;
     
     try {
-      const success = await db.deleteColetaTipoViagem(id);
+      const success = await db.deleteOperationType(id);
       if (success) {
-        if (defaultTypeId === id) {
-          setDefaultTypeId('');
-          localStorage.removeItem('defaultColetaTipoViagem');
-        }
         await loadTypes();
       } else {
-        alert('Erro ao remover tipo de operação. Verifique as permissões do banco de dados (RLS).');
+        alert('Erro ao remover tipo de operação.');
       }
     } catch (e) {
       console.error(e);
@@ -101,8 +96,8 @@ export default function ColetaTiposViagemManager() {
   return (
     <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
       <div className="mb-6">
-        <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Tipos de Operação</h3>
-        <p className="text-xs text-slate-500 mt-1">Gerencie os tipos de operação (Exportação, Importação, etc.) e suas cores para o sistema</p>
+        <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Tipos de Programação</h3>
+        <p className="text-xs text-slate-500 mt-1">Gerencie as modalidades de viagem (Exportação, Importação, etc.) que aparecem em Nova Programação e OC</p>
       </div>
 
       <form onSubmit={handleAdd} className="flex gap-3 mb-6">

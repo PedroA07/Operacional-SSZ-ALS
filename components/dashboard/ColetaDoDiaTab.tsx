@@ -28,6 +28,8 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>(propTemplates);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [hiddenTripTypes, setHiddenTripTypes] = useState<string[]>([]);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   const STABILITY_DURATION = 30000;
 
@@ -109,7 +111,12 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
           }
         }
-        return normalizedTripDate >= '2026-03-16';
+        
+        if (startDate && normalizedTripDate < startDate) return false;
+        if (endDate && normalizedTripDate > endDate) return false;
+        if (!startDate && !endDate) return normalizedTripDate >= '2026-03-16';
+        
+        return true;
       })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
@@ -218,6 +225,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'coletaTipoViagem', 
       label: 'Tipo de Viagem', 
+      sortable: false,
       render: (t: Trip) => {
         const selectedValue = t.coletaTipoViagem || defaultTipoViagemId || '';
         const selectedColor = tiposViagem.find(tv => tv.id === selectedValue)?.color || 'inherit';
@@ -243,6 +251,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'coletaEmailSent', 
       label: 'E-mail', 
+      sortable: false,
       render: (t: Trip) => (
         <div className="flex items-center justify-center gap-2">
           <input 
@@ -267,6 +276,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'coletaDocGenerated', 
       label: 'Doc Originário', 
+      sortable: false,
       render: (t: Trip) => (
         <div className="flex items-center justify-center gap-2">
           <input 
@@ -325,6 +335,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'os', 
       label: 'OS / E-mail', 
+      sortValue: (t: Trip) => t.os,
       render: (t: Trip) => (
         <div className="flex items-center gap-3">
           <div className="flex flex-col gap-1">
@@ -344,6 +355,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'bookingNavioBU', 
       label: 'Booking / Navio / BU', 
+      sortValue: (t: Trip) => t.booking || t.ship || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-black text-slate-900 text-[10px]">{t.booking || '---'}</span>
@@ -357,6 +369,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'containerTaraLacre', 
       label: 'Container / Tara / Lacre', 
+      sortValue: (t: Trip) => t.container || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-black text-slate-900 text-[10px]">{t.container || '---'}</span>
@@ -370,6 +383,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'driverInfo', 
       label: 'Motorista / Veículo', 
+      sortValue: (t: Trip) => t.driver?.name || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words">{t.driver.name || '---'}</span>
@@ -384,6 +398,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     { 
       key: 'customerInfo', 
       label: 'Local Atendimento / Cidade', 
+      sortValue: (t: Trip) => t.customer?.name || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words" title={t.customer.name}>
@@ -399,6 +414,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     {
       key: 'actions',
       label: '',
+      sortable: false,
       render: (t: Trip) => (
         <button
           onClick={() => {
@@ -441,10 +457,9 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
         try {
           const promises = readyTrips.map(trip => db.saveTrip({ 
-        ...trip, 
-        coletaEmissaoSolicitada: true,
-        status: 'Emissão Solicitada' // Atualiza o status para disparar automações
-      }));
+            ...trip, 
+            coletaEmissaoSolicitada: true
+          }));
           await Promise.all(promises);
           onRefresh();
         } catch (error) {
@@ -463,9 +478,43 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   };
 
   const getRowClassName = (t: Trip) => {
-    if (t.coletaDocGenerated) return 'bg-emerald-50/50 border-l-4 border-emerald-500 border-dashed line-through opacity-70';
-    if (t.coletaEmailSent) return 'bg-blue-50/50 border-l-4 border-blue-400';
-    return '';
+    let classes = 'transition-all duration-300 ';
+    if (t.coletaDocGenerated) classes += 'line-through opacity-60 ';
+    return classes;
+  };
+
+  const getRowStyle = (t: Trip) => {
+    const typeId = t.coletaTipoViagem || defaultTipoViagemId;
+    const type = tiposViagem.find(tv => tv.id === typeId);
+    const typeColor = type?.color || '#cbd5e1'; // slate-300 default
+
+    const style: React.CSSProperties = {
+      borderLeftWidth: '6px',
+      borderLeftStyle: 'solid',
+      borderLeftColor: typeColor,
+    };
+
+    if (t.coletaDocGenerated) {
+      // Verde suave para concluído (Doc Gerado)
+      style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+      style.borderLeftStyle = 'dashed';
+    } else if (t.coletaEmailSent) {
+      // Azul suave para e-mail enviado
+      style.backgroundColor = 'rgba(59, 130, 246, 0.15)';
+    } else if (typeColor) {
+      // Cor do tipo com 10% de opacidade
+      const hexToRgba = (hex: string, alpha: number) => {
+        try {
+          const r = parseInt(hex.slice(1, 3), 16);
+          const g = parseInt(hex.slice(3, 5), 16);
+          const b = parseInt(hex.slice(5, 7), 16);
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        } catch (e) { return hex; }
+      };
+      style.backgroundColor = hexToRgba(typeColor, 0.08);
+    }
+
+    return style;
   };
 
   if (isLoading) {
@@ -489,7 +538,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       />
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <button 
             onClick={() => setSettingsModal(true)}
             className="p-4 bg-white text-slate-600 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-95"
@@ -497,6 +546,33 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           >
             <Settings className="w-5 h-5" />
           </button>
+
+          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
+            <input 
+              type="date" 
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+              title="Data Inicial"
+            />
+            <span className="text-[10px] font-black text-slate-400 uppercase">até</span>
+            <input 
+              type="date" 
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+              title="Data Final"
+            />
+            {(startDate || endDate) && (
+              <button 
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                title="Limpar Filtro"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
           <button 
             onClick={handleEmissaoSolicitada}
@@ -527,6 +603,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             data={trips} 
             hideInternalSearch={false}
             getRowClassName={getRowClassName}
+            getRowStyle={getRowStyle}
           />
         </div>
       </div>

@@ -139,7 +139,7 @@ export const tripRepository = {
     if (error) throw error;
     
     if (data && data.length > 0) {
-      console.log("Schema Discovery - Colunas da tabela 'trips':", Object.keys(data[0]));
+      // Schema discovery log removed
     }
 
     return (data || []).map(d => this.mapFromDb(d));
