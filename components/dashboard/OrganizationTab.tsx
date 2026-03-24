@@ -309,7 +309,6 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
 
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(propTrips.length === 0);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
@@ -318,8 +317,20 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [finalizingIds, setFinalizingIds] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  const [visibleTripTypesColeta, setVisibleTripTypesColeta] = useState<string[]>([]);
-  const [visibleTripTypesEntrega, setVisibleTripTypesEntrega] = useState<string[]>([]);
+  const [hiddenTripTypesColeta, setHiddenTripTypesColeta] = useState<string[] | null>(() => {
+    const saved = localStorage.getItem('orgVisibleTripTypesColeta');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return null; }
+    }
+    return null;
+  });
+  const [hiddenTripTypesEntrega, setHiddenTripTypesEntrega] = useState<string[] | null>(() => {
+    const saved = localStorage.getItem('orgVisibleTripTypesEntrega');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return null; }
+    }
+    return null;
+  });
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
@@ -333,32 +344,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const fetchTypes = async () => {
       const types = await db.getOperationTypes();
       setOperationTypes(types);
-      const allTypes = types.map(t => t.name.toUpperCase());
-      
-      const savedColeta = localStorage.getItem('orgVisibleTripTypesColeta');
-      const savedEntrega = localStorage.getItem('orgVisibleTripTypesEntrega');
-      
-      if (savedColeta) {
-        try {
-          const hidden = JSON.parse(savedColeta);
-          setVisibleTripTypesColeta(allTypes.filter(t => !hidden.includes(t)));
-        } catch (e) {
-          setVisibleTripTypesColeta(['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO']);
-        }
-      } else {
-        setVisibleTripTypesColeta(allTypes.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t)));
-      }
-      
-      if (savedEntrega) {
-        try {
-          const hidden = JSON.parse(savedEntrega);
-          setVisibleTripTypesEntrega(allTypes.filter(t => !hidden.includes(t)));
-        } catch (e) {
-          setVisibleTripTypesEntrega(['ENTREGA', 'IMPORTAÇÃO']);
-        }
-      } else {
-        setVisibleTripTypesEntrega(allTypes.filter(t => ['ENTREGA', 'IMPORTAÇÃO'].includes(t)));
-      }
     };
     fetchTypes();
   }, []);
@@ -409,9 +394,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         // Filtro por tipo de operação
         const type = trip.type?.toUpperCase() || '';
         if (activeView === 'COLETA') {
-          if (!visibleTripTypesColeta.includes(type)) return false;
+          if (hiddenTripTypesColeta !== null) {
+            if (hiddenTripTypesColeta.includes(type)) return false;
+          } else {
+            if (!['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(type)) return false;
+          }
         } else {
-          if (!visibleTripTypesEntrega.includes(type)) return false;
+          if (hiddenTripTypesEntrega !== null) {
+            if (hiddenTripTypesEntrega.includes(type)) return false;
+          } else {
+            if (!['ENTREGA', 'IMPORTAÇÃO'].includes(type)) return false;
+          }
         }
 
         // Remove viagens que estão sendo finalizadas
@@ -450,14 +443,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         if (dateA !== dateB) return dateA - dateB;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
-  }, [propTrips, pendingUpdates, finalizingIds, activeView, visibleTripTypesColeta, visibleTripTypesEntrega, startDate, endDate]);
-
-  // Sincroniza isLoading
-  useEffect(() => {
-    if (propTrips.length > 0) {
-      setIsLoading(false);
-    }
-  }, [propTrips]);
+  }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega, startDate, endDate]);
 
   // Limpeza periódica de atualizações expiradas para liberar memória
   useEffect(() => {
@@ -773,19 +759,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   const toggleTripType = (type: string) => {
     if (activeView === 'COLETA') {
-      setVisibleTripTypesColeta(prev => {
-        const next = prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type];
-        const allTypes = operationTypes.map(t => t.name.toUpperCase());
-        const hidden = allTypes.filter(t => !next.includes(t));
-        localStorage.setItem('orgVisibleTripTypesColeta', JSON.stringify(hidden));
+      setHiddenTripTypesColeta(prev => {
+        const currentHidden = prev !== null ? prev : operationTypes.map(t => t.name.toUpperCase()).filter(t => !['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t));
+        const next = currentHidden.includes(type) ? currentHidden.filter(t => t !== type) : [...currentHidden, type];
+        localStorage.setItem('orgVisibleTripTypesColeta', JSON.stringify(next));
         return next;
       });
     } else {
-      setVisibleTripTypesEntrega(prev => {
-        const next = prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type];
-        const allTypes = operationTypes.map(t => t.name.toUpperCase());
-        const hidden = allTypes.filter(t => !next.includes(t));
-        localStorage.setItem('orgVisibleTripTypesEntrega', JSON.stringify(hidden));
+      setHiddenTripTypesEntrega(prev => {
+        const currentHidden = prev !== null ? prev : operationTypes.map(t => t.name.toUpperCase()).filter(t => !['ENTREGA', 'IMPORTAÇÃO'].includes(t));
+        const next = currentHidden.includes(type) ? currentHidden.filter(t => t !== type) : [...currentHidden, type];
+        localStorage.setItem('orgVisibleTripTypesEntrega', JSON.stringify(next));
         return next;
       });
     }
@@ -1082,15 +1066,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled]);
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 bg-white rounded-[3rem] border border-slate-100 shadow-sm animate-pulse">
-        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Carregando Painel Operacional...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <FeedbackModal 
@@ -1122,7 +1097,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
             {operationTypes.map(tv => {
               const type = tv.name.toUpperCase();
-              const isVisible = activeView === 'COLETA' ? visibleTripTypesColeta.includes(type) : visibleTripTypesEntrega.includes(type);
+              let isVisible = false;
+              if (activeView === 'COLETA') {
+                isVisible = hiddenTripTypesColeta !== null ? !hiddenTripTypesColeta.includes(type) : ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(type);
+              } else {
+                isVisible = hiddenTripTypesEntrega !== null ? !hiddenTripTypesEntrega.includes(type) : ['ENTREGA', 'IMPORTAÇÃO'].includes(type);
+              }
               return (
                 <button
                   key={type}
