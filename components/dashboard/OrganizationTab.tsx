@@ -318,6 +318,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [finalizingIds, setFinalizingIds] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [visibleTripTypesColeta, setVisibleTripTypesColeta] = useState<string[]>([]);
+  const [visibleTripTypesEntrega, setVisibleTripTypesEntrega] = useState<string[]>([]);
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
@@ -326,6 +329,40 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const STABILITY_DURATION = 30000; // Aumentado para 30s pois agora temos auto-limpeza ao confirmar
 
   // Auto-limpeza de atualizações que já foram confirmadas pelo servidor
+  useEffect(() => {
+    const fetchTypes = async () => {
+      const types = await db.getOperationTypes();
+      setOperationTypes(types);
+      const allTypes = types.map(t => t.name.toUpperCase());
+      
+      const savedColeta = localStorage.getItem('orgVisibleTripTypesColeta');
+      const savedEntrega = localStorage.getItem('orgVisibleTripTypesEntrega');
+      
+      if (savedColeta) {
+        try {
+          const hidden = JSON.parse(savedColeta);
+          setVisibleTripTypesColeta(allTypes.filter(t => !hidden.includes(t)));
+        } catch (e) {
+          setVisibleTripTypesColeta(['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO']);
+        }
+      } else {
+        setVisibleTripTypesColeta(allTypes.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t)));
+      }
+      
+      if (savedEntrega) {
+        try {
+          const hidden = JSON.parse(savedEntrega);
+          setVisibleTripTypesEntrega(allTypes.filter(t => !hidden.includes(t)));
+        } catch (e) {
+          setVisibleTripTypesEntrega(['ENTREGA', 'IMPORTAÇÃO']);
+        }
+      } else {
+        setVisibleTripTypesEntrega(allTypes.filter(t => ['ENTREGA', 'IMPORTAÇÃO'].includes(t)));
+      }
+    };
+    fetchTypes();
+  }, []);
+
   useEffect(() => {
     const toRemove: string[] = [];
     Object.entries(pendingUpdates).forEach(([id, pending]) => {
@@ -369,6 +406,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     return propTrips
       .filter(trip => {
+        // Filtro por tipo de operação
+        const type = trip.type?.toUpperCase() || '';
+        if (activeView === 'COLETA') {
+          if (!visibleTripTypesColeta.includes(type)) return false;
+        } else {
+          if (!visibleTripTypesEntrega.includes(type)) return false;
+        }
+
         // Remove viagens que estão sendo finalizadas
         if (finalizingIds.has(trip.id)) return false;
 
@@ -398,8 +443,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           return { ...serverTrip, ...pending.data };
         }
         return serverTrip;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.dateTime || 0).getTime();
+        const dateB = new Date(b.dateTime || 0).getTime();
+        if (dateA !== dateB) return dateA - dateB;
+        return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
-  }, [propTrips, pendingUpdates, finalizingIds]);
+  }, [propTrips, pendingUpdates, finalizingIds, activeView, visibleTripTypesColeta, visibleTripTypesEntrega, startDate, endDate]);
 
   // Sincroniza isLoading
   useEffect(() => {
@@ -720,6 +771,26 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
+  const toggleTripType = (type: string) => {
+    if (activeView === 'COLETA') {
+      setVisibleTripTypesColeta(prev => {
+        const next = prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type];
+        const allTypes = operationTypes.map(t => t.name.toUpperCase());
+        const hidden = allTypes.filter(t => !next.includes(t));
+        localStorage.setItem('orgVisibleTripTypesColeta', JSON.stringify(hidden));
+        return next;
+      });
+    } else {
+      setVisibleTripTypesEntrega(prev => {
+        const next = prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type];
+        const allTypes = operationTypes.map(t => t.name.toUpperCase());
+        const hidden = allTypes.filter(t => !next.includes(t));
+        localStorage.setItem('orgVisibleTripTypesEntrega', JSON.stringify(hidden));
+        return next;
+      });
+    }
+  };
+
   const handleFinalizeTrips = () => {
     const allScheduled = trips.filter(t => isTripScheduled(t));
     const readyTrips = allScheduled.filter(t => isTripReadyToFinalize(t));
@@ -1011,42 +1082,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled]);
 
-  const coletaTrips = useMemo(() => {
-    let filtered = trips.filter(t => ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t.type?.toUpperCase()));
-    
-    if (startDate) {
-      filtered = filtered.filter(t => t.dateTime && t.dateTime.substring(0, 10) >= startDate);
-    }
-    if (endDate) {
-      filtered = filtered.filter(t => t.dateTime && t.dateTime.substring(0, 10) <= endDate);
-    }
-
-    return filtered.sort((a, b) => {
-      const dateA = new Date(a.dateTime || 0).getTime();
-      const dateB = new Date(b.dateTime || 0).getTime();
-      if (dateA !== dateB) return dateA - dateB;
-      return (a.driver.name || '').localeCompare(b.driver.name || '');
-    });
-  }, [trips, startDate, endDate]);
-
-  const entregaTrips = useMemo(() => {
-    let filtered = trips.filter(t => ['ENTREGA', 'IMPORTAÇÃO'].includes(t.type?.toUpperCase()));
-    
-    if (startDate) {
-      filtered = filtered.filter(t => t.dateTime && t.dateTime.substring(0, 10) >= startDate);
-    }
-    if (endDate) {
-      filtered = filtered.filter(t => t.dateTime && t.dateTime.substring(0, 10) <= endDate);
-    }
-
-    return filtered.sort((a, b) => {
-      const dateA = new Date(a.dateTime || 0).getTime();
-      const dateB = new Date(b.dateTime || 0).getTime();
-      if (dateA !== dateB) return dateA - dateB;
-      return (a.driver.name || '').localeCompare(b.driver.name || '');
-    });
-  }, [trips, startDate, endDate]);
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-96 bg-white rounded-[3rem] border border-slate-100 shadow-sm animate-pulse">
@@ -1078,10 +1113,30 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       />
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-6 flex-wrap">
           <div>
             <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Organização Operacional</h2>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Agendamentos e NF • Dados desde 06/03/2026</p>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+            {operationTypes.map(tv => {
+              const type = tv.name.toUpperCase();
+              const isVisible = activeView === 'COLETA' ? visibleTripTypesColeta.includes(type) : visibleTripTypesEntrega.includes(type);
+              return (
+                <button
+                  key={type}
+                  onClick={() => toggleTripType(type)}
+                  className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
+                    isVisible
+                      ? 'bg-white text-blue-600 shadow-sm border border-blue-100'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  {type}
+                </button>
+              );
+            })}
           </div>
           
           <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
@@ -1151,13 +1206,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           <div className="space-y-4">
             <div className="flex items-center gap-3 ml-4">
               <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Coleta, Cabotagem e Exportação</h3>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Coleta</h3>
             </div>
             <SmartOperationTable 
               userId={userId} 
               componentId="org-coleta-export" 
               columns={columns} 
-              data={coletaTrips} 
+              data={trips} 
               hideInternalSearch={false}
               getRowClassName={(t: Trip) => {
                 if (isTripReadyToFinalize(t)) return 'bg-emerald-50 border-l-4 border-emerald-500';
@@ -1170,13 +1225,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           <div className="space-y-4">
             <div className="flex items-center gap-3 ml-4">
               <div className="w-2 h-8 bg-emerald-600 rounded-full"></div>
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Entrega e Importação</h3>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Entrega</h3>
             </div>
             <SmartOperationTable 
               userId={userId} 
               componentId="org-entrega-import" 
               columns={columns} 
-              data={entregaTrips} 
+              data={trips} 
               hideInternalSearch={false}
               getRowClassName={(t: Trip) => {
                 if (isTripReadyToFinalize(t)) return 'bg-emerald-50 border-l-4 border-emerald-500';

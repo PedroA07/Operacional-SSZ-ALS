@@ -28,6 +28,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>(propTemplates);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [hiddenTripTypes, setHiddenTripTypes] = useState<string[]>([]);
+  const [visibleTripTypes, setVisibleTripTypes] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
@@ -39,8 +40,23 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   useEffect(() => {
     const loadTipos = async () => {
-      const tipos = await db.getColetaTiposViagem();
+      const tipos = await db.getOperationTypes();
       setTiposViagem(tipos);
+      const allTypes = tipos.map(t => t.name.toUpperCase());
+      
+      const savedHiddenTypes = localStorage.getItem('coletaHiddenTripTypes');
+      if (savedHiddenTypes) {
+        try {
+          const hidden = JSON.parse(savedHiddenTypes);
+          setHiddenTripTypes(hidden);
+          setVisibleTripTypes(allTypes.filter(t => !hidden.includes(t)));
+        } catch (e) {
+          console.error('Erro ao carregar tipos ocultos', e);
+          setVisibleTripTypes(allTypes);
+        }
+      } else {
+        setVisibleTripTypes(allTypes);
+      }
       
       const templates = propTemplates;
       const savedTemplateId = localStorage.getItem('coletaDefaultTemplateId');
@@ -57,15 +73,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     
     const savedDefault = localStorage.getItem('defaultColetaTipoViagem');
     if (savedDefault) setDefaultTipoViagemId(savedDefault);
-
-    const savedHiddenTypes = localStorage.getItem('coletaHiddenTripTypes');
-    if (savedHiddenTypes) {
-      try {
-        setHiddenTripTypes(JSON.parse(savedHiddenTypes));
-      } catch (e) {
-        console.error('Erro ao carregar tipos ocultos', e);
-      }
-    }
   }, [propTemplates]);
 
   useEffect(() => {
@@ -98,7 +105,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return propTrips
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
-      .filter(trip => !hiddenTripTypes.includes(trip.type))
+      .filter(trip => visibleTripTypes.includes(trip.type?.toUpperCase()))
       .filter(trip => {
         const dt = trip.scheduledDateTime || trip.dateTime;
         if (!dt) return false;
@@ -191,7 +198,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   const handleSaveSettings = () => {
     localStorage.setItem('coletaDefaultTemplateId', selectedTemplateId);
-    localStorage.setItem('coletaHiddenTripTypes', JSON.stringify(hiddenTripTypes));
+    const allTypes = tiposViagem.map(t => t.name.toUpperCase());
+    const hidden = allTypes.filter(t => !visibleTripTypes.includes(t));
+    localStorage.setItem('coletaHiddenTripTypes', JSON.stringify(hidden));
+    setHiddenTripTypes(hidden);
     setSettingsModal(false);
     window.dispatchEvent(new CustomEvent('als_show_toast', { 
       detail: { message: 'Configurações salvas!', type: 'success' } 
@@ -526,6 +536,22 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     );
   }
 
+  const toggleTripType = (type: string) => {
+    setVisibleTripTypes(prev => {
+      const next = prev.includes(type) 
+        ? prev.filter(t => t !== type) 
+        : [...prev, type];
+      
+      // Salva automaticamente
+      const allTypes = tiposViagem.map(t => t.name.toUpperCase());
+      const hidden = allTypes.filter(t => !next.includes(t));
+      localStorage.setItem('coletaHiddenTripTypes', JSON.stringify(hidden));
+      setHiddenTripTypes(hidden);
+      
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <FeedbackModal 
@@ -546,6 +572,25 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           >
             <Settings className="w-5 h-5" />
           </button>
+
+          <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+            {tiposViagem.map(tv => {
+              const type = tv.name.toUpperCase();
+              return (
+                <button
+                  key={type}
+                  onClick={() => toggleTripType(type)}
+                  className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
+                    visibleTripTypes.includes(type)
+                      ? 'bg-white text-blue-600 shadow-sm border border-blue-100'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  {type}
+                </button>
+              );
+            })}
+          </div>
 
           <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
             <input 
@@ -646,26 +691,23 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
               {/* Filtro de Tipos de Programação */}
               <div className="space-y-4">
-                <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Ocultar Tipos de Programação</h4>
-                <p className="text-[10px] font-medium text-slate-400">Selecione os tipos de viagem que você <strong>não</strong> deseja ver neste painel:</p>
+                <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Tipos de Programação Visíveis</h4>
+                <p className="text-[10px] font-medium text-slate-400">Selecione os tipos de viagem que você deseja ver neste painel:</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'].map(type => (
-                    <label key={type} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
-                      <input 
-                        type="checkbox"
-                        checked={hiddenTripTypes.includes(type)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setHiddenTripTypes(prev => [...prev, type]);
-                          } else {
-                            setHiddenTripTypes(prev => prev.filter(t => t !== type));
-                          }
-                        }}
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{type}</span>
-                    </label>
-                  ))}
+                  {tiposViagem.map(tv => {
+                    const type = tv.name.toUpperCase();
+                    return (
+                      <label key={type} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input 
+                          type="checkbox"
+                          checked={visibleTripTypes.includes(type)}
+                          onChange={() => toggleTripType(type)}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{type}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             </div>
