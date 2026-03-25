@@ -22,6 +22,7 @@ export const tripRepository = {
     tara: trip.tara || null,
     seal: trip.seal?.toUpperCase() || null,
     cva: trip.cva?.toUpperCase() || null,
+    agencia: trip.agencia?.toUpperCase() || null,
     customer: trip.customer, 
     destination: trip.destination || null, 
     driver: trip.driver, 
@@ -94,6 +95,7 @@ export const tripRepository = {
       tara: d.tara || '',
       seal: d.seal || '',
       cva: d.cva || '',
+      agencia: d.agencia || '',
       customer: safeParse(d.customer, { name: '---' }),
       destination: safeParse(d.destination, null),
       driver: safeParse(d.driver, { name: '---' }),
@@ -156,16 +158,34 @@ export const tripRepository = {
     }
 
     const payload = this.mapToDb(trip);
+    
+    // Tentativa inicial de salvar com todos os campos
     const { error } = await supabase.from('trips').upsert(payload);
+    
     if (error) {
-      console.error("ERRO DETALHADO AO SALVAR TRIP:", {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-        payload: payload
-      });
-      throw error;
+      // Se o erro for de coluna inexistente (PGRST204) e envolver 'agencia'
+      if (error.code === 'PGRST204' || error.message.includes('agencia')) {
+        console.warn('Coluna "agencia" não encontrada na tabela "trips". Tentando salvar sem este campo...');
+        
+        const retryPayload = { ...payload };
+        delete (retryPayload as any).agencia;
+        
+        const { error: retryError } = await supabase.from('trips').upsert(retryPayload);
+        
+        if (retryError) {
+          console.error("ERRO AO SALVAR TRIP (RETRY):", retryError);
+          throw retryError;
+        }
+      } else {
+        console.error("ERRO DETALHADO AO SALVAR TRIP:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          payload: payload
+        });
+        throw error;
+      }
     }
 
     // Dispara automação se o status mudou ou se é uma nova viagem

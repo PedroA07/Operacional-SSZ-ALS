@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Staff, User } from '../../../types';
+import { Staff, User, Category } from '../../../types';
 import { db } from '../../../utils/storage';
 import { maskPhone } from '../../../utils/masks';
 import { fileStorage } from '../../../utils/fileStorage';
@@ -14,6 +14,8 @@ interface StaffModalProps {
   editingStaff?: Staff | null;
   currentUser: User;
   allUsers: User[];
+  categories: Category[];
+  operationTypes: any[];
 }
 
 const StaffModal: React.FC<StaffModalProps> = ({ 
@@ -22,10 +24,13 @@ const StaffModal: React.FC<StaffModalProps> = ({
   onSave, 
   editingStaff, 
   currentUser,
-  allUsers 
+  allUsers,
+  categories,
+  operationTypes
 }) => {
   const [form, setForm] = useState<Partial<Staff & { password?: string }>>({ 
-    name: '', position: '', username: '', role: 'staff', password: '', emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '', registrationDate: new Date().toISOString().split('T')[0]
+    name: '', position: '', username: '', role: 'staff', password: '', emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '', registrationDate: new Date().toISOString().split('T')[0],
+    visibleCategories: [], visibleOperationTypes: []
   });
   
   const [isProcessing, setIsProcessing] = useState(false);
@@ -59,13 +64,16 @@ const StaffModal: React.FC<StaffModalProps> = ({
         photo: editingStaff.photo || '',
         emailCorp: editingStaff.emailCorp || '',
         phoneCorp: editingStaff.phoneCorp || '',
-        registrationDate: editingStaff.registrationDate?.split('T')[0]
+        registrationDate: editingStaff.registrationDate?.split('T')[0],
+        visibleCategories: editingStaff.visibleCategories || [],
+        visibleOperationTypes: editingStaff.visibleOperationTypes || []
       });
       setIsEditingPassword(false);
     } else {
       setForm({ 
         role: 'staff', name: '', position: '', username: '', password: '12345678', 
-        emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '', registrationDate: new Date().toISOString().split('T')[0]
+        emailCorp: '', phoneCorp: '', status: 'Ativo', photo: '', registrationDate: new Date().toISOString().split('T')[0],
+        visibleCategories: [], visibleOperationTypes: []
       });
       setIsEditingPassword(true);
     }
@@ -116,7 +124,9 @@ const StaffModal: React.FC<StaffModalProps> = ({
         emailCorp: (form.emailCorp || '').toLowerCase(),
         phoneCorp: form.phoneCorp || '',
         status: (form.status as 'Ativo' | 'Inativo') || 'Ativo',
-        statusSince: form.statusSince || editingStaff?.statusSince || new Date().toISOString()
+        statusSince: form.statusSince || editingStaff?.statusSince || new Date().toISOString(),
+        visibleCategories: form.visibleCategories || [],
+        visibleOperationTypes: form.visibleOperationTypes || []
       };
       
       const passwordToSave = isEditingPassword ? form.password : undefined;
@@ -220,6 +230,63 @@ const StaffModal: React.FC<StaffModalProps> = ({
                   onChange={e => setForm({...form, phoneCorp: maskPhone(e.target.value)})} 
                   placeholder="(00) 00000-0000" 
                 />
+              </div>
+            </div>
+
+            <div className="p-8 bg-blue-50/50 rounded-[2.5rem] border border-blue-100 space-y-6">
+              <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Restrições de Visualização</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className={labelClass}>Categorias Visíveis</label>
+                  <div className="max-h-40 overflow-y-auto p-4 bg-white rounded-2xl border border-slate-100 space-y-2 custom-scrollbar">
+                    {categories.map(cat => (
+                      <label key={cat.id} className="flex items-center gap-3 cursor-pointer group">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          checked={form.visibleCategories?.includes(cat.name)}
+                          onChange={e => {
+                            const current = form.visibleCategories || [];
+                            if (e.target.checked) {
+                              setForm({...form, visibleCategories: [...current, cat.name]});
+                            } else {
+                              setForm({...form, visibleCategories: current.filter(c => c !== cat.name)});
+                            }
+                          }}
+                        />
+                        <span className="text-[10px] font-bold text-slate-600 uppercase group-hover:text-blue-600 transition-colors">{cat.name}</span>
+                      </label>
+                    ))}
+                    {categories.length === 0 && <p className="text-[9px] text-slate-400 italic">Nenhuma categoria cadastrada.</p>}
+                  </div>
+                  <p className="text-[8px] text-slate-400 italic px-1">Se nada for selecionado, verá todas.</p>
+                </div>
+
+                <div className="space-y-3">
+                  <label className={labelClass}>Tipos de Operação Visíveis</label>
+                  <div className="max-h-40 overflow-y-auto p-4 bg-white rounded-2xl border border-slate-100 space-y-2 custom-scrollbar">
+                    {operationTypes.map(op => (
+                      <label key={op.id} className="flex items-center gap-3 cursor-pointer group">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          checked={form.visibleOperationTypes?.includes(op.name)}
+                          onChange={e => {
+                            const current = form.visibleOperationTypes || [];
+                            if (e.target.checked) {
+                              setForm({...form, visibleOperationTypes: [...current, op.name]});
+                            } else {
+                              setForm({...form, visibleOperationTypes: current.filter(c => c !== op.name)});
+                            }
+                          }}
+                        />
+                        <span className="text-[10px] font-bold text-slate-600 uppercase group-hover:text-blue-600 transition-colors">{op.name}</span>
+                      </label>
+                    ))}
+                    {operationTypes.length === 0 && <p className="text-[9px] text-slate-400 italic">Nenhum tipo cadastrado.</p>}
+                  </div>
+                  <p className="text-[8px] text-slate-400 italic px-1">Se nada for selecionado, verá todos.</p>
+                </div>
               </div>
             </div>
 

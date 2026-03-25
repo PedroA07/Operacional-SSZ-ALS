@@ -9,8 +9,19 @@ const WeatherWidget: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const fetchWeather = async (lat: number, lon: number) => {
+    if (isNaN(lat) || isNaN(lon)) {
+      console.error("Coordenadas inválidas para o clima:", lat, lon);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max&timezone=auto`);
+      const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max&timezone=auto`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      
       const data = await response.json();
 
       const weatherCodes: Record<number, { condition: string, icon: string }> = {
@@ -44,8 +55,33 @@ const WeatherWidget: React.FC = () => {
       } else {
         setLocationName('Sua Região');
       }
-    } catch (error) {
-      console.error("Erro ao buscar clima:", error);
+    } catch (error: any) {
+      console.error("Erro ao buscar clima (Open-Meteo):", error);
+      
+      // Fallback para wttr.in se o Open-Meteo falhar
+      try {
+        const fallbackResponse = await fetch(`https://wttr.in/${lat},${lon}?format=j1`, {
+          signal: AbortSignal.timeout(5000)
+        });
+        if (fallbackResponse.ok) {
+          const data = await fallbackResponse.json();
+          const current = data.current_condition[0];
+          const forecast = data.weather[1];
+          
+          setWeather({
+            temp: parseInt(current.temp_C),
+            condition: current.lang_pt?.[0]?.value || current.weatherDesc[0].value,
+            icon: '🌡️',
+            forecastNextDay: {
+              temp: parseInt(forecast.maxtempC),
+              condition: forecast.hourly[4].lang_pt?.[0]?.value || forecast.hourly[4].weatherDesc[0].value
+            }
+          });
+          setLocationName('Sua Região (Fallback)');
+        }
+      } catch (fallbackError) {
+        console.error("Erro no fallback de clima:", fallbackError);
+      }
     } finally {
       setLoading(false);
     }

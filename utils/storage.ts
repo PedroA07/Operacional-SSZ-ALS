@@ -45,7 +45,8 @@ export const db = {
       status: u.status,
       isFirstLogin: u.isfirstlogin,
       lastSeen: u.last_seen || u.lastseen,
-      presence_status: u.presence_status
+      presence_status: u.presence_status,
+      thirdPartyConfig: u.config
     }));
   },
 
@@ -65,8 +66,15 @@ export const db = {
       status: user.status,
       isfirstlogin: user.isFirstLogin,
       last_seen: user.lastSeen,
-      presence_status: user.presence_status
+      presence_status: user.presence_status,
+      config: user.thirdPartyConfig
     });
+    return !error;
+  },
+
+  deleteUser: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('users').delete().eq('id', id);
     return !error;
   },
 

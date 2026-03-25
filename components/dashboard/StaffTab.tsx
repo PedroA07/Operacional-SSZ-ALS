@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, forwardRef } from 'react';
-import { Staff, User } from '../../types';
+import { Staff, User, Category } from '../../types';
 import { db } from '../../utils/storage';
 import StaffModal from './staff/StaffModal';
 import { maskPhone } from '../../utils/masks';
@@ -13,6 +13,7 @@ interface StaffTabProps {
   onDeleteStaff: (id: string) => Promise<void>;
   forceEditStaffId?: string | null;
   onCloseForceEdit?: () => void;
+  categories: Category[];
 }
 
 const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({ 
@@ -21,7 +22,8 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   onSaveStaff, 
   onDeleteStaff, 
   forceEditStaffId, 
-  onCloseForceEdit 
+  onCloseForceEdit,
+  categories
 }, ref) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -32,10 +34,13 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
   const [viewerData, setViewerData] = useState<{url: string, name: string} | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [showPasswordsList, setShowPasswordsList] = useState<Record<string, boolean>>({});
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
 
   const loadUsers = async () => {
     const u = await db.getUsers();
     setUsers(u);
+    const ops = await db.getOperationTypes();
+    setOperationTypes(ops);
   };
 
   useEffect(() => {
@@ -195,6 +200,8 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
         editingStaff={selectedStaff}
         currentUser={currentUser}
         allUsers={users}
+        categories={categories}
+        operationTypes={operationTypes}
       />
 
       <PhotoViewerModal 

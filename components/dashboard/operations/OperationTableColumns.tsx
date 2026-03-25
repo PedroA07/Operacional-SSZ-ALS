@@ -131,7 +131,7 @@ export const getOperationTableColumns = (
     },
     {
       key: 'equipment',
-      label: '4. Detalhes Equipamento',
+      label: '4. Container / Equipamento',
       render: EquipmentColumn
     },
     {

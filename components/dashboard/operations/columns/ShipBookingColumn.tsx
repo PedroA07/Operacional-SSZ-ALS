@@ -16,5 +16,11 @@ export const ShipBookingColumn = (t: Trip) => (
           {t.booking || '---'}
         </p>
      </div>
+     <div className="flex flex-col">
+        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Armador:</span>
+        <p className="text-[11px] font-black text-slate-600 leading-tight">
+          {t.agencia || '---'}
+        </p>
+     </div>
   </div>
 );

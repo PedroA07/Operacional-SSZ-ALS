@@ -106,7 +106,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                    </div>
                    <div className="min-w-0">
                       <p className="text-[8px] font-black text-slate-400 uppercase leading-none">E-mail Corporativo</p>
-                      <p className="text-[11px] font-bold text-slate-700 truncate mt-1 lowercase">{staffData?.emailCorp || '---'}</p>
+                      <p className="text-[11px] font-bold text-slate-700 truncate mt-1 lowercase">{staffData?.emailCorp || user.emailCorp || '---'}</p>
                    </div>
                 </div>
 
@@ -116,7 +116,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                    </div>
                    <div className="min-w-0">
                       <p className="text-[8px] font-black text-slate-400 uppercase leading-none">Telefone ALS</p>
-                      <p className="text-[11px] font-bold text-slate-700 mt-1">{staffData?.phoneCorp || '---'}</p>
+                      <p className="text-[11px] font-bold text-slate-700 mt-1">{staffData?.phoneCorp || user.phoneCorp || '---'}</p>
                    </div>
                 </div>
 

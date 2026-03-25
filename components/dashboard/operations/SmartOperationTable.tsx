@@ -37,9 +37,12 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
 }) => {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
 
   // Estados de Paginação
   const [currentPage, setCurrentPage] = useState(1);
@@ -85,6 +88,16 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setActiveFilterColumn(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const filteredData = useMemo(() => {
     if (!data || !Array.isArray(data)) return [];
     
@@ -92,20 +105,32 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
       if (!row) return false;
       const searchStr = searchQuery.toLowerCase();
       
-      return Object.values(row).some(val => {
+      // Global search
+      const matchesGlobal = Object.values(row).some(val => {
         if (val === null || val === undefined) return false;
-        
         if (typeof val === 'object') {
           try {
             return Object.values(val).some(v => 
               v !== null && v !== undefined && String(v).toLowerCase().includes(searchStr)
             );
-          } catch (e) {
-            return false;
-          }
+          } catch (e) { return false; }
+        }
+        return String(val).toLowerCase().includes(searchStr);
+      });
+
+      if (!matchesGlobal) return false;
+
+      // Column filters
+      return Object.entries(columnFilters).every(([key, filterVal]) => {
+        if (!filterVal) return true;
+        const column = columns.find(c => c.key === key);
+        let val = column?.sortValue ? column.sortValue(row) : row[key];
+        
+        if (typeof val === 'object' && val !== null) {
+          val = val.name || val.id || JSON.stringify(val);
         }
         
-        return String(val).toLowerCase().includes(searchStr);
+        return String(val || '').toLowerCase() === filterVal.toLowerCase();
       });
     });
 
@@ -151,7 +176,19 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   }, [filteredData, currentPage, itemsPerPage]);
 
   // Resetar para página 1 ao filtrar
-  useEffect(() => { setCurrentPage(1); }, [searchQuery, itemsPerPage]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, columnFilters, itemsPerPage]);
+
+  const getUniqueValues = (key: string) => {
+    const column = columns.find(c => c.key === key);
+    const values = data.map(row => {
+      let val = column?.sortValue ? column.sortValue(row) : row[key];
+      if (typeof val === 'object' && val !== null) {
+        val = val.name || val.id || JSON.stringify(val);
+      }
+      return String(val || '');
+    }).filter(v => v.trim() !== '');
+    return Array.from(new Set(values)).sort();
+  };
 
   return (
     <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm animate-in fade-in duration-500 relative flex flex-col">
@@ -236,17 +273,55 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
               {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
                 <th 
                   key={col.key} 
-                  className={`px-3 py-2 whitespace-nowrap border border-slate-200 bg-slate-100 text-left ${col.sortable !== false ? 'cursor-pointer hover:bg-slate-200 transition-colors' : ''}`}
-                  onClick={() => col.sortable !== false && handleSort(col.key)}
+                  className={`px-2 py-1.5 whitespace-nowrap border border-slate-200 bg-slate-100 text-left relative group/th ${col.sortable !== false ? 'cursor-pointer hover:bg-slate-200 transition-colors' : ''}`}
                 >
-                  <div className="flex items-center gap-1">
-                    {col.label}
-                    {col.sortable !== false && (
-                      <div className="flex flex-col opacity-50">
-                        <svg className={`w-2 h-2 ${sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'text-blue-600 opacity-100' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7"/></svg>
-                        <svg className={`w-2 h-2 -mt-0.5 ${sortConfig?.key === col.key && sortConfig.direction === 'desc' ? 'text-blue-600 opacity-100' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1 flex-1" onClick={() => col.sortable !== false && handleSort(col.key)}>
+                      {col.label}
+                      {col.sortable !== false && (
+                        <div className="flex flex-col opacity-30 group-hover/th:opacity-100">
+                          <svg className={`w-2 h-2 ${sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'text-blue-600 opacity-100' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7"/></svg>
+                          <svg className={`w-2 h-2 -mt-0.5 ${sortConfig?.key === col.key && sortConfig.direction === 'desc' ? 'text-blue-600 opacity-100' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative" onClick={e => e.stopPropagation()}>
+                      <button 
+                        onClick={() => setActiveFilterColumn(activeFilterColumn === col.key ? null : col.key)}
+                        className={`p-1 rounded hover:bg-slate-300 transition-colors ${columnFilters[col.key] ? 'text-blue-600' : 'text-slate-400'}`}
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                      </button>
+
+                      {activeFilterColumn === col.key && (
+                        <div ref={filterRef} className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 z-[110] p-3 animate-in fade-in zoom-in-95 duration-200">
+                          <div className="flex items-center justify-between mb-2 border-b border-slate-100 pb-2">
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Filtrar Valor</span>
+                            <button onClick={() => {
+                              const newFilters = {...columnFilters};
+                              delete newFilters[col.key];
+                              setColumnFilters(newFilters);
+                              setActiveFilterColumn(null);
+                            }} className="text-[7px] font-black text-red-500 uppercase hover:underline">Limpar</button>
+                          </div>
+                          <div className="max-h-40 overflow-y-auto space-y-1 custom-scrollbar">
+                            {getUniqueValues(col.key).map(val => (
+                              <button 
+                                key={val}
+                                onClick={() => {
+                                  setColumnFilters({...columnFilters, [col.key]: val});
+                                  setActiveFilterColumn(null);
+                                }}
+                                className={`w-full text-left px-2 py-1.5 rounded-lg text-[9px] font-bold truncate hover:bg-slate-50 transition-colors ${columnFilters[col.key] === val ? 'bg-blue-50 text-blue-600' : 'text-slate-600'}`}
+                              >
+                                {val}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </th>
               ))}
@@ -261,7 +336,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
                 style={getRowStyle ? getRowStyle(row) : {}}
               >
                 {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
-                  <td key={col.key} className="px-3 py-1.5 text-slate-600 border border-slate-200 align-middle">
+                  <td key={col.key} className="px-2 py-1 text-slate-600 border border-slate-200 align-middle">
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}

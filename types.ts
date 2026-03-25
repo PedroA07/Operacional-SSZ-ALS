@@ -11,7 +11,7 @@ export interface User {
   username: string;
   password?: string;
   displayName: string;
-  role: 'admin' | 'staff' | 'driver' | 'motoboy';
+  role: 'admin' | 'staff' | 'driver' | 'motoboy' | 'third_party';
   lastLogin: string;
   photo?: string;
   position?: string;
@@ -25,6 +25,11 @@ export interface User {
   presence_status?: PresenceStatus;
   emailCorp?: string;
   phoneCorp?: string;
+  thirdPartyConfig?: {
+    visibleFields: string[];
+    allowedCategories?: string[];
+    allowedTypes?: string[];
+  };
 }
 
 export interface LoginCredential {
@@ -34,6 +39,16 @@ export interface LoginCredential {
   username: string;
   password: string;
   additionalFields: { label: string; value: string }[];
+  createdAt: string;
+}
+
+export interface ExternalLogin {
+  id: string;
+  siteName: string;
+  url?: string;
+  username?: string;
+  password?: string;
+  additionalFields?: { label: string; value: string }[];
   createdAt: string;
 }
 
@@ -248,7 +263,8 @@ export enum DashboardTab {
   AVANTIDA = 'AVANTIDA',
   ORGANIZACAO = 'ORGANIZACAO',
   COLETA_DIA = 'COLETA_DIA',
-  AUTOMACOES = 'AUTOMACOES'
+  AUTOMACOES = 'AUTOMACOES',
+  TERCEIROS = 'TERCEIROS'
 }
 
 export interface Automation {
@@ -397,6 +413,8 @@ export interface Trip {
   coletaEmissaoSolicitada?: boolean;
   isRemovedFromColeta?: boolean;
   isRemovedFromOrg?: boolean;
+  price?: number;
+  requestedPrice?: number;
 }
 
 export interface OperationType {
@@ -500,6 +518,8 @@ export interface Staff {
   lastLogin?: string | null; 
   emailCorp?: string; 
   phoneCorp?: string; 
+  visibleCategories?: string[];
+  visibleOperationTypes?: string[];
 }
 
 export interface OperationDefinition { 

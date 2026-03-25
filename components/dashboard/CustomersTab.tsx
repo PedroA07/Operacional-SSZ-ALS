@@ -180,8 +180,12 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
   };
 
   const confirmDelete = (customer: Customer) => {
-    setItemToDelete(customer);
-    setIsDeleteModalOpen(true);
+    setInfoModal({
+      show: true,
+      title: "Solicitação de Exclusão",
+      message: `Você não tem permissão para excluir este cadastro diretamente. Por favor, entre em contato com um administrador da ALS Transportes para solicitar a remoção do cliente: "${customer.legalName || customer.name}".`,
+      type: "warning"
+    });
   };
 
   const executeDelete = async () => {

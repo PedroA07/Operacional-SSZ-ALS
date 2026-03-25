@@ -69,6 +69,7 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                   <div className="space-y-3">
                     <DataItem label="Navio" value={trip.ship} />
                     <DataItem label="Booking" value={trip.booking} color="text-blue-600" />
+                    <DataItem label="Armador" value={trip.agencia || '---'} color="text-slate-500" />
                     <DataItem label="Data Programada" value={new Date(trip.dateTime).toLocaleString('pt-BR')} />
                     <DataItem label="Categoria" value={trip.category} color="text-indigo-600" />
                   </div>

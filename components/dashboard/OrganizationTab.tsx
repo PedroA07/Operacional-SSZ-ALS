@@ -68,21 +68,21 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
               <div className="space-y-0.5">
                 <div className="flex justify-between items-start gap-1">
                   <p className="text-[8px] font-black text-slate-400 uppercase break-words flex-1 leading-tight">
-                    {suggestionLoc?.name || trip.destination?.name || trip.customer.name}
+                    {suggestionLoc?.name || trip.destination?.name || trip.customer?.name || '---'}
                   </p>
                   <p className="text-[7px] font-black text-slate-300 whitespace-nowrap">
                     {suggestionLoc?.zipCode || '---'}
                   </p>
                 </div>
                 <p className="text-[7px] text-slate-300 font-bold uppercase break-words leading-tight">
-                  {suggestionLoc?.legalName || trip.destination?.legalName || trip.customer.legalName || '---'}
+                  {suggestionLoc?.legalName || trip.destination?.legalName || trip.customer?.legalName || '---'}
                 </p>
                 <div className="flex justify-between items-center pt-0.5 border-t border-slate-50/50 gap-1">
                   <p className="text-[7px] text-slate-300 font-medium whitespace-nowrap">
-                    {suggestionLoc?.cnpj || trip.destination?.cnpj || trip.customer.cnpj || '---'}
+                    {suggestionLoc?.cnpj || trip.destination?.cnpj || trip.customer?.cnpj || '---'}
                   </p>
                   <p className="text-[7px] text-slate-300 font-bold uppercase text-right break-words flex-1">
-                    {(suggestionLoc?.city || trip.destination?.city || trip.customer.city)}/{(suggestionLoc?.state || trip.destination?.state || trip.customer.state || '---')}
+                    {(suggestionLoc?.city || trip.destination?.city || trip.customer?.city)}/{(suggestionLoc?.state || trip.destination?.state || trip.customer?.state || '---')}
                   </p>
                 </div>
               </div>

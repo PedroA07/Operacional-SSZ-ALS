@@ -19,6 +19,7 @@ import AvantidaTab from './components/dashboard/AvantidaTab';
 import OrganizationTab from './components/dashboard/OrganizationTab';
 import ColetaDoDiaTab from './components/dashboard/ColetaDoDiaTab';
 import AutomationsTab from './components/dashboard/AutomationsTab';
+import ThirdPartyTab from './components/dashboard/ThirdPartyTab';
 import Sidebar from './components/dashboard/Sidebar';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
@@ -297,7 +298,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 setFeedback({ show: true, title: 'Erro', message: 'Falha ao salvar cliente. Verifique o console.', type: 'error' });
               }
             }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
-           {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} />}
+           {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} categories={categories} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
            {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { 
               const success = await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); 
@@ -336,6 +337,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onRefresh={() => loadAllData(false)} 
              />
            )}
+           {activeTab === DashboardTab.TERCEIROS && <ThirdPartyTab currentUser={user} />}
         </div>
       </main>
 

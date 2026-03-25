@@ -44,7 +44,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   useEffect(() => {
     const loadTipos = async () => {
-      const tipos = await db.getOperationTypes();
+      const tipos = await db.getColetaTiposViagem();
       setTiposViagem(tipos);
       
       const templates = propTemplates;
@@ -94,7 +94,11 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return propTrips
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
-      .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
+      .filter(trip => {
+        const tripTypeId = trip.coletaTipoViagem || defaultTipoViagemId;
+        const tripTypeName = tiposViagem.find(tv => tv.id === tripTypeId)?.name.toUpperCase() || '';
+        return !hiddenTripTypes.includes(tripTypeName);
+      })
       .filter(trip => {
         const dt = trip.scheduledDateTime || trip.dateTime;
         if (!dt) return false;
@@ -127,7 +131,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         if (dateA !== dateB) return dateA - dateB;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
-  }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes, startDate, endDate]);
+  }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes, startDate, endDate, tiposViagem, defaultTipoViagemId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -318,11 +322,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           return <span className="text-[9px] text-slate-400">{dt}</span>;
         }
       }
-    },
-    { 
-      key: 'type', 
-      label: 'Tipo Prog.', 
-      render: (t: Trip) => <span className="font-bold text-slate-600 text-[9px] uppercase">{t.type}</span>
     },
     { 
       key: 'os', 
