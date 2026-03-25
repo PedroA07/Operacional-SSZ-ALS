@@ -60,11 +60,15 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
     return () => clearInterval(interval);
   }, [loadData]);
 
-  const visibleFields = user.thirdPartyConfig?.visibleFields || ['os', 'status', 'dateTime'];
-  const allowedCategories = user.thirdPartyConfig?.allowedCategories || [];
-  const allowedTypes = user.thirdPartyConfig?.allowedTypes || [];
+  const config = user.thirdPartyConfig;
+  const hasConfig = config && (config.visibleFields || config.allowedCategories || config.allowedTypes);
+
+  const visibleFields = config?.visibleFields || [];
+  const allowedCategories = config?.allowedCategories || [];
+  const allowedTypes = config?.allowedTypes || [];
 
   const filteredTrips = useMemo(() => {
+    if (!hasConfig) return [];
     return trips.filter(t => {
       // Filtro de Busca
       const searchLower = searchTerm.toLowerCase();
@@ -99,7 +103,7 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
       const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
       return dateB - dateA;
     });
-  }, [trips, searchTerm, startDate, endDate, allowedCategories, allowedTypes]);
+  }, [trips, searchTerm, startDate, endDate, allowedCategories, allowedTypes, hasConfig]);
 
   const columns = useMemo(() => {
     const allCols = [
@@ -214,14 +218,7 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
     ];
 
     // Filtra colunas baseado na configuração de visibilidade do terceiro
-    return allCols.filter(col => {
-      // Se não houver configuração, mostra apenas as colunas padrão
-      if (!visibleFields || visibleFields.length === 0) {
-        return ['dateTime', 'os', 'status'].includes(col.key);
-      }
-      // Caso contrário, mostra apenas as colunas configuradas
-      return visibleFields.includes(col.key);
-    });
+    return allCols.filter(col => visibleFields.includes(col.key));
   }, [visibleFields, locations]);
 
   return (
@@ -301,14 +298,26 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
             </button>
           </div>
 
-          <SmartOperationTable 
-            userId={user.id}
-            componentId="third-party-portal"
-            title="Acompanhamento de Viagens"
-            data={filteredTrips}
-            columns={columns}
-            hideInternalSearch={true} // Já temos a busca externa
-          />
+          {hasConfig ? (
+            <SmartOperationTable 
+              userId={user.id}
+              componentId="third-party-portal"
+              title="Acompanhamento de Viagens"
+              data={filteredTrips}
+              columns={columns}
+              hideInternalSearch={true} // Já temos a busca externa
+            />
+          ) : (
+            <div className="bg-white p-16 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-6">
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center">
+                <Icons.Configuracoes className="w-8 h-8 text-slate-300" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Aguardando definições</h3>
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Aguardando configuração de permissões de acesso.</p>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
