@@ -131,7 +131,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="pt-6 pb-2">
            {sidebarState === 'open' && <p className="px-5 text-[8px] font-black text-slate-600 uppercase mb-3 tracking-[0.3em]">Administração</p>}
            <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" icon={<Icons.Equipe />} />
-           <MenuItem tab={DashboardTab.TERCEIROS} label="Terceiros" icon={<Icons.Users />} adminOnly />
            <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" icon={<Icons.Configuracoes />} adminOnly />
         </div>
       </nav>

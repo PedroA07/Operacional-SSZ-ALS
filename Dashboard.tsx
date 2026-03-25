@@ -19,7 +19,6 @@ import AvantidaTab from './components/dashboard/AvantidaTab';
 import OrganizationTab from './components/dashboard/OrganizationTab';
 import ColetaDoDiaTab from './components/dashboard/ColetaDoDiaTab';
 import AutomationsTab from './components/dashboard/AutomationsTab';
-import ThirdPartyTab from './components/dashboard/ThirdPartyTab';
 import Sidebar from './components/dashboard/Sidebar';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
@@ -340,7 +339,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onRefresh={() => loadAllData(false)} 
              />
            )}
-           {activeTab === DashboardTab.TERCEIROS && <ThirdPartyTab currentUser={user} />}
+
         </div>
       </main>
 

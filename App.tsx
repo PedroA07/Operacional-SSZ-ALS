@@ -4,7 +4,6 @@ import { AppScreen, User } from './types';
 import LoginForm from './components/LoginForm';
 import Dashboard from './Dashboard';
 import DriverPortal from './components/driver/DriverPortal';
-import ThirdPartyPortal from './components/third-party/ThirdPartyPortal';
 import { db } from './utils/storage';
 import { usePresenceMonitor } from './hooks/usePresenceMonitor';
 
@@ -93,8 +92,6 @@ const App: React.FC = () => {
         <LoginForm onLoginSuccess={handleLoginSuccess} />
       ) : user?.role === 'driver' || user?.role === 'motoboy' ? (
         <DriverPortal user={user} onLogout={handleLogout} />
-      ) : user?.role === 'third_party' ? (
-        <ThirdPartyPortal user={user} onLogout={handleLogout} />
       ) : user ? (
         <Dashboard user={user} onLogout={handleLogout} />
       ) : (

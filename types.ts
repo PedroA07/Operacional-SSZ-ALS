@@ -254,8 +254,7 @@ export enum DashboardTab {
   AVANTIDA = 'AVANTIDA',
   ORGANIZACAO = 'ORGANIZACAO',
   COLETA_DIA = 'COLETA_DIA',
-  AUTOMACOES = 'AUTOMACOES',
-  TERCEIROS = 'TERCEIROS'
+  AUTOMACOES = 'AUTOMACOES'
 }
 
 export interface Automation {
