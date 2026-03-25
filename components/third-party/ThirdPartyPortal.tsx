@@ -28,15 +28,8 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
   const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString('pt-BR'));
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [startDate, setStartDate] = useState<string>(() => {
-    const d = new Date();
-    // Primeiro dia do mês atual
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
-  });
-  const [endDate, setEndDate] = useState<string>(() => {
-    // Hoje
-    return new Date().toISOString().split('T')[0];
-  });
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
@@ -90,9 +83,19 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
     // Filtro por Data
     if (startDate || endDate) {
       result = result.filter(t => {
-        const tripDate = t.dateTime.substring(0, 10);
-        if (startDate && tripDate < startDate) return false;
-        if (endDate && tripDate > endDate) return false;
+        if (!t.dateTime) return false;
+        const tripDateStr = t.dateTime.includes('T') ? t.dateTime.split('T')[0] : t.dateTime;
+        let normalizedTripDate = tripDateStr;
+        if (tripDateStr.includes('/')) {
+          const parts = tripDateStr.split('/');
+          if (parts.length === 3) {
+            const [day, month, year] = parts;
+            normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+        
+        if (startDate && normalizedTripDate < startDate) return false;
+        if (endDate && normalizedTripDate > endDate) return false;
         return true;
       });
     }
@@ -145,7 +148,7 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
             <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover rounded-xl" />
           </div>
           <div>
-            <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">Portal do Terceiro</h1>
+            <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight leading-none">Portal Externo</h1>
             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1.5">ALS Transportes • Acesso Externo</p>
           </div>
         </div>
@@ -214,7 +217,6 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
               data={filteredTrips}
               title="Viagens"
               onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
-              hideInternalSearch={true}
             />
           )}
         </div>
