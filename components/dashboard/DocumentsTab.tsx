@@ -101,8 +101,24 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
     else if (activeTab === 'concluidas') list = list.filter(t => (t.isCompleted || t.status === 'Viagem concluída') && t.completoDoc);
     else list = list.filter(t => t.status === 'Viagem cancelada');
 
-    if (startDate) list = list.filter(t => t.dateTime.substring(0, 10) >= startDate);
-    if (endDate) list = list.filter(t => t.dateTime.substring(0, 10) <= endDate);
+    if (startDate || endDate) {
+      list = list.filter(t => {
+        if (!t.dateTime) return false;
+        const tripDateStr = t.dateTime.includes('T') ? t.dateTime.split('T')[0] : t.dateTime;
+        let normalizedTripDate = tripDateStr;
+        if (tripDateStr.includes('/')) {
+          const parts = tripDateStr.split('/');
+          if (parts.length === 3) {
+            const [day, month, year] = parts;
+            normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+        
+        if (startDate && normalizedTripDate < startDate) return false;
+        if (endDate && normalizedTripDate > endDate) return false;
+        return true;
+      });
+    }
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();

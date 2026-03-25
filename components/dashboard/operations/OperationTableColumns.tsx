@@ -157,6 +157,77 @@ export const getOperationTableColumns = (
       )
     },
     { 
+      key: 'category_only', 
+      label: 'Categoria', 
+      render: (t: Trip) => {
+        const cat = categories.find(c => c.name.toUpperCase() === t.category?.toUpperCase());
+        const color = cat?.color || '#3b82f6';
+        return (
+          <span 
+            className="px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit text-white"
+            style={{ backgroundColor: color, borderColor: color }}
+          >
+            {t.category}
+          </span>
+        );
+      }
+    },
+    {
+      key: 'type_only',
+      label: 'Modalidade',
+      render: (t: Trip) => (
+        <span className="text-[10px] font-black text-slate-600 uppercase">{t.type}</span>
+      )
+    },
+    {
+      key: 'os_only',
+      label: 'OS',
+      render: (t: Trip) => (
+        <span className="text-[11px] font-black text-blue-700 uppercase">OS: {t.os}</span>
+      )
+    },
+    {
+      key: 'status_only',
+      label: 'Status',
+      render: (t: Trip) => {
+        const latestStatus = t.statusHistory?.[t.statusHistory.length - 1]?.status || t.status;
+        return (
+          <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-black uppercase border border-blue-100">
+            {latestStatus}
+          </span>
+        );
+      }
+    },
+    {
+      key: 'is_scheduled_only',
+      label: 'Agendado',
+      render: (t: Trip) => {
+        const isScheduled = t.isScheduled || !!t.scheduledLocationId;
+        return (
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${isScheduled ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-slate-300'}`}></div>
+            <span className={`text-[10px] font-black uppercase ${isScheduled ? 'text-emerald-600' : 'text-slate-400'}`}>
+              {isScheduled ? 'SIM' : 'NÃO'}
+            </span>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'ship_only',
+      label: 'Navio',
+      render: (t: Trip) => (
+        <span className="text-[10px] font-black text-slate-700 uppercase">{t.ship || '---'}</span>
+      )
+    },
+    {
+      key: 'booking_only',
+      label: 'Booking',
+      render: (t: Trip) => (
+        <span className="text-[10px] font-black text-blue-600 font-mono uppercase">{t.booking || '---'}</span>
+      )
+    },
+    { 
       key: 'actions', 
       label: '9. Opções', 
       render: (t: Trip) => (

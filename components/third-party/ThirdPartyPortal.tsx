@@ -1,11 +1,18 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { User, Trip } from '../../types';
+import { User, Trip, Driver, Category, CustomStatus, TripStatus } from '../../types';
 import { db } from '../../utils/storage';
 import { Icons } from '../../constants/icons';
 import UserProfile from '../dashboard/UserProfile';
 import DatabaseStatus from '../dashboard/DatabaseStatus';
 import SmartOperationTable from '../dashboard/operations/SmartOperationTable';
+import { getOperationTableColumns } from '../dashboard/operations/OperationTableColumns';
+import { statusService } from '../../utils/statusService';
+import DocumentViewerModal from '../dashboard/operations/DocumentViewerModal';
+import TripDetailsViewerModal from '../dashboard/operations/TripDetailsViewerModal';
+import DriverDocsViewerModal from '../dashboard/operations/DriverDocsViewerModal';
+import StatusHistoryManagerModal from '../dashboard/operations/StatusHistoryManagerModal';
+import DateRangeFilter from '../dashboard/operations/DateRangeFilter';
 
 interface ThirdPartyPortalProps {
   user: User;
@@ -14,18 +21,43 @@ interface ThirdPartyPortalProps {
 
 const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) => {
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [customStatuses, setCustomStatuses] = useState<CustomStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString('pt-BR'));
   
-  const [startDate, setStartDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
-  const [endDate, setEndDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState<string>(() => {
+    const d = new Date();
+    // Primeiro dia do mês atual
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    // Hoje
+    return new Date().toISOString().split('T')[0];
+  });
+
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const [isDriverDocsModalOpen, setIsDriverDocsModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [previewDocData, setPreviewDocData] = useState({ url: '', title: '' });
 
   const loadData = useCallback(async () => {
     try {
-      const allTrips = await db.getTrips();
-      // Talvez filtrar viagens específicas para este terceiro? 
-      // Por enquanto, mostra todas, mas com campos limitados.
+      const [allTrips, allDrivers, allCategories, allStatuses] = await Promise.all([
+        db.getTrips(),
+        db.getDrivers(),
+        db.getCategories(),
+        db.getCustomStatuses()
+      ]);
+      
       setTrips(allTrips);
+      setDrivers(allDrivers);
+      setCategories(allCategories);
+      setCustomStatuses(allStatuses);
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
     } catch (error) {
       console.error("Erro ao carregar dados para terceiro:", error);
@@ -41,119 +73,69 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
   }, [loadData]);
 
   const visibleFields = user.thirdPartyConfig?.visibleFields || [];
+  const visibleFilters = user.thirdPartyConfig?.visibleFilters || ['search', 'date_range'];
   const allowedCategories = user.thirdPartyConfig?.allowedCategories || [];
   const allowedTypes = user.thirdPartyConfig?.allowedTypes || [];
 
   const filteredTrips = useMemo(() => {
-    return trips.filter(t => {
-      // Use local date for comparison to avoid timezone issues
-      const tripDate = new Date(t.dateTime).toLocaleDateString('en-CA');
-      const dateMatch = tripDate >= startDate && tripDate <= endDate;
-      
-      const categoryMatch = allowedCategories.includes(t.category);
-      const typeMatch = allowedTypes.includes(t.type);
-      
-      return dateMatch && categoryMatch && typeMatch;
-    }).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
-  }, [trips, startDate, endDate, allowedCategories, allowedTypes]);
+    let result = [...trips];
 
-  const getFieldLabel = (fieldId: string) => {
-    const labels: Record<string, string> = {
-      os_info: 'OS',
-      scheduled_date: 'Data e Hora Programada',
-      driver_info: 'Motorista',
-      customer_info: 'Cliente',
-      is_scheduled: 'Agendado',
-      dropoff_location: 'Local de Baixa',
-      status: 'Status',
-      documents: 'Docs'
-    };
-    return labels[fieldId] || fieldId;
-  };
+    // Filtro por Configuração do Terceiro
+    result = result.filter(t => {
+      const categoryMatch = allowedCategories.length === 0 || allowedCategories.includes(t.category);
+      const typeMatch = allowedTypes.length === 0 || allowedTypes.includes(t.type);
+      return categoryMatch && typeMatch;
+    });
+
+    // Filtro por Data
+    if (startDate || endDate) {
+      result = result.filter(t => {
+        const tripDate = t.dateTime.substring(0, 10);
+        if (startDate && tripDate < startDate) return false;
+        if (endDate && tripDate > endDate) return false;
+        return true;
+      });
+    }
+
+    // Filtro por Busca
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(t => 
+        t.os.toLowerCase().includes(q) || 
+        (t.container && t.container.toLowerCase().includes(q)) || 
+        (t.driver && t.driver.name.toLowerCase().includes(q)) || 
+        (t.customer && t.customer.name.toLowerCase().includes(q))
+      );
+    }
+
+    return result.sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+  }, [trips, startDate, endDate, searchQuery, allowedCategories, allowedTypes]);
 
   const columns = useMemo(() => {
-    return visibleFields.map((fieldId: string) => ({
-      key: fieldId,
-      label: getFieldLabel(fieldId),
-      render: (row: Trip) => {
-        if (fieldId === 'status') {
-          return (
-            <span className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-tight border border-blue-100">
-              {row.status}
-            </span>
-          );
-        }
-        if (fieldId === 'os_info') {
-          return (
-            <div className="flex flex-col">
-              <span className="text-sm font-black text-slate-700 uppercase tracking-tight">{row.os}</span>
-              <span className="text-[10px] text-slate-500 font-bold uppercase">{row.category} • {row.type}</span>
-            </div>
-          );
-        }
-        if (fieldId === 'scheduled_date') {
-          const dateObj = new Date(row.dateTime);
-          return (
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-700">{dateObj.toLocaleDateString('pt-BR')}</span>
-              <span className="text-[10px] text-slate-500 font-bold">{dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-          );
-        }
-        if (fieldId === 'driver_info') {
-          if (typeof row.driver === 'object' && row.driver) {
-            return (
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-slate-700 uppercase">{row.driver.name}</span>
-                <span className="text-[10px] text-slate-500 font-bold">CPF: {row.driver.cpf || 'N/I'}</span>
-                <span className="text-[10px] text-slate-500 font-bold uppercase">Cavalo: {row.driver.plateHorse || 'N/I'} • Carreta: {row.driver.plateTrailer || 'N/I'}</span>
-              </div>
-            );
-          }
-          return <span className="text-xs font-bold text-slate-500 uppercase">{typeof row.driver === 'string' ? row.driver : 'N/I'}</span>;
-        }
-        if (fieldId === 'customer_info') {
-          if (typeof row.customer === 'object' && row.customer) {
-            return (
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-slate-700 uppercase">{row.customer.name}</span>
-                <span className="text-[10px] text-slate-500 font-bold uppercase">{row.customer.legalName || 'N/I'}</span>
-                <span className="text-[10px] text-slate-500 font-bold">CNPJ: {row.customer.cnpj || 'N/I'}</span>
-                <span className="text-[10px] text-slate-500 font-bold uppercase">{row.customer.city || 'N/I'}</span>
-              </div>
-            );
-          }
-          return <span className="text-xs font-bold text-slate-500 uppercase">{typeof row.customer === 'string' ? row.customer : 'N/I'}</span>;
-        }
-        if (fieldId === 'is_scheduled') {
-          const isScheduled = !!row.scheduling;
-          return (
-            <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight ${isScheduled ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}>
-              {isScheduled ? 'SIM' : 'NÃO'}
-            </span>
-          );
-        }
-        if (fieldId === 'dropoff_location') {
-          const location = row.scheduling?.location || 'N/I';
-          return <span className="text-xs font-bold text-slate-500 uppercase">{location}</span>;
-        }
-        if (fieldId === 'documents') {
-          return (
-            <div className="flex gap-1">
-              {row.documents?.length ? (
-                <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-tight">
-                  {row.documents.length} Anexos
-                </span>
-              ) : (
-                <span className="text-[9px] text-slate-300 font-bold uppercase">Nenhum</span>
-              )}
-            </div>
-          );
-        }
-        return null;
-      }
-    }));
-  }, [visibleFields]);
+    const allCols = getOperationTableColumns(
+      () => {}, // openStatusEditor (disabled)
+      () => {}, // onEditTrip (disabled)
+      () => {}, // onEditOC (disabled)
+      () => {}, // onEditMinuta (disabled)
+      (url, title) => { setPreviewDocData({ url, title }); setIsDocViewerOpen(true); },
+      () => {}, // onDeleteTrip (disabled)
+      loadData,
+      () => {}, // onEditScheduling (disabled)
+      user,
+      () => {}, // onLocateDriver (disabled)
+      (t) => { setSelectedTrip(t); setIsDriverDocsModalOpen(true); },
+      (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
+      () => {}, // onSetPriority (disabled)
+      drivers,
+      categories
+    );
+
+    const allowedKeys = new Set<string>(visibleFields);
+    // Sempre incluir dateTime se nenhuma for selecionada para não quebrar a tabela
+    if (allowedKeys.size === 0) allowedKeys.add('dateTime');
+
+    return allCols.filter(col => allowedKeys.has(col.key));
+  }, [visibleFields, drivers, categories, loadData, user]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans text-slate-900">
@@ -188,34 +170,24 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
 
       <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
         <div className="max-w-7xl mx-auto space-y-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-            <div>
-              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Acompanhamento de Viagens</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Listagem de operações em tempo real</p>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
-                <div className="flex flex-col px-3">
-                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Data Inicial</label>
-                  <input 
-                    type="date" 
-                    value={startDate}
-                    onChange={e => setStartDate(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-slate-700 outline-none"
-                  />
+          <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
+            <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+              {visibleFilters.includes('search') && (
+                <div className="flex-1 w-full max-w-md relative group">
+                   <input 
+                     type="text" 
+                     placeholder="BUSCAR OS, CONTAINER OU MOTORISTA..."
+                     className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
+                     value={searchQuery}
+                     onChange={e => setSearchQuery(e.target.value)}
+                   />
+                   <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </div>
-                <div className="w-px h-8 bg-slate-200"></div>
-                <div className="flex flex-col px-3">
-                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Data Final</label>
-                  <input 
-                    type="date" 
-                    value={endDate}
-                    onChange={e => setEndDate(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-slate-700 outline-none"
-                  />
-                </div>
-              </div>
+              )}
+
+              {visibleFilters.includes('date_range') && (
+                <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
+              )}
             </div>
           </div>
 
@@ -241,6 +213,8 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
               columns={columns}
               data={filteredTrips}
               title="Viagens"
+              onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
+              hideInternalSearch={true}
             />
           )}
         </div>
@@ -251,6 +225,45 @@ const ThirdPartyPortal: React.FC<ThirdPartyPortalProps> = ({ user, onLogout }) =
           ALS Transportes © 2026 • Sistema de Gestão Logística
         </p>
       </footer>
+
+      {/* Modais de Visualização */}
+      <DocumentViewerModal 
+        isOpen={isDocViewerOpen} 
+        onClose={() => setIsDocViewerOpen(false)} 
+        url={previewDocData.url} 
+        title={previewDocData.title} 
+      />
+      
+      {isTripDetailsOpen && selectedTrip && (
+        <TripDetailsViewerModal 
+          isOpen={isTripDetailsOpen} 
+          onClose={() => setIsTripDetailsOpen(false)} 
+          trip={selectedTrip} 
+          user={user} 
+          onManageHistory={() => setIsHistoryModalOpen(true)}
+        />
+      )}
+
+      {isDriverDocsModalOpen && selectedTrip && (
+        <DriverDocsViewerModal 
+          isOpen={isDriverDocsModalOpen} 
+          onClose={() => setIsDriverDocsModalOpen(false)} 
+          trip={selectedTrip} 
+          user={user} 
+          onSuccess={loadData} 
+        />
+      )}
+
+      {isHistoryModalOpen && selectedTrip && (
+        <StatusHistoryManagerModal 
+          isOpen={isHistoryModalOpen} 
+          onClose={() => setIsHistoryModalOpen(false)} 
+          trip={selectedTrip} 
+          allTrips={trips} 
+          user={user} 
+          onSuccess={loadData} 
+        />
+      )}
     </div>
   );
 };

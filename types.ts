@@ -29,6 +29,7 @@ export interface User {
     visibleFields: string[];
     allowedCategories?: string[];
     allowedTypes?: string[];
+    visibleFilters?: string[];
   };
 }
 

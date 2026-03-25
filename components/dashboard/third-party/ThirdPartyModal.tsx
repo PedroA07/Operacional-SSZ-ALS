@@ -12,14 +12,24 @@ interface ThirdPartyModalProps {
 }
 
 const TRIP_FIELDS = [
-  { id: 'os_info', label: 'OS (OS, Categoria, Tipo)' },
-  { id: 'scheduled_date', label: 'Data e Hora Programada' },
-  { id: 'driver_info', label: 'Motorista (Nome, CPF, Placas)' },
-  { id: 'customer_info', label: 'Cliente (Nome, Razão, CNPJ, Local)' },
-  { id: 'is_scheduled', label: 'Agendado (Sim/Não)' },
-  { id: 'dropoff_location', label: 'Local de Baixa' },
-  { id: 'status', label: 'Status da Viagem' },
-  { id: 'documents', label: 'Documentos (Anexos)' },
+  { id: 'category_only', label: 'Categoria' },
+  { id: 'type_only', label: 'Tipo de Programação (Modalidade)' },
+  { id: 'os_only', label: 'OS' },
+  { id: 'equipment', label: 'Container (Equipamento)' },
+  { id: 'customer', label: 'Local de Atendimento (Cliente)' },
+  { id: 'destination_sch', label: 'Destino' },
+  { id: 'ship_only', label: 'Navio' },
+  { id: 'booking_only', label: 'Booking' },
+  { id: 'status_only', label: 'Status' },
+  { id: 'is_scheduled_only', label: 'Agendado (Sim/Não)' },
+  { id: 'dateTime', label: 'Data e Hora Programada' },
+  { id: 'driver', label: 'Motorista' },
+  { id: 'actions', label: 'Documentos' },
+];
+
+const FILTER_OPTIONS = [
+  { id: 'search', label: 'Busca (OS, Container, Motorista)' },
+  { id: 'date_range', label: 'Período de Data' },
 ];
 
 const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSave, editingUser }) => {
@@ -32,7 +42,8 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
     thirdPartyConfig: {
       visibleFields: ['os', 'status', 'dateTime'],
       allowedCategories: [],
-      allowedTypes: []
+      allowedTypes: [],
+      visibleFilters: ['search', 'date_range']
     }
   });
   const [isProcessing, setIsProcessing] = useState(false);
@@ -65,7 +76,8 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
         thirdPartyConfig: {
           visibleFields: editingUser.thirdPartyConfig?.visibleFields || ['os_info', 'scheduled_date', 'status'],
           allowedCategories: editingUser.thirdPartyConfig?.allowedCategories || [],
-          allowedTypes: editingUser.thirdPartyConfig?.allowedTypes || []
+          allowedTypes: editingUser.thirdPartyConfig?.allowedTypes || [],
+          visibleFilters: editingUser.thirdPartyConfig?.visibleFilters || ['search', 'date_range']
         }
       });
     } else {
@@ -78,7 +90,8 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
         thirdPartyConfig: {
           visibleFields: ['os_info', 'scheduled_date', 'status'],
           allowedCategories: [],
-          allowedTypes: []
+          allowedTypes: [],
+          visibleFilters: ['search', 'date_range']
         }
       });
     }
@@ -158,13 +171,29 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
     });
   };
 
+  const toggleFilter = (filterId: string) => {
+    const currentFilters = formData.thirdPartyConfig?.visibleFilters || [];
+    const newFilters = currentFilters.includes(filterId)
+      ? currentFilters.filter(f => f !== filterId)
+      : [...currentFilters, filterId];
+    
+    setFormData({
+      ...formData,
+      thirdPartyConfig: {
+        ...formData.thirdPartyConfig,
+        visibleFields: formData.thirdPartyConfig?.visibleFields || [],
+        visibleFilters: newFilters
+      }
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">
-              {editingUser ? 'Editar Terceiro' : 'Novo Terceiro'}
+              {editingUser ? 'Editar Acesso Portal Externo' : 'Novo Acesso Portal Externo'}
             </h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configuração de Acesso Externo</p>
           </div>
@@ -247,6 +276,39 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                     )}
                   </div>
                   <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{field.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Filtros Visíveis</h4>
+              <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">Selecione quais filtros estarão disponíveis</span>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+              {FILTER_OPTIONS.map(filter => (
+                <button
+                  key={filter.id}
+                  type="button"
+                  onClick={() => toggleFilter(filter.id)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                    formData.thirdPartyConfig?.visibleFilters?.includes(filter.id)
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
+                    formData.thirdPartyConfig?.visibleFilters?.includes(filter.id)
+                      ? 'bg-white border-white text-blue-600'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    {formData.thirdPartyConfig?.visibleFilters?.includes(filter.id) && (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{filter.label}</span>
                 </button>
               ))}
             </div>
@@ -341,7 +403,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
               disabled={isProcessing}
               className="flex-[2] py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50"
             >
-              {isProcessing ? 'Salvando...' : editingUser ? 'Atualizar Terceiro' : 'Criar Terceiro'}
+              {isProcessing ? 'Salvando...' : editingUser ? 'Atualizar Acesso' : 'Criar Acesso'}
             </button>
           </div>
         </form>

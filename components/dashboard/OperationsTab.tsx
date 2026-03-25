@@ -211,7 +211,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         (t.customer && t.customer.name.toLowerCase().includes(q))
       );
     }
-    return result.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+    return result.sort((a, b) => b.dateTime.localeCompare(a.dateTime));
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery, customStatuses]);
 
   const columns = useMemo(() => getOperationTableColumns(

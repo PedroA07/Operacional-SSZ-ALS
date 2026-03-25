@@ -440,7 +440,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       .sort((a, b) => {
         const dateA = new Date(a.dateTime || 0).getTime();
         const dateB = new Date(b.dateTime || 0).getTime();
-        if (dateA !== dateB) return dateA - dateB;
+        if (dateB !== dateA) return dateB - dateA;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
   }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega, startDate, endDate]);

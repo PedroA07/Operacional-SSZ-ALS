@@ -52,7 +52,7 @@ const ThirdPartyTab: React.FC<ThirdPartyTabProps> = ({ currentUser }) => {
           console.log('Lista recarregada com sucesso.');
         } else {
           console.error('Falha ao excluir usuário no banco de dados.');
-          alert('Erro ao excluir usuário. Verifique se existem registros vinculados.');
+          alert('Erro ao excluir acesso. Verifique se este usuário possui registros vinculados (como estadias ou notificações) que impedem a exclusão.');
         }
       } catch (error) {
         console.error('Erro crítico ao tentar excluir:', error);
@@ -72,7 +72,7 @@ const ThirdPartyTab: React.FC<ThirdPartyTabProps> = ({ currentUser }) => {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tight">Gestão de Terceiros</h2>
+          <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tight">Gestão de Portal Externo</h2>
           <p className="text-sm text-slate-400 font-bold uppercase tracking-widest mt-2">Controle de acessos externos e visualização de dados</p>
         </div>
         <button 
@@ -110,6 +110,7 @@ const ThirdPartyTab: React.FC<ThirdPartyTabProps> = ({ currentUser }) => {
                 <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Terceiro</th>
                 <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Usuário</th>
                 <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Campos Visíveis</th>
+                <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtros Visíveis</th>
                 <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                 <th className="px-8 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Ações</th>
               </tr>
@@ -159,6 +160,18 @@ const ThirdPartyTab: React.FC<ThirdPartyTabProps> = ({ currentUser }) => {
                         ))}
                         {(!tp.thirdPartyConfig?.visibleFields || tp.thirdPartyConfig.visibleFields.length === 0) && (
                           <span className="text-[10px] text-slate-400 italic">Nenhum campo selecionado</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="flex flex-wrap gap-1.5 max-w-xs">
+                        {tp.thirdPartyConfig?.visibleFilters?.map(filter => (
+                          <span key={filter} className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-tight">
+                            {filter === 'search' ? 'Busca' : filter === 'date_range' ? 'Período' : filter}
+                          </span>
+                        ))}
+                        {(!tp.thirdPartyConfig?.visibleFilters || tp.thirdPartyConfig.visibleFilters.length === 0) && (
+                          <span className="text-[10px] text-slate-400 italic">Nenhum filtro selecionado</span>
                         )}
                       </div>
                     </td>

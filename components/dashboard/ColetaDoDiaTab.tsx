@@ -110,7 +110,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         
         if (startDate && normalizedTripDate < startDate) return false;
         if (endDate && normalizedTripDate > endDate) return false;
-        if (!startDate && !endDate) return normalizedTripDate >= '2026-03-16';
+        if (!startDate && !endDate) return normalizedTripDate >= '2026-01-01';
         
         return true;
       })
@@ -124,7 +124,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       .sort((a, b) => {
         const dateA = new Date(a.scheduledDateTime || a.dateTime || 0).getTime();
         const dateB = new Date(b.scheduledDateTime || b.dateTime || 0).getTime();
-        if (dateA !== dateB) return dateA - dateB;
+        if (dateB !== dateA) return dateB - dateA;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
   }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes, startDate, endDate]);
@@ -609,6 +609,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       </div>
     </div>
 
+      {/* Lista de Viagens */}
       <div className="animate-in slide-in-from-bottom-4 duration-500">
         <div className="space-y-4">
           <SmartOperationTable 
