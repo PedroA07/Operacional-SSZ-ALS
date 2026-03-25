@@ -13,7 +13,7 @@ export const exportElementToPDF = async (element: HTMLElement, filename: string)
 
   try {
     const canvas = await html2canvas(element, {
-      scale: 3, // Aumentado de 2 para 3 para maior nitidez
+      scale: 2,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',

@@ -33,12 +33,21 @@ const DriverDossierModal: React.FC<DriverDossierModalProps> = ({ isOpen, onClose
     try {
       const fileName = `DOSSIE_ALS_${driver.name.replace(/\s+/g, '_')}_${driver.plateHorse}`;
       const element = document.getElementById(`dossier-preview-container`);
+      const parent = element?.parentElement;
+      
+      let originalTransform = '';
+      if (parent) {
+        originalTransform = parent.style.transform;
+        parent.style.transform = 'none';
+      }
       
       if (element) {
-        // Se incluir CNH e houver URL, o template lidaria com isso ou poderíamos concatenar PDFs
-        // Por simplicidade visual no template, garantimos que o template mostre o aviso se a opção estiver on
         await exportElementToPDF(element, fileName);
         onClose();
+      }
+      
+      if (parent) {
+        parent.style.transform = originalTransform;
       }
     } catch (error) {
       console.error(error);

@@ -70,17 +70,17 @@ const DriverProfileTemplate: React.FC<DriverProfileTemplateProps> = ({ driver, v
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '15px' }}>
                <div style={{ borderBottom: borderStyle, paddingBottom: '5px' }}>
                   <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', marginBottom: '2px' }}>NOME COMPLETO</p>
-                  <p style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase' }}>{driver.name}</p>
+                  <p style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', wordBreak: 'break-word' }}>{driver.name}</p>
                </div>
                
                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div>
                      <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>CPF</p>
-                     <p style={{ fontSize: '13px', fontWeight: 'bold' }}>{driver.cpf}</p>
+                     <p style={{ fontSize: '13px', fontWeight: 'bold', wordBreak: 'break-word' }}>{driver.cpf}</p>
                   </div>
                   <div>
                      <p style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>RG</p>
-                     <p style={{ fontSize: '13px', fontWeight: 'bold' }}>{driver.rg || '---'}</p>
+                     <p style={{ fontSize: '13px', fontWeight: 'bold', wordBreak: 'break-word' }}>{driver.rg || '---'}</p>
                   </div>
                </div>
 
