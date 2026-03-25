@@ -42,16 +42,6 @@ export interface LoginCredential {
   createdAt: string;
 }
 
-export interface ExternalLogin {
-  id: string;
-  siteName: string;
-  url?: string;
-  username?: string;
-  password?: string;
-  additionalFields?: { label: string; value: string }[];
-  createdAt: string;
-}
-
 export type AvantidaStatus = 'APROVADO' | 'RECUSADO' | 'EM ANÁLISE';
 
 export interface AvantidaRecord {
@@ -413,8 +403,6 @@ export interface Trip {
   coletaEmissaoSolicitada?: boolean;
   isRemovedFromColeta?: boolean;
   isRemovedFromOrg?: boolean;
-  price?: number;
-  requestedPrice?: number;
 }
 
 export interface OperationType {

@@ -88,9 +88,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   
-  const today = new Date().toLocaleDateString('en-CA');
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   
   const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
   const [filterTypes, setFilterTypes] = useState<string[]>([]);

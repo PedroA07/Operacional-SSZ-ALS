@@ -30,7 +30,7 @@ const ThirdPartyTab: React.FC<ThirdPartyTabProps> = ({ currentUser }) => {
 
   useEffect(() => {
     loadThirdParties();
-  }, []);
+  }, [currentUser]); // Adicionado currentUser como dependência
 
   const handleSave = async (user: User) => {
     const success = await db.saveUser(user);

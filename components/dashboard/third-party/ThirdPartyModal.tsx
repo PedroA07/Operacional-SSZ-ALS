@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, Category, OperationType } from '../../../types';
+import { User, Category, OperationType, ColetaTipoViagemOption } from '../../../types';
 import { Icons } from '../../../constants/icons';
 import { db } from '../../../utils/storage';
 
@@ -12,23 +12,13 @@ interface ThirdPartyModalProps {
 }
 
 const TRIP_FIELDS = [
-  { id: 'os', label: 'Número da OS' },
-  { id: 'booking', label: 'Booking' },
-  { id: 'ship', label: 'Navio' },
-  { id: 'container', label: 'Container' },
-  { id: 'seal', label: 'Lacre' },
+  { id: 'os_info', label: 'OS (OS, Categoria, Tipo)' },
+  { id: 'scheduled_date', label: 'Data e Hora Programada' },
+  { id: 'driver_info', label: 'Motorista (Nome, CPF, Placas)' },
+  { id: 'customer_info', label: 'Cliente (Nome, Razão, CNPJ, Local)' },
+  { id: 'is_scheduled', label: 'Agendado (Sim/Não)' },
+  { id: 'dropoff_location', label: 'Local de Baixa' },
   { id: 'status', label: 'Status da Viagem' },
-  { id: 'dateTime', label: 'Data e Hora' },
-  { id: 'category', label: 'Categoria' },
-  { id: 'type', label: 'Tipo de Operação' },
-  { id: 'customer', label: 'Cliente' },
-  { id: 'destination', label: 'Destino' },
-  { id: 'driver', label: 'Motorista' },
-  { id: 'plateHorse', label: 'Placa Cavalo' },
-  { id: 'plateTrailer', label: 'Placa Carreta' },
-  { id: 'isScheduled', label: 'Agendado?' },
-  { id: 'scheduledDateTime', label: 'Data/Hora Agendamento' },
-  { id: 'schedulingLocation', label: 'Local de Agendamento' },
   { id: 'documents', label: 'Documentos (Anexos)' },
 ];
 
@@ -45,24 +35,26 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
       allowedTypes: []
     }
   });
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [operationTypes, setOperationTypes] = useState<OperationType[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadOptions = async () => {
       try {
-        const [allCats, allTypes] = await Promise.all([
+        const [cats, ops] = await Promise.all([
           db.getCategories(),
           db.getOperationTypes()
         ]);
-        setCategories(allCats);
-        setOperationTypes(allTypes);
+        setCategories(cats);
+        setOperationTypes(ops);
       } catch (error) {
-        console.error("Erro ao carregar dados para modal de terceiro:", error);
+        console.error("Erro ao carregar opções:", error);
       }
     };
-    if (isOpen) loadData();
+    if (isOpen) {
+      loadOptions();
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -71,7 +63,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
         ...editingUser,
         password: editingUser.password || '',
         thirdPartyConfig: {
-          visibleFields: editingUser.thirdPartyConfig?.visibleFields || ['os', 'status', 'dateTime'],
+          visibleFields: editingUser.thirdPartyConfig?.visibleFields || ['os_info', 'scheduled_date', 'status'],
           allowedCategories: editingUser.thirdPartyConfig?.allowedCategories || [],
           allowedTypes: editingUser.thirdPartyConfig?.allowedTypes || []
         }
@@ -84,7 +76,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
         role: 'third_party',
         status: 'Ativo',
         thirdPartyConfig: {
-          visibleFields: ['os', 'status', 'dateTime'],
+          visibleFields: ['os_info', 'scheduled_date', 'status'],
           allowedCategories: [],
           allowedTypes: []
         }
@@ -134,16 +126,17 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
     });
   };
 
-  const toggleCategory = (catName: string) => {
+  const toggleCategory = (categoryName: string) => {
     const currentCats = formData.thirdPartyConfig?.allowedCategories || [];
-    const newCats = currentCats.includes(catName)
-      ? currentCats.filter(c => c !== catName)
-      : [...currentCats, catName];
+    const newCats = currentCats.includes(categoryName)
+      ? currentCats.filter(c => c !== categoryName)
+      : [...currentCats, categoryName];
     
     setFormData({
       ...formData,
       thirdPartyConfig: {
-        ...formData.thirdPartyConfig!,
+        ...formData.thirdPartyConfig,
+        visibleFields: formData.thirdPartyConfig?.visibleFields || [],
         allowedCategories: newCats
       }
     });
@@ -158,7 +151,8 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
     setFormData({
       ...formData,
       thirdPartyConfig: {
-        ...formData.thirdPartyConfig!,
+        ...formData.thirdPartyConfig,
+        visibleFields: formData.thirdPartyConfig?.visibleFields || [],
         allowedTypes: newTypes
       }
     });
@@ -166,7 +160,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
 
   return (
     <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">
@@ -179,7 +173,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
+        <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
@@ -225,106 +219,112 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Campos Visíveis</h4>
-                <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">Selecione o que o terceiro poderá visualizar</span>
-              </div>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
-                {TRIP_FIELDS.map(field => (
-                  <button
-                    key={field.id}
-                    type="button"
-                    onClick={() => toggleField(field.id)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                      formData.thirdPartyConfig?.visibleFields.includes(field.id)
-                        ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20'
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
-                      formData.thirdPartyConfig?.visibleFields.includes(field.id)
-                        ? 'bg-white border-white text-blue-600'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      {formData.thirdPartyConfig?.visibleFields.includes(field.id) && (
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{field.label}</span>
-                  </button>
-                ))}
-              </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Campos Visíveis</h4>
+              <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">Selecione o que o terceiro poderá visualizar</span>
             </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Categorias Permitidas</h4>
-                <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg">Filtre as categorias que este terceiro pode ver</span>
-              </div>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
-                {categories.map(cat => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => toggleCategory(cat.name)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                      formData.thirdPartyConfig?.allowedCategories?.includes(cat.name)
-                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20'
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
-                      formData.thirdPartyConfig?.allowedCategories?.includes(cat.name)
-                        ? 'bg-white border-white text-emerald-600'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      {formData.thirdPartyConfig?.allowedCategories?.includes(cat.name) && (
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{cat.name}</span>
-                  </button>
-                ))}
-                {categories.length === 0 && <p className="col-span-full text-center text-[10px] font-bold text-slate-400 uppercase py-4">Nenhuma categoria cadastrada</p>}
-              </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+              {TRIP_FIELDS.map(field => (
+                <button
+                  key={field.id}
+                  type="button"
+                  onClick={() => toggleField(field.id)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                    formData.thirdPartyConfig?.visibleFields.includes(field.id)
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
+                    formData.thirdPartyConfig?.visibleFields.includes(field.id)
+                      ? 'bg-white border-white text-blue-600'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    {formData.thirdPartyConfig?.visibleFields.includes(field.id) && (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{field.label}</span>
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Tipos de Programação Permitidos</h4>
-                <span className="text-[9px] font-bold text-amber-500 bg-amber-50 px-2 py-1 rounded-lg">Filtre os tipos de operação permitidos</span>
-              </div>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
-                {operationTypes.map(type => (
-                  <button
-                    key={type.id}
-                    type="button"
-                    onClick={() => toggleType(type.name)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                      formData.thirdPartyConfig?.allowedTypes?.includes(type.name)
-                        ? 'bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-500/20'
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
-                      formData.thirdPartyConfig?.allowedTypes?.includes(type.name)
-                        ? 'bg-white border-white text-amber-600'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      {formData.thirdPartyConfig?.allowedTypes?.includes(type.name) && (
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{type.name}</span>
-                  </button>
-                ))}
-                {operationTypes.length === 0 && <p className="col-span-full text-center text-[10px] font-bold text-slate-400 uppercase py-4">Nenhum tipo cadastrado</p>}
-              </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Categorias Permitidas</h4>
+              <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">Filtro de viagens por categoria</span>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => toggleCategory(cat.name)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                    formData.thirdPartyConfig?.allowedCategories?.includes(cat.name)
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
+                    formData.thirdPartyConfig?.allowedCategories?.includes(cat.name)
+                      ? 'bg-white border-white text-blue-600'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    {formData.thirdPartyConfig?.allowedCategories?.includes(cat.name) && (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{cat.name}</span>
+                </button>
+              ))}
+              {categories.length === 0 && (
+                <div className="col-span-full text-center text-[10px] text-slate-400 font-bold uppercase py-4">
+                  Nenhuma categoria cadastrada
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Tipos de Programação Permitidos</h4>
+              <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">Filtro de viagens por tipo</span>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+              {operationTypes.map(type => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => toggleType(type.name)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                    formData.thirdPartyConfig?.allowedTypes?.includes(type.name)
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
+                    formData.thirdPartyConfig?.allowedTypes?.includes(type.name)
+                      ? 'bg-white border-white text-blue-600'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    {formData.thirdPartyConfig?.allowedTypes?.includes(type.name) && (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4"/></svg>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-tight leading-tight">{type.name}</span>
+                </button>
+              ))}
+              {operationTypes.length === 0 && (
+                <div className="col-span-full text-center text-[10px] text-slate-400 font-bold uppercase py-4">
+                  Nenhum tipo de programação cadastrado
+                </div>
+              )}
             </div>
           </div>
 

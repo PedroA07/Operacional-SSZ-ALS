@@ -111,7 +111,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[2].status === 'fulfilled') setPorts(responses[2].value);
       if (responses[3].status === 'fulfilled') setPreStacking(responses[3].value);
       if (responses[4].status === 'fulfilled') setStaffList(responses[4].value);
-      if (responses[5].status === 'fulfilled') setTrips(responses[5].value);
+      if (responses[5].status === 'fulfilled') {
+        console.log("Trips carregadas:", responses[5].value);
+        setTrips(responses[5].value);
+      }
       if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
       if (responses[7].status === 'fulfilled') setAvantidaRecords(responses[7].value);
       if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value);

@@ -41,7 +41,8 @@ export const authService = {
         driverId: data.driver_id || data.driverid,
         staffId: data.staff_id || data.staffid,
         status: data.status,
-        isFirstLogin: data.isfirstlogin
+        isFirstLogin: data.isfirstlogin,
+        thirdPartyConfig: data.config
       };
 
       await supabase.from('users').update({ lastlogin: nowISO, presence_status: 'online' }).eq('id', user.id);
