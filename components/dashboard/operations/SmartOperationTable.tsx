@@ -21,6 +21,7 @@ interface SmartOperationTableProps {
   hideInternalSearch?: boolean;
   getRowClassName?: (row: any) => string;
   getRowStyle?: (row: any) => React.CSSProperties;
+  noMaxHeight?: boolean;
 }
 
 const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
@@ -33,7 +34,8 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   onRowClick,
   hideInternalSearch = false,
   getRowClassName,
-  getRowStyle
+  getRowStyle,
+  noMaxHeight = false,
 }) => {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -266,7 +268,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
         </div>
       </div>
 
-      <div className="overflow-x-auto custom-scrollbar border-y border-slate-200">
+      <div className={`overflow-x-auto custom-scrollbar border-y border-slate-200 ${noMaxHeight ? '' : 'max-h-[600px] overflow-y-auto'}`}>
         <table className="w-full text-left text-[10px] border-collapse min-w-[1000px]">
           <thead className="bg-slate-100 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20 shadow-sm">
             <tr>
