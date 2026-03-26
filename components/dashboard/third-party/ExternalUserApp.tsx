@@ -39,7 +39,7 @@ const ExternalUserApp: React.FC<ExternalUserAppProps> = ({ user, onLogout }) => 
   }
 
   return (
-    <div className="bg-[#f8fafc] flex flex-col font-sans text-slate-900 h-auto">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans text-slate-900">
       {/* Header */}
       <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 md:px-10 shadow-sm z-40 shrink-0">
         <div className="flex items-center gap-4">
@@ -74,7 +74,7 @@ const ExternalUserApp: React.FC<ExternalUserAppProps> = ({ user, onLogout }) => 
       </header>
 
       {/* Main Content */}
-      <main className="p-4 md:p-10">
+      <main className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
         <div className="max-w-7xl mx-auto">
           <ExternalPortal user={user} trips={trips} />
         </div>

@@ -95,7 +95,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
   const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
   const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
-  const [selectedScheduling, setSelectedScheduling] = useState<string>('TODOS');
+  const [filterScheduling, setFilterScheduling] = useState<'all' | 'scheduled' | 'not_scheduled'>('all');
 
   useEffect(() => {
     const fetchStatuses = async () => {
@@ -193,6 +193,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     if (filterTypes.length > 0) result = result.filter(t => filterTypes.includes(t.type?.toUpperCase()));
     if (filterClientNames.length > 0) result = result.filter(t => filterClientNames.includes(t.customer?.name));
     if (filterDriverNames.length > 0) result = result.filter(t => filterDriverNames.includes(t.driver?.name));
+    
+    if (filterScheduling === 'scheduled') {
+      result = result.filter(t => t.isScheduled || !!t.scheduling);
+    } else if (filterScheduling === 'not_scheduled') {
+      result = result.filter(t => !t.isScheduled && !t.scheduling);
+    }
     
     if (startDate || endDate) {
       result = result.filter(t => {
@@ -305,7 +311,14 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
               </div>
            </div>
 
-           <OperationFilters selectedTypes={[]} onTypesChange={() => {}} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} hideModality />
+           <OperationFilters 
+             selectedTypes={[]} onTypesChange={() => {}} 
+             selectedClients={filterClientNames} onClientsChange={setFilterClientNames} 
+             selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} 
+             selectedScheduling={filterScheduling} onSchedulingChange={setFilterScheduling}
+             customers={customers} drivers={drivers} 
+             hideModality 
+           />
         </div>
         
         <div className={density === 'compact' ? 'table-compact' : ''}>
@@ -317,7 +330,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
              data={filteredTrips} 
              hideInternalSearch
              onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
-             defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']} 
+             defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'is_scheduled', 'destination_sch', 'finance', 'actions']} 
            />
         </div>
       </div>
