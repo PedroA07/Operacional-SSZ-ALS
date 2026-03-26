@@ -12,7 +12,7 @@ interface ExternalPortalProps {
 const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
   // Define quais colunas serão exibidas com base na configuração do usuário.
   // Se não houver configuração, usa um padrão.
-  const visibleFields = user.thirdPartyConfig?.visibleFields || ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'isScheduled', 'destination', 'category', 'type'];
+  const visibleFields = user.thirdPartyConfig?.visibleFields || ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'category', 'type'];
 
   // Define a data atual no formato YYYY-MM-DD
   const today = new Date().toISOString().split('T')[0];
@@ -199,19 +199,6 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
         render: (t: Trip) => renderLocation(t.customer)
       },
       { 
-        key: 'isScheduled', 
-        label: 'Agendamento', 
-        sortValue: (t: Trip) => t.isScheduled ? 'SIM' : 'NÃO',
-        render: (t: Trip) => (
-          <div className="flex items-center gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${t.isScheduled ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`} />
-            <span className={`text-[9px] font-black uppercase ${t.isScheduled ? 'text-emerald-600' : 'text-slate-400'}`}>
-              {t.isScheduled ? 'Agendado' : 'Não Agendado'}
-            </span>
-          </div>
-        )
-      },
-      { 
         key: 'destination', 
         label: 'Destino', 
         sortValue: (t: Trip) => t.destination?.name || '',
@@ -274,7 +261,6 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
         columns={columns}
         data={filteredTrips}
         defaultVisibleKeys={visibleFields}
-        noMaxHeight={true}
       />
     </div>
   );
