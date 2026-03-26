@@ -93,6 +93,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
   const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
   const [selectedFilterClient, setSelectedFilterClient] = useState<string>(clientName || 'TODOS');
+  const [selectedScheduling, setSelectedScheduling] = useState<string>('TODOS');
 
   const loadAuxData = useCallback(async () => {
     const [p, ps, cs] = await Promise.all([db.getPorts(), db.getPreStacking(), db.getCustomStatuses()]);
@@ -258,7 +259,19 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
          </div>
 
          <div className="pt-4 border-t border-slate-50">
-            <OperationFilters selectedTypes={[]} onTypesChange={() => {}} selectedClients={selectedFilterClient === 'TODOS' ? [] : [selectedFilterClient]} onClientsChange={(cl) => setSelectedFilterClient(cl[0] || 'TODOS')} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={categoryCustomers} drivers={drivers} hideModality />
+            <OperationFilters 
+              selectedTypes={[]} 
+              onTypesChange={() => {}} 
+              selectedClients={selectedFilterClient === 'TODOS' ? [] : [selectedFilterClient]} 
+              onClientsChange={(cl) => setSelectedFilterClient(cl[0] || 'TODOS')} 
+              selectedDrivers={filterDriverNames} 
+              onDriversChange={setFilterDriverNames} 
+              selectedScheduling={selectedScheduling}
+              onSchedulingChange={setSelectedScheduling}
+              customers={categoryCustomers} 
+              drivers={drivers} 
+              hideModality 
+            />
          </div>
       </div>
       
