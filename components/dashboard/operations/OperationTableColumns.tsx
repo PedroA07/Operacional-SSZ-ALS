@@ -145,13 +145,31 @@ export const getOperationTableColumns = (
       render: CustomerColumn
     },
     {
+      key: 'is_scheduled',
+      label: '7. Agendamento',
+      render: (t: Trip) => (
+        <div className="flex flex-col items-center justify-center gap-1.5 min-w-[100px]">
+          <div className={`w-8 h-8 rounded-2xl flex items-center justify-center shadow-sm transition-all ${t.isScheduled ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-slate-100 text-slate-400'}`}>
+            {t.isScheduled ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+            )}
+          </div>
+          <span className={`text-[9px] font-black uppercase tracking-widest ${t.isScheduled ? 'text-emerald-600' : 'text-slate-400'}`}>
+            {t.isScheduled ? 'Agendado' : 'Pendente'}
+          </span>
+        </div>
+      )
+    },
+    {
       key: 'destination_sch',
-      label: '7. Destino / Agendamento',
+      label: '8. Destino',
       render: (t: Trip) => DestinationColumn(t, onEditScheduling)
     },
     {
       key: 'finance',
-      label: '8. Financeiro',
+      label: '9. Financeiro',
       render: (t: Trip) => (
         <FinanceAction trip={t} user={actingUser} onRefresh={onRefreshData} />
       )
@@ -229,7 +247,7 @@ export const getOperationTableColumns = (
     },
     { 
       key: 'actions', 
-      label: '9. Opções', 
+      label: '10. Opções', 
       render: (t: Trip) => (
         <ActionsColumn 
           trip={t}

@@ -60,7 +60,8 @@ const TripForm: React.FC<TripFormProps> = ({
     category: '', container: '', tara: '', seal: '', cva: '', 
     containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', obs: '',
     customer: null, destination: null, driver: null,
-    scheduling: null 
+    scheduling: null,
+    isScheduled: false
   });
 
   const hasInitialized = useRef<string | null>(null);
@@ -194,6 +195,17 @@ const TripForm: React.FC<TripFormProps> = ({
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Previsão Início</label>
             <input required type="datetime-local" className={inputClass} value={formData.dateTime} onChange={e => setFormData({...formData, dateTime: e.target.value})} />
+          </div>
+          <div className="md:col-span-4 flex items-end pb-2">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div 
+                onClick={() => setFormData({...formData, isScheduled: !formData.isScheduled})}
+                className={`w-6 h-6 rounded-lg border-2 transition-all flex items-center justify-center ${formData.isScheduled ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-200' : 'bg-white border-slate-200 group-hover:border-emerald-300'}`}
+              >
+                {formData.isScheduled && <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>}
+              </div>
+              <span className={`text-[11px] font-black uppercase tracking-widest transition-colors ${formData.isScheduled ? 'text-emerald-600' : 'text-slate-400'}`}>Viagem Agendada?</span>
+            </label>
           </div>
         </div>
       </div>

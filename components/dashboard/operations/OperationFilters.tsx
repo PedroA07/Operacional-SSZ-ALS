@@ -9,6 +9,8 @@ interface OperationFiltersProps {
   onClientsChange: (clients: string[]) => void;
   selectedDrivers: string[];
   onDriversChange: (drivers: string[]) => void;
+  selectedScheduling: 'all' | 'scheduled' | 'not_scheduled';
+  onSchedulingChange: (val: 'all' | 'scheduled' | 'not_scheduled') => void;
   customers: Customer[];
   drivers: Driver[];
   hideModality?: boolean;
@@ -21,13 +23,15 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
   onClientsChange, 
   selectedDrivers,
   onDriversChange,
+  selectedScheduling,
+  onSchedulingChange,
   customers,
   drivers,
   hideModality = false
 }) => {
   const [clientSearch, setClientSearch] = useState('');
   const [driverSearch, setDriverSearch] = useState('');
-  const [openDropdown, setOpenDropdown] = useState<'types' | 'clients' | 'drivers' | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<'types' | 'clients' | 'drivers' | 'scheduling' | null>(null);
 
   const MODALITIES = ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
 
@@ -133,9 +137,45 @@ const OperationFilters: React.FC<OperationFiltersProps> = ({
           </div>
         )}
       </div>
+
+      {/* AGENDAMENTO */}
+      <div className="flex-1 min-w-[200px] space-y-2 relative">
+        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Agendamento</label>
+        <DropdownHeader 
+          label="AGENDAMENTO" 
+          count={selectedScheduling === 'all' ? 0 : 1} 
+          isOpen={openDropdown === 'scheduling'} 
+          onClick={() => setOpenDropdown(openDropdown === 'scheduling' ? null : 'scheduling')} 
+        />
+        {openDropdown === 'scheduling' && (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 animate-in fade-in zoom-in-95">
+             <div className="space-y-1">
+                {[
+                  { id: 'all', label: 'Todos' },
+                  { id: 'scheduled', label: 'Agendados' },
+                  { id: 'not_scheduled', label: 'Não Agendados' }
+                ].map(opt => (
+                  <label key={opt.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="scheduling_filter"
+                      checked={selectedScheduling === opt.id} 
+                      onChange={() => {
+                        onSchedulingChange(opt.id as any);
+                        setOpenDropdown(null);
+                      }} 
+                      className="w-4 h-4 rounded-full text-blue-600" 
+                    />
+                    <span className="text-[10px] font-bold uppercase">{opt.label}</span>
+                  </label>
+                ))}
+             </div>
+          </div>
+        )}
+      </div>
       
       <button 
-        onClick={() => { onTypesChange([]); onClientsChange([]); onDriversChange([]); setOpenDropdown(null); }}
+        onClick={() => { onTypesChange([]); onClientsChange([]); onDriversChange([]); onSchedulingChange('all'); setOpenDropdown(null); }}
         className="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
       >
         Limpar Seleção
