@@ -19,6 +19,8 @@ import AvantidaTab from './components/dashboard/AvantidaTab';
 import OrganizationTab from './components/dashboard/OrganizationTab';
 import ColetaDoDiaTab from './components/dashboard/ColetaDoDiaTab';
 import AutomationsTab from './components/dashboard/AutomationsTab';
+import ExternalUsersManager from './components/dashboard/third-party/ExternalUsersManager';
+import ExternalPortal from './components/dashboard/third-party/ExternalPortal';
 import Sidebar from './components/dashboard/Sidebar';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';

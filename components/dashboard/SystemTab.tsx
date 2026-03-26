@@ -7,6 +7,7 @@ import StatusManager from './admin/StatusManager';
 import ColetaTiposViagemManager from './admin/ColetaTiposViagemManager';
 import CategoryManager from './admin/CategoryManager';
 import OperationTypesManager from './admin/OperationTypesManager';
+import ExternalUsersManager from './third-party/ExternalUsersManager';
 
 interface SystemTabProps {
   onRefresh: () => Promise<void>;
@@ -145,6 +146,8 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
       <StatusManager />
 
       <ColetaTiposViagemManager />
+
+      <ExternalUsersManager onRefresh={onRefresh} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-6">

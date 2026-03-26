@@ -31,8 +31,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   staffList
 }) => {
   
-  const MenuItem = ({ tab, label, icon, adminOnly, children, forceActive = false }: any) => {
+  const MenuItem = ({ tab, label, icon, adminOnly, thirdPartyOnly, children, forceActive = false }: any) => {
     if (adminOnly && user.role !== 'admin') return null;
+    if (thirdPartyOnly && user.role !== 'third_party') return null;
     const isActive = forceActive || (tab ? activeTab === tab : false);
     const isExpanded = expandedMenus[label];
     
@@ -107,6 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <MenuItem tab={DashboardTab.ORGANIZACAO} label="Organização" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" strokeLinecap="round" strokeLinejoin="round" /></svg>} />
         <MenuItem tab={DashboardTab.COLETA_DIA} label="Coleta do Dia" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" /></svg>} />
         <MenuItem tab={DashboardTab.AUTOMACOES} label="Automações" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" /></svg>} adminOnly />
+        <MenuItem tab={DashboardTab.EXTERNAL_PORTAL} label="Portal Externo" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" strokeLinecap="round" strokeLinejoin="round" /></svg>} thirdPartyOnly />
         <MenuItem tab={DashboardTab.DOCUMENTOS} label="Documentação" icon={<Icons.Formularios />} />
         <MenuItem tab={DashboardTab.ADMINISTRATIVO} label="Financeiro" icon={<Icons.Clientes />} />
         <MenuItem tab={DashboardTab.ESTADIAS} label="Estadias" icon={<Icons.Estadias />} />
@@ -131,6 +133,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="pt-6 pb-2">
            {sidebarState === 'open' && <p className="px-5 text-[8px] font-black text-slate-600 uppercase mb-3 tracking-[0.3em]">Administração</p>}
            <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" icon={<Icons.Equipe />} />
+           <MenuItem tab={DashboardTab.EXTERNAL_USERS} label="Usuários Externos" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>} adminOnly />
            <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" icon={<Icons.Configuracoes />} adminOnly />
         </div>
       </nav>
