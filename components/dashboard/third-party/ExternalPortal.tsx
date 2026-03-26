@@ -16,7 +16,7 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
 
   // Define a data atual no formato YYYY-MM-DD
   const today = new Date().toISOString().split('T')[0];
-
+  
   // Estados para o filtro de data e busca
   const [startDate, setStartDate] = useState<string>(today);
   const [endDate, setEndDate] = useState<string>(today);

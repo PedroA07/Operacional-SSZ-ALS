@@ -341,6 +341,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                onRefresh={() => loadAllData(false)} 
              />
            )}
+           {activeTab === DashboardTab.EXTERNAL_USERS && (
+             <ExternalUsersManager onRefresh={() => loadAllData(false)} />
+           )}
+           {activeTab === DashboardTab.EXTERNAL_PORTAL && (
+             <ExternalPortal user={user} trips={trips} />
+           )}
 
         </div>
       </main>
