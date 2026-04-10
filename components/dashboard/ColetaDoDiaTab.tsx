@@ -35,6 +35,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   });
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [copied, setCopied] = useState(false);
 
   const STABILITY_DURATION = 30000;
 
@@ -464,6 +465,25 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     });
   };
 
+  const handleCopyDocOriginario = () => {
+    const docTrips = trips.filter(t => t.coletaDocGenerated);
+    if (docTrips.length === 0) {
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Nenhuma OS com Doc. Originário marcado.', type: 'error' }
+      }));
+      return;
+    }
+    const osList = docTrips.map(t => t.os).join('\n');
+    const text = `Doc. originário gerados, gentileza seguir com a emissão do CT-e:\n${osList}`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: `${docTrips.length} OS(s) copiadas!`, type: 'success' }
+      }));
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
   const getRowClassName = (t: Trip) => {
     let classes = 'transition-all duration-300 ';
     if (t.coletaDocGenerated) classes += 'line-through opacity-60 ';
@@ -584,7 +604,26 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             )}
           </div>
 
-          <button 
+          <button
+            onClick={handleCopyDocOriginario}
+            disabled={trips.filter(t => t.coletaDocGenerated).length === 0}
+            className={`px-6 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 disabled:opacity-40 flex items-center gap-2 border ${copied ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-emerald-600 border-emerald-300 hover:bg-emerald-50'}`}
+            title="Copiar OS com Doc. Originário marcado para WhatsApp"
+          >
+            {copied ? (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
+                Copiado!
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                Copiar Doc. Orig. ({trips.filter(t => t.coletaDocGenerated).length})
+              </>
+            )}
+          </button>
+
+          <button
             onClick={handleEmissaoSolicitada}
             disabled={isFinalizing}
             className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
