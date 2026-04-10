@@ -33,8 +33,9 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     }
     return [];
   });
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const today = new Date().toLocaleDateString('en-CA');
+  const [startDate, setStartDate] = useState<string>(today);
+  const [endDate, setEndDate] = useState<string>(today);
   const [copied, setCopied] = useState(false);
 
   const STABILITY_DURATION = 30000;
@@ -111,7 +112,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         
         if (startDate && normalizedTripDate < startDate) return false;
         if (endDate && normalizedTripDate > endDate) return false;
-        if (!startDate && !endDate) return normalizedTripDate >= '2026-03-16';
+        if (!startDate && !endDate) return normalizedTripDate >= new Date().toLocaleDateString('en-CA');
         
         return true;
       })

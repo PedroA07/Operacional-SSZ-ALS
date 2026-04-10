@@ -315,8 +315,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
   const [finalizingIds, setFinalizingIds] = useState<Set<string>>(new Set());
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const today = new Date().toLocaleDateString('en-CA');
+  const [startDate, setStartDate] = useState<string>(today);
+  const [endDate, setEndDate] = useState<string>(today);
   const [hiddenTripTypesColeta, setHiddenTripTypesColeta] = useState<string[] | null>(() => {
     const saved = localStorage.getItem('orgVisibleTripTypesColeta');
     if (saved) {
@@ -386,7 +387,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   // Memoização das viagens filtradas e estabilizadas
   const trips = useMemo(() => {
-    const defaultStartDateStr = '2026-03-06';
+    const defaultStartDateStr = new Date().toLocaleDateString('en-CA');
     const now = Date.now();
 
     return propTrips

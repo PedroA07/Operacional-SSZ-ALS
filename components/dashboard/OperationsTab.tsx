@@ -88,8 +88,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const today = new Date().toLocaleDateString('en-CA');
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
   
   const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
@@ -196,7 +197,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     
     if (startDate || endDate) {
       result = result.filter(t => {
-        const tripDate = t.dateTime.substring(0, 10);
+        const tripDate = t.dateTime ? t.dateTime.substring(0, 10) : '';
         if (startDate && tripDate < startDate) return false;
         if (endDate && tripDate > endDate) return false;
         return true;
