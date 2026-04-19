@@ -571,8 +571,8 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           </button>
 
           <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
-            {tiposViagem.map(tv => {
-              const type = tv.name.toUpperCase();
+            {operationTypes.map((ot: any) => {
+              const type = ot.name.toUpperCase();
               const isVisible = !hiddenTripTypes.includes(type);
               return (
                 <button
@@ -580,9 +580,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                   onClick={() => toggleTripType(type)}
                   className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
                     isVisible
-                      ? 'bg-white text-blue-600 shadow-sm border border-blue-100'
+                      ? 'bg-white shadow-sm border border-blue-100'
                       : 'text-slate-400 hover:text-slate-600'
                   }`}
+                  style={isVisible && ot.color ? { color: ot.color } : {}}
                 >
                   {type}
                 </button>
@@ -684,17 +685,22 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                 <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Tipos de Programação Visíveis</h4>
                 <p className="text-[10px] font-medium text-slate-400">Selecione os tipos de viagem que você deseja ver neste painel:</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {tiposViagem.map(tv => {
-                    const type = tv.name.toUpperCase();
+                  {operationTypes.map((ot: any) => {
+                    const type = ot.name.toUpperCase();
                     return (
                       <label key={type} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input 
+                        <input
                           type="checkbox"
                           checked={!hiddenTripTypes.includes(type)}
                           onChange={() => toggleTripType(type)}
                           className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{type}</span>
+                        <span
+                          className="text-[10px] font-black uppercase tracking-widest"
+                          style={{ color: ot.color || '#475569' }}
+                        >
+                          {type}
+                        </span>
                       </label>
                     );
                   })}
