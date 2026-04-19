@@ -132,19 +132,33 @@ export const tripRepository = {
   },
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
-    const { data, error } = await supabase
-      .from('trips')
-      .select('*')
-      .order('date_time', { ascending: false })
-      .limit(5000); 
+    // O Supabase PostgREST limita 1000 linhas por request por padrão.
+    // Para garantir que todas as viagens sejam carregadas, buscamos em lotes
+    // de 1000 usando range(), repetindo até não restar mais registros.
+    const PAGE_SIZE = 1000;
+    let allData: any[] = [];
+    let from = 0;
+    let hasMore = true;
 
-    if (error) throw error;
-    
-    if (data && data.length > 0) {
-      // Schema discovery log removed
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*')
+        .order('date_time', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        allData = allData.concat(data);
+      }
+
+      // Se o lote veio com menos registros que o tamanho máximo, chegamos ao fim
+      hasMore = (data?.length ?? 0) === PAGE_SIZE;
+      from += PAGE_SIZE;
     }
 
-    return (data || []).map(d => this.mapFromDb(d));
+    return allData.map(d => this.mapFromDb(d));
   },
 
   async save(supabase: SupabaseClient, trip: Trip, actingUser?: User) {
