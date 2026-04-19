@@ -319,7 +319,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       label: 'OS / E-mail',
       sortValue: (t: Trip) => t.os,
       render: (t: Trip) => {
-        const catColor = categories.find(c => c.name === t.category)?.color;
+        const catColor = categories.find((c: any) => c.name?.toUpperCase() === t.category?.toUpperCase())?.color;
         const typeColor = operationTypes.find(ot => ot.name?.toUpperCase() === t.type?.toUpperCase())?.color;
         return (
           <div className="flex items-center gap-3">

@@ -904,7 +904,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       label: 'OS',
       sortValue: (t: Trip) => t.os,
       render: (t: Trip) => {
-        const catColor = categories.find((c: any) => c.name === t.category)?.color;
+        const catColor = categories.find((c: any) => c.name?.toUpperCase() === t.category?.toUpperCase())?.color;
         const typeColor = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase())?.color;
         return (
           <div className="flex items-center gap-2">
