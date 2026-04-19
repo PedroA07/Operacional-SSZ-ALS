@@ -59,6 +59,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [preStackingUnits, setPreStackingUnits] = useState<(Port | PreStacking)[]>([]);
   const [ports, setPorts] = useState<Port[]>([]);
   const [customStatuses, setCustomStatuses] = useState<CustomStatus[]>([]);
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   
   const handleSetPriority = async (trip: Trip) => {
@@ -96,10 +97,11 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
   const [selectedScheduling, setSelectedScheduling] = useState<string>('TODOS');
 
   const loadAuxData = useCallback(async () => {
-    const [p, ps, cs] = await Promise.all([db.getPorts(), db.getPreStacking(), db.getCustomStatuses()]);
+    const [p, ps, cs, ot] = await Promise.all([db.getPorts(), db.getPreStacking(), db.getCustomStatuses(), db.getOperationTypes()]);
     setPorts(p);
     setPreStackingUnits([...p, ...ps]);
     setCustomStatuses(cs);
+    setOperationTypes(ot);
   }, []);
 
   useEffect(() => { loadAuxData(); }, [loadAuxData]);
@@ -186,8 +188,9 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
     handleSetPriority,
     drivers,
-    categories
-  ), [user, drivers, allTrips, categories]);
+    categories,
+    operationTypes
+  ), [user, drivers, allTrips, categories, operationTypes]);
 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
 

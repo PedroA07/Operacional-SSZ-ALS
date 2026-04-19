@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trip, User } from '../../../types';
+import { db } from '../../../utils/storage';
 import ImageViewer from '../../shared/ImageViewer';
 import DocumentViewerModal from './DocumentViewerModal';
 
@@ -15,8 +16,22 @@ interface TripDetailsViewerModalProps {
 const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen, onClose, trip, user, onManageHistory }) => {
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
   const [docPreview, setDocPreview] = useState<{ url: string; title: string } | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      Promise.all([db.getCategories(), db.getOperationTypes()]).then(([cats, opTypes]) => {
+        setCategories(cats);
+        setOperationTypes(opTypes);
+      });
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const catColor = categories.find((c: any) => c.name === trip.category)?.color;
+  const typeColor = operationTypes.find((ot: any) => ot.name?.toUpperCase() === trip.type?.toUpperCase())?.color;
 
   const SectionTitle = ({ title, icon }: { title: string; icon: React.ReactNode }) => (
     <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5 mb-3">
@@ -44,7 +59,25 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
             </div>
             <div>
               <p className="text-[7px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Dossiê Detalhado da Operação</p>
-              <h3 className="text-lg font-black uppercase leading-none">OS {trip.os} › {trip.type}</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-black uppercase leading-none">OS {trip.os}</h3>
+                {trip.type && (
+                  <span
+                    className="px-2 py-0.5 rounded text-[9px] font-black uppercase border"
+                    style={typeColor ? { backgroundColor: `${typeColor}30`, color: typeColor, borderColor: `${typeColor}60` } : { backgroundColor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+                  >
+                    {trip.type}
+                  </span>
+                )}
+                {trip.category && (
+                  <span
+                    className="px-2 py-0.5 rounded text-[9px] font-black uppercase border"
+                    style={catColor ? { backgroundColor: catColor, color: 'white', borderColor: catColor } : { backgroundColor: '#3b82f6', color: 'white', borderColor: '#3b82f6' }}
+                  >
+                    {trip.category}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -71,7 +104,17 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                     <DataItem label="Booking" value={trip.booking} color="text-blue-600" />
                     <DataItem label="Armador" value={trip.agencia || '---'} color="text-slate-500" />
                     <DataItem label="Data Programada" value={new Date(trip.dateTime).toLocaleString('pt-BR')} />
-                    <DataItem label="Categoria" value={trip.category} color="text-indigo-600" />
+                    <div className="flex flex-col">
+                      <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Categoria</span>
+                      {trip.category ? (
+                        <span
+                          className="px-2 py-0.5 rounded text-[8px] font-black uppercase border w-fit"
+                          style={catColor ? { backgroundColor: catColor, color: 'white', borderColor: catColor } : { backgroundColor: '#3b82f6', color: 'white', borderColor: '#3b82f6' }}
+                        >
+                          {trip.category}
+                        </span>
+                      ) : <span className="text-[9.5px] font-black uppercase text-slate-400">---</span>}
+                    </div>
                   </div>
                </section>
 

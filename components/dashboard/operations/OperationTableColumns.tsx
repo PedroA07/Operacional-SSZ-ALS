@@ -29,7 +29,8 @@ export const getOperationTableColumns = (
   onOpenHistoryManager: (t: Trip) => void,
   onSetPriority: any,
   allDrivers: Driver[] = [],
-  categories: Category[] = []
+  categories: Category[] = [],
+  operationTypes: any[] = []
 ) => {
   
   const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO' | 'BATCH', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,14 +106,28 @@ export const getOperationTableColumns = (
           <div className="flex flex-col gap-1">
              {(() => {
                const cat = categories.find(c => c.name.toUpperCase() === t.category?.toUpperCase());
-               const color = cat?.color || '#3b82f6';
+               const catColor = cat?.color || '#3b82f6';
+               const opType = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase());
+               const typeColor = opType?.color;
                return (
-                 <span 
-                   className="px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit text-white"
-                   style={{ backgroundColor: color, borderColor: color }}
-                 >
-                   {t.category}
-                 </span>
+                 <div className="flex flex-wrap gap-1">
+                   {t.category && (
+                     <span
+                       className="px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit text-white"
+                       style={{ backgroundColor: catColor, borderColor: catColor }}
+                     >
+                       {t.category}
+                     </span>
+                   )}
+                   {t.type && (
+                     <span
+                       className="px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit"
+                       style={typeColor ? { backgroundColor: `${typeColor}25`, color: typeColor, borderColor: `${typeColor}60` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
+                     >
+                       {t.type}
+                     </span>
+                   )}
+                 </div>
                );
              })()}
           </div>
@@ -193,9 +208,18 @@ export const getOperationTableColumns = (
     {
       key: 'type_only',
       label: 'Modalidade',
-      render: (t: Trip) => (
-        <span className="text-[10px] font-black text-slate-600 uppercase">{t.type}</span>
-      )
+      render: (t: Trip) => {
+        const opType = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase());
+        const typeColor = opType?.color;
+        return (
+          <span
+            className="px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit"
+            style={typeColor ? { backgroundColor: `${typeColor}25`, color: typeColor, borderColor: `${typeColor}60` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
+          >
+            {t.type}
+          </span>
+        );
+      }
     },
     {
       key: 'os_only',

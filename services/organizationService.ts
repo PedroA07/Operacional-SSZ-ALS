@@ -81,7 +81,8 @@ export const organizationService = {
 
     const updatedTrips = scheduledTrips.map(t => ({
       ...t,
-      isCompleted: true
+      isCompleted: true,
+      isRemovedFromOrg: true
     }));
 
     try {

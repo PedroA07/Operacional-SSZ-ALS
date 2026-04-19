@@ -19,6 +19,8 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const [finalizingIds, setFinalizingIds] = useState<Set<string>>(new Set());
   const [tiposViagem, setTiposViagem] = useState<ColetaTipoViagemOption[]>([]);
   const [defaultTipoViagemId, setDefaultTipoViagemId] = useState<string>('');
+  const [categories, setCategories] = useState<any[]>([]);
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
@@ -33,9 +35,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     }
     return [];
   });
-  const today = new Date().toLocaleDateString('en-CA');
-  const [startDate, setStartDate] = useState<string>(today);
-  const [endDate, setEndDate] = useState<string>(today);
   const [copied, setCopied] = useState(false);
 
   const STABILITY_DURATION = 30000;
@@ -46,8 +45,14 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   useEffect(() => {
     const loadTipos = async () => {
-      const tipos = await db.getColetaTiposViagem();
+      const [tipos, cats, opTypes] = await Promise.all([
+        db.getColetaTiposViagem(),
+        db.getCategories(),
+        db.getOperationTypes()
+      ]);
       setTiposViagem(tipos);
+      setCategories(cats);
+      setOperationTypes(opTypes);
       
       const templates = propTemplates;
       const savedTemplateId = localStorage.getItem('coletaDefaultTemplateId');
@@ -97,25 +102,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
-      .filter(trip => {
-        const dt = trip.scheduledDateTime || trip.dateTime;
-        if (!dt) return false;
-        const tripDateStr = dt.includes('T') ? dt.split('T')[0] : dt;
-        let normalizedTripDate = tripDateStr;
-        if (tripDateStr.includes('/')) {
-          const parts = tripDateStr.split('/');
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          }
-        }
-        
-        if (startDate && normalizedTripDate < startDate) return false;
-        if (endDate && normalizedTripDate > endDate) return false;
-        if (!startDate && !endDate) return normalizedTripDate >= new Date().toLocaleDateString('en-CA');
-        
-        return true;
-      })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
         if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
@@ -129,7 +115,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         if (dateA !== dateB) return dateA - dateB;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
-  }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes, startDate, endDate]);
+  }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -321,25 +307,44 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         }
       }
     },
-    { 
-      key: 'os', 
-      label: 'OS / E-mail', 
+    {
+      key: 'os',
+      label: 'OS / E-mail',
       sortValue: (t: Trip) => t.os,
-      render: (t: Trip) => (
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col gap-1">
-            <span className="font-black text-slate-900 text-[10px]">{t.os}</span>
-            <span className="text-[7px] bg-slate-100 px-1.5 py-0.5 rounded font-black text-slate-600 border border-slate-200 w-fit uppercase">{t.category || '---'}</span>
+      render: (t: Trip) => {
+        const catColor = categories.find(c => c.name === t.category)?.color;
+        const typeColor = operationTypes.find(ot => ot.name?.toUpperCase() === t.type?.toUpperCase())?.color;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="font-black text-slate-900 text-[10px]">{t.os}</span>
+              <div className="flex flex-wrap gap-1">
+                <span
+                  className="text-[7px] px-1.5 py-0.5 rounded font-black border w-fit uppercase"
+                  style={catColor ? { backgroundColor: `${catColor}25`, color: catColor, borderColor: `${catColor}60` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
+                >
+                  {t.category || '---'}
+                </span>
+                {t.type && (
+                  <span
+                    className="text-[7px] px-1.5 py-0.5 rounded font-black border w-fit uppercase"
+                    style={typeColor ? { backgroundColor: `${typeColor}25`, color: typeColor, borderColor: `${typeColor}60` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
+                  >
+                    {t.type}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setEmailSendModal({ isOpen: true, trip: t })}
+              className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+              title="Enviar E-mail"
+            >
+              <Mail className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={() => setEmailSendModal({ isOpen: true, trip: t })}
-            className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-            title="Enviar E-mail"
-          >
-            <Mail className="w-4 h-4" />
-          </button>
-        </div>
-      )
+        );
+      }
     },
     { 
       key: 'bookingNavioBU', 
@@ -418,7 +423,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         </button>
       )
     }
-  ], [tiposViagem, handleUpdateTrip, pendingUpdates]);
+  ], [tiposViagem, handleUpdateTrip, pendingUpdates, categories, operationTypes]);
 
   const handleEmissaoSolicitada = () => {
     const readyTrips = trips.filter(t => t.coletaEmailSent && t.coletaDocGenerated);
@@ -576,33 +581,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                 </button>
               );
             })}
-          </div>
-
-          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-            <input 
-              type="date" 
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
-              title="Data Inicial"
-            />
-            <span className="text-[10px] font-black text-slate-400 uppercase">até</span>
-            <input 
-              type="date" 
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
-              title="Data Final"
-            />
-            {(startDate || endDate) && (
-              <button 
-                onClick={() => { setStartDate(''); setEndDate(''); }}
-                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                title="Limpar Filtro"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
           </div>
 
           <button

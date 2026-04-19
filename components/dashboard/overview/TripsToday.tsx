@@ -1,6 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Trip, CustomStatus } from '../../../types';
+import { db } from '../../../utils/storage';
 import { statsCalculator } from '../../../utils/statsCalculator';
 import { statusService } from '../../../utils/statusService';
 import RichEntityFilter from './RichEntityFilter';
@@ -16,6 +17,15 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips, customStatuses = [] }) =
   const [selTypes, setSelTypes] = useState<string[]>([]);
   const [selClients, setSelClients] = useState<string[]>([]);
   const [selDrivers, setSelDrivers] = useState<string[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [operationTypes, setOperationTypes] = useState<any[]>([]);
+
+  useEffect(() => {
+    Promise.all([db.getCategories(), db.getOperationTypes()]).then(([cats, opTypes]) => {
+      setCategories(cats);
+      setOperationTypes(opTypes);
+    });
+  }, []);
 
   const todayStr = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
   const todayRaw = useMemo(() => {
@@ -105,22 +115,42 @@ const TripsToday: React.FC<TripsTodayProps> = ({ trips, customStatuses = [] }) =
              <RichEntityFilter label="Performance Equipe" stats={driverStats} selectedItems={selDrivers} onChange={setSelDrivers} icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2"/></svg>} />
           </div>
           <div className="overflow-y-auto custom-scrollbar p-5 space-y-3 flex-1 bg-slate-50/30 min-h-[300px] rounded-b-[2.5rem]">
-            {displayTrips.map(trip => (
-              <div key={trip.id} className={`p-4 border rounded-[2rem] shadow-sm flex items-center justify-between transition-all ${getTripItemStyle(trip)}`}>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                     <span className="text-[10px] font-black">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-                     <div className={`w-1 h-1 rounded-full ${trip.isCompleted || statusService.isTripCompleted(trip.status, trip, customStatuses) ? 'bg-emerald-400' : 'bg-blue-400'}`}></div>
+            {displayTrips.map(trip => {
+              const catColor = categories.find((c: any) => c.name === trip.category)?.color;
+              const typeColor = operationTypes.find((ot: any) => ot.name?.toUpperCase() === trip.type?.toUpperCase())?.color;
+              return (
+                <div key={trip.id} className={`p-4 border rounded-[2rem] shadow-sm flex items-center justify-between transition-all ${getTripItemStyle(trip)}`}>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black">{new Date(trip.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                      <div className={`w-1 h-1 rounded-full ${trip.isCompleted || statusService.isTripCompleted(trip.status, trip, customStatuses) ? 'bg-emerald-400' : 'bg-blue-400'}`}></div>
+                      {trip.category && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase border"
+                          style={catColor ? { backgroundColor: catColor, color: 'white', borderColor: catColor } : { backgroundColor: '#3b82f6', color: 'white', borderColor: '#3b82f6' }}
+                        >
+                          {trip.category}
+                        </span>
+                      )}
+                      {trip.type && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase border"
+                          style={typeColor ? { backgroundColor: `${typeColor}25`, color: typeColor, borderColor: `${typeColor}60` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
+                        >
+                          {trip.type}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-[11px] font-black uppercase truncate leading-none mt-1">{trip.driver.name}</h4>
+                    <p className="text-[9px] font-bold opacity-60 uppercase mt-0.5 truncate">{trip.customer.name}</p>
                   </div>
-                  <h4 className="text-[11px] font-black uppercase truncate leading-none mt-1">{trip.driver.name}</h4>
-                  <p className="text-[9px] font-bold opacity-60 uppercase mt-0.5 truncate">{trip.customer.name}</p>
+                  <div className="flex flex-col items-end shrink-0">
+                    <span className="bg-slate-900 text-white px-2 py-1 rounded text-[9px] font-mono font-bold uppercase shadow-sm">{trip.driver.plateHorse}</span>
+                    <span className="text-[8px] font-black uppercase mt-1.5 opacity-80">{trip.status}</span>
+                  </div>
                 </div>
-                <div className="flex flex-col items-end shrink-0">
-                   <span className="bg-slate-900 text-white px-2 py-1 rounded text-[9px] font-mono font-bold uppercase shadow-sm">{trip.driver.plateHorse}</span>
-                   <span className="text-[8px] font-black uppercase mt-1.5 opacity-80">{trip.status}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {displayTrips.length === 0 && (
               <div className="py-20 text-center opacity-30">
                  <p className="text-[10px] font-black uppercase tracking-widest">Sem viagens no filtro atual</p>

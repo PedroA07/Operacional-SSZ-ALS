@@ -309,15 +309,14 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
 
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [settingsModal, setSettingsModal] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
   const [finalizingIds, setFinalizingIds] = useState<Set<string>>(new Set());
-  const today = new Date().toLocaleDateString('en-CA');
-  const [startDate, setStartDate] = useState<string>(today);
-  const [endDate, setEndDate] = useState<string>(today);
   const [hiddenTripTypesColeta, setHiddenTripTypesColeta] = useState<string[] | null>(() => {
     const saved = localStorage.getItem('orgVisibleTripTypesColeta');
     if (saved) {
@@ -343,8 +342,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   // Auto-limpeza de atualizações que já foram confirmadas pelo servidor
   useEffect(() => {
     const fetchTypes = async () => {
-      const types = await db.getOperationTypes();
+      const [types, cats] = await Promise.all([db.getOperationTypes(), db.getCategories()]);
       setOperationTypes(types);
+      setCategories(cats);
     };
     fetchTypes();
   }, []);
@@ -387,12 +387,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   // Memoização das viagens filtradas e estabilizadas
   const trips = useMemo(() => {
-    const defaultStartDateStr = new Date().toLocaleDateString('en-CA');
     const now = Date.now();
 
     return propTrips
       .filter(trip => {
-        // Filtro por tipo de operação
         const type = trip.type?.toUpperCase() || '';
         if (activeView === 'COLETA') {
           if (hiddenTripTypesColeta !== null) {
@@ -408,27 +406,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           }
         }
 
-        // Remove viagens que estão sendo finalizadas
         if (finalizingIds.has(trip.id)) return false;
 
-        if (!trip.dateTime) return false;
-        const tripDateStr = trip.dateTime.includes('T') ? trip.dateTime.split('T')[0] : trip.dateTime;
-        let normalizedTripDate = tripDateStr;
-        if (tripDateStr.includes('/')) {
-          const parts = tripDateStr.split('/');
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            normalizedTripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          }
-        }
-        
-        if (startDate && normalizedTripDate < startDate) return false;
-        if (endDate && normalizedTripDate > endDate) return false;
-        if (!startDate && !endDate && normalizedTripDate < defaultStartDateStr) return false;
-
-        return !trip.isCompleted && !trip.isRemovedFromOrg && trip.status !== 'Viagem concluída' && 
-               trip.status !== 'Viagem cancelada' && 
-               trip.status !== 'Agendamento realizado';
+        return !trip.isRemovedFromOrg;
       })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
@@ -444,7 +424,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         if (dateB !== dateA) return dateB - dateA;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
-  }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega, startDate, endDate]);
+  }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega]);
 
   // Limpeza periódica de atualizações expiradas para liberar memória
   useEffect(() => {
@@ -910,21 +890,43 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         );
       }
     },
-    { 
-      key: 'os', 
-      label: 'OS', 
+    {
+      key: 'os',
+      label: 'OS',
       sortValue: (t: Trip) => t.os,
-      render: (t: Trip) => (
-        <div className="flex items-center gap-2">
-          <div className="flex flex-col">
-            <span className="font-black text-slate-900 text-[9px]">{t.os}</span>
-            <span className="text-[7px] font-bold text-blue-500 uppercase">{t.container || '---'}</span>
+      render: (t: Trip) => {
+        const catColor = categories.find((c: any) => c.name === t.category)?.color;
+        const typeColor = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase())?.color;
+        return (
+          <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-1">
+              <span className="font-black text-slate-900 text-[9px]">{t.os}</span>
+              <span className="text-[7px] font-bold text-blue-500 uppercase">{t.container || '---'}</span>
+              <div className="flex flex-wrap gap-1">
+                {t.category && (
+                  <span
+                    className="text-[6px] px-1 py-0.5 rounded font-black border uppercase"
+                    style={catColor ? { backgroundColor: `${catColor}25`, color: catColor, borderColor: `${catColor}60` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
+                  >
+                    {t.category}
+                  </span>
+                )}
+                {t.type && (
+                  <span
+                    className="text-[6px] px-1 py-0.5 rounded font-black border uppercase"
+                    style={typeColor ? { backgroundColor: `${typeColor}25`, color: typeColor, borderColor: `${typeColor}60` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
+                  >
+                    {t.type}
+                  </span>
+                )}
+              </div>
+            </div>
+            {pendingUpdates[t.id] && (
+              <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" title="Salvando alterações..."></div>
+            )}
           </div>
-          {pendingUpdates[t.id] && (
-            <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" title="Salvando alterações..."></div>
-          )}
-        </div>
-      )
+        );
+      }
     },
     { 
       key: 'driver', 
@@ -1065,7 +1067,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -1095,31 +1097,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Agendamentos e NF • Dados desde 06/03/2026</p>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
-            {operationTypes.map(tv => {
-              const type = tv.name.toUpperCase();
-              let isVisible = false;
-              if (activeView === 'COLETA') {
-                isVisible = hiddenTripTypesColeta !== null ? !hiddenTripTypesColeta.includes(type) : ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(type);
-              } else {
-                isVisible = hiddenTripTypesEntrega !== null ? !hiddenTripTypesEntrega.includes(type) : ['ENTREGA', 'IMPORTAÇÃO'].includes(type);
-              }
-              return (
-                <button
-                  key={type}
-                  onClick={() => toggleTripType(type)}
-                  className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
-                    isVisible
-                      ? 'bg-white text-blue-600 shadow-sm border border-blue-100'
-                      : 'text-slate-400 hover:text-slate-600'
-                  }`}
-                >
-                  {type}
-                </button>
-              );
-            })}
-          </div>
-          
+          <button
+            onClick={() => setSettingsModal(true)}
+            className="p-4 bg-white text-slate-600 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-95"
+            title="Configurações de tipos visíveis"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+
           <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
             <button 
               onClick={() => setActiveView('COLETA')}
@@ -1135,32 +1120,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             </button>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-            <input 
-              type="date" 
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
-              title="Data Inicial"
-            />
-            <span className="text-[10px] font-black text-slate-400 uppercase">até</span>
-            <input 
-              type="date" 
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
-              title="Data Final"
-            />
-            {(startDate || endDate) && (
-              <button 
-                onClick={() => { setStartDate(''); setEndDate(''); }}
-                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                title="Limpar Filtro"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            )}
-          </div>
         </div>
         
         <button 
@@ -1181,6 +1140,91 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           )}
         </button>
       </div>
+
+      {settingsModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Configurações</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Selecione quais tipos aparecem em cada visão</p>
+              </div>
+              <button onClick={() => setSettingsModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="p-8 space-y-8">
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest border-b border-slate-100 pb-2">Coleta / Exportação</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {operationTypes.map((tv: any) => {
+                    const type = tv.name.toUpperCase();
+                    const isVisible = hiddenTripTypesColeta !== null ? !hiddenTripTypesColeta.includes(type) : ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(type);
+                    return (
+                      <label key={type} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isVisible}
+                          onChange={() => {
+                            setHiddenTripTypesColeta(prev => {
+                              const current = prev !== null ? prev : operationTypes.map((t: any) => t.name.toUpperCase()).filter((t: string) => !['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t));
+                              const next = current.includes(type) ? current.filter((t: string) => t !== type) : [...current, type];
+                              localStorage.setItem('orgVisibleTripTypesColeta', JSON.stringify(next));
+                              return next;
+                            });
+                          }}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        <span
+                          className="text-[10px] font-black uppercase tracking-widest"
+                          style={{ color: tv.color || '#475569' }}
+                        >
+                          {type}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-emerald-600 uppercase tracking-widest border-b border-slate-100 pb-2">Entrega / Importação</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {operationTypes.map((tv: any) => {
+                    const type = tv.name.toUpperCase();
+                    const isVisible = hiddenTripTypesEntrega !== null ? !hiddenTripTypesEntrega.includes(type) : ['ENTREGA', 'IMPORTAÇÃO'].includes(type);
+                    return (
+                      <label key={type} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isVisible}
+                          onChange={() => {
+                            setHiddenTripTypesEntrega(prev => {
+                              const current = prev !== null ? prev : operationTypes.map((t: any) => t.name.toUpperCase()).filter((t: string) => !['ENTREGA', 'IMPORTAÇÃO'].includes(t));
+                              const next = current.includes(type) ? current.filter((t: string) => t !== type) : [...current, type];
+                              localStorage.setItem('orgVisibleTripTypesEntrega', JSON.stringify(next));
+                              return next;
+                            });
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span
+                          className="text-[10px] font-black uppercase tracking-widest"
+                          style={{ color: tv.color || '#475569' }}
+                        >
+                          {type}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button onClick={() => setSettingsModal(false)} className="px-8 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all">Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="animate-in slide-in-from-bottom-4 duration-500">
         {activeView === 'COLETA' ? (

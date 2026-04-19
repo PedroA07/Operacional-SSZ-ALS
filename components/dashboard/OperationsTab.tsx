@@ -231,8 +231,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     (t) => { setSelectedTrip(t); setIsHistoryModalOpen(true); },
     handleSetPriority,
     drivers,
-    categories
-  ), [user, onRefresh, onDeleteTrip, drivers, trips, categories]);
+    categories,
+    operationTypes
+  ), [user, onRefresh, onDeleteTrip, drivers, trips, categories, operationTypes]);
 
   if (activeView.type !== 'list') {
     return (
