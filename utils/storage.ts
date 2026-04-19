@@ -54,13 +54,14 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('users').upsert({
       id: user.id,
-      username: user.username,
+      // trim() remove espaços acidentais no início e fim antes de salvar
+      username: user.username?.trim(),
       password: user.password,
-      display_name: user.displayName,
+      display_name: user.displayName?.trim(),
       role: user.role,
       lastlogin: user.lastLogin,
       photo: user.photo,
-      position: user.position,
+      position: user.position?.trim(),
       driver_id: user.driverId,
       staff_id: user.staffId,
       status: user.status,

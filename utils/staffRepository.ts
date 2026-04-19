@@ -5,17 +5,18 @@ import { Staff } from '../types';
 export const staffRepository = {
   mapToDb: (staff: Staff) => ({
     id: staff.id,
-    name: staff.name?.toUpperCase() || '',
-    username: staff.username?.toLowerCase() || '',
+    // trim() remove espaços acidentais no início e fim antes de salvar
+    name: staff.name?.trim().toUpperCase() || '',
+    username: staff.username?.trim().toLowerCase() || '',
     role: staff.role || 'staff',
-    position: staff.position?.toUpperCase() || '',
+    position: staff.position?.trim().toUpperCase() || '',
     registration_date: staff.registrationDate || null,
     status: staff.status || 'Ativo',
     status_since: staff.statusSince || null,
     photo: staff.photo || null,
     lastlogin: staff.lastLogin || null,
-    emailcorp: staff.emailCorp?.toLowerCase() || null,
-    phonecorp: staff.phoneCorp || null
+    emailcorp: staff.emailCorp?.trim().toLowerCase() || null,
+    phonecorp: staff.phoneCorp?.trim() || null
   }),
 
   mapFromDb: (d: any): Staff => ({
