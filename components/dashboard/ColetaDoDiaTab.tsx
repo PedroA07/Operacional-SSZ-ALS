@@ -102,6 +102,13 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
+      .filter(trip => {
+        const dt = trip.scheduledDateTime || trip.dateTime;
+        if (!dt) return true;
+        const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
+        const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
+        return normalized >= '2026-04-01';
+      })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
         if (pending && (now - pending.timestamp) < STABILITY_DURATION) {

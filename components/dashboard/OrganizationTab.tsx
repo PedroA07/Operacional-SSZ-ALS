@@ -408,7 +408,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
         if (finalizingIds.has(trip.id)) return false;
 
-        return !trip.isRemovedFromOrg;
+        if (!trip.isRemovedFromOrg) {
+          const dt = trip.dateTime;
+          if (dt) {
+            const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
+            const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
+            if (normalized < '2026-04-01') return false;
+          }
+          return true;
+        }
+        return false;
       })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
@@ -421,7 +430,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       .sort((a, b) => {
         const dateA = new Date(a.dateTime || 0).getTime();
         const dateB = new Date(b.dateTime || 0).getTime();
-        if (dateB !== dateA) return dateB - dateA;
+        if (dateA !== dateB) return dateA - dateB;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
   }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega]);
