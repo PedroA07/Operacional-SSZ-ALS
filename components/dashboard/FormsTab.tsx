@@ -82,7 +82,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
               <RetiradaCheioForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
             ) : (
               <div className="flex-1 p-10 text-center text-slate-400 font-bold uppercase italic">
-                O formulário {formConfigs[selectedFormType].title} está sendo migrado para o novo padrão modular.
+                O formulário {formConfigs[selectedFormType as FormType].title} está sendo migrado para o novo padrão modular.
               </div>
             )}
           </div>
