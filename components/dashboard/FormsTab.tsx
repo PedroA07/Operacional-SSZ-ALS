@@ -8,6 +8,7 @@ import OrdemColetaForm from './forms/OrdemColetaForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import PreStackingForm from './forms/PreStackingForm';
+import RetiradaCheioForm from './forms/RetiradaCheioForm';
 import PreStackingTemplate from './forms/PreStackingTemplate';
 import DevolucaoVazioTemplate from './forms/DevolucaoVazioTemplate';
 import { maskSeal } from '../../utils/masks';
@@ -77,6 +78,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
               <LiberacaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
             ) : selectedFormType === 'DEVOLUCAO_VAZIO' ? (
               <DevolucaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
+            ) : selectedFormType === 'RETIRADA_CHEIO' ? (
+              <RetiradaCheioForm drivers={drivers} customers={customers} ports={ports} onClose={() => setIsFormModalOpen(false)} />
             ) : (
               <div className="flex-1 p-10 text-center text-slate-400 font-bold uppercase italic">
                 O formulário {formConfigs[selectedFormType].title} está sendo migrado para o novo padrão modular.
