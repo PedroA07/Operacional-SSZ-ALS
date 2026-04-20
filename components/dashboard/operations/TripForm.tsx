@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Trip, Driver, Customer, Category, Port, PreStacking } from '../../../types';
-import { lookupCarrierByContainer } from '../../../utils/carrierService';
+import ContainerInput from '../../shared/ContainerInput';
 import { maskSeal, maskCNPJ } from '../../../utils/masks';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
@@ -116,16 +116,6 @@ const TripForm: React.FC<TripFormProps> = ({
     }
     hasInitialized.current = currentId;
   }, [editTrip, initialCategory, initialCustomer, categories, operationTypes]);
-
-  const handleContainerChange = (val: string) => {
-    const container = val.toUpperCase();
-    const carrier = lookupCarrierByContainer(container);
-    setFormData((prev: any) => ({
-      ...prev,
-      container,
-      agencia: carrier ? carrier.name : prev.agencia
-    }));
-  };
 
   const inputClass = "w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
@@ -262,7 +252,15 @@ const TripForm: React.FC<TripFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
            <div className="md:col-span-3 space-y-1">
               <label className={labelClass}>Container</label>
-              <input className={inputClass} value={formData.container} onChange={e => handleContainerChange(e.target.value)} placeholder="ABCD1234567" />
+              <ContainerInput
+                value={formData.container}
+                onChange={(containerValue, carrierName) => setFormData((prev: any) => ({
+                  ...prev,
+                  container: containerValue,
+                  agencia: carrierName !== '' ? carrierName : prev.agencia,
+                }))}
+                className={inputClass}
+              />
            </div>
            <div className="md:col-span-3 space-y-1">
               <label className={labelClass}>Armador (Agência)</label>

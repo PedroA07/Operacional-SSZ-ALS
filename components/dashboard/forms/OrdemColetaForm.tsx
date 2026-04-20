@@ -7,7 +7,7 @@ import OrdemColetaTemplate from './OrdemColetaTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
 import { maskSeal } from '../../../utils/masks';
-import { lookupCarrierByContainer } from '../../../utils/carrierService';
+import ContainerInput from '../../shared/ContainerInput';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
@@ -134,10 +134,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         }
       }
 
-      if (field === 'container') {
-        const carrier = lookupCarrierByContainer(upValue);
-        next.agencia = carrier ? carrier.name : prev.agencia;
-      }
       if (field === 'seal') {
         next.seal = maskSeal(upValue);
       }
@@ -354,7 +350,18 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 space-y-6 shadow-sm">
           <p className={labelClass}>3. Dados do Equipamento</p>
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-1"><label className={labelClass}>Container</label><input className={inputClasses} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} placeholder="ABCD1234567" /></div>
+            <div className="space-y-1">
+              <label className={labelClass}>Container</label>
+              <ContainerInput
+                value={formData.container}
+                onChange={(containerValue, carrierName) => setFormData((prev: any) => ({
+                  ...prev,
+                  container: containerValue,
+                  agencia: carrierName !== '' ? carrierName : prev.agencia,
+                }))}
+                className={inputClasses}
+              />
+            </div>
             <div className="space-y-1">
               <label className={labelClass}>Tipo Container</label>
               <select className={selectClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>

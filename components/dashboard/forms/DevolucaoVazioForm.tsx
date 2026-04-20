@@ -3,7 +3,7 @@ import { Driver, Customer, Port, User } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import DevolucaoVazioTemplate from './DevolucaoVazioTemplate';
-import { lookupCarrierByContainer } from '../../../utils/carrierService';
+import ContainerInput from '../../shared/ContainerInput';
 import { db } from '../../../utils/storage';
 
 interface DevolucaoVazioFormProps {
@@ -70,10 +70,6 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
     const val = value.toUpperCase();
     setFormData(prev => {
       const next = { ...prev, [field]: val };
-      if (field === 'container') {
-        const carrier = lookupCarrierByContainer(val);
-        if (carrier) next.agencia = carrier.name;
-      }
       if (field === 'tipo' && val === '40HR') {
         next.padrao = 'REEFER';
       }
@@ -164,7 +160,15 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
            <div className="space-y-3">
               <div className="space-y-1">
                  <label className={labelClass}>Container</label>
-                 <input className={`${inputClasses} text-lg border-amber-100`} value={formData.container} onChange={e => handleInputChange('container', e.target.value)} placeholder="ABCD1234567" />
+                 <ContainerInput
+                   value={formData.container}
+                   onChange={(containerValue, carrierName) => setFormData(prev => ({
+                     ...prev,
+                     container: containerValue,
+                     agencia: carrierName !== '' ? carrierName : prev.agencia,
+                   }))}
+                   className={`${inputClasses} text-lg border-amber-100`}
+                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
