@@ -78,7 +78,10 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
       </div>
 
       {/* BLOCO CONTAINER / BARCODES / GENSET */}
-      <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', height: '115px', overflow: 'hidden' }}>
+      {/* minHeight garante altura mínima sem cortar o conteúdo que exceda */}
+      <div style={{ display: 'flex', border: borderStyle, marginBottom: '10px', minHeight: '115px' }}>
+        
+        {/* Coluna do container: ocupa 350px fixos */}
         <div style={{ width: '350px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8' }}>CONTAINER</div>
           <div style={{ fontSize: '20px', fontWeight: 900, lineHeight: '1.2', whiteSpace: 'nowrap', marginBottom: '2px' }}>{formData.container || '---'}</div>
@@ -88,24 +91,29 @@ const OrdemColetaTemplate: React.FC<OrdemColetaTemplateProps> = ({
               GENSET: {formData.genset}
             </div>
           )}
-
-          <div style={{ marginTop: 'auto', height: '32px', overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
+      
+          {/* Barcode do container sem overflow hidden para não cortar */}
+          <div style={{ marginTop: 'auto', height: '32px', display: 'flex', alignItems: 'center' }}>
             <svg id="barcode-container" style={{ width: '330px', height: '22px' }}></svg>
           </div>
         </div>
-
+      
+        {/* Coluna TARA: overflow visível para não cortar valor nem barcode */}
         <div style={{ width: '150px', padding: '10px', borderRight: borderStyle, display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textAlign: 'left' }}>TARA</div>
-          <div style={{ fontSize: '12px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', marginTop: '2px' }}>{formData.tara || '---'}</div>
-          <div style={{ marginTop: 'auto', height: '32px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* wordBreak permite quebrar se o valor for longo */}
+          <div style={{ fontSize: '12px', fontWeight: 900, wordBreak: 'break-all', marginTop: '2px' }}>{formData.tara || '---'}</div>
+          <div style={{ marginTop: 'auto', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg id="barcode-tara" style={{ width: '130px', height: '22px' }}></svg>
           </div>
         </div>
-
+      
+        {/* Coluna LACRE: mesma correção que TARA */}
         <div style={{ width: '214px', padding: '10px', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textAlign: 'left' }}>LACRE</div>
-          <div style={{ fontSize: '12px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', marginTop: '2px' }}>{formData.seal || '---'}</div>
-          <div style={{ marginTop: 'auto', height: '32px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* wordBreak permite que lacres longos (ex: MLBR1680921) não sejam cortados */}
+          <div style={{ fontSize: '12px', fontWeight: 900, wordBreak: 'break-all', marginTop: '2px' }}>{formData.seal || '---'}</div>
+          <div style={{ marginTop: 'auto', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg id="barcode-lacre" style={{ width: '130px', height: '22px' }}></svg>
           </div>
         </div>
