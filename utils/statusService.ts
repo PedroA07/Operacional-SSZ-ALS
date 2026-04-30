@@ -84,7 +84,7 @@ export const statusService = {
         label: s.name, 
         value: s.name as TripStatus, 
         color: s.color || 'bg-blue-500', 
-        isFinal: s.isFinal || index === sorted.length - 1 
+        isFinal: s.isFinal === true
       }));
     }
 

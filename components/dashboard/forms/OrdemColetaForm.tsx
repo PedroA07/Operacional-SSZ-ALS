@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port, Category, Trip, User } from '../../../types';
+import { Driver, Customer, Port, Category, User } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
@@ -31,8 +31,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
   
-  const [showSyncModal, setShowSyncModal] = useState(false);
-  const [existingTrip, setExistingTrip] = useState<Trip | null>(null);
   const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
 
   const [formData, setFormData] = useState(initialData || {
@@ -116,6 +114,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     setTimeout(generateBarcodes, 500);
   }, [formData]);
 
+
   const handleInputChange = (field: string, value: string) => {
     const upValue = (field === 'horarioAgendado' || field === 'obs') ? value : value.toUpperCase();
     
@@ -150,33 +149,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       alert("Preencha OS, Motorista e Cliente para prosseguir.");
       return;
     }
-    
     if (!formData.category) {
       alert("Por favor, selecione um vínculo (categoria) para a operação.");
       return;
     }
-
     setPendingAction(mode);
-    
-    let existing = null;
-    if (tripId) {
-      const trips = await db.getTrips();
-      existing = trips.find(t => t.id === tripId) || null;
-    } else {
-      existing = await tripSyncService.findExistingTrip(formData.os);
-    }
-    
-    if (existing) {
-      const hasChanges = tripSyncService.hasChanges(existing, formData, formData.driverId, formData.remetenteId);
-      if (hasChanges) {
-        setExistingTrip(existing);
-        setShowSyncModal(true);
-      } else {
-        await executeWorkflow(existing.id);
-      }
-    } else {
-      await executeWorkflow();
-    }
+    await executeWorkflow(tripId);
   };
 
   const executeWorkflow = async (targetTripId?: string) => {
@@ -257,25 +235,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         </div>
       </div>
 
-      {showSyncModal && existingTrip && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
-           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95">
-              <div className="p-10 bg-amber-500 text-white flex items-center gap-6">
-                 <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth="2.5"/></svg>
-                 </div>
-                 <div>
-                    <h3 className="text-xl font-black uppercase tracking-tight">Sincronizar com Operações?</h3>
-                    <p className="text-[10px] font-black uppercase opacity-80 mt-1">Os dados desta OC são diferentes da viagem registrada no painel. Deseja atualizar o dashboard?</p>
-                 </div>
-              </div>
-              <div className="p-10 flex gap-4 bg-slate-50 border-t border-slate-100">
-                 <button onClick={() => setShowSyncModal(false)} className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Ignorar Sincronismo</button>
-                 <button onClick={() => executeWorkflow(existingTrip.id)} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all">Atualizar Painel e Imprimir</button>
-              </div>
-           </div>
-        </div>
-      )}
 
       <div className="w-full lg:min-w-[560px] lg:w-[560px] p-10 overflow-y-auto space-y-8 bg-slate-50 border-r border-slate-100 custom-scrollbar relative">
         <button 
