@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Staff, User, Category } from '../../../types';
 import { db } from '../../../utils/storage';
 import { maskPhone } from '../../../utils/masks';
@@ -35,13 +35,34 @@ const StaffModal: React.FC<StaffModalProps> = ({
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
-  
+  const [showUsernameSuggestions, setShowUsernameSuggestions] = useState(false);
+
   const [tempPhotoSrc, setTempPhotoSrc] = useState<string | null>(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   const photoRef = useRef<HTMLInputElement>(null);
   const lastInitializedId = useRef<string | null | undefined>(undefined);
+
+  const usernameSuggestions = useMemo(() => {
+    if (!form.name || form.name.trim().length < 2) return [];
+    const parts = form.name.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (parts.length < 2) return [];
+    const first = parts[0];
+    const suggestions: string[] = [];
+    for (let i = 1; i < parts.length; i++) {
+      suggestions.push(`${first}.${parts[i]}`);
+    }
+    return [...new Set(suggestions)];
+  }, [form.name]);
+
+  const isDuplicateUsername = useMemo(() => {
+    if (!form.username) return false;
+    return allUsers.some(u =>
+      u.username.toLowerCase() === form.username!.toLowerCase() &&
+      u.staffId !== editingStaff?.id
+    );
+  }, [form.username, allUsers, editingStaff]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -101,7 +122,8 @@ const StaffModal: React.FC<StaffModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessing) return;
-    
+    if (isDuplicateUsername) return;
+
     setIsProcessing(true);
     try {
       const staffId = editingStaff?.id || `stf-${Date.now()}`;
@@ -234,59 +256,36 @@ const StaffModal: React.FC<StaffModalProps> = ({
             </div>
 
             <div className="p-8 bg-blue-50/50 rounded-[2.5rem] border border-blue-100 space-y-6">
-              <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Restrições de Visualização</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className={labelClass}>Categorias Visíveis</label>
-                  <div className="max-h-40 overflow-y-auto p-4 bg-white rounded-2xl border border-slate-100 space-y-2 custom-scrollbar">
-                    {categories.map(cat => (
-                      <label key={cat.id} className="flex items-center gap-3 cursor-pointer group">
-                        <input 
-                          type="checkbox" 
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                          checked={form.visibleCategories?.includes(cat.name)}
-                          onChange={e => {
-                            const current = form.visibleCategories || [];
-                            if (e.target.checked) {
-                              setForm({...form, visibleCategories: [...current, cat.name]});
-                            } else {
-                              setForm({...form, visibleCategories: current.filter(c => c !== cat.name)});
-                            }
-                          }}
-                        />
-                        <span className="text-[10px] font-bold text-slate-600 uppercase group-hover:text-blue-600 transition-colors">{cat.name}</span>
-                      </label>
-                    ))}
-                    {categories.length === 0 && <p className="text-[9px] text-slate-400 italic">Nenhuma categoria cadastrada.</p>}
+              <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Nível de Acesso</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <label className={`flex items-center gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${form.role === 'staff' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                  <input
+                    type="radio"
+                    name="role"
+                    value="staff"
+                    checked={form.role === 'staff'}
+                    onChange={() => setForm({ ...form, role: 'staff' })}
+                    className="accent-blue-600"
+                  />
+                  <div>
+                    <p className="text-[11px] font-black text-slate-800 uppercase">Comum</p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Acesso operacional padrão</p>
                   </div>
-                  <p className="text-[8px] text-slate-400 italic px-1">Se nada for selecionado, verá todas.</p>
-                </div>
-
-                <div className="space-y-3">
-                  <label className={labelClass}>Tipos de Operação Visíveis</label>
-                  <div className="max-h-40 overflow-y-auto p-4 bg-white rounded-2xl border border-slate-100 space-y-2 custom-scrollbar">
-                    {operationTypes.map(op => (
-                      <label key={op.id} className="flex items-center gap-3 cursor-pointer group">
-                        <input 
-                          type="checkbox" 
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                          checked={form.visibleOperationTypes?.includes(op.name)}
-                          onChange={e => {
-                            const current = form.visibleOperationTypes || [];
-                            if (e.target.checked) {
-                              setForm({...form, visibleOperationTypes: [...current, op.name]});
-                            } else {
-                              setForm({...form, visibleOperationTypes: current.filter(c => c !== op.name)});
-                            }
-                          }}
-                        />
-                        <span className="text-[10px] font-bold text-slate-600 uppercase group-hover:text-blue-600 transition-colors">{op.name}</span>
-                      </label>
-                    ))}
-                    {operationTypes.length === 0 && <p className="text-[9px] text-slate-400 italic">Nenhum tipo cadastrado.</p>}
+                </label>
+                <label className={`flex items-center gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${form.role === 'admin' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                  <input
+                    type="radio"
+                    name="role"
+                    value="admin"
+                    checked={form.role === 'admin'}
+                    onChange={() => setForm({ ...form, role: 'admin' })}
+                    className="accent-amber-500"
+                  />
+                  <div>
+                    <p className="text-[11px] font-black text-slate-800 uppercase">Administrador</p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Pode cadastrar colaboradores</p>
                   </div>
-                  <p className="text-[8px] text-slate-400 italic px-1">Se nada for selecionado, verá todos.</p>
-                </div>
+                </label>
               </div>
             </div>
 
@@ -295,7 +294,40 @@ const StaffModal: React.FC<StaffModalProps> = ({
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <label className={labelClass}>Usuário (Login)</label>
-                  <input required className={inputClasses} value={form.username} onChange={e => setForm({...form, username: e.target.value.toLowerCase()})} />
+                  <div className="relative">
+                    <input
+                      required
+                      className={`${inputClasses} ${isDuplicateUsername ? 'border-red-400 focus:border-red-500' : ''}`}
+                      value={form.username}
+                      onChange={e => setForm({ ...form, username: e.target.value.toLowerCase() })}
+                      onFocus={() => setShowUsernameSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowUsernameSuggestions(false), 150)}
+                      autoComplete="off"
+                    />
+                    {showUsernameSuggestions && usernameSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-4 pt-3 pb-1">Sugestões</p>
+                        {usernameSuggestions.map(s => {
+                          const taken = allUsers.some(u => u.username.toLowerCase() === s && u.staffId !== editingStaff?.id);
+                          return (
+                            <button
+                              key={s}
+                              type="button"
+                              disabled={taken}
+                              onMouseDown={() => { setForm({ ...form, username: s }); setShowUsernameSuggestions(false); }}
+                              className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors ${taken ? 'opacity-40 cursor-not-allowed' : 'hover:bg-blue-50'}`}
+                            >
+                              <span className="font-mono font-bold text-slate-800 text-xs">{s}</span>
+                              {taken && <span className="text-[8px] font-black text-red-400 uppercase">Em uso</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  {isDuplicateUsername && (
+                    <p className="text-[9px] font-black text-red-500 uppercase tracking-wide px-1">Este usuário já está em uso.</p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center pr-1">
@@ -304,14 +336,17 @@ const StaffModal: React.FC<StaffModalProps> = ({
                       <button type="button" onClick={() => setIsEditingPassword(true)} className="text-[8px] font-black text-blue-500 uppercase hover:underline">Trocar</button>
                     )}
                   </div>
-                  <input 
-                    type="text" 
-                    disabled={!isEditingPassword} 
-                    required={isEditingPassword} 
-                    className={`${inputClasses} font-mono`} 
-                    value={isEditingPassword ? form.password : '••••••••'} 
-                    onChange={e => setForm({...form, password: e.target.value})} 
+                  <input
+                    type="text"
+                    disabled={!isEditingPassword}
+                    required={isEditingPassword}
+                    className={`${inputClasses} font-mono`}
+                    value={isEditingPassword ? form.password : '••••••••'}
+                    onChange={e => setForm({...form, password: e.target.value})}
                   />
+                  {!editingStaff && (
+                    <p className="text-[8px] font-bold text-slate-400 px-1 mt-1">O colaborador será solicitado a trocar a senha no primeiro acesso.</p>
+                  )}
                 </div>
               </div>
             </div>

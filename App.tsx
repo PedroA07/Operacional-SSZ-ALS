@@ -5,13 +5,16 @@ import LoginForm from './components/LoginForm';
 import Dashboard from './Dashboard';
 import DriverPortal from './components/driver/DriverPortal';
 import ExternalUserApp from './components/dashboard/third-party/ExternalUserApp';
+import ForcePasswordChange from './components/ForcePasswordChange';
 import { db } from './utils/storage';
 import { usePresenceMonitor } from './hooks/usePresenceMonitor';
+import { authSecurity } from './utils/authSecurity';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOGIN);
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [pendingFirstLogin, setPendingFirstLogin] = useState<User | null>(null);
 
   const handleLogout = async () => {
     const oldId = user?.id;
@@ -62,14 +65,23 @@ const App: React.FC = () => {
   }, []);
 
   const handleLoginSuccess = async (userData: User) => {
-    setUser(userData);
     const now = new Date().toISOString();
     sessionStorage.setItem('als_session_start', now);
-    
-    // Atualiza presença no banco
     await db.updatePresence(userData.id, 'online');
-    
+
+    if (authSecurity.mustChangePassword(userData)) {
+      setPendingFirstLogin(userData);
+      return;
+    }
+
+    setUser(userData);
     sessionStorage.setItem('als_active_session', JSON.stringify(userData));
+    setCurrentScreen(AppScreen.DASHBOARD);
+  };
+
+  const handlePasswordChanged = (updatedUser: User) => {
+    setPendingFirstLogin(null);
+    setUser(updatedUser);
     setCurrentScreen(AppScreen.DASHBOARD);
   };
 
@@ -89,7 +101,9 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#020617]">
-      {currentScreen === AppScreen.LOGIN ? (
+      {pendingFirstLogin ? (
+        <ForcePasswordChange user={pendingFirstLogin} onDone={handlePasswordChanged} />
+      ) : currentScreen === AppScreen.LOGIN ? (
         <LoginForm onLoginSuccess={handleLoginSuccess} />
       ) : user?.role === 'driver' || user?.role === 'motoboy' ? (
         <DriverPortal user={user} onLogout={handleLogout} />

@@ -79,6 +79,15 @@ export const db = {
     return !error;
   },
 
+  changePassword: async (userId: string, newPassword: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase
+      .from('users')
+      .update({ password: newPassword, isfirstlogin: false })
+      .eq('id', userId);
+    return !error;
+  },
+
   updatePresence: async (userId: string, status: PresenceStatus) => {
     if (!supabase) return false;
     const { error } = await supabase
