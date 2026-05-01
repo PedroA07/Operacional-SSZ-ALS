@@ -24,12 +24,12 @@ interface FormsTabProps {
 
 type FormType = 'ORDEM_COLETA' | 'PRE_STACKING' | 'LIBERACAO_VAZIO' | 'DEVOLUCAO_VAZIO' | 'RETIRADA_CHEIO';
 
-const formConfigs: Record<FormType, { title: string; color: string; description: string }> = {
-  ORDEM_COLETA: { title: 'Ordem de Coleta', color: 'bg-blue-600', description: 'Emissão de OC com campos editáveis e barcodes' },
-  PRE_STACKING: { title: 'Pré-Stacking (Minuta Cheio)', color: 'bg-emerald-600', description: 'Minuta para entrega de container cheio no terminal' },
-  LIBERACAO_VAZIO: { title: 'Liberação de Vazio', color: 'bg-slate-700', description: 'Documento de autorização de retirada em depósitos' },
-  DEVOLUCAO_VAZIO: { title: 'Devolução de Vazio', color: 'bg-amber-600', description: 'Minuta de entrega de unidade vazia (Depot/Santos)' },
-  RETIRADA_CHEIO: { title: 'Retirada de Cheio', color: 'bg-indigo-600', description: 'Ordem para movimentação de container importado' },
+const formConfigs: Record<FormType, { title: string; color: string; hex: string; description: string }> = {
+  ORDEM_COLETA:   { title: 'Ordem de Coleta',            color: 'bg-blue-600',    hex: '#2563eb', description: 'Emissão de OC com campos editáveis e barcodes' },
+  PRE_STACKING:   { title: 'Pré-Stacking (Minuta Cheio)', color: 'bg-emerald-600', hex: '#059669', description: 'Minuta para entrega de container cheio no terminal' },
+  LIBERACAO_VAZIO:{ title: 'Liberação de Vazio',          color: 'bg-slate-700',   hex: '#334155', description: 'Documento de autorização de retirada em depósitos' },
+  DEVOLUCAO_VAZIO:{ title: 'Devolução de Vazio',          color: 'bg-amber-600',   hex: '#d97706', description: 'Minuta de entrega de unidade vazia (Depot/Santos)' },
+  RETIRADA_CHEIO: { title: 'Retirada de Cheio',           color: 'bg-indigo-600',  hex: '#4f46e5', description: 'Ordem para movimentação de container importado' },
 };
 
 const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStacking, initialFormId }) => {
@@ -50,7 +50,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(Object.keys(formConfigs) as FormType[]).map(type => (
             <button key={type} onClick={() => { setSelectedFormType(type); setIsFormModalOpen(true); }} className="flex items-center gap-6 p-6 bg-slate-50 border border-slate-100 rounded-[2rem] hover:bg-white hover:border-blue-500 hover:shadow-xl transition-all group text-left">
-              <div className={`w-14 h-14 ${formConfigs[type].color} rounded-2xl flex items-center justify-center shadow-lg overflow-hidden`}>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden" style={{ backgroundColor: formConfigs[type].hex }}>
                 <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
               </div>
               <div className="flex-1">
