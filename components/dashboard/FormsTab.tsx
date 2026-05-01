@@ -50,6 +50,13 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
   }, [initialFormId]);
 
   useEffect(() => {
+    const el = document.getElementById('dashboard-scroll');
+    if (!el) return;
+    el.style.overflowY = isFormModalOpen ? 'hidden' : '';
+    return () => { el.style.overflowY = ''; };
+  }, [isFormModalOpen]);
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (openHistoryType) {
         const ref = historyRefs.current[openHistoryType];
