@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import LiberacaoVazioTemplate from './LiberacaoVazioTemplate';
 import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
+import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
 
 interface LiberacaoVazioFormProps {
@@ -22,6 +23,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   const podRef = useRef<HTMLDivElement>(null);
   const [plateHorse, setPlateHorse] = useState('');
   const [plateTrailer, setPlateTrailer] = useState('');
+  const [swapModalOpen, setSwapModalOpen] = useState(false);
 
   const [remetenteSearch, setRemetenteSearch] = useState('');
   const [showRemetenteResults, setShowRemetenteResults] = useState(false);
@@ -264,6 +266,29 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
           plateTrailer={plateTrailer}
           onChangePlateHorse={setPlateHorse}
           onChangePlateTrailer={setPlateTrailer}
+        />
+        {selectedDriver && (
+          <button
+            type="button"
+            onClick={() => setSwapModalOpen(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all text-[10px] font-black uppercase tracking-widest"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+            Trocar Equipamento
+          </button>
+        )}
+        <DriverSwapModal
+          isOpen={swapModalOpen}
+          onClose={() => setSwapModalOpen(false)}
+          drivers={drivers}
+          currentDriverId={formData.driverId}
+          onConfirm={(result: DriverSwapResult) => {
+            setFormData((prev: any) => ({ ...prev, driverId: result.driver.id }));
+            setDriverSearch(result.driver.name);
+            setPlateHorse(result.selectedHorse?.plate || primaryHorse(result.driver));
+            setPlateTrailer(result.selectedTrailer?.plate || primaryTrailer(result.driver));
+            setSwapModalOpen(false);
+          }}
         />
 
         <div className="space-y-1">
