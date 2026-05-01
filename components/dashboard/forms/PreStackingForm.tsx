@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
 import PreStackingTemplate from './PreStackingTemplate';
+import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import { db } from '../../../utils/storage';
 import { maskCNPJ, maskCEP } from '../../../utils/masks';
 import { tripSyncService } from '../../../utils/tripSyncService';
@@ -87,6 +88,8 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [selectedRemetente, setSelectedRemetente] = useState<any>(null);
   const [selectedDestinatario, setSelectedDestinatario] = useState<any>(null);
+  const [plateHorse, setPlateHorse] = useState('');
+  const [plateTrailer, setPlateTrailer] = useState('');
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
@@ -123,7 +126,12 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
           remetenteId: trip.customer.id,
           category: trip.category || ''
         }));
-        setSelectedDriver(drivers.find(d => d.id === trip.driver.id));
+        const foundDriver = drivers.find(d => d.id === trip.driver.id);
+        setSelectedDriver(foundDriver || null);
+        if (foundDriver) {
+          setPlateHorse(primaryHorse(foundDriver));
+          setPlateTrailer(primaryTrailer(foundDriver));
+        }
         setSelectedRemetente(customers.find(c => c.id === trip.customer.id));
       } else {
         alert("OS não localizada no painel. Verifique o número digitado.");
@@ -166,6 +174,8 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     await executeWorkflow(existing?.id || null);
   };
 
+  const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : null;
+
   const executeWorkflow = async (existingId: string | null) => {
     setIsExporting(true);
 
@@ -173,20 +183,20 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
       setTimeout(generateBarcodes, 100);
 
       if (currentUser) {
-        await db.addNotification(currentUser, 'MINUTA_GENERATED', `Minuta Pre-Stacking: ${formData.os}`, `Minuta de carregado gerada para ${selectedDriver?.name}.`, { os: formData.os, motorista: selectedDriver?.name, placa: selectedDriver?.plateHorse });
+        await db.addNotification(currentUser, 'MINUTA_GENERATED', `Minuta Pre-Stacking: ${formData.os}`, `Minuta de carregado gerada para ${effectiveDriver?.name}.`, { os: formData.os, motorista: effectiveDriver?.name, placa: effectiveDriver?.plateHorse });
       }
 
-      if (selectedDriver && selectedRemetente) {
-         const schedulingDateTime = formData.schedulingDate && formData.schedulingTime 
-           ? `${formData.schedulingDate}T${formData.schedulingTime}:00` 
+      if (effectiveDriver && selectedRemetente) {
+         const schedulingDateTime = formData.schedulingDate && formData.schedulingTime
+           ? `${formData.schedulingDate}T${formData.schedulingTime}:00`
            : undefined;
          const finalCategory = formData.category || osCategoryService.detectCategoryFromOS(formData.os) || 'Geral';
-         
+
          const tripData = tripSyncService.mapOCtoTrip(
-           { ...formData, schedulingDate: schedulingDateTime }, 
-           selectedDriver, 
-           selectedRemetente, 
-           finalCategory, 
+           { ...formData, schedulingDate: schedulingDateTime },
+           effectiveDriver,
+           selectedRemetente,
+           finalCategory,
            selectedDestinatario,
            'Pre-Stacking'
          );
@@ -197,18 +207,18 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
       const element = captureRef.current;
       if (!element) throw new Error("Referência de captura não encontrada");
 
-      const canvas = await html2canvas(element, { 
-        scale: 3, 
-        useCORS: true, 
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
         backgroundColor: "#ffffff",
         logging: false
       });
-      
+
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      
-      const fileName = `Minuta PreStacking - ${selectedDriver?.name || 'MOTORISTA'} - ${formData.os}.pdf`;
+
+      const fileName = `Minuta PreStacking - ${effectiveDriver?.name || 'MOTORISTA'} - ${formData.os}.pdf`;
       
       if (pendingAction === 'print') {
         const blob = pdf.output('blob');
@@ -246,7 +256,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         <div ref={captureRef}>
           <PreStackingTemplate 
             formData={formData} 
-            selectedDriver={selectedDriver} 
+            selectedDriver={effectiveDriver} 
             selectedRemetente={selectedRemetente} 
             selectedDestinatario={selectedDestinatario} 
           />
@@ -263,6 +273,16 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
         
+        {selectedDriver && (
+          <DriverPlateSelector
+            driver={selectedDriver}
+            plateHorse={plateHorse}
+            plateTrailer={plateTrailer}
+            onChangePlateHorse={setPlateHorse}
+            onChangePlateTrailer={setPlateTrailer}
+          />
+        )}
+
         <div className="bg-emerald-50 p-6 rounded-[2.2rem] border border-emerald-100 shadow-sm space-y-4 mt-4">
            <div className="space-y-1">
               <label className={labelClass}>Busca por Ordem de Serviço</label>
@@ -393,7 +413,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         <div className="origin-top transform scale-[0.7] xl:scale-[0.85] shadow-[0_40px_100px_rgba(0,0,0,0.15)] rounded-sm overflow-hidden bg-white">
           <PreStackingTemplate 
             formData={formData} 
-            selectedDriver={selectedDriver} 
+            selectedDriver={effectiveDriver} 
             selectedRemetente={selectedRemetente} 
             selectedDestinatario={selectedDestinatario} 
           />

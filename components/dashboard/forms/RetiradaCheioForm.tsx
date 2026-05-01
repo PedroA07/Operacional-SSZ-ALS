@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import RetiradaCheioTemplate from './RetiradaCheioTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import ContainerInput from '../../shared/ContainerInput';
+import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import { searchService } from '../../../utils/searchService';
 import { db } from '../../../utils/storage';
 
@@ -30,6 +31,8 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const captureRef = useRef<HTMLDivElement>(null);
+  const [plateHorse, setPlateHorse] = useState('');
+  const [plateTrailer, setPlateTrailer] = useState('');
 
   const [podSearch, setPodSearch] = useState('');
   const [showPodResults, setShowPodResults] = useState(false);
@@ -76,8 +79,17 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
   const selectedCliente = customers.find(c => c.id === formData.clienteId);
   const selectedTerminal = ports.find(p => p.id === formData.terminalId);
 
+  useEffect(() => {
+    if (selectedDriver) {
+      setPlateHorse(primaryHorse(selectedDriver));
+      setPlateTrailer(primaryTrailer(selectedDriver));
+    }
+  }, [formData.driverId]);
+
+  const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : undefined;
+
   const downloadPDF = async () => {
-    if (!selectedDriver || !formData.container) {
+    if (!effectiveDriver || !formData.container) {
       alert('Preencha o Container e selecione o Motorista para continuar.');
       return;
     }
@@ -88,8 +100,8 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
           currentUser,
           'RETIRADA_CHEIO_GENERATED',
           `Minuta Emitida: ${formData.container}`,
-          `Minuta de retirada de cheio para ${selectedDriver.name} gerada com sucesso.`,
-          { container: formData.container, motorista: selectedDriver.name, placa: selectedDriver.plateHorse },
+          `Minuta de retirada de cheio para ${effectiveDriver.name} gerada com sucesso.`,
+          { container: formData.container, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse },
         );
       }
 
@@ -101,7 +113,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      pdf.save(`RETIRADA CHEIO - ${selectedDriver.name} - ${formData.container}.pdf`);
+      pdf.save(`RETIRADA CHEIO - ${effectiveDriver!.name} - ${formData.container}.pdf`);
     } catch (e) {
       console.error('Erro ao gerar PDF de Retirada de Cheio:', e);
     } finally {
@@ -122,7 +134,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
         <div ref={captureRef}>
           <RetiradaCheioTemplate
             formData={formData}
-            selectedDriver={selectedDriver}
+            selectedDriver={effectiveDriver}
             selectedCliente={selectedCliente}
             selectedTerminal={selectedTerminal}
           />
@@ -288,6 +300,13 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
             </svg>
           }
         />
+        <DriverPlateSelector
+          driver={selectedDriver}
+          plateHorse={plateHorse}
+          plateTrailer={plateTrailer}
+          onChangePlateHorse={setPlateHorse}
+          onChangePlateTrailer={setPlateTrailer}
+        />
 
         <div className="space-y-1">
           <label className={labelClass}>Observações</label>
@@ -313,7 +332,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
           <RetiradaCheioTemplate
             formData={formData}
-            selectedDriver={selectedDriver}
+            selectedDriver={effectiveDriver}
             selectedCliente={selectedCliente}
             selectedTerminal={selectedTerminal}
           />

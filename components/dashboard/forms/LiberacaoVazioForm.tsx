@@ -3,6 +3,7 @@ import { Driver, Customer, Port, User } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import LiberacaoVazioTemplate from './LiberacaoVazioTemplate';
+import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import { db } from '../../../utils/storage';
 
 interface LiberacaoVazioFormProps {
@@ -19,7 +20,9 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const podRef = useRef<HTMLDivElement>(null);
-  
+  const [plateHorse, setPlateHorse] = useState('');
+  const [plateTrailer, setPlateTrailer] = useState('');
+
   const [remetenteSearch, setRemetenteSearch] = useState('');
   const [showRemetenteResults, setShowRemetenteResults] = useState(false);
   const [driverSearch, setDriverSearch] = useState('');
@@ -78,8 +81,17 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
 
+  useEffect(() => {
+    if (selectedDriver) {
+      setPlateHorse(primaryHorse(selectedDriver));
+      setPlateTrailer(primaryTrailer(selectedDriver));
+    }
+  }, [formData.driverId]);
+
+  const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : undefined;
+
   const downloadPDF = async () => {
-    if (!selectedDriver || !formData.booking) {
+    if (!effectiveDriver || !formData.booking) {
       alert("Preencha Booking e Motorista.");
       return;
     }
@@ -91,8 +103,8 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
           currentUser,
           'LIBERACAO_GENERATED',
           `Liberação Emitida: ${formData.booking}`,
-          `Documento de liberação de vazio para ${selectedDriver.name} gerado com sucesso.`,
-          { os: formData.booking, motorista: selectedDriver.name, placa: selectedDriver.plateHorse }
+          `Documento de liberação de vazio para ${effectiveDriver.name} gerado com sucesso.`,
+          { os: formData.booking, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse }
         );
       }
 
@@ -103,8 +115,8 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      
-      pdf.save(`LIBERAÇÃO DE VAZIO - ${selectedDriver.name} - ${formData.booking}.pdf`);
+
+      pdf.save(`LIBERAÇÃO DE VAZIO - ${effectiveDriver.name} - ${formData.booking}.pdf`);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
@@ -125,7 +137,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
         <div ref={captureRef}>
           <LiberacaoVazioTemplate 
             formData={formData} 
-            selectedDriver={selectedDriver} 
+            selectedDriver={effectiveDriver} 
             selectedRemetente={selectedRemetente} 
             selectedDestinatario={null} 
           />
@@ -246,6 +258,13 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
             </div>
           )}
         </div>
+        <DriverPlateSelector
+          driver={selectedDriver}
+          plateHorse={plateHorse}
+          plateTrailer={plateTrailer}
+          onChangePlateHorse={setPlateHorse}
+          onChangePlateTrailer={setPlateTrailer}
+        />
 
         <div className="space-y-1">
           <label className={labelSlateClass}>6. Observações Adicionais</label>
@@ -265,7 +284,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
 
       <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
-          <LiberacaoVazioTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={null} />
+          <LiberacaoVazioTemplate formData={formData} selectedDriver={effectiveDriver} selectedRemetente={selectedRemetente} selectedDestinatario={null} />
         </div>
       </div>
     </div>

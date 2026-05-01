@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
 import OrdemColetaTemplate from './OrdemColetaTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import { searchService } from '../../../utils/searchService';
 import { maskSeal } from '../../../utils/masks';
 import ContainerInput from '../../shared/ContainerInput';
@@ -32,6 +33,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
   
   const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
+  const [plateHorse, setPlateHorse] = useState('');
+  const [plateTrailer, setPlateTrailer] = useState('');
 
   const [formData, setFormData] = useState(initialData || {
     date: new Date().toISOString().split('T')[0],
@@ -144,6 +147,15 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
   const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
 
+  useEffect(() => {
+    if (selectedDriver) {
+      setPlateHorse(primaryHorse(selectedDriver));
+      setPlateTrailer(primaryTrailer(selectedDriver));
+    }
+  }, [formData.driverId]);
+
+  const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : undefined;
+
   const startWorkflow = async (mode: 'download' | 'print') => {
     if (!formData.os || !formData.driverId || !formData.remetenteId) {
       alert("Preencha OS, Motorista e Cliente para prosseguir.");
@@ -158,15 +170,15 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   };
 
   const executeWorkflow = async (targetTripId?: string) => {
-    if (!currentUser || !selectedDriver || !selectedRemetente) return;
-    
+    if (!currentUser || !effectiveDriver || !selectedRemetente) return;
+
     setIsExporting(true);
 
     try {
       await ocRules.processOCWorkflow(
-        formData, 
-        selectedDriver, 
-        selectedRemetente, 
+        formData,
+        effectiveDriver,
+        selectedRemetente,
         currentUser, 
         selectedDestinatario,
         targetTripId || tripId
@@ -190,7 +202,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       
-      const fileName = `OC - ${selectedDriver.name} - ${formData.os}`;
+      const fileName = `OC - ${effectiveDriver!.name} - ${formData.os}`;
 
       if (pendingAction === 'print') {
         pdf.autoPrint();
@@ -227,7 +239,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         <div ref={captureRef}>
           <OrdemColetaTemplate 
             formData={formData} 
-            selectedDriver={selectedDriver} 
+            selectedDriver={effectiveDriver}
             selectedRemetente={selectedRemetente} 
             selectedDestinatario={selectedDestinatario} 
           />
@@ -361,7 +373,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           </div>
         </div>
 
-        <AutocompleteSearch 
+        <AutocompleteSearch
           label="5. Motorista Alocado"
           placeholder="Nome, Placa ou CPF..."
           data={drivers}
@@ -369,6 +381,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
           mapToAutocomplete={searchService.mapDriver}
           initialValue={selectedDriver ? selectedDriver.name : ''}
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>}
+        />
+        <DriverPlateSelector
+          driver={selectedDriver}
+          plateHorse={plateHorse}
+          plateTrailer={plateTrailer}
+          onChangePlateHorse={setPlateHorse}
+          onChangePlateTrailer={setPlateTrailer}
         />
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 space-y-6 shadow-sm">
@@ -394,7 +413,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
           <OrdemColetaTemplate 
             formData={formData} 
-            selectedDriver={selectedDriver} 
+            selectedDriver={effectiveDriver}
             selectedRemetente={selectedRemetente} 
             selectedDestinatario={selectedDestinatario} 
           />

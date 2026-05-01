@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import DevolucaoVazioTemplate from './DevolucaoVazioTemplate';
 import ContainerInput from '../../shared/ContainerInput';
+import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import { db } from '../../../utils/storage';
 
 interface DevolucaoVazioFormProps {
@@ -20,6 +21,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const podRef = useRef<HTMLDivElement>(null);
+  const [plateHorse, setPlateHorse] = useState('');
+  const [plateTrailer, setPlateTrailer] = useState('');
 
   const [remetenteSearch, setRemetenteSearch] = useState('');
   const [showRemetenteResults, setShowRemetenteResults] = useState(false);
@@ -81,8 +84,17 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
   const selectedDestinatario = ports.find(l => l.id === formData.destinatarioId);
 
+  useEffect(() => {
+    if (selectedDriver) {
+      setPlateHorse(primaryHorse(selectedDriver));
+      setPlateTrailer(primaryTrailer(selectedDriver));
+    }
+  }, [formData.driverId]);
+
+  const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : undefined;
+
   const downloadPDF = async () => {
-    if (!selectedDriver || !formData.container) {
+    if (!effectiveDriver || !formData.container) {
       alert("Preencha Container e Motorista para prosseguir.");
       return;
     }
@@ -94,8 +106,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
           currentUser,
           'MINUTA_GENERATED',
           `Devolução de Vazio: ${formData.container}`,
-          `Minuta de devolução para o motorista ${selectedDriver.name} gerada com sucesso.`,
-          { os: formData.container, motorista: selectedDriver.name, placa: selectedDriver.plateHorse }
+          `Minuta de devolução para o motorista ${effectiveDriver!.name} gerada com sucesso.`,
+          { os: formData.container, motorista: effectiveDriver!.name, placa: effectiveDriver!.plateHorse }
         );
       }
 
@@ -107,7 +119,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       
-      pdf.save(`DEVOLUÇÃO DE VAZIO - ${selectedDriver.name} - ${formData.container}.pdf`);
+      pdf.save(`DEVOLUÇÃO DE VAZIO - ${effectiveDriver!.name} - ${formData.container}.pdf`);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
@@ -128,7 +140,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
         <div ref={captureRef}>
           <DevolucaoVazioTemplate 
             formData={formData} 
-            selectedDriver={selectedDriver} 
+            selectedDriver={effectiveDriver} 
             selectedRemetente={selectedRemetente} 
             selectedDestinatario={selectedDestinatario} 
           />
@@ -256,6 +268,13 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
             </div>
           )}
         </div>
+        <DriverPlateSelector
+          driver={selectedDriver}
+          plateHorse={plateHorse}
+          plateTrailer={plateTrailer}
+          onChangePlateHorse={setPlateHorse}
+          onChangePlateTrailer={setPlateTrailer}
+        />
 
         <div className="space-y-1">
           <label className={labelAmberClass}>6. Observações Operacionais</label>
@@ -274,7 +293,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
 
       <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
-          <DevolucaoVazioTemplate formData={formData} selectedDriver={selectedDriver} selectedRemetente={selectedRemetente} selectedDestinatario={null} />
+          <DevolucaoVazioTemplate formData={formData} selectedDriver={effectiveDriver} selectedRemetente={selectedRemetente} selectedDestinatario={null} />
         </div>
       </div>
     </div>
