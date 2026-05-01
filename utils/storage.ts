@@ -482,6 +482,38 @@ export const db = {
     return !error;
   },
 
+  saveFormHistory: async (formType: string, formData: any, label: string, user: any) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('form_history').insert({
+      form_type: formType,
+      form_data: formData,
+      label,
+      user_name: user?.displayName || 'Sistema',
+      user_id: user?.id || null,
+    });
+    return !error;
+  },
+
+  getFormHistory: async (formType: string, limit = 8) => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('form_history')
+      .select('*')
+      .eq('form_type', formType)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) return [];
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      formType: r.form_type,
+      formData: r.form_data,
+      label: r.label || '',
+      userName: r.user_name || '',
+      userId: r.user_id || '',
+      createdAt: r.created_at,
+    }));
+  },
+
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('avantida_records').select('*').order('date', { ascending: false });

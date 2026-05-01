@@ -237,6 +237,16 @@ export interface Notification {
   };
 }
 
+export interface FormHistoryEntry {
+  id: string;
+  formType: string;
+  formData: any;
+  label: string;
+  userName: string;
+  userId: string;
+  createdAt: string;
+}
+
 export enum DashboardTab {
   INICIO = 'INICIO',
   OPERACOES = 'OPERACOES',

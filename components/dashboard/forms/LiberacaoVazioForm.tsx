@@ -12,11 +12,12 @@ interface LiberacaoVazioFormProps {
   customers: Customer[];
   ports: Port[];
   onClose: () => void;
+  initialFormData?: any;
 }
 
 const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
 
-const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, customers, ports, onClose }) => {
+const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, customers, ports, onClose, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -53,21 +54,22 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     date: new Date().toISOString().split('T')[0],
     driverId: '',
     remetenteId: '',
     destinatarioId: '',
     booking: '',
     ship: '',
-    agencia: '', 
+    agencia: '',
     pod: '',
     qtdContainer: '01',
     tipo: '40HC',
     padrao: 'CARGA GERAL',
     obs: '',
     manualLocal: ''
-  });
+  };
+  const [formData, setFormData] = useState<typeof defaultFormData>(initialFormData ?? defaultFormData);
 
   const handleInputChange = (field: string, value: string) => {
     const val = value.toUpperCase();
@@ -108,6 +110,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
           `Documento de liberação de vazio para ${effectiveDriver.name} gerado com sucesso.`,
           { os: formData.booking, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse }
         );
+        db.saveFormHistory('LIBERACAO_VAZIO', formData, formData.booking, currentUser);
       }
 
       await new Promise(r => setTimeout(r, 800));

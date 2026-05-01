@@ -187,6 +187,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       );
 
       window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
+      db.saveFormHistory('ORDEM_COLETA', formData, formData.container || formData.os, currentUser);
 
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));

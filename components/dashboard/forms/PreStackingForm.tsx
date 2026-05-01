@@ -186,6 +186,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
 
       if (currentUser) {
         await db.addNotification(currentUser, 'MINUTA_GENERATED', `Minuta Pre-Stacking: ${formData.os}`, `Minuta de carregado gerada para ${effectiveDriver?.name}.`, { os: formData.os, motorista: effectiveDriver?.name, placa: effectiveDriver?.plateHorse });
+        db.saveFormHistory('PRE_STACKING', formData, formData.container || formData.os, currentUser);
       }
 
       if (effectiveDriver && selectedRemetente) {

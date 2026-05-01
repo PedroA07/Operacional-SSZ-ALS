@@ -15,6 +15,7 @@ interface RetiradaCheioFormProps {
   customers: Customer[];
   ports: Port[];
   onClose: () => void;
+  initialFormData?: any;
 }
 
 const commonPODs = [
@@ -28,7 +29,7 @@ const commonPODs = [
   'SÃO FRANCISCO DO SUL',
 ];
 
-const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customers, ports, onClose }) => {
+const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customers, ports, onClose, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -42,7 +43,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
 
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
 
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     date: new Date().toISOString().split('T')[0],
     displayDate: new Date().toLocaleDateString('pt-BR'),
     driverId: '',
@@ -56,7 +57,8 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
     booking: '',
     obs: '',
     manualTerminal: '',
-  });
+  };
+  const [formData, setFormData] = useState<typeof defaultFormData>(initialFormData ?? defaultFormData);
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
@@ -105,6 +107,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
           `Minuta de retirada de cheio para ${effectiveDriver.name} gerada com sucesso.`,
           { container: formData.container, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse },
         );
+        db.saveFormHistory('RETIRADA_CHEIO', formData, formData.container, currentUser);
       }
 
       await new Promise(r => setTimeout(r, 800));
