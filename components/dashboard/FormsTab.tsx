@@ -50,7 +50,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(Object.keys(formConfigs) as FormType[]).map(type => (
             <button key={type} onClick={() => { setSelectedFormType(type); setIsFormModalOpen(true); }} className="flex items-center gap-6 p-6 bg-slate-50 border border-slate-100 rounded-[2rem] hover:bg-white hover:border-blue-500 hover:shadow-xl transition-all group text-left">
-              <div className={`w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden`}>
+              <div className={`w-14 h-14 ${formConfigs[type].color} rounded-2xl flex items-center justify-center shadow-lg overflow-hidden`}>
                 <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
               </div>
               <div className="flex-1">
