@@ -6,6 +6,7 @@ import { maskSeal, maskCNPJ } from '../../../utils/masks';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
 import { db } from '../../../utils/storage';
+import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 
 interface TripFormProps {
   editTrip?: Trip | null;
@@ -20,11 +21,12 @@ interface TripFormProps {
   isSaving: boolean;
 }
 
-const TripForm: React.FC<TripFormProps> = ({ 
-  editTrip, initialCategory, initialCustomer, drivers, customers, categories, ports, onCancel, onSave, isSaving 
+const TripForm: React.FC<TripFormProps> = ({
+  editTrip, initialCategory, initialCustomer, drivers, customers, categories, ports, onCancel, onSave, isSaving
 }) => {
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
+  const [swapModalOpen, setSwapModalOpen] = useState(false);
 
   useEffect(() => {
     db.getContainerTypes().then(types => {
@@ -224,26 +226,149 @@ const TripForm: React.FC<TripFormProps> = ({
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">IV. Recurso de Transporte</h4>
         {formData.driver ? (
-          <div className="bg-slate-900 p-6 rounded-3xl text-white flex items-center justify-between shadow-xl">
-             <div className="flex items-center gap-5">
+          <div className="space-y-4">
+            {/* Card do motorista */}
+            <div className="bg-slate-900 p-6 rounded-3xl text-white flex items-center justify-between shadow-xl">
+              <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center shadow-lg overflow-hidden">
-                  <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+                  {formData.driver.photo
+                    ? <img src={formData.driver.photo} className="w-full h-full object-cover" />
+                    : <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />}
                 </div>
                 <div>
-                   <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Motorista Alocado</p>
-                   <h5 className="text-sm font-black uppercase leading-none">{formData.driver.name}</h5>
-                   <div className="flex gap-3 mt-2">
-                      <span className="text-[10px] font-mono font-black text-blue-200 bg-white/5 px-2 py-0.5 rounded border border-white/10">{formData.driver.plateHorse}</span>
-                   </div>
+                  <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Motorista Alocado</p>
+                  <h5 className="text-sm font-black uppercase leading-none">{formData.driver.name}</h5>
+                  <div className="flex gap-3 mt-2">
+                    <span className="text-[10px] font-mono font-black text-blue-200 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                      {formData.driver.plateHorse || '—'}
+                    </span>
+                    {formData.driver.plateTrailer && (
+                      <span className="text-[10px] font-mono font-bold text-slate-300 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                        {formData.driver.plateTrailer}
+                      </span>
+                    )}
+                  </div>
                 </div>
-             </div>
-             <button type="button" onClick={() => setFormData({...formData, driver: null})} className="w-10 h-10 rounded-2xl bg-white/5 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
-             </button>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Botão trocar motorista */}
+                <button
+                  type="button"
+                  onClick={() => setSwapModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-blue-600/80 text-white text-[9px] font-black uppercase hover:bg-blue-500 transition-all"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  Trocar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, driver: null })}
+                  className="w-10 h-10 rounded-2xl bg-white/5 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" /></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Seletores de placa */}
+            {(() => {
+              const driverFull = drivers.find(d => d.id === formData.driver?.id);
+              const horses = driverFull?.platesHorse || (formData.driver?.plateHorse ? [{ id: 'h0', plate: formData.driver.plateHorse, isPrimary: true }] : []);
+              const trailers = driverFull?.platesTrailer || (formData.driver?.plateTrailer ? [{ id: 't0', plate: formData.driver.plateTrailer, isPrimary: true }] : []);
+              if (horses.length <= 1 && trailers.length <= 1) return null;
+              return (
+                <div className="grid grid-cols-2 gap-4">
+                  {horses.length > 1 && (
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Placa do Cavalo</p>
+                      <select
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none text-sm"
+                        value={formData.driver?.plateHorse || ''}
+                        onChange={e => {
+                          const entry = horses.find((h: any) => h.plate === e.target.value);
+                          setFormData((prev: any) => ({
+                            ...prev,
+                            driver: { ...prev.driver, plateHorse: entry?.plate || '' }
+                          }));
+                        }}
+                      >
+                        {horses.map((h: any) => (
+                          <option key={h.id} value={h.plate}>
+                            {h.plate}{h.year ? ` (${h.year})` : ''}{h.isPrimary ? ' — Principal' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {trailers.length > 1 && (
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Placa da Carreta</p>
+                      <select
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none text-sm"
+                        value={formData.driver?.plateTrailer || ''}
+                        onChange={e => {
+                          const entry = trailers.find((t: any) => t.plate === e.target.value);
+                          setFormData((prev: any) => ({
+                            ...prev,
+                            driver: { ...prev.driver, plateTrailer: entry?.plate || '' }
+                          }));
+                        }}
+                      >
+                        <option value="">— Sem carreta —</option>
+                        {trailers.map((t: any) => (
+                          <option key={t.id} value={t.plate}>
+                            {t.plate}{t.year ? ` (${t.year})` : ''}{t.isPrimary ? ' — Principal' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         ) : (
-          <AutocompleteSearch label="Buscar Motorista" placeholder="Nome ou Placa..." data={drivers} onSelect={(d) => setFormData({...formData, driver: d})} mapToAutocomplete={searchService.mapDriver} />
+          <AutocompleteSearch
+            label="Buscar Motorista"
+            placeholder="Nome ou Placa..."
+            data={drivers}
+            onSelect={(d: Driver) => {
+              const ph = d.platesHorse?.find(e => e.isPrimary) || d.platesHorse?.[0];
+              const pt = d.platesTrailer?.find(e => e.isPrimary) || d.platesTrailer?.[0];
+              setFormData({
+                ...formData,
+                driver: {
+                  ...d,
+                  plateHorse: ph?.plate || d.plateHorse || '',
+                  plateTrailer: pt?.plate || d.plateTrailer || ''
+                }
+              });
+            }}
+            mapToAutocomplete={searchService.mapDriver}
+          />
         )}
+
+        {/* Modal de troca */}
+        <DriverSwapModal
+          isOpen={swapModalOpen}
+          onClose={() => setSwapModalOpen(false)}
+          drivers={drivers}
+          currentDriverId={formData.driver?.id}
+          onConfirm={(result: DriverSwapResult) => {
+            const { driver, selectedHorse, selectedTrailer } = result;
+            setFormData((prev: any) => ({
+              ...prev,
+              driver: {
+                ...driver,
+                plateHorse: selectedHorse?.plate || driver.plateHorse || '',
+                plateTrailer: selectedTrailer?.plate || driver.plateTrailer || ''
+              }
+            }));
+            setSwapModalOpen(false);
+          }}
+        />
       </div>
 
       {/* IV. EQUIPAMENTO */}

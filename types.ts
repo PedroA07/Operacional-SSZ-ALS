@@ -422,13 +422,20 @@ export interface ColetaTipoViagemOption {
   isDefault?: boolean;
 }
 
+export interface PlateEntry {
+  id: string;
+  plate: string;
+  year?: string;
+  isPrimary: boolean;
+}
+
 export interface Driver {
   id: string;
   name: string;
   cpf: string;
   rg?: string;
   cnh?: string;
-  cnhPdfUrl?: string; 
+  cnhPdfUrl?: string;
   photo?: string;
   phone: string;
   email?: string;
@@ -436,6 +443,8 @@ export interface Driver {
   yearHorse?: string;
   plateTrailer: string;
   yearTrailer?: string;
+  platesHorse?: PlateEntry[];
+  platesTrailer?: PlateEntry[];
   driverType: 'Frota' | 'Externo' | 'Motoboy';
   status: 'Ativo' | 'Inativo';
   statusLastChangeDate?: string;
