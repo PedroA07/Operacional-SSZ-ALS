@@ -355,6 +355,7 @@ const TripForm: React.FC<TripFormProps> = ({
           isOpen={swapModalOpen}
           onClose={() => setSwapModalOpen(false)}
           driver={drivers.find(d => d.id === formData.driver?.id) || formData.driver || null}
+          drivers={drivers}
           currentPlateHorse={formData.driver?.plateHorse || ''}
           currentPlateTrailer={formData.driver?.plateTrailer || ''}
           onConfirm={(result: DriverSwapResult) => {

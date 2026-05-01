@@ -294,6 +294,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
           isOpen={swapModalOpen}
           onClose={() => setSwapModalOpen(false)}
           driver={selectedDriver || null}
+          drivers={drivers}
           currentPlateHorse={plateHorse}
           currentPlateTrailer={plateTrailer}
           onConfirm={(result: DriverSwapResult) => {
