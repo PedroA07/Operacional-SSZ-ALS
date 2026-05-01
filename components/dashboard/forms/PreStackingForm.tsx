@@ -298,15 +298,12 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
         <DriverSwapModal
           isOpen={swapModalOpen}
           onClose={() => setSwapModalOpen(false)}
-          drivers={drivers}
-          currentDriverId={formData.driverId}
+          driver={selectedDriver || null}
+          currentPlateHorse={plateHorse}
+          currentPlateTrailer={plateTrailer}
           onConfirm={(result: DriverSwapResult) => {
-            const foundDriver = drivers.find(d => d.id === result.driver.id) || result.driver;
-            setSelectedDriver(foundDriver);
-            setFormData((prev: any) => ({ ...prev, driverId: result.driver.id }));
-            setPlateHorse(result.selectedHorse?.plate || primaryHorse(result.driver));
-            setPlateTrailer(result.selectedTrailer?.plate || primaryTrailer(result.driver));
-            setSwapModalOpen(false);
+            setPlateHorse(result.plateHorse);
+            setPlateTrailer(result.plateTrailer);
           }}
         />
 

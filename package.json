@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "lint": "tsc --noEmit",
-    "build": "npx tsc && vite build",
+    "build": "node node_modules/typescript/bin/tsc && vite build",
     "preview": "vite preview",
     "migrate-r2": "node scripts/migrateToR2.js"
   },

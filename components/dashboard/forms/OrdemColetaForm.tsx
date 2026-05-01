@@ -405,13 +405,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         <DriverSwapModal
           isOpen={swapModalOpen}
           onClose={() => setSwapModalOpen(false)}
-          drivers={drivers}
-          currentDriverId={formData.driverId}
+          driver={selectedDriver || null}
+          currentPlateHorse={plateHorse}
+          currentPlateTrailer={plateTrailer}
           onConfirm={(result: DriverSwapResult) => {
-            setFormData((prev: any) => ({ ...prev, driverId: result.driver.id }));
-            setPlateHorse(result.selectedHorse?.plate || primaryHorse(result.driver));
-            setPlateTrailer(result.selectedTrailer?.plate || primaryTrailer(result.driver));
-            setSwapModalOpen(false);
+            setPlateHorse(result.plateHorse);
+            setPlateTrailer(result.plateTrailer);
           }}
         />
 
