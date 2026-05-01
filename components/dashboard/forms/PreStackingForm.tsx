@@ -168,7 +168,6 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
 
   const executeWorkflow = async (existingId: string | null) => {
     setIsExporting(true);
-    setShowSyncModal(false);
 
     try {
       setTimeout(generateBarcodes, 100);

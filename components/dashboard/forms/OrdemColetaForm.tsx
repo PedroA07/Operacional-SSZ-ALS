@@ -161,8 +161,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     if (!currentUser || !selectedDriver || !selectedRemetente) return;
     
     setIsExporting(true);
-    setShowSyncModal(false);
-    
+
     try {
       await ocRules.processOCWorkflow(
         formData, 
