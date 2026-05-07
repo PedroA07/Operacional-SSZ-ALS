@@ -61,7 +61,11 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   
   const [isSavingStatus, setIsSavingStatus] = useState(false);
-  const [isTableFullscreen, setIsTableFullscreen] = useState(false);
+
+  // Detecta se foi aberto como nova guia e restaura filtros
+  const isStandaloneTab = useMemo(() => {
+    return new URLSearchParams(window.location.search).get('view') === 'ops';
+  }, []);
   
   const handleSetPriority = async (trip: Trip) => {
     if (isSavingStatus) return;
@@ -86,17 +90,26 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     }
   };
 
-  const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>('geral');
-  const [searchQuery, setSearchQuery] = useState('');
-  
+  // Lazy initializers leem estado salvo quando aberto como nova guia
+  const getSavedState = () => {
+    try {
+      const raw = localStorage.getItem('als_ops_newtab_state');
+      if (!raw) return null;
+      const state = JSON.parse(raw);
+      if (Date.now() - (state._ts || 0) > 15000) return null; // expira em 15s
+      return state;
+    } catch { return null; }
+  };
+
   const today = new Date().toLocaleDateString('en-CA');
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
-  
-  const [density, setDensity] = useState<'compact' | 'comfortable'>('compact');
-  const [filterTypes, setFilterTypes] = useState<string[]>([]);
-  const [filterClientNames, setFilterClientNames] = useState<string[]>([]);
-  const [filterDriverNames, setFilterDriverNames] = useState<string[]>([]);
+  const [activeStatusTab, setActiveStatusTab] = useState<'geral' | 'ativas' | 'concluida' | 'cancelada'>(() => getSavedState()?.activeStatusTab || 'geral');
+  const [searchQuery, setSearchQuery] = useState<string>(() => getSavedState()?.searchQuery || '');
+  const [startDate, setStartDate] = useState<string>(() => getSavedState()?.startDate ?? today);
+  const [endDate, setEndDate] = useState<string>(() => getSavedState()?.endDate ?? today);
+  const [density, setDensity] = useState<'compact' | 'comfortable'>(() => getSavedState()?.density || 'compact');
+  const [filterTypes, setFilterTypes] = useState<string[]>(() => getSavedState()?.filterTypes || []);
+  const [filterClientNames, setFilterClientNames] = useState<string[]>(() => getSavedState()?.filterClientNames || []);
+  const [filterDriverNames, setFilterDriverNames] = useState<string[]>(() => getSavedState()?.filterDriverNames || []);
   const [selectedScheduling, setSelectedScheduling] = useState<string>('TODOS');
 
   useEffect(() => {
@@ -334,14 +347,30 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         
         <div className="flex justify-end mb-2">
           <button
-            onClick={() => setIsTableFullscreen(true)}
+            onClick={() => {
+              // Salva o estado atual dos filtros para ser restaurado na nova guia
+              const state = {
+                activeStatusTab,
+                searchQuery,
+                startDate,
+                endDate,
+                density,
+                filterTypes,
+                filterClientNames,
+                filterDriverNames,
+                _ts: Date.now()
+              };
+              localStorage.setItem('als_ops_newtab_state', JSON.stringify(state));
+              // Abre nova guia real com parâmetro que ativa auto-navegação para Operações
+              window.open(window.location.href.split('?')[0] + '?view=ops', '_blank');
+            }}
             className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-2xl text-[9px] font-black uppercase text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:shadow-sm transition-all"
-            title="Expandir tabela para visualização ampliada"
+            title="Abrir tabela em nova aba do navegador"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
-            Abrir em Tela Cheia
+            Abrir em Nova Guia
           </button>
         </div>
 
@@ -357,51 +386,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
              defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']}
            />
         </div>
-
-        {/* Modo Tela Cheia */}
-        {isTableFullscreen && (
-          <div className="fixed inset-0 z-[2000] bg-[#f8fafc] flex flex-col">
-            <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-slate-200 shadow-sm shrink-0">
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Painel Operacional</p>
-                <h2 className="font-black text-slate-800 text-base uppercase tracking-tight">
-                  Programações — Visualização Ampliada
-                  <span className="ml-3 text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg">{filteredTrips.length} registros</span>
-                </h2>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
-                  <button onClick={() => setDensity('compact')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${density === 'compact' ? 'bg-slate-900 text-white shadow' : 'text-slate-400 hover:bg-slate-50'}`}>Compacto</button>
-                  <button onClick={() => setDensity('comfortable')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${density === 'comfortable' ? 'bg-slate-900 text-white shadow' : 'text-slate-400 hover:bg-slate-50'}`}>Amplo</button>
-                </div>
-                <button
-                  onClick={() => setIsTableFullscreen(false)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase hover:bg-red-600 transition-all"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Fechar
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-hidden px-6 py-4">
-              <div className={`h-full overflow-auto custom-scrollbar ${density === 'compact' ? 'table-compact' : ''}`}>
-                <SmartOperationTable
-                  userId={user.id}
-                  componentId="ops-fullscreen"
-                  title=""
-                  columns={columns}
-                  data={filteredTrips}
-                  hideInternalSearch
-                  onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
-                  defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']}
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />

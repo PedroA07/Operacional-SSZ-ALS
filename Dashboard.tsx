@@ -70,6 +70,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
 
+  // Detecta abertura via nova guia (?view=ops) e navega direto para Operações
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('view') === 'ops') {
+      setActiveTab(DashboardTab.OPERACOES);
+    }
+  }, []);
+
   // CONSTRUÇÃO DINÂMICA DAS OPERAÇÕES BASEADA NO BANCO DE DADOS
   const availableOps = useMemo<OperationDefinition[]>(() => {
     return categories

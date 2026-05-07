@@ -94,45 +94,48 @@ export const getOperationTableColumns = (
   };
 
   return [
-    { 
-      key: 'dateTime', 
-      label: '1. Programação / Tipo', 
-      render: (t: Trip) => (
-        <div className="flex flex-col gap-1.5 min-w-[100px]">
-          <div className="flex flex-col gap-0.5">
-            <span className="font-black text-slate-800 text-[11px] leading-tight">{new Date(t.dateTime).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
-            <span className="font-black text-blue-600 text-[11px] leading-tight">{new Date(t.dateTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+    {
+      key: 'dateTime',
+      label: '1. Programação / Tipo',
+      render: (t: Trip) => {
+        const cat = categories.find(c => c.name.toUpperCase() === t.category?.toUpperCase());
+        const catColor = cat?.color || '#3b82f6';
+        const opType = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase());
+        const typeColor = opType?.color;
+        const d = new Date(t.dateTime);
+        return (
+          <div className="flex flex-col gap-1 w-[88px]">
+            {/* Data e hora na mesma linha */}
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="font-black text-slate-800 text-[10px] leading-none">
+                {d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+              </span>
+              <span className="font-black text-blue-600 text-[10px] leading-none">
+                {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+            {/* Badges compactos */}
+            <div className="flex flex-col gap-0.5">
+              {t.category && (
+                <span
+                  className="px-1.5 py-px rounded text-[7px] font-black uppercase border w-fit text-white leading-tight"
+                  style={{ backgroundColor: catColor, borderColor: catColor }}
+                >
+                  {t.category}
+                </span>
+              )}
+              {t.type && (
+                <span
+                  className="px-1.5 py-px rounded text-[7px] font-black uppercase border w-fit leading-tight"
+                  style={typeColor ? { backgroundColor: `${typeColor}22`, color: typeColor, borderColor: `${typeColor}55` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
+                >
+                  {t.type}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col gap-1">
-             {(() => {
-               const cat = categories.find(c => c.name.toUpperCase() === t.category?.toUpperCase());
-               const catColor = cat?.color || '#3b82f6';
-               const opType = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase());
-               const typeColor = opType?.color;
-               return (
-                 <div className="flex flex-wrap gap-1">
-                   {t.category && (
-                     <span
-                       className="px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit text-white"
-                       style={{ backgroundColor: catColor, borderColor: catColor }}
-                     >
-                       {t.category}
-                     </span>
-                   )}
-                   {t.type && (
-                     <span
-                       className="px-2 py-0.5 rounded text-[8px] font-black uppercase border shadow-sm w-fit"
-                       style={typeColor ? { backgroundColor: `${typeColor}25`, color: typeColor, borderColor: `${typeColor}60` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
-                     >
-                       {t.type}
-                     </span>
-                   )}
-                 </div>
-               );
-             })()}
-          </div>
-        </div>
-      )
+        );
+      }
     },
     { 
       key: 'os_status', 
