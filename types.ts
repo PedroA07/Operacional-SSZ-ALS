@@ -532,10 +532,11 @@ export interface Staff {
   visibleOperationTypes?: string[];
 }
 
-export interface OperationDefinition { 
-  id: string; 
-  category: string; 
-  clients: { name: string; hasDedicatedPage: boolean }[]; 
+export interface OperationDefinition {
+  id: string;
+  category: string;
+  color?: string;
+  clients: { name: string; hasDedicatedPage: boolean }[];
 }
 
 export interface WeatherData {

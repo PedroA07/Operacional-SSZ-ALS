@@ -97,7 +97,7 @@ export const getOperationTableColumns = (
     {
       key: 'dateTime',
       label: '1. Programação / Tipo',
-      width: 90,
+      width: 110,
       render: (t: Trip) => {
         const cat = categories.find(c => c.name.toUpperCase() === t.category?.toUpperCase());
         const catColor = cat?.color || '#3b82f6';
@@ -105,13 +105,13 @@ export const getOperationTableColumns = (
         const typeColor = opType?.color;
         const d = new Date(t.dateTime);
         return (
-          <div className="flex flex-col gap-1 w-[88px]">
-            {/* Data e hora na mesma linha */}
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="font-black text-slate-800 text-[10px] leading-none">
+          <div className="flex flex-col gap-1.5 w-[106px]">
+            {/* Data e hora */}
+            <div className="flex flex-col gap-0.5">
+              <span className="font-black text-slate-800 text-[13px] leading-none">
                 {d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
               </span>
-              <span className="font-black text-blue-600 text-[10px] leading-none">
+              <span className="font-black text-blue-600 text-[12px] leading-none">
                 {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
@@ -119,7 +119,7 @@ export const getOperationTableColumns = (
             <div className="flex flex-col gap-0.5">
               {t.category && (
                 <span
-                  className="px-1.5 py-px rounded text-[7px] font-black uppercase border w-fit text-white leading-tight"
+                  className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase border w-fit text-white leading-tight"
                   style={{ backgroundColor: catColor, borderColor: catColor }}
                 >
                   {t.category}
@@ -127,7 +127,7 @@ export const getOperationTableColumns = (
               )}
               {t.type && (
                 <span
-                  className="px-1.5 py-px rounded text-[7px] font-black uppercase border w-fit leading-tight"
+                  className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase border w-fit leading-tight"
                   style={typeColor ? { backgroundColor: `${typeColor}22`, color: typeColor, borderColor: `${typeColor}55` } : { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' }}
                 >
                   {t.type}

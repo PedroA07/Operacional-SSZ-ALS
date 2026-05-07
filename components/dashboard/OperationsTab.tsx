@@ -294,80 +294,98 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         </div>
       </div>
 
-      <div className="pt-8 border-t border-slate-200 space-y-6">
-        <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
-           <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
-              <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-1 w-full lg:w-auto overflow-x-auto">
-                {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
-                  <button key={tab} onClick={() => setActiveStatusTab(tab as any)} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>{tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}</button>
-                ))}
-              </div>
-              
-              <div className="flex-1 w-full max-w-md relative group">
-                 <input 
-                   type="text" 
-                   placeholder="BUSCAR OS, CONTAINER OU MOTORISTA..."
-                   className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
-                   value={searchQuery}
-                   onChange={e => setSearchQuery(e.target.value)}
-                 />
-                 <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              </div>
+      <div className="pt-8 border-t border-slate-200 space-y-4">
+        <div className="bg-white px-6 py-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
 
-              <DateRangeFilter startDate={startDate} onStartDateChange={setStartDate} endDate={endDate} onEndDateChange={setEndDate} onClear={() => { setStartDate(''); setEndDate(''); }} />
-           </div>
+          {/* Linha 1: abas de status + botão nova guia */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="bg-slate-100 p-1 rounded-xl flex gap-1 overflow-x-auto shrink-0">
+              {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveStatusTab(tab as any)}
+                  className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white shadow' : 'text-slate-400 hover:bg-white hover:text-slate-600'}`}
+                >
+                  {tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                const state = { activeStatusTab, searchQuery, startDate, endDate, density, filterTypes, filterClientNames, filterDriverNames, _ts: Date.now() };
+                localStorage.setItem('als_ops_newtab_state', JSON.stringify(state));
+                window.open(window.location.href.split('?')[0] + '?view=ops', '_blank');
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-all shrink-0"
+              title="Abrir tabela em nova aba do navegador"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Nova Guia
+            </button>
+          </div>
 
-           <div className="flex flex-col gap-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Filtro por Tipo de Operação</p>
-              <div className="flex flex-wrap gap-2">
-                 <button 
-                   onClick={() => setFilterTypes([])}
-                   className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${filterTypes.length === 0 ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'}`}
-                 >
-                   Todas as Modalidades
-                 </button>
-                 {operationTypes.map(op => (
-                   <button 
-                     key={op.id}
-                     onClick={() => setFilterTypes(prev => prev.includes(op.name) ? prev.filter(t => t !== op.name) : [...prev, op.name])}
-                     className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${filterTypes.includes(op.name) ? 'bg-slate-900 border-slate-900 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-500 hover:text-blue-600'}`}
-                   >
-                     {op.name}
-                   </button>
-                 ))}
-              </div>
-           </div>
+          {/* Linha 2: busca + datas inline */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-[180px] relative group">
+              <input
+                type="text"
+                placeholder="BUSCAR OS, CONTAINER, MOTORISTA..."
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+              <svg className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">De</span>
+              <input
+                type="date"
+                className="px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-[10px] font-bold text-slate-700 focus:border-blue-500 focus:bg-white outline-none transition-all"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">Até</span>
+              <input
+                type="date"
+                className="px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-[10px] font-bold text-slate-700 focus:border-blue-500 focus:bg-white outline-none transition-all"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-red-50 hover:text-red-500 text-slate-400 text-[9px] font-black uppercase transition-all shrink-0"
+                title="Limpar datas"
+              >✕</button>
+            )}
+          </div>
 
-           <OperationFilters selectedTypes={[]} onTypesChange={() => {}} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} hideModality />
-        </div>
-        
-        <div className="flex justify-end mb-2">
-          <button
-            onClick={() => {
-              // Salva o estado atual dos filtros para ser restaurado na nova guia
-              const state = {
-                activeStatusTab,
-                searchQuery,
-                startDate,
-                endDate,
-                density,
-                filterTypes,
-                filterClientNames,
-                filterDriverNames,
-                _ts: Date.now()
-              };
-              localStorage.setItem('als_ops_newtab_state', JSON.stringify(state));
-              // Abre nova guia real com parâmetro que ativa auto-navegação para Operações
-              window.open(window.location.href.split('?')[0] + '?view=ops', '_blank');
-            }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-2xl text-[9px] font-black uppercase text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:shadow-sm transition-all"
-            title="Abrir tabela em nova aba do navegador"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-            Abrir em Nova Guia
-          </button>
+          {/* Linha 3: modalidades + filtros de cliente/motorista */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setFilterTypes([])}
+              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${filterTypes.length === 0 ? 'bg-blue-600 border-blue-600 text-white shadow' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-400 hover:text-blue-600'}`}
+            >
+              Todas
+            </button>
+            {operationTypes.map(op => (
+              <button
+                key={op.id}
+                onClick={() => setFilterTypes(prev => prev.includes(op.name) ? prev.filter(t => t !== op.name) : [...prev, op.name])}
+                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${filterTypes.includes(op.name) ? 'bg-slate-900 border-slate-900 text-white shadow' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-400 hover:text-blue-600'}`}
+              >
+                {op.name}
+              </button>
+            ))}
+            <div className="w-px h-5 bg-slate-200 mx-0.5 hidden sm:block" />
+            <OperationFilters selectedTypes={[]} onTypesChange={() => {}} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} hideModality />
+          </div>
+
         </div>
 
         <div className={density === 'compact' ? 'table-compact' : ''}>

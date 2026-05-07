@@ -84,6 +84,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         return {
           id: cat.id,
           category: cat.name,
+          color: cat.color,
           clients: linkedClients
         };
       })

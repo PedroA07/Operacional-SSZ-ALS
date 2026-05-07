@@ -56,6 +56,7 @@ const StandaloneOperationsPage: React.FC<StandaloneOperationsPageProps> = ({ use
       .map(cat => ({
         id: cat.id,
         category: cat.name,
+        color: cat.color,
         clients: customers
           .filter(c => c.operations?.some(op => op.toUpperCase() === cat.name.toUpperCase()))
           .map(c => ({ name: c.name, hasDedicatedPage: true })),
