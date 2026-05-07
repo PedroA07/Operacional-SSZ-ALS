@@ -74,12 +74,12 @@ const StandaloneOperationsPage: React.FC<StandaloneOperationsPageProps> = ({ use
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[#f8fafc] font-sans text-slate-900 overflow-hidden">
+    <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900">
       <NotificationToast />
       <SimpleToast />
 
-      {/* Header mínimo */}
-      <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm shrink-0 z-50">
+      {/* Header fixo no topo */}
+      <div className="sticky top-0 z-50 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm">
             <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover" />
@@ -114,8 +114,8 @@ const StandaloneOperationsPage: React.FC<StandaloneOperationsPageProps> = ({ use
         </div>
       </div>
 
-      {/* Painel operacional completo com filtros */}
-      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar" id="dashboard-scroll">
+      {/* Painel operacional — scroll natural da página */}
+      <div className="p-8">
         <OperationsTab
           user={user}
           availableOps={availableOps}
