@@ -35,10 +35,11 @@ interface OperationsTabProps {
   setActiveView: (view: any) => void;
   onDeleteTrip: (id: string) => void;
   onRefresh: () => void;
+  noMaxHeight?: boolean; // quando true, tabela expande livremente (scroll da página)
 }
 
-const OperationsTab: React.FC<OperationsTabProps> = ({ 
-  user, drivers, customers, ports, trips, categories, preStacking, availableOps, activeView, setActiveView, onDeleteTrip, onRefresh 
+const OperationsTab: React.FC<OperationsTabProps> = ({
+  user, drivers, customers, ports, trips, categories, preStacking, availableOps, activeView, setActiveView, onDeleteTrip, onRefresh, noMaxHeight = false
 }) => {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -396,6 +397,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
              columns={columns}
              data={filteredTrips}
              hideInternalSearch
+             noMaxHeight={noMaxHeight}
              onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
              defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']}
            />

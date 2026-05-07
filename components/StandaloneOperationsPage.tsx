@@ -127,6 +127,7 @@ const StandaloneOperationsPage: React.FC<StandaloneOperationsPageProps> = ({ use
           preStacking={preStacking}
           activeView={{ type: 'list' }}
           setActiveView={() => {}}
+          noMaxHeight
           onDeleteTrip={async (id) => {
             await db.deleteTrip(id, user);
             await loadData(false);

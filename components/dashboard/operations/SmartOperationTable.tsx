@@ -268,9 +268,9 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
         </div>
       </div>
 
-      <div className={`overflow-auto ${noMaxHeight ? '' : 'max-h-[calc(100vh-300px)]'} custom-scrollbar border-y border-slate-200`}>
+      <div className={`${noMaxHeight ? 'overflow-x-auto' : 'overflow-auto max-h-[calc(100vh-300px)]'} custom-scrollbar border-y border-slate-200`}>
         <table className="w-full text-left text-[10px] border-collapse min-w-[1000px]">
-          <thead className="bg-slate-100 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20 shadow-sm">
+          <thead className={`bg-slate-100 text-slate-500 font-black uppercase tracking-widest z-20 shadow-sm ${noMaxHeight ? 'sticky top-14' : 'sticky top-0'}`}>
             <tr>
               {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
                 <th
