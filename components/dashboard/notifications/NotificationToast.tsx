@@ -1,13 +1,64 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Notification, User, NotificationType, NotificationOrigin } from '../../../types';
+import { Notification, User, NotificationType, NotificationOrigin, NotificationPreference } from '../../../types';
 import { audioUtils } from '../../../utils/audioUtils';
 import { supabase } from '../../../utils/storage';
+
+// Mapeia o tipo da notificação para a chave de preferência do usuário
+const getPreferenceKey = (type: NotificationType): keyof NotificationPreference | null => {
+  switch (type) {
+    case 'TRIP_CREATED':
+      return 'newTrip';
+    case 'TRIP_UPDATED':
+    case 'STATUS_UPDATED':
+    case 'OC_GENERATED':
+    case 'OC_EDITED':
+    case 'LIBERACAO_GENERATED':
+    case 'MINUTA_GENERATED':
+    case 'RETIRADA_CHEIO_GENERATED':
+    case 'DOC_ATTACHED':
+    case 'CONTRACT_UPLOADED':
+    case 'DRIVER_DOC_UPLOADED':
+    case 'DRIVER_PROFILE_UPDATED':
+      return 'statusUpdate';
+    case 'PAYMENT_LIBERATED':
+      return 'paymentLiberated';
+    case 'DRIVER_CREATED':
+    case 'DRIVER_UPDATED':
+    case 'CUSTOMER_CREATED':
+    case 'CUSTOMER_UPDATED':
+    case 'PORT_CREATED':
+    case 'PORT_UPDATED':
+    case 'PRESTACKING_CREATED':
+    case 'PRESTACKING_UPDATED':
+    case 'CATEGORY_CREATED':
+    case 'EMAIL_TEMPLATE_CREATED':
+    case 'EMAIL_TEMPLATE_UPDATED':
+      return 'newRegistrations';
+    case 'SYSTEM':
+    case 'DELETED':
+      return 'systemChanges';
+    default:
+      return null;
+  }
+};
+
+const getUserPrefs = (): NotificationPreference => {
+  const sessionStr = sessionStorage.getItem('als_active_session');
+  const user: User | null = sessionStr ? JSON.parse(sessionStr) : null;
+  return user?.notificationPrefs || {
+    newTrip: true,
+    statusUpdate: true,
+    paymentLiberated: true,
+    systemChanges: true,
+    newRegistrations: true,
+  };
+};
 
 const NotificationToast: React.FC = () => {
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const [progress, setProgress] = useState(100);
-  
+
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -22,8 +73,6 @@ const NotificationToast: React.FC = () => {
     const data = payload.new;
     if (!data) return;
 
-    clearToast();
-
     const notif: Notification = {
       id: String(data.id),
       title: data.type ? data.type.replace(/_/g, ' ').toUpperCase() : 'ALERTA DO SISTEMA',
@@ -36,8 +85,18 @@ const NotificationToast: React.FC = () => {
       summary: { ...(data.summary || {}), os: data.os_ref }
     };
 
+    // Verifica preferências do usuário antes de exibir
+    const prefs = getUserPrefs();
+    const prefKey = getPreferenceKey(notif.type);
+    if (prefKey !== null && prefs[prefKey] === false) {
+      // Notificação do tipo desabilitado — não exibe o toast, mas dispara o evento para o centro
+      window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: notif }));
+      return;
+    }
+
+    clearToast();
     setActiveToast(notif);
-    
+
     const sessionStr = sessionStorage.getItem('als_active_session');
     const currentUser: User | null = sessionStr ? JSON.parse(sessionStr) : null;
     const isDriver = currentUser?.role === 'driver' || currentUser?.role === 'motoboy';
@@ -46,7 +105,7 @@ const NotificationToast: React.FC = () => {
       if (notif.origin === 'MOTORISTA') audioUtils.playDriverUpdate();
       else audioUtils.playNotification();
     }
-    
+
     window.dispatchEvent(new CustomEvent('als_new_notification_event', { detail: notif }));
 
     timerRef.current = setTimeout(() => setActiveToast(null), 8000);
