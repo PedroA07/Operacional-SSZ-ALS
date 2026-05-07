@@ -268,9 +268,10 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
         </div>
       </div>
 
-      <div className={`${noMaxHeight ? 'overflow-x-auto' : 'overflow-auto max-h-[calc(100vh-300px)]'} custom-scrollbar border-y border-slate-200`}>
+      {/* noMaxHeight: sem overflow no wrapper para o sticky funcionar relativo à viewport */}
+      <div className={`${noMaxHeight ? '' : 'overflow-auto max-h-[calc(100vh-300px)]'} custom-scrollbar border-y border-slate-200`}>
         <table className="w-full text-left text-[10px] border-collapse min-w-[1000px]">
-          <thead className={`bg-slate-100 text-slate-500 font-black uppercase tracking-widest z-20 shadow-sm ${noMaxHeight ? 'sticky top-14' : 'sticky top-0'}`}>
+          <thead className={`bg-slate-100 text-slate-500 font-black uppercase tracking-widest z-20 shadow-sm sticky ${noMaxHeight ? 'top-14' : 'top-0'}`}>
             <tr>
               {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
                 <th

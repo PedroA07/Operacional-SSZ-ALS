@@ -88,9 +88,40 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
     setIsOpen(false); 
   };
 
+  const lastCheck = useMemo(() => {
+    const s = localStorage.getItem(`als_notif_last_check_${user.id}`);
+    return s ? new Date(s).getTime() : 0;
+  }, [user.id]);
+
+  const unreadPerTab = useMemo(() => {
+    const operacional = notifications.filter(n => n.origin === 'OPERACIONAL' && new Date(n.timestamp).getTime() > lastCheck).length;
+    const motorista  = notifications.filter(n => n.origin === 'MOTORISTA'  && new Date(n.timestamp).getTime() > lastCheck).length;
+    return { OPERACIONAL: operacional, MOTORISTA: motorista };
+  }, [notifications, lastCheck]);
+
   const filteredNotifications = useMemo(() => {
     return notifications.filter(n => n.origin === activeTab);
   }, [notifications, activeTab]);
+
+  // Agrupa notificações por dia
+  const groupedNotifications = useMemo(() => {
+    const groups: { label: string; items: typeof filteredNotifications }[] = [];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+
+    const map = new Map<string, typeof filteredNotifications>();
+    filteredNotifications.forEach(n => {
+      const d = new Date(n.timestamp); d.setHours(0, 0, 0, 0);
+      let label: string;
+      if (d.getTime() === today.getTime()) label = 'Hoje';
+      else if (d.getTime() === yesterday.getTime()) label = 'Ontem';
+      else label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+      if (!map.has(label)) map.set(label, []);
+      map.get(label)!.push(n);
+    });
+    map.forEach((items, label) => groups.push({ label, items }));
+    return groups;
+  }, [filteredNotifications]);
 
   return (
     <div className="relative flex items-center" ref={dropdownRef}>
@@ -129,42 +160,86 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
 
               {view === 'list' && (
                 <div className="flex bg-slate-200/50 p-1 rounded-2xl gap-1">
-                   <button onClick={() => handleTabChange('OPERACIONAL')} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'OPERACIONAL' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Operacional</button>
-                   <button onClick={() => handleTabChange('MOTORISTA')} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'MOTORISTA' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Motorista</button>
+                  {(['OPERACIONAL', 'MOTORISTA'] as const).map(tab => {
+                    const isActive = activeTab === tab;
+                    const count = unreadPerTab[tab];
+                    const color = tab === 'OPERACIONAL' ? 'bg-blue-600' : 'bg-emerald-600';
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => handleTabChange(tab)}
+                        className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all relative ${isActive ? `${color} text-white shadow-md` : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        {tab === 'OPERACIONAL' ? 'Operacional' : 'Motorista'}
+                        {count > 0 && !isActive && (
+                          <span className={`absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full text-[7px] font-black text-white flex items-center justify-center ${tab === 'OPERACIONAL' ? 'bg-blue-500' : 'bg-emerald-500'}`}>
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
            </div>
            
-           <div className="max-h-[420px] overflow-y-auto custom-scrollbar p-4 space-y-3 bg-white min-h-[150px]">
+           <div className="max-h-[460px] overflow-y-auto custom-scrollbar p-4 bg-white min-h-[150px]">
               {isLoading ? (
                 <div className="py-16 flex flex-col items-center justify-center gap-3">
-                   <div className="w-7 h-7 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Sincronizando...</p>
+                  <div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Sincronizando...</p>
                 </div>
               ) : view === 'settings' ? (
                 <NotificationSettings user={user} onUpdate={() => {}} />
-              ) : filteredNotifications.length === 0 ? (
+              ) : groupedNotifications.length === 0 ? (
                 <div className="py-20 text-center text-slate-300 text-[9px] font-black uppercase italic">Sem atividades registradas</div>
-              ) : filteredNotifications.map(n => (
-                <button 
-                  key={n.id} 
-                  onClick={() => handleNotifClick(n)}
-                  className="w-full text-left p-4 bg-slate-50 border border-slate-100 rounded-3xl transition-all hover:bg-slate-100/80 group relative overflow-hidden active:scale-[0.98]"
-                >
-                   <div className={`absolute top-0 left-0 w-1.5 h-full ${n.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
-                   <div className="flex justify-between items-start mb-2">
-                      <span className={`px-2 py-0.5 rounded text-[6.5px] font-black uppercase ${n.origin === 'MOTORISTA' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>{n.type.replace(/_/g, ' ')}</span>
-                      <p className="text-[8px] font-mono font-black text-slate-400 leading-none">{new Date(n.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
-                   </div>
-                   <h5 className="text-[10px] font-black text-slate-800 uppercase leading-tight group-hover:text-blue-600 transition-colors">{n.title}</h5>
-                   <p className="text-[9px] text-slate-500 font-medium mt-1 leading-snug line-clamp-1">{n.description}</p>
-                   
-                   <div className="mt-3 pt-2 border-t border-slate-200/50 flex items-center justify-between">
-                      <span className="text-[7.5px] font-black text-slate-400 uppercase">Ação por: <span className="text-slate-600">{n.authorName}</span></span>
-                      {n.summary?.os && <span className="text-[8px] font-black text-blue-500">OS {n.summary.os}</span>}
-                   </div>
-                </button>
-              ))}
+              ) : (
+                <div className="space-y-1">
+                  {groupedNotifications.map(({ label, items }) => (
+                    <div key={label}>
+                      {/* Separador de dia */}
+                      <div className="flex items-center gap-2 py-3 sticky top-0 bg-white z-10">
+                        <div className="flex-1 h-px bg-slate-100" />
+                        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${label === 'Hoje' ? 'bg-blue-50 text-blue-600 border-blue-100' : label === 'Ontem' ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                          {label}
+                        </span>
+                        <div className="flex-1 h-px bg-slate-100" />
+                      </div>
+
+                      <div className="space-y-2 mb-2">
+                        {items.map(n => {
+                          const isUnread = new Date(n.timestamp).getTime() > lastCheck;
+                          const accentColor = n.origin === 'MOTORISTA' ? 'bg-emerald-500' : 'bg-blue-500';
+                          return (
+                            <button
+                              key={n.id}
+                              onClick={() => handleNotifClick(n)}
+                              className={`w-full text-left p-4 border rounded-2xl transition-all group relative overflow-hidden active:scale-[0.98] ${isUnread ? 'bg-blue-50/60 border-blue-100 hover:bg-blue-50' : 'bg-slate-50 border-slate-100 hover:bg-slate-100/80'}`}
+                            >
+                              <div className={`absolute top-0 left-0 w-1 h-full ${accentColor}`} />
+                              {isUnread && <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.6)]" />}
+                              <div className="flex justify-between items-start mb-1.5 pl-1">
+                                <span className={`px-2 py-0.5 rounded text-[6.5px] font-black uppercase ${n.origin === 'MOTORISTA' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
+                                  {n.type.replace(/_/g, ' ')}
+                                </span>
+                                <p className="text-[8px] font-mono font-black text-slate-400 leading-none">
+                                  {new Date(n.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                              <h5 className="text-[10px] font-black text-slate-800 uppercase leading-tight group-hover:text-blue-600 transition-colors pl-1">{n.title}</h5>
+                              <p className="text-[9px] text-slate-500 font-medium mt-1 leading-snug line-clamp-1 pl-1">{n.description}</p>
+                              <div className="mt-2.5 pt-2 border-t border-slate-200/50 flex items-center justify-between pl-1">
+                                <span className="text-[7.5px] font-black text-slate-400 uppercase">Por: <span className="text-slate-600">{n.authorName}</span></span>
+                                {n.summary?.os && <span className="text-[8px] font-black text-blue-500">OS {n.summary.os}</span>}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
            </div>
         </div>
       )}
