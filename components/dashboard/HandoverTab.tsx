@@ -180,9 +180,9 @@ const HandoverTab: React.FC<HandoverTabProps> = ({ user, trips, drivers, custome
   const getMentionOptions = () => {
     const q = mentionSearch.toLowerCase();
     switch (mentionType) {
-      case 'trip': return trips.filter(t => t.os?.toLowerCase().includes(q) || t.customer?.toLowerCase().includes(q)).slice(0, 8).map(t => ({ type: 'trip' as const, id: t.id, label: `OS ${t.os}` }));
+      case 'trip': return trips.filter(t => t.os?.toLowerCase().includes(q) || t.customer?.name?.toLowerCase().includes(q)).slice(0, 8).map(t => ({ type: 'trip' as const, id: t.id, label: `OS ${t.os}` }));
       case 'driver': return drivers.filter(d => d.name?.toLowerCase().includes(q)).slice(0, 8).map(d => ({ type: 'driver' as const, id: d.id, label: d.name }));
-      case 'customer': return customers.filter(c => c.name?.toLowerCase().includes(q) || c.fantasy?.toLowerCase().includes(q)).slice(0, 8).map(c => ({ type: 'customer' as const, id: c.id, label: c.fantasy || c.name }));
+      case 'customer': return customers.filter(c => c.name?.toLowerCase().includes(q) || c.legalName?.toLowerCase().includes(q)).slice(0, 8).map(c => ({ type: 'customer' as const, id: c.id, label: c.legalName || c.name }));
       case 'port': return ports.filter(p => p.name?.toLowerCase().includes(q)).slice(0, 8).map(p => ({ type: 'port' as const, id: p.id, label: p.name }));
       default: return [];
     }
