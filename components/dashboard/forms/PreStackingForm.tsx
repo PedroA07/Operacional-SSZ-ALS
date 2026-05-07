@@ -75,9 +75,9 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     schedulingDate: '', schedulingTime: '', category: ''
   };
 
-  const [formData, setFormData] = useState(
+  const [formData, setFormData] = useState<typeof defaultFormData>(
     initialFormData
-      ? { ...initialFormData, displayDate: new Date().toLocaleDateString('pt-BR') }
+      ? { ...defaultFormData, ...initialFormData, displayDate: new Date().toLocaleDateString('pt-BR') }
       : defaultFormData
   );
 
