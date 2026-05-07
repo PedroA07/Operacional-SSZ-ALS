@@ -61,6 +61,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const [isTableFullscreen, setIsTableFullscreen] = useState(false);
   
   const handleSetPriority = async (trip: Trip) => {
     if (isSavingStatus) return;
@@ -156,14 +157,35 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       }
 
       const isCompleted = statusService.isTripCompleted(tempStatus, selectedTrip, customStatuses);
-      const updatedTrip: Trip = { 
-        ...selectedTrip, 
-        status: tempStatus, 
-        statusTime: eventTime, 
+
+      let autoSchedulingData: Partial<Trip> = {};
+      // Se a viagem chegou ao status final mas ainda não tem agendamento confirmado,
+      // confirma automaticamente com o destino original e a data/hora deste status
+      if (isCompleted && !selectedTrip.isScheduled && !selectedTrip.preStackingFormData) {
+        const destId = selectedTrip.destination?.id || selectedTrip.customer?.id || '';
+        const destName = selectedTrip.destination?.name || selectedTrip.customer?.name || '';
+        autoSchedulingData = {
+          isScheduled: true,
+          scheduledLocationId: destId,
+          scheduledDateTime: eventTime.substring(0, 16),
+          scheduling: {
+            locationId: destId,
+            location: destName,
+            dateTime: eventTime,
+            obs: 'Agendamento confirmado automaticamente ao finalizar viagem'
+          }
+        };
+      }
+
+      const updatedTrip: Trip = {
+        ...selectedTrip,
+        ...autoSchedulingData,
+        status: tempStatus,
+        statusTime: eventTime,
         isCompleted: isCompleted,
-        statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: new Date().toISOString() }, ...(selectedTrip.statusHistory || [])] 
+        statusHistory: [{ status: tempStatus, dateTime: eventTime, createdAt: new Date().toISOString() }, ...(selectedTrip.statusHistory || [])]
       };
-      
+
       if (await db.saveTrip(updatedTrip, user)) {
         setIsStatusModalOpen(false);
         onRefresh();
@@ -310,18 +332,76 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
            <OperationFilters selectedTypes={[]} onTypesChange={() => {}} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} hideModality />
         </div>
         
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={() => setIsTableFullscreen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-2xl text-[9px] font-black uppercase text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:shadow-sm transition-all"
+            title="Expandir tabela para visualização ampliada"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+            Abrir em Tela Cheia
+          </button>
+        </div>
+
         <div className={density === 'compact' ? 'table-compact' : ''}>
-           <SmartOperationTable 
-             userId={user.id} 
-             componentId="ops-global" 
-             title={`Painel Operacional Sincronizado`} 
-             columns={columns} 
-             data={filteredTrips} 
+           <SmartOperationTable
+             userId={user.id}
+             componentId="ops-global"
+             title={`Painel Operacional Sincronizado`}
+             columns={columns}
+             data={filteredTrips}
              hideInternalSearch
              onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
-             defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']} 
+             defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']}
            />
         </div>
+
+        {/* Modo Tela Cheia */}
+        {isTableFullscreen && (
+          <div className="fixed inset-0 z-[2000] bg-[#f8fafc] flex flex-col">
+            <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-slate-200 shadow-sm shrink-0">
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Painel Operacional</p>
+                <h2 className="font-black text-slate-800 text-base uppercase tracking-tight">
+                  Programações — Visualização Ampliada
+                  <span className="ml-3 text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg">{filteredTrips.length} registros</span>
+                </h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
+                  <button onClick={() => setDensity('compact')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${density === 'compact' ? 'bg-slate-900 text-white shadow' : 'text-slate-400 hover:bg-slate-50'}`}>Compacto</button>
+                  <button onClick={() => setDensity('comfortable')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${density === 'comfortable' ? 'bg-slate-900 text-white shadow' : 'text-slate-400 hover:bg-slate-50'}`}>Amplo</button>
+                </div>
+                <button
+                  onClick={() => setIsTableFullscreen(false)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase hover:bg-red-600 transition-all"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Fechar
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-hidden px-6 py-4">
+              <div className={`h-full overflow-auto custom-scrollbar ${density === 'compact' ? 'table-compact' : ''}`}>
+                <SmartOperationTable
+                  userId={user.id}
+                  componentId="ops-fullscreen"
+                  title=""
+                  columns={columns}
+                  data={filteredTrips}
+                  hideInternalSearch
+                  onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
+                  defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />

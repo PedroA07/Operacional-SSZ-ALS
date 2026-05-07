@@ -307,6 +307,23 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
   );
 };
 
+// Converte ISO UTC (ou string local) para o formato exigido por datetime-local input
+const formatToLocalInput = (isoString: string): string => {
+  if (!isoString) return '';
+  try {
+    // Se já é uma string local sem timezone (ex: "2026-05-15T10:30"), retorna diretamente
+    if (isoString.length <= 16 && !isoString.endsWith('Z') && !isoString.includes('+')) {
+      return isoString.substring(0, 16);
+    }
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '';
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  } catch (e) {
+    return '';
+  }
+};
+
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -576,7 +593,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       scheduling: {
         locationId: locationId,
         location: selectedLoc?.name || '',
-        dateTime: dateTime,
+        dateTime: dateTime ? new Date(dateTime).toISOString() : '',
         obs: selectedTripForScheduling.scheduling?.obs || ''
       }
     };
@@ -655,12 +672,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, [locations]);
 
   const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
-    const dateTimeData = { 
+    // Salva como ISO UTC para consistência com SchedulingEditModal
+    const isoDateTime = dateTime ? new Date(dateTime).toISOString() : '';
+    const dateTimeData = {
       scheduledDateTime: dateTime,
       scheduling: {
         locationId: trip.scheduledLocationId || '',
         location: trip.scheduling?.location || '',
-        dateTime: dateTime,
+        dateTime: isoDateTime,
         obs: trip.scheduling?.obs || ''
       }
     };
@@ -1022,17 +1041,23 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         />
       )
     },
-    { 
-      key: 'scheduledDateTime', 
-      label: 'Data/Hora Agend.', 
-      render: (t: Trip) => (
-        <input 
-          type="datetime-local" 
-          value={t.scheduledDateTime && typeof t.scheduledDateTime === 'string' ? t.scheduledDateTime.substring(0, 16) : ''} 
-          onChange={(e) => handleDateTimeChange(t, e.target.value)}
-          className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}
-        />
-      )
+    {
+      key: 'scheduledDateTime',
+      label: 'Data/Hora Agend.',
+      render: (t: Trip) => {
+        // Prioriza scheduling.dateTime (salvo via SchedulingEditModal como ISO UTC),
+        // com fallback para scheduledDateTime (salvo via OrganizationTab como local string)
+        const rawDT = t.scheduling?.dateTime || t.scheduledDateTime || '';
+        const displayValue = formatToLocalInput(rawDT);
+        return (
+          <input
+            type="datetime-local"
+            value={displayValue}
+            onChange={(e) => handleDateTimeChange(t, e.target.value)}
+            className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}
+          />
+        );
+      }
     },
     { 
       key: 'hasAdvance', 
