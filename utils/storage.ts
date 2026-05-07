@@ -500,6 +500,7 @@ export const db = {
       user_name: user?.displayName || 'Sistema',
       user_id: user?.id || null,
     });
+    if (error) console.error('[saveFormHistory] Erro ao salvar histórico:', error.message, error);
     return !error;
   },
 
@@ -511,7 +512,10 @@ export const db = {
       .eq('form_type', formType)
       .order('created_at', { ascending: false })
       .limit(limit);
-    if (error) return [];
+    if (error) {
+      console.error('[getFormHistory] Erro ao buscar histórico:', error.message, error);
+      return [];
+    }
     return (data || []).map((r: any) => ({
       id: r.id,
       formType: r.form_type,

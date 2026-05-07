@@ -17,6 +17,7 @@ interface PreStackingFormProps {
   ports: Port[];
   onClose: () => void;
   initialOS?: string;
+  initialFormData?: any;
 }
 
 const TerminalCardItem: React.FC<any> = ({ unit, isSelected = false, onClick }) => (
@@ -53,7 +54,7 @@ const TerminalCardItem: React.FC<any> = ({ unit, isSelected = false, onClick }) 
   </button>
 );
 
-const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, ports, onClose, initialOS }) => {
+const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, ports, onClose, initialOS, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isLoadingTrip, setIsLoadingTrip] = useState(false);
   const [isTerminalDropdownOpen, setIsTerminalDropdownOpen] = useState(false);
@@ -67,24 +68,18 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
 
   const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
 
-  const [formData, setFormData] = useState({
-    os: '', 
-    nf: '', 
-    container: '', 
-    tipo: '40HC', 
-    tara: '', 
-    seal: '', 
-    booking: '', 
-    autColeta: '', 
-    ship: '', 
-    driverId: '', 
-    remetenteId: '', 
-    destinatarioId: '', 
-    displayDate: new Date().toLocaleDateString('pt-BR'),
-    schedulingDate: '',
-    schedulingTime: '',
-    category: ''
-  });
+  const defaultFormData = {
+    os: '', nf: '', container: '', tipo: '40HC', tara: '', seal: '',
+    booking: '', autColeta: '', ship: '', driverId: '', remetenteId: '',
+    destinatarioId: '', displayDate: new Date().toLocaleDateString('pt-BR'),
+    schedulingDate: '', schedulingTime: '', category: ''
+  };
+
+  const [formData, setFormData] = useState(
+    initialFormData
+      ? { ...initialFormData, displayDate: new Date().toLocaleDateString('pt-BR') }
+      : defaultFormData
+  );
 
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [selectedRemetente, setSelectedRemetente] = useState<any>(null);
@@ -104,6 +99,29 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     loadUnits();
     if (initialOS) handleOSLookup(initialOS);
   }, [initialOS]);
+
+  // Pré-preenche driver e remetente quando vindo do histórico
+  useEffect(() => {
+    if (!initialFormData) return;
+    if (initialFormData.driverId) {
+      const drv = drivers.find(d => d.id === initialFormData.driverId);
+      if (drv) {
+        setSelectedDriver(drv);
+        setPlateHorse(primaryHorse(drv));
+        setPlateTrailer(primaryTrailer(drv));
+      }
+    }
+    if (initialFormData.remetenteId) {
+      setSelectedRemetente(customers.find(c => c.id === initialFormData.remetenteId) || null);
+    }
+  }, [initialFormData, drivers, customers]);
+
+  // Pré-preenche destinatário após a lista assíncrona carregar
+  useEffect(() => {
+    if (!initialFormData?.destinatarioId || !preStackingList.length) return;
+    const dest = preStackingList.find(p => p.id === initialFormData.destinatarioId);
+    if (dest) setSelectedDestinatario(dest);
+  }, [initialFormData, preStackingList]);
 
 
   const handleOSLookup = async (manualOS?: string) => {

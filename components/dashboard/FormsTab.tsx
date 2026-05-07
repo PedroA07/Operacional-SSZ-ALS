@@ -249,7 +249,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
             {selectedFormType === 'ORDEM_COLETA' ? (
               <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialData={initialFormData} />
             ) : selectedFormType === 'PRE_STACKING' ? (
-              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={handleClose} />
+              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
             ) : selectedFormType === 'LIBERACAO_VAZIO' ? (
               <LiberacaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
             ) : selectedFormType === 'DEVOLUCAO_VAZIO' ? (
