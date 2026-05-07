@@ -19,6 +19,7 @@ import AvantidaTab from './components/dashboard/AvantidaTab';
 import OrganizationTab from './components/dashboard/OrganizationTab';
 import ColetaDoDiaTab from './components/dashboard/ColetaDoDiaTab';
 import AutomationsTab from './components/dashboard/AutomationsTab';
+import HandoverTab from './components/dashboard/HandoverTab';
 import ExternalUsersManager from './components/dashboard/third-party/ExternalUsersManager';
 import ExternalPortal from './components/dashboard/third-party/ExternalPortal';
 import Sidebar from './components/dashboard/Sidebar';
@@ -270,6 +271,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                lastSyncTime={lastSyncTime} 
                isSyncing={isSyncing} 
                user={user}
+             />
+           )}
+           {activeTab === DashboardTab.HANDOVER && (
+             <HandoverTab
+               user={user}
+               trips={trips}
+               drivers={drivers}
+               customers={customers}
+               ports={ports}
              />
            )}
            {activeTab === DashboardTab.OPERACOES && (

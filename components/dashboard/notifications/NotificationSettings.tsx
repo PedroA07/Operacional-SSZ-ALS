@@ -10,12 +10,20 @@ interface NotificationSettingsProps {
 
 const NotificationSettings: React.FC<NotificationSettingsProps> = ({ user, onUpdate }) => {
   const [localPrefs, setLocalPrefs] = useState<NotificationPreference>(() => {
+    // Lê do sessionStorage primeiro (atualizado a cada toggle), depois do prop user (inicial)
+    try {
+      const sessionStr = sessionStorage.getItem('als_active_session');
+      if (sessionStr) {
+        const sessionUser = JSON.parse(sessionStr);
+        if (sessionUser?.notificationPrefs) return sessionUser.notificationPrefs;
+      }
+    } catch {}
     return user.notificationPrefs || {
       newTrip: true,
       statusUpdate: true,
       paymentLiberated: true,
       systemChanges: true,
-      newRegistrations: true
+      newRegistrations: true,
     };
   });
 

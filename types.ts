@@ -247,8 +247,26 @@ export interface FormHistoryEntry {
   createdAt: string;
 }
 
+export interface HandoverMention {
+  type: 'trip' | 'driver' | 'customer' | 'port';
+  id: string;
+  label: string;
+}
+
+export interface HandoverPost {
+  id: string;
+  content: string; // HTML rich text
+  authorId: string;
+  authorName: string;
+  authorPhoto?: string;
+  authorRole?: string;
+  mentions: HandoverMention[];
+  createdAt: string;
+}
+
 export enum DashboardTab {
   INICIO = 'INICIO',
+  HANDOVER = 'HANDOVER',
   OPERACOES = 'OPERACOES',
   ADMINISTRATIVO = 'ADMINISTRATIVO',
   MOTORISTAS = 'MOTORISTAS',

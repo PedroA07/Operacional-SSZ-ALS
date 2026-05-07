@@ -90,3 +90,19 @@ CREATE TABLE IF NOT EXISTS form_history (
 );
 
 CREATE INDEX IF NOT EXISTS form_history_type_created_idx ON form_history(form_type, created_at DESC);
+
+-- 7. Coluna para preferências de notificação por usuário
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_prefs JSONB;
+
+-- 8. Tabela para Passagem de Serviço (feed de posts)
+CREATE TABLE IF NOT EXISTS handover_posts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content TEXT NOT NULL,
+  author_id TEXT NOT NULL,
+  author_name TEXT NOT NULL,
+  author_photo TEXT,
+  author_role TEXT,
+  mentions JSONB DEFAULT '[]'::JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS handover_posts_created_idx ON handover_posts(created_at DESC);

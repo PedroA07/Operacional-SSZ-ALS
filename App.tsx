@@ -48,6 +48,9 @@ const App: React.FC = () => {
 
           if (dbUser && dbUser.status !== 'Inativo') {
             setUser(dbUser);
+            // Sempre atualiza sessionStorage com dados frescos do banco (inclui notificationPrefs)
+            const mergedSession = { ...JSON.parse(saved), ...dbUser };
+            sessionStorage.setItem('als_active_session', JSON.stringify(mergedSession));
             await db.updatePresence(dbUser.id, 'online');
             if (!sessionStorage.getItem('als_session_start')) {
               sessionStorage.setItem('als_session_start', new Date().toISOString());

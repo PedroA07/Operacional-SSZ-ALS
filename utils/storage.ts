@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import { 
-  User, Driver, Customer, Port, PreStacking, Staff, Trip, Category, 
-  Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession, 
-  StayRecord, NotificationType, NotificationOrigin, PresenceStatus, 
-  LoginCredential, EmailTemplate, CustomStatus, Automation 
+import {
+  User, Driver, Customer, Port, PreStacking, Staff, Trip, Category,
+  Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
+  StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
+  LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -46,7 +46,8 @@ export const db = {
       isFirstLogin: u.isfirstlogin,
       lastSeen: u.last_seen || u.lastseen,
       presence_status: u.presence_status,
-      thirdPartyConfig: u.config
+      thirdPartyConfig: u.config,
+      notificationPrefs: u.notification_prefs || undefined,
     }));
   },
 
@@ -68,8 +69,10 @@ export const db = {
       isfirstlogin: user.isFirstLogin,
       last_seen: user.lastSeen,
       presence_status: user.presence_status,
-      config: user.thirdPartyConfig
+      config: user.thirdPartyConfig,
+      notification_prefs: user.notificationPrefs || null,
     });
+    if (error) console.error('[saveUser] Erro:', error.message);
     return !error;
   },
 
@@ -1023,5 +1026,47 @@ export const db = {
     if (!prefs.visibleColumns) prefs.visibleColumns = {};
     prefs.visibleColumns[componentId] = columns;
     localStorage.setItem(`als_prefs_${userId}`, JSON.stringify(prefs));
-  }
+  },
+
+  // Passagem de Serviço
+  getHandoverPosts: async (): Promise<HandoverPost[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('handover_posts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) { console.error('[getHandoverPosts]', error.message); return []; }
+    return (data || []).map(p => ({
+      id: String(p.id),
+      content: p.content || '',
+      authorId: p.author_id || '',
+      authorName: p.author_name || '',
+      authorPhoto: p.author_photo,
+      authorRole: p.author_role,
+      mentions: p.mentions || [],
+      createdAt: p.created_at,
+    }));
+  },
+
+  saveHandoverPost: async (post: Omit<HandoverPost, 'id' | 'createdAt'>): Promise<string | null> => {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('handover_posts').insert({
+      content: post.content,
+      author_id: post.authorId,
+      author_name: post.authorName,
+      author_photo: post.authorPhoto,
+      author_role: post.authorRole,
+      mentions: post.mentions,
+    }).select('id').single();
+    if (error) { console.error('[saveHandoverPost]', error.message); return null; }
+    return String(data?.id);
+  },
+
+  deleteHandoverPost: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('handover_posts').delete().eq('id', id);
+    if (error) { console.error('[deleteHandoverPost]', error.message); return false; }
+    return true;
+  },
 };

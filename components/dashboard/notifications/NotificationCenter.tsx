@@ -5,6 +5,35 @@ import { db } from '../../../utils/storage';
 import NotificationSettings from './NotificationSettings';
 import NotificationDetailModal from './NotificationDetailModal';
 
+const typeLabels: Record<string, string> = {
+  TRIP_CREATED: 'Nova Viagem',
+  TRIP_UPDATED: 'Viagem Atualizada',
+  STATUS_UPDATED: 'Status Atualizado',
+  PAYMENT_LIBERATED: 'Pagamento Liberado',
+  OC_GENERATED: 'OC Emitida',
+  OC_EDITED: 'OC Editada',
+  LIBERACAO_GENERATED: 'Liberação Emitida',
+  MINUTA_GENERATED: 'Minuta Emitida',
+  RETIRADA_CHEIO_GENERATED: 'Retirada de Cheio',
+  DOC_ATTACHED: 'Documento Anexado',
+  CONTRACT_UPLOADED: 'Contrato Enviado',
+  DRIVER_DOC_UPLOADED: 'Doc. Motorista Enviado',
+  DRIVER_PROFILE_UPDATED: 'Perfil Atualizado',
+  DRIVER_CREATED: 'Motorista Cadastrado',
+  DRIVER_UPDATED: 'Motorista Atualizado',
+  CUSTOMER_CREATED: 'Cliente Cadastrado',
+  CUSTOMER_UPDATED: 'Cliente Atualizado',
+  PORT_CREATED: 'Porto/Terminal Cadastrado',
+  PORT_UPDATED: 'Porto/Terminal Atualizado',
+  PRESTACKING_CREATED: 'Pré-Stacking Cadastrado',
+  PRESTACKING_UPDATED: 'Pré-Stacking Atualizado',
+  CATEGORY_CREATED: 'Categoria Cadastrada',
+  EMAIL_TEMPLATE_CREATED: 'Template de E-mail Criado',
+  EMAIL_TEMPLATE_UPDATED: 'Template de E-mail Atualizado',
+  SYSTEM: 'Sistema',
+  DELETED: 'Registro Removido',
+};
+
 interface NotificationCenterProps {
   user: User;
 }
@@ -220,7 +249,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ user }) => {
                               {isUnread && <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.6)]" />}
                               <div className="flex justify-between items-start mb-1.5 pl-1">
                                 <span className={`px-2 py-0.5 rounded text-[6.5px] font-black uppercase ${n.origin === 'MOTORISTA' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
-                                  {n.type.replace(/_/g, ' ')}
+                                  {typeLabels[n.type] || n.type.replace(/_/g, ' ')}
                                 </span>
                                 <p className="text-[8px] font-mono font-black text-slate-400 leading-none">
                                   {new Date(n.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}

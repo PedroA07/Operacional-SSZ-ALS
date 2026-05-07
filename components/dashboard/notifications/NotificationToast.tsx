@@ -4,6 +4,35 @@ import { Notification, User, NotificationType, NotificationOrigin, NotificationP
 import { audioUtils } from '../../../utils/audioUtils';
 import { supabase } from '../../../utils/storage';
 
+const typeLabels: Record<string, string> = {
+  TRIP_CREATED: 'Nova Viagem',
+  TRIP_UPDATED: 'Viagem Atualizada',
+  STATUS_UPDATED: 'Status Atualizado',
+  PAYMENT_LIBERATED: 'Pagamento Liberado',
+  OC_GENERATED: 'OC Emitida',
+  OC_EDITED: 'OC Editada',
+  LIBERACAO_GENERATED: 'Liberação Emitida',
+  MINUTA_GENERATED: 'Minuta Emitida',
+  RETIRADA_CHEIO_GENERATED: 'Retirada de Cheio',
+  DOC_ATTACHED: 'Documento Anexado',
+  CONTRACT_UPLOADED: 'Contrato Enviado',
+  DRIVER_DOC_UPLOADED: 'Doc. Motorista Enviado',
+  DRIVER_PROFILE_UPDATED: 'Perfil Atualizado',
+  DRIVER_CREATED: 'Motorista Cadastrado',
+  DRIVER_UPDATED: 'Motorista Atualizado',
+  CUSTOMER_CREATED: 'Cliente Cadastrado',
+  CUSTOMER_UPDATED: 'Cliente Atualizado',
+  PORT_CREATED: 'Porto/Terminal Cadastrado',
+  PORT_UPDATED: 'Porto/Terminal Atualizado',
+  PRESTACKING_CREATED: 'Pré-Stacking Cadastrado',
+  PRESTACKING_UPDATED: 'Pré-Stacking Atualizado',
+  CATEGORY_CREATED: 'Categoria Cadastrada',
+  EMAIL_TEMPLATE_CREATED: 'Template de E-mail Criado',
+  EMAIL_TEMPLATE_UPDATED: 'Template de E-mail Atualizado',
+  SYSTEM: 'Sistema',
+  DELETED: 'Registro Removido',
+};
+
 // Mapeia o tipo da notificação para a chave de preferência do usuário
 const getPreferenceKey = (type: NotificationType): keyof NotificationPreference | null => {
   switch (type) {
@@ -75,7 +104,7 @@ const NotificationToast: React.FC = () => {
 
     const notif: Notification = {
       id: String(data.id),
-      title: data.type ? data.type.replace(/_/g, ' ').toUpperCase() : 'ALERTA DO SISTEMA',
+      title: data.type ? (typeLabels[data.type] || data.type.replace(/_/g, ' ')).toUpperCase() : 'ALERTA DO SISTEMA',
       description: data.message || '',
       type: (data.type as NotificationType) || 'SYSTEM',
       origin: (data.origin as NotificationOrigin) || 'OPERACIONAL',

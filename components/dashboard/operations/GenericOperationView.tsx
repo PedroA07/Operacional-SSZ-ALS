@@ -1,5 +1,6 @@
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Driver, OperationDefinition, User, Customer, Trip, TripStatus, PreStacking, Port, Category, CustomStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 import { getOperationTableColumns } from './OperationTableColumns';
@@ -295,29 +296,67 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
 
-      {isOCFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
-          <OrdemColetaForm 
-            drivers={drivers} 
-            customers={customers} 
-            ports={ports} 
-            onClose={() => { setIsOCFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} 
-            initialData={selectedTrip.ocFormData} 
-            tripId={selectedTrip.id} 
-          />
-        </div>
+      {isOCFormOpen && selectedTrip && createPortal(
+        <div className="fixed inset-0 z-[9000] animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
+            <div className="h-14 bg-blue-600 flex items-center justify-between px-6 shrink-0 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div>
+                  <p className="text-white font-black text-sm uppercase tracking-tight leading-none">Ordem de Coleta</p>
+                  <p className="text-white/60 text-[9px] font-bold uppercase mt-0.5">OS: {selectedTrip.os}</p>
+                </div>
+              </div>
+              <button onClick={() => { setIsOCFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center hover:bg-white/40 text-white transition-all">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <OrdemColetaForm
+                drivers={drivers}
+                customers={customers}
+                ports={ports}
+                onClose={() => { setIsOCFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }}
+                initialData={selectedTrip.ocFormData}
+                tripId={selectedTrip.id}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
-      {isMinutaFormOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3000] bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden flex flex-col">
-          <PreStackingForm 
-            drivers={drivers} 
-            customers={customers} 
-            ports={ports} 
-            onClose={() => { setIsMinutaFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} 
-            initialOS={selectedTrip.os} 
-          />
-        </div>
+      {isMinutaFormOpen && selectedTrip && createPortal(
+        <div className="fixed inset-0 z-[9000] animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
+            <div className="h-14 bg-slate-800 flex items-center justify-between px-6 shrink-0 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </div>
+                <div>
+                  <p className="text-white font-black text-sm uppercase tracking-tight leading-none">Minuta / Pré-Stacking</p>
+                  <p className="text-white/60 text-[9px] font-bold uppercase mt-0.5">OS: {selectedTrip.os}</p>
+                </div>
+              </div>
+              <button onClick={() => { setIsMinutaFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }} className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center hover:bg-white/40 text-white transition-all">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <PreStackingForm
+                drivers={drivers}
+                customers={customers}
+                ports={ports}
+                onClose={() => { setIsMinutaFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }}
+                initialOS={selectedTrip.os}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {isStatusModalOpen && selectedTrip && (
