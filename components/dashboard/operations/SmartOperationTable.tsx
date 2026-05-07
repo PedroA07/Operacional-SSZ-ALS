@@ -8,6 +8,7 @@ interface Column {
   render?: (row: any) => React.ReactNode;
   sortable?: boolean;
   sortValue?: (row: any) => any;
+  width?: number | string; // largura fixa em px ou string CSS
 }
 
 interface SmartOperationTableProps {
@@ -272,8 +273,9 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
           <thead className="bg-slate-100 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20 shadow-sm">
             <tr>
               {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
-                <th 
-                  key={col.key} 
+                <th
+                  key={col.key}
+                  style={col.width ? { width: typeof col.width === 'number' ? `${col.width}px` : col.width, minWidth: typeof col.width === 'number' ? `${col.width}px` : col.width, maxWidth: typeof col.width === 'number' ? `${col.width}px` : col.width } : undefined}
                   className={`px-2 py-1.5 whitespace-nowrap border border-slate-200 bg-slate-100 text-left relative group/th ${col.sortable !== false ? 'cursor-pointer hover:bg-slate-200 transition-colors' : ''}`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -337,7 +339,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
                 style={getRowStyle ? getRowStyle(row) : {}}
               >
                 {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
-                  <td key={col.key} className="px-2 py-1 text-slate-600 border border-slate-200 align-middle">
+                  <td key={col.key} style={col.width ? { width: typeof col.width === 'number' ? `${col.width}px` : col.width, maxWidth: typeof col.width === 'number' ? `${col.width}px` : col.width, overflow: 'hidden' } : undefined} className="px-2 py-1 text-slate-600 border border-slate-200 align-middle">
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}

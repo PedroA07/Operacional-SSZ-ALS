@@ -6,9 +6,12 @@ import Dashboard from './Dashboard';
 import DriverPortal from './components/driver/DriverPortal';
 import ExternalUserApp from './components/dashboard/third-party/ExternalUserApp';
 import ForcePasswordChange from './components/ForcePasswordChange';
+import StandaloneOperationsPage from './components/StandaloneOperationsPage';
 import { db } from './utils/storage';
 import { usePresenceMonitor } from './hooks/usePresenceMonitor';
 import { authSecurity } from './utils/authSecurity';
+
+const isStandaloneOps = new URLSearchParams(window.location.search).get('view') === 'ops';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOGIN);
@@ -97,6 +100,11 @@ const App: React.FC = () => {
         <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mt-6">Sincronizando Terminal...</p>
       </div>
     );
+  }
+
+  // Modo tela cheia do painel operacional (nova guia)
+  if (isStandaloneOps && user && currentScreen === AppScreen.DASHBOARD) {
+    return <StandaloneOperationsPage user={user} />;
   }
 
   return (

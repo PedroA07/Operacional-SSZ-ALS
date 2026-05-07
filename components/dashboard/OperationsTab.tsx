@@ -62,10 +62,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   
   const [isSavingStatus, setIsSavingStatus] = useState(false);
 
-  // Detecta se foi aberto como nova guia e restaura filtros
-  const isStandaloneTab = useMemo(() => {
-    return new URLSearchParams(window.location.search).get('view') === 'ops';
-  }, []);
   
   const handleSetPriority = async (trip: Trip) => {
     if (isSavingStatus) return;

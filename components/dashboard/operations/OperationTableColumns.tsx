@@ -97,6 +97,7 @@ export const getOperationTableColumns = (
     {
       key: 'dateTime',
       label: '1. Programação / Tipo',
+      width: 90,
       render: (t: Trip) => {
         const cat = categories.find(c => c.name.toUpperCase() === t.category?.toUpperCase());
         const catColor = cat?.color || '#3b82f6';
