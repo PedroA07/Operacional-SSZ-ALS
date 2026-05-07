@@ -20,6 +20,11 @@ const StandaloneOperationsPage: React.FC<StandaloneOperationsPageProps> = ({ use
   const [isLoading, setIsLoading] = useState(true);
   const [lastSync, setLastSync] = useState('');
 
+  useEffect(() => {
+    document.body.classList.add('scrollable');
+    return () => document.body.classList.remove('scrollable');
+  }, []);
+
   const loadData = useCallback(async (showLoading = false) => {
     if (showLoading) setIsLoading(true);
     try {
