@@ -283,6 +283,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                drivers={drivers}
                customers={customers}
                ports={ports}
+               staffList={staffList}
              />
            )}
            {activeTab === DashboardTab.OPERACOES && (

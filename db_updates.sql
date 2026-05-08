@@ -185,3 +185,48 @@ CREATE POLICY "hp_delete" ON handover_posts
 
 -- Para remover o job se precisar recriar:
 -- SELECT cron.unschedule('purge-history-90d');
+
+-- =============================================================================
+-- 10. ESCALA DE PLANTÃO — system_settings + duty_swap_requests
+-- =============================================================================
+
+-- Tabela genérica de configurações do sistema (chave/valor JSONB)
+CREATE TABLE IF NOT EXISTS system_settings (
+  key        TEXT PRIMARY KEY,
+  value      JSONB,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "ss_select" ON system_settings;
+CREATE POLICY "ss_select" ON system_settings FOR SELECT USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "ss_upsert" ON system_settings;
+CREATE POLICY "ss_upsert" ON system_settings FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "ss_update" ON system_settings;
+CREATE POLICY "ss_update" ON system_settings FOR UPDATE USING (auth.role() = 'authenticated');
+
+-- Tabela de solicitações de troca na escala de plantão
+CREATE TABLE IF NOT EXISTS duty_swap_requests (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  from_staff_id   TEXT NOT NULL,
+  from_staff_name TEXT NOT NULL,
+  to_staff_id     TEXT NOT NULL,
+  to_staff_name   TEXT NOT NULL,
+  message         TEXT,
+  status          TEXT NOT NULL DEFAULT 'pending',   -- 'pending' | 'accepted' | 'rejected'
+  created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE duty_swap_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "dsr_select" ON duty_swap_requests;
+CREATE POLICY "dsr_select" ON duty_swap_requests FOR SELECT USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "dsr_insert" ON duty_swap_requests;
+CREATE POLICY "dsr_insert" ON duty_swap_requests FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "dsr_update" ON duty_swap_requests;
+CREATE POLICY "dsr_update" ON duty_swap_requests FOR UPDATE USING (auth.role() = 'authenticated');

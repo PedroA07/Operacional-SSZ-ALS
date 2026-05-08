@@ -3,7 +3,7 @@ import {
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category,
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
-  LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost
+  LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, DutySwapRequest
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1084,5 +1084,75 @@ export const db = {
     const { error } = await supabase.from('handover_posts').delete().eq('id', id);
     if (error) { console.error('[deleteHandoverPost]', error.message); return false; }
     return true;
+  },
+
+  // ── Escala de Plantão ──────────────────────────────────────────────────────
+
+  getDutyRoster: async (): Promise<string[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'duty_roster')
+      .maybeSingle();
+    if (error) { console.error('[getDutyRoster]', error.message); return []; }
+    return (data?.value as string[]) || [];
+  },
+
+  saveDutyRoster: async (roster: string[]): Promise<void> => {
+    if (!supabase) return;
+    await supabase.from('system_settings').upsert(
+      { key: 'duty_roster', value: roster, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
+  },
+
+  sendSwapRequest: async (
+    fromStaffId: string, fromStaffName: string,
+    toStaffId: string, toStaffName: string,
+    message?: string
+  ): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('duty_swap_requests').insert({
+      from_staff_id: fromStaffId,
+      from_staff_name: fromStaffName,
+      to_staff_id: toStaffId,
+      to_staff_name: toStaffName,
+      message: message || null,
+      status: 'pending',
+    });
+    if (error) console.error('[sendSwapRequest]', error.message);
+  },
+
+  respondSwapRequest: async (id: string, status: 'accepted' | 'rejected', newRoster?: string[]): Promise<void> => {
+    if (!supabase) return;
+    await supabase.from('duty_swap_requests').update({ status }).eq('id', id);
+    if (status === 'accepted' && newRoster) {
+      await supabase.from('system_settings').upsert(
+        { key: 'duty_roster', value: newRoster, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+    }
+  },
+
+  getSwapRequests: async (staffId: string): Promise<DutySwapRequest[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('duty_swap_requests')
+      .select('*')
+      .or(`from_staff_id.eq.${staffId},to_staff_id.eq.${staffId}`)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) { console.error('[getSwapRequests]', error.message); return []; }
+    return (data || []).map(r => ({
+      id: String(r.id),
+      fromStaffId: r.from_staff_id,
+      fromStaffName: r.from_staff_name,
+      toStaffId: r.to_staff_id,
+      toStaffName: r.to_staff_name,
+      message: r.message,
+      status: r.status,
+      createdAt: r.created_at,
+    }));
   },
 };

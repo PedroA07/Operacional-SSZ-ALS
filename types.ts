@@ -248,9 +248,20 @@ export interface FormHistoryEntry {
 }
 
 export interface HandoverMention {
-  type: 'trip' | 'driver' | 'customer' | 'port';
+  type: 'trip' | 'driver' | 'customer' | 'port' | 'user';
   id: string;
   label: string;
+}
+
+export interface DutySwapRequest {
+  id: string;
+  fromStaffId: string;
+  fromStaffName: string;
+  toStaffId: string;
+  toStaffName: string;
+  message?: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
 }
 
 export interface HandoverPost {
