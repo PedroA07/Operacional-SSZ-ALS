@@ -7,6 +7,7 @@ import ContainerInput from '../../shared/ContainerInput';
 import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
+import { localDateStr } from '../../../utils/dateHelpers';
 
 interface DevolucaoVazioFormProps {
   drivers: Driver[];
@@ -56,7 +57,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
   }, []);
 
   const defaultFormData = {
-    date: new Date().toISOString().split('T')[0],
+    date: localDateStr(),
     driverId: '',
     remetenteId: '',
     destinatarioId: '',

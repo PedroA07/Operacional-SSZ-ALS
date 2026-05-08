@@ -14,6 +14,7 @@ import { osCategoryService } from '../../../utils/osCategoryService';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
 import { db } from '../../../utils/storage';
+import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
 
 interface OrdemColetaFormProps {
   drivers: Driver[];
@@ -39,7 +40,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
   const [swapModalOpen, setSwapModalOpen] = useState(false);
 
   const [formData, setFormData] = useState(initialData || {
-    date: new Date().toISOString().split('T')[0],
+    date: localDateStr(),
     driverId: '',
     remetenteId: '',
     destinatarioId: '',
@@ -50,15 +51,15 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
     genset: '',
     booking: '',
     ship: '',
-    agencia: '', 
+    agencia: '',
     tipo: '40HC',
     padrao: 'CARGA GERAL',
     tipoOperacao: 'EXPORTAÇÃO',
     autColeta: '',
     embarcador: '',
-    horarioAgendado: new Date().toISOString().slice(0, 16),
+    horarioAgendado: localDateTimeStr(),
     obs: '',
-    category: '', 
+    category: '',
     displayDate: new Date().toLocaleDateString('pt-BR')
   });
 
@@ -181,13 +182,14 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
         formData,
         effectiveDriver,
         selectedRemetente,
-        currentUser, 
+        currentUser,
         selectedDestinatario,
         targetTripId || tripId
       );
 
       window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
-      db.saveFormHistory('ORDEM_COLETA', formData, formData.container || formData.os, currentUser);
+      // Salva histórico independentemente do resultado do PDF
+      db.saveFormHistory('ORDEM_COLETA', formData, formData.container || formData.os || 'OC', currentUser);
 
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));

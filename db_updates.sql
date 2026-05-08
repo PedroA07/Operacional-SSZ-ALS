@@ -91,6 +91,30 @@ CREATE TABLE IF NOT EXISTS form_history (
 
 CREATE INDEX IF NOT EXISTS form_history_type_created_idx ON form_history(form_type, created_at DESC);
 
+-- Habilitar RLS e políticas para form_history
+ALTER TABLE form_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY IF NOT EXISTS "form_history_select" ON form_history
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY IF NOT EXISTS "form_history_insert" ON form_history
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY IF NOT EXISTS "form_history_delete" ON form_history
+  FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Habilitar RLS para handover_posts (se ainda não habilitado)
+ALTER TABLE handover_posts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY IF NOT EXISTS "handover_posts_select" ON handover_posts
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY IF NOT EXISTS "handover_posts_insert" ON handover_posts
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY IF NOT EXISTS "handover_posts_delete" ON handover_posts
+  FOR DELETE USING (auth.uid()::text = author_id OR auth.role() = 'service_role');
+
 -- 7. Coluna para preferências de notificação por usuário
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_prefs JSONB;
 

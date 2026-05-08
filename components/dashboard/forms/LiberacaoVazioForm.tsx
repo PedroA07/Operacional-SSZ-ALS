@@ -6,6 +6,7 @@ import LiberacaoVazioTemplate from './LiberacaoVazioTemplate';
 import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
+import { localDateStr } from '../../../utils/dateHelpers';
 
 interface LiberacaoVazioFormProps {
   drivers: Driver[];
@@ -55,7 +56,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
   }, []);
 
   const defaultFormData = {
-    date: new Date().toISOString().split('T')[0],
+    date: localDateStr(),
     driverId: '',
     remetenteId: '',
     destinatarioId: '',

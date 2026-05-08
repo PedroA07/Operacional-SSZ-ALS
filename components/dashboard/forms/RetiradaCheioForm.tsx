@@ -9,6 +9,7 @@ import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { searchService } from '../../../utils/searchService';
 import { db } from '../../../utils/storage';
+import { localDateStr } from '../../../utils/dateHelpers';
 
 interface RetiradaCheioFormProps {
   drivers: Driver[];
@@ -44,7 +45,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
 
   const defaultFormData = {
-    date: new Date().toISOString().split('T')[0],
+    date: localDateStr(),
     displayDate: new Date().toLocaleDateString('pt-BR'),
     driverId: '',
     clienteId: '',

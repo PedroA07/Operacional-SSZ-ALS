@@ -7,6 +7,7 @@ import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import PreStackingForm from './forms/PreStackingForm';
 import RetiradaCheioForm from './forms/RetiradaCheioForm';
 import { db } from '../../utils/storage';
+import { localDateStr, localDateTimeStr, formatDateTimePtBR } from '../../utils/dateHelpers';
 
 interface FormsTabProps {
   drivers: Driver[];
@@ -27,8 +28,7 @@ const formConfigs: Record<FormType, { title: string; color: string; hex: string;
 };
 
 function formatHistoryDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return formatDateTimePtBR(iso);
 }
 
 const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStacking, initialFormId }) => {
@@ -88,7 +88,14 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
 
   const openFormWithData = (type: FormType, data: any) => {
     setSelectedFormType(type);
-    setInitialFormData({ ...data, date: new Date().toISOString().split('T')[0], displayDate: new Date().toLocaleDateString('pt-BR') });
+    // Reseta datas para HOJE (local) ao reemitir do histórico,
+    // para evitar sobrescrever agendamentos com datas antigas.
+    setInitialFormData({
+      ...data,
+      date: localDateStr(),
+      displayDate: new Date().toLocaleDateString('pt-BR'),
+      horarioAgendado: localDateTimeStr(), // novo datetime local, não o antigo
+    });
     setIsFormModalOpen(true);
     setOpenHistoryType(null);
   };
@@ -181,51 +188,89 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
                     className="border border-t-0 rounded-b-[1.8rem] overflow-hidden bg-white shadow-xl"
                     style={{ borderColor: cfg.hex }}
                   >
+                    {/* Cabeçalho do histórico */}
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Emissões Anteriores</span>
+                      <button
+                        onClick={() => openNewForm(type)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase text-white transition-all active:scale-95"
+                        style={{ backgroundColor: cfg.hex }}
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Novo
+                      </button>
+                    </div>
+
                     {loadingHistory === type ? (
                       <div className="flex items-center justify-center py-8 gap-2">
                         <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: cfg.hex }} />
                         <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Carregando...</span>
                       </div>
                     ) : typeHistories.length === 0 ? (
-                      <div className="py-8 text-center">
+                      <div className="py-8 text-center space-y-2">
+                        <svg className="w-8 h-8 mx-auto text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
                         <p className="text-[9px] font-black uppercase text-slate-300 tracking-widest">Nenhum formulário emitido ainda</p>
+                        <p className="text-[8px] text-slate-300 font-bold">
+                          O histórico aparece após gerar o primeiro PDF
+                        </p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-slate-100">
-                        {typeHistories.map(entry => (
-                          <button
-                            key={entry.id}
-                            onClick={() => openFormWithData(type, entry.formData)}
-                            className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 transition-all group text-left"
-                          >
-                            <div
-                              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 opacity-80"
-                              style={{ backgroundColor: cfg.hex + '20' }}
+                      <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto custom-scrollbar">
+                        {typeHistories.map((entry, idx) => {
+                          // Extrai campos relevantes para preview
+                          const fd = entry.formData || {};
+                          const preview = [
+                            fd.os && `OS: ${fd.os}`,
+                            fd.container && `CTR: ${fd.container}`,
+                            fd.booking && `BK: ${fd.booking}`,
+                          ].filter(Boolean).join(' · ');
+
+                          return (
+                            <button
+                              key={entry.id}
+                              onClick={() => openFormWithData(type, entry.formData)}
+                              className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-blue-50/40 transition-all group text-left"
                             >
-                              <svg className="w-4 h-4" style={{ color: cfg.hex }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[10px] font-black text-slate-700 uppercase truncate">
-                                {entry.label || '—'}
-                              </p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-[8px] font-bold text-slate-400 uppercase">{entry.userName}</span>
-                                <span className="text-slate-200">·</span>
-                                <span className="text-[8px] font-bold text-slate-400">{formatHistoryDate(entry.createdAt)}</span>
-                              </div>
-                            </div>
-                            <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {/* Índice */}
                               <div
-                                className="px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest text-white"
-                                style={{ backgroundColor: cfg.hex }}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[9px] font-black"
+                                style={{ backgroundColor: cfg.hex + '18', color: cfg.hex }}
                               >
-                                Reemitir
+                                {idx + 1}
                               </div>
-                            </div>
-                          </button>
-                        ))}
+
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-black text-slate-800 uppercase truncate leading-tight">
+                                  {entry.label || preview || '—'}
+                                </p>
+                                {preview && entry.label && (
+                                  <p className="text-[8px] text-slate-400 font-bold truncate mt-0.5 uppercase">{preview}</p>
+                                )}
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[8px] font-bold text-slate-400 uppercase">{entry.userName}</span>
+                                  <span className="text-slate-200 text-[8px]">·</span>
+                                  <span className="text-[8px] font-bold text-slate-400">{formatHistoryDate(entry.createdAt)}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div
+                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest text-white"
+                                  style={{ backgroundColor: cfg.hex }}
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                  </svg>
+                                  Reemitir
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

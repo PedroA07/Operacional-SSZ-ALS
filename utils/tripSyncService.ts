@@ -108,7 +108,25 @@ export const tripSyncService = {
         const cleanTripData = Object.fromEntries(
           Object.entries(tripData).filter(([_, v]) => v !== undefined)
         );
-        
+
+        // Preserva o dateTime da viagem existente ao reemitir OC/formulário:
+        // O form pode ter um horarioAgendado antigo (histórico) que sobrescreveria
+        // a programação correta do sistema.
+        if (existing.dateTime && cleanTripData.dateTime) {
+          // Só atualiza se o operador alterou explicitamente (diferença > 5 min)
+          const existingMs = new Date(existing.dateTime).getTime();
+          const newMs = new Date(cleanTripData.dateTime).getTime();
+          if (Math.abs(existingMs - newMs) < 5 * 60 * 1000) {
+            // Sem mudança significativa — preserva o existente
+            delete cleanTripData.dateTime;
+          }
+        }
+
+        // Preserva scheduling existente se o formulário não trouxe um novo
+        if (existing.scheduling && !cleanTripData.scheduling) {
+          // cleanTripData.scheduling já é undefined e foi filtrado, ok
+        }
+
         finalTrip = {
           ...existing,
           ...cleanTripData,
@@ -117,7 +135,9 @@ export const tripSyncService = {
           status: existing.status || tripData.status || 'Pendente',
           statusHistory: existing.statusHistory?.length ? existing.statusHistory : (tripData.statusHistory || []),
           advancePayment: existing.advancePayment || tripData.advancePayment,
-          balancePayment: existing.balancePayment || tripData.balancePayment
+          balancePayment: existing.balancePayment || tripData.balancePayment,
+          // Sempre preserva scheduling se já existia e não foi alterado
+          scheduling: cleanTripData.scheduling ?? existing.scheduling
         } as Trip;
       } else {
         finalTrip = { ...tripData, id: existingId } as Trip;
