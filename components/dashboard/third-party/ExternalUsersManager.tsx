@@ -9,11 +9,12 @@ interface ExternalUsersManagerProps {
 const AVAILABLE_COLUMNS = [
   { key: 'os', label: 'OS' },
   { key: 'container', label: 'Container' },
-  { key: 'status', label: 'Status' },
+  { key: 'status', label: 'Status (em camadas)' },
   { key: 'dateTime', label: 'Data' },
   { key: 'driver', label: 'Motorista' },
   { key: 'customer', label: 'Cliente' },
   { key: 'destination', label: 'Destino' },
+  { key: 'scheduling', label: 'Agendamento' },
   { key: 'category', label: 'Categoria' },
   { key: 'type', label: 'Tipo' }
 ];

@@ -171,11 +171,45 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
           </div>
         )
       },
-      { 
-        key: 'status', 
-        label: 'Status', 
+      {
+        key: 'status',
+        label: 'Status',
         sortValue: (t: Trip) => t.status || '',
-        render: (t: Trip) => <span className="text-[9px] font-bold text-slate-600 uppercase">{t.status || '---'}</span>
+        render: (t: Trip) => {
+          const history = t.statusHistory;
+          if (!history || history.length === 0) {
+            return <span className="text-[9px] font-bold text-slate-400 uppercase">{t.status || '---'}</span>;
+          }
+          const sorted = [...history].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          const isCompleted = t.isCompleted || sorted[0]?.status === 'Viagem concluída';
+          const getStyle = (status: string, isLatest: boolean) => {
+            if (status === 'Viagem concluída' || isCompleted) {
+              return isLatest
+                ? 'bg-emerald-600 text-white shadow scale-105 border-emerald-400'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+            }
+            if (status === 'Viagem cancelada') {
+              return isLatest
+                ? 'bg-red-600 text-white shadow border-red-400'
+                : 'bg-red-50 text-red-600 border-red-200';
+            }
+            return isLatest
+              ? 'bg-blue-600 text-white shadow-lg border-blue-400'
+              : 'bg-white text-slate-400 border-slate-100';
+          };
+          return (
+            <div className="flex flex-col gap-1 py-1">
+              {sorted.map((entry, idx) => (
+                <div
+                  key={idx}
+                  className={`px-2 py-1 rounded-lg border text-[8px] font-bold uppercase tracking-wide transition-all ${getStyle(entry.status, idx === 0)}`}
+                >
+                  {entry.status}
+                </div>
+              ))}
+            </div>
+          );
+        }
       },
       { 
         key: 'driver', 
@@ -198,11 +232,45 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
         sortValue: (t: Trip) => t.customer?.name || '',
         render: (t: Trip) => renderLocation(t.customer)
       },
-      { 
-        key: 'destination', 
-        label: 'Destino', 
+      {
+        key: 'destination',
+        label: 'Destino',
         sortValue: (t: Trip) => t.destination?.name || '',
         render: (t: Trip) => renderLocation(t.destination)
+      },
+      {
+        key: 'scheduling',
+        label: 'Agendamento',
+        sortValue: (t: Trip) => t.scheduling?.dateTime || '',
+        render: (t: Trip) => {
+          const s = t.scheduling;
+          if (!s) return <span className="text-[9px] text-slate-400">---</span>;
+          let formattedDate = '';
+          let formattedTime = '';
+          if (s.dateTime) {
+            try {
+              const d = new Date(s.dateTime);
+              if (!isNaN(d.getTime())) {
+                formattedDate = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+                formattedTime = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(d);
+              }
+            } catch {}
+          }
+          return (
+            <div className="flex flex-col gap-0.5">
+              {s.location && (
+                <span className="font-black text-slate-800 text-[10px] uppercase">{s.location}</span>
+              )}
+              {formattedDate && (
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[8px] font-bold">{formattedDate}</span>
+                  {formattedTime && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[8px] font-bold">{formattedTime}</span>}
+                </div>
+              )}
+              {s.obs && <span className="text-[8px] text-slate-400 italic mt-0.5">{s.obs}</span>}
+            </div>
+          );
+        }
       }
     ];
 
@@ -210,6 +278,7 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
       if (col.key === 'category' || col.key === 'type') return false;
       return visibleFields.includes(col.key);
     });
+    // Note: 'category' and 'type' are rendered inline within the 'os' column when selected
   }, [visibleFields]);
 
   return (
