@@ -464,7 +464,12 @@ export const db = {
 
   getNotifications: async (): Promise<Notification[]> => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false });
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .gte('timestamp', cutoff)
+      .order('timestamp', { ascending: false });
     if (error) throw error;
     return (data || []).map(n => ({
       id: String(n.id),
@@ -509,10 +514,12 @@ export const db = {
 
   getFormHistory: async (formType: string, limit = 8) => {
     if (!supabase) return [];
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from('form_history')
       .select('*')
       .eq('form_type', formType)
+      .gte('created_at', cutoff)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) {
@@ -528,6 +535,15 @@ export const db = {
       userId: r.user_id || '',
       createdAt: r.created_at,
     }));
+  },
+
+  // Remove registros com mais de 90 dias de form_history e notifications.
+  // Chamado silenciosamente na inicialização da sessão.
+  purgeOldHistory: async () => {
+    if (!supabase) return;
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from('form_history').delete().lt('created_at', cutoff);
+    await supabase.from('notifications').delete().lt('timestamp', cutoff);
   },
 
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {

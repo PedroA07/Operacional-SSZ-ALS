@@ -133,7 +133,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   }, []);
 
-  useEffect(() => { 
+  useEffect(() => {
+    // Purga silenciosa de registros com mais de 90 dias (form_history + notifications)
+    db.purgeOldHistory().catch(() => {});
+
     loadAllData(true);
 
     const refreshDataInterval = setInterval(() => loadAllData(false, true), 30000);
