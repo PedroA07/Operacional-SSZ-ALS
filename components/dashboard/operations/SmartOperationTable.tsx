@@ -23,6 +23,7 @@ interface SmartOperationTableProps {
   getRowClassName?: (row: any) => string;
   getRowStyle?: (row: any) => React.CSSProperties;
   noMaxHeight?: boolean;
+  stickyHeaderTop?: number; // offset em px para o header sticky (quando noMaxHeight=true)
 }
 
 const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
@@ -36,7 +37,8 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   hideInternalSearch = false,
   getRowClassName,
   getRowStyle,
-  noMaxHeight = false
+  noMaxHeight = false,
+  stickyHeaderTop
 }) => {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -268,10 +270,13 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
         </div>
       </div>
 
-      {/* noMaxHeight: sem overflow no wrapper para o sticky funcionar relativo à viewport */}
+      {/* noMaxHeight: sem overflow no wrapper para o sticky funcionar relativo ao scroll do pai */}
       <div className={`${noMaxHeight ? '' : 'overflow-auto max-h-[calc(100vh-300px)]'} custom-scrollbar border-y border-slate-200`}>
         <table className="w-full text-left text-[10px] border-collapse min-w-[1000px]">
-          <thead className={`bg-slate-100 text-slate-500 font-black uppercase tracking-widest z-20 shadow-sm sticky ${noMaxHeight ? 'top-14' : 'top-0'}`}>
+          <thead
+            className="bg-slate-100 text-slate-500 font-black uppercase tracking-widest z-20 shadow-sm sticky"
+            style={{ top: noMaxHeight ? (stickyHeaderTop ?? 56) : 0 }}
+          >
             <tr>
               {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
                 <th
