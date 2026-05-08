@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port } from '../../../types';
+import { Driver, Customer, Port, User } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import RetiradaCheioTemplate from './RetiradaCheioTemplate';
@@ -9,9 +9,10 @@ import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { searchService } from '../../../utils/searchService';
 import { db } from '../../../utils/storage';
-import { localDateStr } from '../../../utils/dateHelpers';
+import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
 
 interface RetiradaCheioFormProps {
+  user?: User;
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
@@ -30,7 +31,7 @@ const commonPODs = [
   'SÃO FRANCISCO DO SUL',
 ];
 
-const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customers, ports, onClose, initialFormData }) => {
+const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, customers, ports, onClose, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -100,15 +101,20 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ drivers, customer
     }
     setIsExporting(true);
     try {
-      if (currentUser) {
+      const activeUser = user || currentUser;
+      if (activeUser) {
         await db.addNotification(
-          currentUser,
+          activeUser,
           'RETIRADA_CHEIO_GENERATED',
           `Minuta Emitida: ${formData.container}`,
           `Minuta de retirada de cheio para ${effectiveDriver.name} gerada com sucesso.`,
           { container: formData.container, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse },
         );
-        db.saveFormHistory('RETIRADA_CHEIO', formData, formData.container, currentUser);
+      }
+      // Salva histórico: sempre se for novo; só se editado se vier do histórico
+      const dataChanged = !initialFormData || formFingerprint(formData) !== formFingerprint(initialFormData);
+      if (dataChanged) {
+        db.saveFormHistory('RETIRADA_CHEIO', formData, formData.container, activeUser);
       }
 
       await new Promise(r => setTimeout(r, 800));

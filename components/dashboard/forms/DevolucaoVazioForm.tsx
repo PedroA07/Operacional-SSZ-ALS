@@ -7,9 +7,10 @@ import ContainerInput from '../../shared/ContainerInput';
 import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
-import { localDateStr } from '../../../utils/dateHelpers';
+import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
 
 interface DevolucaoVazioFormProps {
+  user?: User;
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
@@ -19,7 +20,7 @@ interface DevolucaoVazioFormProps {
 
 const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
 
-const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, customers, ports, onClose, initialFormData }) => {
+const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, onClose, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -106,15 +107,19 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ drivers, custom
 
     setIsExporting(true);
     try {
-      if (currentUser) {
+      const activeUser = user || currentUser;
+      if (activeUser) {
         await db.addNotification(
-          currentUser,
+          activeUser,
           'MINUTA_GENERATED',
           `Devolução de Vazio: ${formData.container}`,
           `Minuta de devolução para o motorista ${effectiveDriver!.name} gerada com sucesso.`,
           { os: formData.container, motorista: effectiveDriver!.name, placa: effectiveDriver!.plateHorse }
         );
-        db.saveFormHistory('DEVOLUCAO_VAZIO', formData, formData.container || formData.booking, currentUser);
+      }
+      const dataChanged = !initialFormData || formFingerprint(formData) !== formFingerprint(initialFormData);
+      if (dataChanged) {
+        db.saveFormHistory('DEVOLUCAO_VAZIO', formData, formData.container || formData.booking, activeUser);
       }
 
       await new Promise(r => setTimeout(r, 800));

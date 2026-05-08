@@ -14,9 +14,10 @@ import { osCategoryService } from '../../../utils/osCategoryService';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
 import { db } from '../../../utils/storage';
-import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
+import { localDateStr, localDateTimeStr, formFingerprint } from '../../../utils/dateHelpers';
 
 interface OrdemColetaFormProps {
+  user?: User;
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
@@ -25,7 +26,7 @@ interface OrdemColetaFormProps {
   tripId?: string;
 }
 
-const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, ports, onClose, initialData, tripId }) => {
+const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, customers, ports, onClose, initialData, tripId }) => {
   const [isExporting, setIsExporting] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -188,8 +189,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ drivers, customers, p
       );
 
       window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
-      // Salva histórico independentemente do resultado do PDF
-      db.saveFormHistory('ORDEM_COLETA', formData, formData.container || formData.os || 'OC', currentUser);
+      // Salva histórico: sempre se for novo; só se editado se vier do histórico
+      const activeUser = user || currentUser;
+      const dataChanged = !initialData || formFingerprint(formData) !== formFingerprint(initialData);
+      if (dataChanged) {
+        db.saveFormHistory('ORDEM_COLETA', formData, formData.container || formData.os || 'OC', activeUser);
+      }
 
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));

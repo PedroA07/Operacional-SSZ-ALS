@@ -6,9 +6,10 @@ import LiberacaoVazioTemplate from './LiberacaoVazioTemplate';
 import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
-import { localDateStr } from '../../../utils/dateHelpers';
+import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
 
 interface LiberacaoVazioFormProps {
+  user?: User;
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
@@ -18,7 +19,7 @@ interface LiberacaoVazioFormProps {
 
 const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
 
-const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, customers, ports, onClose, initialFormData }) => {
+const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, customers, ports, onClose, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -103,15 +104,19 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ drivers, custom
 
     setIsExporting(true);
     try {
-      if (currentUser) {
+      const activeUser = user || currentUser;
+      if (activeUser) {
         await db.addNotification(
-          currentUser,
+          activeUser,
           'LIBERACAO_GENERATED',
           `Liberação Emitida: ${formData.booking}`,
           `Documento de liberação de vazio para ${effectiveDriver.name} gerado com sucesso.`,
           { os: formData.booking, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse }
         );
-        db.saveFormHistory('LIBERACAO_VAZIO', formData, formData.booking, currentUser);
+      }
+      const dataChanged = !initialFormData || formFingerprint(formData) !== formFingerprint(initialFormData);
+      if (dataChanged) {
+        db.saveFormHistory('LIBERACAO_VAZIO', formData, formData.booking, activeUser);
       }
 
       await new Promise(r => setTimeout(r, 800));

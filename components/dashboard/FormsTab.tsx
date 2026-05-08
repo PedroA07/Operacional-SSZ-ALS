@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Driver, Customer, Port, PreStacking, FormHistoryEntry } from '../../types';
+import { User, Driver, Customer, Port, PreStacking, FormHistoryEntry } from '../../types';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
@@ -10,6 +10,7 @@ import { db } from '../../utils/storage';
 import { localDateStr, localDateTimeStr, formatDateTimePtBR } from '../../utils/dateHelpers';
 
 interface FormsTabProps {
+  user: User;
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
@@ -31,7 +32,7 @@ function formatHistoryDate(iso: string) {
   return formatDateTimePtBR(iso);
 }
 
-const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStacking, initialFormId }) => {
+const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, preStacking, initialFormId }) => {
   const [selectedFormType, setSelectedFormType] = useState<FormType | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [initialFormData, setInitialFormData] = useState<any>(null);
@@ -292,15 +293,15 @@ const FormsTab: React.FC<FormsTabProps> = ({ drivers, customers, ports, preStack
             </div>
 
             {selectedFormType === 'ORDEM_COLETA' ? (
-              <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialData={initialFormData} />
+              <OrdemColetaForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialData={initialFormData} />
             ) : selectedFormType === 'PRE_STACKING' ? (
-              <PreStackingForm drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
+              <PreStackingForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
             ) : selectedFormType === 'LIBERACAO_VAZIO' ? (
-              <LiberacaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
+              <LiberacaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
             ) : selectedFormType === 'DEVOLUCAO_VAZIO' ? (
-              <DevolucaoVazioForm drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
+              <DevolucaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
             ) : selectedFormType === 'RETIRADA_CHEIO' ? (
-              <RetiradaCheioForm drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
+              <RetiradaCheioForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
             ) : null}
           </div>
         </div>

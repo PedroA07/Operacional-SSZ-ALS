@@ -21,6 +21,22 @@ export const localDateTimeStr = (d: Date = new Date()): string => {
 };
 
 /**
+ * Gera uma "assinatura" dos campos de conteúdo de um formulário,
+ * ignorando campos de data/hora que são resetados ao reemitir.
+ * Usado para detectar se o usuário editou os dados antes de gerar novamente.
+ */
+const FINGERPRINT_IGNORED = new Set([
+  'date', 'displayDate', 'horarioAgendado', 'schedulingDate', 'schedulingTime',
+]);
+export const formFingerprint = (data: any): string => {
+  if (!data) return '';
+  const filtered = Object.fromEntries(
+    Object.entries(data).filter(([k]) => !FINGERPRINT_IGNORED.has(k))
+  );
+  return JSON.stringify(filtered);
+};
+
+/**
  * Formata uma ISO string ou qualquer string de data para o padrão
  * pt-BR DD/MM/YYYY HH:MM sem depender do fuso do servidor.
  */

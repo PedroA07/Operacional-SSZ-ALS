@@ -8,11 +8,12 @@ import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
 import { maskCNPJ, maskCEP } from '../../../utils/masks';
-import { localDateStr } from '../../../utils/dateHelpers';
+import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { osCategoryService } from '../../../utils/osCategoryService';
 
 interface PreStackingFormProps {
+  user?: User;
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
@@ -55,7 +56,7 @@ const TerminalCardItem: React.FC<any> = ({ unit, isSelected = false, onClick }) 
   </button>
 );
 
-const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, ports, onClose, initialOS, initialFormData }) => {
+const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, customers, ports, onClose, initialOS, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isLoadingTrip, setIsLoadingTrip] = useState(false);
   const [isTerminalDropdownOpen, setIsTerminalDropdownOpen] = useState(false);
@@ -203,9 +204,13 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ drivers, customers, p
     try {
       setTimeout(generateBarcodes, 100);
 
-      if (currentUser) {
-        await db.addNotification(currentUser, 'MINUTA_GENERATED', `Minuta Pre-Stacking: ${formData.os}`, `Minuta de carregado gerada para ${effectiveDriver?.name}.`, { os: formData.os, motorista: effectiveDriver?.name, placa: effectiveDriver?.plateHorse });
-        db.saveFormHistory('PRE_STACKING', formData, formData.container || formData.os, currentUser);
+      const activeUser = user || currentUser;
+      if (activeUser) {
+        await db.addNotification(activeUser, 'MINUTA_GENERATED', `Minuta Pre-Stacking: ${formData.os}`, `Minuta de carregado gerada para ${effectiveDriver?.name}.`, { os: formData.os, motorista: effectiveDriver?.name, placa: effectiveDriver?.plateHorse });
+      }
+      const dataChanged = !initialFormData || formFingerprint(formData) !== formFingerprint(initialFormData);
+      if (dataChanged) {
+        db.saveFormHistory('PRE_STACKING', formData, formData.container || formData.os, activeUser);
       }
 
       if (effectiveDriver && selectedRemetente) {

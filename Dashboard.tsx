@@ -319,7 +319,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               }
             }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} categories={categories} />}
-           {activeTab === DashboardTab.FORMULARIOS && <FormsTab drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
+           {activeTab === DashboardTab.FORMULARIOS && <FormsTab user={user} drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
            {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { 
               const success = await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); 
               if (success) {
