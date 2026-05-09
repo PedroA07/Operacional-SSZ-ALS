@@ -9,7 +9,7 @@ import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
 import { maskCNPJ, maskCEP } from '../../../utils/masks';
 import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
-import DatePicker from '../../shared/DatePicker';
+import DateTimePicker from '../../shared/DateTimePicker';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { osCategoryService } from '../../../utils/osCategoryService';
 
@@ -359,24 +359,17 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
         </div>
 
         <div className="space-y-4 bg-white p-6 rounded-[2.2rem] border border-slate-200 shadow-sm">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className={labelClass}>Data Agendamento (Opcional)</label>
-              <DatePicker
-                value={formData.schedulingDate || ''}
-                onChange={v => setFormData({...formData, schedulingDate: v})}
-                placeholder="Data de agendamento..."
-              />
-            </div>
-            <div className="space-y-1">
-              <label className={labelClass}>Hora Agendamento (Opcional)</label>
-              <input 
-                type="time" 
-                className={inputClass} 
-                value={formData.schedulingTime} 
-                onChange={e => setFormData({...formData, schedulingTime: e.target.value})} 
-              />
-            </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Data e Hora de Agendamento (Opcional)</label>
+            <DateTimePicker
+              value={formData.schedulingDate ? `${formData.schedulingDate}T${formData.schedulingTime || '00:00'}` : ''}
+              onChange={v => {
+                const [date, time] = v.split('T');
+                setFormData({...formData, schedulingDate: date, schedulingTime: time || ''});
+              }}
+              placeholder="Data e hora de agendamento..."
+              inputClassName={inputClass}
+            />
           </div>
           <div className="space-y-1">
             <label className={labelClass}>Navio / Embarcação</label>

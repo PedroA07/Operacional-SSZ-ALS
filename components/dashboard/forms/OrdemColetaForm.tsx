@@ -11,6 +11,7 @@ import { searchService } from '../../../utils/searchService';
 import { maskSeal } from '../../../utils/masks';
 import ContainerInput from '../../shared/ContainerInput';
 import CustomSelect from '../../shared/CustomSelect';
+import DateTimePicker from '../../shared/DateTimePicker';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
@@ -430,7 +431,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 space-y-6 shadow-sm">
            <div className="space-y-1">
               <label className={labelBlueClass}>6. Horário Agendado para Coleta</label>
-              <input type="datetime-local" className={inputClasses} value={formData.horarioAgendado} onChange={e => handleInputChange('horarioAgendado', e.target.value)} />
+              <DateTimePicker
+                value={formData.horarioAgendado || ''}
+                onChange={v => handleInputChange('horarioAgendado', v)}
+                placeholder="Horário agendado..."
+                inputClassName={inputClasses}
+              />
            </div>
         </div>
 

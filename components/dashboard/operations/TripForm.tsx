@@ -8,6 +8,7 @@ import { searchService } from '../../../utils/searchService';
 import { db } from '../../../utils/storage';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import CustomSelect from '../../shared/CustomSelect';
+import DateTimePicker from '../../shared/DateTimePicker';
 
 interface TripFormProps {
   editTrip?: Trip | null;
@@ -192,7 +193,13 @@ const TripForm: React.FC<TripFormProps> = ({
           </div>
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Previsão Início</label>
-            <input required type="datetime-local" className={inputClass} value={formData.dateTime} onChange={e => setFormData({...formData, dateTime: e.target.value})} />
+            <DateTimePicker
+                required
+                value={formData.dateTime || ''}
+                onChange={v => setFormData({...formData, dateTime: v})}
+                placeholder="Previsão início..."
+                inputClassName={inputClass}
+              />
           </div>
           <div className="md:col-span-4 flex items-end pb-2">
             <label className="flex items-center gap-3 cursor-pointer group">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Trip, Driver, Customer, Category, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 import CustomSelect from '../../shared/CustomSelect';
+import DateTimePicker from '../../shared/DateTimePicker';
 
 interface NewTripModalProps {
   isOpen: boolean;
@@ -89,9 +90,13 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
             </div>
             <div>
               <label className={labelClass}>Data/Hora Programação</label>
-              <div className="relative">
-                <input required type="datetime-local" className="w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 outline-none" value={form.dateTime} onChange={e => setForm({...form, dateTime: e.target.value})} />
-              </div>
+              <DateTimePicker
+                required
+                value={form.dateTime || ''}
+                onChange={v => setForm({...form, dateTime: v})}
+                placeholder="Data/Hora Programação..."
+                inputClassName="w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+              />
             </div>
           </div>
 
