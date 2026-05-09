@@ -212,7 +212,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className={labelClass}>Admissão</label>
-                    <DatePicker value={form.registrationDate} onChange={v => setForm({...form, registrationDate: v})} placeholder="Data de admissão..." />
+                    <DatePicker value={form.registrationDate || ''} onChange={v => setForm({...form, registrationDate: v})} placeholder="Data de admissão..." />
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Status</label>

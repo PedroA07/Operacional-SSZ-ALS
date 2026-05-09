@@ -391,7 +391,7 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
 
               <div className="space-y-1">
                 <label className={labelClass}>Data de Registro</label>
-                <DatePicker value={form.registrationDate} onChange={v => setForm({...form, registrationDate: v})} placeholder="Data de registro..." />
+                <DatePicker value={form.registrationDate || ''} onChange={v => setForm({...form, registrationDate: v})} placeholder="Data de registro..." />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
