@@ -352,7 +352,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
               <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl space-y-4">
                 <label className={labelClass}>Vínculo & Status</label>
                 <CustomSelect
-                  value={form.driverType}
+                  value={form.driverType || ''}
                   onChange={v => setForm({ ...form, driverType: v as any })}
                   options={[
                     { value: 'Externo', label: 'EXTERNO / TERCEIRO' },
@@ -362,7 +362,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                   inputClassName={inputClasses}
                 />
                 <CustomSelect
-                  value={form.status}
+                  value={form.status || ''}
                   onChange={v => setForm({ ...form, status: v as any, statusLastChangeDate: new Date().toISOString() })}
                   options={[
                     { value: 'Ativo', label: 'SISTEMA ATIVO' },
@@ -427,7 +427,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                   <div className="space-y-1">
                     <label className="text-[8px] opacity-40 uppercase font-black ml-1">Tipo de Operação</label>
                     <CustomSelect
-                      value={form.paymentPreference}
+                      value={form.paymentPreference || ''}
                       onChange={v => setForm({ ...form, paymentPreference: v as any })}
                       options={[
                         { value: 'PIX', label: 'PIX' },

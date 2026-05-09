@@ -62,7 +62,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
               <label className={labelClass}>Categoria</label>
               <CustomSelect
                 required
-                value={form.category}
+                value={form.category || ''}
                 onChange={v => setForm({...form, category: v})}
                 placeholder="Selecione..."
                 options={categories.filter(c => !c.parentId).map(c => ({ value: c.name, label: c.name }))}
@@ -72,7 +72,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
             <div className="relative">
               <label className={labelClass}>Subcategoria</label>
               <CustomSelect
-                value={form.subCategory}
+                value={form.subCategory || ''}
                 onChange={v => setForm({...form, subCategory: v})}
                 placeholder="Nenhuma"
                 options={categories.filter(c => c.parentId && categories.find(p => p.id === c.parentId)?.name === form.category).map(c => ({ value: c.name, label: c.name }))}

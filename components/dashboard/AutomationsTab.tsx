@@ -121,7 +121,7 @@ const AutomationsTab: React.FC = () => {
                   Status de Gatilho (Trigger)
                 </label>
                 <CustomSelect
-                  value={currentAutomation.status}
+                  value={currentAutomation.status || ''}
                   onChange={(v) => setCurrentAutomation({ ...currentAutomation, status: v })}
                   placeholder="Selecione um status..."
                   options={allStatuses.map(status => ({ value: status, label: status }))}

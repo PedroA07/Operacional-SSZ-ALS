@@ -218,7 +218,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
                   <div className="space-y-1">
                     <label className={labelClass}>Status</label>
                   <CustomSelect
-                    value={form.status}
+                    value={form.status || ''}
                     onChange={v => {
                       setForm({
                         ...form,

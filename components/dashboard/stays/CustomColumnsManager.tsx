@@ -69,7 +69,7 @@ const CustomColumnsManager: React.FC<CustomColumnsManagerProps> = ({ session, on
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Tipo</label>
                 <CustomSelect
-                  value={newCol.type}
+                  value={newCol.type || ''}
                   onChange={v => setNewCol({ ...newCol, type: v as any })}
                   options={[
                     { value: 'text', label: 'TEXTO' },
