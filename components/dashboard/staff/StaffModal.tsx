@@ -6,6 +6,7 @@ import { maskPhone } from '../../../utils/masks';
 import { fileStorage } from '../../../utils/fileStorage';
 import ImageCropperModal from '../../shared/ImageCropperModal';
 import PhotoViewerModal from '../../shared/PhotoViewerModal';
+import DatePicker from '../../shared/DatePicker';
 
 interface StaffModalProps {
   isOpen: boolean;
@@ -211,7 +212,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className={labelClass}>Admissão</label>
-                    <input type="date" required className={inputClasses} value={form.registrationDate} onChange={e => setForm({...form, registrationDate: e.target.value})} />
+                    <DatePicker value={form.registrationDate} onChange={v => setForm({...form, registrationDate: v})} placeholder="Data de admissão..." />
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Status</label>

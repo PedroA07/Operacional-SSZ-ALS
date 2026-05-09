@@ -5,6 +5,7 @@ import { db } from '../../../utils/storage';
 import { lookupCarrierByContainer } from '../../../utils/carrierService';
 import { CARRIERS } from '../../../constants/carriers';
 import { showToast } from '../../shared/SimpleToast';
+import DatePicker from '../../shared/DatePicker';
 
 interface AvantidaModalProps {
   isOpen: boolean;
@@ -169,11 +170,11 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
               <label className={labelClass}>Data do Pedido</label>
-              <input type="date" required className={inputClass} value={date} onChange={e => setDate(e.target.value)} />
+              <DatePicker value={date} onChange={setDate} placeholder="Data do pedido..." />
             </div>
             <div className="space-y-1">
               <label className={labelClass}>Data de Reuso</label>
-              <input type="date" className={inputClass} value={reuseDate} onChange={e => setReuseDate(e.target.value)} />
+              <DatePicker value={reuseDate} onChange={setReuseDate} placeholder="Data de reuso..." />
             </div>
           </div>
 

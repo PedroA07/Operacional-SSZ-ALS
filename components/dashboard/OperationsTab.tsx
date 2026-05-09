@@ -13,6 +13,7 @@ import GenericOperationView from './operations/GenericOperationView';
 import OperationFilters from './operations/OperationFilters';
 import DateRangeFilter from './operations/DateRangeFilter';
 import CategoryNavigation from './operations/CategoryNavigation';
+import DatePicker from '../shared/DatePicker';
 import CategoryControl from './operations/CategoryControl';
 import CategoryManagerModal from './operations/CategoryManagerModal';
 import OrdemColetaForm from './forms/OrdemColetaForm';
@@ -336,20 +337,24 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">De</span>
-              <input
-                type="date"
-                className="px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-[10px] font-bold text-slate-700 focus:border-blue-500 focus:bg-white outline-none transition-all"
+              <DatePicker
                 value={startDate}
-                onChange={e => setStartDate(e.target.value)}
+                onChange={setStartDate}
+                placeholder="Data inicial..."
+                maxDate={endDate || undefined}
+                className="w-40"
+                inputClassName="py-2.5 text-[10px]"
               />
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">Até</span>
-              <input
-                type="date"
-                className="px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-[10px] font-bold text-slate-700 focus:border-blue-500 focus:bg-white outline-none transition-all"
+              <DatePicker
                 value={endDate}
-                onChange={e => setEndDate(e.target.value)}
+                onChange={setEndDate}
+                placeholder="Data final..."
+                minDate={startDate || undefined}
+                className="w-40"
+                inputClassName="py-2.5 text-[10px]"
               />
             </div>
             {(startDate || endDate) && (

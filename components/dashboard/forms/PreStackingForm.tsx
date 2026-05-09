@@ -9,6 +9,7 @@ import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
 import { maskCNPJ, maskCEP } from '../../../utils/masks';
 import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
+import DatePicker from '../../shared/DatePicker';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { osCategoryService } from '../../../utils/osCategoryService';
 
@@ -361,11 +362,10 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className={labelClass}>Data Agendamento (Opcional)</label>
-              <input 
-                type="date" 
-                className={inputClass} 
-                value={formData.schedulingDate} 
-                onChange={e => setFormData({...formData, schedulingDate: e.target.value})} 
+              <DatePicker
+                value={formData.schedulingDate || ''}
+                onChange={v => setFormData({...formData, schedulingDate: v})}
+                placeholder="Data de agendamento..."
               />
             </div>
             <div className="space-y-1">

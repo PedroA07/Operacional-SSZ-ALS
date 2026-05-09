@@ -1,5 +1,6 @@
 
 import React from 'react';
+import DatePicker from '../../shared/DatePicker';
 
 interface ViewFiltersProps {
   searchQuery: string;
@@ -51,20 +52,20 @@ const ViewFilters: React.FC<ViewFiltersProps> = ({
       <div className="grid grid-cols-2 gap-4 w-full lg:w-[450px]">
         <div className="space-y-1">
           <label className={labelClass}>De (Data Início)</label>
-          <input 
-            type="date" 
-            className={inputClass}
+          <DatePicker
             value={startDate}
-            onChange={(e) => onStartDateChange(e.target.value)}
+            onChange={onStartDateChange}
+            placeholder="Data início..."
+            maxDate={endDate || undefined}
           />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Até (Data Fim)</label>
-          <input 
-            type="date" 
-            className={inputClass}
+          <DatePicker
             value={endDate}
-            onChange={(e) => onEndDateChange(e.target.value)}
+            onChange={onEndDateChange}
+            placeholder="Data fim..."
+            minDate={startDate || undefined}
           />
         </div>
       </div>

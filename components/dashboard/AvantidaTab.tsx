@@ -6,6 +6,7 @@ import AvantidaModal from './avantida/AvantidaModal';
 import AvantidaFilters from './avantida/AvantidaFilters';
 import AvantidaPriceConfigModal from './avantida/AvantidaPriceConfigModal';
 import { excelAvantidaService } from '../../utils/excelAvantidaService';
+import DatePicker from '../shared/DatePicker';
 
 interface AvantidaTabProps {
   userId: string;
@@ -200,7 +201,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                       <input className={inputClass} value={r.importLocation} onChange={e => handleUpdateField(r, 'importLocation', e.target.value.toUpperCase())} placeholder="SANTOS / DEPOT" />
                     </td>
                     <td className="px-6 py-4">
-                      <input type="date" className={inputClass} value={r.date} onChange={e => handleUpdateField(r, 'date', e.target.value)} />
+                      <DatePicker value={r.date} onChange={v => handleUpdateField(r, 'date', v)} placeholder="Data..." />
                     </td>
                     <td className="px-6 py-4 text-center">
                        {savingId === r.id ? (
@@ -226,7 +227,7 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                       <input className={inputClass} value={r.exportRef} onChange={e => handleUpdateField(r, 'exportRef', e.target.value.toUpperCase())} placeholder="---" />
                     </td>
                     <td className="px-6 py-4">
-                      <input type="date" className={inputClass} value={r.reuseDate || ''} onChange={e => handleUpdateField(r, 'reuseDate', e.target.value)} />
+                      <DatePicker value={r.reuseDate || ''} onChange={v => handleUpdateField(r, 'reuseDate', v)} placeholder="Reuso..." />
                     </td>
                     <td className="px-6 py-4">
                       <div className="relative group/price">

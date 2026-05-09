@@ -6,6 +6,7 @@ import { showToast } from '../../shared/SimpleToast';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
 import Editor from 'react-simple-wysiwyg';
+import DatePicker from '../../shared/DatePicker';
 
 interface EmailTemplateModalProps {
   isOpen: boolean;
@@ -888,9 +889,10 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                         {!table.defaultFilters?.useTodayDate && (
                           <div className="animate-in fade-in zoom-in-95">
                             <label className="text-[9px] font-black text-slate-400 uppercase ml-1 mb-1 block">Data Específica</label>
-                            <input type="date" className="w-full px-5 py-4 text-[12px] font-bold text-slate-700 rounded-2xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all outline-none shadow-inner" 
+                            <DatePicker
                               value={table.defaultFilters?.date || ''}
-                              onChange={e => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, date: e.target.value } })}
+                              onChange={v => updateTable(table.id, { defaultFilters: { ...table.defaultFilters, date: v } })}
+                              placeholder="Data específica..."
                             />
                           </div>
                         )}

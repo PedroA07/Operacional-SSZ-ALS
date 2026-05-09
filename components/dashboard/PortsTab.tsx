@@ -4,6 +4,7 @@ import { Port } from '../../types';
 import { maskCEP, maskCNPJ } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
 import ListFilters from './shared/ListFilters';
+import DatePicker from '../shared/DatePicker';
 
 interface PortsTabProps {
   ports: Port[];
@@ -390,12 +391,7 @@ const PortsTab: React.FC<PortsTabProps> = ({ ports, onSavePort, onDeletePort }) 
 
               <div className="space-y-1">
                 <label className={labelClass}>Data de Registro</label>
-                <input 
-                  type="date" 
-                  className={inputClasses} 
-                  value={form.registrationDate} 
-                  onChange={e => setForm({...form, registrationDate: e.target.value})} 
-                />
+                <DatePicker value={form.registrationDate} onChange={v => setForm({...form, registrationDate: v})} placeholder="Data de registro..." />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

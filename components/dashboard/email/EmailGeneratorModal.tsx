@@ -4,6 +4,7 @@ import { showToast } from '../../shared/SimpleToast';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { AutocompleteItem } from '../../../utils/searchService';
 import Editor from 'react-simple-wysiwyg';
+import DatePicker from '../../shared/DatePicker';
 
 interface EmailGeneratorModalProps {
   isOpen: boolean;
@@ -942,15 +943,11 @@ const EmailGeneratorModal: React.FC<EmailGeneratorModalProps> = ({ isOpen, onClo
                       {!tableFilters[table.id]?.useTodayDate && (
                         <div className="animate-in fade-in zoom-in-95">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block">Data Programada</label>
-                          <div className="relative group">
-                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors">
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                            </div>
-                            <input type="date" className="w-full pl-12 pr-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-[12px] font-bold uppercase focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm placeholder:text-slate-300" 
-                              value={tableFilters[table.id]?.date || ''}
-                              onChange={e => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], date: e.target.value } }))}
-                            />
-                          </div>
+                          <DatePicker
+                            value={tableFilters[table.id]?.date || ''}
+                            onChange={v => setTableFilters(prev => ({ ...prev, [table.id]: { ...prev[table.id], date: v } }))}
+                            placeholder="Data programada..."
+                          />
                         </div>
                       )}
                       <div className={tableFilters[table.id]?.useTodayDate ? 'col-span-2' : ''}>

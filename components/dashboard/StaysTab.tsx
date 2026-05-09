@@ -11,6 +11,7 @@ import StayFolderCard from './stays/StayFolderCard';
 import ExportStaysButton from './stays/ExportStaysButton';
 import CustomColumnsManager from './stays/CustomColumnsManager';
 import { formulaEvaluator } from '../../utils/formulaEvaluator';
+import DatePicker from '../shared/DatePicker';
 
 interface StaysTabProps {
   categories: Category[];
@@ -740,8 +741,8 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
                    </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase">Início</label><input type="date" required className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold" value={newSessionForm.startDate} onChange={e => setNewSessionForm({...newSessionForm, startDate: e.target.value})} /></div>
-                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase">Fim</label><input type="date" required className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold" value={newSessionForm.endDate} onChange={e => setNewSessionForm({...newSessionForm, endDate: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase">Início</label><DatePicker value={newSessionForm.startDate} onChange={v => setNewSessionForm({...newSessionForm, startDate: v})} placeholder="Data início..." maxDate={newSessionForm.endDate || undefined} /></div>
+                  <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase">Fim</label><DatePicker value={newSessionForm.endDate} onChange={v => setNewSessionForm({...newSessionForm, endDate: v})} placeholder="Data fim..." minDate={newSessionForm.startDate || undefined} /></div>
                 </div>
                 <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95">Criar Pasta</button>
                 <button type="button" onClick={() => setIsCreatingSession(false)} className="w-full py-3 text-[10px] font-black text-slate-400 uppercase text-center">Voltar</button>

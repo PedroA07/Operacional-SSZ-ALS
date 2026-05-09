@@ -5,6 +5,7 @@ import { fileStorage } from '../../utils/fileStorage';
 import { db } from '../../utils/storage';
 import TripFolderCard from './docs/TripFolderCard';
 import TripDocsOverviewModal from './docs/TripDocsOverviewModal';
+import DatePicker from '../shared/DatePicker';
 
 interface DocumentsTabProps {
   userId: string;
@@ -163,8 +164,8 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ userId, trips, onUpdateTrip
 
         <div className="flex items-center gap-3 shrink-0">
            <div className="flex gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-              <input type="date" className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={startDate} onChange={e => setStartDate(e.target.value)} />
-              <input type="date" className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold" value={endDate} onChange={e => setEndDate(e.target.value)} />
+              <DatePicker value={startDate} onChange={setStartDate} placeholder="Data início..." maxDate={endDate || undefined} className="w-40" inputClassName="py-1.5 text-[10px]" />
+              <DatePicker value={endDate} onChange={setEndDate} placeholder="Data fim..." minDate={startDate || undefined} className="w-40" inputClassName="py-1.5 text-[10px]" />
            </div>
            
            <input type="file" multiple accept=".pdf" className="hidden" ref={batchInputRef} onChange={processBatchFiles} />

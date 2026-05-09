@@ -4,6 +4,7 @@ import { db } from '../../../utils/storage';
 import ExcelJS from 'exceljs';
 import { excelSealStyles } from '../../../utils/excelSealStyles';
 import { excelSealFormulas } from '../../../utils/excelSealFormulas';
+import DatePicker from '../../shared/DatePicker';
 
 interface SealDetailsViewProps {
   batch: SealBatch;
@@ -364,7 +365,7 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
                         <input className={inputClass} value={r.booking || ''} onChange={e => handleUpdate(r.id, 'booking', e.target.value.toUpperCase())} placeholder="----" />
                       </td>
                       <td className="px-8 py-4">
-                        <input type="date" className={inputClass} value={r.reuseDate || ''} onChange={e => handleUpdate(r.id, 'reuseDate', e.target.value)} />
+                        <DatePicker value={r.reuseDate || ''} onChange={v => handleUpdate(r.id, 'reuseDate', v)} placeholder="Data reuso..." />
                       </td>
                       <td className="px-8 py-4">
                         <input 

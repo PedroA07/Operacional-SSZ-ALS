@@ -1,5 +1,7 @@
 
 import React from 'react';
+import DatePicker from '../../shared/DatePicker';
+import { localDateStr } from '../../../utils/dateHelpers';
 
 interface DateRangeFilterProps {
   startDate: string;
@@ -9,52 +11,77 @@ interface DateRangeFilterProps {
   onClear: () => void;
 }
 
+const offsetDate = (n: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return localDateStr(d);
+};
+
+const QuickBtn: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all ${
+      active ? 'bg-slate-800 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-400'
+    }`}
+  >
+    {label}
+  </button>
+);
+
 const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
-  startDate,
-  onStartDateChange,
-  endDate,
-  onEndDateChange,
-  onClear
+  startDate, onStartDateChange, endDate, onEndDateChange, onClear,
 }) => {
-  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block";
-  const inputClass = "w-full px-5 py-3.5 rounded-2xl border-2 border-slate-50 bg-slate-50 text-[11px] font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm";
+  const today     = localDateStr();
+  const yesterday = offsetDate(-1);
+  const tomorrow  = offsetDate(1);
+
+  const isSingleDay = (d: string) => startDate === d && endDate === d;
+  const setDay = (d: string) => { onStartDateChange(d); onEndDateChange(d); };
 
   return (
-    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-6 flex flex-col md:flex-row items-end gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-        <div className="space-y-1">
-          <label className={labelClass}>Início do Período</label>
-          <input 
-            type="date" 
-            className={inputClass}
-            value={startDate}
-            onChange={(e) => onStartDateChange(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <label className={labelClass}>Fim do Período</label>
-          <input 
-            type="date" 
-            className={inputClass}
-            value={endDate}
-            onChange={(e) => onEndDateChange(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="shrink-0 flex gap-2 w-full md:w-auto">
+    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+      {/* Quick shortcuts */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mr-1">Atalhos:</span>
+        <QuickBtn label="Ontem" active={isSingleDay(yesterday)} onClick={() => setDay(yesterday)} />
+        <QuickBtn label="Hoje"  active={isSingleDay(today)}     onClick={() => setDay(today)} />
+        <QuickBtn label="Amanhã" active={isSingleDay(tomorrow)} onClick={() => setDay(tomorrow)} />
+        <div className="w-px h-4 bg-slate-200 mx-1" />
         {(startDate || endDate) && (
-          <button 
+          <button
+            type="button"
             onClick={onClear}
-            className="flex-1 md:flex-none px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase transition-all active:scale-95 border border-slate-200"
+            className="px-3 py-1.5 rounded-xl text-[8px] font-black uppercase text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all border border-slate-200"
           >
-            Limpar Datas
+            ✕ Limpar
           </button>
         )}
-        <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600">
-           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-           </svg>
+      </div>
+
+      {/* Date pickers */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-1">
+            Início do Período
+          </label>
+          <DatePicker
+            value={startDate}
+            onChange={onStartDateChange}
+            placeholder="Data inicial..."
+            maxDate={endDate || undefined}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-1">
+            Fim do Período
+          </label>
+          <DatePicker
+            value={endDate}
+            onChange={onEndDateChange}
+            placeholder="Data final..."
+            minDate={startDate || undefined}
+          />
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import DatePicker from '../../shared/DatePicker';
 
 interface AvantidaFiltersProps {
   search: string;
@@ -37,11 +38,11 @@ const AvantidaFilters: React.FC<AvantidaFiltersProps> = ({
       <div className="grid grid-cols-2 gap-4 w-full lg:w-[400px]">
         <div className="space-y-1">
            <label className={labelClass}>Data Início</label>
-           <input type="date" className={inputClass} value={startDate} onChange={e => setStartDate(e.target.value)} />
+           <DatePicker value={startDate} onChange={setStartDate} placeholder="Data início..." maxDate={endDate || undefined} />
         </div>
         <div className="space-y-1">
            <label className={labelClass}>Data Fim</label>
-           <input type="date" className={inputClass} value={endDate} onChange={e => setEndDate(e.target.value)} />
+           <DatePicker value={endDate} onChange={setEndDate} placeholder="Data fim..." minDate={startDate || undefined} />
         </div>
       </div>
 

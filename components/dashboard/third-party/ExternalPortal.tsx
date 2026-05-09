@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Trip, User } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
+import DatePicker from '../../shared/DatePicker';
 
 interface ExternalPortalProps {
   user: User;
@@ -347,29 +348,24 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
               </div>
 
               {/* Filtro de data */}
-              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
-                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                <input
-                  type="date"
+              <div className="flex items-center gap-2">
+                <DatePicker
                   value={startDate}
-                  onChange={e => setStartDate(e.target.value)}
-                  className="text-[10px] font-black text-slate-600 outline-none bg-transparent cursor-pointer"
+                  onChange={setStartDate}
+                  placeholder="Data início..."
+                  maxDate={endDate || undefined}
+                  className="w-36"
+                  inputClassName="py-2 text-[10px]"
                 />
-                <span className="text-[9px] font-black text-slate-300 px-1">→</span>
-                <input
-                  type="date"
+                <span className="text-[9px] font-black text-slate-300">→</span>
+                <DatePicker
                   value={endDate}
-                  onChange={e => setEndDate(e.target.value)}
-                  className="text-[10px] font-black text-slate-600 outline-none bg-transparent cursor-pointer"
+                  onChange={setEndDate}
+                  placeholder="Data fim..."
+                  minDate={startDate || undefined}
+                  className="w-36"
+                  inputClassName="py-2 text-[10px]"
                 />
-                <button
-                  onClick={() => { setStartDate(todayLocal); setEndDate(todayLocal); }}
-                  className="ml-2 text-[8px] font-black text-blue-500 uppercase hover:text-blue-700 transition-colors shrink-0 border-l border-slate-200 pl-2"
-                >
-                  Hoje
-                </button>
               </div>
             </div>
           </div>
