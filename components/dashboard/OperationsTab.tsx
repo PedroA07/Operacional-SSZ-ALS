@@ -285,14 +285,8 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex flex-col lg:flex-row justify-between items-end gap-6">
         <div className="flex-1 w-full"><CategoryNavigation availableOps={availableOps} onNavigate={setActiveView} /></div>
-        <div className="flex flex-col items-end gap-4 w-full lg:w-auto">
-           <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
-              <button onClick={() => setDensity('compact')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${density === 'compact' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Compacto</button>
-              <button onClick={() => setDensity('comfortable')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${density === 'comfortable' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Amplo</button>
-           </div>
-           <div className="flex gap-3">
-              <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
-           </div>
+        <div className="flex items-end gap-4 w-full lg:w-auto">
+           <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
         </div>
       </div>
 

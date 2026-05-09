@@ -19,6 +19,7 @@ const StandaloneOperationsPage: React.FC<StandaloneOperationsPageProps> = ({ use
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastSync, setLastSync] = useState('');
+  const [activeView, setActiveView] = useState<{ type: 'list' | 'category' | 'client'; id?: string; categoryName?: string; clientName?: string }>({ type: 'list' });
 
   useEffect(() => {
     document.body.classList.add('scrollable');
@@ -130,8 +131,8 @@ const StandaloneOperationsPage: React.FC<StandaloneOperationsPageProps> = ({ use
           trips={trips}
           categories={categories}
           preStacking={preStacking}
-          activeView={{ type: 'list' }}
-          setActiveView={() => {}}
+          activeView={activeView}
+          setActiveView={setActiveView}
           noMaxHeight
           onDeleteTrip={async (id) => {
             await db.deleteTrip(id, user);

@@ -222,14 +222,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         onConfirm={feedback.onConfirm}
       />
       
-      {(isSyncing || isRealtimeActive) && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4">
-           <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-50 animate-pulse' : 'bg-emerald-50'}`}></div>
-           <span className="text-[8px] font-black text-white uppercase tracking-widest">
-             {isSyncing ? 'Sincronizando...' : 'Tempo Real Ativo'}
-           </span>
-        </div>
-      )}
 
       <Sidebar 
         user={user}
