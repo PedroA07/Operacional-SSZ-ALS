@@ -273,6 +273,19 @@ export interface HandoverPost {
   authorRole?: string;
   mentions: HandoverMention[];
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface HandoverComment {
+  id: string;
+  postId: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  authorPhoto?: string;
+  authorRole?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export enum DashboardTab {

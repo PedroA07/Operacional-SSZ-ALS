@@ -3,7 +3,7 @@ import {
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category,
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
-  LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, DutySwapRequest
+  LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1062,6 +1062,7 @@ export const db = {
       authorRole: p.author_role,
       mentions: p.mentions || [],
       createdAt: p.created_at,
+      updatedAt: p.updated_at,
     }));
   },
 
@@ -1086,6 +1087,87 @@ export const db = {
     return true;
   },
 
+  updateHandoverPost: async (id: string, content: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('handover_posts')
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) { console.error('[updateHandoverPost]', error.message); return false; }
+    return true;
+  },
+
+  getHandoverComments: async (postId: string): Promise<HandoverComment[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('handover_comments')
+      .select('*')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+    if (error) { console.error('[getHandoverComments]', error.message); return []; }
+    return (data || []).map(c => ({
+      id: String(c.id),
+      postId: c.post_id,
+      content: c.content || '',
+      authorId: c.author_id || '',
+      authorName: c.author_name || '',
+      authorPhoto: c.author_photo,
+      authorRole: c.author_role,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
+    }));
+  },
+
+  saveHandoverComment: async (comment: Omit<HandoverComment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string | null> => {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('handover_comments').insert({
+      post_id: comment.postId,
+      content: comment.content,
+      author_id: comment.authorId,
+      author_name: comment.authorName,
+      author_photo: comment.authorPhoto,
+      author_role: comment.authorRole,
+    }).select('id').single();
+    if (error) { console.error('[saveHandoverComment]', error.message); return null; }
+    return String(data?.id);
+  },
+
+  updateHandoverComment: async (id: string, content: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('handover_comments')
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) { console.error('[updateHandoverComment]', error.message); return false; }
+    return true;
+  },
+
+  deleteHandoverComment: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('handover_comments').delete().eq('id', id);
+    if (error) { console.error('[deleteHandoverComment]', error.message); return false; }
+    return true;
+  },
+
+  getHandoverEditWindow: async (): Promise<number> => {
+    if (!supabase) return 30;
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'handover_edit_window')
+      .maybeSingle();
+    if (error) { console.error('[getHandoverEditWindow]', error.message); return 30; }
+    if (data?.value === null || data?.value === undefined) return 30;
+    return Number(data.value);
+  },
+
+  saveHandoverEditWindow: async (minutes: number): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('system_settings').upsert(
+      { key: 'handover_edit_window', value: minutes, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
+    if (error) console.error('[saveHandoverEditWindow]', error.message);
+  },
+
   // ── Escala de Plantão ──────────────────────────────────────────────────────
 
   getDutyRoster: async (): Promise<string[]> => {
@@ -1099,12 +1181,14 @@ export const db = {
     return (data?.value as string[]) || [];
   },
 
-  saveDutyRoster: async (roster: string[]): Promise<void> => {
-    if (!supabase) return;
-    await supabase.from('system_settings').upsert(
+  saveDutyRoster: async (roster: string[]): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('system_settings').upsert(
       { key: 'duty_roster', value: roster, updated_at: new Date().toISOString() },
       { onConflict: 'key' }
     );
+    if (error) { console.error('[saveDutyRoster]', error.message); return false; }
+    return true;
   },
 
   sendSwapRequest: async (
