@@ -7,6 +7,7 @@ import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
 import { db } from '../../../utils/storage';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface TripFormProps {
   editTrip?: Trip | null;
@@ -155,18 +156,23 @@ const TripForm: React.FC<TripFormProps> = ({
           </div>
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Tipo de Operação</label>
-            <select className={inputClass} value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-              {operationTypes.map(op => (
-                <option key={op.id} value={op.name}>{op.name}</option>
-              ))}
-            </select>
+            <CustomSelect
+              value={formData.type}
+              onChange={v => setFormData({...formData, type: v})}
+              options={operationTypes.map(op => ({ value: op.name, label: op.name }))}
+              inputClassName={inputClass}
+            />
           </div>
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Vínculo Operacional</label>
-            <select required className={inputClass} value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-              <option value="">SELECIONE...</option>
-              {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>)}
-            </select>
+            <CustomSelect
+              required
+              value={formData.category}
+              onChange={v => setFormData({...formData, category: v})}
+              placeholder="SELECIONE..."
+              options={categories.filter(c => !c.parentId).map(c => ({ value: c.name, label: c.name.toUpperCase() }))}
+              inputClassName={inputClass}
+            />
           </div>
           <div className="md:col-span-3 space-y-1">
             <label className={labelClass}>Navio / Embarcação</label>
@@ -283,46 +289,42 @@ const TripForm: React.FC<TripFormProps> = ({
                   {horses.length > 1 && (
                     <div className="space-y-2">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Placa do Cavalo</p>
-                      <select
-                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none text-sm"
+                      <CustomSelect
                         value={formData.driver?.plateHorse || ''}
-                        onChange={e => {
-                          const entry = horses.find((h: any) => h.plate === e.target.value);
+                        onChange={v => {
+                          const entry = horses.find((h: any) => h.plate === v);
                           setFormData((prev: any) => ({
                             ...prev,
                             driver: { ...prev.driver, plateHorse: entry?.plate || '' }
                           }));
                         }}
-                      >
-                        {horses.map((h: any) => (
-                          <option key={h.id} value={h.plate}>
-                            {h.plate}{h.year ? ` (${h.year})` : ''}{h.isPrimary ? ' — Principal' : ''}
-                          </option>
-                        ))}
-                      </select>
+                        options={horses.map((h: any) => ({
+                          value: h.plate,
+                          label: `${h.plate}${h.year ? ` (${h.year})` : ''}${h.isPrimary ? ' — Principal' : ''}`
+                        }))}
+                        inputClassName="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none text-sm"
+                      />
                     </div>
                   )}
                   {trailers.length > 1 && (
                     <div className="space-y-2">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Placa da Carreta</p>
-                      <select
-                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none text-sm"
+                      <CustomSelect
                         value={formData.driver?.plateTrailer || ''}
-                        onChange={e => {
-                          const entry = trailers.find((t: any) => t.plate === e.target.value);
+                        onChange={v => {
+                          const entry = trailers.find((t: any) => t.plate === v);
                           setFormData((prev: any) => ({
                             ...prev,
                             driver: { ...prev.driver, plateTrailer: entry?.plate || '' }
                           }));
                         }}
-                      >
-                        <option value="">— Sem carreta —</option>
-                        {trailers.map((t: any) => (
-                          <option key={t.id} value={t.plate}>
-                            {t.plate}{t.year ? ` (${t.year})` : ''}{t.isPrimary ? ' — Principal' : ''}
-                          </option>
-                        ))}
-                      </select>
+                        placeholder="— Sem carreta —"
+                        options={trailers.map((t: any) => ({
+                          value: t.plate,
+                          label: `${t.plate}${t.year ? ` (${t.year})` : ''}${t.isPrimary ? ' — Principal' : ''}`
+                        }))}
+                        inputClassName="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none text-sm"
+                      />
                     </div>
                   )}
                 </div>
@@ -397,11 +399,12 @@ const TripForm: React.FC<TripFormProps> = ({
            </div>
            <div className="md:col-span-2 space-y-1">
               <label className={labelClass}>Tipo Unidade</label>
-              <select className={inputClass} value={formData.containerType} onChange={e => setFormData({...formData, containerType: e.target.value})}>
-                 {containerTypes.map(type => (
-                   <option key={type.id} value={type.name}>{type.name}</option>
-                 ))}
-              </select>
+              <CustomSelect
+                 value={formData.containerType}
+                 onChange={v => setFormData({...formData, containerType: v})}
+                 options={containerTypes.map(type => ({ value: type.name, label: type.name }))}
+                 inputClassName={inputClass}
+              />
            </div>
         </div>
       </div>

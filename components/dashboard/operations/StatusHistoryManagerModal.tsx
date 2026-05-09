@@ -4,6 +4,7 @@ import { Trip, User, StatusHistoryEntry, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 import { statusService } from '../../../utils/statusService';
 import { showToast } from '../../shared/SimpleToast';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface StatusHistoryManagerModalProps {
   isOpen: boolean;
@@ -169,13 +170,12 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
 
               <div className="flex-1 space-y-1">
                 <label className="text-[7px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição do Status</label>
-                <select 
-                  className="w-full bg-transparent font-black text-slate-800 uppercase text-[11px] outline-none cursor-pointer focus:text-blue-600"
+                <CustomSelect
                   value={entry.status}
-                  onChange={e => handleUpdateEntry(idx, 'status', e.target.value)}
-                >
-                  {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label.toUpperCase()}</option>)}
-                </select>
+                  onChange={v => handleUpdateEntry(idx, 'status', v)}
+                  options={statusOptions.map(opt => ({ value: opt.value, label: opt.label.toUpperCase() }))}
+                  inputClassName="w-full bg-transparent font-black text-slate-800 uppercase text-[11px] outline-none cursor-pointer focus:text-blue-600"
+                />
               </div>
 
               <div className="w-48 space-y-1">

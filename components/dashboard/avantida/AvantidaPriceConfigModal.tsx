@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { AvantidaPriceRule } from '../../../types';
 import { db } from '../../../utils/storage';
 import { CARRIERS } from '../../../constants/carriers';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface AvantidaPriceConfigModalProps {
   isOpen: boolean;
@@ -97,17 +98,14 @@ const AvantidaPriceConfigModal: React.FC<AvantidaPriceConfigModalProps> = ({ isO
         <form onSubmit={handleAdd} className="p-8 bg-blue-50/30 border-b border-blue-100 flex flex-wrap items-end gap-4 shrink-0">
            <div className="flex-1 min-w-[200px] space-y-1">
               <label className="text-[8px] font-black text-blue-600 uppercase tracking-widest ml-1">Selecionar Armador</label>
-              <select 
+              <CustomSelect
                 required
-                className="w-full px-4 py-3 rounded-xl border border-blue-100 bg-white text-[10px] font-bold uppercase outline-none focus:ring-4 focus:ring-blue-500/10"
                 value={shippingLine}
-                onChange={e => setShippingLine(e.target.value)}
-              >
-                <option value="">SELECIONE...</option>
-                {CARRIERS.map(c => (
-                  <option key={c.name} value={c.name}>{c.name.toUpperCase()}</option>
-                ))}
-              </select>
+                onChange={v => setShippingLine(v)}
+                placeholder="SELECIONE..."
+                options={CARRIERS.map(c => ({ value: c.name, label: c.name.toUpperCase() }))}
+                inputClassName="w-full px-4 py-3 rounded-xl border border-blue-100 bg-white text-[10px] font-bold uppercase outline-none focus:ring-4 focus:ring-blue-500/10"
+              />
            </div>
            <div className="w-40 space-y-1">
               <label className="text-[8px] font-black text-blue-600 uppercase tracking-widest ml-1">Preço (R$)</label>

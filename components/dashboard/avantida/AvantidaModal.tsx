@@ -6,6 +6,7 @@ import { lookupCarrierByContainer } from '../../../utils/carrierService';
 import { CARRIERS } from '../../../constants/carriers';
 import { showToast } from '../../shared/SimpleToast';
 import DatePicker from '../../shared/DatePicker';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface AvantidaModalProps {
   isOpen: boolean;
@@ -231,11 +232,16 @@ const AvantidaModal: React.FC<AvantidaModalProps> = ({ isOpen, onClose, onSucces
             </div>
             <div className="space-y-1">
               <label className={labelClass}>Estado da Solicitação</label>
-              <select className={`${inputClass} cursor-pointer`} value={status} onChange={e => setStatus(e.target.value as AvantidaStatus)}>
-                <option value="EM ANÁLISE">EM ANÁLISE</option>
-                <option value="APROVADO">APROVADO</option>
-                <option value="RECUSADO">RECUSADO</option>
-              </select>
+              <CustomSelect
+                value={status}
+                onChange={v => setStatus(v as AvantidaStatus)}
+                options={[
+                  { value: 'EM ANÁLISE', label: 'EM ANÁLISE' },
+                  { value: 'APROVADO', label: 'APROVADO' },
+                  { value: 'RECUSADO', label: 'RECUSADO' },
+                ]}
+                inputClassName={`${inputClass} cursor-pointer`}
+              />
             </div>
           </div>
 

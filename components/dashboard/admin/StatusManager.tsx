@@ -3,6 +3,7 @@ import { db } from '../../../utils/storage';
 import { CustomStatus, Customer, Port, PreStacking } from '../../../types';
 import { showToast } from '../../shared/SimpleToast';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import CustomSelect from '../../shared/CustomSelect';
 
 const MODALITIES = ['EXPORTAÇÃO', 'IMPORTAÇÃO', 'COLETA', 'ENTREGA', 'CABOTAGEM'];
 
@@ -268,16 +269,13 @@ const StatusManager: React.FC = () => {
           
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Modalidade (Opcional)</label>
-            <select 
-              className="w-full px-6 py-4 rounded-2xl border-2 border-white bg-white font-bold text-slate-800 uppercase focus:border-blue-500 transition-all outline-none shadow-sm"
+            <CustomSelect
               value={currentFlow.modality}
-              onChange={e => setCurrentFlow({ ...currentFlow, modality: e.target.value })}
-            >
-              <option value="">Todas as Modalidades</option>
-              {MODALITIES.map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+              onChange={v => setCurrentFlow({ ...currentFlow, modality: v })}
+              placeholder="Todas as Modalidades"
+              options={MODALITIES.map(m => ({ value: m, label: m }))}
+              inputClassName="w-full px-6 py-4 rounded-2xl border-2 border-white bg-white font-bold text-slate-800 uppercase focus:border-blue-500 transition-all outline-none shadow-sm"
+            />
           </div>
 
           <div className="space-y-1">

@@ -7,6 +7,7 @@ import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
 import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface LiberacaoVazioFormProps {
   user?: User;
@@ -184,22 +185,28 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
               </div>
               <div className="space-y-1">
                  <label className={labelClass}>Tipo</label>
-                 <select className={inputClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
-                    {containerTypes.map(t => (
-                      <option key={t.id} value={t.name}>{t.name}</option>
-                    ))}
-                 </select>
+                 <CustomSelect
+                    value={formData.tipo}
+                    onChange={v => handleInputChange('tipo', v)}
+                    options={containerTypes.map(t => ({ value: t.name, label: t.name }))}
+                    inputClassName={inputClasses}
+                 />
               </div>
            </div>
            <div className="space-y-1">
               <label className={labelClass}>Padrão</label>
-              <select className={inputClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
-                 <option value="CARGA GERAL">CARGA GERAL</option>
-                 <option value="CARGO PREMIUM">CARGO PREMIUM</option>
-                 <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
-                 <option value="REEFER">REEFER</option>
-                 <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
-              </select>
+              <CustomSelect
+                 value={formData.padrao}
+                 onChange={v => handleInputChange('padrao', v)}
+                 options={[
+                   { value: 'CARGA GERAL', label: 'CARGA GERAL' },
+                   { value: 'CARGO PREMIUM', label: 'CARGO PREMIUM' },
+                   { value: 'PADRÃO ALIMENTO', label: 'PADRÃO ALIMENTO' },
+                   { value: 'REEFER', label: 'REEFER' },
+                   { value: 'PRODUTO QUÍMICO', label: 'PRODUTO QUÍMICO' },
+                 ]}
+                 inputClassName={inputClasses}
+              />
            </div>
         </div>
 

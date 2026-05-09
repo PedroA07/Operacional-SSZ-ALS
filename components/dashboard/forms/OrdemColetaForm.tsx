@@ -10,6 +10,7 @@ import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { searchService } from '../../../utils/searchService';
 import { maskSeal } from '../../../utils/masks';
 import ContainerInput from '../../shared/ContainerInput';
+import CustomSelect from '../../shared/CustomSelect';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
@@ -281,25 +282,23 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
            <div className="grid grid-cols-2 gap-6">
               <div className="space-y-1">
                  <label className={labelClass}>Tipo de Operação</label>
-                 <select className={selectClasses} value={formData.tipoOperacao} onChange={e => handleInputChange('tipoOperacao', e.target.value)}>
-                    {operationTypes.map(op => (
-                      <option key={op.id} value={op.name}>{op.name}</option>
-                    ))}
-                 </select>
+                 <CustomSelect
+                    value={formData.tipoOperacao}
+                    onChange={v => handleInputChange('tipoOperacao', v)}
+                    options={operationTypes.map(op => ({ value: op.name, label: op.name }))}
+                    inputClassName={selectClasses}
+                 />
               </div>
               <div className="space-y-1">
                  <label className={labelClass}>Vínculo Operacional</label>
-                 <select 
+                 <CustomSelect
                    required
-                   className={`${selectClasses} ${formData.category ? 'text-blue-600 border-blue-400 ring-2 ring-blue-500/5' : ''}`} 
-                   value={formData.category} 
-                   onChange={e => handleInputChange('category', e.target.value)}
-                 >
-                    <option value="">{userHasChosenCategory ? 'SELECIONE VÍNCULO...' : 'AUTO DETECTANDO...'}</option>
-                    {availableOptions.map(name => (
-                       <option key={name} value={name}>{name}</option>
-                    ))}
-                 </select>
+                   value={formData.category}
+                   onChange={v => handleInputChange('category', v)}
+                   placeholder={userHasChosenCategory ? 'SELECIONE VÍNCULO...' : 'AUTO DETECTANDO...'}
+                   options={availableOptions.map(name => ({ value: name, label: name }))}
+                   inputClassName={`${selectClasses} ${formData.category ? 'text-blue-600 border-blue-400 ring-2 ring-blue-500/5' : ''}`}
+                 />
                  {formData.category && !userHasChosenCategory && (
                     <p className="text-[8px] font-black text-blue-500 uppercase mt-2 ml-1 animate-pulse">✓ Sugestão Automática: {formData.category}</p>
                  )}
@@ -344,11 +343,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
             </div>
             <div className="space-y-1">
               <label className={labelClass}>Tipo Container</label>
-              <select className={selectClasses} value={formData.tipo} onChange={e => handleInputChange('tipo', e.target.value)}>
-                {containerTypes.map(t => (
-                  <option key={t.id} value={t.name}>{t.name}</option>
-                ))}
-              </select>
+              <CustomSelect
+                value={formData.tipo}
+                onChange={v => handleInputChange('tipo', v)}
+                options={containerTypes.map(t => ({ value: t.name, label: t.name }))}
+                inputClassName={selectClasses}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-6">
@@ -361,13 +361,18 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           </div>
           <div className="space-y-1">
             <label className={labelClass}>Padrão de Carga</label>
-            <select className={selectClasses} value={formData.padrao} onChange={e => handleInputChange('padrao', e.target.value)}>
-              <option value="CARGA GERAL">CARGA GERAL</option>
-              <option value="CARGO PREMIUM">CARGO PREMIUM</option>
-              <option value="PADRÃO ALIMENTO">PADRÃO ALIMENTO</option>
-              <option value="REEFER">REEFER</option>
-              <option value="PRODUTO QUÍMICO">PRODUTO QUÍMICO</option>
-            </select>
+            <CustomSelect
+              value={formData.padrao}
+              onChange={v => handleInputChange('padrao', v)}
+              options={[
+                { value: 'CARGA GERAL', label: 'CARGA GERAL' },
+                { value: 'CARGO PREMIUM', label: 'CARGO PREMIUM' },
+                { value: 'PADRÃO ALIMENTO', label: 'PADRÃO ALIMENTO' },
+                { value: 'REEFER', label: 'REEFER' },
+                { value: 'PRODUTO QUÍMICO', label: 'PRODUTO QUÍMICO' },
+              ]}
+              inputClassName={selectClasses}
+            />
           </div>
         </div>
 

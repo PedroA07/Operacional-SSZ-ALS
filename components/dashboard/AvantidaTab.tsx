@@ -7,6 +7,7 @@ import AvantidaFilters from './avantida/AvantidaFilters';
 import AvantidaPriceConfigModal from './avantida/AvantidaPriceConfigModal';
 import { excelAvantidaService } from '../../utils/excelAvantidaService';
 import DatePicker from '../shared/DatePicker';
+import CustomSelect from '../shared/CustomSelect';
 
 interface AvantidaTabProps {
   userId: string;
@@ -183,19 +184,21 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
                       <input className={`${inputClass} text-indigo-600`} value={r.shippingLine} onChange={e => handleUpdateField(r, 'shippingLine', e.target.value.toUpperCase())} placeholder="ARMADOR" />
                     </td>
                     <td className="px-6 py-4 text-center">
-                       <select 
-                         className={`px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all ${
-                           r.status === 'APROVADO' ? 'bg-emerald-50 text-emerald-600' : 
-                           r.status === 'RECUSADO' ? 'bg-red-50 text-red-600' : 
+                       <CustomSelect
+                         className="w-full"
+                         value={r.status}
+                         onChange={v => handleUpdateField(r, 'status', v as AvantidaStatus)}
+                         options={[
+                           { value: 'EM ANÁLISE', label: 'EM ANÁLISE' },
+                           { value: 'APROVADO', label: 'APROVADO' },
+                           { value: 'RECUSADO', label: 'RECUSADO' },
+                         ]}
+                         inputClassName={`px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all ${
+                           r.status === 'APROVADO' ? 'bg-emerald-50 text-emerald-600' :
+                           r.status === 'RECUSADO' ? 'bg-red-50 text-red-600' :
                            'bg-amber-50 text-amber-600'
                          }`}
-                         value={r.status}
-                         onChange={e => handleUpdateField(r, 'status', e.target.value as AvantidaStatus)}
-                       >
-                         <option value="EM ANÁLISE">EM ANÁLISE</option>
-                         <option value="APROVADO">APROVADO</option>
-                         <option value="RECUSADO">RECUSADO</option>
-                       </select>
+                       />
                     </td>
                     <td className="px-6 py-4">
                       <input className={inputClass} value={r.importLocation} onChange={e => handleUpdateField(r, 'importLocation', e.target.value.toUpperCase())} placeholder="SANTOS / DEPOT" />

@@ -23,6 +23,7 @@ import TripModal from './operations/TripModal';
 import TripDetailsViewerModal from './operations/TripDetailsViewerModal';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 import { statusService } from '../../utils/statusService';
+import CustomSelect from '../shared/CustomSelect';
 
 interface OperationsTabProps {
   user: User;
@@ -485,9 +486,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
              <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status</label>
-                  <select className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={tempStatus} onChange={e => setTempStatus(e.target.value as TripStatus)}>
-                    {availableStatusesForSelectedTrip.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                  </select>
+                  <CustomSelect
+                    value={tempStatus}
+                    onChange={v => setTempStatus(v as TripStatus)}
+                    options={availableStatusesForSelectedTrip.map(opt => ({ value: opt.value, label: opt.label }))}
+                    inputClassName="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase"
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora Real</label>

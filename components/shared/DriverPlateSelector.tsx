@@ -1,5 +1,6 @@
 import React from 'react';
 import { Driver } from '../../types';
+import CustomSelect from './CustomSelect';
 
 interface DriverPlateSelectorProps {
   driver: Driver | null | undefined;
@@ -30,26 +31,30 @@ const DriverPlateSelector: React.FC<DriverPlateSelectorProps> = ({
       {horses.length > 1 && (
         <div className="space-y-1">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Placa do Cavalo</p>
-          <select className={selectCls} value={plateHorse} onChange={e => onChangePlateHorse(e.target.value)}>
-            {horses.map(h => (
-              <option key={h.id} value={h.plate}>
-                {h.plate}{h.year ? ` (${h.year})` : ''}{h.isPrimary ? ' — Principal' : ''}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={plateHorse}
+            onChange={v => onChangePlateHorse(v)}
+            options={horses.map(h => ({
+              value: h.plate,
+              label: `${h.plate}${h.year ? ` (${h.year})` : ''}${h.isPrimary ? ' — Principal' : ''}`
+            }))}
+            inputClassName={selectCls}
+          />
         </div>
       )}
       {trailers.length > 1 && (
         <div className="space-y-1">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Placa da Carreta</p>
-          <select className={selectCls} value={plateTrailer} onChange={e => onChangePlateTrailer(e.target.value)}>
-            <option value="">— Sem carreta —</option>
-            {trailers.map(t => (
-              <option key={t.id} value={t.plate}>
-                {t.plate}{t.year ? ` (${t.year})` : ''}{t.isPrimary ? ' — Principal' : ''}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={plateTrailer}
+            onChange={v => onChangePlateTrailer(v)}
+            placeholder="— Sem carreta —"
+            options={trailers.map(t => ({
+              value: t.plate,
+              label: `${t.plate}${t.year ? ` (${t.year})` : ''}${t.isPrimary ? ' — Principal' : ''}`
+            }))}
+            inputClassName={selectCls}
+          />
         </div>
       )}
     </div>

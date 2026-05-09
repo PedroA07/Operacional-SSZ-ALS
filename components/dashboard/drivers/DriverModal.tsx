@@ -5,6 +5,7 @@ import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../../utils/
 import { fileStorage } from '../../../utils/fileStorage';
 import { driverAuthService } from '../../../utils/driverAuthService';
 import { Icons } from '../../../constants/icons';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface DriverModalProps {
   isOpen: boolean;
@@ -350,17 +351,25 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
               {/* Vínculo & Status */}
               <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl space-y-4">
                 <label className={labelClass}>Vínculo & Status</label>
-                <select className={inputClasses} value={form.driverType} onChange={e => setForm({ ...form, driverType: e.target.value as any })}>
-                  <option value="Externo">EXTERNO / TERCEIRO</option>
-                  <option value="Frota">FROTA ALS</option>
-                  <option value="Motoboy">MOTOBOY</option>
-                </select>
-                <select className={inputClasses} value={form.status} onChange={e => {
-                  setForm({ ...form, status: e.target.value as any, statusLastChangeDate: new Date().toISOString() });
-                }}>
-                  <option value="Ativo">SISTEMA ATIVO</option>
-                  <option value="Inativo">SISTEMA INATIVO</option>
-                </select>
+                <CustomSelect
+                  value={form.driverType}
+                  onChange={v => setForm({ ...form, driverType: v as any })}
+                  options={[
+                    { value: 'Externo', label: 'EXTERNO / TERCEIRO' },
+                    { value: 'Frota', label: 'FROTA ALS' },
+                    { value: 'Motoboy', label: 'MOTOBOY' },
+                  ]}
+                  inputClassName={inputClasses}
+                />
+                <CustomSelect
+                  value={form.status}
+                  onChange={v => setForm({ ...form, status: v as any, statusLastChangeDate: new Date().toISOString() })}
+                  options={[
+                    { value: 'Ativo', label: 'SISTEMA ATIVO' },
+                    { value: 'Inativo', label: 'SISTEMA INATIVO' },
+                  ]}
+                  inputClassName={inputClasses}
+                />
               </div>
             </div>
 
@@ -417,10 +426,15 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                 <div className="grid grid-cols-3 gap-6">
                   <div className="space-y-1">
                     <label className="text-[8px] opacity-40 uppercase font-black ml-1">Tipo de Operação</label>
-                    <select className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none" value={form.paymentPreference} onChange={e => setForm({ ...form, paymentPreference: e.target.value as any })}>
-                      <option value="PIX">PIX</option>
-                      <option value="TED">TED BANCÁRIO</option>
-                    </select>
+                    <CustomSelect
+                      value={form.paymentPreference}
+                      onChange={v => setForm({ ...form, paymentPreference: v as any })}
+                      options={[
+                        { value: 'PIX', label: 'PIX' },
+                        { value: 'TED', label: 'TED BANCÁRIO' },
+                      ]}
+                      inputClassName="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none"
+                    />
                   </div>
                   <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Celular Benef.</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none" value={form.beneficiaryPhone} onChange={e => setForm({ ...form, beneficiaryPhone: maskPhone(e.target.value) })} /></div>
                   <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">E-mail Benef.</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none lowercase" value={form.beneficiaryEmail} onChange={e => setForm({ ...form, beneficiaryEmail: e.target.value })} /></div>
@@ -441,9 +455,12 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                   <div className="flex flex-wrap gap-4 items-end">
                     <div className="space-y-1">
                       <label className={labelClass}>Categoria</label>
-                      <select className="w-48 px-4 py-2.5 rounded-xl border border-slate-200 text-[10px] font-bold" value={tempCategory} onChange={e => setTempCategory(e.target.value)}>
-                        {availableOps.map(op => <option key={op.id} value={op.category}>{op.category.toUpperCase()}</option>)}
-                      </select>
+                      <CustomSelect
+                        value={tempCategory}
+                        onChange={v => setTempCategory(v)}
+                        options={availableOps.map(op => ({ value: op.category, label: op.category.toUpperCase() }))}
+                        inputClassName="w-48 px-4 py-2.5 rounded-xl border border-slate-200 text-[10px] font-bold"
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className={labelClass}>Cliente Vinculado</label>

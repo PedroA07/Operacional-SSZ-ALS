@@ -1,5 +1,6 @@
 
 import React from 'react';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface ListFiltersProps {
   searchQuery: string;
@@ -40,29 +41,31 @@ const ListFilters: React.FC<ListFiltersProps> = ({
       <div className="flex items-center gap-3 w-full md:w-auto">
         <div className="flex-1 md:w-48 space-y-1">
           <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Ordenar por</label>
-          <select 
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[9px] font-black uppercase outline-none focus:border-blue-400 cursor-pointer"
+          <CustomSelect
             value={sortBy}
-            onChange={(e) => onSortChange(e.target.value)}
-          >
-            <option value="name_asc">A-Z (ALFABÉTICA)</option>
-            <option value="name_desc">Z-A</option>
-            <option value="recent">MAIS RECENTES</option>
-          </select>
+            onChange={(v) => onSortChange(v)}
+            options={[
+              { value: 'name_asc', label: 'A-Z (ALFABÉTICA)' },
+              { value: 'name_desc', label: 'Z-A' },
+              { value: 'recent', label: 'MAIS RECENTES' },
+            ]}
+            inputClassName="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[9px] font-black uppercase outline-none focus:border-blue-400 cursor-pointer"
+          />
         </div>
 
         {onStatusFilterChange && (
           <div className="flex-1 md:w-40 space-y-1">
             <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Status</label>
-            <select 
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[9px] font-black uppercase outline-none focus:border-blue-400 cursor-pointer"
-              value={statusFilter}
-              onChange={(e) => onStatusFilterChange(e.target.value)}
-            >
-              <option value="todos">TODOS</option>
-              <option value="Ativo">ATIVOS</option>
-              <option value="Inativo">INATIVOS</option>
-            </select>
+            <CustomSelect
+              value={statusFilter || 'todos'}
+              onChange={(v) => onStatusFilterChange(v)}
+              options={[
+                { value: 'todos', label: 'TODOS' },
+                { value: 'Ativo', label: 'ATIVOS' },
+                { value: 'Inativo', label: 'INATIVOS' },
+              ]}
+              inputClassName="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[9px] font-black uppercase outline-none focus:border-blue-400 cursor-pointer"
+            />
           </div>
         )}
       </div>

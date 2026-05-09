@@ -12,6 +12,7 @@ import ExportStaysButton from './stays/ExportStaysButton';
 import CustomColumnsManager from './stays/CustomColumnsManager';
 import { formulaEvaluator } from '../../utils/formulaEvaluator';
 import DatePicker from '../shared/DatePicker';
+import CustomSelect from '../shared/CustomSelect';
 
 interface StaysTabProps {
   categories: Category[];
@@ -497,24 +498,39 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-50">
            <div className="space-y-1">
               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoria</label>
-              <select className="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black uppercase" value={activeCategory} onChange={e => setActiveCategory(e.target.value)}>
-                 <option value="GERAL">TODAS</option>
-                 {globalCategories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>)}
-              </select>
+              <CustomSelect
+                 value={activeCategory}
+                 onChange={v => setActiveCategory(v)}
+                 options={[
+                   { value: 'GERAL', label: 'TODAS' },
+                   ...globalCategories.filter(c => !c.parentId).map(c => ({ value: c.name, label: c.name.toUpperCase() })),
+                 ]}
+                 inputClassName="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black uppercase"
+              />
            </div>
            <div className="space-y-1">
               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Ano</label>
-              <select className="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black" value={filterYear} onChange={e => setFilterYear(e.target.value)}>
-                 <option value="TODOS">TODOS</option>
-                 {years.map(y => <option key={y} value={y.toString()}>{y}</option>)}
-              </select>
+              <CustomSelect
+                 value={filterYear}
+                 onChange={v => setFilterYear(v)}
+                 options={[
+                   { value: 'TODOS', label: 'TODOS' },
+                   ...years.map(y => ({ value: y.toString(), label: String(y) })),
+                 ]}
+                 inputClassName="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black"
+              />
            </div>
            <div className="space-y-1">
               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Mês</label>
-              <select className="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black uppercase" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
-                 <option value="TODOS">TODOS</option>
-                 {monthsList.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+              <CustomSelect
+                 value={filterMonth}
+                 onChange={v => setFilterMonth(v)}
+                 options={[
+                   { value: 'TODOS', label: 'TODOS' },
+                   ...monthsList.map(m => ({ value: m, label: m })),
+                 ]}
+                 inputClassName="w-full px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black uppercase"
+              />
            </div>
         </div>
       </div>
@@ -657,12 +673,17 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Tipo</label>
-                  <select className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold" value={manualRecordForm.type} onChange={e => setManualRecordForm({...manualRecordForm, type: e.target.value})}>
-                    <option value="IMPORTAÇÃO">IMPORTAÇÃO</option>
-                    <option value="EXPORTAÇÃO">EXPORTAÇÃO</option>
-                    <option value="COLETA">COLETA</option>
-                    <option value="ENTREGA">ENTREGA</option>
-                  </select>
+                  <CustomSelect
+                    value={manualRecordForm.type}
+                    onChange={v => setManualRecordForm({...manualRecordForm, type: v})}
+                    options={[
+                      { value: 'IMPORTAÇÃO', label: 'IMPORTAÇÃO' },
+                      { value: 'EXPORTAÇÃO', label: 'EXPORTAÇÃO' },
+                      { value: 'COLETA', label: 'COLETA' },
+                      { value: 'ENTREGA', label: 'ENTREGA' },
+                    ]}
+                    inputClassName="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold"
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1">OS</label>
@@ -735,10 +756,14 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
               <form onSubmit={handleCreateSession} className="p-10 space-y-6">
                 <div className="space-y-1">
                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Categoria Vinculada</label>
-                   <select required className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase" value={newSessionForm.category} onChange={e => setNewSessionForm({...newSessionForm, category: e.target.value})}>
-                     <option value="">Selecione...</option>
-                     {globalCategories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name.toUpperCase()}</option>)}
-                   </select>
+                   <CustomSelect
+                     required
+                     value={newSessionForm.category}
+                     onChange={v => setNewSessionForm({...newSessionForm, category: v})}
+                     placeholder="Selecione..."
+                     options={globalCategories.filter(c => !c.parentId).map(c => ({ value: c.name, label: c.name.toUpperCase() }))}
+                     inputClassName="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase"
+                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase">Início</label><DatePicker value={newSessionForm.startDate} onChange={v => setNewSessionForm({...newSessionForm, startDate: v})} placeholder="Data início..." maxDate={newSessionForm.endDate || undefined} /></div>

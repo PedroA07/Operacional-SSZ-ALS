@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../../../utils/storage';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface Column {
   key: string;
@@ -209,15 +210,16 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
           {/* Seletor de Itens por Página */}
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm shrink-0">
              <span className="text-[8px] font-black text-slate-400 uppercase">Exibir:</span>
-             <select 
-               className="text-[10px] font-black text-blue-600 outline-none bg-transparent cursor-pointer"
-               value={itemsPerPage}
-               onChange={(e) => setItemsPerPage(Number(e.target.value))}
-             >
-                <option value={100}>100</option>
-                <option value={500}>500</option>
-                <option value={1000}>1000</option>
-             </select>
+             <CustomSelect
+               value={String(itemsPerPage)}
+               onChange={(v) => setItemsPerPage(Number(v))}
+               options={[
+                 { value: '100', label: '100' },
+                 { value: '500', label: '500' },
+                 { value: '1000', label: '1000' },
+               ]}
+               inputClassName="text-[10px] font-black text-blue-600 outline-none bg-transparent cursor-pointer"
+             />
           </div>
 
           {!hideInternalSearch && (

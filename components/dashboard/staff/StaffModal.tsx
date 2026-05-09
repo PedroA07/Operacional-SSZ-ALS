@@ -7,6 +7,7 @@ import { fileStorage } from '../../../utils/fileStorage';
 import ImageCropperModal from '../../shared/ImageCropperModal';
 import PhotoViewerModal from '../../shared/PhotoViewerModal';
 import DatePicker from '../../shared/DatePicker';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface StaffModalProps {
   isOpen: boolean;
@@ -216,17 +217,21 @@ const StaffModal: React.FC<StaffModalProps> = ({
                   </div>
                   <div className="space-y-1">
                     <label className={labelClass}>Status</label>
-                  <select className={inputClasses} value={form.status} onChange={e => {
-                    const newStatus = e.target.value as any;
-                    setForm({
-                      ...form, 
-                      status: newStatus,
-                      statusSince: new Date().toISOString()
-                    });
-                  }}>
-                    <option value="Ativo">ATIVO / LIBERADO</option>
-                    <option value="Inativo">INATIVO / BLOQUEADO</option>
-                  </select>
+                  <CustomSelect
+                    value={form.status}
+                    onChange={v => {
+                      setForm({
+                        ...form,
+                        status: v as any,
+                        statusSince: new Date().toISOString()
+                      });
+                    }}
+                    options={[
+                      { value: 'Ativo', label: 'ATIVO / LIBERADO' },
+                      { value: 'Inativo', label: 'INATIVO / BLOQUEADO' },
+                    ]}
+                    inputClassName={inputClasses}
+                  />
                   </div>
                 </div>
               </div>

@@ -7,6 +7,7 @@ import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
 import Editor from 'react-simple-wysiwyg';
 import DatePicker from '../../shared/DatePicker';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface EmailTemplateModalProps {
   isOpen: boolean;
@@ -555,27 +556,26 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                               <div className="space-y-2">
                                 <span className="text-[8px] font-bold text-slate-500 uppercase">{v.desc}</span>
                                 <div className="flex gap-1">
-                                  <select 
-                                    className="flex-1 px-2 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold uppercase outline-none focus:border-blue-500"
+                                  <CustomSelect
+                                    className="flex-1"
                                     value={bodyStatusFormula}
-                                    onChange={e => setBodyStatusFormula(e.target.value)}
-                                  >
-                                    <option value="">STATUS...</option>
-                                    {customStatuses.map(s => (
-                                      <option key={s} value={s}>{s}</option>
-                                    ))}
-                                  </select>
-                                  <select
-                                    className="w-16 px-1 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold outline-none focus:border-blue-500"
+                                    onChange={v => setBodyStatusFormula(v)}
+                                    placeholder="STATUS..."
+                                    options={customStatuses.map(s => ({ value: s, label: s }))}
+                                    inputClassName="flex-1 px-2 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold uppercase outline-none focus:border-blue-500"
+                                  />
+                                  <CustomSelect
+                                    className="w-16"
                                     value={bodyStatusIndex}
-                                    onChange={e => setBodyStatusIndex(e.target.value)}
-                                    title="Ocorrência (1ª, 2ª, 3ª...)"
-                                  >
-                                    <option value="1">1ª</option>
-                                    <option value="2">2ª</option>
-                                    <option value="3">3ª</option>
-                                    <option value="4">4ª</option>
-                                  </select>
+                                    onChange={v => setBodyStatusIndex(v)}
+                                    options={[
+                                      { value: '1', label: '1ª' },
+                                      { value: '2', label: '2ª' },
+                                      { value: '3', label: '3ª' },
+                                      { value: '4', label: '4ª' },
+                                    ]}
+                                    inputClassName="w-16 px-1 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold outline-none focus:border-blue-500"
+                                  />
                                   <button 
                                     onClick={() => insertStatusInBody(bodyStatusFormula, bodyStatusIndex)}
                                     disabled={!bodyStatusFormula}
@@ -589,16 +589,13 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                               <div className="space-y-2">
                                 <span className="text-[8px] font-bold text-slate-500 uppercase">{v.desc}</span>
                                 <div className="flex flex-col gap-1">
-                                  <select 
-                                    className="w-full px-2 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold uppercase outline-none focus:border-blue-500"
+                                  <CustomSelect
                                     value={bodyPrevisaoStatus}
-                                    onChange={e => setBodyPrevisaoStatus(e.target.value)}
-                                  >
-                                    <option value="">STATUS BASE...</option>
-                                    {customStatuses.map(s => (
-                                      <option key={s} value={s}>{s}</option>
-                                    ))}
-                                  </select>
+                                    onChange={v => setBodyPrevisaoStatus(v)}
+                                    placeholder="STATUS BASE..."
+                                    options={customStatuses.map(s => ({ value: s, label: s }))}
+                                    inputClassName="w-full px-2 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold uppercase outline-none focus:border-blue-500"
+                                  />
                                   <div className="flex gap-1">
                                     <input 
                                       type="number" 
@@ -607,14 +604,16 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                                       onChange={e => setBodyPrevisaoAmount(e.target.value)}
                                       placeholder="Qtd"
                                     />
-                                    <select
-                                      className="w-14 px-1 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold outline-none focus:border-blue-500"
+                                    <CustomSelect
+                                      className="w-14"
                                       value={bodyPrevisaoUnit}
-                                      onChange={e => setBodyPrevisaoUnit(e.target.value)}
-                                    >
-                                      <option value="m">min</option>
-                                      <option value="h">hrs</option>
-                                    </select>
+                                      onChange={v => setBodyPrevisaoUnit(v)}
+                                      options={[
+                                        { value: 'm', label: 'min' },
+                                        { value: 'h', label: 'hrs' },
+                                      ]}
+                                      inputClassName="w-14 px-1 py-1.5 rounded border border-slate-200 bg-white text-[9px] font-bold outline-none focus:border-blue-500"
+                                    />
                                     <button 
                                       onClick={insertPrevisaoInBody}
                                       disabled={!bodyPrevisaoStatus}
@@ -960,61 +959,62 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
                         onChange={e => setNewColumn({ ...newColumn, [table.id]: e.target.value })}
                         onKeyPress={e => e.key === 'Enter' && addColumn(table.id)}
                       />
-                      <select
-                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-white text-[10px] font-bold uppercase outline-none focus:border-blue-500"
+                      <CustomSelect
+                        className="flex-1"
                         value={newColumnFormula[table.id] || ''}
-                        onChange={e => setNewColumnFormula({ ...newColumnFormula, [table.id]: e.target.value })}
-                      >
-                        <option value="">FÓRMULA (OPCIONAL)</option>
-                        <option value="OS">OS</option>
-                        <option value="CLIENTE">CLIENTE</option>
-                        <option value="CNPJ CLIENTE">CNPJ CLIENTE</option>
-                        <option value="CNPJ PORTO">CNPJ PORTO</option>
-                        <option value="MOTORISTA">MOTORISTA</option>
-                        <option value="CPF MOTORISTA">CPF MOTORISTA</option>
-                        <option value="TELEFONE MOTORISTA">TELEFONE MOTORISTA</option>
-                        <option value="PLACA CAVALO">PLACA CAVALO</option>
-                        <option value="PLACA CARRETA">PLACA CARRETA</option>
-                        <option value="CONTAINER">CONTAINER</option>
-                        <option value="TIPO">TIPO</option>
-                        <option value="TARA">TARA</option>
-                        <option value="LACRE">LACRE</option>
-                        <option value="STATUS">STATUS</option>
-                        <option value="DATA">DATA</option>
-                        <option value="BOOKING">BOOKING/RESERVA</option>
-                        <option value="NAVIO">NAVIO</option>
-                        <option value="NF">NOTA FISCAL</option>
-                        <option value="ORIGEM">ORIGEM/COLETA</option>
-                        <option value="DESTINO">DESTINO/ENTREGA</option>
-                        <option value="QUANTIDADE LINHAS">QUANTIDADE LINHAS</option>
-                        <option value="VIAGEM ATUAL">VIAGEM ATUAL (SIM/NÃO)</option>
-                        <option value="VIAGEM ATUAL COUNT">CONTAGEM DA VIAGEM ATUAL</option>
-                        <option value="STATUS_ESPECIFICO">STATUS ESPECÍFICO (DATA/HORA)</option>
-                      </select>
+                        onChange={v => setNewColumnFormula({ ...newColumnFormula, [table.id]: v })}
+                        placeholder="FÓRMULA (OPCIONAL)"
+                        options={[
+                          { value: 'OS', label: 'OS' },
+                          { value: 'CLIENTE', label: 'CLIENTE' },
+                          { value: 'CNPJ CLIENTE', label: 'CNPJ CLIENTE' },
+                          { value: 'CNPJ PORTO', label: 'CNPJ PORTO' },
+                          { value: 'MOTORISTA', label: 'MOTORISTA' },
+                          { value: 'CPF MOTORISTA', label: 'CPF MOTORISTA' },
+                          { value: 'TELEFONE MOTORISTA', label: 'TELEFONE MOTORISTA' },
+                          { value: 'PLACA CAVALO', label: 'PLACA CAVALO' },
+                          { value: 'PLACA CARRETA', label: 'PLACA CARRETA' },
+                          { value: 'CONTAINER', label: 'CONTAINER' },
+                          { value: 'TIPO', label: 'TIPO' },
+                          { value: 'TARA', label: 'TARA' },
+                          { value: 'LACRE', label: 'LACRE' },
+                          { value: 'STATUS', label: 'STATUS' },
+                          { value: 'DATA', label: 'DATA' },
+                          { value: 'BOOKING', label: 'BOOKING/RESERVA' },
+                          { value: 'NAVIO', label: 'NAVIO' },
+                          { value: 'NF', label: 'NOTA FISCAL' },
+                          { value: 'ORIGEM', label: 'ORIGEM/COLETA' },
+                          { value: 'DESTINO', label: 'DESTINO/ENTREGA' },
+                          { value: 'QUANTIDADE LINHAS', label: 'QUANTIDADE LINHAS' },
+                          { value: 'VIAGEM ATUAL', label: 'VIAGEM ATUAL (SIM/NÃO)' },
+                          { value: 'VIAGEM ATUAL COUNT', label: 'CONTAGEM DA VIAGEM ATUAL' },
+                          { value: 'STATUS_ESPECIFICO', label: 'STATUS ESPECÍFICO (DATA/HORA)' },
+                        ]}
+                        inputClassName="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-white text-[10px] font-bold uppercase outline-none focus:border-blue-500"
+                      />
                       
                       {newColumnFormula[table.id] === 'STATUS_ESPECIFICO' && (
                         <div className="flex flex-1 gap-1 animate-in fade-in zoom-in-95">
-                          <select
-                            className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-blue-50 text-[10px] font-bold uppercase outline-none focus:border-blue-500"
+                          <CustomSelect
+                            className="flex-1"
                             value={selectedStatusForFormula[table.id] || ''}
-                            onChange={e => setSelectedStatusForFormula({ ...selectedStatusForFormula, [table.id]: e.target.value })}
-                          >
-                            <option value="">STATUS...</option>
-                            {customStatuses.map(s => (
-                              <option key={s} value={s}>{s}</option>
-                            ))}
-                          </select>
-                          <select
-                            className="w-20 px-2 py-3 rounded-xl border border-slate-200 bg-blue-50 text-[10px] font-bold outline-none focus:border-blue-500"
+                            onChange={v => setSelectedStatusForFormula({ ...selectedStatusForFormula, [table.id]: v })}
+                            placeholder="STATUS..."
+                            options={customStatuses.map(s => ({ value: s, label: s }))}
+                            inputClassName="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-blue-50 text-[10px] font-bold uppercase outline-none focus:border-blue-500"
+                          />
+                          <CustomSelect
+                            className="w-20"
                             value={selectedStatusIndex[table.id] || '1'}
-                            onChange={e => setSelectedStatusIndex({ ...selectedStatusIndex, [table.id]: e.target.value })}
-                            title="Ocorrência"
-                          >
-                            <option value="1">1ª</option>
-                            <option value="2">2ª</option>
-                            <option value="3">3ª</option>
-                            <option value="4">4ª</option>
-                          </select>
+                            onChange={v => setSelectedStatusIndex({ ...selectedStatusIndex, [table.id]: v })}
+                            options={[
+                              { value: '1', label: '1ª' },
+                              { value: '2', label: '2ª' },
+                              { value: '3', label: '3ª' },
+                              { value: '4', label: '4ª' },
+                            ]}
+                            inputClassName="w-20 px-2 py-3 rounded-xl border border-slate-200 bg-blue-50 text-[10px] font-bold outline-none focus:border-blue-500"
+                          />
                         </div>
                       )}
                       

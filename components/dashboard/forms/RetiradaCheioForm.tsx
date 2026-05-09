@@ -10,6 +10,7 @@ import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { searchService } from '../../../utils/searchService';
 import { db } from '../../../utils/storage';
 import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface RetiradaCheioFormProps {
   user?: User;
@@ -217,17 +218,14 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
             </div>
             <div className="space-y-1">
               <label className={labelClass}>Tipo</label>
-              <select
-                className={inputClasses}
+              <CustomSelect
                 value={formData.tipo}
-                onChange={e => handleInputChange('tipo', e.target.value)}
-              >
-                {containerTypes.length > 0
-                  ? containerTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)
-                  : ['40HC', '20DC', '40DC', '40HR', '20OT', '40OT'].map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-              </select>
+                onChange={v => handleInputChange('tipo', v)}
+                options={containerTypes.length > 0
+                  ? containerTypes.map(t => ({ value: t.name, label: t.name }))
+                  : ['40HC', '20DC', '40DC', '40HR', '20OT', '40OT'].map(t => ({ value: t, label: t }))}
+                inputClassName={inputClasses}
+              />
             </div>
           </div>
 

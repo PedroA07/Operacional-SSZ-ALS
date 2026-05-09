@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import CustomSelect from '../../../shared/CustomSelect';
 
 interface SILInternalSiteProps {
   user: string;
@@ -65,10 +66,15 @@ const SILInternalSite: React.FC<SILInternalSiteProps> = ({ user, onLogout }) => 
               </div>
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Status</label>
-                <select className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-bold uppercase">
-                  <option>Todos os Status</option>
-                  <option>Em Viagem</option>
-                </select>
+                <CustomSelect
+                  value=""
+                  onChange={() => {}}
+                  options={[
+                    { value: '', label: 'Todos os Status' },
+                    { value: 'Em Viagem', label: 'Em Viagem' },
+                  ]}
+                  inputClassName="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-bold uppercase"
+                />
               </div>
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Cliente</label>

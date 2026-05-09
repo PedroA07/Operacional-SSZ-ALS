@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Category, User } from '../../../types';
 import { db } from '../../../utils/storage';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface Props {
   isOpen: boolean;
@@ -76,10 +77,13 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[9px] font-black text-slate-400 uppercase">Vincular à Categoria Pai</label>
-              <select className="w-full px-4 py-3 rounded-xl border border-slate-200 font-bold text-xs" value={parentId} onChange={e => setParentId(e.target.value)}>
-                <option value="">NENHUMA (PRINCIPAL)</option>
-                {categories.filter(c => !c.parentId && c.id !== editingId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <CustomSelect
+                value={parentId}
+                onChange={v => setParentId(v)}
+                placeholder="NENHUMA (PRINCIPAL)"
+                options={categories.filter(c => !c.parentId && c.id !== editingId).map(c => ({ value: c.id, label: c.name }))}
+                inputClassName="w-full px-4 py-3 rounded-xl border border-slate-200 font-bold text-xs"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-[9px] font-black text-slate-400 uppercase">Cor da Categoria</label>

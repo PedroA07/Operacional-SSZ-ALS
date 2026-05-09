@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Trip, Driver, Customer, Category, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface NewTripModalProps {
   isOpen: boolean;
@@ -59,23 +60,24 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
           <div className="grid grid-cols-2 gap-6">
             <div className="relative">
               <label className={labelClass}>Categoria</label>
-              <select required className={selectClass} value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
-                <option value="">Selecione...</option>
-                {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-              <div className="absolute right-4 top-[38px] pointer-events-none text-slate-400">
-                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
-              </div>
+              <CustomSelect
+                required
+                value={form.category}
+                onChange={v => setForm({...form, category: v})}
+                placeholder="Selecione..."
+                options={categories.filter(c => !c.parentId).map(c => ({ value: c.name, label: c.name }))}
+                inputClassName={selectClass}
+              />
             </div>
             <div className="relative">
               <label className={labelClass}>Subcategoria</label>
-              <select className={selectClass} value={form.subCategory} onChange={e => setForm({...form, subCategory: e.target.value})}>
-                <option value="">Nenhuma</option>
-                {categories.filter(c => c.parentId && categories.find(p => p.id === c.parentId)?.name === form.category).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-              <div className="absolute right-4 top-[38px] pointer-events-none text-slate-400">
-                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
-              </div>
+              <CustomSelect
+                value={form.subCategory}
+                onChange={v => setForm({...form, subCategory: v})}
+                placeholder="Nenhuma"
+                options={categories.filter(c => c.parentId && categories.find(p => p.id === c.parentId)?.name === form.category).map(c => ({ value: c.name, label: c.name }))}
+                inputClassName={selectClass}
+              />
             </div>
           </div>
 
@@ -96,16 +98,17 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
           {/* Row 3: Customer (Full Width) */}
           <div className="relative">
             <label className={labelBlueClass}>Cliente</label>
-            <select required className={selectClass} onChange={e => {
-              const c = customers.find(cust => cust.id === e.target.value);
-              if (c) setForm({...form, customer: { id: c.id, name: c.name, city: c.city, state: c.state }});
-            }}>
-              <option value="">Selecione o cliente...</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <div className="absolute right-4 top-[38px] pointer-events-none text-slate-400">
-               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
-            </div>
+            <CustomSelect
+              required
+              value={form.customer?.id || ''}
+              onChange={v => {
+                const c = customers.find(cust => cust.id === v);
+                if (c) setForm({...form, customer: { id: c.id, name: c.name, city: c.city, state: c.state }});
+              }}
+              placeholder="Selecione o cliente..."
+              options={customers.map(c => ({ value: c.id, label: c.name }))}
+              inputClassName={selectClass}
+            />
           </div>
 
           {/* Row 4: Container / CVA */}
@@ -135,16 +138,17 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
           {/* Row 6: Driver (Full Width) */}
           <div className="relative">
             <label className={labelBlueClass}>Motorista</label>
-            <select required className={selectClass} onChange={e => {
-              const d = drivers.find(drv => drv.id === e.target.value);
-              if (d) setForm({...form, driver: { id: d.id, name: d.name, plateHorse: d.plateHorse, plateTrailer: d.plateTrailer, status: 'Pronto', cpf: d.cpf, phone: d.phone }});
-            }}>
-              <option value="">Selecione o motorista...</option>
-              {drivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.plateHorse})</option>)}
-            </select>
-            <div className="absolute right-4 top-[38px] pointer-events-none text-slate-400">
-               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
-            </div>
+            <CustomSelect
+              required
+              value={form.driver?.id || ''}
+              onChange={v => {
+                const d = drivers.find(drv => drv.id === v);
+                if (d) setForm({...form, driver: { id: d.id, name: d.name, plateHorse: d.plateHorse, plateTrailer: d.plateTrailer, status: 'Pronto', cpf: d.cpf, phone: d.phone }});
+              }}
+              placeholder="Selecione o motorista..."
+              options={drivers.map(d => ({ value: d.id, label: `${d.name} (${d.plateHorse})` }))}
+              inputClassName={selectClass}
+            />
           </div>
 
           {/* Row 7: Ship / Booking */}

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { User, Trip, Driver, Customer, Port, HandoverPost, HandoverComment, HandoverMention, Staff, DutySwapRequest } from '../../types';
 import { db, supabase } from '../../utils/storage';
 import { showToast } from '../shared/SimpleToast';
+import CustomSelect from '../shared/CustomSelect';
 
 interface HandoverTabProps {
   user: User;
@@ -705,20 +706,19 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
               <ToolBtn title="Texto grande"       onClick={() => execCmd('fontSize', '5')}><span className="text-[14px]">A</span></ToolBtn>
               <ToolBtn title="Texto extra grande" onClick={() => execCmd('fontSize', '6')}><span className="text-[18px]">A</span></ToolBtn>
               <div className="w-px h-5 bg-slate-200 mx-1" />
-              <select
-                title="Família de fonte"
+              <CustomSelect
                 value={fontFamily}
-                onChange={e => applyFont(e.target.value)}
-                onMouseDown={e => e.stopPropagation()}
-                className="h-7 px-2 rounded-lg border border-slate-200 text-[9px] font-bold text-slate-600 bg-white outline-none cursor-pointer hover:border-slate-400 transition-all"
-              >
-                <option value="Arial">Arial</option>
-                <option value="Georgia">Georgia</option>
-                <option value="'Courier New'">Courier New</option>
-                <option value="'Times New Roman'">Times New Roman</option>
-                <option value="Trebuchet MS">Trebuchet</option>
-                <option value="Verdana">Verdana</option>
-              </select>
+                onChange={v => applyFont(v)}
+                options={[
+                  { value: 'Arial', label: 'Arial' },
+                  { value: 'Georgia', label: 'Georgia' },
+                  { value: "'Courier New'", label: 'Courier New' },
+                  { value: "'Times New Roman'", label: 'Times New Roman' },
+                  { value: 'Trebuchet MS', label: 'Trebuchet' },
+                  { value: 'Verdana', label: 'Verdana' },
+                ]}
+                inputClassName="!py-1.5 !text-[9px]"
+              />
               <div className="w-px h-5 bg-slate-200 mx-1" />
               <ToolBtn title="Esquerda"   active={activeFormats.justifyLeft}   onClick={() => execCmd('justifyLeft')}>
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 6h18M3 12h12M3 18h18"/></svg>
@@ -873,19 +873,20 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
               <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
               Prazo para Edição
             </p>
-            <select
-              value={editWindowMinutes}
-              onChange={e => handleSaveEditWindow(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-[10px] font-bold text-slate-700 bg-white outline-none cursor-pointer hover:border-slate-400 transition-all"
-            >
-              <option value={0}>Sem prazo (ilimitado)</option>
-              <option value={15}>15 minutos</option>
-              <option value={30}>30 minutos</option>
-              <option value={60}>1 hora</option>
-              <option value={120}>2 horas</option>
-              <option value={240}>4 horas</option>
-              <option value={-1}>Desabilitado (sem edição)</option>
-            </select>
+            <CustomSelect
+              value={String(editWindowMinutes)}
+              onChange={v => handleSaveEditWindow(Number(v))}
+              options={[
+                { value: '0', label: 'Sem prazo (ilimitado)' },
+                { value: '15', label: '15 minutos' },
+                { value: '30', label: '30 minutos' },
+                { value: '60', label: '1 hora' },
+                { value: '120', label: '2 horas' },
+                { value: '240', label: '4 horas' },
+                { value: '-1', label: 'Desabilitado (sem edição)' },
+              ]}
+              inputClassName="w-full px-3 py-2 rounded-xl border border-slate-200 text-[10px] font-bold text-slate-700 bg-white outline-none cursor-pointer hover:border-slate-400 transition-all"
+            />
             <p className="text-[7px] font-bold text-slate-400 uppercase leading-relaxed">
               Janela de tempo após publicar para editar posts e comentários
             </p>

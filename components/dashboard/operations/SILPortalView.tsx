@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface SILPortalViewProps {
   user: string;
@@ -56,10 +57,15 @@ const SILPortalView: React.FC<SILPortalViewProps> = ({ user, onLogout }) => {
             <div className="bg-[#f8fafc] p-4 border-b border-slate-200 grid grid-cols-4 gap-4">
                <input type="text" className="px-3 py-2 bg-white border border-slate-300 rounded text-[10px] uppercase font-bold" placeholder="FILTRAR SM..." />
                <input type="text" className="px-3 py-2 bg-white border border-slate-300 rounded text-[10px] uppercase font-bold" placeholder="PLACA..." />
-               <select className="px-3 py-2 bg-white border border-slate-300 rounded text-[10px] uppercase font-bold">
-                 <option>TODOS OS STATUS</option>
-                 <option>EM VIAGEM</option>
-               </select>
+               <CustomSelect
+                 value=""
+                 onChange={() => {}}
+                 options={[
+                   { value: '', label: 'TODOS OS STATUS' },
+                   { value: 'EM VIAGEM', label: 'EM VIAGEM' },
+                 ]}
+                 inputClassName="px-3 py-2 bg-white border border-slate-300 rounded text-[10px] uppercase font-bold"
+               />
                <button className="bg-[#001e50] text-white text-[9px] font-black uppercase rounded shadow-md">Aplicar Filtros</button>
             </div>
 

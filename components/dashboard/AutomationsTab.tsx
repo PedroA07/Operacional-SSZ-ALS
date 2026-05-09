@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../utils/storage';
 import { Automation, EmailTemplate, TripStatus, CustomStatus } from '../../types';
 import { Plus, Trash2, Mail, MessageSquare, ToggleLeft, ToggleRight, Save, X, AlertCircle } from 'lucide-react';
+import CustomSelect from '../shared/CustomSelect';
 
 const AutomationsTab: React.FC = () => {
   const [automations, setAutomations] = useState<Automation[]>([]);
@@ -119,16 +120,13 @@ const AutomationsTab: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                   Status de Gatilho (Trigger)
                 </label>
-                <select
+                <CustomSelect
                   value={currentAutomation.status}
-                  onChange={(e) => setCurrentAutomation({ ...currentAutomation, status: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                >
-                  <option value="">Selecione um status...</option>
-                  {allStatuses.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
+                  onChange={(v) => setCurrentAutomation({ ...currentAutomation, status: v })}
+                  placeholder="Selecione um status..."
+                  options={allStatuses.map(status => ({ value: status, label: status }))}
+                  inputClassName="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                />
                 <p className="text-[10px] text-slate-500 mt-1.5">A automação será disparada sempre que uma viagem mudar para este status.</p>
               </div>
 
@@ -147,16 +145,13 @@ const AutomationsTab: React.FC = () => {
                 </label>
                 <div className="relative">
                   <Mail size={16} className="absolute left-3 top-3 text-slate-500" />
-                  <select
+                  <CustomSelect
                     value={currentAutomation.emailTemplateId || ''}
-                    onChange={(e) => setCurrentAutomation({ ...currentAutomation, emailTemplateId: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  >
-                    <option value="">Nenhum e-mail</option>
-                    {templates.map(template => (
-                      <option key={template.id} value={template.id}>{template.name}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setCurrentAutomation({ ...currentAutomation, emailTemplateId: v })}
+                    placeholder="Nenhum e-mail"
+                    options={templates.map(template => ({ value: template.id, label: template.name }))}
+                    inputClassName="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  />
                 </div>
               </div>
 

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { OpentechTrip, Driver, Customer } from '../../../types';
 import { maskPlate, maskCPF } from '../../../utils/masks';
 import OpentechConnector from './OpentechConnector';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface SILMonitoringViewProps {
   trips: OpentechTrip[];
@@ -129,17 +130,18 @@ const SILMonitoringView: React.FC<SILMonitoringViewProps> = ({ trips: initialTri
           </div>
           <div className="space-y-1">
             <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Status</label>
-            <select 
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-[10px] font-bold uppercase focus:border-blue-500 outline-none transition-all"
+            <CustomSelect
               value={filters.status}
-              onChange={e => setFilters({...filters, status: e.target.value})}
-            >
-              <option value="">Todos</option>
-              <option value="Em Viagem">Em Viagem</option>
-              <option value="Concluída">Concluída</option>
-              <option value="Alerta">Alerta</option>
-              <option value="Sinistrada">Sinistrada</option>
-            </select>
+              onChange={v => setFilters({...filters, status: v})}
+              placeholder="Todos"
+              options={[
+                { value: 'Em Viagem', label: 'Em Viagem' },
+                { value: 'Concluída', label: 'Concluída' },
+                { value: 'Alerta', label: 'Alerta' },
+                { value: 'Sinistrada', label: 'Sinistrada' },
+              ]}
+              inputClassName="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-[10px] font-bold uppercase focus:border-blue-500 outline-none transition-all"
+            />
           </div>
           <div className="flex items-end">
             <button className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase hover:bg-blue-700 transition-all shadow-md">

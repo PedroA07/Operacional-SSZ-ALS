@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CustomColumn, StaySession } from '../../../types';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface CustomColumnsManagerProps {
   session: StaySession;
@@ -67,19 +68,20 @@ const CustomColumnsManager: React.FC<CustomColumnsManagerProps> = ({ session, on
               </div>
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Tipo</label>
-                <select 
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white font-bold text-[11px]"
+                <CustomSelect
                   value={newCol.type}
-                  onChange={e => setNewCol({ ...newCol, type: e.target.value as any })}
-                >
-                  <option value="text">TEXTO</option>
-                  <option value="number">NÚMERO</option>
-                  <option value="formula">FÓRMULA</option>
-                  <option value="date">DATA</option>
-                  <option value="time">HORA</option>
-                  <option value="datetime">DATA E HORA</option>
-                  <option value="currency">MOEDA</option>
-                </select>
+                  onChange={v => setNewCol({ ...newCol, type: v as any })}
+                  options={[
+                    { value: 'text', label: 'TEXTO' },
+                    { value: 'number', label: 'NÚMERO' },
+                    { value: 'formula', label: 'FÓRMULA' },
+                    { value: 'date', label: 'DATA' },
+                    { value: 'time', label: 'HORA' },
+                    { value: 'datetime', label: 'DATA E HORA' },
+                    { value: 'currency', label: 'MOEDA' },
+                  ]}
+                  inputClassName="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white font-bold text-[11px]"
+                />
               </div>
               {newCol.type === 'formula' && (
                 <div className="space-y-1">

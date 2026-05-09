@@ -5,6 +5,7 @@ import SmartOperationTable from './operations/SmartOperationTable';
 import FeedbackModal from '../shared/FeedbackModal';
 import { Mail, Settings, Send, X, Copy } from 'lucide-react';
 import EmailGeneratorModal from './email/EmailGeneratorModal';
+import CustomSelect from '../shared/CustomSelect';
 
 interface ColetaDoDiaTabProps {
   userId: string;
@@ -218,20 +219,13 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         const selectedColor = tiposViagem.find(tv => tv.id === selectedValue)?.color || 'inherit';
         
         return (
-          <select
+          <CustomSelect
             value={selectedValue}
-            onChange={(e) => handleUpdateTrip(t, { coletaTipoViagem: e.target.value })}
-            className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all"
-            style={{
-              color: selectedColor,
-              borderColor: selectedColor
-            }}
-          >
-            <option value="">Selecione...</option>
-            {tiposViagem.map(tv => (
-              <option key={tv.id} value={tv.id} style={{ color: tv.color }}>{tv.name}</option>
-            ))}
-          </select>
+            onChange={(v) => handleUpdateTrip(t, { coletaTipoViagem: v })}
+            placeholder="Selecione..."
+            options={tiposViagem.map(tv => ({ value: tv.id, label: tv.name, color: tv.color }))}
+            inputClassName="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all"
+          />
         );
       }
     },
@@ -664,16 +658,13 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                 <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Modelo de E-mail</h4>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Selecione o Modelo Padrão</label>
-                  <select 
-                    value={selectedTemplateId} 
-                    onChange={e => setSelectedTemplateId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="">Selecione um modelo...</option>
-                    {emailTemplates.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={selectedTemplateId}
+                    onChange={v => setSelectedTemplateId(v)}
+                    placeholder="Selecione um modelo..."
+                    options={emailTemplates.map(t => ({ value: t.id, label: t.name }))}
+                    inputClassName="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
                   <p className="text-[9px] font-medium text-slate-400 ml-1">
                     Crie ou edite modelos na aba "Administrativo &gt; Modelos de E-mail".
                   </p>

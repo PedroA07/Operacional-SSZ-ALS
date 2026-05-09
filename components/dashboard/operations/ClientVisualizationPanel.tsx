@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Customer } from '../../../types';
+import CustomSelect from '../../shared/CustomSelect';
 
 interface ClientVisualizationPanelProps {
   customers: Customer[];
@@ -25,16 +26,15 @@ const ClientVisualizationPanel: React.FC<ClientVisualizationPanelProps> = ({
     <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm mb-6 flex flex-wrap items-center gap-6 animate-in slide-in-from-top-4 duration-500">
       <div className="space-y-1.5 flex-1 min-w-[240px]">
         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Filtrar por Cliente Específico</label>
-        <select 
-          className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all cursor-pointer"
+        <CustomSelect
           value={selectedClient}
-          onChange={(e) => onClientChange(e.target.value)}
-        >
-          <option value="TODOS">TODOS OS CLIENTES DA CATEGORIA</option>
-          {customers.map(c => (
-            <option key={c.id} value={c.name}>{c.name}</option>
-          ))}
-        </select>
+          onChange={(v) => onClientChange(v)}
+          options={[
+            { value: 'TODOS', label: 'TODOS OS CLIENTES DA CATEGORIA' },
+            ...customers.map(c => ({ value: c.name, label: c.name })),
+          ]}
+          inputClassName="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all cursor-pointer"
+        />
       </div>
 
       <div className="flex items-center gap-4">
