@@ -234,8 +234,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       if (d.plateTrailer) driverByPlate.set(norm(d.plateTrailer), d);
     });
 
-    const customerByName = new Map<string, Customer>();
-    customers.forEach(c => { if (c.name) customerByName.set(norm(c.name), c); });
+    const customerByNameCity = new Map<string, Customer>();
+    const customerByName     = new Map<string, Customer>();
+    customers.forEach(c => {
+      if (!c.name) return;
+      customerByName.set(norm(c.name), c);
+      if (c.city) customerByNameCity.set(`${norm(c.name)}|${norm(c.city)}`, c);
+    });
 
     const mapType = (sil: string): string => {
       if (!sil) return '';
@@ -288,7 +293,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         phone: matchedDriver.phone,
       } : trip.driver;
 
-      const matchedCustomer = customerByName.get(norm(sil.nomeLocalAtendimento));
+      const matchedCustomer =
+        customerByNameCity.get(`${norm(sil.nomeLocalAtendimento)}|${norm(sil.cidadeAtendimento)}`) ||
+        customerByName.get(norm(sil.nomeLocalAtendimento));
       const customerRef = matchedCustomer ? {
         id: matchedCustomer.id,
         name: matchedCustomer.name,
