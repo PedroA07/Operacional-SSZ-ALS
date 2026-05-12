@@ -396,12 +396,13 @@ export interface DriverCapturedDoc {
 export interface CustomStatus {
   id: string;
   name: string;
-  customerId?: string; // Se vazio, é status geral
-  modality?: string; // EXPORTAÇÃO, IMPORTAÇÃO, etc.
+  customerId?: string;    // Se vazio, é status geral
+  modality?: string;      // EXPORTAÇÃO, IMPORTAÇÃO, etc.
   destinationId?: string; // ID do porto, pre-stacking ou cliente de destino
   orderIndex: number;
   color?: string;
-  isFinal?: boolean;
+  isFinal?: boolean;          // Marca viagem como concluída ao atingir este status
+  operationalOnly?: boolean;  // Visível apenas no painel operacional (não para motoristas)
 }
 
 export interface Trip {

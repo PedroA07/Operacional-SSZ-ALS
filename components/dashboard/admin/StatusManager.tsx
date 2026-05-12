@@ -15,21 +15,42 @@ interface FlowGroup {
   statuses: CustomStatus[];
 }
 
+// ── Botão toggle reutilizável ──────────────────────────────────────────────────
+const Toggle: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  activeClass: string;
+}> = ({ active, onClick, icon, label, activeClass }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={label}
+    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[9px] font-black uppercase transition-all border-2 ${
+      active
+        ? `${activeClass} border-transparent shadow-sm`
+        : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-slate-200'
+    }`}
+  >
+    {icon}
+    <span className="hidden md:inline">{label}</span>
+  </button>
+);
+
 const StatusManager: React.FC = () => {
-  const [statuses, setStatuses] = useState<CustomStatus[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [ports, setPorts] = useState<Port[]>([]);
+  const [statuses,    setStatuses]    = useState<CustomStatus[]>([]);
+  const [customers,   setCustomers]   = useState<Customer[]>([]);
+  const [ports,       setPorts]       = useState<Port[]>([]);
   const [preStacking, setPreStacking] = useState<PreStacking[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  const [isEditingFlow, setIsEditingFlow] = useState(false);
-  const [currentFlow, setCurrentFlow] = useState<FlowGroup | null>(null);
-  const [flowStatuses, setFlowStatuses] = useState<CustomStatus[]>([]);
+  const [loading,     setLoading]     = useState(true);
+
+  const [isEditingFlow,    setIsEditingFlow]    = useState(false);
+  const [currentFlow,      setCurrentFlow]      = useState<FlowGroup | null>(null);
+  const [flowStatuses,     setFlowStatuses]     = useState<CustomStatus[]>([]);
   const [deletedStatusIds, setDeletedStatusIds] = useState<string[]>([]);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -38,7 +59,7 @@ const StatusManager: React.FC = () => {
         db.getCustomStatuses(),
         db.getCustomers(),
         db.getPorts(),
-        db.getPreStacking()
+        db.getPreStacking(),
       ]);
       setStatuses(statusData);
       setCustomers(customerData);
@@ -51,39 +72,30 @@ const StatusManager: React.FC = () => {
     }
   };
 
-  // Agrupar status por regra
+  // Agrupa status por regra (Cliente × Modalidade × Destino)
   const flowGroups = React.useMemo(() => {
     const groups = new Map<string, FlowGroup>();
     statuses.forEach(s => {
       const key = `${s.customerId || ''}-${s.modality || ''}-${s.destinationId || ''}`;
       if (!groups.has(key)) {
-        groups.set(key, {
-          key,
-          customerId: s.customerId || '',
-          modality: s.modality || '',
-          destinationId: s.destinationId || '',
-          statuses: []
-        });
+        groups.set(key, { key, customerId: s.customerId || '', modality: s.modality || '', destinationId: s.destinationId || '', statuses: [] });
       }
       groups.get(key)!.statuses.push(s);
     });
-
-    // Ordenar os status dentro de cada grupo
-    groups.forEach(group => {
-      group.statuses.sort((a, b) => a.orderIndex - b.orderIndex);
-    });
-
+    groups.forEach(g => g.statuses.sort((a, b) => a.orderIndex - b.orderIndex));
     return Array.from(groups.values());
   }, [statuses]);
 
+  const generateUUID = () =>
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+
   const handleCreateFlow = () => {
-    setCurrentFlow({
-      key: 'new',
-      customerId: '',
-      modality: '',
-      destinationId: '',
-      statuses: []
-    });
+    setCurrentFlow({ key: 'new', customerId: '', modality: '', destinationId: '', statuses: [] });
     setFlowStatuses([]);
     setDeletedStatusIds([]);
     setIsEditingFlow(true);
@@ -96,177 +108,160 @@ const StatusManager: React.FC = () => {
     setIsEditingFlow(true);
   };
 
-  const generateUUID = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  };
-
   const handleAddStatusToFlow = () => {
     const newStatus: CustomStatus = {
-      id: generateUUID(),
-      name: 'Novo Status',
-      customerId: currentFlow?.customerId || undefined,
-      modality: currentFlow?.modality || undefined,
+      id:            generateUUID(),
+      name:          '',
+      customerId:    currentFlow?.customerId   || undefined,
+      modality:      currentFlow?.modality     || undefined,
       destinationId: currentFlow?.destinationId || undefined,
-      orderIndex: flowStatuses.length,
-      color: '#3b82f6'
+      orderIndex:    flowStatuses.length,
+      color:         '#3b82f6',
+      isFinal:         false,
+      operationalOnly: false,
     };
     setFlowStatuses([...flowStatuses, newStatus]);
   };
 
   const handleRemoveStatusFromFlow = (id: string) => {
     setFlowStatuses(flowStatuses.filter(s => s.id !== id));
-    if (statuses.some(s => s.id === id)) {
-      setDeletedStatusIds([...deletedStatusIds, id]);
-    }
+    if (statuses.some(s => s.id === id)) setDeletedStatusIds([...deletedStatusIds, id]);
   };
 
   const handleMoveStatus = (index: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && index === 0) return;
+    if (direction === 'up'   && index === 0)                    return;
     if (direction === 'down' && index === flowStatuses.length - 1) return;
-
-    const newStatuses = [...flowStatuses];
-    const swapIndex = direction === 'up' ? index - 1 : index + 1;
-    
-    const temp = newStatuses[index];
-    newStatuses[index] = newStatuses[swapIndex];
-    newStatuses[swapIndex] = temp;
-
-    // Atualizar orderIndex
-    newStatuses.forEach((s, i) => s.orderIndex = i);
-    setFlowStatuses(newStatuses);
+    const arr = [...flowStatuses];
+    const swap = direction === 'up' ? index - 1 : index + 1;
+    [arr[index], arr[swap]] = [arr[swap], arr[index]];
+    arr.forEach((s, i) => (s.orderIndex = i));
+    setFlowStatuses(arr);
   };
 
-  const handleUpdateStatusInFlow = (index: number, field: keyof CustomStatus, value: any) => {
-    const newStatuses = [...flowStatuses];
-    newStatuses[index] = { ...newStatuses[index], [field]: value };
-    setFlowStatuses(newStatuses);
+  const handleUpdateStatus = (index: number, field: keyof CustomStatus, value: any) => {
+    const arr = [...flowStatuses];
+    arr[index] = { ...arr[index], [field]: value };
+    setFlowStatuses(arr);
   };
 
   const handleSaveFlow = async () => {
     if (!currentFlow) return;
-
-    // Validar nomes vazios
     if (flowStatuses.some(s => !s.name.trim())) {
       showToast('Todos os status devem ter um nome', 'error');
       return;
     }
 
-    try {
-      // Deletar status removidos
-      for (const id of deletedStatusIds) {
-        await db.deleteCustomStatus(id);
-      }
+    // Garante que existe ao menos um status final
+    const hasFinal = flowStatuses.some(s => s.isFinal);
+    if (flowStatuses.length > 0 && !hasFinal) {
+      showToast('Marque ao menos um status como "Finaliza viagem" (🏁)', 'warning');
+      return;
+    }
 
-      // Salvar/Atualizar status
+    try {
+      for (const id of deletedStatusIds) await db.deleteCustomStatus(id);
+
       for (let i = 0; i < flowStatuses.length; i++) {
         const s = flowStatuses[i];
         const result = await db.saveCustomStatus({
           ...s,
-          customerId: currentFlow.customerId || undefined,
-          modality: currentFlow.modality || undefined,
+          customerId:    currentFlow.customerId    || undefined,
+          modality:      currentFlow.modality      || undefined,
           destinationId: currentFlow.destinationId || undefined,
-          orderIndex: i, // Garantir a ordem correta
-          isFinal: i === flowStatuses.length - 1 // O último é o final
+          orderIndex:    i,
+          // isFinal e operationalOnly são controlados pelos toggles — não sobrescreve automaticamente
+          isFinal:         s.isFinal         ?? false,
+          operationalOnly: s.operationalOnly ?? false,
         });
-        if (!result.success) {
-          throw new Error(`Falha ao salvar status "${s.name}": ${result.error}`);
-        }
+        if (!result.success) throw new Error(`Falha ao salvar "${s.name}": ${result.error}`);
       }
 
-      showToast('Fluxo de status salvo com sucesso', 'success');
+      showToast('Fluxo salvo com sucesso', 'success');
       setIsEditingFlow(false);
       loadData();
     } catch (error: any) {
-      console.error(error);
       showToast(error.message || 'Erro ao salvar fluxo', 'error');
     }
   };
 
   const handleDeleteFlow = async (group: FlowGroup) => {
-    if (window.confirm('Deseja realmente excluir todos os status deste fluxo?')) {
-      try {
-        for (const s of group.statuses) {
-          await db.deleteCustomStatus(s.id);
-        }
-        showToast('Fluxo excluído com sucesso', 'success');
-        loadData();
-      } catch (error) {
-        showToast('Erro ao excluir fluxo', 'error');
-      }
-    }
+    if (!window.confirm('Excluir todos os status deste fluxo?')) return;
+    try {
+      for (const s of group.statuses) await db.deleteCustomStatus(s.id);
+      showToast('Fluxo excluído', 'success');
+      loadData();
+    } catch { showToast('Erro ao excluir fluxo', 'error'); }
   };
 
-  const mapCustomerToAutocomplete = (item: Customer) => ({
-    id: item.id,
-    type: 'CUSTOMER' as const,
-    mainText: item.name,
-    subText: item.cnpj || '',
-    location: item.city || '',
-    originalData: item
-  });
+  // ── Helpers de destinos ──────────────────────────────────────────────────
+  const getDestinationOptions = () => [
+    ...customers.map(c => ({ id: c.id, type: 'CUSTOMER',     mainText: c.name, subText: 'Cliente',       originalData: { id: c.id } })),
+    ...ports.map(p => ({     id: p.id, type: 'PORT',          mainText: p.name, subText: 'Porto',          originalData: { id: p.id } })),
+    ...preStacking.map(p => ({ id: p.id, type: 'PRE_STACKING', mainText: p.name, subText: 'Pre-Stacking', originalData: { id: p.id } })),
+  ];
 
-  const getDestinationOptions = () => {
-    const options: any[] = [];
-    customers.forEach(c => options.push({ id: c.id, type: 'CUSTOMER', mainText: c.name, subText: 'Cliente', originalData: { id: c.id } }));
-    ports.forEach(p => options.push({ id: p.id, type: 'PORT', mainText: p.name, subText: 'Porto', originalData: { id: p.id } }));
-    preStacking.forEach(p => options.push({ id: p.id, type: 'PRE_STACKING', mainText: p.name, subText: 'Pre-Stacking', originalData: { id: p.id } }));
-    return options;
-  };
-
-  const getCustomerName = (id: string) => customers.find(c => c.id === id)?.name || 'Todos os Clientes';
+  const getCustomerName  = (id: string) => customers.find(c => c.id === id)?.name || 'Todos os Clientes';
   const getDestinationName = (id: string) => {
-    const c = customers.find(c => c.id === id);
-    if (c) return c.name;
-    const p = ports.find(p => p.id === id);
-    if (p) return p.name;
-    const ps = preStacking.find(p => p.id === id);
-    if (ps) return ps.name;
-    return 'Todos os Destinos';
+    return customers.find(c => c.id === id)?.name
+      || ports.find(p => p.id === id)?.name
+      || preStacking.find(p => p.id === id)?.name
+      || 'Todos os Destinos';
   };
 
-  if (loading) {
-    return <div className="p-8 text-center text-slate-500 font-bold uppercase text-xs">Carregando...</div>;
-  }
+  if (loading) return (
+    <div className="p-8 text-center text-slate-500 font-bold uppercase text-xs">Carregando...</div>
+  );
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  TELA DE EDIÇÃO DE FLUXO
+  // ══════════════════════════════════════════════════════════════════════════
   if (isEditingFlow && currentFlow) {
+    const finalsCount = flowStatuses.filter(s => s.isFinal).length;
+
     return (
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
+
+        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">
               {currentFlow.key === 'new' ? 'Novo Fluxo de Status' : 'Editar Fluxo de Status'}
             </h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configure as regras e a ordem dos status</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+              Configure as regras, ordem e propriedades de cada status
+            </p>
           </div>
-          <button 
-            onClick={() => setIsEditingFlow(false)}
-            className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-slate-200 transition-colors font-bold"
-          >
-            X
+          <button onClick={() => setIsEditingFlow(false)}
+            className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-slate-200 transition-colors font-bold">
+            ✕
           </button>
         </div>
 
+        {/* Legenda */}
+        <div className="flex flex-wrap gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+          <div className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase">
+            <span className="w-6 h-6 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center text-sm">🏁</span>
+            Finaliza a viagem — marca a OS como concluída (pode ter mais de um)
+          </div>
+          <div className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase">
+            <span className="w-6 h-6 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center text-sm">🔒</span>
+            Só painel operacional — não aparece para o motorista
+          </div>
+        </div>
+
+        {/* Regras do fluxo */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-3xl border-2 border-slate-100">
           <div className="space-y-1">
             <AutocompleteSearch
               label="Cliente (Opcional)"
               data={customers}
-              mapToAutocomplete={mapCustomerToAutocomplete}
-              onSelect={(item) => setCurrentFlow({ ...currentFlow, customerId: item?.id || '' })}
-              onChange={(val) => {
-                if (!val) setCurrentFlow({ ...currentFlow, customerId: '' });
-              }}
+              mapToAutocomplete={(c: Customer) => ({ id: c.id, type: 'CUSTOMER' as const, mainText: c.name, subText: c.cnpj || '', location: c.city || '', originalData: c })}
+              onSelect={item => setCurrentFlow({ ...currentFlow, customerId: item?.id || '' })}
+              onChange={val => { if (!val) setCurrentFlow({ ...currentFlow, customerId: '' }); }}
               placeholder="Todos os Clientes"
-              initialValue={currentFlow.customerId ? customers.find(c => c.id === currentFlow.customerId)?.name : ''}
+              initialValue={currentFlow.customerId ? getCustomerName(currentFlow.customerId) : ''}
             />
           </div>
-          
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Modalidade (Opcional)</label>
             <CustomSelect
@@ -277,26 +272,31 @@ const StatusManager: React.FC = () => {
               inputClassName="w-full px-6 py-4 rounded-2xl border-2 border-white bg-white font-bold text-slate-800 uppercase focus:border-blue-500 transition-all outline-none shadow-sm"
             />
           </div>
-
           <div className="space-y-1">
             <AutocompleteSearch
               label="Destino (Opcional)"
               data={getDestinationOptions()}
               mapToAutocomplete={(item: any) => item}
-              onSelect={(item) => setCurrentFlow({ ...currentFlow, destinationId: item?.id || '' })}
-              onChange={(val) => {
-                if (!val) setCurrentFlow({ ...currentFlow, destinationId: '' });
-              }}
+              onSelect={item => setCurrentFlow({ ...currentFlow, destinationId: item?.id || '' })}
+              onChange={val => { if (!val) setCurrentFlow({ ...currentFlow, destinationId: '' }); }}
               placeholder="Todos os Destinos"
               initialValue={currentFlow.destinationId ? getDestinationName(currentFlow.destinationId) : ''}
             />
           </div>
         </div>
 
+        {/* Sequência de Status */}
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h4 className="text-sm font-black text-slate-800 uppercase">Sequência de Status</h4>
-            <button 
+            <div>
+              <h4 className="text-sm font-black text-slate-800 uppercase">Sequência de Status</h4>
+              {finalsCount > 0 && (
+                <p className="text-[9px] font-bold text-emerald-600 uppercase mt-0.5">
+                  {finalsCount} opção{finalsCount > 1 ? 'ões' : ''} de finalização configurada{finalsCount > 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+            <button
               onClick={handleAddStatusToFlow}
               className="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-200 transition-colors flex items-center gap-2"
             >
@@ -306,45 +306,79 @@ const StatusManager: React.FC = () => {
 
           <div className="space-y-3">
             {flowStatuses.length === 0 ? (
-              <div className="text-center py-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+              <div className="text-center py-12 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase">Nenhum status neste fluxo</p>
+                <p className="text-[9px] text-slate-300 mt-1">Clique em "Adicionar Status" para começar</p>
               </div>
             ) : (
               flowStatuses.map((status, index) => (
-                <div key={status.id} className="flex items-center gap-4 bg-white p-4 rounded-2xl border-2 border-slate-100 shadow-sm group">
-                  <div className="flex flex-col gap-1 text-slate-300">
-                    <button onClick={() => handleMoveStatus(index, 'up')} disabled={index === 0} className="hover:text-blue-500 disabled:opacity-30 font-black text-xs">↑</button>
-                    <button onClick={() => handleMoveStatus(index, 'down')} disabled={index === flowStatuses.length - 1} className="hover:text-blue-500 disabled:opacity-30 font-black text-xs">↓</button>
+                <div
+                  key={status.id}
+                  className={`flex items-center gap-3 p-4 rounded-2xl border-2 shadow-sm transition-colors ${
+                    status.isFinal
+                      ? 'bg-emerald-50/50 border-emerald-200'
+                      : status.operationalOnly
+                        ? 'bg-orange-50/40 border-orange-100'
+                        : 'bg-white border-slate-100'
+                  }`}
+                >
+                  {/* Setas de ordenação */}
+                  <div className="flex flex-col gap-1 text-slate-300 shrink-0">
+                    <button onClick={() => handleMoveStatus(index, 'up')}   disabled={index === 0}                      className="hover:text-blue-500 disabled:opacity-20 font-black text-xs leading-none">↑</button>
+                    <button onClick={() => handleMoveStatus(index, 'down')} disabled={index === flowStatuses.length - 1} className="hover:text-blue-500 disabled:opacity-20 font-black text-xs leading-none">↓</button>
                   </div>
-                  
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-slate-400 bg-slate-50 text-xs">
+
+                  {/* Número de ordem */}
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-white text-[10px] shrink-0"
+                    style={{ backgroundColor: status.color || '#3b82f6' }}>
                     {index + 1}
                   </div>
 
-                  <div className="flex-1">
-                    <input 
-                      type="text" 
-                      value={status.name}
-                      onChange={e => handleUpdateStatusInFlow(index, 'name', e.target.value)}
-                      placeholder="Nome do Status"
-                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-800 uppercase focus:border-blue-500 transition-all outline-none"
-                    />
-                  </div>
+                  {/* Nome */}
+                  <input
+                    type="text"
+                    value={status.name}
+                    onChange={e => handleUpdateStatus(index, 'name', e.target.value.toUpperCase())}
+                    placeholder="NOME DO STATUS"
+                    className="flex-1 min-w-0 px-4 py-3 rounded-xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-800 uppercase text-[11px] focus:border-blue-400 transition-all outline-none"
+                  />
 
-                  <div className="w-24">
-                    <input 
-                      type="color" 
-                      value={status.color || '#3b82f6'}
-                      onChange={e => handleUpdateStatusInFlow(index, 'color', e.target.value)}
-                      className="w-full h-12 rounded-xl cursor-pointer border-0 p-0"
-                    />
-                  </div>
+                  {/* Cor */}
+                  <input
+                    type="color"
+                    value={status.color || '#3b82f6'}
+                    onChange={e => handleUpdateStatus(index, 'color', e.target.value)}
+                    title="Cor do status"
+                    className="w-10 h-10 rounded-xl cursor-pointer border-2 border-slate-100 p-0.5 shrink-0"
+                  />
 
-                  <button 
+                  {/* Toggle: Finaliza viagem */}
+                  <Toggle
+                    active={!!status.isFinal}
+                    onClick={() => handleUpdateStatus(index, 'isFinal', !status.isFinal)}
+                    icon={<span>🏁</span>}
+                    label="Finaliza"
+                    activeClass="bg-emerald-100 text-emerald-700"
+                  />
+
+                  {/* Toggle: Só painel operacional */}
+                  <Toggle
+                    active={!!status.operationalOnly}
+                    onClick={() => handleUpdateStatus(index, 'operationalOnly', !status.operationalOnly)}
+                    icon={<span>🔒</span>}
+                    label="Só painel"
+                    activeClass="bg-orange-100 text-orange-600"
+                  />
+
+                  {/* Remover */}
+                  <button
                     onClick={() => handleRemoveStatusFromFlow(status.id)}
-                    className="w-12 h-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors font-bold"
+                    className="w-10 h-10 rounded-xl bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-colors font-bold shrink-0"
+                    title="Remover status"
                   >
-                    X
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
                   </button>
                 </div>
               ))
@@ -352,17 +386,14 @@ const StatusManager: React.FC = () => {
           </div>
         </div>
 
+        {/* Rodapé */}
         <div className="flex justify-end gap-4 pt-6 border-t border-slate-100">
-          <button 
-            onClick={() => setIsEditingFlow(false)}
-            className="px-8 py-4 bg-slate-100 text-slate-500 rounded-2xl text-xs font-black uppercase hover:bg-slate-200 transition-all"
-          >
+          <button onClick={() => setIsEditingFlow(false)}
+            className="px-8 py-4 bg-slate-100 text-slate-500 rounded-2xl text-xs font-black uppercase hover:bg-slate-200 transition-all">
             Cancelar
           </button>
-          <button 
-            onClick={handleSaveFlow}
-            className="px-8 py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-blue-600/40 transition-all flex items-center gap-2"
-          >
+          <button onClick={handleSaveFlow}
+            className="px-8 py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all">
             Salvar Fluxo
           </button>
         </div>
@@ -370,80 +401,106 @@ const StatusManager: React.FC = () => {
     );
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  TELA DE LISTAGEM DE FLUXOS
+  // ══════════════════════════════════════════════════════════════════════════
   return (
     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Fluxos de Status</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gerencie a ordem dos status por operação</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+            Gerencie a ordem dos status por operação
+          </p>
         </div>
-        <button 
-          onClick={handleCreateFlow}
-          className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2"
-        >
+        <button onClick={handleCreateFlow}
+          className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2">
           + Novo Fluxo
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {flowGroups.map(group => (
-          <div key={group.key} className="bg-slate-50 p-6 rounded-3xl border-2 border-slate-100 flex flex-col h-full">
-            <div className="flex-1 space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 bg-slate-200 text-slate-600 rounded-lg text-[8px] font-black uppercase">Cliente</span>
-                  <span className="text-[10px] font-bold text-slate-800 uppercase truncate">{group.customerId ? getCustomerName(group.customerId) : 'Todos'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 bg-slate-200 text-slate-600 rounded-lg text-[8px] font-black uppercase">Modalidade</span>
-                  <span className="text-[10px] font-bold text-slate-800 uppercase truncate">{group.modality || 'Todas'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 bg-slate-200 text-slate-600 rounded-lg text-[8px] font-black uppercase">Destino</span>
-                  <span className="text-[10px] font-bold text-slate-800 uppercase truncate">{group.destinationId ? getDestinationName(group.destinationId) : 'Todos'}</span>
-                </div>
-              </div>
+        {flowGroups.map(group => {
+          const finals          = group.statuses.filter(s => s.isFinal);
+          const operationalOnly = group.statuses.filter(s => s.operationalOnly);
 
-              <div className="pt-4 border-t border-slate-200">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-3">{group.statuses.length} Status na sequência:</p>
+          return (
+            <div key={group.key} className="bg-slate-50 p-6 rounded-3xl border-2 border-slate-100 flex flex-col h-full">
+              <div className="flex-1 space-y-4">
+
+                {/* Regras */}
                 <div className="space-y-2">
-                  {group.statuses.slice(0, 4).map((s, i) => (
-                    <div key={s.id} className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black text-white" style={{ backgroundColor: s.color || '#3b82f6' }}>
-                        {i + 1}
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-700 uppercase truncate">{s.name}</span>
+                  {[
+                    { label: 'Cliente',    value: group.customerId    ? getCustomerName(group.customerId)     : 'Todos' },
+                    { label: 'Modalidade', value: group.modality      || 'Todas' },
+                    { label: 'Destino',    value: group.destinationId ? getDestinationName(group.destinationId) : 'Todos' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="px-2 py-1 bg-slate-200 text-slate-600 rounded-lg text-[8px] font-black uppercase">{label}</span>
+                      <span className="text-[10px] font-bold text-slate-800 uppercase truncate">{value}</span>
                     </div>
                   ))}
-                  {group.statuses.length > 4 && (
-                    <div className="text-[10px] font-bold text-slate-400 italic pl-6">
-                      + {group.statuses.length - 4} status...
+                </div>
+
+                {/* Badges de resumo */}
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[8px] font-black uppercase">
+                    {group.statuses.length} status
+                  </span>
+                  {finals.length > 0 && (
+                    <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase">
+                      🏁 {finals.length} finalização{finals.length > 1 ? 'ões' : ''}
+                    </span>
+                  )}
+                  {operationalOnly.length > 0 && (
+                    <span className="px-2 py-1 bg-orange-50 text-orange-500 rounded-lg text-[8px] font-black uppercase">
+                      🔒 {operationalOnly.length} só painel
+                    </span>
+                  )}
+                </div>
+
+                {/* Lista de status */}
+                <div className="pt-2 border-t border-slate-200 space-y-1.5">
+                  {group.statuses.slice(0, 6).map((s, i) => (
+                    <div key={s.id} className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black text-white shrink-0"
+                        style={{ backgroundColor: s.color || '#3b82f6' }}>
+                        {i + 1}
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-700 uppercase truncate flex-1">{s.name}</span>
+                      <div className="flex gap-1 shrink-0">
+                        {s.isFinal         && <span title="Finaliza viagem"     className="text-[9px]">🏁</span>}
+                        {s.operationalOnly && <span title="Só painel operacional" className="text-[9px]">🔒</span>}
+                      </div>
                     </div>
+                  ))}
+                  {group.statuses.length > 6 && (
+                    <p className="text-[9px] font-bold text-slate-400 italic pl-6">
+                      + {group.statuses.length - 6} status...
+                    </p>
                   )}
                 </div>
               </div>
-            </div>
 
-            <div className="flex gap-2 mt-6 pt-4 border-t border-slate-200">
-              <button 
-                onClick={() => handleEditFlow(group)}
-                className="flex-1 py-2 bg-white text-blue-600 border-2 border-blue-100 rounded-xl text-[10px] font-black uppercase hover:bg-blue-50 transition-colors"
-              >
-                Editar Fluxo
-              </button>
-              <button 
-                onClick={() => handleDeleteFlow(group)}
-                className="w-10 h-10 bg-white text-red-500 border-2 border-red-100 rounded-xl flex items-center justify-center hover:bg-red-50 transition-colors font-bold"
-              >
-                X
-              </button>
+              <div className="flex gap-2 mt-6 pt-4 border-t border-slate-200">
+                <button onClick={() => handleEditFlow(group)}
+                  className="flex-1 py-2 bg-white text-blue-600 border-2 border-blue-100 rounded-xl text-[10px] font-black uppercase hover:bg-blue-50 transition-colors">
+                  Editar Fluxo
+                </button>
+                <button onClick={() => handleDeleteFlow(group)}
+                  className="w-10 h-10 bg-white text-red-500 border-2 border-red-100 rounded-xl flex items-center justify-center hover:bg-red-50 transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {flowGroups.length === 0 && (
           <div className="col-span-full py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-            <p className="text-sm font-bold text-slate-400 uppercase">Nenhum fluxo de status configurado</p>
+            <p className="text-sm font-bold text-slate-400 uppercase">Nenhum fluxo configurado</p>
             <p className="text-[10px] text-slate-400 mt-1">Crie um novo fluxo para personalizar a operação</p>
           </div>
         )}

@@ -921,7 +921,8 @@ export const db = {
       destinationId: s.destination_id,
       orderIndex: s.order_index,
       color: s.color,
-      isFinal: s.is_final
+      isFinal: s.is_final,
+      operationalOnly: s.operational_only || false,
     }));
   },
 
@@ -935,7 +936,8 @@ export const db = {
       destination_id: status.destinationId || null,
       order_index: status.orderIndex,
       color: status.color || null,
-      is_final: status.isFinal || false
+      is_final: status.isFinal || false,
+      operational_only: status.operationalOnly || false,
     });
     if (error) {
       console.error('Erro ao salvar status customizado:', error);
