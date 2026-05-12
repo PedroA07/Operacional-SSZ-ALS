@@ -1,7 +1,8 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Trip, TripDocument, Driver } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
+import DatePicker from '../../shared/DatePicker';
 
 interface Props {
   trips: Trip[];
@@ -13,62 +14,104 @@ interface Props {
 
 type SendTo = 'driver' | 'beneficiary' | 'group';
 
-interface DriverRowState {
+interface RowEdit {
   sendTo: SendTo;
   lastDate: string;
   lastLocation: string;
   saving: boolean;
 }
 
-const SEND_TO_LABELS: Record<SendTo, string> = {
-  driver: 'Motorista',
-  beneficiary: 'Beneficiário',
-  group: 'Grupo (ambos)',
-};
-
 const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, drivers = [], onUpdateDriver }) => {
   const [view, setView] = useState<'queue' | 'recipients'>('queue');
-  const [rowStates, setRowStates] = useState<Record<string, DriverRowState>>({});
+  const [edits, setEdits] = useState<Record<string, RowEdit>>({});
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
+  const [addSearch, setAddSearch] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const getRowState = useCallback((driver: Driver): DriverRowState => {
-    if (rowStates[driver.id]) return rowStates[driver.id];
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowAddDropdown(false);
+        setAddSearch('');
+      }
+    };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, []);
+
+  // Motoristas "na fila" = têm freightContractSendTo definido
+  const recipientDrivers = drivers.filter(d => d.status === 'Ativo' && d.freightContractSendTo);
+
+  // Motoristas disponíveis para adicionar
+  const availableToAdd = drivers.filter(d =>
+    d.status === 'Ativo' &&
+    d.driverType !== 'Motoboy' &&
+    !d.freightContractSendTo &&
+    (addSearch === '' || d.name.toLowerCase().includes(addSearch.toLowerCase()) || d.plateHorse.toLowerCase().includes(addSearch.toLowerCase()))
+  );
+
+  const getEdit = useCallback((driver: Driver): RowEdit => {
+    if (edits[driver.id]) return edits[driver.id];
     return {
       sendTo: driver.freightContractSendTo || 'driver',
       lastDate: driver.lastFreightContractDate || '',
       lastLocation: driver.lastFreightContractLocation || '',
       saving: false,
     };
-  }, [rowStates]);
+  }, [edits]);
 
-  const setRowField = (driverId: string, field: keyof DriverRowState, value: any) => {
-    setRowStates(prev => ({
-      ...prev,
-      [driverId]: { ...getRowState({ id: driverId } as Driver), ...prev[driverId], [field]: value },
-    }));
+  const patchEdit = (driverId: string, patch: Partial<RowEdit>, base: RowEdit) => {
+    setEdits(prev => ({ ...prev, [driverId]: { ...base, ...prev[driverId], ...patch } }));
   };
 
-  const handleSaveDriver = async (driver: Driver) => {
+  const handleSave = async (driver: Driver) => {
     if (!onUpdateDriver) return;
-    const state = getRowState(driver);
-    setRowField(driver.id, 'saving', true);
+    const e = getEdit(driver);
+    patchEdit(driver.id, { saving: true }, e);
     try {
       await onUpdateDriver({
         ...driver,
-        freightContractSendTo: state.sendTo,
-        lastFreightContractDate: state.lastDate || undefined,
-        lastFreightContractLocation: state.lastLocation || undefined,
+        freightContractSendTo: e.sendTo,
+        lastFreightContractDate: e.lastDate || undefined,
+        lastFreightContractLocation: e.lastLocation || undefined,
       });
-    } finally {
-      setRowField(driver.id, 'saving', false);
+      // Limpa edição local após salvar
+      setEdits(prev => { const n = { ...prev }; delete n[driver.id]; return n; });
+    } catch {
+      patchEdit(driver.id, { saving: false }, e);
     }
   };
 
+  const handleAdd = async (driver: Driver) => {
+    if (!onUpdateDriver) return;
+    setShowAddDropdown(false);
+    setAddSearch('');
+    await onUpdateDriver({ ...driver, freightContractSendTo: 'driver' });
+  };
+
+  const handleRemove = async (driver: Driver) => {
+    if (!onUpdateDriver) return;
+    await onUpdateDriver({
+      ...driver,
+      freightContractSendTo: undefined,
+      lastFreightContractDate: undefined,
+      lastFreightContractLocation: undefined,
+    });
+    setEdits(prev => { const n = { ...prev }; delete n[driver.id]; return n; });
+  };
+
+  const phoneDisplay = (driver: Driver, sendTo: SendTo) => {
+    if (sendTo === 'driver') return driver.phone || '—';
+    if (sendTo === 'beneficiary') return driver.beneficiaryPhone || '—';
+    return driver.whatsappGroupName ? `Grupo: ${driver.whatsappGroupName}` : (driver.whatsappGroupLink ? 'Grupo config.' : '—');
+  };
+
+  // ── Trips queue ──────────────────────────────────────────────────────────
   const eligibleTrips = trips.filter(t =>
     (t.isCompleted || t.status === 'Viagem concluída') &&
     (t.balancePayment?.status === 'LIBERAR' || t.balancePayment?.status === 'PAGO')
   );
-
-  const activeDrivers = drivers.filter(d => d.status === 'Ativo' && d.driverType !== 'Motoboy');
 
   const handleFileUpload = (trip: Trip, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -155,15 +198,10 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     },
   ];
 
-  const phoneDisplay = (driver: Driver, state: DriverRowState) => {
-    if (state.sendTo === 'driver') return driver.phone || '—';
-    if (state.sendTo === 'beneficiary') return driver.beneficiaryPhone || '—';
-    return driver.whatsappGroupName ? `Grupo: ${driver.whatsappGroupName}` : (driver.whatsappGroupLink ? 'Grupo configurado' : '—');
-  };
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header info */}
+      {/* Header */}
       <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 flex items-start gap-4">
         <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2.5" /></svg>
@@ -171,7 +209,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
         <div>
           <h4 className="text-[11px] font-black text-blue-900 uppercase tracking-widest">Gestão de Contratos de Frete</h4>
           <p className="text-[9px] font-bold text-blue-800 opacity-70 mt-1 uppercase leading-tight">
-            Gerencie a fila de contratos pendentes e configure os destinatários de envio via WhatsApp.
+            Gerencie a fila de contratos pendentes e configure os motoristas destinatários de envio via WhatsApp.
           </p>
         </div>
       </div>
@@ -190,11 +228,11 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
           className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'recipients' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
         >
           Motoristas Destinatários
-          <span className={`ml-2 px-2 py-0.5 rounded-full text-[8px] ${view === 'recipients' ? 'bg-white text-blue-600' : 'bg-slate-200 text-slate-500'}`}>{activeDrivers.length}</span>
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-[8px] ${view === 'recipients' ? 'bg-white text-blue-600' : 'bg-slate-200 text-slate-500'}`}>{recipientDrivers.length}</span>
         </button>
       </div>
 
-      {/* Queue view */}
+      {/* ── Fila de Contratos ── */}
       {view === 'queue' && (
         <SmartOperationTable
           userId={userId}
@@ -205,34 +243,101 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
         />
       )}
 
-      {/* Recipients view */}
+      {/* ── Motoristas Destinatários ── */}
       {view === 'recipients' && (
-        <div className="space-y-3">
-          {activeDrivers.length === 0 ? (
-            <div className="text-center py-16 text-slate-400 text-[11px] font-black uppercase tracking-widest">
-              Nenhum motorista ativo cadastrado
+        <div className="space-y-4">
+          {/* Barra de ações: Adicionar motorista */}
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+              {recipientDrivers.length} motorista{recipientDrivers.length !== 1 ? 's' : ''} configurado{recipientDrivers.length !== 1 ? 's' : ''}
+            </p>
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => { setShowAddDropdown(v => !v); setAddSearch(''); }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                Adicionar Motorista
+              </button>
+
+              {showAddDropdown && (
+                <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden w-72">
+                  <div className="p-3 border-b border-slate-50">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={addSearch}
+                      onChange={e => setAddSearch(e.target.value)}
+                      placeholder="Buscar por nome ou placa..."
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-[10px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder:text-slate-300"
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {availableToAdd.length === 0 ? (
+                      <p className="text-center py-6 text-[9px] font-black text-slate-300 uppercase">
+                        {addSearch ? 'Nenhum resultado' : 'Todos os motoristas já estão na lista'}
+                      </p>
+                    ) : (
+                      availableToAdd.map(d => (
+                        <button
+                          key={d.id}
+                          onClick={() => handleAdd(d)}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                        >
+                          <div className="flex-1">
+                            <p className="text-[10px] font-black text-slate-800 uppercase">{d.name}</p>
+                            <p className="text-[8px] font-bold text-slate-400 mt-0.5 font-mono">{d.plateHorse}</p>
+                          </div>
+                          <svg className="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tabela de destinatários */}
+          {recipientDrivers.length === 0 ? (
+            <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+              <div className="w-12 h-12 bg-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+              </div>
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Nenhum motorista adicionado</p>
+              <p className="text-[9px] font-bold text-slate-300 mt-1">Clique em "Adicionar Motorista" para configurar os destinatários</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-3xl border border-slate-100 shadow-sm">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[1000px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
-                    {['Motorista', 'Beneficiário', 'Enviar para', 'Telefone / Grupo', 'Data Último Contrato', 'Local Último Contrato', ''].map(h => (
+                    {[
+                      'Motorista',
+                      'Beneficiário',
+                      'Enviar para',
+                      'Telefone / Grupo',
+                      'Data Último Contrato',
+                      'Local Último Contrato',
+                      '',
+                    ].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {activeDrivers.map((driver, idx) => {
-                    const state = getRowState(driver);
-                    const phone = phoneDisplay(driver, state);
+                  {recipientDrivers.map((driver, idx) => {
+                    const e = getEdit(driver);
                     const isDirty =
-                      state.sendTo !== (driver.freightContractSendTo || 'driver') ||
-                      state.lastDate !== (driver.lastFreightContractDate || '') ||
-                      state.lastLocation !== (driver.lastFreightContractLocation || '');
+                      e.sendTo !== (driver.freightContractSendTo || 'driver') ||
+                      e.lastDate !== (driver.lastFreightContractDate || '') ||
+                      e.lastLocation !== (driver.lastFreightContractLocation || '');
 
                     return (
-                      <tr key={driver.id} className={`border-b border-slate-50 hover:bg-slate-50/60 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
+                      <tr
+                        key={driver.id}
+                        className={`border-b border-slate-50 hover:bg-slate-50/60 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}
+                      >
                         {/* Motorista */}
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
@@ -263,30 +368,35 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                         {/* Enviar para */}
                         <td className="px-4 py-3">
                           <select
-                            value={state.sendTo}
-                            onChange={e => setRowField(driver.id, 'sendTo', e.target.value as SendTo)}
+                            value={e.sendTo}
+                            onChange={ev => patchEdit(driver.id, { sendTo: ev.target.value as SendTo }, e)}
                             className="text-[9px] font-black uppercase bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer shadow-sm"
                           >
                             <option value="driver">Motorista</option>
-                            <option value="beneficiary" disabled={!driver.beneficiaryPhone}>Beneficiário{!driver.beneficiaryPhone ? ' (sem tel.)' : ''}</option>
-                            <option value="group" disabled={!driver.whatsappGroupLink && !driver.whatsappGroupName}>Grupo (ambos){!driver.whatsappGroupLink && !driver.whatsappGroupName ? ' (não config.)' : ''}</option>
+                            <option value="beneficiary" disabled={!driver.beneficiaryPhone}>
+                              Beneficiário{!driver.beneficiaryPhone ? ' (sem tel.)' : ''}
+                            </option>
+                            <option value="group" disabled={!driver.whatsappGroupLink && !driver.whatsappGroupName}>
+                              Grupo (ambos){!driver.whatsappGroupLink && !driver.whatsappGroupName ? ' (não config.)' : ''}
+                            </option>
                           </select>
                         </td>
 
                         {/* Telefone */}
                         <td className="px-4 py-3">
-                          <span className={`text-[10px] font-black ${state.sendTo === 'group' ? 'text-emerald-600' : 'text-blue-600'} tabular-nums`}>
-                            {phone}
+                          <span className={`text-[10px] font-black tabular-nums ${e.sendTo === 'group' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                            {phoneDisplay(driver, e.sendTo)}
                           </span>
                         </td>
 
-                        {/* Data último contrato */}
+                        {/* Data último contrato — DatePicker customizado */}
                         <td className="px-4 py-3">
-                          <input
-                            type="date"
-                            value={state.lastDate}
-                            onChange={e => setRowField(driver.id, 'lastDate', e.target.value)}
-                            className="text-[9px] font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm w-36"
+                          <DatePicker
+                            value={e.lastDate}
+                            onChange={val => patchEdit(driver.id, { lastDate: val }, e)}
+                            placeholder="Selecionar..."
+                            inputClassName="!py-2 !text-[9px] !rounded-xl"
+                            className="w-36"
                           />
                         </td>
 
@@ -294,31 +404,40 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                         <td className="px-4 py-3">
                           <input
                             type="text"
-                            value={state.lastLocation}
-                            onChange={e => setRowField(driver.id, 'lastLocation', e.target.value)}
-                            placeholder="Ex: Santos/SP → São Paulo/SP"
-                            className="text-[9px] font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm w-48 placeholder:text-slate-300"
+                            value={e.lastLocation}
+                            onChange={ev => patchEdit(driver.id, { lastLocation: ev.target.value }, e)}
+                            placeholder="Ex: Santos → São Paulo"
+                            className="text-[9px] font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm w-44 placeholder:text-slate-300"
                           />
                         </td>
 
-                        {/* Salvar */}
+                        {/* Ações */}
                         <td className="px-4 py-3">
-                          <button
-                            onClick={() => handleSaveDriver(driver)}
-                            disabled={state.saving || !isDirty || !onUpdateDriver}
-                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-sm ${
-                              isDirty && !state.saving
-                                ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
-                                : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                            }`}
-                          >
-                            {state.saving ? (
-                              <span className="flex items-center gap-1">
-                                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
-                                Salvando
-                              </span>
-                            ) : 'Salvar'}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleSave(driver)}
+                              disabled={e.saving || !isDirty || !onUpdateDriver}
+                              className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-sm ${
+                                isDirty && !e.saving
+                                  ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
+                                  : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                              }`}
+                            >
+                              {e.saving ? (
+                                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                </svg>
+                              ) : 'Salvar'}
+                            </button>
+                            <button
+                              onClick={() => handleRemove(driver)}
+                              title="Remover da lista"
+                              className="p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
