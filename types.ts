@@ -664,3 +664,27 @@ export interface OpentechTrip {
   status: string;
   riskLevel: 'Crítico' | 'Alto' | 'Médio' | 'Baixo';
 }
+
+export interface SILProgramacao {
+  _rowIndex: number;
+  numeroProgramacao: string;
+  tipoProgramado: string;
+  container: string;
+  tipoContainer: string;
+  taraEspecifica: string;
+  lacre1: string;
+  booking: string;
+  previsaoAtendimento: string;
+  situacao: string;
+  nomeMotorista: string;
+  cpfMotorista: string;
+  placaVeiculo: string;
+  placaCarreta: string;
+  cidadeAtendimento: string;
+  referenciaPosCidade: string;
+  nomeLocalAtendimento: string;
+  numeroColeta: string;
+  embarcador: string;
+  navio: string;
+  bl: string;
+}

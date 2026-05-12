@@ -1,229 +1,236 @@
 
 import React, { useState } from 'react';
-import { OpentechTrip, Driver, Customer } from '../../../types';
+import { SILProgramacao, Driver, Customer } from '../../../types';
 import { maskPlate, maskCPF } from '../../../utils/masks';
-import OpentechConnector from './OpentechConnector';
-import CustomSelect from '../../shared/CustomSelect';
+import SILExcelImporter from './SILExcelImporter';
 
 interface SILMonitoringViewProps {
-  trips: OpentechTrip[];
   drivers: Driver[];
   customers: Customer[];
-  onAddTrip: (trip: Partial<OpentechTrip>) => void;
 }
 
-const SILMonitoringView: React.FC<SILMonitoringViewProps> = ({ trips: initialTrips, drivers, customers, onAddTrip }) => {
-  const [trips, setTrips] = useState<OpentechTrip[]>(initialTrips);
-  const [isConnectorOpen, setIsConnectorOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    sm: '',
-    placa: '',
-    cpf: '',
-    status: '',
-    cliente: ''
-  });
+const TIPO_COLOR: Record<string, string> = {
+  exportação: 'bg-blue-100 text-blue-700',
+  importação:  'bg-emerald-100 text-emerald-700',
+};
 
-  const stats = {
-    total: trips.length,
-    emViagem: trips.filter(t => t.status === 'Em Viagem').length,
-    alertas: trips.filter(t => t.status === 'Alerta' || t.status === 'Sinistrada').length,
-    concluidas: trips.filter(t => t.status === 'Concluída').length
+const SILMonitoringView: React.FC<SILMonitoringViewProps> = () => {
+  const [programacoes, setProgramacoes] = useState<SILProgramacao[]>([]);
+  const [isImporterOpen, setIsImporterOpen] = useState(false);
+  const [filters, setFilters] = useState({ prog: '', placa: '', motorista: '', tipo: '', situacao: '' });
+
+  const handleImport = (rows: SILProgramacao[]) => {
+    setProgramacoes(prev => {
+      // Evita duplicatas por numeroProgramacao+container
+      const existingKeys = new Set(prev.map(p => `${p.numeroProgramacao}|${p.container}`));
+      const novos = rows.filter(r => !existingKeys.has(`${r.numeroProgramacao}|${r.container}`));
+      return [...novos, ...prev];
+    });
   };
 
-  const filteredTrips = trips.filter(t => {
-    return (
-      (filters.sm === '' || t.smNumber.includes(filters.sm)) &&
-      (filters.placa === '' || t.plateHorse.toLowerCase().includes(filters.placa.toLowerCase())) &&
-      (filters.cpf === '' || t.driverCpf.includes(filters.cpf)) &&
-      (filters.status === '' || t.status === filters.status) &&
-      (filters.cliente === '' || t.clientName.toLowerCase().includes(filters.cliente.toLowerCase()))
-    );
-  });
+  const filtered = programacoes.filter(p =>
+    (filters.prog      === '' || p.numeroProgramacao.includes(filters.prog)) &&
+    (filters.placa     === '' || p.placaVeiculo.toLowerCase().includes(filters.placa.toLowerCase()) || p.placaCarreta.toLowerCase().includes(filters.placa.toLowerCase())) &&
+    (filters.motorista === '' || p.nomeMotorista.toLowerCase().includes(filters.motorista.toLowerCase())) &&
+    (filters.tipo      === '' || p.tipoProgramado.toLowerCase() === filters.tipo.toLowerCase()) &&
+    (filters.situacao  === '' || p.situacao.toLowerCase().includes(filters.situacao.toLowerCase()))
+  );
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Em Viagem': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'Concluída': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-      case 'Alerta': return 'bg-amber-100 text-amber-700 border-amber-200';
-      case 'Sinistrada': return 'bg-red-100 text-red-700 border-red-200';
-      default: return 'bg-slate-100 text-slate-700 border-slate-200';
-    }
+  const stats = {
+    total:       programacoes.length,
+    exportacao:  programacoes.filter(p => p.tipoProgramado.toLowerCase().includes('export')).length,
+    importacao:  programacoes.filter(p => p.tipoProgramado.toLowerCase().includes('import')).length,
+    encerradas:  programacoes.filter(p => p.situacao.toLowerCase().includes('encerr')).length,
+  };
+
+  const tipoColor = (tipo: string) => TIPO_COLOR[tipo.toLowerCase()] || 'bg-slate-100 text-slate-600';
+  const situacaoColor = (s: string) => {
+    const sl = s.toLowerCase();
+    if (sl.includes('encerr')) return 'bg-slate-100 text-slate-500';
+    if (sl.includes('prazo'))  return 'bg-emerald-100 text-emerald-700';
+    return 'bg-amber-100 text-amber-700';
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <OpentechConnector 
-        isOpen={isConnectorOpen} 
-        onClose={() => setIsConnectorOpen(false)} 
-        onSuccess={(newData) => setTrips([...newData, ...trips])}
+      <SILExcelImporter
+        isOpen={isImporterOpen}
+        onClose={() => setIsImporterOpen(false)}
+        onImport={handleImport}
       />
 
+      {/* Header */}
       <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
         <div>
-           <h2 className="text-lg font-black text-[#001e50] uppercase tracking-tight flex items-center gap-3">
-             <div className="w-8 h-8 bg-[#001e50] text-white rounded-lg flex items-center justify-center text-xs italic shadow-lg">SIL</div>
-             Monitoramento Integrado Opentech
-           </h2>
-           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Conexão direta com o Módulo de Programação Detalhada</p>
+          <h2 className="text-lg font-black text-[#001e50] uppercase tracking-tight flex items-center gap-3">
+            <div className="w-8 h-8 bg-[#001e50] text-white rounded-lg flex items-center justify-center text-xs italic shadow-lg">SIL</div>
+            Programações Detalhadas — SIL Opentech
+          </h2>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+            Importação via Excel exportado do módulo de Programação Detalhada
+          </p>
         </div>
-        <button 
-          onClick={() => setIsConnectorOpen(true)}
-          className="px-6 py-4 bg-[#001e50] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-900 transition-all shadow-xl flex items-center gap-3 active:scale-95"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-          Sincronizar Dados Reais
-        </button>
-      </div>
-
-      {/* KPI Header SIL Style */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center">
-          <p className="text-[9px] font-black text-slate-400 uppercase">Total Geral</p>
-          <p className="text-2xl font-black text-slate-800">{stats.total}</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center border-l-4 border-l-blue-500">
-          <p className="text-[9px] font-black text-blue-500 uppercase">Em Viagem</p>
-          <p className="text-2xl font-black text-blue-600">{stats.emViagem}</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center border-l-4 border-l-red-500">
-          <p className="text-[9px] font-black text-red-500 uppercase">Alertas / Sinistros</p>
-          <p className="text-2xl font-black text-red-600">{stats.alertas}</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center border-l-4 border-l-emerald-500">
-          <p className="text-[9px] font-black text-emerald-500 uppercase">Concluídas</p>
-          <p className="text-2xl font-black text-emerald-600">{stats.concluidas}</p>
-        </div>
-      </div>
-
-      {/* Filters Form SIL Style */}
-      <div className="bg-slate-100 p-6 rounded-2xl border border-slate-200">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="space-y-1">
-            <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Nº SM / Viagem</label>
-            <input 
-              type="text" 
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-[10px] font-bold uppercase focus:border-blue-500 outline-none transition-all"
-              placeholder="000000"
-              value={filters.sm}
-              onChange={e => setFilters({...filters, sm: e.target.value})}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Placa Veículo</label>
-            <input 
-              type="text" 
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-[10px] font-bold uppercase focus:border-blue-500 outline-none transition-all"
-              placeholder="ABC-1234"
-              value={filters.placa}
-              onChange={e => setFilters({...filters, placa: maskPlate(e.target.value)})}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[8px] font-black text-slate-500 uppercase ml-1">CPF Motorista</label>
-            <input 
-              type="text" 
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-[10px] font-bold uppercase focus:border-blue-500 outline-none transition-all"
-              placeholder="000.000.000-00"
-              value={filters.cpf}
-              onChange={e => setFilters({...filters, cpf: maskCPF(e.target.value)})}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Status</label>
-            <CustomSelect
-              value={filters.status}
-              onChange={v => setFilters({...filters, status: v})}
-              placeholder="Todos"
-              options={[
-                { value: 'Em Viagem', label: 'Em Viagem' },
-                { value: 'Concluída', label: 'Concluída' },
-                { value: 'Alerta', label: 'Alerta' },
-                { value: 'Sinistrada', label: 'Sinistrada' },
-              ]}
-              inputClassName="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-[10px] font-bold uppercase focus:border-blue-500 outline-none transition-all"
-            />
-          </div>
-          <div className="flex items-end">
-            <button className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase hover:bg-blue-700 transition-all shadow-md">
-              Filtrar Resultados
+        <div className="flex items-center gap-3">
+          {programacoes.length > 0 && (
+            <button
+              onClick={() => setProgramacoes([])}
+              className="px-4 py-3 text-slate-400 hover:text-red-500 rounded-2xl text-[9px] font-black uppercase transition-all hover:bg-red-50"
+            >
+              Limpar lista
             </button>
+          )}
+          <button
+            onClick={() => setIsImporterOpen(true)}
+            className="px-6 py-4 bg-[#001e50] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-900 transition-all shadow-xl flex items-center gap-3 active:scale-95"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            Importar Excel SIL
+          </button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total importado', value: stats.total, color: 'text-slate-800', border: '' },
+          { label: 'Exportação', value: stats.exportacao, color: 'text-blue-600', border: 'border-l-4 border-l-blue-500' },
+          { label: 'Importação', value: stats.importacao, color: 'text-emerald-600', border: 'border-l-4 border-l-emerald-500' },
+          { label: 'Encerradas', value: stats.encerradas, color: 'text-slate-400', border: 'border-l-4 border-l-slate-300' },
+        ].map(k => (
+          <div key={k.label} className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center ${k.border}`}>
+            <p className="text-[9px] font-black text-slate-400 uppercase">{k.label}</p>
+            <p className={`text-2xl font-black ${k.color}`}>{k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-slate-100 p-5 rounded-2xl border border-slate-200">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[
+            { label: 'Nº Programação', key: 'prog',      placeholder: '35906178' },
+            { label: 'Placa',          key: 'placa',     placeholder: 'ABC-1D23' },
+            { label: 'Motorista',      key: 'motorista', placeholder: 'Nome...' },
+            { label: 'Situação',       key: 'situacao',  placeholder: 'Encerrada...' },
+          ].map(f => (
+            <div key={f.key} className="space-y-1">
+              <label className="text-[8px] font-black text-slate-500 uppercase ml-1">{f.label}</label>
+              <input
+                type="text"
+                placeholder={f.placeholder}
+                value={(filters as any)[f.key]}
+                onChange={e => setFilters({ ...filters, [f.key]: e.target.value })}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-[10px] font-bold uppercase focus:border-blue-500 outline-none transition-all"
+              />
+            </div>
+          ))}
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Tipo</label>
+            <select
+              value={filters.tipo}
+              onChange={e => setFilters({ ...filters, tipo: e.target.value })}
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-[10px] font-bold uppercase focus:border-blue-500 outline-none transition-all"
+            >
+              <option value="">Todos</option>
+              <option value="Exportação">Exportação</option>
+              <option value="Importação">Importação</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* Main Table SIL Style */}
+      {/* Tabela */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[10px] border-collapse">
-            <thead className="bg-[#001e50] text-white font-bold uppercase tracking-widest border-b border-slate-200">
+          <table className="w-full text-left text-[9px] border-collapse min-w-[1300px]">
+            <thead className="bg-[#001e50] text-white font-black uppercase tracking-widest">
               <tr>
-                <th className="px-4 py-4 w-12 text-center">Risco</th>
-                <th className="px-4 py-4">SM / Operação</th>
-                <th className="px-4 py-4">Transportador / Placa</th>
-                <th className="px-4 py-4">Motorista / CPF</th>
-                <th className="px-4 py-4">Origem / Destino</th>
-                <th className="px-4 py-4">Início / ETA</th>
-                <th className="px-4 py-4">Status</th>
-                <th className="px-4 py-4 text-right">Ações</th>
+                {[
+                  'Nº Prog.', 'Tipo', 'Container', 'Tp. Cont.',
+                  'Booking', 'Previsão Atend.', 'Situação',
+                  'Motorista', 'CPF', 'Placa', 'Carreta',
+                  'Cidade Atend.', 'Local', 'Embarcador', 'Navio', 'BL',
+                ].map(h => (
+                  <th key={h} className="px-3 py-3 whitespace-nowrap">{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredTrips.map(t => (
-                <tr key={t.id} className="hover:bg-slate-50 transition-colors align-middle">
-                  <td className="px-4 py-3 text-center">
-                    <div className={`w-3 h-3 rounded-full mx-auto ${
-                      t.riskLevel === 'Crítico' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
-                      t.riskLevel === 'Alto' ? 'bg-orange-500' :
-                      t.riskLevel === 'Médio' ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`}></div>
+            <tbody className="divide-y divide-slate-50">
+              {filtered.map((p, idx) => (
+                <tr key={`${p.numeroProgramacao}-${p._rowIndex}`}
+                    className={`hover:bg-slate-50 transition-colors align-middle ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                  <td className="px-3 py-2.5 font-black text-blue-700 whitespace-nowrap">{p.numeroProgramacao}</td>
+                  <td className="px-3 py-2.5">
+                    {p.tipoProgramado && (
+                      <span className={`px-2 py-0.5 rounded-lg font-black uppercase text-[8px] ${tipoColor(p.tipoProgramado)}`}>
+                        {p.tipoProgramado}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="font-black text-slate-800">{t.smNumber}</p>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase truncate max-w-[120px]">{t.clientName}</p>
+                  <td className="px-3 py-2.5 font-mono font-black text-slate-800 whitespace-nowrap">{p.container}</td>
+                  <td className="px-3 py-2.5 text-slate-500 font-bold">{p.tipoContainer}</td>
+                  <td className="px-3 py-2.5 font-black text-slate-700 whitespace-nowrap">{p.booking}</td>
+                  <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{p.previsaoAtendimento}</td>
+                  <td className="px-3 py-2.5">
+                    {p.situacao && (
+                      <span className={`px-2 py-0.5 rounded-lg font-black uppercase text-[8px] ${situacaoColor(p.situacao)}`}>
+                        {p.situacao}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="font-black text-blue-600 font-mono text-[11px]">{t.plateHorse}</p>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase">ALS TRANSPORTES</p>
+                  <td className="px-3 py-2.5 font-bold text-slate-800 uppercase whitespace-nowrap max-w-[160px] truncate">{p.nomeMotorista}</td>
+                  <td className="px-3 py-2.5 font-mono text-slate-400 whitespace-nowrap">{p.cpfMotorista}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    <span className="bg-slate-900 text-white px-2 py-0.5 rounded font-mono font-black text-[8px]">{p.placaVeiculo}</span>
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="font-bold text-slate-700 uppercase leading-none">{t.driverName}</p>
-                    <p className="text-[9px] text-slate-400 mt-1">{t.driverCpf}</p>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    {p.placaCarreta && (
+                      <span className="bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded font-mono font-bold text-[8px]">{p.placaCarreta}</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="text-slate-500 font-bold truncate max-w-[150px]"><span className="text-slate-300">O:</span> {t.origin}</p>
-                    <p className="text-slate-800 font-black truncate max-w-[150px]"><span className="text-slate-300">D:</span> {t.destination}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col">
-                      <span className="text-slate-400">INÍ: <span className="text-slate-600 font-bold">{new Date(t.startTime).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span></span>
-                      <span className="text-blue-500 font-black">ETA: <span>{new Date(t.eta).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span></span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-[8px] font-black uppercase border ${getStatusColor(t.status)}`}>
-                      {t.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right space-x-2">
-                    <button className="p-1.5 text-slate-300 hover:text-blue-600 transition-all" title="Ver no Mapa">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    </button>
-                    <button className="p-1.5 text-slate-300 hover:text-slate-900 transition-all" title="Detalhes da SM">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    </button>
-                  </td>
+                  <td className="px-3 py-2.5 text-slate-600 font-bold uppercase whitespace-nowrap">{p.cidadeAtendimento}</td>
+                  <td className="px-3 py-2.5 text-slate-500 max-w-[120px] truncate">{p.nomeLocalAtendimento}</td>
+                  <td className="px-3 py-2.5 text-slate-600 font-bold uppercase whitespace-nowrap">{p.embarcador}</td>
+                  <td className="px-3 py-2.5 text-slate-500 font-bold uppercase whitespace-nowrap">{p.navio}</td>
+                  <td className="px-3 py-2.5 font-mono text-slate-400 whitespace-nowrap">{p.bl}</td>
                 </tr>
               ))}
-              {filteredTrips.length === 0 && (
+              {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-20 text-center text-slate-300 font-bold uppercase italic border-2 border-dashed border-slate-50">
-                    Nenhuma Solicitação de Monitoramento (SM) encontrada com os filtros aplicados. Clique em "Sincronizar Dados Reais" para importar do SIL.
+                  <td colSpan={16} className="px-6 py-20 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
+                        <svg className="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
+                          {programacoes.length > 0 ? 'Nenhuma programação com esses filtros' : 'Nenhuma programação importada'}
+                        </p>
+                        {programacoes.length === 0 && (
+                          <p className="text-[9px] font-bold text-slate-300 mt-1">
+                            Exporte o Excel no SIL e clique em "Importar Excel SIL"
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+        {filtered.length > 0 && (
+          <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
+            <p className="text-[9px] font-black text-slate-400 uppercase">
+              {filtered.length} programaç{filtered.length !== 1 ? 'ões' : 'ão'} exibida{filtered.length !== 1 ? 's' : ''}
+              {filtered.length !== programacoes.length && ` (de ${programacoes.length} total)`}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
