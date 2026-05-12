@@ -5,7 +5,7 @@ import { SILProgramacao } from '../types';
 // Mapeamento flexível: aceita variações de cabeçalho do SIL
 const COL_MAP: Record<keyof Omit<SILProgramacao, '_rowIndex'>, string[]> = {
   numeroProgramacao:    ['número da programação', 'numero da programacao', 'num programacao', 'programação'],
-  tipoProgramado:       ['tipo de programado', 'tipo programado', 'tipo de programação'],
+  tipoProgramado:       ['tipo de programação', 'tipo de programado', 'tipo programado'],
   container:            ['containers', 'container', 'num container'],
   tipoContainer:        ['tipo container', 'tipo de container'],
   taraEspecifica:       ['tara específica', 'tara especifica', 'tara esp'],
@@ -23,7 +23,7 @@ const COL_MAP: Record<keyof Omit<SILProgramacao, '_rowIndex'>, string[]> = {
   numeroColeta:         ['número da solicitação de coleta', 'numero da solicitacao de coleta', 'num coleta', 'nº coleta'],
   embarcador:           ['embarcador'],
   navio:                ['navio'],
-  bl:                   ['bl', 'b/l', 'bill of lading'],
+  bl:                   ['bu', 'bl', 'b/l', 'bill of lading'],
 };
 
 function normalizeHeader(h: string): string {
