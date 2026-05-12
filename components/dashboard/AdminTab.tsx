@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trip, User } from '../../types';
+import { Trip, User, Driver } from '../../types';
 import { db } from '../../utils/storage';
 import AdvanceSubTab from './admin/AdvanceSubTab';
 import BalanceSubTab from './admin/BalanceSubTab';
@@ -13,16 +13,23 @@ interface AdminTabProps {
 const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
   const [activeSubTab, setActiveSubTab] = useState<'advance' | 'balance' | 'contracts'>('advance');
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
 
   const loadData = async () => {
-    const data = await db.getTrips();
-    setTrips(data);
+    const [tripsData, driversData] = await Promise.all([db.getTrips(), db.getDrivers()]);
+    setTrips(tripsData);
+    setDrivers(driversData);
   };
 
   useEffect(() => { loadData(); }, []);
 
   const handleUpdate = async (updated: Trip) => {
     await db.saveTrip(updated, user);
+    loadData();
+  };
+
+  const handleUpdateDriver = async (updated: Driver) => {
+    await db.saveDriver(updated, user);
     loadData();
   };
 
@@ -93,7 +100,7 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
           <BalanceSubTab userId={user.id} trips={trips} onUpdate={handleUpdate} />
         )}
         {activeSubTab === 'contracts' && (
-          <FreightContractsSubTab userId={user.id} trips={trips} onUpdate={handleUpdate} />
+          <FreightContractsSubTab userId={user.id} trips={trips} onUpdate={handleUpdate} drivers={drivers} onUpdateDriver={handleUpdateDriver} />
         )}
       </div>
     </div>

@@ -542,6 +542,9 @@ export interface Driver {
   paymentPreference?: 'PIX' | 'TED';
   whatsappGroupName?: string;
   whatsappGroupLink?: string;
+  freightContractSendTo?: 'driver' | 'beneficiary' | 'group';
+  lastFreightContractDate?: string;
+  lastFreightContractLocation?: string;
   registrationDate?: string;
   operations: { category: string; client: string }[];
   tripsCount?: number;
