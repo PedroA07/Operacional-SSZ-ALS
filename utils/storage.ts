@@ -4,7 +4,7 @@ import {
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
-  BotGroup
+  BotGroup, BotAutomation
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1284,6 +1284,66 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('bot_groups').delete().eq('jid', jid);
     if (error) { console.error('[deleteBotGroup]', error.message); return false; }
+    return true;
+  },
+
+  // ── Automações do Bot WhatsApp ─────────────────────────────────────────────
+
+  getBotAutomations: async (): Promise<BotAutomation[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('bot_automations')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) { console.error('[getBotAutomations]', error.message); return []; }
+    return (data || []).map(a => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      isActive: a.is_active,
+      scheduleTime: a.schedule_time || undefined,
+      scheduleDays: a.schedule_days || undefined,
+      triggerStatus: a.trigger_status || undefined,
+      delayMinutes: a.delay_minutes ?? 0,
+      reminderMinutes: a.reminder_minutes ?? 60,
+      target: a.target || 'internals',
+      targetJid: a.target_jid || undefined,
+      messageTemplate: a.message_template || '',
+      createdAt: a.created_at,
+      updatedAt: a.updated_at,
+    }));
+  },
+
+  saveBotAutomation: async (auto: Partial<BotAutomation>): Promise<boolean> => {
+    if (!supabase) return false;
+    const payload: any = {
+      name:             auto.name,
+      type:             auto.type,
+      is_active:        auto.isActive ?? true,
+      schedule_time:    auto.scheduleTime   || null,
+      schedule_days:    auto.scheduleDays   || null,
+      trigger_status:   auto.triggerStatus  || null,
+      delay_minutes:    auto.delayMinutes   ?? 0,
+      reminder_minutes: auto.reminderMinutes ?? 60,
+      target:           auto.target         || 'internals',
+      target_jid:       auto.targetJid      || null,
+      message_template: auto.messageTemplate || '',
+      updated_at:       new Date().toISOString(),
+    };
+    if (auto.id) {
+      const { error } = await supabase.from('bot_automations').update(payload).eq('id', auto.id);
+      if (error) { console.error('[saveBotAutomation update]', error.message); return false; }
+    } else {
+      const { error } = await supabase.from('bot_automations').insert(payload);
+      if (error) { console.error('[saveBotAutomation insert]', error.message); return false; }
+    }
+    return true;
+  },
+
+  deleteBotAutomation: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('bot_automations').delete().eq('id', id);
+    if (error) { console.error('[deleteBotAutomation]', error.message); return false; }
     return true;
   },
 };

@@ -3,6 +3,7 @@ import { db } from '../../utils/storage';
 import { Automation, EmailTemplate, TripStatus, CustomStatus } from '../../types';
 import { Plus, Trash2, Mail, MessageSquare, ToggleLeft, ToggleRight, Save, X, AlertCircle } from 'lucide-react';
 import CustomSelect from '../shared/CustomSelect';
+import BotAutomationsManager from './admin/BotAutomationsManager';
 
 const AutomationsTab: React.FC = () => {
   const [automations, setAutomations] = useState<Automation[]>([]);
@@ -267,6 +268,11 @@ const AutomationsTab: React.FC = () => {
             </div>
           ))
         )}
+      </div>
+
+      {/* ── Automações do Bot WhatsApp ─────────────────────────────────────── */}
+      <div className="mt-10 pt-8 border-t border-slate-800">
+        <BotAutomationsManager />
       </div>
     </div>
   );

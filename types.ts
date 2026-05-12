@@ -417,6 +417,28 @@ export interface BotGroup {
   updatedAt: string;
 }
 
+export interface BotAutomation {
+  id: string;
+  name: string;
+  type: 'scheduled' | 'status_trigger' | 'reminder_before';
+  isActive: boolean;
+  // Agendado
+  scheduleTime?: string;    // "07:00"
+  scheduleDays?: number[];  // [0-6] 0=Dom
+  // Gatilho de status
+  triggerStatus?: string;
+  delayMinutes?: number;
+  // Lembrete antes
+  reminderMinutes?: number;
+  // Destino
+  target: 'driver' | 'internals' | 'all' | 'specific';
+  targetJid?: string;
+  // Mensagem
+  messageTemplate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Trip {
   id: string;
   os: string;
