@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking, CustomStatus } from '../../types';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking, CustomStatus, SILProgramacao } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db } from '../../utils/storage';
 import OperationRegisterAction from './operations/OperationRegisterAction';
@@ -24,7 +24,7 @@ import TripDetailsViewerModal from './operations/TripDetailsViewerModal';
 import { getOperationTableColumns } from './operations/OperationTableColumns';
 import { statusService } from '../../utils/statusService';
 import CustomSelect from '../shared/CustomSelect';
-import SILMonitoringView from './operations/SILMonitoringView';
+import SILExcelImporter from './operations/SILExcelImporter';
 
 interface OperationsTabProps {
   user: User;
@@ -66,7 +66,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [locationDriverId, setLocationDriverId] = useState<string | null>(null);
   
   const [isSavingStatus, setIsSavingStatus] = useState(false);
-  const [opView, setOpView] = useState<'ops' | 'sil'>('ops');
+  const [isSilImporterOpen, setIsSilImporterOpen] = useState(false);
+  const [importedOs, setImportedOs] = useState<Set<string>>(new Set());
+  const [lastSilImport, setLastSilImport] = useState<{ linked: number; unlinked: number } | null>(null);
 
 
   const handleSetPriority = async (trip: Trip) => {
@@ -213,6 +215,121 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     }
   };
 
+  const handleSilImport = useCallback(async (
+    matched: { sil: SILProgramacao; trip: Trip }[],
+    unmatched: SILProgramacao[]
+  ) => {
+    const norm = (s: string) =>
+      s.trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ');
+
+    const driverByName  = new Map<string, Driver>();
+    const driverByCpf   = new Map<string, Driver>();
+    const driverByPlate = new Map<string, Driver>();
+    drivers.forEach(d => {
+      if (d.name)         driverByName.set(norm(d.name), d);
+      if (d.cpf)          driverByCpf.set(norm(d.cpf), d);
+      if (d.plateHorse)   driverByPlate.set(norm(d.plateHorse), d);
+      if (d.plateTrailer) driverByPlate.set(norm(d.plateTrailer), d);
+    });
+
+    const customerByName = new Map<string, Customer>();
+    customers.forEach(c => { if (c.name) customerByName.set(norm(c.name), c); });
+
+    const mapType = (sil: string): string => {
+      if (!sil) return '';
+      const silN = norm(sil);
+      const exact = operationTypes.find(t => norm(t.name) === silN);
+      if (exact) return exact.name;
+      const silWords = silN.split(' ');
+      let best = { score: 0, name: '' };
+      for (const t of operationTypes) {
+        const score = silWords.filter(w => norm(t.name).includes(w)).length;
+        if (score > best.score) best = { score, name: t.name };
+      }
+      return best.score > 0 ? best.name : sil.toUpperCase();
+    };
+
+    const mapStatus = (sit: string): TripStatus | null => {
+      const s = sit.toLowerCase();
+      if (s.includes('encerr') || s.includes('conclu') || s.includes('finaliz')) return 'Viagem concluída';
+      if (s.includes('viagem')) return 'Em viagem';
+      return null;
+    };
+
+    const parseDate = (s: string): string => {
+      if (!s) return '';
+      const [datePart, timePart] = s.trim().split(' ');
+      const dp = datePart.split('/');
+      if (dp.length !== 3) return '';
+      const [d, m, y] = dp;
+      return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T${timePart || '00:00'}`;
+    };
+
+    let updateCount = 0;
+    const newOs = new Set<string>();
+
+    for (const { sil, trip } of matched) {
+      const osKey = trip.os.trim().toLowerCase();
+      if (importedOs.has(osKey)) continue;
+
+      const matchedDriver =
+        driverByName.get(norm(sil.nomeMotorista)) ||
+        driverByCpf.get(norm(sil.cpfMotorista)) ||
+        driverByPlate.get(norm(sil.placaVeiculo));
+      const driverRef = matchedDriver ? {
+        id: matchedDriver.id,
+        name: matchedDriver.name,
+        plateHorse: matchedDriver.plateHorse,
+        plateTrailer: matchedDriver.plateTrailer,
+        status: matchedDriver.status,
+        cpf: matchedDriver.cpf,
+        phone: matchedDriver.phone,
+      } : trip.driver;
+
+      const matchedCustomer = customerByName.get(norm(sil.nomeLocalAtendimento));
+      const customerRef = matchedCustomer ? {
+        id: matchedCustomer.id,
+        name: matchedCustomer.name,
+        legalName: matchedCustomer.legalName,
+        cnpj: matchedCustomer.cnpj,
+        city: matchedCustomer.city,
+        state: matchedCustomer.state,
+      } : trip.customer;
+
+      const newType     = sil.tipoProgramado ? mapType(sil.tipoProgramado) : '';
+      const newStatus   = sil.situacao ? mapStatus(sil.situacao) : null;
+      const newDateTime = sil.previsaoAtendimento ? parseDate(sil.previsaoAtendimento) : '';
+
+      const updated: Trip = {
+        ...trip,
+        driver:        driverRef,
+        customer:      customerRef,
+        type:          newType || trip.type,
+        ...(newDateTime ? { dateTime: newDateTime } : {}),
+        ...(newStatus   ? { status: newStatus }   : {}),
+        booking:       sil.booking        || trip.booking,
+        container:     sil.container      || trip.container,
+        containerType: sil.tipoContainer  || trip.containerType,
+        ship:          sil.navio          || trip.ship,
+        bu:            sil.bl             || trip.bu,
+        embarcador:    sil.embarcador     || trip.embarcador,
+        tara:          sil.taraEspecifica || trip.tara,
+        seal:          sil.lacre1         || trip.seal,
+      };
+
+      await db.saveTrip(updated, user);
+      newOs.add(osKey);
+      updateCount++;
+    }
+
+    setImportedOs(prev => { const n = new Set(prev); newOs.forEach(o => n.add(o)); return n; });
+    setLastSilImport({ linked: updateCount, unlinked: unmatched.length });
+    setIsSilImporterOpen(false);
+    onRefresh();
+  }, [drivers, customers, operationTypes, importedOs, user, onRefresh]);
+
   const filteredTrips = useMemo(() => {
     let result = [...trips];
     if (activeStatusTab === 'ativas') {
@@ -287,37 +404,30 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Toggle Operações / SIL */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setOpView('ops')}
-          className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${opView === 'ops' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-        >
-          Painel Operacional
-        </button>
-        <button
-          onClick={() => setOpView('sil')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${opView === 'sil' ? 'bg-[#001e50] text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-        >
-          <span className={`text-[8px] font-black italic px-1.5 py-0.5 rounded ${opView === 'sil' ? 'bg-white text-[#001e50]' : 'bg-slate-300 text-white'}`}>SIL</span>
-          Programações Opentech
-        </button>
-      </div>
-
-      {opView === 'sil' && (
-        <SILMonitoringView
-          trips={trips}
-          drivers={drivers}
-          customers={customers}
-          onUpdateTrip={async (t) => { await db.saveTrip(t, user); onRefresh(); }}
-        />
+      {lastSilImport && (
+        <div className="flex items-center gap-3 px-5 py-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl">
+          <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span className="text-[10px] font-black text-emerald-700 uppercase">
+            <span className="italic text-[8px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded mr-2">SIL</span>
+            {lastSilImport.linked} programaç{lastSilImport.linked !== 1 ? 'ões' : 'ão'} importada{lastSilImport.linked !== 1 ? 's' : ''} e vinculadas
+            {lastSilImport.unlinked > 0 && ` · ${lastSilImport.unlinked} sem OS no sistema`}
+          </span>
+          <button onClick={() => setLastSilImport(null)} className="ml-auto text-emerald-400 hover:text-emerald-700 transition-colors text-sm leading-none">✕</button>
+        </div>
       )}
 
-      {opView === 'ops' && <>
+      <>
       <div className="flex flex-col lg:flex-row justify-between items-end gap-6">
         <div className="flex-1 w-full"><CategoryNavigation availableOps={availableOps} onNavigate={setActiveView} /></div>
-        <div className="flex items-end gap-4 w-full lg:w-auto">
-           <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
+        <div className="flex items-end gap-3 w-full lg:w-auto">
+          <button
+            onClick={() => setIsSilImporterOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#001e50] text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-950 transition-all shadow-lg shrink-0"
+          >
+            <span className="text-[7px] font-black italic bg-white text-[#001e50] px-1.5 py-0.5 rounded leading-none">SIL</span>
+            Importar Programações
+          </button>
+          <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
         </div>
       </div>
 
@@ -433,7 +543,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
            />
         </div>
       </div>
-      </>}
+      </>
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
@@ -534,6 +644,16 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
              </div>
           </div>
         </div>
+      )}
+
+      {isSilImporterOpen && (
+        <SILExcelImporter
+          isOpen={isSilImporterOpen}
+          onClose={() => setIsSilImporterOpen(false)}
+          trips={trips}
+          importedOs={importedOs}
+          onImport={handleSilImport}
+        />
       )}
 
       <style>{`
