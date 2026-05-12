@@ -13,8 +13,8 @@ interface DateTimePickerProps {
   required?: boolean;
 }
 
-const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const DAYS_PT   = ['D','S','T','Q','Q','S','S'];
+const MONTHS_PT  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DAYS_PT    = ['D','S','T','Q','Q','S','S'];
 const QUICK_TIMES = ['06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00'];
 
 const offsetDate = (n: number): string => {
@@ -23,11 +23,12 @@ const offsetDate = (n: number): string => {
   return localDateStr(d);
 };
 
+// Default hour 0 (not 8) so arrows start from 00:00
 const parseDateTime = (v: string) => {
-  if (!v) return { date: '', hour: 8, minute: 0 };
+  if (!v) return { date: '', hour: 0, minute: 0 };
   const [datePart, timePart] = v.split('T');
-  const [h, m] = (timePart || '08:00').split(':');
-  return { date: datePart || '', hour: parseInt(h) || 8, minute: parseInt(m) || 0 };
+  const [h, m] = (timePart || '00:00').split(':');
+  return { date: datePart || '', hour: parseInt(h) || 0, minute: parseInt(m) || 0 };
 };
 
 /** YYYY-MM-DDTHH:MM  →  DD/MM/AAAA HH:MM */
@@ -40,26 +41,90 @@ const toDisplay = (v: string) => {
   return `${d}/${mo}/${y}${timeStr}`;
 };
 
+/**
+ * Applies the mask DD/MM/AAAA HH:MM to a raw string of digits.
+ * Accepts only digits, auto-inserts separators, clamps each field to its max value.
+ *   Day  01–31 | Month 01–12 | Year 4 digits | Hour 00–23 | Minute 00–59
+ */
+const applyDateMask = (raw: string): string => {
+  // Strip every non-digit and cap at 12 digits (2+2+4+2+2)
+  const d = raw.replace(/\D/g, '').slice(0, 12);
+  let r = '';
+  let i = 0;
+
+  // ── Day ─────────────────────────────
+  if (i >= d.length) return r;
+  let d0 = parseInt(d[i++]);
+  if (d0 > 3) d0 = 3;            // first digit: 0-3
+  r += d0;
+
+  if (i >= d.length) return r;
+  let d1 = parseInt(d[i++]);
+  const day = d0 * 10 + d1;
+  if (day > 31) d1 = 1;          // 32-39 → clamp to _1
+  if (day === 0) d1 = 1;         // 00 → 01
+  r += d1 + '/';
+
+  // ── Month ────────────────────────────
+  if (i >= d.length) return r;
+  let m0 = parseInt(d[i++]);
+  if (m0 > 1) m0 = 1;            // first digit: 0-1
+  r += m0;
+
+  if (i >= d.length) return r;
+  let m1 = parseInt(d[i++]);
+  const month = m0 * 10 + m1;
+  if (month > 12) m1 = 2;        // 13-19 → clamp to _2
+  if (month === 0) m1 = 1;       // 00 → 01
+  r += m1 + '/';
+
+  // ── Year (4 digits) ──────────────────
+  for (let j = 0; j < 4 && i < d.length; j++, i++) r += d[i];
+  if (i < 8 && d.length >= 8) return r;   // year still being typed
+  if (d.length < 8) return r;             // year not finished yet
+  r += ' ';
+
+  // ── Hour ─────────────────────────────
+  if (i >= d.length) return r;
+  let h0 = parseInt(d[i++]);
+  if (h0 > 2) h0 = 2;            // first digit: 0-2
+  r += h0;
+
+  if (i >= d.length) return r;
+  let h1 = parseInt(d[i++]);
+  const hr = h0 * 10 + h1;
+  if (hr > 23) h1 = 3;           // 24-29 → clamp to _3
+  r += h1 + ':';
+
+  // ── Minute ───────────────────────────
+  if (i >= d.length) return r;
+  let min0 = parseInt(d[i++]);
+  if (min0 > 5) min0 = 5;        // first digit: 0-5
+  r += min0;
+
+  if (i >= d.length) return r;
+  r += d[i];                     // second digit 0-9, always valid
+
+  return r;
+};
+
 /** DD/MM/AAAA HH:MM  →  YYYY-MM-DDTHH:MM  (returns '' on invalid) */
-const fromManual = (s: string): string => {
+const fromDisplay = (s: string): string => {
   const clean = s.trim();
-  const match = clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[\s,]+(\d{1,2}):(\d{2}))?$/);
+  const match = clean.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?$/);
   if (!match) return '';
-  const [, d, mo, y, hh, mm] = match;
-  const date = `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
-  if (hh !== undefined) {
-    const h = Math.min(23, Math.max(0, parseInt(hh)));
-    const m = Math.min(59, Math.max(0, parseInt(mm)));
-    return `${date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-  }
-  return `${date}T08:00`;
+  const [, d, mo, y, hh = '00', mm = '00'] = match;
+  const date = `${y}-${mo}-${d}`;
+  const h = Math.min(23, parseInt(hh));
+  const m = Math.min(59, parseInt(mm));
+  return `${date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 };
 
 const DateTimePicker: React.FC<DateTimePickerProps> = ({
   value, onChange, placeholder, className, inputClassName, minDate, maxDate,
 }) => {
-  const today   = new Date();
-  const parsed  = parseDateTime(value);
+  const today  = new Date();
+  const parsed = parseDateTime(value);
 
   const [isOpen,         setIsOpen]         = useState(false);
   const [viewYear,       setViewYear]        = useState(() => parsed.date ? parseInt(parsed.date.slice(0, 4)) : today.getFullYear());
@@ -71,9 +136,11 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   const [manualError,    setManualError]     = useState(false);
   const [popupStyle,     setPopupStyle]      = useState<React.CSSProperties>({ top: '100%', left: 0, marginTop: 8 });
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef  = useRef<HTMLDivElement>(null);
+  const manualRef     = useRef<HTMLInputElement>(null);
+  const prevDigitsRef = useRef('');
 
-  // Sync internal state when value changes externally
+  // Sync when value changes externally
   useEffect(() => {
     const p = parseDateTime(value);
     if (p.date) {
@@ -83,43 +150,29 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     setHour(p.hour);
     setMinute(p.minute);
     setManualInput(toDisplay(value));
+    prevDigitsRef.current = value.replace(/\D/g, '');
   }, [value]);
 
-  // Compute popup position when opening
+  // Compute popup position after opening
   useEffect(() => {
     if (!isOpen || !containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const vh   = window.innerHeight;
-    const vw   = window.innerWidth;
+    const rect  = containerRef.current.getBoundingClientRect();
+    const vh    = window.innerHeight;
+    const vw    = window.innerWidth;
     const POP_W = 480;
-    const POP_H = 400;
-
+    const POP_H = 410;
     const style: React.CSSProperties = {};
 
-    // Vertical: prefer below, fallback above
-    const spaceBelow = vh - rect.bottom - 8;
-    const spaceAbove = rect.top - 8;
-    if (spaceBelow >= POP_H || spaceBelow >= spaceAbove) {
-      style.top    = '100%';
-      style.bottom = 'auto';
-      style.marginTop    = 8;
-      style.marginBottom = 0;
+    // Vertical
+    if (vh - rect.bottom - 8 >= POP_H || vh - rect.bottom >= rect.top) {
+      style.top = '100%'; style.bottom = 'auto'; style.marginTop = 8; style.marginBottom = 0;
     } else {
-      style.bottom = '100%';
-      style.top    = 'auto';
-      style.marginBottom = 8;
-      style.marginTop    = 0;
+      style.bottom = '100%'; style.top = 'auto'; style.marginBottom = 8; style.marginTop = 0;
     }
 
-    // Horizontal: prefer left-aligned, fallback right-aligned
-    if (rect.left + POP_W <= vw) {
-      style.left  = 0;
-      style.right = 'auto';
-    } else {
-      style.right = 0;
-      style.left  = 'auto';
-    }
+    // Horizontal
+    if (rect.left + POP_W <= vw) { style.left = 0; style.right = 'auto'; }
+    else                          { style.right = 0; style.left = 'auto'; }
 
     setPopupStyle(style);
   }, [isOpen]);
@@ -128,8 +181,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   useEffect(() => {
     const onMouse = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-        setShowYearPicker(false);
+        setIsOpen(false); setShowYearPicker(false);
       }
     };
     const onKey = (e: KeyboardEvent) => {
@@ -143,7 +195,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     };
   }, []);
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Core helpers ────────────────────────────────────────────────────────────
   const buildValue = (date: string, h: number, m: number) =>
     date ? `${date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` : '';
 
@@ -157,14 +209,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     setShowYearPicker(false);
   };
 
-  const selectQuickDate = (offset: number) => {
-    const date = offsetDate(offset);
-    emit(date, hour, minute);
-  };
+  const selectQuickDate = (offset: number) => emit(offsetDate(offset), hour, minute);
 
   const applyHour = (h: number) => {
-    // Clamp 0–23 (no negatives, no overflow)
-    const safe = ((h % 24) + 24) % 24;
+    const safe = ((h % 24) + 24) % 24;   // wrap 0↔23, never negative
     setHour(safe);
     if (parsed.date) emit(parsed.date, safe, minute);
   };
@@ -181,36 +229,36 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     if (parsed.date) emit(parsed.date, h, m);
   };
 
-  // Hour: always wraps 0↔23, no negatives
-  const incHour = () => applyHour(hour + 1);
-  const decHour = () => applyHour(hour - 1);
+  const incHour   = () => applyHour(hour + 1);
+  const decHour   = () => applyHour(hour - 1);
 
-  // Minute: if NOT on a multiple of 5 → step by 1 toward nearest multiple; else step by 5
-  const incMinute = () => {
-    if (minute % 5 !== 0) {
-      applyMinute(minute + 1);           // step +1 until we hit a multiple of 5
-    } else {
-      applyMinute(minute + 5);           // already aligned → jump 5
-    }
-  };
-  const decMinute = () => {
-    if (minute % 5 !== 0) {
-      applyMinute(minute - 1);           // step -1 until we hit a multiple of 5
-    } else {
-      applyMinute(minute - 5);           // already aligned → jump 5
-    }
+  // Smart minute: if not on multiple-of-5 → step 1 toward it; else step 5
+  const incMinute = () => applyMinute(minute % 5 !== 0 ? minute + 1 : minute + 5);
+  const decMinute = () => applyMinute(minute % 5 !== 0 ? minute - 1 : minute - 5);
+
+  // ── Masked manual input ────────────────────────────────────────────────────
+  const handleManualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw      = e.target.value;
+    const newDigits = raw.replace(/\D/g, '');
+    const oldDigits = prevDigitsRef.current;
+
+    // If the user deleted a separator (same digit count, shorter string) → remove last digit too
+    const digitsToUse =
+      newDigits === oldDigits && raw.length < manualInput.length
+        ? newDigits.slice(0, -1)
+        : newDigits;
+
+    prevDigitsRef.current = digitsToUse;
+    const masked = applyDateMask(digitsToUse);
+    setManualInput(masked);
+    setManualError(false);
   };
 
-  // ── Manual input ───────────────────────────────────────────────────────────
-  const commitManual = (raw: string) => {
-    if (!raw.trim()) { onChange(''); setManualError(false); return; }
-    const result = fromManual(raw);
-    if (result) {
-      onChange(result);
-      setManualError(false);
-    } else {
-      setManualError(true);
-    }
+  const commitManual = () => {
+    if (!manualInput.trim()) { onChange(''); setManualError(false); return; }
+    const result = fromDisplay(manualInput);
+    if (result) { onChange(result); setManualError(false); }
+    else        { setManualError(true); }
   };
 
   // ── Calendar helpers ───────────────────────────────────────────────────────
@@ -219,11 +267,9 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   const yearRange       = Array.from({ length: 21 }, (_, i) => today.getFullYear() - 5 + i);
 
   const isSelected = (d: number) => {
-    const mo = String(viewMonth + 1).padStart(2,'0');
-    const dy = String(d).padStart(2,'0');
-    return parsed.date === `${viewYear}-${mo}-${dy}`;
+    const iso = `${viewYear}-${String(viewMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    return parsed.date === iso;
   };
-
   const isTodayCell = (d: number) =>
     d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
 
@@ -253,8 +299,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     inputClassName ?? '',
   ].join(' ');
 
-  // Shared arrow button style
-  const arrowBtn = "w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-all";
+  const arrowBtn = 'w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-all';
 
   return (
     <div ref={containerRef} className={`relative ${className ?? ''}`}>
@@ -278,13 +323,13 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
           className="absolute z-[600] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
           style={{ width: 480, ...popupStyle }}
         >
-          {/* ── Two-column layout: LEFT = calendar  |  RIGHT = time ── */}
+          {/* Two-column: LEFT = calendar | RIGHT = time */}
           <div className="flex">
 
             {/* ════ LEFT: Calendar ════ */}
             <div className="flex-1 min-w-0 border-r border-slate-100">
 
-              {/* Quick date shortcuts */}
+              {/* Quick shortcuts */}
               <div className="flex gap-1.5 p-3 border-b border-slate-100 bg-slate-50/60">
                 {([[-1,'Ontem'],[0,'Hoje'],[1,'Amanhã']] as [number,string][]).map(([offset, label]) => (
                   <button key={label} type="button" onClick={() => selectQuickDate(offset)}
@@ -299,7 +344,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
               {!showYearPicker ? (
                 <>
-                  {/* Month / Year nav */}
+                  {/* Month/Year nav */}
                   <div className="flex items-center justify-between px-3 py-2">
                     <button type="button" onClick={prevMonth}
                       className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
@@ -345,7 +390,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                   </div>
                 </>
               ) : (
-                /* Year / Month picker */
+                /* Year/Month picker */
                 <div className="p-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Selecionar Ano</span>
@@ -382,10 +427,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Horário</p>
 
-              {/* Hour : Minute columns */}
+              {/* Hour : Minute */}
               <div className="flex items-center gap-2">
 
-                {/* Hour column */}
+                {/* Hour */}
                 <div className="flex flex-col items-center gap-1">
                   <button type="button" onClick={incHour} className={arrowBtn}>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"/></svg>
@@ -401,7 +446,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
                 <span className="text-[22px] font-black text-slate-300 mb-5 select-none">:</span>
 
-                {/* Minute column */}
+                {/* Minute */}
                 <div className="flex flex-col items-center gap-1">
                   <button type="button" onClick={incMinute} className={arrowBtn}>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"/></svg>
@@ -440,18 +485,21 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             </div>
           </div>
 
-          {/* ── Bottom: Manual text input + actions ── */}
+          {/* ── Bottom: Masked manual input + actions ── */}
           <div className="px-3 pb-3 pt-2 border-t border-slate-100 flex items-center gap-2">
 
-            {/* Manual input */}
+            {/* Masked input: only digits accepted, auto-formats DD/MM/AAAA HH:MM */}
             <div className="flex-1 relative">
               <input
+                ref={manualRef}
                 type="text"
+                inputMode="numeric"
                 value={manualInput}
-                onChange={e => { setManualInput(e.target.value); setManualError(false); }}
-                onBlur={e  => commitManual(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitManual(manualInput); } }}
+                onChange={handleManualChange}
+                onBlur={commitManual}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitManual(); } }}
                 placeholder="DD/MM/AAAA HH:MM"
+                maxLength={16}
                 className={`w-full px-3 py-2 rounded-xl border text-[10px] font-mono font-bold outline-none transition-all
                   ${manualError
                     ? 'border-red-400 bg-red-50 text-red-700 focus:ring-1 focus:ring-red-400'
@@ -469,7 +517,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             {value && (
               <button
                 type="button"
-                onClick={() => { onChange(''); setManualInput(''); setManualError(false); setIsOpen(false); }}
+                onClick={() => { onChange(''); setManualInput(''); setManualError(false); prevDigitsRef.current = ''; setIsOpen(false); }}
                 className="px-3 py-2 rounded-xl text-[8px] font-black uppercase text-slate-400 border border-slate-200 hover:bg-slate-50 transition-colors whitespace-nowrap"
               >
                 Limpar
