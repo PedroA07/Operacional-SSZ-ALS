@@ -405,9 +405,9 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                           <input
                             type="text"
                             value={e.lastLocation}
-                            onChange={ev => patchEdit(driver.id, { lastLocation: ev.target.value }, e)}
-                            placeholder="Ex: Santos → São Paulo"
-                            className="text-[9px] font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm w-44 placeholder:text-slate-300"
+                            onChange={ev => patchEdit(driver.id, { lastLocation: ev.target.value.toUpperCase() }, e)}
+                            placeholder="EX: SANTOS → SÃO PAULO"
+                            className="text-[9px] font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm w-44 placeholder:text-slate-300 uppercase"
                           />
                         </td>
 
