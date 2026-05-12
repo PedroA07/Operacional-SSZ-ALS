@@ -305,7 +305,12 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       </div>
 
       {opView === 'sil' && (
-        <SILMonitoringView drivers={drivers} customers={customers} />
+        <SILMonitoringView
+          trips={trips}
+          drivers={drivers}
+          customers={customers}
+          onUpdateTrip={async (t) => { await db.saveTrip(t, user); onRefresh(); }}
+        />
       )}
 
       {opView === 'ops' && <>
