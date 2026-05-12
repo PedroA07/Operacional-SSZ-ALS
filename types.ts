@@ -405,6 +405,18 @@ export interface CustomStatus {
   operationalOnly?: boolean;  // Visível apenas no painel operacional (não para motoristas)
 }
 
+export interface BotGroup {
+  id: string;
+  jid: string;
+  name: string;
+  type: 'driver' | 'internal' | 'admin';
+  driverId: string | null;
+  driverName: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Trip {
   id: string;
   os: string;

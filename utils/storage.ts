@@ -3,7 +3,8 @@ import {
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category,
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
-  LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest
+  LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
+  BotGroup
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1240,5 +1241,49 @@ export const db = {
       status: r.status,
       createdAt: r.created_at,
     }));
+  },
+
+  // ── Grupos do WhatsApp (ALS BOT) ───────────────────────────────────────────
+
+  getBotGroups: async (): Promise<BotGroup[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('bot_groups')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) { console.error('[getBotGroups]', error.message); return []; }
+    return (data || []).map(g => ({
+      id: g.id,
+      jid: g.jid,
+      name: g.name || g.jid,
+      type: g.type || 'internal',
+      driverId: g.driver_id || null,
+      driverName: g.driver_name || null,
+      active: g.active === true,
+      createdAt: g.created_at,
+      updatedAt: g.updated_at,
+    }));
+  },
+
+  saveBotGroup: async (group: Partial<BotGroup> & { jid: string }): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('bot_groups').upsert({
+      jid: group.jid,
+      name: group.name || group.jid,
+      type: group.type || 'internal',
+      driver_id: group.driverId || null,
+      driver_name: group.driverName || null,
+      active: group.active ?? false,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'jid' });
+    if (error) { console.error('[saveBotGroup]', error.message); return false; }
+    return true;
+  },
+
+  deleteBotGroup: async (jid: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('bot_groups').delete().eq('jid', jid);
+    if (error) { console.error('[deleteBotGroup]', error.message); return false; }
+    return true;
   },
 };

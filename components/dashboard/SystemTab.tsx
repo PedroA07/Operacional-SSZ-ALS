@@ -8,6 +8,7 @@ import ColetaTiposViagemManager from './admin/ColetaTiposViagemManager';
 import CategoryManager from './admin/CategoryManager';
 import OperationTypesManager from './admin/OperationTypesManager';
 import ExternalUsersManager from './third-party/ExternalUsersManager';
+import BotGroupsManager from './admin/BotGroupsManager';
 
 interface SystemTabProps {
   onRefresh: () => Promise<void>;
@@ -146,6 +147,8 @@ const SystemTab: React.FC<SystemTabProps> = ({ onRefresh, driversCount, customer
       <StatusManager />
 
       <ColetaTiposViagemManager />
+
+      <BotGroupsManager />
 
       <ExternalUsersManager onRefresh={onRefresh} />
 
