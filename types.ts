@@ -366,6 +366,7 @@ export interface TripDocument {
 }
 
 export interface FreightContractDoc extends TripDocument {
+  expiresAt?: string; // ISO string — 90 dias após uploadDate
   parsedData?: {
     prevTermino?: string;
     localidade?: string;

@@ -300,6 +300,19 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     });
   };
 
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const isExpired = (doc: FreightContractDoc) =>
+    doc.expiresAt ? new Date(doc.expiresAt) < new Date() : false;
+
+  const activeDocs = (t: Trip): FreightContractDoc[] => {
+    const docs: FreightContractDoc[] = t.freightContractDocs?.length
+      ? t.freightContractDocs
+      : t.freightContractDoc
+        ? [t.freightContractDoc as FreightContractDoc]
+        : [];
+    return docs.filter(d => !isExpired(d));
+  };
+
   // ── Trips queue ──────────────────────────────────────────────────────────────
   const eligibleTrips = trips.filter(t =>
     (t.isCompleted || t.status === 'Viagem concluída') &&
@@ -349,11 +362,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     {
       key: 'contract_status', label: '5. Contratos de Frete',
       render: (t: Trip) => {
-        const allDocs: FreightContractDoc[] = t.freightContractDocs?.length
-          ? t.freightContractDocs
-          : t.freightContractDoc
-            ? [t.freightContractDoc as FreightContractDoc]
-            : [];
+        const allDocs = activeDocs(t);
 
         if (dropzoneOpen === t.id) {
           return (
@@ -377,10 +386,15 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                   <path strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[9px] font-black text-emerald-700 uppercase">Contrato {idx + 1}</span>
                     <button onClick={() => window.open(doc.url, '_blank')}
                       className="text-[8px] font-black text-blue-500 hover:underline">Ver PDF</button>
+                    {doc.expiresAt && (
+                      <span className="text-[7px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5">
+                        Expira {new Date(doc.expiresAt).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
                   </div>
                   {doc.parsedData && (
                     <div className="grid grid-cols-2 gap-x-3 mt-1">

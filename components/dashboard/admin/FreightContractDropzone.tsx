@@ -103,12 +103,16 @@ const FreightContractDropzone: React.FC<Props> = ({ tripOS, existingDocs, onDone
       patch(entry.id, { status: 'uploading' });
       try {
         const url = await fileStorage.uploadFreightContract(entry.file, tripOS, startIdx + i);
+        const uploadDate = new Date();
+        const expiresAt = new Date(uploadDate);
+        expiresAt.setDate(expiresAt.getDate() + 90);
         const doc: FreightContractDoc = {
           id: entry.id,
           type: 'CONTRATO_FRETE',
           url,
           fileName: entry.file.name,
-          uploadDate: new Date().toISOString(),
+          uploadDate: uploadDate.toISOString(),
+          expiresAt: expiresAt.toISOString(),
           parsedData: {
             prevTermino: entry.parsed.prevTermino || undefined,
             localidade: entry.parsed.localidade || undefined,

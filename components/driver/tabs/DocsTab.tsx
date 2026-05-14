@@ -26,14 +26,16 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips, driver }) => {
   const [keyError, setKeyError] = useState(false);
 
   const freightContracts = useMemo<ContractItem[]>(() => {
+    const now = new Date();
     const items: ContractItem[] = [];
     for (const t of trips) {
-      // Prioriza freightContractDocs (múltiplos); cai para freightContractDoc legado
-      const docs: FreightContractDoc[] = t.freightContractDocs?.length
+      const allDocs: FreightContractDoc[] = t.freightContractDocs?.length
         ? t.freightContractDocs
         : t.freightContractDoc
           ? [t.freightContractDoc as FreightContractDoc]
           : [];
+      // Exclui documentos expirados
+      const docs = allDocs.filter(d => !d.expiresAt || new Date(d.expiresAt) > now);
       docs.forEach((doc, idx) => {
         items.push({ os: t.os, customer: t.customer.name, doc, index: idx + 1, total: docs.length });
       });
