@@ -10,7 +10,11 @@ interface IbgeCity {
   nome: string;
   microrregiao?: { mesorregiao: { UF: { sigla: string } } };
 }
-type CityEntry = { name: string; uf: string };
+type CityEntry = { name: string; uf: string; norm: string };
+
+// Strip accents for accent-insensitive search
+const accentFree = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 
 let _cities: CityEntry[] | null = null; // null=not fetched, []=error/empty
 let _fetching = false;
@@ -23,7 +27,10 @@ function ensureCitiesLoaded() {
     .then((data: IbgeCity[]) => {
       _cities = data
         .filter(c => c.microrregiao?.mesorregiao?.UF?.sigla)
-        .map(c => ({ name: c.nome.toUpperCase(), uf: c.microrregiao!.mesorregiao.UF.sigla }));
+        .map(c => {
+          const name = c.nome.toUpperCase();
+          return { name, uf: c.microrregiao!.mesorregiao.UF.sigla, norm: accentFree(c.nome) };
+        });
     })
     .catch(() => { _cities = []; })
     .finally(() => {
@@ -47,15 +54,11 @@ const CitySearch: React.FC<{ value: string; onChange: (v: string) => void }> = (
   useEffect(() => {
     const handler = () => {
       setLoading(false);
-      const q = queryRef.current;
-      if (q && _cities && _cities.length > 0) {
-        const norm = q.toUpperCase().trim();
-        setResults(_cities.filter(c => c.name.includes(norm)).slice(0, 10));
-      }
+      if (queryRef.current) runSearch(queryRef.current);
     };
     window.addEventListener('ibge:ready', handler);
     return () => window.removeEventListener('ibge:ready', handler);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const fn = (e: MouseEvent) => {
@@ -67,8 +70,15 @@ const CitySearch: React.FC<{ value: string; onChange: (v: string) => void }> = (
 
   const runSearch = (q: string) => {
     if (!q.trim() || !_cities || !_cities.length) { setResults([]); return; }
-    const norm = q.toUpperCase().trim();
-    setResults(_cities.filter(c => c.name.includes(norm)).slice(0, 10));
+    // Split query: last token treated as UF filter if it's exactly 2 letters
+    const parts = q.trim().toUpperCase().split(/\s+/);
+    const lastPart = parts[parts.length - 1];
+    const ufFilter = parts.length >= 2 && /^[A-Z]{2}$/.test(lastPart) ? lastPart : '';
+    const nameQ = accentFree(ufFilter ? parts.slice(0, -1).join(' ') : q);
+    if (!nameQ) { setResults([]); return; }
+    let hits = _cities.filter(c => c.norm.includes(nameQ));
+    if (ufFilter) hits = hits.filter(c => c.uf === ufFilter);
+    setResults(hits.slice(0, 12));
   };
 
   const handleInput = (raw: string) => {
