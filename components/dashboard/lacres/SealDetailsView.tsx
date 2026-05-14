@@ -5,13 +5,15 @@ import ExcelJS from 'exceljs';
 import { excelSealStyles } from '../../../utils/excelSealStyles';
 import { excelSealFormulas } from '../../../utils/excelSealFormulas';
 import DatePicker from '../../shared/DatePicker';
+import SmartOperationTable from '../operations/SmartOperationTable';
 
 interface SealDetailsViewProps {
   batch: SealBatch;
   onBack: () => void;
+  userId: string;
 }
 
-const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
+const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack, userId }) => {
   const [records, setRecords] = useState<SealRecord[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -268,6 +270,89 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
 
   const inputClass = "w-full bg-transparent border-none text-[10px] font-bold text-slate-700 uppercase focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 outline-none transition-all placeholder:text-slate-200";
 
+  const columns = [
+    {
+      key: 'audit',
+      label: 'Audit',
+      sortable: false,
+      width: 60,
+      render: (r: SealRecord) => (
+        <div className="flex justify-center py-1">
+          {savingId === r.id ? (
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          ) : r.containerNumber ? (
+            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div>
+          ) : (
+            <div className="w-2.5 h-2.5 rounded-full bg-slate-200"></div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'sealNumber',
+      label: 'Identificação Lacre',
+      sortable: true,
+      width: 160,
+      render: (r: SealRecord) => (
+        <span className="text-[12px] font-black text-slate-800 font-mono tracking-tighter">{r.sealNumber}</span>
+      ),
+    },
+    {
+      key: 'containerNumber',
+      label: 'Equipamento (Container)',
+      sortable: true,
+      render: (r: SealRecord) => (
+        <input
+          className={`${inputClass} !bg-slate-50/40 text-[11px] font-black text-blue-700`}
+          value={r.containerNumber || ''}
+          onChange={e => handleUpdate(r.id, 'containerNumber', e.target.value.toUpperCase())}
+          placeholder="----"
+        />
+      ),
+    },
+    {
+      key: 'booking',
+      label: 'Referência (Booking)',
+      sortable: true,
+      render: (r: SealRecord) => (
+        <input
+          className={inputClass}
+          value={r.booking || ''}
+          onChange={e => handleUpdate(r.id, 'booking', e.target.value.toUpperCase())}
+          placeholder="----"
+        />
+      ),
+    },
+    {
+      key: 'reuseDate',
+      label: 'Data Uso',
+      sortable: true,
+      width: 170,
+      render: (r: SealRecord) => (
+        <DatePicker value={r.reuseDate || ''} onChange={v => handleUpdate(r.id, 'reuseDate', v)} placeholder="Data reuso..." />
+      ),
+    },
+    {
+      key: 'driverName',
+      label: 'Recurso (Motorista)',
+      sortable: true,
+      render: (r: SealRecord) => (
+        <>
+          <input
+            list={`drv-list-${batch.id}`}
+            className={inputClass}
+            value={r.driverName || ''}
+            onChange={e => handleUpdate(r.id, 'driverName', e.target.value.toUpperCase())}
+            placeholder="DIGITE NOME..."
+          />
+          <datalist id={`drv-list-${batch.id}`}>
+            {drivers.map(d => <option key={d.id} value={d.name}>{d.plateHorse}</option>)}
+          </datalist>
+        </>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
       <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col xl:flex-row items-center justify-between gap-6">
@@ -330,61 +415,14 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack }) => {
         </div>
       </div>
 
-      <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-           <table className="w-full text-left border-collapse min-w-[1200px]">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                 <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                    <th className="px-8 py-6 w-24 text-center">Audit</th>
-                    <th className="px-8 py-6 bg-blue-50/20 text-blue-600 w-40">Identificação Lacre</th>
-                    <th className="px-8 py-6">Equipamento (Container)</th>
-                    <th className="px-8 py-6">Referência (Booking)</th>
-                    <th className="px-8 py-6">Data Uso</th>
-                    <th className="px-8 py-6">Recurso (Motorista)</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                 {filteredRecords.map((r, idx) => (
-                   <tr key={r.id} className={`hover:bg-blue-50/10 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/5'}`}>
-                      <td className="px-8 py-4 text-center">
-                         {savingId === r.id ? (
-                           <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                         ) : r.containerNumber ? (
-                           <div className="w-3 h-3 rounded-full bg-emerald-500 mx-auto shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div>
-                         ) : (
-                           <div className="w-2.5 h-2.5 rounded-full bg-slate-200 mx-auto"></div>
-                         )}
-                      </td>
-                      <td className="px-8 py-4">
-                        <span className="text-[12px] font-black text-slate-800 font-mono tracking-tighter">{r.sealNumber}</span>
-                      </td>
-                      <td className="px-8 py-4">
-                        <input className={`${inputClass} !bg-slate-50/40 text-[11px] font-black text-blue-700`} value={r.containerNumber || ''} onChange={e => handleUpdate(r.id, 'containerNumber', e.target.value.toUpperCase())} placeholder="----" />
-                      </td>
-                      <td className="px-8 py-4">
-                        <input className={inputClass} value={r.booking || ''} onChange={e => handleUpdate(r.id, 'booking', e.target.value.toUpperCase())} placeholder="----" />
-                      </td>
-                      <td className="px-8 py-4">
-                        <DatePicker value={r.reuseDate || ''} onChange={v => handleUpdate(r.id, 'reuseDate', v)} placeholder="Data reuso..." />
-                      </td>
-                      <td className="px-8 py-4">
-                        <input 
-                          list={`drv-list-${batch.id}`}
-                          className={inputClass}
-                          value={r.driverName || ''}
-                          onChange={e => handleUpdate(r.id, 'driverName', e.target.value.toUpperCase())}
-                          placeholder="DIGITE NOME..."
-                        />
-                        <datalist id={`drv-list-${batch.id}`}>
-                           {drivers.map(d => <option key={d.id} value={d.name}>{d.plateHorse}</option>)}
-                        </datalist>
-                      </td>
-                   </tr>
-                 ))}
-              </tbody>
-           </table>
-        </div>
-      </div>
+      <SmartOperationTable
+        userId={userId}
+        componentId="seal-details-records"
+        columns={columns}
+        data={filteredRecords}
+        hideInternalSearch
+        noMaxHeight
+      />
     </div>
   );
 };

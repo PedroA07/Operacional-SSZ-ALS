@@ -371,6 +371,145 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     },
   ];
 
+  // ── Recipients columns ────────────────────────────────────────────────────────
+  const recipientColumns = [
+    {
+      key: 'name',
+      label: 'Motorista',
+      sortable: true,
+      sortValue: (d: Driver) => d.name,
+      render: (driver: Driver) => (
+        <div className="flex flex-col">
+          <span className="font-black text-slate-800 text-[10px] uppercase">{driver.name}</span>
+          <div className="flex gap-1 mt-1">
+            <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">{driver.plateHorse}</span>
+            {driver.plateTrailer && <span className="bg-slate-100 text-slate-500 border border-slate-200 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">{driver.plateTrailer}</span>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'beneficiary',
+      label: 'Beneficiário',
+      sortable: false,
+      render: (driver: Driver) => (
+        driver.beneficiaryName ? (
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-700 text-[10px] uppercase leading-tight">{driver.beneficiaryName}</span>
+            {driver.beneficiaryCnpj && (
+              <span className="text-[8px] text-slate-400 font-bold mt-0.5 font-mono">{formatDoc(driver.beneficiaryCnpj)}</span>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-500 text-[10px] uppercase leading-tight">{driver.name}</span>
+            <span className="text-[8px] text-blue-400 font-black italic mt-0.5">próprio</span>
+          </div>
+        )
+      ),
+    },
+    {
+      key: 'sendTo',
+      label: 'Enviar para',
+      sortable: false,
+      render: (driver: Driver) => {
+        const e = getEdit(driver);
+        return (
+          <select
+            value={e.sendTo}
+            onChange={ev => patchEdit(driver.id, { sendTo: ev.target.value as SendTo }, e)}
+            className="text-[9px] font-black uppercase bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer shadow-sm"
+          >
+            <option value="driver">Motorista</option>
+            <option value="beneficiary" disabled={!driver.beneficiaryPhone}>
+              Beneficiário{!driver.beneficiaryPhone ? ' (sem tel.)' : ''}
+            </option>
+            <option value="group" disabled={!driver.whatsappGroupLink && !driver.whatsappGroupName}>
+              Grupo (ambos){!driver.whatsappGroupLink && !driver.whatsappGroupName ? ' (não config.)' : ''}
+            </option>
+          </select>
+        );
+      },
+    },
+    {
+      key: 'whatsapp',
+      label: 'WhatsApp',
+      sortable: false,
+      width: 150,
+      render: (driver: Driver) => {
+        const e = getEdit(driver);
+        return phoneLink(driver, e.sendTo);
+      },
+    },
+    {
+      key: 'lastDate',
+      label: 'Data Último Contrato',
+      sortable: true,
+      sortValue: (d: Driver) => d.lastFreightContractDate || '',
+      render: (driver: Driver) => {
+        const e = getEdit(driver);
+        return (
+          <DatePicker
+            value={e.lastDate}
+            onChange={val => patchEdit(driver.id, { lastDate: val }, e)}
+            placeholder="Selecionar..."
+            inputClassName="!py-2 !text-[9px] !rounded-xl"
+            className="w-36"
+          />
+        );
+      },
+    },
+    {
+      key: 'lastLocation',
+      label: 'Local Último Contrato',
+      sortable: true,
+      sortValue: (d: Driver) => d.lastFreightContractLocation || '',
+      render: (driver: Driver) => {
+        const e = getEdit(driver);
+        return (
+          <CitySearch
+            value={e.lastLocation}
+            onChange={val => patchEdit(driver.id, { lastLocation: val }, e)}
+          />
+        );
+      },
+    },
+    {
+      key: 'actions',
+      label: '',
+      sortable: false,
+      render: (driver: Driver) => {
+        const e = getEdit(driver);
+        const isDirty =
+          e.sendTo !== (driver.freightContractSendTo || 'driver') ||
+          e.lastDate !== (driver.lastFreightContractDate || '') ||
+          e.lastLocation !== (driver.lastFreightContractLocation || '');
+        return (
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => handleCopy(driver, e)} title="Copiar data · motorista · local"
+              className={`p-2 rounded-xl transition-all ${e.copied ? 'bg-emerald-100 text-emerald-600' : 'text-slate-300 hover:text-blue-500 hover:bg-blue-50'}`}>
+              {e.copied
+                ? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              }
+            </button>
+            <button onClick={() => handleSave(driver)}
+              disabled={e.saving || !isDirty || !onUpdateDriver}
+              className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-sm ${isDirty && !e.saving ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}>
+              {e.saving
+                ? <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                : 'Salvar'}
+            </button>
+            <button onClick={() => handleRemove(driver)} title="Remover da lista"
+              className="p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        );
+      },
+    },
+  ];
+
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -454,124 +593,14 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
               <p className="text-[9px] font-bold text-slate-300 mt-1">Clique em "Adicionar Motorista" para configurar os destinatários</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-3xl border border-slate-100 shadow-sm">
-              <table className="w-full min-w-[1100px]">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    {['Motorista', 'Beneficiário', 'Enviar para', 'WhatsApp', 'Data Último Contrato', 'Local Último Contrato', ''].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-[8px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {recipientDrivers.map((driver, idx) => {
-                    const e = getEdit(driver);
-                    const isDirty =
-                      e.sendTo !== (driver.freightContractSendTo || 'driver') ||
-                      e.lastDate !== (driver.lastFreightContractDate || '') ||
-                      e.lastLocation !== (driver.lastFreightContractLocation || '');
-
-                    return (
-                      <tr key={driver.id} className={`border-b border-slate-50 hover:bg-slate-50/60 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
-
-                        {/* Motorista */}
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col">
-                            <span className="font-black text-slate-800 text-[10px] uppercase">{driver.name}</span>
-                            <div className="flex gap-1 mt-1">
-                              <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">{driver.plateHorse}</span>
-                              {driver.plateTrailer && <span className="bg-slate-100 text-slate-500 border border-slate-200 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">{driver.plateTrailer}</span>}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Beneficiário — fallback para o próprio motorista */}
-                        <td className="px-4 py-3">
-                          {driver.beneficiaryName ? (
-                            <div className="flex flex-col">
-                              <span className="font-bold text-slate-700 text-[10px] uppercase leading-tight">{driver.beneficiaryName}</span>
-                              {driver.beneficiaryCnpj && (
-                                <span className="text-[8px] text-slate-400 font-bold mt-0.5 font-mono">{formatDoc(driver.beneficiaryCnpj)}</span>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex flex-col">
-                              <span className="font-bold text-slate-500 text-[10px] uppercase leading-tight">{driver.name}</span>
-                              <span className="text-[8px] text-blue-400 font-black italic mt-0.5">próprio</span>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Enviar para */}
-                        <td className="px-4 py-3">
-                          <select
-                            value={e.sendTo}
-                            onChange={ev => patchEdit(driver.id, { sendTo: ev.target.value as SendTo }, e)}
-                            className="text-[9px] font-black uppercase bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer shadow-sm"
-                          >
-                            <option value="driver">Motorista</option>
-                            <option value="beneficiary" disabled={!driver.beneficiaryPhone}>
-                              Beneficiário{!driver.beneficiaryPhone ? ' (sem tel.)' : ''}
-                            </option>
-                            <option value="group" disabled={!driver.whatsappGroupLink && !driver.whatsappGroupName}>
-                              Grupo (ambos){!driver.whatsappGroupLink && !driver.whatsappGroupName ? ' (não config.)' : ''}
-                            </option>
-                          </select>
-                        </td>
-
-                        {/* WhatsApp */}
-                        <td className="px-4 py-3 min-w-[130px]">
-                          {phoneLink(driver, e.sendTo)}
-                        </td>
-
-                        {/* Data */}
-                        <td className="px-4 py-3">
-                          <DatePicker
-                            value={e.lastDate}
-                            onChange={val => patchEdit(driver.id, { lastDate: val }, e)}
-                            placeholder="Selecionar..."
-                            inputClassName="!py-2 !text-[9px] !rounded-xl"
-                            className="w-36"
-                          />
-                        </td>
-
-                        {/* Local — busca de cidades */}
-                        <td className="px-4 py-3">
-                          <CitySearch
-                            value={e.lastLocation}
-                            onChange={val => patchEdit(driver.id, { lastLocation: val }, e)}
-                          />
-                        </td>
-
-                        {/* Ações */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => handleCopy(driver, e)} title="Copiar data · motorista · local"
-                              className={`p-2 rounded-xl transition-all ${e.copied ? 'bg-emerald-100 text-emerald-600' : 'text-slate-300 hover:text-blue-500 hover:bg-blue-50'}`}>
-                              {e.copied
-                                ? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
-                                : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                              }
-                            </button>
-                            <button onClick={() => handleSave(driver)}
-                              disabled={e.saving || !isDirty || !onUpdateDriver}
-                              className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-sm ${isDirty && !e.saving ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}>
-                              {e.saving
-                                ? <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                                : 'Salvar'}
-                            </button>
-                            <button onClick={() => handleRemove(driver)} title="Remover da lista"
-                              className="p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <SmartOperationTable
+              userId={userId}
+              componentId="admin-freight-recipients"
+              columns={recipientColumns}
+              data={recipientDrivers}
+              hideInternalSearch
+              noMaxHeight
+            />
           )}
         </div>
       )}

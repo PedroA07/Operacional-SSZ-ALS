@@ -5,7 +5,7 @@ import { db } from '../../utils/storage';
 import SealBatchModal from './lacres/SealBatchModal';
 import SealDetailsView from './lacres/SealDetailsView';
 
-const LacresTab: React.FC = () => {
+const LacresTab: React.FC<{ userId: string }> = ({ userId }) => {
   const [batches, setBatches] = useState<(SealBatch & { used: number, total: number })[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<SealBatch | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -109,7 +109,7 @@ const LacresTab: React.FC = () => {
            )}
         </div>
       ) : (
-        <SealDetailsView batch={selectedBatch} onBack={() => { setSelectedBatch(null); loadBatches(); }} />
+        <SealDetailsView batch={selectedBatch} onBack={() => { setSelectedBatch(null); loadBatches(); }} userId={userId} />
       )}
 
       <SealBatchModal 

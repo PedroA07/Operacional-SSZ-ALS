@@ -298,7 +298,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.DOCUMENTOS && <DocumentsTab userId={user.id} trips={trips} onUpdateTrip={async (t) => { await db.saveTrip(t, user); await loadAllData(false); }} />}
            {activeTab === DashboardTab.ADMINISTRATIVO && <AdminTab user={user} />}
            {activeTab === DashboardTab.LOGINS && <LoginsTab />}
-           {activeTab === DashboardTab.LACRES && <LacresTab />}
+           {activeTab === DashboardTab.LACRES && <LacresTab userId={user.id} />}
            {activeTab === DashboardTab.AVANTIDA && <AvantidaTab userId={user.id} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab userId={user.id} drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
            {activeTab === DashboardTab.CLIENTES && <CustomersTab userId={user.id} customers={customers} onSaveCustomer={async (c, id) => {
