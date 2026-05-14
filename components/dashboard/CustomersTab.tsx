@@ -5,8 +5,10 @@ import { maskCEP, maskCNPJ } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
 import ListFilters from './shared/ListFilters';
 import DatePicker from '../shared/DatePicker';
+import SmartOperationTable from './operations/SmartOperationTable';
 
 interface CustomersTabProps {
+  userId: string;
   customers: Customer[];
   onSaveCustomer: (customer: Partial<Customer>, id?: string) => void;
   onDeleteCustomer: (id: string) => void;
@@ -15,7 +17,7 @@ interface CustomersTabProps {
 
 const SEGMENTS = ['Aliança', 'Mercosul', 'Indústria', 'Carga Solta', 'Logística Reversa', 'Urgente'];
 
-const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, onDeleteCustomer, isAdmin }) => {
+const CustomersTab: React.FC<CustomersTabProps> = ({ userId, customers, onSaveCustomer, onDeleteCustomer, isAdmin }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<Customer | null>(null);
@@ -232,11 +234,77 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
   const labelBlueClass = "text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 ml-1 block";
 
+  const columns = useMemo(() => [
+    {
+      key: 'identificacao',
+      label: 'Identificação Jurídica',
+      render: (c: Customer) => (
+        <>
+          <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{c.legalName || c.name}</p>
+          {c.legalName && c.name !== c.legalName && <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">FANTASIA: {c.name}</p>}
+        </>
+      ),
+      sortable: true,
+      sortValue: (c: Customer) => (c.legalName || c.name).toUpperCase(),
+    },
+    {
+      key: 'cnpj',
+      label: 'CNPJ',
+      render: (c: Customer) => (
+        <span className="font-mono font-bold text-slate-500 whitespace-nowrap">{maskCNPJ(c.cnpj)}</span>
+      ),
+    },
+    {
+      key: 'segmentacao',
+      label: 'Segmentação / Vínculos',
+      render: (c: Customer) => (
+        <div className="flex flex-wrap gap-1">
+          {c.operations && c.operations.length > 0 ? c.operations.map((seg, i) => (
+            <span key={i} className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-md text-[7px] font-black uppercase tracking-tighter">
+              {seg}
+            </span>
+          )) : <span className="text-[8px] text-slate-300 font-bold uppercase tracking-widest italic">Não classificado</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'endereco',
+      label: 'Endereço / Localidade',
+      render: (c: Customer) => (
+        <>
+          <p className="text-slate-500 font-bold uppercase text-[9px]">{c.address}</p>
+          <p className="text-slate-400 font-black uppercase text-[10px] mt-1">{c.city} - {c.state}</p>
+        </>
+      ),
+    },
+    {
+      key: 'acoes',
+      label: 'Ações',
+      sortable: false,
+      render: (c: Customer) => (
+        <div className="text-right space-x-1 whitespace-nowrap">
+          <button onClick={() => handleOpenMap(c)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors" title="Visualizar Mapa">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5" />
+              <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/>
+            </svg>
+          </button>
+          <button onClick={() => handleOpenModal(c)} className="p-2 text-slate-300 hover:text-blue-500 transition-all">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/>
+            </svg>
+          </button>
+          <button onClick={() => confirmDelete(c)} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Icons.Excluir /></button>
+        </div>
+      ),
+    },
+  ], [handleOpenMap, handleOpenModal, confirmDelete]);
+
   return (
     <div className="max-w-full mx-auto space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1">
-          <ListFilters 
+          <ListFilters
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             sortBy={sortBy}
@@ -247,50 +315,14 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onSaveCustomer, 
         <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl active:scale-95 shrink-0 h-[58px] mt-[-24px]">Novo Cliente</button>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
-            <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
-              <tr>
-                <th className="px-8 py-5">Identificação Jurídica</th>
-                <th className="px-8 py-5">CNPJ</th>
-                <th className="px-8 py-5">Segmentação / Vínculos</th>
-                <th className="px-8 py-5">Endereço / Localidade</th>
-                <th className="px-8 py-5 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredCustomers.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-8 py-4">
-                    <p className="font-black text-slate-800 uppercase text-[11px] leading-tight">{c.legalName || c.name}</p>
-                    {c.legalName && c.name !== c.legalName && <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">FANTASIA: {c.name}</p>}
-                  </td>
-                  <td className="px-8 py-4 font-mono font-bold text-slate-500 whitespace-nowrap">{maskCNPJ(c.cnpj)}</td>
-                  <td className="px-8 py-4">
-                    <div className="flex flex-wrap gap-1">
-                       {c.operations && c.operations.length > 0 ? c.operations.map((seg, i) => (
-                          <span key={i} className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-md text-[7px] font-black uppercase tracking-tighter">
-                             {seg}
-                          </span>
-                       )) : <span className="text-[8px] text-slate-300 font-bold uppercase tracking-widest italic">Não classificado</span>}
-                    </div>
-                  </td>
-                  <td className="px-8 py-4">
-                    <p className="text-slate-500 font-bold uppercase text-[9px]">{c.address}</p>
-                    <p className="text-slate-400 font-black uppercase text-[10px] mt-1">{c.city} - {c.state}</p>
-                  </td>
-                  <td className="px-8 py-4 text-right space-x-1 whitespace-nowrap">
-                    <button onClick={() => handleOpenMap(c)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors" title="Visualizar Mapa"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg></button>
-                    <button onClick={() => handleOpenModal(c)} className="p-2 text-slate-300 hover:text-blue-500 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                    <button onClick={() => confirmDelete(c)} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Icons.Excluir /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <SmartOperationTable
+        userId={userId}
+        componentId="customers-list"
+        columns={columns}
+        data={filteredCustomers}
+        title="Clientes Cadastrados"
+        hideInternalSearch={true}
+      />
 
       {/* MODAL DE AVISO / ERRO (SUBSTITUI ALERTA NATIVO) */}
       {infoModal.show && (

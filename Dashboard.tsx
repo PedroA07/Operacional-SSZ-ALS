@@ -300,9 +300,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.LOGINS && <LoginsTab />}
            {activeTab === DashboardTab.LACRES && <LacresTab />}
            {activeTab === DashboardTab.AVANTIDA && <AvantidaTab userId={user.id} />}
-           {activeTab === DashboardTab.MOTORISTAS && <DriversTab drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
-           {activeTab === DashboardTab.CLIENTES && <CustomersTab customers={customers} onSaveCustomer={async (c, id) => { 
-              const success = await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user); 
+           {activeTab === DashboardTab.MOTORISTAS && <DriversTab userId={user.id} drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
+           {activeTab === DashboardTab.CLIENTES && <CustomersTab userId={user.id} customers={customers} onSaveCustomer={async (c, id) => {
+              const success = await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user);
               if (success) {
                 await loadAllData(false);
                 setFeedback({ show: true, title: 'Sucesso', message: 'Cliente salvo com sucesso!', type: 'success' });
@@ -312,7 +312,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             }} onDeleteCustomer={async id => { if(confirm('Excluir cliente?')) { await db.deleteCustomer(id); await loadAllData(false); } }} isAdmin={user.role === 'admin'} />}
            {activeTab === DashboardTab.COLABORADORES && <StaffTab staffList={staffList} currentUser={user} onSaveStaff={async (s, p) => { await db.saveStaff(s, p); await loadAllData(false); }} onDeleteStaff={async id => { await db.deleteStaff(id); await loadAllData(true); }} categories={categories} />}
            {activeTab === DashboardTab.FORMULARIOS && <FormsTab user={user} drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} />}
-           {activeTab === DashboardTab.PORTOS && <PortsTab ports={ports} onSavePort={async (p, id) => { 
+           {activeTab === DashboardTab.PORTOS && <PortsTab userId={user.id} ports={ports} onSavePort={async (p, id) => {
               const success = await db.savePort({...p, id: id || `prt-${Date.now()}`} as Port, user); 
               if (success) {
                 await loadAllData(false);
@@ -321,7 +321,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 setFeedback({ show: true, title: 'Erro', message: 'Falha ao salvar porto. Verifique o console.', type: 'error' });
               }
             }} onDeletePort={async id => { if(confirm('Excluir porto?')) { await db.deletePort(id); await loadAllData(false); } }} />}
-           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab preStacking={preStacking} onSavePreStacking={async (p, id) => { 
+           {activeTab === DashboardTab.PRE_STACKING && <PreStackingTab userId={user.id} preStacking={preStacking} onSavePreStacking={async (p, id) => {
               const success = await db.savePreStacking({...p, id: id || `ps-${Date.now()}`} as PreStacking, user); 
               if (success) {
                 await loadAllData(false);

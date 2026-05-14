@@ -2,15 +2,17 @@
 import React, { useState, useRef } from 'react';
 import { VWSchedule, Driver, VWStatus } from '../../types';
 import { createNewVWSchedule, formatVWDateTime } from '../../utils/vwService';
+import SmartOperationTable from './operations/SmartOperationTable';
 
 interface VWTabProps {
+  userId: string;
   schedules: VWSchedule[];
   drivers: Driver[];
   onSaveSchedule: (schedule: Partial<VWSchedule>, id?: string) => void;
   onUpdateStatus: (scheduleId: string, status: VWStatus, time: string) => void;
 }
 
-const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpdateStatus }) => {
+const VWTab: React.FC<VWTabProps> = ({ userId, schedules, drivers, onSaveSchedule, onUpdateStatus }) => {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
@@ -72,6 +74,75 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
 
   const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none shadow-sm transition-all";
 
+  const columns = [
+    {
+      key: 'agendamento',
+      label: 'Agendamento',
+      render: (s: VWSchedule) => {
+        const { date, time } = formatVWDateTime(s.dateTime);
+        return (
+          <>
+            <p className="font-bold text-slate-700">{date}</p>
+            <p className="text-blue-500 font-bold">{time}</p>
+          </>
+        );
+      },
+    },
+    {
+      key: 'os_container_cva',
+      label: 'OS / Container / CVA',
+      render: (s: VWSchedule) => (
+        <>
+          <p className="font-bold text-slate-700 uppercase">{s.os}</p>
+          <p className="text-slate-400">{s.container}</p>
+          <p className="text-blue-400 font-black text-[9px] mt-1">CVA: {s.cva || '---'}</p>
+        </>
+      ),
+    },
+    {
+      key: 'motorista_placas',
+      label: 'Motorista / Placas',
+      render: (s: VWSchedule) => (
+        <>
+          <p className="font-bold text-slate-700 uppercase">{s.driverName}</p>
+          <div className="flex flex-col mt-1">
+            <span className="text-slate-500 font-mono font-bold text-[10px] uppercase">Cavalo: {s.plateHorse}</span>
+            <span className="text-slate-400 font-mono text-[9px] uppercase">Carreta: {s.plateTrailer}</span>
+          </div>
+        </>
+      ),
+    },
+    {
+      key: 'linha_do_tempo',
+      label: 'Linha do Tempo',
+      render: (s: VWSchedule) => (
+        <div className="space-y-3">
+          {[...(s.statusHistory || [])].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((step, idx) => (
+            <div key={idx} className="flex items-start gap-2 border-l-2 border-slate-100 pl-3 py-0.5 ml-1">
+              <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${idx === 0 ? 'bg-blue-600 ring-4 ring-blue-50' : 'bg-slate-300'}`}></div>
+              <div>
+                <p className={`font-black uppercase text-[9px] leading-none ${idx === 0 ? 'text-blue-600' : 'text-slate-400'}`}>{step.status}</p>
+                <p className="text-[8px] text-slate-300 font-bold mt-1">
+                  {new Date(step.dateTime).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: 'acoes',
+      label: 'Ações',
+      render: (s: VWSchedule) => (
+        <div className="text-right space-x-2 whitespace-nowrap">
+          <button onClick={() => handleOpenStatus(s)} className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg font-black uppercase text-[8px] hover:bg-blue-600 hover:text-white transition-all shadow-sm">Novo Status</button>
+          <button onClick={() => handleOpenEditSchedule(s)} className="p-2 text-slate-300 hover:text-blue-600 transition-colors" title="Editar Programação"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
@@ -84,65 +155,13 @@ const VWTab: React.FC<VWTabProps> = ({ schedules, drivers, onSaveSchedule, onUpd
         <button onClick={handleOpenNewSchedule} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-blue-700 transition-all">Nova Programação</button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-4">Agendamento</th>
-                <th className="px-6 py-4">OS / Container / CVA</th>
-                <th className="px-6 py-4">Motorista / Placas</th>
-                <th className="px-6 py-4">Linha do Tempo</th>
-                <th className="px-6 py-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {schedules.map(s => {
-                const { date, time } = formatVWDateTime(s.dateTime);
-                return (
-                  <tr key={s.id} className="hover:bg-slate-50/50 align-top transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-slate-700">{date}</p>
-                      <p className="text-blue-500 font-bold">{time}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-slate-700 uppercase">{s.os}</p>
-                      <p className="text-slate-400">{s.container}</p>
-                      <p className="text-blue-400 font-black text-[9px] mt-1">CVA: {s.cva || '---'}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-slate-700 uppercase">{s.driverName}</p>
-                      <div className="flex flex-col mt-1">
-                        <span className="text-slate-500 font-mono font-bold text-[10px] uppercase">Cavalo: {s.plateHorse}</span>
-                        <span className="text-slate-400 font-mono text-[9px] uppercase">Carreta: {s.plateTrailer}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-3">
-                        {[...(s.statusHistory || [])].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).map((step, idx) => (
-                          <div key={idx} className="flex items-start gap-2 border-l-2 border-slate-100 pl-3 py-0.5 ml-1">
-                            <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${idx === 0 ? 'bg-blue-600 ring-4 ring-blue-50' : 'bg-slate-300'}`}></div>
-                            <div>
-                              <p className={`font-black uppercase text-[9px] leading-none ${idx === 0 ? 'text-blue-600' : 'text-slate-400'}`}>{step.status}</p>
-                              <p className="text-[8px] text-slate-300 font-bold mt-1">
-                                {new Date(step.dateTime).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
-                      <button onClick={() => handleOpenStatus(s)} className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg font-black uppercase text-[8px] hover:bg-blue-600 hover:text-white transition-all shadow-sm">Novo Status</button>
-                      <button onClick={() => handleOpenEditSchedule(s)} className="p-2 text-slate-300 hover:text-blue-600 transition-colors" title="Editar Programação"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <SmartOperationTable
+        userId={userId}
+        componentId="vw-list"
+        columns={columns}
+        data={schedules}
+        title="Agendamentos VW"
+      />
 
       {isStatusModalOpen && selectedSchedule && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">

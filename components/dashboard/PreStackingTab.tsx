@@ -5,14 +5,16 @@ import { maskCEP, maskCNPJ } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
 import ListFilters from './shared/ListFilters';
 import DatePicker from '../shared/DatePicker';
+import SmartOperationTable from './operations/SmartOperationTable';
 
 interface PreStackingTabProps {
+  userId: string;
   preStacking: PreStacking[];
   onSavePreStacking: (data: Partial<PreStacking>, id?: string) => void;
   onDeletePreStacking?: (id: string) => void;
 }
 
-const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreStacking, onDeletePreStacking }) => {
+const PreStackingTab: React.FC<PreStackingTabProps> = ({ userId, preStacking, onSavePreStacking, onDeletePreStacking }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<PreStacking | null>(null);
@@ -211,6 +213,68 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
     return result;
   }, [preStacking, searchQuery, sortBy]);
 
+  const preStackingColumns = [
+    {
+      key: 'unidade',
+      label: 'Unidade (Razão / Fantasia)',
+      sortable: true,
+      sortValue: (p: PreStacking) => (p.legalName || p.name).toUpperCase(),
+      render: (p: PreStacking) => (
+        <div className="flex flex-col gap-1.5 min-w-[280px]">
+          <div className="flex flex-col">
+            <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest leading-none">Razão Social</span>
+            <p className="font-black text-slate-800 uppercase text-[11px] leading-tight mt-1">{p.legalName || '---'}</p>
+          </div>
+          <div className="flex flex-col border-t border-slate-50 pt-1">
+            <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Nome Fantasia</span>
+            <p className="text-[10px] font-bold text-slate-600 uppercase leading-tight mt-0.5">{p.name || '---'}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'cnpj',
+      label: 'CNPJ',
+      sortable: true,
+      sortValue: (p: PreStacking) => p.cnpj,
+      render: (p: PreStacking) => (
+        <span className="font-mono font-bold text-slate-500">{maskCNPJ(p.cnpj)}</span>
+      ),
+    },
+    {
+      key: 'endereco',
+      label: 'Endereço / Cidade',
+      sortable: true,
+      sortValue: (p: PreStacking) => p.city,
+      render: (p: PreStacking) => (
+        <>
+          <p className="text-slate-500 font-bold uppercase text-[9px]">{p.address}</p>
+          <p className="text-slate-400 font-black uppercase text-[10px] mt-1">{p.city} - {p.state}</p>
+        </>
+      ),
+    },
+    {
+      key: 'acoes',
+      label: 'Ações',
+      sortable: false,
+      render: (p: PreStacking) => (
+        <div className="text-right space-x-1 whitespace-nowrap">
+          <button onClick={(e) => { e.stopPropagation(); handleOpenMap(p); }} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors" title="Ver no Mapa">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); handleOpenModal(p); }} className="p-2 text-slate-300 hover:text-blue-500 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg>
+          </button>
+          {onDeletePreStacking && (
+            <button onClick={(e) => { e.stopPropagation(); confirmDelete(p); }} className="p-2 text-slate-300 hover:text-red-500 transition-all">
+              <Icons.Excluir />
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   const inputClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50 placeholder:text-slate-300";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
   const labelBlueClass = "text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 ml-1 block";
@@ -219,7 +283,7 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
     <div className="max-w-full mx-auto space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1">
-          <ListFilters 
+          <ListFilters
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             sortBy={sortBy}
@@ -230,48 +294,14 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ preStacking, onSavePreS
         <button onClick={() => handleOpenModal()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95 shrink-0 h-[58px] mt-[-24px]">Novo Pré-Stacking</button>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
-              <tr>
-                <th className="px-8 py-5">Unidade (Razão / Fantasia)</th>
-                <th className="px-8 py-5">CNPJ</th>
-                <th className="px-8 py-5">Endereço / Cidade</th>
-                <th className="px-8 py-5 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map(p => (
-                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-8 py-4">
-                    <div className="flex flex-col gap-1.5 min-w-[280px]">
-                      <div className="flex flex-col">
-                         <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest leading-none">Razão Social</span>
-                         <p className="font-black text-slate-800 uppercase text-[11px] leading-tight mt-1">{p.legalName || '---'}</p>
-                      </div>
-                      <div className="flex flex-col border-t border-slate-50 pt-1">
-                         <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-none">Nome Fantasia</span>
-                         <p className="text-[10px] font-bold text-slate-600 uppercase leading-tight mt-0.5">{p.name || '---'}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-8 py-4 font-mono font-bold text-slate-500">{maskCNPJ(p.cnpj)}</td>
-                  <td className="px-8 py-4">
-                    <p className="text-slate-500 font-bold uppercase text-[9px]">{p.address}</p>
-                    <p className="text-slate-400 font-black uppercase text-[10px] mt-1">{p.city} - {p.state}</p>
-                  </td>
-                  <td className="px-8 py-4 text-right space-x-1 whitespace-nowrap">
-                    <button onClick={() => handleOpenMap(p)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors" title="Ver no Mapa"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg></button>
-                    <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                    {onDeletePreStacking && <button onClick={() => confirmDelete(p)} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Icons.Excluir /></button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <SmartOperationTable
+        userId={userId}
+        componentId="prestacking-list"
+        columns={preStackingColumns}
+        data={filtered}
+        title="Pré-Stacking"
+        hideInternalSearch={true}
+      />
 
       {/* MODAL DE AVISO / ERRO */}
       {infoModal.show && (

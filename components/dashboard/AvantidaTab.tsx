@@ -8,6 +8,7 @@ import AvantidaPriceConfigModal from './avantida/AvantidaPriceConfigModal';
 import { excelAvantidaService } from '../../utils/excelAvantidaService';
 import DatePicker from '../shared/DatePicker';
 import CustomSelect from '../shared/CustomSelect';
+import SmartOperationTable from './operations/SmartOperationTable';
 
 interface AvantidaTabProps {
   userId: string;
@@ -114,6 +115,186 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
 
   const inputClass = "w-full bg-transparent border-none text-[11px] font-bold text-slate-700 uppercase focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 outline-none transition-all placeholder:text-slate-200";
 
+  const columns = [
+    {
+      key: 'shippingLine',
+      label: 'Linha de Expedição',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <input
+          className={`${inputClass} text-indigo-600`}
+          value={r.shippingLine}
+          onChange={e => handleUpdateField(r, 'shippingLine', e.target.value.toUpperCase())}
+          placeholder="ARMADOR"
+        />
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <CustomSelect
+          className="w-full"
+          value={r.status}
+          onChange={v => handleUpdateField(r, 'status', v as AvantidaStatus)}
+          options={[
+            { value: 'EM ANÁLISE', label: 'EM ANÁLISE' },
+            { value: 'APROVADO', label: 'APROVADO' },
+            { value: 'RECUSADO', label: 'RECUSADO' },
+          ]}
+          inputClassName={`px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all ${
+            r.status === 'APROVADO' ? 'bg-emerald-50 text-emerald-600' :
+            r.status === 'RECUSADO' ? 'bg-red-50 text-red-600' :
+            'bg-amber-50 text-amber-600'
+          }`}
+        />
+      ),
+    },
+    {
+      key: 'importLocation',
+      label: 'Localização Importação',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <input
+          className={inputClass}
+          value={r.importLocation}
+          onChange={e => handleUpdateField(r, 'importLocation', e.target.value.toUpperCase())}
+          placeholder="SANTOS / DEPOT"
+        />
+      ),
+    },
+    {
+      key: 'date',
+      label: 'Data do Pedido',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <DatePicker value={r.date} onChange={v => handleUpdateField(r, 'date', v)} placeholder="Data..." />
+      ),
+    },
+    {
+      key: 'verified',
+      label: 'Conf.',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <div className="flex justify-center">
+          {savingId === r.id ? (
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <input
+                type="checkbox"
+                checked={r.verified}
+                onChange={e => handleUpdateField(r, 'verified', e.target.checked)}
+                className="w-4 h-4 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              />
+              <span className={`text-[7px] font-black uppercase mt-1 ${r.verified ? 'text-emerald-600' : 'text-amber-500'}`}>
+                {r.verified ? 'CONF.' : 'PEND.'}
+              </span>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'containerNumber',
+      label: 'Número do Container',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <input
+          className={`${inputClass} font-mono text-blue-700 text-[12px] font-black`}
+          value={r.containerNumber}
+          onChange={e => handleUpdateField(r, 'containerNumber', e.target.value.toUpperCase())}
+        />
+      ),
+    },
+    {
+      key: 'exportRef',
+      label: 'Exportar Ref.',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <input
+          className={inputClass}
+          value={r.exportRef}
+          onChange={e => handleUpdateField(r, 'exportRef', e.target.value.toUpperCase())}
+          placeholder="---"
+        />
+      ),
+    },
+    {
+      key: 'reuseDate',
+      label: 'Data Reuso',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <DatePicker value={r.reuseDate || ''} onChange={v => handleUpdateField(r, 'reuseDate', v)} placeholder="Reuso..." />
+      ),
+    },
+    {
+      key: 'requestedPrice',
+      label: 'Preço Pedido',
+      sortable: true,
+      sortValue: (r: AvantidaRecord) => r.requestedPrice || 0,
+      render: (r: AvantidaRecord) => (
+        <div className="relative group/price">
+          <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 group-focus-within/price:text-blue-500">R$</span>
+          <input
+            type="text"
+            className={`${inputClass} text-emerald-600 pl-6 text-right font-black`}
+            value={(r.requestedPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            onChange={e => handlePriceChange(r, e.target.value)}
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'customerRef',
+      label: 'Ref. do Cliente',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <input
+          className={inputClass}
+          value={r.customerRef}
+          onChange={e => handleUpdateField(r, 'customerRef', e.target.value.toUpperCase())}
+          placeholder="CLIENTE"
+        />
+      ),
+    },
+    {
+      key: 'tripSettlement',
+      label: 'Acerto de Viagem',
+      sortable: true,
+      render: (r: AvantidaRecord) => (
+        <input
+          className={`${inputClass} font-black text-blue-800`}
+          value={r.tripSettlement}
+          onChange={e => handleUpdateField(r, 'tripSettlement', e.target.value.toUpperCase())}
+          placeholder="---"
+        />
+      ),
+    },
+    {
+      key: 'actions',
+      label: '',
+      sortable: false,
+      render: (r: AvantidaRecord) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setEditingRecord(r); setIsModalOpen(true); }}
+            className="p-2 text-slate-300 hover:text-blue-500 transition-all opacity-0 group-hover:opacity-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" strokeWidth="2.5"/></svg>
+          </button>
+          <button
+            onClick={() => handleDelete(r.id)}
+            className="p-2 text-slate-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
@@ -158,114 +339,15 @@ const AvantidaTab: React.FC<AvantidaTabProps> = ({ userId }) => {
         setShowOnlyPending={setShowOnlyPending}
       />
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1800px]">
-             <thead className="bg-slate-50 border-b border-slate-200">
-                <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                   <th className="px-6 py-5 w-48">Linha de expedição</th>
-                   <th className="px-6 py-5 w-32 text-center">Status</th>
-                   <th className="px-6 py-5 w-48">Localização Importação</th>
-                   <th className="px-6 py-5 w-32">Data do pedido</th>
-                   <th className="px-6 py-5 w-24 text-center">Conf.</th>
-                   <th className="px-6 py-5 w-40">Número do container</th>
-                   <th className="px-6 py-5 w-40">Exportar ref.</th>
-                   <th className="px-6 py-5 w-32">Data reuso</th>
-                   <th className="px-6 py-5 w-40 text-center">Preço pedido</th>
-                   <th className="px-6 py-5">Ref. do cliente</th>
-                   <th className="px-6 py-5 text-blue-600 bg-blue-50/20">Acerto de viagem</th>
-                   <th className="px-6 py-5 text-right w-16"></th>
-                </tr>
-             </thead>
-             <tbody className="divide-y divide-slate-50">
-                {filteredRecords.map((r) => (
-                  <tr key={r.id} className="hover:bg-blue-50/10 transition-colors group">
-                    <td className="px-6 py-4">
-                      <input className={`${inputClass} text-indigo-600`} value={r.shippingLine} onChange={e => handleUpdateField(r, 'shippingLine', e.target.value.toUpperCase())} placeholder="ARMADOR" />
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                       <CustomSelect
-                         className="w-full"
-                         value={r.status}
-                         onChange={v => handleUpdateField(r, 'status', v as AvantidaStatus)}
-                         options={[
-                           { value: 'EM ANÁLISE', label: 'EM ANÁLISE' },
-                           { value: 'APROVADO', label: 'APROVADO' },
-                           { value: 'RECUSADO', label: 'RECUSADO' },
-                         ]}
-                         inputClassName={`px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all ${
-                           r.status === 'APROVADO' ? 'bg-emerald-50 text-emerald-600' :
-                           r.status === 'RECUSADO' ? 'bg-red-50 text-red-600' :
-                           'bg-amber-50 text-amber-600'
-                         }`}
-                       />
-                    </td>
-                    <td className="px-6 py-4">
-                      <input className={inputClass} value={r.importLocation} onChange={e => handleUpdateField(r, 'importLocation', e.target.value.toUpperCase())} placeholder="SANTOS / DEPOT" />
-                    </td>
-                    <td className="px-6 py-4">
-                      <DatePicker value={r.date} onChange={v => handleUpdateField(r, 'date', v)} placeholder="Data..." />
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                       {savingId === r.id ? (
-                         <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                       ) : (
-                         <div className="flex flex-col items-center">
-                           <input 
-                             type="checkbox" 
-                             checked={r.verified} 
-                             onChange={e => handleUpdateField(r, 'verified', e.target.checked)}
-                             className="w-4 h-4 rounded-lg border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                           />
-                           <span className={`text-[7px] font-black uppercase mt-1 ${r.verified ? 'text-emerald-600' : 'text-amber-500'}`}>
-                             {r.verified ? 'CONF.' : 'PEND.'}
-                           </span>
-                         </div>
-                       )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <input className={`${inputClass} font-mono text-blue-700 text-[12px] font-black`} value={r.containerNumber} onChange={e => handleUpdateField(r, 'containerNumber', e.target.value.toUpperCase())} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <input className={inputClass} value={r.exportRef} onChange={e => handleUpdateField(r, 'exportRef', e.target.value.toUpperCase())} placeholder="---" />
-                    </td>
-                    <td className="px-6 py-4">
-                      <DatePicker value={r.reuseDate || ''} onChange={v => handleUpdateField(r, 'reuseDate', v)} placeholder="Reuso..." />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="relative group/price">
-                        <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 group-focus-within/price:text-blue-500">R$</span>
-                        <input 
-                          type="text" 
-                          className={`${inputClass} text-emerald-600 pl-6 text-right font-black`} 
-                          value={(r.requestedPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
-                          onChange={e => handlePriceChange(r, e.target.value)} 
-                        />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <input className={inputClass} value={r.customerRef} onChange={e => handleUpdateField(r, 'customerRef', e.target.value.toUpperCase())} placeholder="CLIENTE" />
-                    </td>
-                    <td className="px-6 py-4 bg-blue-50/10">
-                      <input className={`${inputClass} font-black text-blue-800`} value={r.tripSettlement} onChange={e => handleUpdateField(r, 'tripSettlement', e.target.value.toUpperCase())} placeholder="---" />
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center gap-2">
-                         <button onClick={() => { setEditingRecord(r); setIsModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-500 transition-all opacity-0 group-hover:opacity-100"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" strokeWidth="2.5"/></svg></button>
-                         <button onClick={() => handleDelete(r.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-             </tbody>
-          </table>
-          {filteredRecords.length === 0 && !isLoading && (
-            <div className="py-24 text-center border-t border-slate-50 bg-white">
-               <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Nenhum registro localizado para o período selecionado</p>
-            </div>
-          )}
-        </div>
-      </div>
+      <SmartOperationTable
+        userId={userId}
+        componentId="avantida-list"
+        columns={columns}
+        data={filteredRecords}
+        title="Registros Avantida"
+        hideInternalSearch={true}
+        noMaxHeight={true}
+      />
 
       <AvantidaModal 
         isOpen={isModalOpen} 
