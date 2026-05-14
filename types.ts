@@ -365,6 +365,15 @@ export interface TripDocument {
   uploadDate: string;
 }
 
+export interface FreightContractDoc extends TripDocument {
+  parsedData?: {
+    prevTermino?: string;
+    localidade?: string;
+    motorista?: string;
+    container?: string;
+  };
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -472,6 +481,7 @@ export interface Trip {
   agendamentoDoc?: TripDocument;
   completoDoc?: TripDocument;
   freightContractDoc?: TripDocument;
+  freightContractDocs?: FreightContractDoc[];
   cteDoc?: TripDocument;
   cvaDoc?: TripDocument;
   nfDoc?: TripDocument; 

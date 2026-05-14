@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Trip, TripDocument, Driver } from '../../../types';
+import { Trip, TripDocument, FreightContractDoc, Driver } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
 import DatePicker from '../../shared/DatePicker';
+import FreightContractDropzone from './FreightContractDropzone';
 
 // ── IBGE city loader ──────────────────────────────────────────────────────────
 interface IbgeCity {
@@ -220,6 +221,8 @@ interface RowEdit {
 const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, drivers = [], onUpdateDriver }) => {
   const [view, setView] = useState<'queue' | 'recipients'>('queue');
   const [edits, setEdits] = useState<Record<string, RowEdit>>({});
+  // ID da trip com dropzone aberto (null = nenhuma)
+  const [dropzoneOpen, setDropzoneOpen] = useState<string | null>(null);
   const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [addSearch, setAddSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -303,21 +306,11 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     (t.balancePayment?.status === 'LIBERAR' || t.balancePayment?.status === 'PAGO')
   );
 
-  const handleFileUpload = (trip: Trip, ev: React.ChangeEvent<HTMLInputElement>) => {
-    const file = ev.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const doc: TripDocument = {
-        id: `freight-contract-${Date.now()}`,
-        type: 'CONTRATO_FRETE',
-        url: reader.result as string,
-        fileName: `CONTRATO - ${trip.driver.name} - OS ${trip.os}`,
-        uploadDate: new Date().toISOString(),
-      };
-      await onUpdate({ ...trip, freightContractDoc: doc });
-    };
-    reader.readAsDataURL(file);
+  const handleDropzoneDone = async (trip: Trip, docs: FreightContractDoc[]) => {
+    // Mantém retrocompatibilidade: o primeiro doc vai para freightContractDoc também
+    const legacyDoc = docs[0] as TripDocument | undefined;
+    await onUpdate({ ...trip, freightContractDoc: legacyDoc, freightContractDocs: docs });
+    setDropzoneOpen(null);
   };
 
   const queueColumns = [
@@ -354,20 +347,84 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       ),
     },
     {
-      key: 'contract_status', label: '5. Ação Contrato',
-      render: (t: Trip) => t.freightContractDoc ? (
-        <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-2 rounded-xl border border-emerald-100">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-          <span className="text-[9px] font-black uppercase">Anexado</span>
-          <button onClick={() => window.open(t.freightContractDoc!.url, '_blank')} className="ml-2 text-[8px] font-black text-blue-600 hover:underline">Ver</button>
-        </div>
-      ) : (
-        <label className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-md active:scale-95">
-          <input type="file" className="hidden" accept=".pdf,image/*" onChange={(ev) => handleFileUpload(t, ev)} />
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-          <span className="text-[9px] font-black uppercase tracking-widest">Anexar</span>
-        </label>
-      ),
+      key: 'contract_status', label: '5. Contratos de Frete',
+      render: (t: Trip) => {
+        const allDocs: FreightContractDoc[] = t.freightContractDocs?.length
+          ? t.freightContractDocs
+          : t.freightContractDoc
+            ? [t.freightContractDoc as FreightContractDoc]
+            : [];
+
+        if (dropzoneOpen === t.id) {
+          return (
+            <div className="w-[520px] py-2">
+              <FreightContractDropzone
+                tripOS={t.os}
+                existingDocs={allDocs}
+                onDone={docs => handleDropzoneDone(t, docs)}
+                onCancel={() => setDropzoneOpen(null)}
+              />
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex flex-col gap-2">
+            {/* Lista de contratos já salvos */}
+            {allDocs.map((doc, idx) => (
+              <div key={doc.id} className="flex items-start gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                <svg className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-black text-emerald-700 uppercase">Contrato {idx + 1}</span>
+                    <button onClick={() => window.open(doc.url, '_blank')}
+                      className="text-[8px] font-black text-blue-500 hover:underline">Ver PDF</button>
+                  </div>
+                  {doc.parsedData && (
+                    <div className="grid grid-cols-2 gap-x-3 mt-1">
+                      {doc.parsedData.prevTermino && (
+                        <span className="text-[8px] text-slate-500 font-bold truncate">
+                          <span className="text-slate-400">Término:</span> {doc.parsedData.prevTermino}
+                        </span>
+                      )}
+                      {doc.parsedData.localidade && (
+                        <span className="text-[8px] text-slate-500 font-bold truncate">
+                          <span className="text-slate-400">Local:</span> {doc.parsedData.localidade}
+                        </span>
+                      )}
+                      {doc.parsedData.motorista && (
+                        <span className="text-[8px] text-slate-500 font-bold truncate col-span-2">
+                          <span className="text-slate-400">Mot.:</span> {doc.parsedData.motorista}
+                        </span>
+                      )}
+                      {doc.parsedData.container && (
+                        <span className="text-[8px] font-mono font-black text-slate-600 truncate">
+                          {doc.parsedData.container}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Botão Anexar / Adicionar */}
+            <button
+              onClick={() => setDropzoneOpen(t.id)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-md active:scale-95 w-fit"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <span className="text-[9px] font-black uppercase tracking-widest">
+                {allDocs.length > 0 ? 'Adicionar PDF' : 'Anexar Contrato'}
+              </span>
+            </button>
+          </div>
+        );
+      },
     },
   ];
 

@@ -1,6 +1,6 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Trip, DriverCapturedDoc, User } from '../types';
+import { Trip, DriverCapturedDoc, FreightContractDoc, User } from '../types';
 import { fileStorage } from './fileStorage';
 
 export const tripRepository = {
@@ -35,6 +35,7 @@ export const tripRepository = {
     agendamento_doc: trip.agendamentoDoc || null,
     completo_doc: trip.completoDoc || null,
     freight_contract_doc: trip.freightContractDoc || null,
+    freight_contract_docs: trip.freightContractDocs?.length ? trip.freightContractDocs : null,
     cte_doc: trip.cteDoc || null,
     cva_doc: trip.cvaDoc || null,
     nf_doc: trip.nfDoc || null,
@@ -108,6 +109,12 @@ export const tripRepository = {
       agendamentoDoc: normalizeDoc(d.agendamento_doc),
       completoDoc: normalizeDoc(d.completo_doc),
       freightContractDoc: normalizeDoc(d.freight_contract_doc),
+      freightContractDocs: Array.isArray(safeParse(d.freight_contract_docs, null))
+        ? (safeParse(d.freight_contract_docs, []) as FreightContractDoc[]).map(doc => ({
+            ...doc,
+            url: fileStorage.getPublicUrl(doc.url),
+          }))
+        : undefined,
       cteDoc: normalizeDoc(d.cte_doc),
       cvaDoc: normalizeDoc(d.cva_doc),
       nfDoc: normalizeDoc(d.nf_doc),

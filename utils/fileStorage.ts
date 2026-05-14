@@ -109,6 +109,11 @@ export const fileStorage = {
     return fileStorage.upload(file, `trips/${cleanOS}/documentos/${type}.pdf`);
   },
 
+  uploadFreightContract: (file: File, os: string, index: number) => {
+    const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
+    return fileStorage.upload(file, `trips/${cleanOS}/contratos_frete/contrato_${index}_${Date.now()}.pdf`);
+  },
+
   uploadTripPhoto: (file: File | string, os: string, photoId: string) => {
     const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
     // Verifica se o arquivo original é um PDF para manter a extensão
