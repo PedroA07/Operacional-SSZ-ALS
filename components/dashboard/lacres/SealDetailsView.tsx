@@ -421,7 +421,6 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack, userId
         columns={columns}
         data={filteredRecords}
         hideInternalSearch
-        noMaxHeight
       />
     </div>
   );

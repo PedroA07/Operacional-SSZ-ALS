@@ -599,7 +599,6 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
               columns={recipientColumns}
               data={recipientDrivers}
               hideInternalSearch
-              noMaxHeight
             />
           )}
         </div>
