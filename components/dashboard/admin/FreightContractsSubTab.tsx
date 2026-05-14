@@ -4,6 +4,156 @@ import { Trip, TripDocument, Driver } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
 import DatePicker from '../../shared/DatePicker';
 
+// ── IBGE city loader ─────────────────────────────────────────────────────────
+interface IbgeCity { id: number; nome: string; microrregiao: { mesorregiao: { UF: { sigla: string } } } }
+type CityEntry = { name: string; uf: string };
+
+let _cityCache: CityEntry[] | null = null;
+let _cityLoading = false;
+let _cityCallbacks: Array<() => void> = [];
+
+function loadCities(cb: () => void) {
+  if (_cityCache) { cb(); return; }
+  _cityCallbacks.push(cb);
+  if (_cityLoading) return;
+  _cityLoading = true;
+  fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
+    .then(r => r.json())
+    .then((data: IbgeCity[]) => {
+      _cityCache = data.map(c => ({
+        name: c.nome.toUpperCase(),
+        uf: c.microrregiao.mesorregiao.UF.sigla,
+      }));
+      _cityLoading = false;
+      _cityCallbacks.forEach(f => f());
+      _cityCallbacks = [];
+    })
+    .catch(() => {
+      _cityCache = [];
+      _cityLoading = false;
+      _cityCallbacks.forEach(f => f());
+      _cityCallbacks = [];
+    });
+}
+
+// ── CitySearch ───────────────────────────────────────────────────────────────
+const CitySearch: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => {
+  const [open, setOpen]       = useState(false);
+  const [query, setQuery]     = useState(value);
+  const [results, setResults] = useState<CityEntry[]>([]);
+  const [loaded, setLoaded]   = useState(!!_cityCache);
+  const wrapRef               = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setQuery(value); }, [value]);
+
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, []);
+
+  const search = useCallback((q: string) => {
+    if (!q.trim() || !_cityCache) { setResults([]); return; }
+    const norm = q.toUpperCase().trim();
+    setResults(_cityCache.filter(c => c.name.includes(norm)).slice(0, 10));
+  }, []);
+
+  const handleInput = (raw: string) => {
+    const q = raw.toUpperCase();
+    setQuery(q);
+    onChange(q);
+    setOpen(true);
+    if (!_cityCache) {
+      loadCities(() => { setLoaded(true); search(q); });
+    } else {
+      search(q);
+    }
+  };
+
+  const handleSelect = (c: CityEntry) => {
+    const val = `${c.name} - ${c.uf}`;
+    setQuery(val);
+    onChange(val);
+    setOpen(false);
+    setResults([]);
+  };
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <input
+        type="text"
+        value={query}
+        onChange={e => handleInput(e.target.value)}
+        onFocus={() => { if (!_cityCache) loadCities(() => { setLoaded(true); search(query); }); if (query) setOpen(true); }}
+        placeholder="BUSCAR CIDADE..."
+        className="text-[9px] font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm w-52 placeholder:text-slate-300 uppercase"
+      />
+      {open && !loaded && (
+        <div className="absolute top-full mt-1 left-0 z-50 bg-white rounded-xl shadow-lg border border-slate-100 px-4 py-3 text-[9px] text-slate-400 font-bold uppercase whitespace-nowrap">
+          Carregando cidades...
+        </div>
+      )}
+      {open && loaded && results.length > 0 && (
+        <div className="absolute top-full mt-1 left-0 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden w-60">
+          {results.map(c => (
+            <button
+              key={`${c.name}|${c.uf}`}
+              type="button"
+              onMouseDown={() => handleSelect(c)}
+              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 text-left border-b border-slate-50 last:border-0"
+            >
+              <span className="text-[9px] font-bold text-slate-800 uppercase leading-tight">{c.name}</span>
+              <span className="text-[8px] font-black text-blue-500 ml-2 shrink-0">{c.uf}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+type SendTo = 'driver' | 'beneficiary' | 'group';
+
+const cleanPhone = (p?: string) => (p || '').replace(/\D/g, '');
+
+const WhatsAppIcon = () => (
+  <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.553 4.118 1.524 5.847L.054 23.5l5.832-1.53A11.938 11.938 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.882a9.875 9.875 0 01-5.034-1.376l-.36-.214-3.735.979 1-3.64-.235-.374A9.862 9.862 0 012.118 12C2.118 6.535 6.535 2.118 12 2.118c5.464 0 9.882 4.417 9.882 9.882 0 5.464-4.418 9.882-9.882 9.882z"/>
+  </svg>
+);
+
+const phoneLink = (driver: Driver, sendTo: SendTo): React.ReactElement => {
+  if (sendTo === 'group') {
+    const name = driver.whatsappGroupName || 'Grupo WhatsApp';
+    const link = driver.whatsappGroupLink;
+    if (!link) return <span className="text-[9px] text-slate-300 font-bold italic">Grupo não configurado</span>;
+    return (
+      <a href={link} target="_blank" rel="noopener noreferrer"
+        className="flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 font-black text-[9px] hover:underline underline-offset-2 transition-colors"
+      >
+        <WhatsAppIcon />
+        {name}
+      </a>
+    );
+  }
+  const phone = sendTo === 'driver' ? driver.phone : driver.beneficiaryPhone;
+  if (!phone) return <span className="text-[9px] text-slate-300 font-bold italic">—</span>;
+  const wa = `https://wa.me/55${cleanPhone(phone)}`;
+  return (
+    <a href={wa} target="_blank" rel="noopener noreferrer"
+      className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-black text-[9px] tabular-nums hover:underline underline-offset-2 transition-colors"
+    >
+      <WhatsAppIcon />
+      {phone}
+    </a>
+  );
+};
+
+// ── Component ────────────────────────────────────────────────────────────────
 interface Props {
   trips: Trip[];
   onUpdate: (trip: Trip) => Promise<void>;
@@ -12,13 +162,12 @@ interface Props {
   onUpdateDriver?: (driver: Driver) => Promise<void>;
 }
 
-type SendTo = 'driver' | 'beneficiary' | 'group';
-
 interface RowEdit {
   sendTo: SendTo;
   lastDate: string;
   lastLocation: string;
   saving: boolean;
+  copied: boolean;
 }
 
 const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, drivers = [], onUpdateDriver }) => {
@@ -28,7 +177,6 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   const [addSearch, setAddSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fecha dropdown ao clicar fora
   useEffect(() => {
     const fn = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -40,10 +188,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     return () => document.removeEventListener('mousedown', fn);
   }, []);
 
-  // Motoristas "na fila" = têm freightContractSendTo definido
   const recipientDrivers = drivers.filter(d => d.status === 'Ativo' && d.freightContractSendTo);
 
-  // Motoristas disponíveis para adicionar
   const availableToAdd = drivers.filter(d =>
     d.status === 'Ativo' &&
     d.driverType !== 'Motoboy' &&
@@ -58,6 +204,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       lastDate: driver.lastFreightContractDate || '',
       lastLocation: driver.lastFreightContractLocation || '',
       saving: false,
+      copied: false,
     };
   }, [edits]);
 
@@ -76,7 +223,6 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
         lastFreightContractDate: e.lastDate || undefined,
         lastFreightContractLocation: e.lastLocation || undefined,
       });
-      // Limpa edição local após salvar
       setEdits(prev => { const n = { ...prev }; delete n[driver.id]; return n; });
     } catch {
       patchEdit(driver.id, { saving: false }, e);
@@ -101,10 +247,15 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     setEdits(prev => { const n = { ...prev }; delete n[driver.id]; return n; });
   };
 
-  const phoneDisplay = (driver: Driver, sendTo: SendTo) => {
-    if (sendTo === 'driver') return driver.phone || '—';
-    if (sendTo === 'beneficiary') return driver.beneficiaryPhone || '—';
-    return driver.whatsappGroupName ? `Grupo: ${driver.whatsappGroupName}` : (driver.whatsappGroupLink ? 'Grupo config.' : '—');
+  const handleCopy = (driver: Driver, e: RowEdit) => {
+    const date = e.lastDate
+      ? new Date(e.lastDate + 'T12:00').toLocaleDateString('pt-BR')
+      : '—';
+    const text = `${date} - ${driver.name} - ${e.lastLocation || '—'}`;
+    navigator.clipboard.writeText(text).then(() => {
+      patchEdit(driver.id, { copied: true }, e);
+      setTimeout(() => patchEdit(driver.id, { copied: false }, getEdit(driver)), 2000);
+    });
   };
 
   // ── Trips queue ──────────────────────────────────────────────────────────
@@ -246,7 +397,6 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       {/* ── Motoristas Destinatários ── */}
       {view === 'recipients' && (
         <div className="space-y-4">
-          {/* Barra de ações: Adicionar motorista */}
           <div className="flex items-center justify-between">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
               {recipientDrivers.length} motorista{recipientDrivers.length !== 1 ? 's' : ''} configurado{recipientDrivers.length !== 1 ? 's' : ''}
@@ -298,7 +448,6 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             </div>
           </div>
 
-          {/* Tabela de destinatários */}
           {recipientDrivers.length === 0 ? (
             <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
               <div className="w-12 h-12 bg-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -309,14 +458,14 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             </div>
           ) : (
             <div className="overflow-x-auto rounded-3xl border border-slate-100 shadow-sm">
-              <table className="w-full min-w-[1000px]">
+              <table className="w-full min-w-[1100px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
                     {[
                       'Motorista',
                       'Beneficiário',
                       'Enviar para',
-                      'Telefone / Grupo',
+                      'WhatsApp',
                       'Data Último Contrato',
                       'Local Último Contrato',
                       '',
@@ -382,14 +531,12 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                           </select>
                         </td>
 
-                        {/* Telefone */}
+                        {/* WhatsApp */}
                         <td className="px-4 py-3">
-                          <span className={`text-[10px] font-black tabular-nums ${e.sendTo === 'group' ? 'text-emerald-600' : 'text-blue-600'}`}>
-                            {phoneDisplay(driver, e.sendTo)}
-                          </span>
+                          {phoneLink(driver, e.sendTo)}
                         </td>
 
-                        {/* Data último contrato — DatePicker customizado */}
+                        {/* Data último contrato */}
                         <td className="px-4 py-3">
                           <DatePicker
                             value={e.lastDate}
@@ -400,20 +547,35 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                           />
                         </td>
 
-                        {/* Local último contrato */}
+                        {/* Local último contrato — busca de cidades */}
                         <td className="px-4 py-3">
-                          <input
-                            type="text"
+                          <CitySearch
                             value={e.lastLocation}
-                            onChange={ev => patchEdit(driver.id, { lastLocation: ev.target.value.toUpperCase() }, e)}
-                            placeholder="EX: SANTOS → SÃO PAULO"
-                            className="text-[9px] font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm w-44 placeholder:text-slate-300 uppercase"
+                            onChange={val => patchEdit(driver.id, { lastLocation: val }, e)}
                           />
                         </td>
 
                         {/* Ações */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
+                            {/* Copiar referência */}
+                            <button
+                              onClick={() => handleCopy(driver, e)}
+                              title="Copiar: data – motorista – local"
+                              className={`p-2 rounded-xl transition-all ${
+                                e.copied
+                                  ? 'bg-emerald-100 text-emerald-600'
+                                  : 'text-slate-300 hover:text-blue-500 hover:bg-blue-50'
+                              }`}
+                            >
+                              {e.copied ? (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                              )}
+                            </button>
+
+                            {/* Salvar */}
                             <button
                               onClick={() => handleSave(driver)}
                               disabled={e.saving || !isDirty || !onUpdateDriver}
@@ -430,6 +592,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                                 </svg>
                               ) : 'Salvar'}
                             </button>
+
+                            {/* Remover */}
                             <button
                               onClick={() => handleRemove(driver)}
                               title="Remover da lista"
