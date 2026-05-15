@@ -146,6 +146,19 @@ const FreightContractUploadTab: React.FC<Props> = ({ trips }) => {
               uploadDate: new Date().toISOString(),
             },
           }, { id: 'system', role: 'admin' } as any);
+
+          // Atualiza data e local do último contrato no motorista
+          try {
+            const drivers = await db.getDrivers();
+            const driver = drivers.find(d => d.id === trip.driver?.id);
+            if (driver) {
+              await db.saveDriver({
+                ...driver,
+                lastFreightContractDate:     new Date().toISOString().slice(0, 10),
+                lastFreightContractLocation: trip.destination?.name ?? trip.customer?.name ?? undefined,
+              }, { id: 'system', role: 'admin' } as any);
+            }
+          } catch { /* non-critical */ }
         }
 
         patchEntry(entry.id, { status: 'saved', savedId: savedId ?? undefined });

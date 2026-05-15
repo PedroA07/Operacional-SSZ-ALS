@@ -11,7 +11,7 @@ export interface User {
   username: string;
   password?: string;
   displayName: string;
-  role: 'admin' | 'staff' | 'driver' | 'motoboy' | 'third_party';
+  role: 'admin' | 'staff' | 'driver' | 'motoboy' | 'third_party' | 'beneficiary';
   lastLogin: string;
   photo?: string;
   position?: string;
@@ -569,6 +569,8 @@ export interface Driver {
   freightContractSendTo?: 'driver' | 'beneficiary' | 'group';
   lastFreightContractDate?: string;
   lastFreightContractLocation?: string;
+  beneficiaryIsDriver?: boolean;
+  beneficiaryUserId?: string;
   registrationDate?: string;
   operations: { category: string; client: string }[];
   tripsCount?: number;

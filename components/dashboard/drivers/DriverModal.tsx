@@ -6,6 +6,7 @@ import { fileStorage } from '../../../utils/fileStorage';
 import { driverAuthService } from '../../../utils/driverAuthService';
 import { Icons } from '../../../constants/icons';
 import CustomSelect from '../../shared/CustomSelect';
+import { db } from '../../../utils/storage';
 
 interface DriverModalProps {
   isOpen: boolean;
@@ -416,29 +417,109 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                 </div>
               </div>
 
-              {/* III. FINANCEIRO */}
+              {/* III. FINANCEIRO / BENEFICIÁRIO */}
               <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white space-y-6">
-                <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">III. Dados do Favorecido (Pagamentos)</h4>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Nome do Beneficiário</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold uppercase outline-none focus:bg-white/20" value={form.beneficiaryName} onChange={e => setForm({ ...form, beneficiaryName: e.target.value.toUpperCase() })} /></div>
-                  <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Documento Chave (CPF/CNPJ)</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white/20" value={form.beneficiaryCnpj} onChange={e => setForm({ ...form, beneficiaryCnpj: e.target.value })} /></div>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">III. Dados do Favorecido (Pagamentos)</h4>
+                  {/* Toggle motorista é o próprio beneficiário */}
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <span className="text-[9px] text-slate-400 font-black uppercase">Motorista é o próprio beneficiário</span>
+                    <div
+                      onClick={() => setForm(f => ({ ...f, beneficiaryIsDriver: !f.beneficiaryIsDriver }))}
+                      className={`relative w-10 h-6 rounded-full transition-all ${form.beneficiaryIsDriver ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                    >
+                      <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${form.beneficiaryIsDriver ? 'left-5' : 'left-1'}`} />
+                    </div>
+                  </label>
                 </div>
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="space-y-1">
-                    <label className="text-[8px] opacity-40 uppercase font-black ml-1">Tipo de Operação</label>
-                    <CustomSelect
-                      value={form.paymentPreference || ''}
-                      onChange={v => setForm({ ...form, paymentPreference: v as any })}
-                      options={[
-                        { value: 'PIX', label: 'PIX' },
-                        { value: 'TED', label: 'TED BANCÁRIO' },
-                      ]}
-                      inputClassName="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none"
-                    />
+
+                {form.beneficiaryIsDriver ? (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 flex items-center gap-4">
+                    <span className="text-2xl">✅</span>
+                    <div>
+                      <p className="text-[11px] font-black text-emerald-400 uppercase">Acesso via login do próprio motorista</p>
+                      <p className="text-[9px] text-slate-400 mt-1">O motorista acessa os contratos de frete com seu próprio login. Nenhum acesso separado necessário.</p>
+                    </div>
                   </div>
-                  <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Celular Benef.</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none" value={form.beneficiaryPhone} onChange={e => setForm({ ...form, beneficiaryPhone: maskPhone(e.target.value) })} /></div>
-                  <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">E-mail Benef.</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none lowercase" value={form.beneficiaryEmail} onChange={e => setForm({ ...form, beneficiaryEmail: e.target.value })} /></div>
-                </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Nome do Beneficiário</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold uppercase outline-none focus:bg-white/20" value={form.beneficiaryName || ''} onChange={e => setForm({ ...form, beneficiaryName: e.target.value.toUpperCase() })} /></div>
+                      <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Documento Chave (CPF/CNPJ)</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white/20" value={form.beneficiaryCnpj || ''} onChange={e => setForm({ ...form, beneficiaryCnpj: e.target.value })} /></div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-6">
+                      <div className="space-y-1">
+                        <label className="text-[8px] opacity-40 uppercase font-black ml-1">Tipo de Operação</label>
+                        <CustomSelect
+                          value={form.paymentPreference || ''}
+                          onChange={v => setForm({ ...form, paymentPreference: v as any })}
+                          options={[{ value: 'PIX', label: 'PIX' }, { value: 'TED', label: 'TED BANCÁRIO' }]}
+                          inputClassName="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Celular Benef.</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none" value={form.beneficiaryPhone || ''} onChange={e => setForm({ ...form, beneficiaryPhone: maskPhone(e.target.value) })} /></div>
+                      <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">E-mail Benef.</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none lowercase" value={form.beneficiaryEmail || ''} onChange={e => setForm({ ...form, beneficiaryEmail: e.target.value })} /></div>
+                    </div>
+
+                    {/* Acesso do beneficiário */}
+                    <div className="border-t border-white/10 pt-5 space-y-4">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Acesso ao Portal do Beneficiário</p>
+                      {form.beneficiaryUserId ? (
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-4">
+                          <span className="text-xl">🔐</span>
+                          <div className="flex-1">
+                            <p className="text-[10px] font-black text-blue-400 uppercase">Acesso criado</p>
+                            <p className="text-[9px] text-slate-400 mt-0.5">O beneficiário possui login próprio no sistema. <span className="text-slate-500 italic">Não visualiza contratos de frete.</span></p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setForm(f => ({ ...f, beneficiaryUserId: undefined }))}
+                            className="text-[9px] text-red-400 hover:text-red-300 font-black uppercase"
+                          >
+                            Revogar
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between gap-4">
+                          <p className="text-[9px] text-slate-500">O beneficiário não tem acesso ao sistema. Clique para criar um login separado.</p>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!form.beneficiaryName?.trim()) {
+                                alert('Preencha o nome do beneficiário antes de criar o acesso.');
+                                return;
+                              }
+                              const nameParts = form.beneficiaryName.trim().toLowerCase().split(' ');
+                              const username = `${nameParts[0]}.${nameParts[nameParts.length - 1]}.${Math.floor(1000 + Math.random() * 9000)}`;
+                              const password = Math.random().toString(36).slice(-8).toUpperCase();
+                              const userId = `benef-${Date.now()}`;
+                              try {
+                                await db.saveUser({
+                                  id: userId,
+                                  username,
+                                  password,
+                                  displayName: form.beneficiaryName.trim(),
+                                  role: 'beneficiary',
+                                  lastLogin: new Date().toISOString(),
+                                  status: 'Ativo',
+                                  isFirstLogin: true,
+                                  driverId: form.id,
+                                } as any);
+                                setForm(f => ({ ...f, beneficiaryUserId: userId }));
+                                alert(`✅ Acesso criado!\n\nUsuário: ${username}\nSenha: ${password}\n\nGuarde estas credenciais.`);
+                              } catch {
+                                alert('Erro ao criar acesso. Tente novamente.');
+                              }
+                            }}
+                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[9px] font-black uppercase whitespace-nowrap transition-all"
+                          >
+                            + Criar acesso
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* IV. GRUPOS & VÍNCULOS */}

@@ -60,6 +60,8 @@ export const driverRepository = {
       payment_preference: driver.paymentPreference || 'PIX',
       whatsapp_group_name: driver.whatsappGroupName?.trim() || null,
       whatsapp_group_link: driver.whatsappGroupLink?.trim() || null,
+      beneficiary_is_driver: driver.beneficiaryIsDriver ?? null,
+      beneficiary_user_id: driver.beneficiaryUserId || null,
       freight_contract_send_to: driver.freightContractSendTo || null,
       last_freight_contract_date: driver.lastFreightContractDate || null,
       last_freight_contract_location: driver.lastFreightContractLocation?.trim() || null,
@@ -119,6 +121,8 @@ export const driverRepository = {
       freightContractSendTo: d.freight_contract_send_to || d.freightContractSendTo,
       lastFreightContractDate: d.last_freight_contract_date || d.lastFreightContractDate,
       lastFreightContractLocation: d.last_freight_contract_location || d.lastFreightContractLocation,
+      beneficiaryIsDriver: d.beneficiary_is_driver ?? undefined,
+      beneficiaryUserId: d.beneficiary_user_id || undefined,
       currentLat: d.current_lat ? Number(d.current_lat) : undefined,
       currentLng: d.current_lng ? Number(d.current_lng) : undefined,
       lastLocationAt: d.last_location_at || d.lastLocationAt
