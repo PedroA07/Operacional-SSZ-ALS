@@ -4,7 +4,7 @@ import {
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
-  BotGroup, BotAutomation
+  BotGroup, BotAutomation, FreightContract
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1337,6 +1337,66 @@ export const db = {
       const { error } = await supabase.from('bot_automations').insert(payload);
       if (error) { console.error('[saveBotAutomation insert]', error.message); return false; }
     }
+    return true;
+  },
+
+  // ── Contratos de Frete ────────────────────────────────────────────────────
+
+  getFreightContracts: async (): Promise<FreightContract[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('freight_contracts')
+      .select('*')
+      .order('uploaded_at', { ascending: false });
+    if (error) { console.error('[getFreightContracts]', error.message); return []; }
+    return (data || []).map(r => ({
+      id:             r.id,
+      fileName:       r.file_name,
+      fileUrl:        r.file_url || undefined,
+      contractNumber: r.contract_number || undefined,
+      container:      r.container || undefined,
+      tripId:         r.trip_id || undefined,
+      tripOs:         r.trip_os || undefined,
+      destination:    r.destination || undefined,
+      status:         r.status,
+      uploadedAt:     r.uploaded_at,
+    }));
+  },
+
+  saveFreightContract: async (c: Omit<FreightContract, 'id' | 'uploadedAt'>): Promise<string | null> => {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('freight_contracts').insert({
+      file_name:       c.fileName,
+      file_url:        c.fileUrl || null,
+      contract_number: c.contractNumber || null,
+      container:       c.container || null,
+      trip_id:         c.tripId || null,
+      trip_os:         c.tripOs || null,
+      destination:     c.destination || null,
+      status:          c.status,
+      updated_at:      new Date().toISOString(),
+    }).select('id').single();
+    if (error) { console.error('[saveFreightContract]', error.message); return null; }
+    return data?.id ?? null;
+  },
+
+  updateFreightContractLink: async (id: string, tripId: string | null, tripOs: string | null, destination: string | null): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('freight_contracts').update({
+      trip_id:     tripId,
+      trip_os:     tripOs,
+      destination: destination,
+      status:      tripId ? 'linked' : 'unlinked',
+      updated_at:  new Date().toISOString(),
+    }).eq('id', id);
+    if (error) { console.error('[updateFreightContractLink]', error.message); return false; }
+    return true;
+  },
+
+  deleteFreightContract: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('freight_contracts').delete().eq('id', id);
+    if (error) { console.error('[deleteFreightContract]', error.message); return false; }
     return true;
   },
 

@@ -415,6 +415,19 @@ export interface CustomStatus {
   operationalOnly?: boolean;  // Visível apenas no painel operacional (não para motoristas)
 }
 
+export interface FreightContract {
+  id: string;
+  fileName: string;
+  fileUrl?: string;
+  contractNumber?: string;
+  container?: string;
+  tripId?: string;
+  tripOs?: string;
+  destination?: string;
+  status: 'linked' | 'unlinked';
+  uploadedAt: string;
+}
+
 export interface BotGroup {
   id: string;
   jid: string;

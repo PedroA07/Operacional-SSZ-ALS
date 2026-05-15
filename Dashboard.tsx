@@ -255,7 +255,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            </div>
         </header>
         
-        <div id="dashboard-scroll" className="flex-1 overflow-y-auto p-10 bg-[#f8fafc] custom-scrollbar">
+        <div id="dashboard-scroll" className="flex-1 overflow-y-auto overflow-x-hidden p-10 bg-[#f8fafc] custom-scrollbar">
            {activeTab === DashboardTab.INICIO && (
              <OverviewTab 
                trips={trips} 
