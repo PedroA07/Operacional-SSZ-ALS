@@ -181,7 +181,11 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   // Close on outside click / ESC
   useEffect(() => {
     const onMouse = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const t = e.target as Node;
+      const inTrigger = containerRef.current?.contains(t);
+      const popup = document.getElementById('datetimepicker-portal-popup');
+      const inPopup = popup?.contains(t);
+      if (!inTrigger && !inPopup) {
         setIsOpen(false); setShowYearPicker(false);
       }
     };
@@ -321,8 +325,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
       {/* ── Popup (portal para escapar overflow dos containers pais) ── */}
       {isOpen && createPortal(
         <div
+          id="datetimepicker-portal-popup"
           className="z-[9999] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
           style={popupStyle}
+          onMouseDown={e => e.nativeEvent.stopPropagation()}
         >
           {/* Two-column: LEFT = calendar | RIGHT = time */}
           <div className="flex">
