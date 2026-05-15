@@ -384,9 +384,10 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       const dMatch = parsed.motorista && t.driver?.name &&
         (normAccent(t.driver.name).includes(normAccent(parsed.motorista.split(' ')[0])) ||
          normAccent(parsed.motorista).includes(normAccent(t.driver.name.split(' ')[0])));
-      const lMatch = parsed.localidade && t.destination?.name &&
-        normAccent(t.destination.name).includes(normAccent(parsed.localidade.split(' ')[0]));
-      return !!(cMatch || (dMatch && lMatch) || (dMatch && !parsed.localidade));
+      // Localidade é critério obrigatório quando disponível (evita falso match em container reutilizado)
+      const lMatch = !parsed.localidade || !!(t.destination?.name &&
+        normAccent(t.destination.name).includes(normAccent(parsed.localidade.split(' ')[0])));
+      return !!((cMatch || dMatch) && lMatch);
     });
     return candidates.length === 1 ? candidates[0].id : null;
   }, [trips]);
