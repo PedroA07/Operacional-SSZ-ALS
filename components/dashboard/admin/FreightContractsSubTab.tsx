@@ -391,6 +391,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             <div className="w-[520px] py-2">
               <FreightContractDropzone
                 tripOS={t.os}
+                tripDriver={t.driver?.name}
                 existingDocs={allDocs}
                 onDone={docs => handleDropzoneDone(t, docs)}
                 onCancel={() => setDropzoneOpen(null)}
