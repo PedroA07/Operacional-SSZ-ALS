@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch, EmailTemplate } from './types';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch, EmailTemplate, Beneficiary } from './types';
 import OverviewTab from './components/dashboard/OverviewTab';
 import DriversTab from './components/dashboard/DriversTab';
+import BeneficiariesTab from './components/dashboard/beneficiaries/BeneficiariesTab';
 import FormsTab from './components/dashboard/FormsTab';
 import CustomersTab from './components/dashboard/CustomersTab';
 import PortsTab from './components/dashboard/PortsTab';
@@ -55,6 +56,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [avantidaRecords, setAvantidaRecords] = useState<AvantidaRecord[]>([]);
   const [sealBatches, setSealBatches] = useState<SealBatch[]>([]);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -107,7 +109,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         db.getCategories(),
         db.getAvantidaRecords(),
         db.getSealBatches(),
-        db.getEmailTemplates()
+        db.getEmailTemplates(),
+        db.getBeneficiaries()
       ]);
 
       if (responses[0].status === 'fulfilled') setDrivers(responses[0].value);
@@ -123,6 +126,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[7].status === 'fulfilled') setAvantidaRecords(responses[7].value);
       if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value);
       if (responses[9].status === 'fulfilled') setEmailTemplates(responses[9].value);
+      if (responses[10].status === 'fulfilled') setBeneficiaries(responses[10].value);
 
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
     } catch (e) {
@@ -301,6 +305,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.LACRES && <LacresTab userId={user.id} />}
            {activeTab === DashboardTab.AVANTIDA && <AvantidaTab userId={user.id} />}
            {activeTab === DashboardTab.MOTORISTAS && <DriversTab userId={user.id} drivers={drivers} customers={customers} onSaveDriver={async (d, id) => { await db.saveDriver({...d, id: id || `drv-${Date.now()}`} as Driver, user); await loadAllData(false); }} onDeleteDriver={async id => { await db.deleteDriver(id); await loadAllData(false); }} availableOps={availableOps} />}
+           {activeTab === DashboardTab.BENEFICIARIOS && <BeneficiariesTab userId={user.id} beneficiaries={beneficiaries} onSave={async (b) => { await db.saveBeneficiary(b); await loadAllData(false); }} onDelete={async (id) => { await db.deleteBeneficiary(id); await loadAllData(false); }} />}
            {activeTab === DashboardTab.CLIENTES && <CustomersTab userId={user.id} customers={customers} onSaveCustomer={async (c, id) => {
               const success = await db.saveCustomer({...c, id: id || `cust-${Date.now()}`} as Customer, user);
               if (success) {
