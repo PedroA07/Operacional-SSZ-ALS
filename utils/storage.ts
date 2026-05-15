@@ -54,9 +54,8 @@ export const db = {
 
   saveUser: async (user: User) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('users').upsert({
+    const payload = {
       id: user.id,
-      // trim() remove espaços acidentais no início e fim antes de salvar
       username: user.username?.trim(),
       password: user.password,
       display_name: user.displayName?.trim(),
@@ -72,7 +71,20 @@ export const db = {
       presence_status: user.presence_status,
       config: user.thirdPartyConfig,
       notification_prefs: user.notificationPrefs || null,
-    });
+    };
+    const { error } = await supabase.from('users').upsert(payload, { onConflict: 'id' });
+    // Se o id não existe mas o username já está ocupado (race condition / CPF duplicado),
+    // buscamos o id real pelo username e atualizamos esse registro
+    if (error?.code === '23505' && user.username) {
+      const { data: existing } = await supabase
+        .from('users').select('id').eq('username', user.username.trim()).maybeSingle();
+      if (existing?.id) {
+        const { error: e2 } = await supabase
+          .from('users').upsert({ ...payload, id: existing.id }, { onConflict: 'id' });
+        if (e2) console.error('[saveUser] Erro:', e2.message);
+        return !e2;
+      }
+    }
     if (error) console.error('[saveUser] Erro:', error.message);
     return !error;
   },
@@ -80,6 +92,43 @@ export const db = {
   deleteUser: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('users').delete().eq('id', id);
+    return !error;
+  },
+
+  // ── Contratos de frete avulsos (sem vínculo com viagem) ──────────────────────
+  saveStandaloneContract: async (doc: {
+    id: string; code: string; url: string; fileName: string;
+    uploadDate: string; expiresAt?: string; parsedData?: Record<string, string | undefined>;
+  }) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('standalone_freight_contracts').upsert({
+      id: doc.id, code: doc.code, url: doc.url, file_name: doc.fileName,
+      upload_date: doc.uploadDate, expires_at: doc.expiresAt || null,
+      parsed_data: doc.parsedData || null,
+    }, { onConflict: 'id' });
+    if (error) console.error('[saveStandaloneContract] Erro:', error.message);
+    return !error;
+  },
+
+  getStandaloneContracts: async () => {
+    if (!supabase) return [];
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('standalone_freight_contracts')
+      .select('*')
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .order('upload_date', { ascending: false });
+    if (error) console.error('[getStandaloneContracts] Erro:', error.message);
+    return (data || []).map((r: any) => ({
+      id: r.id, code: r.code, url: r.url, fileName: r.file_name,
+      uploadDate: r.upload_date, expiresAt: r.expires_at || undefined,
+      parsedData: r.parsed_data || undefined,
+    }));
+  },
+
+  deleteStandaloneContract: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('standalone_freight_contracts').delete().eq('id', id);
     return !error;
   },
 

@@ -4,6 +4,7 @@ import { Trip, TripDocument, FreightContractDoc, Driver } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
 import DatePicker from '../../shared/DatePicker';
 import { fileStorage } from '../../../utils/fileStorage';
+import { db } from '../../../utils/storage';
 import {
   extractTextFromPDF,
   parseFreightContractText,
@@ -32,6 +33,20 @@ function ensureCitiesLoaded() {
 // ── Types ─────────────────────────────────────────────────────────────────────
 type FileStatus = 'parsing' | 'compressing' | 'ready' | 'uploading' | 'done' | 'error';
 type SendTo = 'driver' | 'beneficiary' | 'group';
+
+interface StandaloneContract {
+  id: string; code: string; url: string; fileName: string;
+  uploadDate: string; expiresAt?: string;
+  parsedData?: { prevTermino?: string; localidade?: string; motorista?: string; container?: string };
+}
+
+const genContractCode = () => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+  const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `CF-${date}-${rand}`;
+};
 
 interface FileEntry {
   id: string;
@@ -343,6 +358,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   const [saving, setSaving] = useState(false);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const [historySearch, setHistorySearch] = useState('');
+  const [standaloneContracts, setStandaloneContracts] = useState<StandaloneContract[]>([]);
   const [edits, setEdits] = useState<Record<string, RowEdit>>({});
   const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [addSearch, setAddSearch] = useState('');
@@ -353,6 +369,10 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   useEffect(() => {
     if (view === 'recipients') ensureCitiesLoaded();
   }, [view]);
+
+  useEffect(() => {
+    db.getStandaloneContracts().then(setStandaloneContracts).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const fn = (e: MouseEvent) => {
@@ -425,7 +445,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     Array.from(files).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')).forEach(processFile);
   };
 
-  // ── Save all — processa com ou sem vínculo ────────────────────────────────────
+  // ── Save all — vinculados vão para a viagem; avulsos geram código próprio ────
   const handleSaveAll = async () => {
     const readyEntries = entries.filter(e => e.status === 'ready');
     if (!readyEntries.length) return;
@@ -452,17 +472,17 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             id: entry.id, type: 'CONTRATO_FRETE', url, fileName: entry.file.name,
             uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(), parsedData,
           };
-          const newDocs = [...existing, doc];
-          await onUpdate({ ...trip, freightContractDoc: newDocs[0] as TripDocument, freightContractDocs: newDocs });
+          await onUpdate({ ...trip, freightContractDoc: [...existing, doc][0] as TripDocument, freightContractDocs: [...existing, doc] });
         } else {
-          // Sem vínculo: faz upload como contrato avulso
-          const url = await fileStorage.uploadFreightContract(entry.file, 'AVULSO', Date.now());
-          const doc: FreightContractDoc = {
-            id: entry.id, type: 'CONTRATO_FRETE', url, fileName: entry.file.name,
+          // Sem vínculo: gera código de identificação e salva no Supabase
+          const code = genContractCode();
+          const url = await fileStorage.uploadFreightContract(entry.file, code, 0);
+          const standalone: StandaloneContract = {
+            id: entry.id, code, url, fileName: entry.file.name,
             uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(), parsedData,
           };
-          const prev = JSON.parse(localStorage.getItem('avulsoFreightContracts') || '[]');
-          localStorage.setItem('avulsoFreightContracts', JSON.stringify([...prev, doc]));
+          await db.saveStandaloneContract(standalone);
+          setStandaloneContracts(prev => [standalone, ...prev]);
         }
         patch(entry.id, { status: 'done' });
       } catch (err: any) {
@@ -474,8 +494,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   };
 
   // ── Delete doc ────────────────────────────────────────────────────────────────
-  const handleDeleteDoc = async (trip: Trip | null, docId: string) => {
-    if (!trip) return;
+  const handleDeleteDoc = async (trip: Trip, docId: string) => {
     const docs = activeDocs(trip);
     const doc = docs.find(d => d.id === docId);
     if (!doc) return;
@@ -493,29 +512,26 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
   // ── History ───────────────────────────────────────────────────────────────────
   const contractHistory = useMemo(() => {
-    const items: { trip: Trip | null; doc: FreightContractDoc }[] = [];
+    const items: { trip: Trip | null; standalone: StandaloneContract | null; doc: FreightContractDoc | StandaloneContract }[] = [];
     for (const t of trips) {
-      for (const doc of activeDocs(t)) items.push({ trip: t, doc });
+      for (const doc of activeDocs(t)) items.push({ trip: t, standalone: null, doc });
     }
-    // Contratos avulsos (sem vínculo) salvos localmente
-    try {
-      const avulsos: FreightContractDoc[] = JSON.parse(localStorage.getItem('avulsoFreightContracts') || '[]');
-      for (const doc of avulsos) {
-        if (!isExpired(doc)) items.push({ trip: null, doc });
-      }
-    } catch { /* ignore */ }
+    for (const s of standaloneContracts) {
+      items.push({ trip: null, standalone: s, doc: s });
+    }
     return items.sort((a, b) => new Date(b.doc.uploadDate).getTime() - new Date(a.doc.uploadDate).getTime());
-  }, [trips]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trips, standaloneContracts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredHistory = useMemo(() => {
     if (!historySearch.trim()) return contractHistory;
     const q = historySearch.toLowerCase();
-    return contractHistory.filter(({ trip, doc }) =>
+    return contractHistory.filter(({ trip, standalone, doc }) =>
       (trip?.os || '').toLowerCase().includes(q) ||
       (trip?.driver?.name || '').toLowerCase().includes(q) ||
-      (doc.parsedData?.container || '').toLowerCase().includes(q) ||
+      ((doc as any).parsedData?.container || '').toLowerCase().includes(q) ||
       (trip?.customer?.name || '').toLowerCase().includes(q) ||
-      (doc.parsedData?.motorista || '').toLowerCase().includes(q)
+      ((doc as any).parsedData?.motorista || '').toLowerCase().includes(q) ||
+      (standalone?.code || '').toLowerCase().includes(q)
     );
   }, [contractHistory, historySearch]);
 
@@ -868,15 +884,15 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
               <p className="text-center py-8 text-[9px] font-black text-slate-300 uppercase">Nenhum resultado para "{historySearch}"</p>
             ) : (
               <div className="space-y-2">
-                {filteredHistory.map(({ trip, doc }) => (
-                  <div key={doc.id} className={`flex items-center gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm hover:border-slate-200 transition-colors ${!trip ? 'border-amber-100' : 'border-slate-100'}`}>
-                    {/* OS badge */}
-                    <div className="flex flex-col items-center shrink-0 w-16">
-                      <span className="text-[7px] font-black text-slate-400 uppercase">OS</span>
-                      {trip ? (
-                        <span className="text-[11px] font-black text-blue-700 tracking-tighter">{trip.os}</span>
+                {filteredHistory.map(({ trip, standalone, doc }) => (
+                  <div key={doc.id} className={`flex items-center gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm hover:border-slate-200 transition-colors ${standalone ? 'border-amber-100' : 'border-slate-100'}`}>
+                    {/* OS / Código badge */}
+                    <div className="flex flex-col items-center shrink-0 w-20">
+                      <span className="text-[7px] font-black text-slate-400 uppercase">{standalone ? 'Código' : 'OS'}</span>
+                      {standalone ? (
+                        <span className="text-[8px] font-black text-amber-600 tracking-tight font-mono">{standalone.code}</span>
                       ) : (
-                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-tight">Avulso</span>
+                        <span className="text-[11px] font-black text-blue-700 tracking-tighter">{trip?.os}</span>
                       )}
                     </div>
 
@@ -887,7 +903,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                     <div className="flex flex-col min-w-0 w-36 shrink-0">
                       <span className="text-[7px] font-black text-slate-400 uppercase">Motorista</span>
                       <span className="text-[9px] font-black text-slate-700 uppercase truncate">
-                        {trip?.driver?.name || doc.parsedData?.motorista || '—'}
+                        {trip?.driver?.name || (doc as any).parsedData?.motorista || '—'}
                       </span>
                       {trip?.driver?.plateHorse && (
                         <div className="flex gap-1 mt-0.5">
@@ -928,18 +944,17 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                         </svg>
                       </button>
                       <button
-                        onClick={() => {
-                          const label = trip ? `OS ${trip.os}` : 'contrato avulso';
+                        onClick={async () => {
+                          const label = standalone ? `contrato ${standalone.code}` : `OS ${trip?.os}`;
                           if (!confirm(`Excluir ${label}? O arquivo será removido do R2.`)) return;
-                          if (trip) {
+                          if (standalone) {
+                            setDeletingDocId(doc.id);
+                            try { await fileStorage.deleteFile(standalone.url); } catch { /* ignore */ }
+                            await db.deleteStandaloneContract(standalone.id);
+                            setStandaloneContracts(prev => prev.filter(s => s.id !== standalone.id));
+                            setDeletingDocId(null);
+                          } else if (trip) {
                             handleDeleteDoc(trip, doc.id);
-                          } else {
-                            fileStorage.deleteFile(doc.url).catch(() => {}).finally(() => {
-                              const prev: FreightContractDoc[] = JSON.parse(localStorage.getItem('avulsoFreightContracts') || '[]');
-                              localStorage.setItem('avulsoFreightContracts', JSON.stringify(prev.filter(d => d.id !== doc.id)));
-                              // force re-render by clearing history search
-                              setHistorySearch(v => v);
-                            });
                           }
                         }}
                         disabled={deletingDocId === doc.id}
