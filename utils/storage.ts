@@ -95,6 +95,43 @@ export const db = {
     return !error;
   },
 
+  // ── Contratos de frete avulsos (sem vínculo com viagem) ──────────────────────
+  saveStandaloneContract: async (doc: {
+    id: string; code: string; url: string; fileName: string;
+    uploadDate: string; expiresAt?: string; parsedData?: Record<string, string | undefined>;
+  }) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('standalone_freight_contracts').upsert({
+      id: doc.id, code: doc.code, url: doc.url, file_name: doc.fileName,
+      upload_date: doc.uploadDate, expires_at: doc.expiresAt || null,
+      parsed_data: doc.parsedData || null,
+    }, { onConflict: 'id' });
+    if (error) console.error('[saveStandaloneContract] Erro:', error.message);
+    return !error;
+  },
+
+  getStandaloneContracts: async () => {
+    if (!supabase) return [];
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('standalone_freight_contracts')
+      .select('*')
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .order('upload_date', { ascending: false });
+    if (error) console.error('[getStandaloneContracts] Erro:', error.message);
+    return (data || []).map((r: any) => ({
+      id: r.id, code: r.code, url: r.url, fileName: r.file_name,
+      uploadDate: r.upload_date, expiresAt: r.expires_at || undefined,
+      parsedData: r.parsed_data || undefined,
+    }));
+  },
+
+  deleteStandaloneContract: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('standalone_freight_contracts').delete().eq('id', id);
+    return !error;
+  },
+
   changePassword: async (userId: string, newPassword: string) => {
     if (!supabase) return false;
     const { error } = await supabase
