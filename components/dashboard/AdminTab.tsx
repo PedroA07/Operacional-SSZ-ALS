@@ -5,14 +5,13 @@ import { db } from '../../utils/storage';
 import AdvanceSubTab from './admin/AdvanceSubTab';
 import BalanceSubTab from './admin/BalanceSubTab';
 import FreightContractsSubTab from './admin/FreightContractsSubTab';
-import FreightContractUploadTab from './admin/FreightContractUploadTab';
 
 interface AdminTabProps {
   user: User;
 }
 
 const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'advance' | 'balance' | 'contracts' | 'upload'>('advance');
+  const [activeSubTab, setActiveSubTab] = useState<'advance' | 'balance' | 'contracts'>('advance');
   const [trips, setTrips] = useState<Trip[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
 
@@ -73,12 +72,6 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
               >
                 Contratos de Frete
               </button>
-              <button
-                onClick={() => setActiveSubTab('upload')}
-                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'upload' ? 'bg-blue-600 text-white shadow-xl' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
-              >
-                📂 Enviar Contratos
-              </button>
             </div>
           </div>
 
@@ -108,9 +101,6 @@ const AdminTab: React.FC<AdminTabProps> = ({ user }) => {
         )}
         {activeSubTab === 'contracts' && (
           <FreightContractsSubTab userId={user.id} trips={trips} onUpdate={handleUpdate} drivers={drivers} onUpdateDriver={handleUpdateDriver} />
-        )}
-        {activeSubTab === 'upload' && (
-          <FreightContractUploadTab trips={trips} />
         )}
       </div>
     </div>
