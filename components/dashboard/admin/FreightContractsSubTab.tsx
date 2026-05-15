@@ -12,6 +12,81 @@ import {
   normAccent,
 } from '../../../utils/freightContractParser';
 
+// ── PDF thumbnail cache (module-level to survive re-renders) ─────────────────
+const _thumbCache = new Map<string, string | 'loading' | 'error'>();
+
+async function renderPDFThumb(url: string, cacheKey: string): Promise<void> {
+  if (_thumbCache.has(cacheKey)) return;
+  _thumbCache.set(cacheKey, 'loading');
+  try {
+    const pdfjsLib = await import('pdfjs-dist');
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+        'pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url
+      ).toString();
+    }
+    const res = await fetch(url);
+    const buf = await res.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 0.4 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise;
+    _thumbCache.set(cacheKey, canvas.toDataURL('image/jpeg', 0.8));
+    window.dispatchEvent(new CustomEvent('pdf-thumb-ready', { detail: cacheKey }));
+  } catch {
+    _thumbCache.set(cacheKey, 'error');
+    window.dispatchEvent(new CustomEvent('pdf-thumb-ready', { detail: cacheKey }));
+  }
+}
+
+const PDFThumbnail: React.FC<{ url: string; docId: string }> = ({ url, docId }) => {
+  const [thumb, setThumb] = useState<string | 'loading' | 'error' | null>(() => _thumbCache.get(docId) ?? null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const update = (e: Event) => {
+      if ((e as CustomEvent).detail === docId) setThumb(_thumbCache.get(docId) ?? null);
+    };
+    window.addEventListener('pdf-thumb-ready', update);
+    return () => window.removeEventListener('pdf-thumb-ready', update);
+  }, [docId]);
+
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        obs.disconnect();
+        const cached = _thumbCache.get(docId);
+        if (cached) { setThumb(cached); return; }
+        setThumb('loading');
+        renderPDFThumb(url, docId);
+      }
+    }, { threshold: 0.1 });
+    obs.observe(wrapRef.current);
+    return () => obs.disconnect();
+  }, [url, docId]);
+
+  return (
+    <div ref={wrapRef} className="w-12 h-16 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
+      {thumb && thumb !== 'loading' && thumb !== 'error' ? (
+        <img src={thumb} alt="preview" className="w-full h-full object-cover object-top"/>
+      ) : thumb === 'loading' ? (
+        <svg className="w-4 h-4 text-slate-300 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+      ) : (
+        <svg className="w-5 h-5 text-red-300" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z"/>
+        </svg>
+      )}
+    </div>
+  );
+};
+
 // ── IBGE city loader ──────────────────────────────────────────────────────────
 interface IbgeCity { id: number; nome: string; microrregiao?: { mesorregiao: { UF: { sigla: string } } }; }
 type CityEntry = { name: string; uf: string; norm: string };
@@ -886,6 +961,9 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
               <div className="space-y-2">
                 {filteredHistory.map(({ trip, standalone, doc }) => (
                   <div key={doc.id} className={`flex items-center gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm hover:border-slate-200 transition-colors ${standalone ? 'border-amber-100' : 'border-slate-100'}`}>
+                    {/* PDF thumbnail */}
+                    <PDFThumbnail url={doc.url} docId={doc.id}/>
+
                     {/* OS / Código badge */}
                     <div className="flex flex-col items-center shrink-0 w-20">
                       <span className="text-[7px] font-black text-slate-400 uppercase">{standalone ? 'Código' : 'OS'}</span>
