@@ -2,16 +2,23 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { FreightContractDoc } from '../../../types';
 import { fileStorage } from '../../../utils/fileStorage';
-import { extractTextFromPDF, parseFreightContractText } from '../../../utils/freightContractParser';
+import { extractTextFromPDF, parseFreightContractText, compressPDFForStorage } from '../../../utils/freightContractParser';
 
 // ── Estado por arquivo ─────────────────────────────────────────────────────────
-type FileStatus = 'parsing' | 'ready' | 'uploading' | 'done' | 'error';
+type FileStatus = 'parsing' | 'compressing' | 'ready' | 'uploading' | 'done' | 'error';
+
+const fmt = (bytes: number) =>
+  bytes < 1024 * 1024
+    ? `${(bytes / 1024).toFixed(0)} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
 interface FileEntry {
   id: string;
-  file: File;
+  file: File;           // arquivo final (já comprimido se aplicável)
+  originalSize: number; // tamanho original para exibição
   status: FileStatus;
   errorMsg?: string;
+  compressed: boolean;
   parsed: {
     prevTermino: string;
     localidade: string;
@@ -53,15 +60,25 @@ const FreightContractDropzone: React.FC<Props> = ({ tripOS, existingDocs, onDone
     const entry: FileEntry = {
       id,
       file,
+      originalSize: file.size,
       status: 'parsing',
+      compressed: false,
       parsed: { prevTermino: '', localidade: '', motorista: '', container: '' },
     };
     setEntries(prev => [...prev, entry]);
 
     try {
+      // 1. Extrai texto ANTES de comprimir (garante que os dados sejam lidos)
       const text = await extractTextFromPDF(file);
       const parsed = parseFreightContractText(text);
+
+      // 2. Comprime o PDF (só age se > 300 KB)
+      patch(id, { status: 'compressing' });
+      const { file: finalFile, compressed } = await compressPDFForStorage(file);
+
       patch(id, {
+        file: finalFile,
+        compressed,
         status: 'ready',
         parsed: {
           prevTermino: parsed.prevTermino || '',
@@ -71,7 +88,7 @@ const FreightContractDropzone: React.FC<Props> = ({ tripOS, existingDocs, onDone
         },
       });
     } catch {
-      patch(id, { status: 'error', errorMsg: 'Falha ao ler PDF — verifique se é texto (não escaneado).' });
+      patch(id, { status: 'error', errorMsg: 'Falha ao processar PDF.' });
     }
   }, []);
 
@@ -133,36 +150,41 @@ const FreightContractDropzone: React.FC<Props> = ({ tripOS, existingDocs, onDone
 
   const remove = (id: string) => setEntries(prev => prev.filter(e => e.id !== id));
 
-  const allReady = entries.length > 0 && entries.every(e => e.status === 'ready' || e.status === 'done' || e.status === 'error');
+  const allReady = entries.length > 0 && entries.every(e => ['ready', 'done', 'error'].includes(e.status));
   const hasReady = entries.some(e => e.status === 'ready');
 
   // ── Status badge ─────────────────────────────────────────────────────────────
-  const StatusBadge = ({ status, errorMsg }: { status: FileStatus; errorMsg?: string }) => {
+  const Spinner = () => (
+    <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+    </svg>
+  );
+
+  const StatusBadge = ({ entry }: { entry: FileEntry }) => {
+    const { status, errorMsg, compressed, originalSize, file } = entry;
     if (status === 'parsing')
-      return (
-        <span className="flex items-center gap-1 text-[8px] font-black text-blue-500 uppercase">
-          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-          </svg>
-          Lendo PDF…
-        </span>
-      );
+      return <span className="flex items-center gap-1 text-[8px] font-black text-blue-500 uppercase"><Spinner />Lendo PDF…</span>;
+    if (status === 'compressing')
+      return <span className="flex items-center gap-1 text-[8px] font-black text-violet-500 uppercase"><Spinner />Comprimindo…</span>;
     if (status === 'uploading')
-      return (
-        <span className="flex items-center gap-1 text-[8px] font-black text-amber-500 uppercase">
-          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-          </svg>
-          Enviando…
-        </span>
-      );
+      return <span className="flex items-center gap-1 text-[8px] font-black text-amber-500 uppercase"><Spinner />Enviando…</span>;
     if (status === 'done')
       return <span className="text-[8px] font-black text-emerald-600 uppercase">✓ Salvo</span>;
     if (status === 'error')
       return <span className="text-[8px] font-black text-red-500 uppercase" title={errorMsg}>✗ Erro</span>;
-    return <span className="text-[8px] font-black text-slate-400 uppercase">Pronto</span>;
+    // ready — mostra tamanho com economia se houve compressão
+    if (compressed && file.size < originalSize) {
+      const pct = Math.round((1 - file.size / originalSize) * 100);
+      return (
+        <span className="flex items-center gap-1.5">
+          <span className="text-[8px] font-bold text-slate-400 line-through">{fmt(originalSize)}</span>
+          <span className="text-[8px] font-black text-emerald-600">{fmt(file.size)}</span>
+          <span className="text-[7px] font-black text-emerald-500 bg-emerald-50 border border-emerald-100 rounded px-1">−{pct}%</span>
+        </span>
+      );
+    }
+    return <span className="text-[8px] font-bold text-slate-400">{fmt(file.size)}</span>;
   };
 
   return (
@@ -220,7 +242,7 @@ const FreightContractDropzone: React.FC<Props> = ({ tripOS, existingDocs, onDone
                   <span className="text-[10px] font-black text-slate-700 truncate max-w-[200px]">{entry.file.name}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <StatusBadge status={entry.status} errorMsg={entry.errorMsg} />
+                  <StatusBadge entry={entry} />
                   {entry.status !== 'uploading' && entry.status !== 'done' && (
                     <button onClick={() => remove(entry.id)}
                       className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
