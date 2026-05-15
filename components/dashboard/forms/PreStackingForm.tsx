@@ -192,6 +192,10 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
       alert("Busque uma OS e selecione o Local de Entrega.");
       return;
     }
+    if (!formData.schedulingDate || !formData.schedulingTime) {
+      alert("Informe a Data e Hora de Agendamento.");
+      return;
+    }
     setPendingAction(mode);
     const existing = await tripSyncService.findExistingTrip(formData.os);
     await executeWorkflow(existing?.id || null);
@@ -360,7 +364,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
 
         <div className="space-y-4 bg-white p-6 rounded-[2.2rem] border border-slate-200 shadow-sm">
           <div className="space-y-1">
-            <label className={labelClass}>Data e Hora de Agendamento (Opcional)</label>
+            <label className={labelClass}>Data e Hora de Agendamento <span className="text-red-500">*</span></label>
             <DateTimePicker
               value={formData.schedulingDate ? `${formData.schedulingDate}T${formData.schedulingTime || '00:00'}` : ''}
               onChange={v => {

@@ -199,7 +199,7 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
             <div className="space-y-4">
               <div className="flex items-center gap-2 ml-1">
                 <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
-                <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Local de Destino</label>
+                <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Local de Destino <span className="text-red-500">*</span></label>
               </div>
               
               <div className="relative group">
@@ -251,7 +251,7 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
               <div className="space-y-4">
                 <div className="flex items-center gap-2 ml-1">
                   <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
-                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Data e Hora do Agendamento</label>
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Data e Hora do Agendamento <span className="text-red-500">*</span></label>
                 </div>
                 <div className="relative group">
                   <div className="absolute left-4 top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors">
@@ -296,7 +296,7 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
           </button>
           <button 
             onClick={() => onConfirm(locationId, dateTime)}
-            disabled={!locationId}
+            disabled={!locationId || !dateTime}
             className="flex-1 px-6 py-5 bg-slate-900 text-white rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             Confirmar Agendamento
