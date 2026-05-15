@@ -426,15 +426,15 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       <>
       <div className="flex flex-col lg:flex-row justify-between items-end gap-6">
         <div className="flex-1 w-full"><CategoryNavigation availableOps={availableOps} onNavigate={setActiveView} /></div>
-        <div className="flex items-end gap-3 w-full lg:w-auto">
+        <div className="flex flex-col items-end gap-2 w-full lg:w-auto">
+          <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
           <button
             onClick={() => setIsSilImporterOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#001e50] text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-950 transition-all shadow-lg shrink-0"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-[#001e50] transition-all shadow shrink-0"
           >
             <span className="text-[7px] font-black italic bg-white text-[#001e50] px-1.5 py-0.5 rounded leading-none">SIL</span>
             Importar Programações
           </button>
-          <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
         </div>
       </div>
 

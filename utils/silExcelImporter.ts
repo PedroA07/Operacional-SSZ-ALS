@@ -4,26 +4,26 @@ import { SILProgramacao } from '../types';
 
 // Mapeamento flexível: aceita variações de cabeçalho do SIL
 const COL_MAP: Record<keyof Omit<SILProgramacao, '_rowIndex'>, string[]> = {
-  numeroProgramacao:    ['número da programação', 'numero da programacao', 'num programacao', 'programação'],
-  tipoProgramado:       ['tipo de programação', 'tipo de programado', 'tipo programado'],
-  container:            ['containers', 'container', 'num container'],
-  tipoContainer:        ['tipo container', 'tipo de container'],
-  taraEspecifica:       ['tara específica', 'tara especifica', 'tara esp'],
+  numeroProgramacao:    ['número da programação', 'numero da programacao', 'num programacao', 'programação', 'nº programação', 'no programacao', 'n programacao', 'id programacao', 'num. programacao'],
+  tipoProgramado:       ['tipo de programação', 'tipo de programado', 'tipo programado', 'tipo'],
+  container:            ['containers', 'container', 'num container', 'nº container', 'numero container', 'cont'],
+  tipoContainer:        ['tipo container', 'tipo de container', 'tipo cont'],
+  taraEspecifica:       ['tara específica', 'tara especifica', 'tara esp', 'tara'],
   lacre1:               ['lacre 1', 'lacre1', 'lacre'],
-  booking:              ['booking'],
-  previsaoAtendimento:  ['previsão inicio atendimento (bra)', 'previsão inicio atendimento', 'previsao inicio atendimento', 'previsão de início', 'dt chegada local'],
-  situacao:             ['situação programado', 'situacao programado', 'situação programada', 'situação pri'],
-  nomeMotorista:        ['nome do motorista programado', 'nome motorista programado', 'nome do motorista', 'nome motorista'],
-  cpfMotorista:         ['cpf motorista programado', 'cpf motorista', 'cpf do motorista'],
-  placaVeiculo:         ['placa do veículo', 'placa do veiculo', 'placa veiculo', 'placa do', 'placa cavalo'],
-  placaCarreta:         ['placa da carreta 1', 'placa carreta 1', 'placa carreta', 'placa da carreta'],
-  cidadeAtendimento:    ['cidade local de atendimento', 'cidade atendimento', 'cidade local de', 'cidade local'],
-  referenciaPosCidade:  ['referência posição cidade', 'referencia posicao cidade', 'referência posição', 'ref posicao'],
-  nomeLocalAtendimento: ['nome local de atendimento', 'nome local atendimento', 'nome local', 'local atendimento'],
-  numeroColeta:         ['número da solicitação de coleta', 'numero da solicitacao de coleta', 'num coleta', 'nº coleta'],
-  embarcador:           ['embarcador'],
-  navio:                ['navio'],
-  bl:                   ['bu', 'bl', 'b/l', 'bill of lading'],
+  booking:              ['booking', 'num booking', 'nº booking'],
+  previsaoAtendimento:  ['previsão inicio atendimento (bra)', 'previsão inicio atendimento', 'previsao inicio atendimento', 'previsão de início', 'dt chegada local', 'previsão atendimento', 'previsao atendimento', 'data prevista', 'dt prevista', 'data/hora prevista'],
+  situacao:             ['situação programado', 'situacao programado', 'situação programada', 'situação pri', 'situacao', 'situação', 'status'],
+  nomeMotorista:        ['nome do motorista programado', 'nome motorista programado', 'nome do motorista', 'nome motorista', 'motorista'],
+  cpfMotorista:         ['cpf motorista programado', 'cpf motorista', 'cpf do motorista', 'cpf'],
+  placaVeiculo:         ['placa do veículo', 'placa do veiculo', 'placa veiculo', 'placa do', 'placa cavalo', 'placa', 'veículo', 'veiculo'],
+  placaCarreta:         ['placa da carreta 1', 'placa carreta 1', 'placa carreta', 'placa da carreta', 'carreta'],
+  cidadeAtendimento:    ['cidade local de atendimento', 'cidade atendimento', 'cidade local de', 'cidade local', 'cidade'],
+  referenciaPosCidade:  ['referência posição cidade', 'referencia posicao cidade', 'referência posição', 'ref posicao', 'referência'],
+  nomeLocalAtendimento: ['nome local de atendimento', 'nome local atendimento', 'nome local', 'local atendimento', 'local de atendimento'],
+  numeroColeta:         ['número da solicitação de coleta', 'numero da solicitacao de coleta', 'num coleta', 'nº coleta', 'solicitação de coleta', 'coleta'],
+  embarcador:           ['embarcador', 'shipper'],
+  navio:                ['navio', 'vessel', 'embarcação'],
+  bl:                   ['bu', 'bl', 'b/l', 'bill of lading', 'conhecimento', 'bill'],
 };
 
 function normalizeHeader(h: string): string {
@@ -62,6 +62,32 @@ function clean(value: any): string {
   return String(value).trim();
 }
 
+// Palavras-chave que indicam que uma linha é a linha de cabeçalho
+const HEADER_KEYWORDS = [
+  'programação', 'programacao', 'número da programação', 'numero da programacao',
+  'container', 'containers', 'motorista', 'booking', 'situação', 'situacao',
+  'placa', 'navio', 'embarcador', 'bl', 'bu', 'tipo',
+];
+
+function findHeaderRowIndex(rows: any[][]): number {
+  // Varre as primeiras 15 linhas em busca da que tem mais correspondências com HEADER_KEYWORDS
+  let bestRow = 0;
+  let bestScore = 0;
+  const limit = Math.min(15, rows.length);
+  for (let i = 0; i < limit; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    const normalized = row.map(h => String(h ?? '').trim().toLowerCase());
+    const score = normalized.reduce((acc, cell) =>
+      acc + (HEADER_KEYWORDS.some(kw => cell.includes(kw)) ? 1 : 0), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestRow = i;
+    }
+  }
+  return bestScore >= 2 ? bestRow : 0; // fallback linha 0 se não achou nada confiável
+}
+
 export const silExcelImporter = {
   parse: (file: File): Promise<SILProgramacao[]> => {
     return new Promise((resolve, reject) => {
@@ -78,8 +104,9 @@ export const silExcelImporter = {
             return;
           }
 
-          // Linha 0 = cabeçalho
-          const headers: string[] = (rows[0] as any[]).map(h => String(h ?? ''));
+          // Localiza linha de cabeçalho dinamicamente (SIL exporta linhas de título antes dos headers)
+          const headerRowIdx = findHeaderRowIndex(rows);
+          const headers: string[] = (rows[headerRowIdx] as any[]).map(h => String(h ?? ''));
 
           // Mapeia nome do campo → índice da coluna
           const colIdx: Record<string, number> = {};
@@ -96,7 +123,7 @@ export const silExcelImporter = {
           };
 
           const result: SILProgramacao[] = [];
-          for (let i = 1; i < rows.length; i++) {
+          for (let i = headerRowIdx + 1; i < rows.length; i++) {
             const row = rows[i];
             // Ignora linhas totalmente vazias
             if (!row || row.every(c => c === '' || c === null || c === undefined)) continue;
