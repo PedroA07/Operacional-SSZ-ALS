@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Trip, TripDocument, FreightContractDoc, Driver } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
 import DatePicker from '../../shared/DatePicker';
@@ -14,11 +14,10 @@ interface IbgeCity {
 }
 type CityEntry = { name: string; uf: string; norm: string };
 
-// Strip accents for accent-insensitive search
 const accentFree = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 
-let _cities: CityEntry[] | null = null; // null=not fetched, []=error/empty
+let _cities: CityEntry[] | null = null;
 let _fetching = false;
 
 function ensureCitiesLoaded() {
@@ -52,7 +51,6 @@ const CitySearch: React.FC<{ value: string; onChange: (v: string) => void }> = (
 
   useEffect(() => { setQuery(value); queryRef.current = value; }, [value]);
 
-  // Re-run search when IBGE finishes loading
   useEffect(() => {
     const handler = () => {
       setLoading(false);
@@ -72,7 +70,6 @@ const CitySearch: React.FC<{ value: string; onChange: (v: string) => void }> = (
 
   const runSearch = (q: string) => {
     if (!q.trim() || !_cities || !_cities.length) { setResults([]); return; }
-    // Split query: last token treated as UF filter if it's exactly 2 letters
     const parts = q.trim().toUpperCase().split(/\s+/);
     const lastPart = parts[parts.length - 1];
     const ufFilter = parts.length >= 2 && /^[A-Z]{2}$/.test(lastPart) ? lastPart : '';
@@ -202,6 +199,104 @@ const phoneLink = (driver: Driver, sendTo: SendTo): React.ReactElement => {
   );
 };
 
+// ── SendToDropdown ─────────────────────────────────────────────────────────────
+interface SendToOption {
+  value: SendTo;
+  tag: string;
+  tagClass: string;
+  label: string;
+  sublabel: string;
+  available: boolean;
+}
+
+const SendToDropdown: React.FC<{ driver: Driver; value: SendTo; onChange: (v: SendTo) => void }> = ({ driver, value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, []);
+
+  const options: SendToOption[] = [
+    {
+      value: 'driver',
+      tag: 'Motorista',
+      tagClass: 'text-blue-600 bg-blue-50 border-blue-200',
+      label: driver.name,
+      sublabel: driver.phone || 'Sem telefone',
+      available: true,
+    },
+    {
+      value: 'beneficiary',
+      tag: 'Beneficiário',
+      tagClass: 'text-violet-600 bg-violet-50 border-violet-200',
+      label: driver.beneficiaryName || driver.name,
+      sublabel: driver.beneficiaryPhone || 'Sem telefone',
+      available: !!driver.beneficiaryPhone,
+    },
+    {
+      value: 'group',
+      tag: 'Grupo',
+      tagClass: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+      label: driver.whatsappGroupName || 'Grupo WhatsApp',
+      sublabel: 'Todos os participantes',
+      available: !!(driver.whatsappGroupLink || driver.whatsappGroupName),
+    },
+  ];
+
+  const selected = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2.5 px-3 py-2.5 bg-white border border-slate-200 rounded-xl hover:border-blue-400 transition-all w-52 shadow-sm text-left"
+      >
+        <div className="flex-1 min-w-0">
+          <span className={`inline-block text-[7px] font-black uppercase px-1.5 py-0.5 rounded border ${selected.tagClass}`}>{selected.tag}</span>
+          <p className="text-[9px] font-black text-slate-800 uppercase truncate mt-0.5">{selected.label}</p>
+          <p className="text-[7px] font-bold text-slate-400 truncate">{selected.sublabel}</p>
+        </div>
+        <svg className={`w-3 h-3 text-slate-400 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden w-64">
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={!opt.available}
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-slate-50 last:border-0
+                ${opt.available ? 'hover:bg-slate-50 cursor-pointer' : 'opacity-40 cursor-not-allowed'}
+                ${value === opt.value ? 'bg-blue-50' : ''}`}
+            >
+              <div className="flex-1 min-w-0">
+                <span className={`inline-block text-[7px] font-black uppercase px-1.5 py-0.5 rounded border ${opt.tagClass}`}>{opt.tag}</span>
+                <p className="text-[9px] font-black text-slate-800 uppercase truncate mt-0.5">{opt.label}</p>
+                <p className="text-[7px] font-bold text-slate-400 truncate">{opt.sublabel}</p>
+              </div>
+              {value === opt.value && (
+                <svg className="w-3.5 h-3.5 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 interface Props {
   trips: Trip[];
@@ -223,13 +318,13 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   const [view, setView] = useState<'queue' | 'recipients'>('queue');
   const [edits, setEdits] = useState<Record<string, RowEdit>>({});
   const [dropzoneOpen, setDropzoneOpen] = useState<string | null>(null);
-  // docId em processo de exclusão
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [addSearch, setAddSearch] = useState('');
+  const [queueSearch, setQueueSearch] = useState('');
+  const [recipientSearch, setRecipientSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Pre-warm IBGE when entering recipients view
   useEffect(() => {
     if (view === 'recipients') ensureCitiesLoaded();
   }, [view]);
@@ -322,9 +417,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     if (!doc) return;
     setDeletingDocId(docId);
     try {
-      // 1. Deleta do R2
       await fileStorage.deleteFile(doc.url);
-      // 2. Remove do array e salva no Supabase
       const remaining = allDocs.filter(d => d.id !== docId);
       const legacyDoc = remaining[0] as TripDocument | undefined;
       await onUpdate({ ...trip, freightContractDoc: legacyDoc, freightContractDocs: remaining.length ? remaining : undefined });
@@ -341,13 +434,34 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     (t.balancePayment?.status === 'LIBERAR' || t.balancePayment?.status === 'PAGO')
   );
 
+  const filteredQueueTrips = useMemo(() => {
+    if (!queueSearch.trim()) return eligibleTrips;
+    const q = queueSearch.toLowerCase().trim();
+    return eligibleTrips.filter(t =>
+      t.os.toLowerCase().includes(q) ||
+      (t.driver?.name || '').toLowerCase().includes(q) ||
+      (t.customer?.name || '').toLowerCase().includes(q) ||
+      (t.customer?.legalName || '').toLowerCase().includes(q)
+    );
+  }, [eligibleTrips, queueSearch]);
+
+  const filteredRecipientDrivers = useMemo(() => {
+    if (!recipientSearch.trim()) return recipientDrivers;
+    const q = recipientSearch.toLowerCase().trim();
+    return recipientDrivers.filter(d =>
+      d.name.toLowerCase().includes(q) ||
+      d.plateHorse.toLowerCase().includes(q) ||
+      (d.beneficiaryName || '').toLowerCase().includes(q)
+    );
+  }, [recipientDrivers, recipientSearch]);
+
   const handleDropzoneDone = async (trip: Trip, docs: FreightContractDoc[]) => {
-    // Mantém retrocompatibilidade: o primeiro doc vai para freightContractDoc também
     const legacyDoc = docs[0] as TripDocument | undefined;
     await onUpdate({ ...trip, freightContractDoc: legacyDoc, freightContractDocs: docs });
     setDropzoneOpen(null);
   };
 
+  // ── Queue columns ─────────────────────────────────────────────────────────────
   const queueColumns = [
     {
       key: 'dateTime', label: '1. Data/Hora Viagem',
@@ -401,59 +515,88 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
         }
 
         return (
-          <div className="flex flex-col gap-2">
-            {/* Lista de contratos já salvos */}
-            {allDocs.map((doc, idx) => (
-              <div key={doc.id} className="flex items-start gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
-                <svg className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <div className="flex flex-col gap-2 min-w-[280px]">
+            {/* Motorista vinculado automaticamente à viagem */}
+            {t.driver && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 rounded-xl w-fit">
+                <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                 </svg>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[9px] font-black text-emerald-700 uppercase">Contrato {idx + 1}</span>
-                    <button onClick={() => window.open(doc.url, '_blank')}
-                      className="text-[8px] font-black text-blue-500 hover:underline">Ver PDF</button>
+                <span className="text-[8px] font-black text-white uppercase truncate max-w-[150px]">{t.driver.name}</span>
+                <span className="text-[7px] font-black text-emerald-400 uppercase tracking-wide">Vinculado</span>
+              </div>
+            )}
+
+            {/* Contratos salvos */}
+            {allDocs.map((doc, idx) => (
+              <div key={doc.id} className="flex flex-col bg-emerald-50 border border-emerald-100 rounded-xl p-3 gap-2">
+                {/* Header do contrato */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span className="text-[9px] font-black text-emerald-700 uppercase">Contrato {idx + 1}{allDocs.length > 1 ? `/${allDocs.length}` : ''}</span>
                     {doc.expiresAt && (
-                      <span className="text-[7px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5">
+                      <span className="text-[7px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 shrink-0">
                         Expira {new Date(doc.expiresAt).toLocaleDateString('pt-BR')}
                       </span>
                     )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => window.open(doc.url, '_blank')}
+                      title="Ver PDF"
+                      className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-100 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                      </svg>
+                    </button>
                     <button
                       onClick={() => {
                         if (confirm(`Excluir contrato ${idx + 1}? O arquivo será removido do R2 e do banco.`))
                           handleDeleteDoc(t, doc.id);
                       }}
                       disabled={deletingDocId === doc.id}
-                      className="text-[8px] font-black text-red-400 hover:text-red-600 hover:underline disabled:opacity-40"
+                      title="Excluir"
+                      className="p-1.5 rounded-lg text-red-400 hover:bg-red-100 transition-colors disabled:opacity-40"
                     >
-                      {deletingDocId === doc.id ? 'Excluindo…' : 'Excluir'}
+                      {deletingDocId === doc.id
+                        ? <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                        : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      }
                     </button>
                   </div>
-                  {doc.parsedData && (
-                    <div className="grid grid-cols-2 gap-x-3 mt-1">
-                      {doc.parsedData.prevTermino && (
-                        <span className="text-[8px] text-slate-500 font-bold truncate">
-                          <span className="text-slate-400">Término:</span> {doc.parsedData.prevTermino}
+                </div>
+
+                {/* Dados extraídos do PDF */}
+                {doc.parsedData && (
+                  <div className="flex flex-col gap-1">
+                    {doc.parsedData.container && (
+                      <span className="text-[8px] font-mono font-black text-white bg-slate-800 px-2 py-1 rounded-lg w-fit tracking-wide">
+                        {doc.parsedData.container}
+                      </span>
+                    )}
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                      {doc.parsedData.localidade && (
+                        <span className="text-[8px] font-bold text-slate-600 truncate">
+                          <span className="text-slate-400">Local: </span>{doc.parsedData.localidade}
                         </span>
                       )}
-                      {doc.parsedData.localidade && (
-                        <span className="text-[8px] text-slate-500 font-bold truncate">
-                          <span className="text-slate-400">Local:</span> {doc.parsedData.localidade}
+                      {doc.parsedData.prevTermino && (
+                        <span className="text-[8px] font-bold text-slate-600 truncate">
+                          <span className="text-slate-400">Térm: </span>{doc.parsedData.prevTermino}
                         </span>
                       )}
                       {doc.parsedData.motorista && (
-                        <span className="text-[8px] text-slate-500 font-bold truncate col-span-2">
-                          <span className="text-slate-400">Mot.:</span> {doc.parsedData.motorista}
-                        </span>
-                      )}
-                      {doc.parsedData.container && (
-                        <span className="text-[8px] font-mono font-black text-slate-600 truncate">
-                          {doc.parsedData.container}
+                        <span className="text-[8px] font-bold text-slate-500 col-span-2 truncate">
+                          <span className="text-slate-400">Mot: </span>{doc.parsedData.motorista}
                         </span>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -462,8 +605,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
               onClick={() => setDropzoneOpen(t.id)}
               className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-md active:scale-95 w-fit"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
               </svg>
               <span className="text-[9px] font-black uppercase tracking-widest">
                 {allDocs.length > 0 ? 'Adicionar PDF' : 'Anexar Contrato'}
@@ -519,19 +662,11 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       render: (driver: Driver) => {
         const e = getEdit(driver);
         return (
-          <select
+          <SendToDropdown
+            driver={driver}
             value={e.sendTo}
-            onChange={ev => patchEdit(driver.id, { sendTo: ev.target.value as SendTo }, e)}
-            className="text-[9px] font-black uppercase bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer shadow-sm"
-          >
-            <option value="driver">Motorista</option>
-            <option value="beneficiary" disabled={!driver.beneficiaryPhone}>
-              Beneficiário{!driver.beneficiaryPhone ? ' (sem tel.)' : ''}
-            </option>
-            <option value="group" disabled={!driver.whatsappGroupLink && !driver.whatsappGroupName}>
-              Grupo (ambos){!driver.whatsappGroupLink && !driver.whatsappGroupName ? ' (não config.)' : ''}
-            </option>
-          </select>
+            onChange={v => patchEdit(driver.id, { sendTo: v }, e)}
+          />
         );
       },
     },
@@ -606,7 +741,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             </button>
             <button onClick={() => handleRemove(driver)} title="Remover da lista"
               className="p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
         );
@@ -619,7 +754,9 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     <div className="space-y-6">
       <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 flex items-start gap-4">
         <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="2.5" /></svg>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
         </div>
         <div>
           <h4 className="text-[11px] font-black text-blue-900 uppercase tracking-widest">Gestão de Contratos de Frete</h4>
@@ -629,79 +766,164 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
         </div>
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-2">
-        <button onClick={() => setView('queue')}
-          className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'queue' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
+        <button
+          onClick={() => setView('queue')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'queue' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 10h16M4 14h10"/>
+          </svg>
           Fila de Contratos
-          <span className={`ml-2 px-2 py-0.5 rounded-full text-[8px] ${view === 'queue' ? 'bg-white text-slate-900' : 'bg-slate-200 text-slate-500'}`}>{eligibleTrips.length}</span>
+          <span className={`px-2 py-0.5 rounded-full text-[8px] ${view === 'queue' ? 'bg-white text-slate-900' : 'bg-slate-200 text-slate-500'}`}>{eligibleTrips.length}</span>
         </button>
-        <button onClick={() => setView('recipients')}
-          className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'recipients' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
-          Motoristas Destinatários
-          <span className={`ml-2 px-2 py-0.5 rounded-full text-[8px] ${view === 'recipients' ? 'bg-white text-blue-600' : 'bg-slate-200 text-slate-500'}`}>{recipientDrivers.length}</span>
+        <button
+          onClick={() => setView('recipients')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'recipients' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+          </svg>
+          Enviar Contratos
+          <span className={`px-2 py-0.5 rounded-full text-[8px] ${view === 'recipients' ? 'bg-white text-blue-600' : 'bg-slate-200 text-slate-500'}`}>{recipientDrivers.length}</span>
         </button>
       </div>
 
+      {/* Queue view */}
       {view === 'queue' && (
-        <SmartOperationTable userId={userId} componentId="admin-freight-contracts" columns={queueColumns} data={eligibleTrips} title="Fila de Documentação de Frete" />
+        <div className="space-y-4">
+          {/* Search bar */}
+          <div className="relative max-w-md">
+            <svg className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input
+              type="text"
+              value={queueSearch}
+              onChange={e => setQueueSearch(e.target.value)}
+              placeholder="Buscar por OS, motorista ou cliente..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-[10px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm placeholder:text-slate-300"
+            />
+            {queueSearch && (
+              <button
+                onClick={() => setQueueSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {queueSearch && (
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+              {filteredQueueTrips.length} resultado{filteredQueueTrips.length !== 1 ? 's' : ''} para "{queueSearch}"
+            </p>
+          )}
+
+          <SmartOperationTable
+            userId={userId}
+            componentId="admin-freight-contracts"
+            columns={queueColumns}
+            data={filteredQueueTrips}
+            title="Fila de Documentação de Frete"
+          />
+        </div>
       )}
 
+      {/* Recipients view */}
       {view === 'recipients' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-              {recipientDrivers.length} motorista{recipientDrivers.length !== 1 ? 's' : ''} configurado{recipientDrivers.length !== 1 ? 's' : ''}
-            </p>
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => { setShowAddDropdown(v => !v); setAddSearch(''); }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-                Adicionar Motorista
-              </button>
-              {showAddDropdown && (
-                <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden w-72">
-                  <div className="p-3 border-b border-slate-50">
-                    <input autoFocus type="text" value={addSearch} onChange={e => setAddSearch(e.target.value)}
-                      placeholder="Buscar por nome ou placa..."
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-[10px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder:text-slate-300" />
-                  </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {availableToAdd.length === 0 ? (
-                      <p className="text-center py-6 text-[9px] font-black text-slate-300 uppercase">
-                        {addSearch ? 'Nenhum resultado' : 'Todos os motoristas já estão na lista'}
-                      </p>
-                    ) : availableToAdd.map(d => (
-                      <button key={d.id} onClick={() => handleAdd(d)}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-50 last:border-0">
-                        <div className="flex-1">
-                          <p className="text-[10px] font-black text-slate-800 uppercase">{d.name}</p>
-                          <p className="text-[8px] font-bold text-slate-400 mt-0.5 font-mono">{d.plateHorse}</p>
-                        </div>
-                        <svg className="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            {/* Search bar */}
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <svg className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+              <input
+                type="text"
+                value={recipientSearch}
+                onChange={e => setRecipientSearch(e.target.value)}
+                placeholder="Buscar motorista ou placa..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-[10px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm placeholder:text-slate-300"
+              />
+              {recipientSearch && (
+                <button
+                  onClick={() => setRecipientSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
               )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                {filteredRecipientDrivers.length} motorista{filteredRecipientDrivers.length !== 1 ? 's' : ''}
+                {recipientSearch ? ' encontrado' : ' configurado'}{filteredRecipientDrivers.length !== 1 ? 's' : ''}
+              </p>
+
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => { setShowAddDropdown(v => !v); setAddSearch(''); }}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+                  Adicionar Motorista
+                </button>
+                {showAddDropdown && (
+                  <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden w-72">
+                    <div className="p-3 border-b border-slate-50">
+                      <input autoFocus type="text" value={addSearch} onChange={e => setAddSearch(e.target.value)}
+                        placeholder="Buscar por nome ou placa..."
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-[10px] font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder:text-slate-300"/>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      {availableToAdd.length === 0 ? (
+                        <p className="text-center py-6 text-[9px] font-black text-slate-300 uppercase">
+                          {addSearch ? 'Nenhum resultado' : 'Todos os motoristas já estão na lista'}
+                        </p>
+                      ) : availableToAdd.map(d => (
+                        <button key={d.id} onClick={() => handleAdd(d)}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left border-b border-slate-50 last:border-0">
+                          <div className="flex-1">
+                            <p className="text-[10px] font-black text-slate-800 uppercase">{d.name}</p>
+                            <p className="text-[8px] font-bold text-slate-400 mt-0.5 font-mono">{d.plateHorse}</p>
+                          </div>
+                          <svg className="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {recipientDrivers.length === 0 ? (
+          {filteredRecipientDrivers.length === 0 ? (
             <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
               <div className="w-12 h-12 bg-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
               </div>
-              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Nenhum motorista adicionado</p>
-              <p className="text-[9px] font-bold text-slate-300 mt-1">Clique em "Adicionar Motorista" para configurar os destinatários</p>
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                {recipientSearch ? 'Nenhum motorista encontrado' : 'Nenhum motorista adicionado'}
+              </p>
+              <p className="text-[9px] font-bold text-slate-300 mt-1">
+                {recipientSearch ? `Sem resultados para "${recipientSearch}"` : 'Clique em "Adicionar Motorista" para configurar os destinatários'}
+              </p>
             </div>
           ) : (
             <SmartOperationTable
               userId={userId}
               componentId="admin-freight-recipients"
               columns={recipientColumns}
-              data={recipientDrivers}
+              data={filteredRecipientDrivers}
               hideInternalSearch
             />
           )}

@@ -171,9 +171,19 @@ const FreightContractDropzone: React.FC<Props> = ({ tripOS, tripDriver, existing
     if (status === 'uploading')
       return <span className="flex items-center gap-1 text-[8px] font-black text-amber-500 uppercase"><Spinner />Enviando…</span>;
     if (status === 'done')
-      return <span className="text-[8px] font-black text-emerald-600 uppercase">✓ Salvo</span>;
+      return (
+        <span className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase">
+          <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+          Salvo
+        </span>
+      );
     if (status === 'error')
-      return <span className="text-[8px] font-black text-red-500 uppercase" title={errorMsg}>✗ Erro</span>;
+      return (
+        <span className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase" title={errorMsg}>
+          <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+          Erro
+        </span>
+      );
     // ready — mostra tamanho com economia se houve compressão
     if (compressed && file.size < originalSize) {
       const pct = Math.round((1 - file.size / originalSize) * 100);
@@ -282,10 +292,16 @@ const FreightContractDropzone: React.FC<Props> = ({ tripOS, tripDriver, existing
                       <div className="flex items-center gap-2">
                         <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Motorista</label>
                         {driverMatch === true && (
-                          <span className="text-[7px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">✓ Confere com a viagem</span>
+                          <span className="flex items-center gap-1 text-[7px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+                            <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                            Confere com a viagem
+                          </span>
                         )}
                         {driverMatch === false && (
-                          <span className="text-[7px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">⚠ Nome diferente da viagem</span>
+                          <span className="flex items-center gap-1 text-[7px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                            <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                            Nome diferente da viagem
+                          </span>
                         )}
                       </div>
                       <input
