@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { localDateStr } from '../../utils/dateHelpers';
 
 interface DateTimePickerProps {
@@ -153,7 +154,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     prevDigitsRef.current = value.replace(/\D/g, '');
   }, [value]);
 
-  // Compute popup position after opening
+  // Compute popup position using fixed coords to escape overflow clipping
   useEffect(() => {
     if (!isOpen || !containerRef.current) return;
     const rect  = containerRef.current.getBoundingClientRect();
@@ -161,18 +162,18 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     const vw    = window.innerWidth;
     const POP_W = 480;
     const POP_H = 410;
-    const style: React.CSSProperties = {};
+    const style: React.CSSProperties = { position: 'fixed', width: POP_W };
 
-    // Vertical
+    // Vertical: open below if room, else above
     if (vh - rect.bottom - 8 >= POP_H || vh - rect.bottom >= rect.top) {
-      style.top = '100%'; style.bottom = 'auto'; style.marginTop = 8; style.marginBottom = 0;
+      style.top = rect.bottom + 8; style.bottom = 'auto';
     } else {
-      style.bottom = '100%'; style.top = 'auto'; style.marginBottom = 8; style.marginTop = 0;
+      style.bottom = vh - rect.top + 8; style.top = 'auto';
     }
 
     // Horizontal
-    if (rect.left + POP_W <= vw) { style.left = 0; style.right = 'auto'; }
-    else                          { style.right = 0; style.left = 'auto'; }
+    if (rect.left + POP_W <= vw) { style.left = rect.left; style.right = 'auto'; }
+    else                          { style.right = vw - rect.right; style.left = 'auto'; }
 
     setPopupStyle(style);
   }, [isOpen]);
@@ -317,11 +318,11 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
         </svg>
       </div>
 
-      {/* ── Popup ── */}
-      {isOpen && (
+      {/* ── Popup (portal para escapar overflow dos containers pais) ── */}
+      {isOpen && createPortal(
         <div
-          className="absolute z-[600] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
-          style={{ width: 480, ...popupStyle }}
+          className="z-[9999] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
+          style={popupStyle}
         >
           {/* Two-column: LEFT = calendar | RIGHT = time */}
           <div className="flex">
@@ -533,7 +534,8 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
               OK
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
