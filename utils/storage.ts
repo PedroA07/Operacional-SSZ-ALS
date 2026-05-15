@@ -54,9 +54,8 @@ export const db = {
 
   saveUser: async (user: User) => {
     if (!supabase) return false;
-    const { error } = await supabase.from('users').upsert({
+    const payload = {
       id: user.id,
-      // trim() remove espaços acidentais no início e fim antes de salvar
       username: user.username?.trim(),
       password: user.password,
       display_name: user.displayName?.trim(),
@@ -72,7 +71,20 @@ export const db = {
       presence_status: user.presence_status,
       config: user.thirdPartyConfig,
       notification_prefs: user.notificationPrefs || null,
-    });
+    };
+    const { error } = await supabase.from('users').upsert(payload, { onConflict: 'id' });
+    // Se o id não existe mas o username já está ocupado (race condition / CPF duplicado),
+    // buscamos o id real pelo username e atualizamos esse registro
+    if (error?.code === '23505' && user.username) {
+      const { data: existing } = await supabase
+        .from('users').select('id').eq('username', user.username.trim()).maybeSingle();
+      if (existing?.id) {
+        const { error: e2 } = await supabase
+          .from('users').upsert({ ...payload, id: existing.id }, { onConflict: 'id' });
+        if (e2) console.error('[saveUser] Erro:', e2.message);
+        return !e2;
+      }
+    }
     if (error) console.error('[saveUser] Erro:', error.message);
     return !error;
   },
