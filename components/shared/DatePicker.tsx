@@ -152,6 +152,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
       id="datepicker-portal-popup"
       style={popupStyle}
       className="bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
+      onMouseDown={e => e.nativeEvent.stopPropagation()}
     >
       {/* Quick shortcuts */}
       <div className="flex gap-1.5 p-3 border-b border-slate-50 bg-slate-50/60">
