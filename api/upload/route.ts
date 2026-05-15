@@ -50,6 +50,7 @@ export async function POST(request: Request) {
     });
 
     await client.send(command);
+    console.log(`[R2 Route] Bucket=${bucketName} Key=${cleanKey}`);
 
     let domain = process.env.R2_PUBLIC_DOMAIN || "";
     domain = domain.trim().replace(/\/$/, "");

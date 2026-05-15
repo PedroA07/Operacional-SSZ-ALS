@@ -56,6 +56,7 @@ export default async function handler(request: Request) {
     });
 
     await client.send(command);
+    console.log(`[R2 Upload] Bucket=${bucketName} Key=${finalKey}`);
 
     let domain = process.env.R2_PUBLIC_DOMAIN || "";
     domain = domain.trim().replace(/\/$/, "");
