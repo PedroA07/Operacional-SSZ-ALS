@@ -2,7 +2,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { FreightContractDoc } from '../../../types';
 import { fileStorage } from '../../../utils/fileStorage';
-import { extractTextFromPDF, parseFreightContractText, compressPDFForStorage } from '../../../utils/freightContractParser';
+import { extractTextFromPDF, parseFreightContractText, compressPDFForStorage, normAccent } from '../../../utils/freightContractParser';
 
 // ── Estado por arquivo ─────────────────────────────────────────────────────────
 type FileStatus = 'parsing' | 'compressing' | 'ready' | 'uploading' | 'done' | 'error';
@@ -29,6 +29,7 @@ interface FileEntry {
 
 interface Props {
   tripOS: string;
+  tripDriver?: string;   // nome do motorista da viagem para comparação
   existingDocs: FreightContractDoc[];
   onDone: (docs: FreightContractDoc[]) => void;
   onCancel: () => void;
@@ -41,7 +42,7 @@ const FIELD_LABEL: Record<keyof FileEntry['parsed'], string> = {
   container: 'Container',
 };
 
-const FreightContractDropzone: React.FC<Props> = ({ tripOS, existingDocs, onDone, onCancel }) => {
+const FreightContractDropzone: React.FC<Props> = ({ tripOS, tripDriver, existingDocs, onDone, onCancel }) => {
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -225,62 +226,105 @@ const FreightContractDropzone: React.FC<Props> = ({ tripOS, existingDocs, onDone
       {/* Cards por arquivo */}
       {entries.length > 0 && (
         <div className="space-y-3">
-          {entries.map(entry => (
-            <div
-              key={entry.id}
-              className={`rounded-2xl border p-4 space-y-3 transition-all
-                ${entry.status === 'error' ? 'border-red-200 bg-red-50' :
-                  entry.status === 'done' ? 'border-emerald-200 bg-emerald-50' :
-                  'border-slate-200 bg-white'}`}
-            >
-              {/* Header do card */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <svg className="w-4 h-4 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z" />
-                  </svg>
-                  <span className="text-[10px] font-black text-slate-700 truncate max-w-[200px]">{entry.file.name}</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <StatusBadge entry={entry} />
-                  {entry.status !== 'uploading' && entry.status !== 'done' && (
-                    <button onClick={() => remove(entry.id)}
-                      className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </div>
+          {entries.map(entry => {
+            // Nome descritivo: usa dados extraídos se disponíveis
+            const displayName = entry.parsed.motorista
+              ? `Contrato · ${entry.parsed.motorista.split(' ').slice(0, 2).join(' ')}${entry.parsed.container ? ` · ${entry.parsed.container}` : ''}`
+              : entry.file.name;
 
-              {/* Campos extraídos (editáveis) */}
-              {(entry.status === 'ready' || entry.status === 'error') && (
-                <div className="grid grid-cols-2 gap-2">
-                  {(Object.keys(FIELD_LABEL) as Array<keyof FileEntry['parsed']>).map(field => (
-                    <div key={field} className="flex flex-col gap-1">
-                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                        {FIELD_LABEL[field]}
-                      </label>
+            // Verifica se motorista do PDF bate com o da viagem
+            const driverMatch = tripDriver && entry.parsed.motorista
+              ? normAccent(entry.parsed.motorista).includes(normAccent(tripDriver.split(' ')[0])) ||
+                normAccent(tripDriver).includes(normAccent(entry.parsed.motorista.split(' ')[0]))
+              : null;
+
+            return (
+              <div
+                key={entry.id}
+                className={`rounded-2xl border p-4 space-y-3 transition-all
+                  ${entry.status === 'error' ? 'border-red-200 bg-red-50' :
+                    entry.status === 'done' ? 'border-emerald-200 bg-emerald-50' :
+                    'border-slate-200 bg-white'}`}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z" />
+                    </svg>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black text-slate-700 leading-tight">
+                        {entry.status === 'parsing' || entry.status === 'compressing'
+                          ? entry.file.name
+                          : displayName}
+                      </p>
+                      <p className="text-[8px] text-slate-400 font-bold mt-0.5 truncate">{entry.file.name}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <StatusBadge entry={entry} />
+                    {entry.status !== 'uploading' && entry.status !== 'done' && (
+                      <button onClick={() => remove(entry.id)}
+                        className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Campos extraídos */}
+                {(entry.status === 'ready' || entry.status === 'error') && (
+                  <div className="space-y-2">
+                    {/* Motorista em destaque */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Motorista</label>
+                        {driverMatch === true && (
+                          <span className="text-[7px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">✓ Confere com a viagem</span>
+                        )}
+                        {driverMatch === false && (
+                          <span className="text-[7px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">⚠ Nome diferente da viagem</span>
+                        )}
+                      </div>
                       <input
                         type="text"
-                        value={entry.parsed[field]}
-                        onChange={e => patchParsed(entry.id, field, e.target.value)}
-                        placeholder={entry.status === 'error' ? 'Não extraído' : '—'}
-                        className={`text-[9px] font-bold rounded-xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white
-                          ${entry.parsed[field] ? 'text-slate-800 border-slate-200' : 'text-slate-300 border-slate-100'}`}
+                        value={entry.parsed.motorista}
+                        onChange={e => patchParsed(entry.id, 'motorista', e.target.value)}
+                        placeholder="Não extraído — preencha manualmente"
+                        className={`text-[9px] font-bold rounded-xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-full
+                          ${entry.parsed.motorista ? 'text-slate-800 border-slate-200' : 'text-slate-400 border-amber-200 bg-amber-50/30'}`}
                       />
                     </div>
-                  ))}
-                </div>
-              )}
 
-              {/* Erro de leitura */}
-              {entry.status === 'error' && entry.errorMsg && (
-                <p className="text-[8px] font-bold text-red-500">{entry.errorMsg}</p>
-              )}
-            </div>
-          ))}
+                    {/* Container + Local + Término em linha */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['container', 'localidade', 'prevTermino'] as const).map(field => (
+                        <div key={field} className="flex flex-col gap-1">
+                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                            {FIELD_LABEL[field]}
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.parsed[field]}
+                            onChange={e => patchParsed(entry.id, field, e.target.value)}
+                            placeholder="—"
+                            className={`text-[9px] font-bold rounded-xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white
+                              ${entry.parsed[field] ? 'text-slate-800 border-slate-200' : 'text-slate-300 border-slate-100'}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {entry.status === 'error' && entry.errorMsg && (
+                  <p className="text-[8px] font-bold text-red-500">{entry.errorMsg}</p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

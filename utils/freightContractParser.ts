@@ -2,7 +2,7 @@
 // Cidades excluídas da localidade (porto/origem ALS)
 const EXCLUDED_CITIES = ['GUARUJA', 'GUARUJÁ', 'SANTOS'];
 
-function normAccent(s: string): string {
+export function normAccent(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
 }
 
@@ -38,7 +38,39 @@ export async function extractTextFromPDF(file: File): Promise<string> {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    pages.push(content.items.map((item: any) => item.str).join(' '));
+
+    // O pdf.js retorna items na ordem do stream interno do PDF, não em ordem de leitura.
+    // Em layouts de tabela/formulário (labels numa coluna, valores em outra) isso embaralha
+    // o texto. Ordenamos por linha (y decrescente = topo→baixo) e depois por coluna (x crescente).
+    const items = (content.items as any[]).filter(item => item.str?.trim());
+
+    items.sort((a, b) => {
+      const ay = a.transform[5], by = b.transform[5];
+      const ax = a.transform[4], bx = b.transform[4];
+      const yDiff = by - ay;
+      // Tolerância de 4pt para considerar na mesma linha
+      if (Math.abs(yDiff) > 4) return yDiff;
+      return ax - bx;
+    });
+
+    // Agrupa em linhas para manter "label: valor" juntos
+    const lines: string[][] = [];
+    let currentLine: string[] = [];
+    let lastY: number | null = null;
+
+    for (const item of items) {
+      const y = item.transform[5];
+      if (lastY === null || Math.abs(y - lastY) <= 4) {
+        currentLine.push(item.str);
+      } else {
+        if (currentLine.length) lines.push(currentLine);
+        currentLine = [item.str];
+      }
+      lastY = y;
+    }
+    if (currentLine.length) lines.push(currentLine);
+
+    pages.push(lines.map(line => line.join(' ')).join('\n'));
   }
   return pages.join('\n');
 }
@@ -108,16 +140,19 @@ export async function compressPDFForStorage(file: File): Promise<{ file: File; c
 export function parseFreightContractText(text: string): ParsedFreightContract {
   const result: ParsedFreightContract = {};
 
-  // ── Prev. Término ────────────────────────────────────────────────────────────
-  const termMatch = text.match(/Prev\.?\s*T[eé]rmin[oa][\s:]*(\d{2}\/\d{2}\/\d{4})/i);
+  // ── Prev. Término ─────────────────────────────────────────────────────────────
+  // Cobre: "Prev. Término: 06/05/2026" e "Prev. Término 06/05/2026" etc.
+  const termMatch = text.match(/Prev\.?\s*T[eé]rmin[oa][o]?[\s:]+(\d{2}\/\d{2}\/\d{4})/i);
   if (termMatch) result.prevTermino = termMatch[1];
 
-  // ── Origem e Destino ─────────────────────────────────────────────────────────
-  const origemMatch = text.match(/Origem[\s:]+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][A-ZÀÁÂÃÉÊÍÓÔÕÚÇ\s]+ - [A-Z]{2})/i);
-  const destinoMatch = text.match(/Destino[\s:]+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][A-ZÀÁÂÃÉÊÍÓÔÕÚÇ\s]+ - [A-Z]{2})/i);
+  // ── Origem e Destino ──────────────────────────────────────────────────────────
+  // Formato: "GUARUJA - SP" ou "GUARULHOS - SP"
+  // Captura palavras maiúsculas (com acentos e espaços) seguidas de " - XX"
+  const origemMatch = text.match(/Origem[\s:]+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][A-ZÀÁÂÃÉÊÍÓÔÕÚÇ ]+?)\s*-\s*([A-Z]{2})\b/i);
+  const destinoMatch = text.match(/Destino[\s:]+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][A-ZÀÁÂÃÉÊÍÓÔÕÚÇ ]+?)\s*-\s*([A-Z]{2})\b/i);
 
-  const origem = origemMatch?.[1]?.trim();
-  const destino = destinoMatch?.[1]?.trim();
+  const origem = origemMatch ? `${origemMatch[1].trim()} - ${origemMatch[2]}` : undefined;
+  const destino = destinoMatch ? `${destinoMatch[1].trim()} - ${destinoMatch[2]}` : undefined;
 
   if (destino && !isExcludedCity(destino)) {
     result.localidade = destino;
@@ -128,12 +163,22 @@ export function parseFreightContractText(text: string): ParsedFreightContract {
   }
 
   // ── Motorista ─────────────────────────────────────────────────────────────────
-  const motMatch = text.match(/Motorista[\s:]+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][A-ZÀÁÂÃÉÊÍÓÔÕÚÇ\s]+?)(?:\s{2,}|\s+CPF[\s:]|\s+CNH[\s:]|\s+Fone[\s:])/i);
+  // Linha típica: "Motorista: NOME COMPLETO" seguido de CPF/CNH/Fone ou fim de linha
+  const motMatch = text.match(
+    /Motorista[\s:]+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][A-ZÀÁÂÃÉÊÍÓÔÕÚÇ ]{3,}?)(?:\s+CPF|\s+CNH|\s+Fone|\s{3,}|\n|$)/im
+  );
   if (motMatch) result.motorista = motMatch[1].trim();
 
   // ── Container ─────────────────────────────────────────────────────────────────
-  const ctnMatch = text.match(/Nr\s*conteiner[\s:]+([A-Z]{4}\d{7})/i);
-  if (ctnMatch) result.container = ctnMatch[1].toUpperCase();
+  // Padrão: "Nr conteiner: HASU4364753," — captura SOMENTE o primeiro
+  const ctnMatch = text.match(/Nr\.?\s*conteiner[:\s]+([A-Z]{4}\d{7})/i);
+  if (ctnMatch) {
+    result.container = ctnMatch[1].toUpperCase();
+  } else {
+    // Fallback: qualquer sequência 4 letras + 7 dígitos no texto
+    const fallback = text.match(/\b([A-Z]{4}\d{7})\b/);
+    if (fallback) result.container = fallback[1].toUpperCase();
+  }
 
   return result;
 }
