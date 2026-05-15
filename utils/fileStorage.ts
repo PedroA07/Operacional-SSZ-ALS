@@ -117,8 +117,9 @@ export const fileStorage = {
   // Extrai a R2 key de uma URL pública e deleta do bucket
   deleteFile: async (url: string): Promise<void> => {
     // URL formato: https://{domain}/als-transportes/{key}
+    // A key enviada ao delete inclui o prefixo als-transportes/ para bater com o path gravado no bucket
     const match = url.match(/\/als-transportes\/(.+)$/);
-    const key = match?.[1];
+    const key = match ? `als-transportes/${match[1]}` : null;
     if (!key) throw new Error('URL inválida para exclusão');
     const res = await fetch('/api/delete-file', {
       method: 'DELETE',

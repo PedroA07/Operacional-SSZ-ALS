@@ -28,12 +28,15 @@ export async function POST(request: Request) {
       });
     }
 
-    // Limpeza da Key: Remove o bucket se ele vier no path e garante que não haja barras duplas
-    // O R2 grava a partir da raiz do bucket, então a Key não deve começar com o nome do bucket
-    const cleanKey = rawPath
-      .replace(new RegExp(`^${bucketName}/`, 'i'), '')
+    // Limpeza da Key: remove prefixo als-transportes se vier duplicado no path
+    const cleanPath = rawPath
+      .replace(/^als-transportes\//i, '')
+      .replace(/^als-transportes/i, '')
       .replace(/^\/+/, '')
       .replace(/\/+/g, '/');
+
+    // Sempre grava com o prefixo als-transportes/ para que a key bata com a URL pública
+    const cleanKey = `als-transportes/${cleanPath}`;
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
@@ -52,13 +55,12 @@ export async function POST(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
 
-    // CONSTRUÇÃO DA URL PÚBLICA:
-    // Forçamos o prefixo als-transportes/ na URL para compatibilidade com o sistema de visualização
-    const publicUrl = `${domain}/als-transportes/${cleanKey}`;
+    // URL pública: domain + key completa (que já inclui als-transportes/)
+    const publicUrl = `${domain}/${cleanKey}`;
 
-    return new Response(JSON.stringify({ 
-      url: publicUrl, 
-      path: `als-transportes/${cleanKey}`,
+    return new Response(JSON.stringify({
+      url: publicUrl,
+      path: cleanKey,
       success: true 
     }), {
       status: 200,

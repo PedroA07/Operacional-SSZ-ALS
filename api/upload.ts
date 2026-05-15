@@ -35,11 +35,14 @@ export default async function handler(request: Request) {
     }
 
     // Limpeza da Key para gravação física
-    const finalKey = rawPath
-      .replace(/^als-transportes\//i, '') 
+    const cleanPath = rawPath
+      .replace(/^als-transportes\//i, '')
       .replace(/^als-transportes/i, '')
       .replace(/^\/+/, '')
       .replace(/\/+/g, '/');
+
+    // Sempre grava com o prefixo als-transportes/ para que a key bata com a URL pública
+    const finalKey = `als-transportes/${cleanPath}`;
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const client = getS3Client();
@@ -58,12 +61,12 @@ export default async function handler(request: Request) {
     domain = domain.trim().replace(/\/$/, "");
     if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
     
-    // ATRIBUIÇÃO DIRETA: Forçamos a pasta als-transportes na URL de visualização
-    const publicUrl = `${domain}/als-transportes/${finalKey}`;
+    // URL pública: domain + key completa (que já inclui als-transportes/)
+    const publicUrl = `${domain}/${finalKey}`;
 
-    return new Response(JSON.stringify({ 
-      url: publicUrl, 
-      path: `als-transportes/${finalKey}`, // Retorna o path completo para o banco
+    return new Response(JSON.stringify({
+      url: publicUrl,
+      path: finalKey,
       success: true 
     }), {
       status: 200,
