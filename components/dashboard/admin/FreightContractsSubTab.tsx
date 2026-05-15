@@ -4,6 +4,7 @@ import { Trip, TripDocument, FreightContractDoc, Driver } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
 import DatePicker from '../../shared/DatePicker';
 import FreightContractDropzone from './FreightContractDropzone';
+import { fileStorage } from '../../../utils/fileStorage';
 
 // ── IBGE city loader ──────────────────────────────────────────────────────────
 interface IbgeCity {
@@ -221,8 +222,9 @@ interface RowEdit {
 const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, drivers = [], onUpdateDriver }) => {
   const [view, setView] = useState<'queue' | 'recipients'>('queue');
   const [edits, setEdits] = useState<Record<string, RowEdit>>({});
-  // ID da trip com dropzone aberto (null = nenhuma)
   const [dropzoneOpen, setDropzoneOpen] = useState<string | null>(null);
+  // docId em processo de exclusão
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [addSearch, setAddSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -313,6 +315,26 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     return docs.filter(d => !isExpired(d));
   };
 
+  // ── Exclusão: R2 primeiro, depois Supabase ────────────────────────────────────
+  const handleDeleteDoc = async (trip: Trip, docId: string) => {
+    const allDocs = activeDocs(trip);
+    const doc = allDocs.find(d => d.id === docId);
+    if (!doc) return;
+    setDeletingDocId(docId);
+    try {
+      // 1. Deleta do R2
+      await fileStorage.deleteFile(doc.url);
+      // 2. Remove do array e salva no Supabase
+      const remaining = allDocs.filter(d => d.id !== docId);
+      const legacyDoc = remaining[0] as TripDocument | undefined;
+      await onUpdate({ ...trip, freightContractDoc: legacyDoc, freightContractDocs: remaining.length ? remaining : undefined });
+    } catch (e: any) {
+      alert(`Erro ao excluir: ${e?.message || 'desconhecido'}`);
+    } finally {
+      setDeletingDocId(null);
+    }
+  };
+
   // ── Trips queue ──────────────────────────────────────────────────────────────
   const eligibleTrips = trips.filter(t =>
     (t.isCompleted || t.status === 'Viagem concluída') &&
@@ -395,6 +417,16 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                         Expira {new Date(doc.expiresAt).toLocaleDateString('pt-BR')}
                       </span>
                     )}
+                    <button
+                      onClick={() => {
+                        if (confirm(`Excluir contrato ${idx + 1}? O arquivo será removido do R2 e do banco.`))
+                          handleDeleteDoc(t, doc.id);
+                      }}
+                      disabled={deletingDocId === doc.id}
+                      className="text-[8px] font-black text-red-400 hover:text-red-600 hover:underline disabled:opacity-40"
+                    >
+                      {deletingDocId === doc.id ? 'Excluindo…' : 'Excluir'}
+                    </button>
                   </div>
                   {doc.parsedData && (
                     <div className="grid grid-cols-2 gap-x-3 mt-1">

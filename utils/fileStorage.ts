@@ -114,6 +114,23 @@ export const fileStorage = {
     return fileStorage.upload(file, `trips/${cleanOS}/contratos_frete/contrato_${index}_${Date.now()}.pdf`);
   },
 
+  // Extrai a R2 key de uma URL pública e deleta do bucket
+  deleteFile: async (url: string): Promise<void> => {
+    // URL formato: https://{domain}/als-transportes/{key}
+    const match = url.match(/\/als-transportes\/(.+)$/);
+    const key = match?.[1];
+    if (!key) throw new Error('URL inválida para exclusão');
+    const res = await fetch('/api/delete-file', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Erro ao excluir: HTTP ${res.status}`);
+    }
+  },
+
   uploadTripPhoto: (file: File | string, os: string, photoId: string) => {
     const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
     // Verifica se o arquivo original é um PDF para manter a extensão

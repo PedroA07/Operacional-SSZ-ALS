@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Trip, Driver, FreightContractDoc } from '../../../types';
+import PDFViewer from '../../shared/PDFViewer';
 
 interface DocsTabProps {
   trips: Trip[];
@@ -207,27 +208,11 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips, driver }) => {
        )}
 
        {isViewerOpen && selectedDoc && (
-        <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col animate-in fade-in duration-300">
-           <div className="h-20 bg-slate-900 flex items-center justify-between px-6 shrink-0 border-b border-white/5">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">Documento Digital</p>
-                <p className="text-xs font-bold text-white uppercase truncate mt-1">{selectedDoc.title}</p>
-              </div>
-              <button 
-                onClick={() => setIsViewerOpen(false)}
-                className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white active:bg-red-600 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
-              </button>
-           </div>
-           <div className="flex-1 overflow-auto bg-slate-100 flex items-center justify-center">
-              {selectedDoc.url.startsWith('data:image') ? (
-                <img src={selectedDoc.url} className="max-w-full max-h-full object-contain" alt="Doc" />
-              ) : (
-                <iframe src={selectedDoc.url} className="w-full h-full border-none" title="Doc Viewer" />
-              )}
-           </div>
-        </div>
+        <PDFViewer
+          url={selectedDoc.url}
+          title={selectedDoc.title}
+          onClose={() => setIsViewerOpen(false)}
+        />
       )}
     </div>
   );
