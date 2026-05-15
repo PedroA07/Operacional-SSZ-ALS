@@ -80,9 +80,17 @@ export const fileStorage = {
       }
       
       const data = await res.json();
-      if (!data.url) throw new Error("A API de upload não retornou uma URL válida.");
-      
-      return data.url; 
+      if (!data.url && !data.key) throw new Error("A API de upload não retornou uma URL válida.");
+
+      // Constrói URL no cliente usando VITE_R2_PUBLIC_DOMAIN + key retornada pelo API.
+      // Isso garante que a URL sempre bate com a key real gravada no bucket,
+      // independente de como o server construiu a URL.
+      const clientDomain = ((import.meta as any).env?.VITE_R2_PUBLIC_DOMAIN || '').trim().replace(/\/$/, '');
+      if (clientDomain && data.key) {
+        return `${clientDomain}/${data.key}`;
+      }
+
+      return data.url;
     } catch (e: any) {
       console.error("[Storage Upload Error]:", e);
       throw e;
