@@ -377,17 +377,19 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     return docs.filter(d => !isExpired(d));
   };
 
-  // ── Auto-match logic ──────────────────────────────────────────────────────────
+  // ── Auto-match logic — busca em TODAS as viagens, não só elegíveis ───────────
   const findAutoMatch = useCallback((parsed: FileEntry['parsed']): string | null => {
-    const candidates = eligibleTrips.filter(t => {
+    const candidates = trips.filter(t => {
       const cMatch = parsed.container && t.container && normAccent(t.container) === normAccent(parsed.container);
       const dMatch = parsed.motorista && t.driver?.name &&
         (normAccent(t.driver.name).includes(normAccent(parsed.motorista.split(' ')[0])) ||
          normAccent(parsed.motorista).includes(normAccent(t.driver.name.split(' ')[0])));
-      return !!(cMatch || dMatch);
+      const lMatch = parsed.localidade && t.destination?.name &&
+        normAccent(t.destination.name).includes(normAccent(parsed.localidade.split(' ')[0]));
+      return !!(cMatch || (dMatch && lMatch) || (dMatch && !parsed.localidade));
     });
     return candidates.length === 1 ? candidates[0].id : null;
-  }, [eligibleTrips]);
+  }, [trips]);
 
   // ── File processing ───────────────────────────────────────────────────────────
   const patch = (id: string, delta: Partial<FileEntry>) =>
@@ -422,33 +424,45 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     Array.from(files).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')).forEach(processFile);
   };
 
-  // ── Save all ──────────────────────────────────────────────────────────────────
+  // ── Save all — processa com ou sem vínculo ────────────────────────────────────
   const handleSaveAll = async () => {
-    const readyEntries = entries.filter(e => e.status === 'ready' && e.linkedTripId);
+    const readyEntries = entries.filter(e => e.status === 'ready');
     if (!readyEntries.length) return;
     setSaving(true);
     for (const entry of readyEntries) {
-      const trip = eligibleTrips.find(t => t.id === entry.linkedTripId);
-      if (!trip) continue;
       patch(entry.id, { status: 'uploading' });
       try {
-        const existing = activeDocs(trip);
-        const url = await fileStorage.uploadFreightContract(entry.file, trip.os, existing.length);
         const uploadDate = new Date();
         const expiresAt = new Date(uploadDate);
         expiresAt.setDate(expiresAt.getDate() + 90);
-        const doc: FreightContractDoc = {
-          id: entry.id, type: 'CONTRATO_FRETE', url, fileName: entry.file.name,
-          uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(),
-          parsedData: {
-            prevTermino: entry.parsed.prevTermino || undefined,
-            localidade: entry.parsed.localidade || undefined,
-            motorista: entry.parsed.motorista || undefined,
-            container: entry.parsed.container || undefined,
-          },
+        const parsedData = {
+          prevTermino: entry.parsed.prevTermino || undefined,
+          localidade: entry.parsed.localidade || undefined,
+          motorista: entry.parsed.motorista || undefined,
+          container: entry.parsed.container || undefined,
         };
-        const newDocs = [...existing, doc];
-        await onUpdate({ ...trip, freightContractDoc: newDocs[0] as TripDocument, freightContractDocs: newDocs });
+
+        if (entry.linkedTripId) {
+          const trip = trips.find(t => t.id === entry.linkedTripId);
+          if (!trip) { patch(entry.id, { status: 'error', errorMsg: 'Viagem não encontrada.' }); continue; }
+          const existing = activeDocs(trip);
+          const url = await fileStorage.uploadFreightContract(entry.file, trip.os, existing.length);
+          const doc: FreightContractDoc = {
+            id: entry.id, type: 'CONTRATO_FRETE', url, fileName: entry.file.name,
+            uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(), parsedData,
+          };
+          const newDocs = [...existing, doc];
+          await onUpdate({ ...trip, freightContractDoc: newDocs[0] as TripDocument, freightContractDocs: newDocs });
+        } else {
+          // Sem vínculo: faz upload como contrato avulso
+          const url = await fileStorage.uploadFreightContract(entry.file, 'AVULSO', Date.now());
+          const doc: FreightContractDoc = {
+            id: entry.id, type: 'CONTRATO_FRETE', url, fileName: entry.file.name,
+            uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(), parsedData,
+          };
+          const prev = JSON.parse(localStorage.getItem('avulsoFreightContracts') || '[]');
+          localStorage.setItem('avulsoFreightContracts', JSON.stringify([...prev, doc]));
+        }
         patch(entry.id, { status: 'done' });
       } catch (err: any) {
         patch(entry.id, { status: 'error', errorMsg: `Erro: ${err?.message || 'desconhecido'}` });
@@ -459,7 +473,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   };
 
   // ── Delete doc ────────────────────────────────────────────────────────────────
-  const handleDeleteDoc = async (trip: Trip, docId: string) => {
+  const handleDeleteDoc = async (trip: Trip | null, docId: string) => {
+    if (!trip) return;
     const docs = activeDocs(trip);
     const doc = docs.find(d => d.id === docId);
     if (!doc) return;
@@ -477,21 +492,29 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
   // ── History ───────────────────────────────────────────────────────────────────
   const contractHistory = useMemo(() => {
-    const items: { trip: Trip; doc: FreightContractDoc }[] = [];
-    for (const t of eligibleTrips) {
+    const items: { trip: Trip | null; doc: FreightContractDoc }[] = [];
+    for (const t of trips) {
       for (const doc of activeDocs(t)) items.push({ trip: t, doc });
     }
+    // Contratos avulsos (sem vínculo) salvos localmente
+    try {
+      const avulsos: FreightContractDoc[] = JSON.parse(localStorage.getItem('avulsoFreightContracts') || '[]');
+      for (const doc of avulsos) {
+        if (!isExpired(doc)) items.push({ trip: null, doc });
+      }
+    } catch { /* ignore */ }
     return items.sort((a, b) => new Date(b.doc.uploadDate).getTime() - new Date(a.doc.uploadDate).getTime());
-  }, [eligibleTrips]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trips]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredHistory = useMemo(() => {
     if (!historySearch.trim()) return contractHistory;
     const q = historySearch.toLowerCase();
     return contractHistory.filter(({ trip, doc }) =>
-      trip.os.toLowerCase().includes(q) ||
-      (trip.driver?.name || '').toLowerCase().includes(q) ||
+      (trip?.os || '').toLowerCase().includes(q) ||
+      (trip?.driver?.name || '').toLowerCase().includes(q) ||
       (doc.parsedData?.container || '').toLowerCase().includes(q) ||
-      (trip.customer?.name || '').toLowerCase().includes(q)
+      (trip?.customer?.name || '').toLowerCase().includes(q) ||
+      (doc.parsedData?.motorista || '').toLowerCase().includes(q)
     );
   }, [contractHistory, historySearch]);
 
@@ -643,7 +666,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     return <span className="text-[8px] font-bold text-slate-400">{fmt(file.size)}</span>;
   };
 
-  const pendingCount = entries.filter(e => e.status === 'ready' && e.linkedTripId).length;
+  const pendingCount = entries.filter(e => e.status === 'ready').length;
   const processingCount = entries.filter(e => ['parsing', 'compressing'].includes(e.status)).length;
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -762,7 +785,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                           <TripSelector
                             value={entry.linkedTripId}
                             onChange={id => patch(entry.id, { linkedTripId: id, autoMatched: false })}
-                            trips={eligibleTrips}
+                            trips={trips}
                             parsed={entry.parsed}
                             autoMatched={entry.autoMatched}
                           />
@@ -845,11 +868,15 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             ) : (
               <div className="space-y-2">
                 {filteredHistory.map(({ trip, doc }) => (
-                  <div key={doc.id} className="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl px-4 py-3 shadow-sm hover:border-slate-200 transition-colors">
+                  <div key={doc.id} className={`flex items-center gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm hover:border-slate-200 transition-colors ${!trip ? 'border-amber-100' : 'border-slate-100'}`}>
                     {/* OS badge */}
                     <div className="flex flex-col items-center shrink-0 w-16">
                       <span className="text-[7px] font-black text-slate-400 uppercase">OS</span>
-                      <span className="text-[11px] font-black text-blue-700 tracking-tighter">{trip.os}</span>
+                      {trip ? (
+                        <span className="text-[11px] font-black text-blue-700 tracking-tighter">{trip.os}</span>
+                      ) : (
+                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-tight">Avulso</span>
+                      )}
                     </div>
 
                     {/* Separator */}
@@ -858,10 +885,14 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                     {/* Driver */}
                     <div className="flex flex-col min-w-0 w-36 shrink-0">
                       <span className="text-[7px] font-black text-slate-400 uppercase">Motorista</span>
-                      <span className="text-[9px] font-black text-slate-700 uppercase truncate">{trip.driver?.name || '—'}</span>
-                      <div className="flex gap-1 mt-0.5">
-                        <span className="text-[7px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{trip.driver?.plateHorse}</span>
-                      </div>
+                      <span className="text-[9px] font-black text-slate-700 uppercase truncate">
+                        {trip?.driver?.name || doc.parsedData?.motorista || '—'}
+                      </span>
+                      {trip?.driver?.plateHorse && (
+                        <div className="flex gap-1 mt-0.5">
+                          <span className="text-[7px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{trip.driver.plateHorse}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Parsed chips */}
@@ -896,7 +927,20 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                         </svg>
                       </button>
                       <button
-                        onClick={() => { if (confirm(`Excluir contrato da OS ${trip.os}? O arquivo será removido do R2.`)) handleDeleteDoc(trip, doc.id); }}
+                        onClick={() => {
+                          const label = trip ? `OS ${trip.os}` : 'contrato avulso';
+                          if (!confirm(`Excluir ${label}? O arquivo será removido do R2.`)) return;
+                          if (trip) {
+                            handleDeleteDoc(trip, doc.id);
+                          } else {
+                            fileStorage.deleteFile(doc.url).catch(() => {}).finally(() => {
+                              const prev: FreightContractDoc[] = JSON.parse(localStorage.getItem('avulsoFreightContracts') || '[]');
+                              localStorage.setItem('avulsoFreightContracts', JSON.stringify(prev.filter(d => d.id !== doc.id)));
+                              // force re-render by clearing history search
+                              setHistorySearch(v => v);
+                            });
+                          }
+                        }}
                         disabled={deletingDocId === doc.id}
                         title="Excluir" className="p-1.5 rounded-xl text-red-300 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-40"
                       >
