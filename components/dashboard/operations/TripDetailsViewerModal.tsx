@@ -80,17 +80,19 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
   };
 
   const buildAeText = () => {
-    const today = new Date();
-    const todayStr = today.toLocaleDateString('pt-BR');
+    const clientFirst = (trip.customer.name || '').trim().split(/\s+/)[0].toUpperCase();
+    const city = (trip.customer.city || '').toUpperCase();
+    const state = (trip.customer.state || '').toUpperCase();
+    const location = city && state ? ` + ${city}/${state}` : city ? ` + ${city}` : '';
     return [
-      `PROGRAMAÇÃO ${todayStr}`,
-      `OS: ${trip.os || ''}`,
-      `Container: ${trip.container || ''}`,
-      `Data e Hora: ${fmtFull(trip.dateTime)}`,
-      `Motorista: ${trip.driver.name || ''}`,
-      `Cavalo: ${trip.driver.plateHorse || ''}`,
-      `Carreta: ${trip.driver.plateTrailer || ''}`,
-      `GERAR AE: ${fmtAeDateTime(aeDateTime)}`,
+      `> PROGRAMAÇÃO (${clientFirst}${location})`,
+      `* OS: \`${trip.os || ''}\``,
+      `* Container: \`${trip.container || ''}\``,
+      `* Data e Hora: \`${fmtFull(trip.dateTime)}\``,
+      `* Motorista: \`${trip.driver.name || ''}\``,
+      `* Cavalo: \`${trip.driver.plateHorse || ''}\``,
+      `* Carreta: \`${trip.driver.plateTrailer || ''}\``,
+      `*\`GERAR AE:\` ${fmtAeDateTime(aeDateTime)}*`,
     ].join('\n');
   };
 
@@ -182,7 +184,7 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                   <div className="space-y-3">
                     <DataItem label="Navio" value={trip.ship} copyable />
                     <DataItem label="Booking" value={trip.booking} color="text-blue-600" copyable />
-                    <DataItem label="Armador" value={trip.agencia || '---'} color="text-slate-500" />
+                    <DataItem label="Armador" value={trip.agencia || '---'} color="text-slate-500" copyable />
                     <DataItem label="Data Programada" value={new Date(trip.dateTime).toLocaleString('pt-BR')} />
                     <div className="flex flex-col">
                       <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Categoria</span>
@@ -218,7 +220,7 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                       </div>
                     </div>
                     <DataItem label="Lacre Oficial" value={trip.seal || ''} />
-                    <DataItem label="CVA" value={trip.cva || ''} color="text-amber-600" />
+                    <DataItem label="CVA" value={trip.cva || ''} color="text-amber-600" copyable />
                     {(trip as any).autColeta && (
                       <DataItem label="Aut. de Coleta" value={(trip as any).autColeta} copyable />
                     )}
@@ -239,7 +241,7 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                     <DataItem label="Motorista" value={trip.driver.name} copyable />
                     <div className="flex gap-4">
                       <DataItem label="CPF" value={trip.driver.cpf || '---'} copyable />
-                      <DataItem label="Telefone" value={trip.driver.phone || '---'} />
+                      <DataItem label="Telefone" value={trip.driver.phone || '---'} copyable />
                     </div>
                     <div className="flex gap-4">
                       <DataItem label="Cavalo" value={trip.driver.plateHorse} color="text-slate-900 font-bold" copyable />
