@@ -1,28 +1,36 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch, EmailTemplate, Beneficiary } from './types';
-import OverviewTab from './components/dashboard/OverviewTab';
-import DriversTab from './components/dashboard/DriversTab';
-import BeneficiariesTab from './components/dashboard/beneficiaries/BeneficiariesTab';
-import FormsTab from './components/dashboard/FormsTab';
-import CustomersTab from './components/dashboard/CustomersTab';
-import PortsTab from './components/dashboard/PortsTab';
-import PreStackingTab from './components/dashboard/PreStackingTab';
-import OperationsTab from './components/dashboard/OperationsTab';
-import AdminTab from './components/dashboard/AdminTab';
-import StaffTab from './components/dashboard/StaffTab';
-import SystemTab from './components/dashboard/SystemTab';
-import DocumentsTab from './components/dashboard/DocumentsTab';
-import StaysTab from './components/dashboard/StaysTab';
-import LoginsTab from './components/dashboard/LoginsTab';
-import LacresTab from './components/dashboard/LacresTab';
-import AvantidaTab from './components/dashboard/AvantidaTab';
-import OrganizationTab from './components/dashboard/OrganizationTab';
-import ColetaDoDiaTab from './components/dashboard/ColetaDoDiaTab';
-import AutomationsTab from './components/dashboard/AutomationsTab';
-import HandoverTab from './components/dashboard/HandoverTab';
-import ExternalUsersManager from './components/dashboard/third-party/ExternalUsersManager';
-import ExternalPortal from './components/dashboard/third-party/ExternalPortal';
+
+// Tabs carregadas sob demanda — reduz o bundle inicial significativamente
+const OverviewTab        = lazy(() => import('./components/dashboard/OverviewTab'));
+const DriversTab         = lazy(() => import('./components/dashboard/DriversTab'));
+const BeneficiariesTab   = lazy(() => import('./components/dashboard/beneficiaries/BeneficiariesTab'));
+const FormsTab           = lazy(() => import('./components/dashboard/FormsTab'));
+const CustomersTab       = lazy(() => import('./components/dashboard/CustomersTab'));
+const PortsTab           = lazy(() => import('./components/dashboard/PortsTab'));
+const PreStackingTab     = lazy(() => import('./components/dashboard/PreStackingTab'));
+const OperationsTab      = lazy(() => import('./components/dashboard/OperationsTab'));
+const AdminTab           = lazy(() => import('./components/dashboard/AdminTab'));
+const StaffTab           = lazy(() => import('./components/dashboard/StaffTab'));
+const SystemTab          = lazy(() => import('./components/dashboard/SystemTab'));
+const DocumentsTab       = lazy(() => import('./components/dashboard/DocumentsTab'));
+const StaysTab           = lazy(() => import('./components/dashboard/StaysTab'));
+const LoginsTab          = lazy(() => import('./components/dashboard/LoginsTab'));
+const LacresTab          = lazy(() => import('./components/dashboard/LacresTab'));
+const AvantidaTab        = lazy(() => import('./components/dashboard/AvantidaTab'));
+const OrganizationTab    = lazy(() => import('./components/dashboard/OrganizationTab'));
+const ColetaDoDiaTab     = lazy(() => import('./components/dashboard/ColetaDoDiaTab'));
+const AutomationsTab     = lazy(() => import('./components/dashboard/AutomationsTab'));
+const HandoverTab        = lazy(() => import('./components/dashboard/HandoverTab'));
+const ExternalUsersManager = lazy(() => import('./components/dashboard/third-party/ExternalUsersManager'));
+const ExternalPortal     = lazy(() => import('./components/dashboard/third-party/ExternalPortal'));
+
+const TabFallback = () => (
+  <div className="flex-1 flex items-center justify-center py-24">
+    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 import Sidebar from './components/dashboard/Sidebar';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
@@ -72,6 +80,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
+  const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
   // CONSTRUÇÃO DINÂMICA DAS OPERAÇÕES BASEADA NO BANCO DE DADOS
@@ -145,16 +154,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
     const refreshDataInterval = setInterval(() => loadAllData(false, true), 30000);
 
+    // Debounce realtime — evita múltiplos reloads em batch updates do servidor
+    const debouncedRealtimeRefresh = () => {
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+      realtimeDebounceRef.current = setTimeout(() => loadAllData(false, true), 800);
+    };
+
     let channel: any = null;
     if (supabase) {
       channel = supabase
         .channel('db-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => {
-          loadAllData(false, true);
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'seal_records' }, () => {
-          loadAllData(false, true);
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, debouncedRealtimeRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'seal_records' }, debouncedRealtimeRefresh)
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') setIsRealtimeActive(true);
         });
@@ -260,6 +271,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </header>
         
         <div id="dashboard-scroll" className="flex-1 overflow-y-auto overflow-x-hidden p-10 bg-[#f8fafc] custom-scrollbar">
+         <Suspense fallback={<TabFallback />}>
            {activeTab === DashboardTab.INICIO && (
              <OverviewTab 
                trips={trips} 
@@ -360,7 +372,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.EXTERNAL_PORTAL && (
              <ExternalPortal user={user} trips={trips} />
            )}
-
+         </Suspense>
         </div>
       </main>
 

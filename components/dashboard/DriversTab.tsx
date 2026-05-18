@@ -39,9 +39,19 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
     setUsers(data);
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, [drivers, isModalOpen]);
+  // Busca users só na montagem e quando o modal fecha (não a cada sync de drivers)
+  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => { if (!isModalOpen) fetchUsers(); }, [isModalOpen]);
+
+  // Mapa para lookup O(1) em vez de .find() por linha de tabela
+  const usersMap = useMemo(() => {
+    const m = new Map<string, User>();
+    users.forEach(u => {
+      if (u.driverId) m.set(u.driverId, u);
+      if (u.username) m.set(u.username, u);
+    });
+    return m;
+  }, [users]);
 
   const handleOpenModal = (d?: Driver) => {
     setEditingDriver(d || null);
@@ -60,7 +70,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
     return result;
   }, [drivers, searchQuery, sortBy, statusFilter]);
 
-  const columns = useMemo(() => [
+  const columns = useMemo(() => [ // eslint-disable-next-line react-hooks/exhaustive-deps
     {
       key: 'identificacao',
       label: 'Identificação / Beneficiário',
@@ -134,7 +144,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
       key: 'acesso',
       label: 'Acesso Portal',
       render: (d: Driver) => {
-        const linkedUser = users.find(u => u.driverId === d.id || u.username === d.cpf.replace(/\D/g,''));
+        const linkedUser = usersMap.get(d.id) || usersMap.get(d.cpf.replace(/\D/g,''));
         const passVisible = showPasswords[d.id];
         return (
           <div className="p-3 bg-slate-900 rounded-2xl border border-white/5 space-y-2 min-w-[200px]">
@@ -181,7 +191,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
         </div>
       ),
     },
-  ], [users, showPasswords, handleOpenModal]);
+  ], [usersMap, showPasswords, handleOpenModal]);
 
   return (
     <div className="max-w-full mx-auto space-y-6">
