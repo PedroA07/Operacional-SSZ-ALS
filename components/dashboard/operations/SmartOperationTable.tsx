@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { db } from '../../../utils/storage';
 import CustomSelect from '../../shared/CustomSelect';
 
@@ -43,6 +43,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
 }) => {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
@@ -104,38 +105,57 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Debounce search — evita filtrar 1000 linhas a cada tecla
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Pré-computa valores únicos por coluna uma única vez quando data muda
+  const uniqueValuesMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    columns.forEach(col => {
+      const seen = new Set<string>();
+      data.forEach(row => {
+        let val = col.sortValue ? col.sortValue(row) : row[col.key];
+        if (typeof val === 'object' && val !== null) val = val.name || val.id || '';
+        const s = String(val || '').trim();
+        if (s) seen.add(s);
+      });
+      map[col.key] = Array.from(seen).sort();
+    });
+    return map;
+  }, [data, columns]);
+
+  const getUniqueValues = useCallback((key: string) => uniqueValuesMap[key] ?? [], [uniqueValuesMap]);
+
   const filteredData = useMemo(() => {
     if (!data || !Array.isArray(data)) return [];
     
+    const searchStr = debouncedSearch.toLowerCase();
     let base = hideInternalSearch ? [...data] : data.filter(row => {
       if (!row) return false;
-      const searchStr = searchQuery.toLowerCase();
-      
-      // Global search
-      const matchesGlobal = Object.values(row).some(val => {
-        if (val === null || val === undefined) return false;
-        if (typeof val === 'object') {
-          try {
-            return Object.values(val).some(v => 
-              v !== null && v !== undefined && String(v).toLowerCase().includes(searchStr)
-            );
-          } catch (e) { return false; }
-        }
-        return String(val).toLowerCase().includes(searchStr);
-      });
 
-      if (!matchesGlobal) return false;
+      // Global search — só itera se há query
+      if (searchStr) {
+        const matchesGlobal = Object.values(row).some(val => {
+          if (val === null || val === undefined) return false;
+          if (typeof val === 'object') {
+            try { return Object.values(val).some(v => v != null && String(v).toLowerCase().includes(searchStr)); }
+            catch { return false; }
+          }
+          return String(val).toLowerCase().includes(searchStr);
+        });
+        if (!matchesGlobal) return false;
+      }
 
       // Column filters
+      if (Object.keys(columnFilters).length === 0) return true;
       return Object.entries(columnFilters).every(([key, filterVal]) => {
         if (!filterVal) return true;
         const column = columns.find(c => c.key === key);
         let val = column?.sortValue ? column.sortValue(row) : row[key];
-        
-        if (typeof val === 'object' && val !== null) {
-          val = val.name || val.id || JSON.stringify(val);
-        }
-        
+        if (typeof val === 'object' && val !== null) val = val.name || val.id || '';
         return String(val || '').toLowerCase() === filterVal.toLowerCase();
       });
     });
@@ -172,7 +192,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
     }
 
     return base;
-  }, [data, searchQuery, hideInternalSearch, sortConfig]);
+  }, [data, debouncedSearch, columnFilters, hideInternalSearch, sortConfig, columns]);
 
   // Lógica de Paginação
   const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
@@ -183,18 +203,6 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
 
   // Resetar para página 1 ao filtrar
   useEffect(() => { setCurrentPage(1); }, [searchQuery, columnFilters, itemsPerPage]);
-
-  const getUniqueValues = (key: string) => {
-    const column = columns.find(c => c.key === key);
-    const values = data.map(row => {
-      let val = column?.sortValue ? column.sortValue(row) : row[key];
-      if (typeof val === 'object' && val !== null) {
-        val = val.name || val.id || JSON.stringify(val);
-      }
-      return String(val || '');
-    }).filter(v => v.trim() !== '');
-    return Array.from(new Set(values)).sort();
-  };
 
   return (
     <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm animate-in fade-in duration-500 relative flex flex-col">
