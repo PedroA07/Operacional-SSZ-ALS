@@ -1,6 +1,18 @@
 
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef } from 'react';
-import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch, EmailTemplate, Beneficiary } from './types';
+import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch, EmailTemplate, Beneficiary, MonitoredShip } from './types';
+import Sidebar from './components/dashboard/Sidebar';
+import WeatherWidget from './components/dashboard/WeatherWidget';
+import OnlineStatus from './components/dashboard/OnlineStatus';
+import DatabaseStatus from './components/dashboard/DatabaseStatus';
+import UserProfile from './components/dashboard/UserProfile';
+import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
+import EmailCenter from './components/dashboard/email/EmailCenter';
+import NotificationToast from './components/dashboard/notifications/NotificationToast';
+import SimpleToast from './components/shared/SimpleToast';
+import FeedbackModal from './components/shared/FeedbackModal';
+import { db, supabase } from './utils/storage';
+import { Icons } from './constants/icons';
 
 // Tabs carregadas sob demanda — reduz o bundle inicial significativamente
 const OverviewTab        = lazy(() => import('./components/dashboard/OverviewTab'));
@@ -25,24 +37,13 @@ const AutomationsTab     = lazy(() => import('./components/dashboard/Automations
 const HandoverTab        = lazy(() => import('./components/dashboard/HandoverTab'));
 const ExternalUsersManager = lazy(() => import('./components/dashboard/third-party/ExternalUsersManager'));
 const ExternalPortal     = lazy(() => import('./components/dashboard/third-party/ExternalPortal'));
+const NaviosTab          = lazy(() => import('./components/dashboard/ships/NaviosTab'));
 
 const TabFallback = () => (
   <div className="flex-1 flex items-center justify-center py-24">
     <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
   </div>
 );
-import Sidebar from './components/dashboard/Sidebar';
-import WeatherWidget from './components/dashboard/WeatherWidget';
-import OnlineStatus from './components/dashboard/OnlineStatus';
-import DatabaseStatus from './components/dashboard/DatabaseStatus';
-import UserProfile from './components/dashboard/UserProfile';
-import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
-import EmailCenter from './components/dashboard/email/EmailCenter';
-import NotificationToast from './components/dashboard/notifications/NotificationToast';
-import SimpleToast from './components/shared/SimpleToast';
-import FeedbackModal from './components/shared/FeedbackModal';
-import { db, supabase } from './utils/storage';
-import { Icons } from './constants/icons';
 
 interface DashboardProps {
   user: User;
@@ -65,6 +66,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [sealBatches, setSealBatches] = useState<SealBatch[]>([]);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [ships, setShips] = useState<MonitoredShip[]>([]);
   
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -119,7 +121,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         db.getAvantidaRecords(),
         db.getSealBatches(),
         db.getEmailTemplates(),
-        db.getBeneficiaries()
+        db.getBeneficiaries(),
+        db.getMonitoredShips()
       ]);
 
       if (responses[0].status === 'fulfilled') setDrivers(responses[0].value);
@@ -136,6 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value);
       if (responses[9].status === 'fulfilled') setEmailTemplates(responses[9].value);
       if (responses[10].status === 'fulfilled') setBeneficiaries(responses[10].value);
+      if (responses[11].status === 'fulfilled') setShips(responses[11].value);
 
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
     } catch (e) {
@@ -371,6 +375,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            )}
            {activeTab === DashboardTab.EXTERNAL_PORTAL && (
              <ExternalPortal user={user} trips={trips} />
+           )}
+           {activeTab === DashboardTab.NAVIOS && (
+             <NaviosTab userId={user.id} ships={ships} onSave={async (s) => { await db.saveMonitoredShip(s); await loadAllData(false); }} onDelete={async (id) => { await db.deleteMonitoredShip(id); await loadAllData(false); }} />
            )}
          </Suspense>
         </div>
