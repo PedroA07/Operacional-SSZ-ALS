@@ -83,9 +83,9 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
     const clientFirst = (trip.customer.name || '').trim().split(/\s+/)[0].toUpperCase();
     const city = (trip.customer.city || '').toUpperCase();
     const state = (trip.customer.state || '').toUpperCase();
-    const location = city && state ? ` + ${city}/${state}` : city ? ` + ${city}` : '';
+    const location = city && state ? ` - ${city}/${state}` : city ? ` - ${city}` : '';
     return [
-      `> PROGRAMAÇÃO (${clientFirst}${location})`,
+      `> PROGRAMAÇÃO: (${clientFirst}${location})`,
       `* OS: \`${trip.os || ''}\``,
       `* Container: \`${trip.container || ''}\``,
       `* Data e Hora: \`${fmtFull(trip.dateTime)}\``,
