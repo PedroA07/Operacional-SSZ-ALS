@@ -33,6 +33,24 @@ export interface User {
   };
 }
 
+export interface Beneficiary {
+  id: string;
+  name: string;
+  cpf?: string;
+  cnpj?: string;
+  phone: string;
+  email?: string;
+  pixKey?: string;
+  paymentPreference?: 'PIX' | 'TED';
+  bankName?: string;
+  bankAgency?: string;
+  bankAccount?: string;
+  status: 'Ativo' | 'Inativo';
+  registrationDate?: string;
+  userId?: string;      // references users table
+  observations?: string;
+}
+
 export interface LoginCredential {
   id: string;
   siteName: string;
@@ -294,6 +312,7 @@ export enum DashboardTab {
   OPERACOES = 'OPERACOES',
   ADMINISTRATIVO = 'ADMINISTRATIVO',
   MOTORISTAS = 'MOTORISTAS',
+  BENEFICIARIOS = 'BENEFICIARIOS',
   CLIENTES = 'CLIENTES',
   SISTEMA = 'SISTEMA',
   FORMULARIOS = 'FORMULARIOS',
@@ -571,6 +590,7 @@ export interface Driver {
   lastFreightContractLocation?: string;
   beneficiaryIsDriver?: boolean;
   beneficiaryUserId?: string;
+  beneficiaryId?: string;
   registrationDate?: string;
   operations: { category: string; client: string }[];
   tripsCount?: number;

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, PlateEntry, OperationDefinition, Customer } from '../../../types';
+import { Driver, PlateEntry, OperationDefinition, Customer, Beneficiary } from '../../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../../utils/masks';
 import { fileStorage } from '../../../utils/fileStorage';
 import { driverAuthService } from '../../../utils/driverAuthService';
@@ -148,6 +148,9 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cnhFileInputRef = useRef<HTMLInputElement>(null);
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [benefSearch, setBenefSearch] = useState('');
+  const [showBenefDropdown, setShowBenefDropdown] = useState(false);
 
   const initialForm: Partial<Driver> = {
     photo: '', name: '', cpf: '', rg: '', cnh: '',
@@ -168,8 +171,14 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
   const hasInitialized = useRef<string | null>(null);
 
   useEffect(() => {
+    if (isOpen) db.getBeneficiaries().then(setBeneficiaries).catch(() => {});
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) {
       hasInitialized.current = null;
+      setBenefSearch('');
+      setShowBenefDropdown(false);
       return;
     }
 
@@ -421,11 +430,10 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
               <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white space-y-6">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">III. Dados do Favorecido (Pagamentos)</h4>
-                  {/* Toggle motorista é o próprio beneficiário */}
                   <label className="flex items-center gap-3 cursor-pointer select-none">
                     <span className="text-[9px] text-slate-400 font-black uppercase">Motorista é o próprio beneficiário</span>
                     <div
-                      onClick={() => setForm(f => ({ ...f, beneficiaryIsDriver: !f.beneficiaryIsDriver }))}
+                      onClick={() => setForm(f => ({ ...f, beneficiaryIsDriver: !f.beneficiaryIsDriver, beneficiaryId: undefined, beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '', beneficiaryCnpj: '' }))}
                       className={`relative w-10 h-6 rounded-full transition-all ${form.beneficiaryIsDriver ? 'bg-emerald-500' : 'bg-slate-600'}`}
                     >
                       <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${form.beneficiaryIsDriver ? 'left-5' : 'left-1'}`} />
@@ -434,91 +442,109 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                 </div>
 
                 {form.beneficiaryIsDriver ? (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 flex items-center gap-4">
-                    <span className="text-2xl">✅</span>
-                    <div>
-                      <p className="text-[11px] font-black text-emerald-400 uppercase">Acesso via login do próprio motorista</p>
-                      <p className="text-[9px] text-slate-400 mt-1">O motorista acessa os contratos de frete com seu próprio login. Nenhum acesso separado necessário.</p>
-                    </div>
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5">
+                    <p className="text-[11px] font-black text-emerald-400 uppercase">Acesso via login do próprio motorista</p>
+                    <p className="text-[9px] text-slate-400 mt-1">O motorista acessa os contratos de frete com seu próprio login.</p>
                   </div>
                 ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Nome do Beneficiário</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold uppercase outline-none focus:bg-white/20" value={form.beneficiaryName || ''} onChange={e => setForm({ ...form, beneficiaryName: e.target.value.toUpperCase() })} /></div>
-                      <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Documento Chave (CPF/CNPJ)</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white/20" value={form.beneficiaryCnpj || ''} onChange={e => setForm({ ...form, beneficiaryCnpj: e.target.value })} /></div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-6">
-                      <div className="space-y-1">
-                        <label className="text-[8px] opacity-40 uppercase font-black ml-1">Tipo de Operação</label>
-                        <CustomSelect
-                          value={form.paymentPreference || ''}
-                          onChange={v => setForm({ ...form, paymentPreference: v as any })}
-                          options={[{ value: 'PIX', label: 'PIX' }, { value: 'TED', label: 'TED BANCÁRIO' }]}
-                          inputClassName="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none"
-                        />
-                      </div>
-                      <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">Celular Benef.</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none" value={form.beneficiaryPhone || ''} onChange={e => setForm({ ...form, beneficiaryPhone: maskPhone(e.target.value) })} /></div>
-                      <div className="space-y-1"><label className="text-[8px] opacity-40 uppercase font-black ml-1">E-mail Benef.</label><input className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none lowercase" value={form.beneficiaryEmail || ''} onChange={e => setForm({ ...form, beneficiaryEmail: e.target.value })} /></div>
-                    </div>
-
-                    {/* Acesso do beneficiário */}
-                    <div className="border-t border-white/10 pt-5 space-y-4">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Acesso ao Portal do Beneficiário</p>
-                      {form.beneficiaryUserId ? (
-                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-4">
-                          <span className="text-xl">🔐</span>
-                          <div className="flex-1">
-                            <p className="text-[10px] font-black text-blue-400 uppercase">Acesso criado</p>
-                            <p className="text-[9px] text-slate-400 mt-0.5">O beneficiário possui login próprio no sistema. <span className="text-slate-500 italic">Não visualiza contratos de frete.</span></p>
+                  <div className="space-y-4">
+                    {/* Beneficiário selecionado */}
+                    {form.beneficiaryId ? (
+                      (() => {
+                        const sel = beneficiaries.find(b => b.id === form.beneficiaryId);
+                        return (
+                          <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-5 space-y-3">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <p className="text-[11px] font-black text-blue-300 uppercase">{sel?.name || form.beneficiaryName || '—'}</p>
+                                <p className="text-[9px] text-slate-400 mt-0.5">{sel?.cpf || sel?.cnpj || form.beneficiaryCnpj || '—'}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setForm(f => ({ ...f, beneficiaryId: undefined, beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '', beneficiaryCnpj: '' }))}
+                                className="text-[9px] text-slate-400 hover:text-white font-black uppercase transition-colors"
+                              >
+                                Trocar
+                              </button>
+                            </div>
+                            <div className="flex gap-4 text-[9px] text-slate-400">
+                              {(sel?.phone || form.beneficiaryPhone) && <span>{sel?.phone || form.beneficiaryPhone}</span>}
+                              {(sel?.email || form.beneficiaryEmail) && <span>{sel?.email || form.beneficiaryEmail}</span>}
+                              {(sel?.paymentPreference || form.paymentPreference) && (
+                                <span className="px-2 py-0.5 bg-blue-500/20 rounded-lg font-black text-blue-300">
+                                  {sel?.paymentPreference || form.paymentPreference}
+                                </span>
+                              )}
+                            </div>
+                            {sel?.userId && (
+                              <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Portal ativo</p>
+                            )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setForm(f => ({ ...f, beneficiaryUserId: undefined }))}
-                            className="text-[9px] text-red-400 hover:text-red-300 font-black uppercase"
-                          >
-                            Revogar
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between gap-4">
-                          <p className="text-[9px] text-slate-500">O beneficiário não tem acesso ao sistema. Clique para criar um login separado.</p>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!form.beneficiaryName?.trim()) {
-                                alert('Preencha o nome do beneficiário antes de criar o acesso.');
-                                return;
-                              }
-                              const nameParts = form.beneficiaryName.trim().toLowerCase().split(' ');
-                              const username = `${nameParts[0]}.${nameParts[nameParts.length - 1]}.${Math.floor(1000 + Math.random() * 9000)}`;
-                              const password = Math.random().toString(36).slice(-8).toUpperCase();
-                              const userId = `benef-${Date.now()}`;
-                              try {
-                                await db.saveUser({
-                                  id: userId,
-                                  username,
-                                  password,
-                                  displayName: form.beneficiaryName.trim(),
-                                  role: 'beneficiary',
-                                  lastLogin: new Date().toISOString(),
-                                  status: 'Ativo',
-                                  isFirstLogin: true,
-                                  driverId: form.id,
-                                } as any);
-                                setForm(f => ({ ...f, beneficiaryUserId: userId }));
-                                alert(`✅ Acesso criado!\n\nUsuário: ${username}\nSenha: ${password}\n\nGuarde estas credenciais.`);
-                              } catch {
-                                alert('Erro ao criar acesso. Tente novamente.');
-                              }
-                            }}
-                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[9px] font-black uppercase whitespace-nowrap transition-all"
-                          >
-                            + Criar acesso
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </>
+                        );
+                      })()
+                    ) : (
+                      /* Busca de beneficiário */
+                      <div className="relative">
+                        <label className="text-[8px] opacity-40 uppercase font-black ml-1 block mb-1">Buscar Beneficiário</label>
+                        <input
+                          className="w-full bg-white/10 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white/15 placeholder-slate-500"
+                          placeholder="Digite nome ou documento..."
+                          value={benefSearch}
+                          onChange={e => { setBenefSearch(e.target.value); setShowBenefDropdown(true); }}
+                          onFocus={() => setShowBenefDropdown(true)}
+                        />
+                        {showBenefDropdown && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden z-50 shadow-2xl max-h-64 overflow-y-auto">
+                            {beneficiaries
+                              .filter(b => {
+                                const q = benefSearch.toLowerCase();
+                                return (
+                                  b.name.toLowerCase().includes(q) ||
+                                  (b.cpf || '').replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
+                                  (b.cnpj || '').replace(/\D/g, '').includes(q.replace(/\D/g, ''))
+                                );
+                              })
+                              .map(b => (
+                                <button
+                                  key={b.id}
+                                  type="button"
+                                  onMouseDown={() => {
+                                    setForm(f => ({
+                                      ...f,
+                                      beneficiaryId: b.id,
+                                      beneficiaryName: b.name,
+                                      beneficiaryPhone: b.phone,
+                                      beneficiaryEmail: b.email || '',
+                                      beneficiaryCnpj: b.cpf || b.cnpj || '',
+                                      paymentPreference: b.paymentPreference || f.paymentPreference,
+                                    }));
+                                    setBenefSearch('');
+                                    setShowBenefDropdown(false);
+                                  }}
+                                  className="w-full text-left px-5 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+                                >
+                                  <p className="text-[11px] font-black text-white uppercase">{b.name}</p>
+                                  <p className="text-[9px] text-slate-400">{b.cpf || b.cnpj || '—'} · {b.phone}</p>
+                                </button>
+                              ))
+                            }
+                            {beneficiaries.filter(b => {
+                              const q = benefSearch.toLowerCase();
+                              return b.name.toLowerCase().includes(q) || (b.cpf || '').replace(/\D/g,'').includes(q.replace(/\D/g,'')) || (b.cnpj||'').replace(/\D/g,'').includes(q.replace(/\D/g,''));
+                            }).length === 0 && (
+                              <div className="px-5 py-4 text-center">
+                                <p className="text-[10px] text-slate-500 font-bold">Nenhum resultado</p>
+                                <p className="text-[9px] text-slate-600 mt-1">Cadastre o beneficiário na aba Beneficiários e retorne aqui.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {showBenefDropdown && (
+                          <div className="fixed inset-0 z-40" onMouseDown={() => setShowBenefDropdown(false)} />
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 

@@ -4,7 +4,7 @@ import {
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
-  BotGroup, BotAutomation, FreightContract
+  BotGroup, BotAutomation, FreightContract, Beneficiary
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1453,6 +1453,59 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('bot_automations').delete().eq('id', id);
     if (error) { console.error('[deleteBotAutomation]', error.message); return false; }
+    return true;
+  },
+
+  getBeneficiaries: async (): Promise<Beneficiary[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('beneficiaries').select('*').order('name');
+    if (error) { console.error('[getBeneficiaries]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      cpf: r.cpf || undefined,
+      cnpj: r.cnpj || undefined,
+      phone: r.phone,
+      email: r.email || undefined,
+      pixKey: r.pix_key || undefined,
+      paymentPreference: r.payment_preference || undefined,
+      bankName: r.bank_name || undefined,
+      bankAgency: r.bank_agency || undefined,
+      bankAccount: r.bank_account || undefined,
+      status: r.status || 'Ativo',
+      registrationDate: r.registration_date || undefined,
+      userId: r.user_id || undefined,
+      observations: r.observations || undefined,
+    }));
+  },
+
+  saveBeneficiary: async (b: Beneficiary): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('beneficiaries').upsert({
+      id: b.id,
+      name: b.name,
+      cpf: b.cpf || null,
+      cnpj: b.cnpj || null,
+      phone: b.phone,
+      email: b.email || null,
+      pix_key: b.pixKey || null,
+      payment_preference: b.paymentPreference || null,
+      bank_name: b.bankName || null,
+      bank_agency: b.bankAgency || null,
+      bank_account: b.bankAccount || null,
+      status: b.status,
+      registration_date: b.registrationDate || new Date().toISOString(),
+      user_id: b.userId || null,
+      observations: b.observations || null,
+    }, { onConflict: 'id' });
+    if (error) { console.error('[saveBeneficiary]', error.message); return false; }
+    return true;
+  },
+
+  deleteBeneficiary: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('beneficiaries').delete().eq('id', id);
+    if (error) { console.error('[deleteBeneficiary]', error.message); return false; }
     return true;
   },
 };
