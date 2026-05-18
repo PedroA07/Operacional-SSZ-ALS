@@ -4,7 +4,7 @@ import {
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
-  BotGroup, BotAutomation, FreightContract, Beneficiary
+  BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1506,6 +1506,38 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('beneficiaries').delete().eq('id', id);
     if (error) { console.error('[deleteBeneficiary]', error.message); return false; }
+    return true;
+  },
+
+  getMonitoredShips: async (): Promise<MonitoredShip[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('monitored_ships').select('*').order('created_at', { ascending: false });
+    if (error) { console.error('[getMonitoredShips]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id, shipName: r.ship_name, voyage: r.voyage, terminal: r.terminal,
+      status: r.status, eta: r.eta, etd: r.etd, ataDate: r.ata_date, atdDate: r.atd_date,
+      notes: r.notes, linkedTripOs: r.linked_trip_os,
+      createdAt: r.created_at, updatedAt: r.updated_at,
+    }));
+  },
+
+  saveMonitoredShip: async (s: MonitoredShip): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('monitored_ships').upsert({
+      id: s.id, ship_name: s.shipName, voyage: s.voyage, terminal: s.terminal,
+      status: s.status, eta: s.eta || null, etd: s.etd || null,
+      ata_date: s.ataDate || null, atd_date: s.atdDate || null,
+      notes: s.notes || null, linked_trip_os: s.linkedTripOs || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
+    if (error) { console.error('[saveMonitoredShip]', error.message); return false; }
+    return true;
+  },
+
+  deleteMonitoredShip: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('monitored_ships').delete().eq('id', id);
+    if (error) { console.error('[deleteMonitoredShip]', error.message); return false; }
     return true;
   },
 };

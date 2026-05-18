@@ -328,7 +328,8 @@ export enum DashboardTab {
   COLETA_DIA = 'COLETA_DIA',
   AUTOMACOES = 'AUTOMACOES',
   EXTERNAL_PORTAL = 'EXTERNAL_PORTAL',
-  EXTERNAL_USERS = 'EXTERNAL_USERS'
+  EXTERNAL_USERS = 'EXTERNAL_USERS',
+  NAVIOS = 'NAVIOS'
 }
 
 export interface Automation {
@@ -733,4 +734,31 @@ export interface SILProgramacao {
   embarcador: string;
   navio: string;
   bl: string;
+}
+
+export type ShipStatus = 'GATE ABERTO' | 'GATE FECHADO' | 'AG. ATRACAÇÃO' | 'ATRACADO' | 'EM TRÂNSITO' | 'FINALIZADO';
+
+export interface MonitoredShip {
+  id: string;
+  shipName: string;
+  voyage: string;
+  terminal: string;
+  status: ShipStatus;
+  eta?: string;        // ISO datetime
+  etd?: string;        // ISO datetime
+  ataDate?: string;    // actual arrival
+  atdDate?: string;    // actual departure
+  notes?: string;
+  linkedTripOs?: string;   // optional link to a trip OS
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TerminalService {
+  id: string;
+  name: string;
+  url: string;
+  status: 'online' | 'offline' | 'checking' | 'unknown';
+  lastCheck?: string;
+  responseMs?: number;
 }
