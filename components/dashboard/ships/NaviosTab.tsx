@@ -635,29 +635,8 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const [newSt, setNewSt]             = useState<ShipStatus>('NOVO');
   const [stObs, setStObs]             = useState('');
 
-  // EMBRAPORT scraper
+  // EMBRAPORT scraper state (callback declared after loadTV below)
   const [scrapingEmbraport, setScrapingEmbraport] = useState(false);
-  const scrapeEmbraport = useCallback(async () => {
-    setScrapingEmbraport(true);
-    try {
-      const res = await fetch('/api/embraport-escala');
-      const data = await res.json();
-      if (data.ok) {
-        window.dispatchEvent(new CustomEvent('als_show_toast', {
-          detail: { message: `EMBRAPORT: ${data.total} navios atualizados`, type: 'success' }
-        }));
-        await loadTV();
-      } else {
-        window.dispatchEvent(new CustomEvent('als_show_toast', {
-          detail: { message: data.error || 'Erro ao buscar EMBRAPORT', type: 'error' }
-        }));
-      }
-    } catch {
-      window.dispatchEvent(new CustomEvent('als_show_toast', {
-        detail: { message: 'Erro ao conectar com scraper', type: 'error' }
-      }));
-    } finally { setScrapingEmbraport(false); }
-  }, [loadTV]);
 
   // Collapsibles
   const [showMonit, setShowMonit]     = useState(true);
@@ -713,6 +692,29 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   }, []);
 
   useEffect(() => { loadShips(); loadTV(); }, []); // eslint-disable-line
+
+  // EMBRAPORT scraper callback — declared after loadTV to avoid "used before declaration"
+  const scrapeEmbraport = useCallback(async () => {
+    setScrapingEmbraport(true);
+    try {
+      const res = await fetch('/api/embraport-escala');
+      const data = await res.json();
+      if (data.ok) {
+        window.dispatchEvent(new CustomEvent('als_show_toast', {
+          detail: { message: `EMBRAPORT: ${data.total} navios atualizados`, type: 'success' }
+        }));
+        await loadTV();
+      } else {
+        window.dispatchEvent(new CustomEvent('als_show_toast', {
+          detail: { message: data.error || 'Erro ao buscar EMBRAPORT', type: 'error' }
+        }));
+      }
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao conectar com scraper', type: 'error' }
+      }));
+    } finally { setScrapingEmbraport(false); }
+  }, [loadTV]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
   // Status counts (panel bar)
