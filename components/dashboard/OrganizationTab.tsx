@@ -1312,16 +1312,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Coleta</h3>
             </div>
-            <SmartOperationTable 
-              userId={userId} 
-              componentId="org-coleta-export" 
-              columns={columns} 
-              data={trips} 
+            <SmartOperationTable
+              userId={userId}
+              componentId="org-coleta-export"
+              columns={columns}
+              data={trips}
               hideInternalSearch={false}
-              getRowClassName={(t: Trip) => {
-                if (isTripReadyToFinalize(t)) return 'bg-emerald-50 border-l-4 border-emerald-500';
-                if (isTripScheduled(t)) return 'bg-amber-50/50 border-l-4 border-amber-400/50';
-                return '';
+              getRowStyle={(t: Trip) => {
+                if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
+                if (isTripScheduled(t))       return { backgroundColor: '#fffbeb', boxShadow: 'inset 4px 0 0 #f59e0b' };
+                return {};
               }}
             />
           </div>
@@ -1337,10 +1337,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               columns={columns} 
               data={trips} 
               hideInternalSearch={false}
-              getRowClassName={(t: Trip) => {
-                if (isTripReadyToFinalize(t)) return 'bg-emerald-50 border-l-4 border-emerald-500';
-                if (isTripScheduled(t)) return 'bg-amber-50/50 border-l-4 border-amber-400/50';
-                return '';
+              getRowStyle={(t: Trip) => {
+                if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
+                if (isTripScheduled(t))       return { backgroundColor: '#fffbeb', boxShadow: 'inset 4px 0 0 #f59e0b' };
+                return {};
               }}
             />
           </div>
