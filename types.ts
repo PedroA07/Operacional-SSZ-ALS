@@ -327,6 +327,7 @@ export enum DashboardTab {
   ORGANIZACAO = 'ORGANIZACAO',
   COLETA_DIA = 'COLETA_DIA',
   AUTOMACOES = 'AUTOMACOES',
+  NAVIOS = 'NAVIOS',
   EXTERNAL_PORTAL = 'EXTERNAL_PORTAL',
   EXTERNAL_USERS = 'EXTERNAL_USERS',
   NAVIOS = 'NAVIOS'
@@ -710,6 +711,35 @@ export interface OpentechTrip {
   eta: string;
   status: string;
   riskLevel: 'Crítico' | 'Alto' | 'Médio' | 'Baixo';
+}
+
+export type ShipStatus = 'EM TRÂNSITO' | 'ATRACADO' | 'FUNDEADO' | 'AGUARDANDO JANELA' | 'SAÍDO';
+
+export interface Ship {
+  id: string;
+  name: string;               // nome do navio
+  imo?: string;               // número IMO
+  armador?: string;           // companhia (MSC, Maersk, etc.)
+  viagem?: string;            // número da viagem
+  terminal?: string;          // ECOPORTO | SANTOS BRASIL | EMBRAPORT | BTP | OUTRO
+  berco?: string;             // berço de atracação
+  eta?: string;               // previsão chegada (ISO date)
+  etd?: string;               // previsão saída (ISO date)
+  status: ShipStatus;
+  observacoes?: string;
+  tripIds?: string[];         // viagens vinculadas
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TerminalVessel {
+  navio: string;
+  situacao: string;           // Previsto | Em Operação | Desatracado | Encerrado
+  previsao?: string;
+  berco?: string;
+  armador?: string;
+  viagem?: string;
+  terminal: string;           // nome do terminal
 }
 
 export interface SILProgramacao {

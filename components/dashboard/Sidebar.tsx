@@ -122,6 +122,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <MenuItem tab={DashboardTab.PORTOS} label="Portos" icon={<Icons.Portos />} />
         <MenuItem tab={DashboardTab.NAVIOS} label="Navios" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" d="M3 13l1.5 5.5A1 1 0 005.46 20h13.08a1 1 0 00.96-.5L21 13M3 13h18M3 13l2-8h14l2 8M12 3v10"/></svg>} />
         <MenuItem tab={DashboardTab.PRE_STACKING} label="Pré-Stacking" icon={<Icons.PreStacking />} />
+        <MenuItem tab={DashboardTab.NAVIOS} label="Navios" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M5 12H3l9-9 9 9h-2M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6" strokeLinecap="round" strokeLinejoin="round"/></svg>} />
         
         <MenuItem label="Outros" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>}>
             <button onClick={() => setActiveTab(DashboardTab.LOGINS)} className={`w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase transition-colors ${activeTab === DashboardTab.LOGINS ? 'text-blue-400' : 'text-slate-500 hover:text-white'}`}>
