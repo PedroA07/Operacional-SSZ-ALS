@@ -727,7 +727,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                       <p className="text-[8px] font-black text-orange-300 uppercase truncate">{t.ship}</p>
                       <p className="text-[7px] text-slate-500">{t.os} · {t.status}</p>
                     </div>
-                    <span className="text-[7px] text-slate-600 font-bold shrink-0">{t.terminal || '?'}</span>
+                    <span className="text-[7px] text-slate-600 font-bold shrink-0">{t.destination?.name || t.customer?.name || '?'}</span>
                   </div>
                 ))}
               </div>
