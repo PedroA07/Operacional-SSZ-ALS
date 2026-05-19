@@ -463,7 +463,8 @@ const TripDetailModal: React.FC<TripDetailModalProps> = ({ trip, locations, onCl
               {[
                 { label: 'Navio',       value: trip.ship },
                 { label: 'Motorista',   value: trip.driver?.name },
-                { label: 'Placa',       value: trip.driver?.plate },
+                { label: 'Cavalo',      value: trip.driver?.plateHorse },
+                { label: 'Carreta',     value: trip.driver?.plateTrailer },
                 { label: 'Container',   value: trip.container },
                 { label: 'Data Prog.',  value: trip.dateTime ? new Date(trip.dateTime).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }) : null },
                 { label: 'Destino',     value: trip.destination?.name || trip.scheduling?.location },
