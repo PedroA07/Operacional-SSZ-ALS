@@ -135,7 +135,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
       .filter(trip => {
-        const dt = trip.scheduledDateTime || trip.dateTime;
+        const dt = trip.scheduling?.dateTime || trip.scheduledDateTime || trip.dateTime;
         if (!dt) return true;
         const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
         const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
@@ -153,8 +153,8 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         const aNF = !!a.sentNF;
         const bNF = !!b.sentNF;
         if (aNF !== bNF) return aNF ? -1 : 1;
-        const dateA = new Date(a.scheduledDateTime || a.dateTime || 0).getTime();
-        const dateB = new Date(b.scheduledDateTime || b.dateTime || 0).getTime();
+        const dateA = new Date(a.scheduling?.dateTime || a.scheduledDateTime || a.dateTime || 0).getTime();
+        const dateB = new Date(b.scheduling?.dateTime || b.scheduledDateTime || b.dateTime || 0).getTime();
         if (dateA !== dateB) return dateA - dateB;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
@@ -317,7 +317,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       key: 'dateTime', 
       label: 'Data/Hora', 
       render: (t: Trip) => {
-        const dt = t.scheduledDateTime || t.dateTime;
+        const dt = t.scheduling?.dateTime || t.scheduledDateTime || t.dateTime;
         if (!dt) return <span className="text-[9px] text-slate-400">---</span>;
         try {
           const d = new Date(dt);
