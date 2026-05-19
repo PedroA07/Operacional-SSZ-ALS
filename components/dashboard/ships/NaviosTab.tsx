@@ -145,8 +145,10 @@ const I = {
   ChevD:   (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>,
   Pin:     (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>,
   Check:   (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>,
-  Search:  (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>,
-  Eye:     (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>,
+  Search:   (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>,
+  Eye:      (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>,
+  Settings: (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
+  Tag:      (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>,
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -363,6 +365,27 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   // Collapsibles
   const [showMonit, setShowMonit]     = useState(true);
 
+  // ── Filtro de tipos no Monitoramento ─────────────────────────────────────────
+  const [showTypeConfig, setShowTypeConfig] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('monitTypeFilter');
+      return saved ? new Set(JSON.parse(saved)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
+  const toggleType = (type: string) => {
+    setTypeFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type); else next.add(type);
+      localStorage.setItem('monitTypeFilter', JSON.stringify([...next]));
+      return next;
+    });
+  };
+  const clearTypeFilter = () => {
+    setTypeFilter(new Set());
+    localStorage.removeItem('monitTypeFilter');
+  };
+
   // ── Load ────────────────────────────────────────────────────────────────────
   const loadShips = useCallback(async () => {
     setLS(true);
@@ -416,10 +439,24 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   }, [termVessels]);
 
   // ── MONITORAMENTO: trip-vessel matching ──────────────────────────────────────
-  // Only trips that are in the Organização page (not removed) and have a ship name
+  // Apenas viagens do painel Organização (não removidas) que tenham nome de navio
   const orgTripsWithShip = useMemo(() =>
     trips.filter(t => !INACTIVE_STATUSES.includes(t.status) && !t.isRemovedFromOrg && t.ship?.trim()),
   [trips]);
+
+  // Todos os tipos únicos das viagens org (para o painel de configuração)
+  const allTripTypes = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of orgTripsWithShip) { if (t.type?.trim()) s.add(t.type.trim()); }
+    return [...s].sort();
+  }, [orgTripsWithShip]);
+
+  // Viagens filtradas pelo filtro de tipo (vazio = todas)
+  const filteredOrgTrips = useMemo(() =>
+    typeFilter.size === 0
+      ? orgTripsWithShip
+      : orgTripsWithShip.filter(t => typeFilter.has(t.type ?? '')),
+  [orgTripsWithShip, typeFilter]);
 
   // Group by ship name → find matching terminal vessel
   interface VesselMatch {
@@ -433,7 +470,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     const usedVessels = new Set<number>();
     // Group trips by ship name first
     const byShip = new Map<string, Trip[]>();
-    for (const t of orgTripsWithShip) {
+    for (const t of filteredOrgTrips) {
       const key = normShip(t.ship);
       if (!byShip.has(key)) byShip.set(key, []);
       byShip.get(key)!.push(t);
@@ -457,14 +494,14 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
       }
     });
     return matches;
-  }, [termVessels, orgTripsWithShip]);
+  }, [termVessels, filteredOrgTrips]);
 
   // Trips whose ship was NOT found in any terminal vessel
   const unmatchedTrips = useMemo(() => {
-    return orgTripsWithShip.filter(t =>
+    return filteredOrgTrips.filter(t =>
       !termVessels.some(v => shipMatch(v.navio, t.ship))
     );
-  }, [orgTripsWithShip, termVessels]);
+  }, [filteredOrgTrips, termVessels]);
 
   const allHistory = useMemo(() => {
     const e: Array<ShipStatusEntry & { shipName: string; viagem?: string; terminal?: string }> = [];
@@ -744,25 +781,90 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
 
           {/* ── A: Navios identificados em viagens ativas ── */}
           <div className="rounded-2xl bg-[#0f172a] border border-slate-800 overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+            <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <I.Search className="w-4 h-4 text-slate-500"/>
                 <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                  Navios Identificados em Viagens Ativas
+                  Navios — Viagens da Organização
                 </span>
                 {vesselMatches.length > 0 && (
                   <span className="text-[8px] font-black bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">
                     {vesselMatches.length} navios · {vesselMatches.reduce((a,m) => a+m.matchedTrips.length,0)} viagens
                   </span>
                 )}
+                {typeFilter.size > 0 && (
+                  <span className="text-[7px] font-black bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full">
+                    {typeFilter.size} tipo(s) filtrado(s)
+                  </span>
+                )}
               </div>
-              {vesselMatches.some(m => m.pendingCount > 0) && (
-                <span className="flex items-center gap-1.5 text-[8px] font-black text-red-400">
-                  <I.Warning className="w-3.5 h-3.5"/>
-                  {vesselMatches.reduce((a,m)=>a+m.pendingCount,0)} agendamentos pendentes
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {vesselMatches.some(m => m.pendingCount > 0) && (
+                  <span className="flex items-center gap-1.5 text-[8px] font-black text-red-400">
+                    <I.Warning className="w-3 h-3"/>
+                    {vesselMatches.reduce((a,m)=>a+m.pendingCount,0)} pendentes
+                  </span>
+                )}
+                {/* Botão de configuração de tipos */}
+                <button
+                  onClick={() => setShowTypeConfig(p => !p)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest transition-all ${
+                    showTypeConfig
+                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600'
+                  }`}
+                  title="Filtrar por tipo de programação">
+                  <I.Settings className="w-3 h-3"/>
+                  Tipos
+                  {typeFilter.size > 0 && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"/>}
+                </button>
+              </div>
             </div>
+
+            {/* Painel de configuração de tipos */}
+            {showTypeConfig && (
+              <div className="px-5 py-3 border-b border-slate-800/60 bg-slate-900/40">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <I.Tag className="w-3 h-3"/> Filtrar por tipo de programação
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[7px] text-slate-600 font-bold">
+                      {typeFilter.size === 0 ? 'Mostrando todos' : `${typeFilter.size} selecionado(s)`}
+                    </span>
+                    {typeFilter.size > 0 && (
+                      <button onClick={clearTypeFilter}
+                        className="text-[7px] font-black text-blue-400 hover:text-blue-300 uppercase tracking-widest">
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {allTripTypes.length === 0 ? (
+                  <p className="text-[8px] text-slate-600 italic">Nenhum tipo encontrado nas viagens</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {allTripTypes.map(tp => {
+                      const active = typeFilter.has(tp);
+                      return (
+                        <button key={tp} onClick={() => toggleType(tp)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-wide transition-all ${
+                            active
+                              ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                              : 'bg-slate-800/60 text-slate-500 border-slate-700 hover:border-slate-600 hover:text-slate-400'
+                          }`}>
+                          {active && <I.Check className="w-2.5 h-2.5"/>}
+                          {tp}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-[7px] text-slate-700 font-bold mt-2">
+                  Vazio = mostra todos os tipos · Selecionado = mostra apenas os marcados
+                </p>
+              </div>
+            )}
 
             {vesselMatches.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
@@ -849,19 +951,74 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                         </div>
                       </div>
 
+                      {/* Gate + Deadline do terminal (do vessel) */}
+                      {(match.vessel.gateDry || match.vessel.gateReefer || match.vessel.deadLineStr || match.vessel.dtPrevAtrac) && (
+                        <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-800/40 flex-wrap">
+                          {match.vessel.dtPrevAtrac && (
+                            <span className="text-[8px] text-slate-400">
+                              <span className="text-slate-600 font-bold uppercase text-[7px]">Prev. Atrac. </span>
+                              {fmtCell(match.vessel.dtPrevAtrac)}
+                            </span>
+                          )}
+                          {match.vessel.deadLineStr && (
+                            <span className={`text-[8px] font-black flex items-center gap-1 ${isExpiredStr(match.vessel.deadLineStr) ? 'text-red-400' : 'text-orange-400'}`}>
+                              <I.Warning className="w-2.5 h-2.5"/>
+                              <span className="text-slate-600 font-bold uppercase text-[7px]">Dead-Line </span>
+                              {fmtCell(match.vessel.deadLineStr)}
+                              {isExpiredStr(match.vessel.deadLineStr) && <span className="text-[6px] font-black text-red-500 uppercase">(VENCIDO)</span>}
+                            </span>
+                          )}
+                          {(match.vessel.gateDry || match.vessel.gateReefer) && (
+                            <span className={`text-[8px] font-black flex items-center gap-1 ${isExpiredStr(match.vessel.gateDry || match.vessel.gateReefer) ? 'text-slate-500' : 'text-green-400'}`}>
+                              <I.Check className="w-2.5 h-2.5"/>
+                              <span className="text-slate-600 font-bold uppercase text-[7px]">Abert. Gate </span>
+                              {fmtCell(match.vessel.gateDry || match.vessel.gateReefer)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {/* Trips list */}
                       <div className="space-y-1.5 pl-2">
                         {match.matchedTrips.map((t, ti) => {
                           const isScheduled = t.isScheduled || t.status === 'Agendamento realizado';
                           return (
                             <div key={ti}
-                              className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${isScheduled ? 'border-green-900/30 bg-green-950/10' : 'border-slate-800 bg-slate-900/40'}`}>
-                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isScheduled ? 'bg-green-500' : 'bg-red-500'}`}/>
-                              <span className="text-[9px] font-black text-slate-300 uppercase">{t.os}</span>
-                              <span className="text-[8px] text-slate-500 truncate">{t.driver?.name}</span>
-                              <span className="text-[8px] text-slate-600">{t.status}</span>
-                              {t.container && <span className="text-[7px] text-slate-600 font-bold">{t.container}</span>}
-                              <div className="ml-auto shrink-0">
+                              className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${isScheduled ? 'border-green-900/30 bg-green-950/10' : 'border-slate-800 bg-slate-900/40'}`}>
+                              {/* Indicador de status */}
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${isScheduled ? 'bg-green-500' : 'bg-red-500'}`}/>
+
+                              {/* Informações da viagem */}
+                              <div className="flex-1 min-w-0 space-y-1">
+                                {/* Linha 1: OS + container + motorista */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[9px] font-black text-slate-200 uppercase">{t.os}</span>
+                                  {t.container && (
+                                    <span className="text-[7px] font-bold text-slate-500 border border-slate-700 rounded px-1">{t.container}</span>
+                                  )}
+                                  <span className="text-[8px] text-slate-500 truncate">{t.driver?.name}</span>
+                                </div>
+                                {/* Linha 2: tipo + categoria + status */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {t.type && (
+                                    <span className="inline-flex items-center gap-1 text-[7px] font-black uppercase rounded px-1.5 py-0.5 bg-slate-700/60 text-slate-300 border border-slate-600/40">
+                                      <I.Tag className="w-2 h-2"/>{t.type}
+                                    </span>
+                                  )}
+                                  {t.category && (
+                                    <span className="inline-flex items-center text-[7px] font-bold uppercase rounded px-1.5 py-0.5 bg-slate-800 text-slate-400 border border-slate-700/40">
+                                      {t.category}
+                                    </span>
+                                  )}
+                                  {t.subCategory && (
+                                    <span className="text-[7px] text-slate-600 font-bold">{t.subCategory}</span>
+                                  )}
+                                  <span className="text-[7px] text-slate-600">{t.status}</span>
+                                </div>
+                              </div>
+
+                              {/* Agendamento */}
+                              <div className="shrink-0 flex flex-col items-end gap-1">
                                 {isScheduled
                                   ? <span className="flex items-center gap-1 text-[7px] font-black text-green-500">
                                       <I.Check className="w-2.5 h-2.5"/> Agendado
@@ -869,6 +1026,11 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                                   : <span className="flex items-center gap-1 text-[7px] font-black text-red-400">
                                       <I.Warning className="w-2.5 h-2.5"/> Pendente
                                     </span>}
+                                {t.scheduledDateTime && (
+                                  <span className="text-[6px] text-slate-600 font-bold">
+                                    {fmtDT(t.scheduledDateTime)}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );
