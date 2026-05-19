@@ -4,12 +4,12 @@ import { db, supabase } from '../../../utils/storage';
 
 interface NaviosTabProps { user: User; trips: Trip[]; }
 
-// ── Terminal accent colors ─────────────────────────────────────────────────────
-const TERM_ACCENT: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-  'BTP':           { bg: 'bg-amber-500/10',   text: 'text-amber-300',   border: 'border-amber-500/30',   dot: 'bg-amber-400' },
-  'ECOPORTO':      { bg: 'bg-blue-500/10',    text: 'text-blue-300',    border: 'border-blue-500/30',    dot: 'bg-blue-400' },
-  'SANTOS BRASIL': { bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
-  'EMBRAPORT':     { bg: 'bg-purple-500/10',  text: 'text-purple-300',  border: 'border-purple-500/30',  dot: 'bg-purple-400' },
+// ── Terminal config ────────────────────────────────────────────────────────────
+const TERM_ACCENT: Record<string, { bg: string; text: string; border: string; dot: string; badge: string }> = {
+  'BTP':           { bg: 'bg-amber-500/10',   text: 'text-amber-300',   border: 'border-amber-500/30',   dot: 'bg-amber-400',   badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+  'ECOPORTO':      { bg: 'bg-blue-500/10',    text: 'text-blue-300',    border: 'border-blue-500/30',    dot: 'bg-blue-400',    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
+  'SANTOS BRASIL': { bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/30', dot: 'bg-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+  'EMBRAPORT':     { bg: 'bg-purple-500/10',  text: 'text-purple-300',  border: 'border-purple-500/30',  dot: 'bg-purple-400',  badge: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
 };
 const TERM_LINKS: Record<string, string> = {
   'BTP':           'https://novo-tas.btp.com.br/ConsultasLivres/ListaAtracacaoIndex',
@@ -19,39 +19,72 @@ const TERM_LINKS: Record<string, string> = {
 };
 
 // ── Status config ──────────────────────────────────────────────────────────────
-const STATUS_CFG: Record<ShipStatus, { label: string; bg: string; text: string; border: string; dot: string }> = {
-  'NOVO':              { label: 'Novo',           bg: 'bg-slate-500/20',  text: 'text-slate-300',  border: 'border-slate-500/30',  dot: 'bg-slate-400' },
-  'NÃO ENCONTRADO':   { label: 'Não Encontrado', bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/30', dot: 'bg-orange-400' },
-  'SEM PREVISÃO':     { label: 'Sem Previsão',   bg: 'bg-yellow-500/20', text: 'text-yellow-300', border: 'border-yellow-500/30', dot: 'bg-yellow-400' },
-  'AG. ATRACAÇÃO':    { label: 'Ag. Atracação',  bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30', dot: 'bg-purple-400' },
-  'ATRACADO':         { label: 'Atracado',        bg: 'bg-blue-500/20',   text: 'text-blue-300',   border: 'border-blue-500/30',   dot: 'bg-blue-400' },
-  'GATE ABERTO':      { label: 'Gate Aberto',     bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/30',  dot: 'bg-green-400' },
-  'GATE FECHADO':     { label: 'Gate Fechado',    bg: 'bg-red-500/20',    text: 'text-red-300',    border: 'border-red-500/30',    dot: 'bg-red-400' },
-  'GATE ENCERRADO':   { label: 'Gate Encerrado',  bg: 'bg-pink-500/20',   text: 'text-pink-300',   border: 'border-pink-500/30',   dot: 'bg-pink-400' },
-  'DESATRACADO':      { label: 'Desatracado',     bg: 'bg-cyan-500/20',   text: 'text-cyan-300',   border: 'border-cyan-500/30',   dot: 'bg-cyan-400' },
-  'FINALIZADO':       { label: 'Finalizado',      bg: 'bg-slate-600/20',  text: 'text-slate-400',  border: 'border-slate-600/30',  dot: 'bg-slate-500' },
-  'EM TRÂNSITO':      { label: 'Em Trânsito',     bg: 'bg-blue-400/20',   text: 'text-blue-300',   border: 'border-blue-400/30',   dot: 'bg-blue-400' },
-  'FUNDEADO':         { label: 'Fundeado',        bg: 'bg-amber-500/20',  text: 'text-amber-300',  border: 'border-amber-500/30',  dot: 'bg-amber-400' },
-  'AGUARDANDO JANELA':{ label: 'Ag. Janela',      bg: 'bg-violet-500/20', text: 'text-violet-300', border: 'border-violet-500/30', dot: 'bg-violet-400' },
-  'SAÍDO':            { label: 'Saído',           bg: 'bg-slate-500/20',  text: 'text-slate-400',  border: 'border-slate-500/30',  dot: 'bg-slate-500' },
+const STATUS_CFG: Record<ShipStatus, { label: string; bg: string; text: string; border: string; dot: string; rowBg: string }> = {
+  'NOVO':               { label: 'Novo',           bg: 'bg-slate-500/20',   text: 'text-slate-300',   border: 'border-slate-500/30',   dot: 'bg-slate-400',   rowBg: '' },
+  'NÃO ENCONTRADO':     { label: 'Não Encontrado', bg: 'bg-orange-500/15',  text: 'text-orange-300',  border: 'border-orange-500/30',  dot: 'bg-orange-400',  rowBg: 'bg-orange-950/20' },
+  'SEM PREVISÃO':       { label: 'Sem Previsão',   bg: 'bg-slate-500/15',   text: 'text-slate-400',   border: 'border-slate-600/30',   dot: 'bg-slate-500',   rowBg: '' },
+  'AG. ATRACAÇÃO':      { label: 'Ag. Atracação',  bg: 'bg-yellow-500/15',  text: 'text-yellow-300',  border: 'border-yellow-500/30',  dot: 'bg-yellow-400',  rowBg: 'bg-yellow-950/20' },
+  'ATRACADO':           { label: 'Atracado',        bg: 'bg-amber-500/15',   text: 'text-amber-300',   border: 'border-amber-500/30',   dot: 'bg-amber-400',   rowBg: 'bg-amber-950/25' },
+  'GATE ABERTO':        { label: 'Gate Aberto',     bg: 'bg-green-500/15',   text: 'text-green-300',   border: 'border-green-500/30',   dot: 'bg-green-400',   rowBg: 'bg-green-950/25' },
+  'GATE FECHADO':       { label: 'Gate Fechado',    bg: 'bg-red-500/15',     text: 'text-red-300',     border: 'border-red-500/30',     dot: 'bg-red-400',     rowBg: 'bg-red-950/25' },
+  'GATE ENCERRADO':     { label: 'Gate Encerrado',  bg: 'bg-pink-500/15',    text: 'text-pink-300',    border: 'border-pink-500/30',    dot: 'bg-pink-400',    rowBg: 'bg-pink-950/20' },
+  'DESATRACADO':        { label: 'Desatracado',     bg: 'bg-slate-600/15',   text: 'text-slate-400',   border: 'border-slate-600/30',   dot: 'bg-slate-500',   rowBg: 'bg-slate-800/30' },
+  'FINALIZADO':         { label: 'Finalizado',      bg: 'bg-slate-600/20',   text: 'text-slate-400',   border: 'border-slate-600/30',   dot: 'bg-slate-500',   rowBg: '' },
+  'EM TRÂNSITO':        { label: 'Em Trânsito',     bg: 'bg-blue-400/15',    text: 'text-blue-300',    border: 'border-blue-400/30',    dot: 'bg-blue-400',    rowBg: 'bg-blue-950/20' },
+  'FUNDEADO':           { label: 'Fundeado',        bg: 'bg-amber-500/15',   text: 'text-amber-300',   border: 'border-amber-500/30',   dot: 'bg-amber-400',   rowBg: 'bg-amber-950/20' },
+  'AGUARDANDO JANELA':  { label: 'Ag. Janela',      bg: 'bg-violet-500/15',  text: 'text-violet-300',  border: 'border-violet-500/30',  dot: 'bg-violet-400',  rowBg: 'bg-violet-950/20' },
+  'SAÍDO':              { label: 'Saído',           bg: 'bg-slate-500/15',   text: 'text-slate-400',   border: 'border-slate-500/30',   dot: 'bg-slate-500',   rowBg: '' },
 };
+
 const PANEL_STATUSES: ShipStatus[] = ['NOVO','NÃO ENCONTRADO','SEM PREVISÃO','GATE FECHADO','GATE ABERTO','GATE ENCERRADO','AG. ATRACAÇÃO','ATRACADO','DESATRACADO'];
-const ALL_STATUSES: ShipStatus[] = Object.keys(STATUS_CFG) as ShipStatus[];
-const TERMINALS_MANUAL = ['BTP','ECOPORTO','SANTOS BRASIL','EMBRAPORT','OUTRO'];
+const ALL_STATUSES: ShipStatus[]   = Object.keys(STATUS_CFG) as ShipStatus[];
+const TERMINALS_MANUAL             = ['BTP','ECOPORTO','SANTOS BRASIL','EMBRAPORT','OUTRO'];
+
+// ── TV filter options ──────────────────────────────────────────────────────────
+type TVFilter = 'TODOS' | 'ATRACADO' | 'AG. ATRACAÇÃO' | 'GATE ABERTO' | 'GATE FECHADO' | 'DESATRACADO' | 'SEM PREVISÃO';
+const TV_FILTERS: { key: TVFilter; label: string }[] = [
+  { key: 'TODOS',          label: 'Todos' },
+  { key: 'ATRACADO',       label: 'Atracados' },
+  { key: 'AG. ATRACAÇÃO',  label: 'Na Barra' },
+  { key: 'GATE ABERTO',    label: 'Gate Aberto' },
+  { key: 'GATE FECHADO',   label: 'Gate Fechado' },
+  { key: 'DESATRACADO',    label: 'Desatracados' },
+  { key: 'SEM PREVISÃO',   label: 'Previstos' },
+];
 
 // ── Situação → ShipStatus ─────────────────────────────────────────────────────
 function mapSituacao(s: string): ShipStatus {
-  const n = s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const n = (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   if (n.includes('em operac') || n.includes('operando') || n.includes('atracad')) return 'ATRACADO';
-  if (n.includes('gate abert') || n.includes('gate open'))                        return 'GATE ABERTO';
-  if (n.includes('gate fech') || n.includes('gate closed'))                       return 'GATE FECHADO';
-  if (n.includes('gate encerr') || n.includes('encerr'))                          return 'GATE ENCERRADO';
-  if (n.includes('desatrac') || n.includes('saiu') || n.includes('saido'))        return 'DESATRACADO';
-  if (n.includes('previsto') || n.includes('aguard') || n.includes('ag.atrac') || n.includes('ag. atrac')) return 'AG. ATRACAÇÃO';
+  if (n.includes('gate abert') || n.includes('gate open'))                         return 'GATE ABERTO';
+  if (n.includes('gate fech') || n.includes('gate closed'))                        return 'GATE FECHADO';
+  if (n.includes('gate encerr') || n.includes('encerr'))                           return 'GATE ENCERRADO';
+  if (n.includes('desatrac') || n.includes('saiu') || n.includes('saido'))         return 'DESATRACADO';
+  if (n.includes('previsto') || n.includes('aguard') || n.includes('ag.') || n.includes('ag '))
+    return 'AG. ATRACAÇÃO';
   return 'SEM PREVISÃO';
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+/** Formata string de data brasileira ou ISO para exibição curta */
+function fmtCell(v?: string | null): string {
+  if (!v || v === '—') return '—';
+  // Já no formato DD/MM/YYYY HH:MM — retorna como está, apenas trunca
+  if (/^\d{2}\/\d{2}\/\d{2,4}/.test(v)) {
+    // Se tiver hora, mostra só até os minutos
+    const parts = v.split(' ');
+    const datePart = parts[0]; // DD/MM/YYYY ou DD/MM/YY
+    const timePart = parts[1] ? parts[1].slice(0,5) : ''; // HH:MM
+    return timePart ? `${datePart} ${timePart}` : datePart;
+  }
+  // ISO string
+  try {
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return v;
+    return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+  } catch { return v; }
+}
+
 function fmtDT(iso?: string | null) {
   if (!iso) return '—';
   try {
@@ -60,6 +93,7 @@ function fmtDT(iso?: string | null) {
     return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
   } catch { return iso; }
 }
+
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
   try {
@@ -68,9 +102,16 @@ function fmtDate(iso?: string | null) {
     return d.toLocaleDateString('pt-BR');
   } catch { return iso; }
 }
-function isExpired(iso?: string | null) {
-  return !!iso && new Date(iso) < new Date();
+
+function isExpired(v?: string | null) {
+  if (!v) return false;
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(v)) {
+    const [dd, mm, yyyy] = v.split(/[\/ ]/);
+    return new Date(`${yyyy}-${mm}-${dd}`) < new Date();
+  }
+  return new Date(v) < new Date();
 }
+
 const emptyShip = (): Partial<Ship> => ({
   name:'', imo:'', armador:'', viagem:'', terminal:'BTP', berco:'',
   prevAtracacao:'', abertGate:'', deadLine:'', dataAtracacao:'', dataDesatrac:'',
@@ -91,8 +132,10 @@ const I = {
   Anchor:  (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3a3 3 0 100 6 3 3 0 000-6zm0 6v12M5 12h14M5 19.5c0-2.5 2-4.5 7-4.5s7 2 7 4.5"/></svg>,
   ChevD:   (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>,
   Pin:     (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>,
+  Gate:    (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>,
 };
 
+// ── Sub-components ────────────────────────────────────────────────────────────
 function SBadge({ status, size='sm' }: { status: ShipStatus; size?: 'xs'|'sm' }) {
   const c = STATUS_CFG[status] ?? STATUS_CFG['NOVO'];
   return (
@@ -102,29 +145,56 @@ function SBadge({ status, size='sm' }: { status: ShipStatus; size?: 'xs'|'sm' })
   );
 }
 
+function TermBadge({ terminal }: { terminal: string }) {
+  const acc = TERM_ACCENT[terminal] ?? { badge: 'bg-slate-700 text-slate-300 border-slate-600' };
+  const short: Record<string,string> = { 'SANTOS BRASIL': 'SB', 'ECOPORTO': 'ECO', 'BTP': 'BTP', 'EMBRAPORT': 'EMB' };
+  return (
+    <span className={`inline-flex items-center font-black uppercase rounded border text-[7px] px-1.5 py-0.5 whitespace-nowrap ${acc.badge}`}>
+      {short[terminal] ?? terminal.slice(0,3)}
+    </span>
+  );
+}
+
+function GateTag({ value, isDeadline }: { value?: string | null; isDeadline?: boolean }) {
+  if (!value || value === '—') return <span className="text-slate-700">—</span>;
+  const expired = isExpired(value);
+  return (
+    <span className={`text-[8px] font-black whitespace-nowrap ${expired ? 'text-red-400' : isDeadline ? 'text-orange-400' : 'text-green-400'}`}>
+      {fmtCell(value)}
+    </span>
+  );
+}
+
+// ── Table cell helper ─────────────────────────────────────────────────────────
+function TC({ v, muted }: { v?: string | null; muted?: boolean }) {
+  const val = fmtCell(v);
+  if (val === '—') return <span className="text-slate-700">—</span>;
+  return <span className={`whitespace-nowrap ${muted ? 'text-slate-400' : 'text-slate-200'}`}>{val}</span>;
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
-  const [ships, setShips]           = useState<Ship[]>([]);
-  const [loadingShips, setLS]       = useState(true);
-  const [termVessels, setTV]        = useState<TerminalVessel[]>([]);
-  const [tvFetchedAt, setTVAt]      = useState<string|null>(null);
-  const [loadingTV, setLTV]         = useState(true);
-  const [tvError, setTVError]       = useState<string|null>(null);
-  const [lastRefresh, setLastRefresh] = useState<Date|null>(null);
+  const [ships, setShips]             = useState<Ship[]>([]);
+  const [loadingShips, setLS]         = useState(true);
+  const [termVessels, setTV]          = useState<TerminalVessel[]>([]);
+  const [tvFetchedAt, setTVAt]        = useState<string|null>(null);
+  const [loadingTV, setLTV]           = useState(true);
+  const [tvError, setTVError]         = useState<string|null>(null);
+  const [tvFilter, setTVFilter]       = useState<TVFilter>('TODOS');
 
   // modal states
-  const [modalOpen, setModalOpen]   = useState(false);
-  const [editing, setEditing]       = useState<Partial<Ship>>(emptyShip());
-  const [saving, setSaving]         = useState(false);
-  const [mErr, setMErr]             = useState<string|null>(null);
+  const [modalOpen, setModalOpen]     = useState(false);
+  const [editing, setEditing]         = useState<Partial<Ship>>(emptyShip());
+  const [saving, setSaving]           = useState(false);
+  const [mErr, setMErr]               = useState<string|null>(null);
 
-  const [stModal, setStModal]       = useState(false);
-  const [stTarget, setStTarget]     = useState<Ship|null>(null);
-  const [newSt, setNewSt]           = useState<ShipStatus>('NOVO');
-  const [stObs, setStObs]           = useState('');
+  const [stModal, setStModal]         = useState(false);
+  const [stTarget, setStTarget]       = useState<Ship|null>(null);
+  const [newSt, setNewSt]             = useState<ShipStatus>('NOVO');
+  const [stObs, setStObs]             = useState('');
 
-  const [showMonit, setShowMonit]   = useState(true);
-  const [showHist, setShowHist]     = useState(true);
+  const [showMonit, setShowMonit]     = useState(true);
+  const [showHist, setShowHist]       = useState(false);
 
   // ── Load data ──────────────────────────────────────────────────────────────
   const loadShips = useCallback(async () => {
@@ -136,12 +206,38 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
     if (!supabase) return;
     setLTV(true); setTVError(null);
     try {
-      const { data, error } = await supabase.from('terminal_vessels').select('*').order('fetched_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('terminal_vessels')
+        .select('*')
+        .order('fetched_at', { ascending: false });
       if (error) throw error;
       const rows = (data ?? []) as any[];
-      setTV(rows.map(r => ({ navio: r.navio, situacao: r.situacao, previsao: r.previsao, berco: r.berco, armador: r.armador, viagem: r.viagem, terminal: r.terminal })));
+
+      setTV(rows.map(r => ({
+        terminal:      r.terminal,
+        navio:         r.navio,
+        situacao:      r.situacao,
+        previsao:      r.previsao,
+        berco:         r.berco,
+        armador:       r.armador,
+        viagem:        r.viagem,
+        // BTP extended fields
+        rap:           r.rap,
+        agencia:       r.agencia,
+        dtPrevChegada: r.dt_prev_chegada,
+        dtChegada:     r.dt_chegada,
+        dtPrevAtrac:   r.dt_prev_atrac,
+        dtAtracacao:   r.dt_atracacao,
+        dtPrevSaida:   r.dt_prev_saida,
+        dtSaida:       r.dt_saida,
+        gateDry:       r.gate_dry,
+        gateReefer:    r.gate_reefer,
+        deadLineStr:   r.dead_line_str,
+        servico:       r.servico,
+        fetchedAt:     r.fetched_at,
+      } as TerminalVessel)));
+
       setTVAt(rows[0]?.fetched_at ?? null);
-      setLastRefresh(new Date());
     } catch(e:any) {
       setTVError(e?.message ?? 'Erro ao carregar dados dos terminais');
     } finally { setLTV(false); }
@@ -150,17 +246,6 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
   useEffect(() => { loadShips(); loadTV(); }, []); // eslint-disable-line
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  // Group terminal vessels by terminal
-  const byTerminal = useMemo(() => {
-    const m: Record<string, TerminalVessel[]> = {};
-    for (const v of termVessels) {
-      if (!m[v.terminal]) m[v.terminal] = [];
-      m[v.terminal].push(v);
-    }
-    return m;
-  }, [termVessels]);
-
-  // Status counts: terminal vessels + manual ships
   const counts = useMemo(() => {
     const c: Partial<Record<ShipStatus, number>> = {};
     for (const v of termVessels) {
@@ -175,11 +260,33 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
     return c;
   }, [termVessels, ships]);
 
+  const filteredVessels = useMemo(() => {
+    if (tvFilter === 'TODOS') return termVessels;
+    return termVessels.filter(v => mapSituacao(v.situacao) === tvFilter);
+  }, [termVessels, tvFilter]);
+
+  // Count per filter for badges
+  const filterCounts = useMemo(() => {
+    const c: Partial<Record<TVFilter, number>> = { TODOS: termVessels.length };
+    for (const v of termVessels) {
+      const s = mapSituacao(v.situacao) as TVFilter;
+      c[s] = (c[s] ?? 0) + 1;
+    }
+    return c;
+  }, [termVessels]);
+
   const allHistory = useMemo(() => {
     const e: Array<ShipStatusEntry & { shipName: string; viagem?: string; terminal?: string }> = [];
     for (const s of ships) for (const h of (s.statusHistory ?? [])) e.push({ ...h, shipName: s.name, viagem: s.viagem, terminal: s.terminal });
     return e.sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).slice(0,20);
   }, [ships]);
+
+  // Whether any vessel has extended BTP data
+  const hasExtended = useMemo(() => termVessels.some(v =>
+    v.dtPrevChegada || v.dtChegada || v.dtPrevAtrac || v.dtAtracacao ||
+    v.dtPrevSaida   || v.dtSaida   || v.gateDry     || v.gateReefer  ||
+    v.deadLineStr   || v.servico
+  ), [termVessels]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const openNew = (prefill?: Partial<Ship>) => { setEditing({ ...emptyShip(), ...prefill }); setMErr(null); setModalOpen(true); };
@@ -212,39 +319,54 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
     const entry: ShipStatusEntry = { status: newSt, dateTime: new Date().toISOString(), obs: stObs || undefined };
     const hist = [...(stTarget.statusHistory ?? []), entry];
     const extra: Partial<Ship> = {};
-    if (newSt === 'ATRACADO' && !stTarget.dataAtracacao) extra.dataAtracacao = new Date().toISOString();
-    if (newSt === 'DESATRACADO' && !stTarget.dataDesatrac) extra.dataDesatrac = new Date().toISOString();
+    if (newSt === 'ATRACADO'    && !stTarget.dataAtracacao) extra.dataAtracacao = new Date().toISOString();
+    if (newSt === 'DESATRACADO' && !stTarget.dataDesatrac)  extra.dataDesatrac  = new Date().toISOString();
     try { await db.saveShip({ ...stTarget, status: newSt, statusHistory: hist, ...extra }); setStModal(false); await loadShips(); }
     catch(e:any) { alert('Erro: ' + e?.message); }
   };
 
   const handlePinFromTerminal = (v: TerminalVessel) => {
-    openNew({ name: v.navio.toUpperCase(), terminal: v.terminal, viagem: v.viagem, armador: v.armador, berco: v.berco, prevAtracacao: v.previsao ? '' : '', status: mapSituacao(v.situacao) });
+    openNew({
+      name:         v.navio.toUpperCase(),
+      terminal:     v.terminal,
+      viagem:       v.viagem,
+      armador:      v.armador,
+      berco:        v.berco,
+      prevAtracacao: v.dtPrevAtrac || v.previsao || '',
+      deadLine:      v.deadLineStr || '',
+      status:        mapSituacao(v.situacao),
+    });
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">Monitoramento de Navios</h1>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Acompanhe gates, atracações e situação nos terminais de Santos</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+            Programação de atracação · BTP · ECOPORTO · Santos Brasil
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => { loadTV(); loadShips(); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 text-[9px] font-black uppercase tracking-widest transition-all">
+          <button
+            onClick={() => { loadTV(); loadShips(); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 text-[9px] font-black uppercase tracking-widest transition-all"
+          >
             <I.Refresh className="w-3.5 h-3.5"/> Atualizar
           </button>
-          <button onClick={() => openNew()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all active:scale-95">
-            <I.Plus className="w-3.5 h-3.5"/> Novo Navio
+          <button
+            onClick={() => openNew()}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all active:scale-95"
+          >
+            <I.Plus className="w-3.5 h-3.5"/> Monitorar Navio
           </button>
         </div>
       </div>
 
-      {/* Status summary bar */}
+      {/* ── Status summary bar ── */}
       <div className="grid grid-cols-3 sm:grid-cols-5 xl:grid-cols-9 gap-2">
         {PANEL_STATUSES.map(st => {
           const c = STATUS_CFG[st]; const n = counts[st] ?? 0;
@@ -257,116 +379,277 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
         })}
       </div>
 
-      {/* ── TERMINAL VESSELS — primary content ── */}
-      <div className="space-y-4">
-        {/* Section header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <I.Anchor className="w-4 h-4 text-slate-400"/>
-            <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Lista de Atracação dos Terminais</p>
+      {/* ══════════════════════════════════════════════════════════════
+          TERMINAL VESSELS — tabela estilo BTP
+      ══════════════════════════════════════════════════════════════ */}
+      <div className="rounded-2xl bg-[#0f172a] border border-slate-800 overflow-hidden">
+
+        {/* Table toolbar */}
+        <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <I.Anchor className="w-4 h-4 text-slate-500"/>
+            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+              Programação de Atracação
+            </span>
             {tvFetchedAt && (
-              <span className="text-[8px] text-slate-400 font-bold">
-                — atualizado às {new Date(tvFetchedAt).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
+              <span className="text-[8px] text-slate-600 font-bold">
+                · atualizado {new Date(tvFetchedAt).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
               </span>
             )}
+            {loadingTV && <span className="text-[8px] text-blue-400 font-bold animate-pulse">Carregando...</span>}
           </div>
-          {loadingTV && <span className="text-[8px] text-blue-400 font-bold animate-pulse">Carregando...</span>}
+
+          {/* Terminal links */}
+          <div className="flex items-center gap-2">
+            {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(t => (
+              <a key={t} href={TERM_LINKS[t]} target="_blank" rel="noopener noreferrer"
+                className={`flex items-center gap-1 text-[7px] font-black uppercase px-2 py-1 rounded border transition-all hover:opacity-80 ${TERM_ACCENT[t].badge}`}>
+                <I.Link className="w-2.5 h-2.5"/> {t === 'SANTOS BRASIL' ? 'S.BRASIL' : t}
+              </a>
+            ))}
+          </div>
         </div>
 
+        {/* Filter buttons */}
+        <div className="px-5 py-2.5 border-b border-slate-800/60 flex items-center gap-2 flex-wrap">
+          {TV_FILTERS.map(({ key, label }) => {
+            const active = tvFilter === key;
+            const cnt = filterCounts[key] ?? 0;
+            const statusKey = key === 'TODOS' ? null : key as ShipStatus;
+            const cfg = statusKey ? STATUS_CFG[statusKey] : null;
+            return (
+              <button
+                key={key}
+                onClick={() => setTVFilter(key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border ${
+                  active
+                    ? cfg ? `${cfg.bg} ${cfg.text} ${cfg.border}` : 'bg-slate-700 text-slate-200 border-slate-600'
+                    : 'bg-slate-900 text-slate-500 border-slate-800 hover:border-slate-700 hover:text-slate-400'
+                }`}
+              >
+                {cfg && <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`}/>}
+                {label}
+                {cnt > 0 && <span className={`ml-0.5 font-black ${active ? '' : 'text-slate-600'}`}>({cnt})</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Error state */}
         {tvError && (
-          <div className="rounded-xl bg-amber-50 border border-amber-200 px-5 py-4 flex items-start gap-3">
+          <div className="px-6 py-4 flex items-start gap-3">
             <I.Warning className="w-4 h-4 text-amber-500 shrink-0 mt-0.5"/>
             <div>
-              <p className="text-[10px] font-black text-amber-700 uppercase">Aguardando dados do Railway</p>
+              <p className="text-[10px] font-black text-amber-400 uppercase">Aguardando dados do Railway</p>
               <p className="text-[9px] text-amber-600 font-bold mt-0.5">{tvError}</p>
             </div>
           </div>
         )}
 
+        {/* Empty state */}
         {!loadingTV && termVessels.length === 0 && !tvError && (
-          <div className="rounded-2xl bg-[#0f172a] border border-slate-800 px-6 py-10 flex flex-col items-center gap-3 text-center">
-            <I.Anchor className="w-10 h-10 text-slate-700"/>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Aguardando primeira coleta do Railway</p>
-            <p className="text-[9px] text-slate-600 font-bold">O bot raspa os terminais a cada 30 minutos e salva aqui automaticamente.</p>
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+            <I.Anchor className="w-12 h-12 text-slate-800"/>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Aguardando primeira coleta</p>
+            <p className="text-[9px] text-slate-700 font-bold max-w-xs">
+              O bot raspa os terminais a cada 30 min e salva automaticamente.
+            </p>
           </div>
         )}
 
-        {/* Terminal grids */}
-        {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(term => {
-          const vessels = byTerminal[term];
-          if (!vessels || vessels.length === 0) return null;
-          const acc = TERM_ACCENT[term];
-          return (
-            <div key={term} className="rounded-2xl bg-[#0f172a] border border-slate-800 overflow-hidden">
-              {/* Terminal header */}
-              <div className={`px-5 py-3 flex items-center justify-between border-b ${acc.border} ${acc.bg}`}>
-                <div className="flex items-center gap-3">
-                  <I.Anchor className={`w-4 h-4 ${acc.text}`}/>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${acc.text}`}>{term}</span>
-                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${acc.bg} ${acc.text} border ${acc.border}`}>
-                    {vessels.length} navios
-                  </span>
-                </div>
-                <a href={TERM_LINKS[term]} target="_blank" rel="noopener noreferrer"
-                  className={`flex items-center gap-1.5 text-[8px] font-black uppercase ${acc.text} hover:opacity-70 transition-all`}>
-                  <I.Link className="w-3 h-3"/> Portal
-                </a>
-              </div>
-
-              {/* Vessel cards grid */}
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {vessels.map((v, idx) => {
-                  const mappedStatus = mapSituacao(v.situacao);
-                  const sc = STATUS_CFG[mappedStatus];
+        {/* ── THE TABLE ── */}
+        {filteredVessels.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[9px] border-collapse" style={{ minWidth: hasExtended ? '1400px' : '700px' }}>
+              <thead>
+                <tr className="border-b border-slate-800">
+                  {/* Sticky columns */}
+                  <th className="sticky left-0 z-10 bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap border-r border-slate-800/60 w-16">
+                    Porto
+                  </th>
+                  <th className="sticky left-16 z-10 bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap border-r border-slate-800/60 min-w-[140px]">
+                    Navio
+                  </th>
+                  <th className="sticky left-[196px] z-10 bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap border-r border-slate-800/60 w-28">
+                    Status
+                  </th>
+                  {/* Scrollable columns */}
+                  <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Viagem</th>
+                  <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Agência</th>
+                  <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Berço</th>
+                  {hasExtended && <>
+                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Chegada</th>
+                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Chegada</th>
+                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Atrac.</th>
+                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Atracação</th>
+                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Saída</th>
+                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Saída</th>
+                    <th className="px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Dry</th>
+                    <th className="px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Reefer</th>
+                    <th className="px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Dead-Line</th>
+                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Serviço</th>
+                  </>}
+                  {!hasExtended && (
+                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Previsão</th>
+                  )}
+                  <th className="px-3 py-2.5 w-8"/>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredVessels.map((v, idx) => {
+                  const st  = mapSituacao(v.situacao);
+                  const sc  = STATUS_CFG[st];
+                  const acc = TERM_ACCENT[v.terminal] ?? TERM_ACCENT['BTP'];
                   const isMonitored = ships.some(s => s.name.toUpperCase() === v.navio.toUpperCase());
                   return (
-                    <div key={idx} className={`rounded-xl border ${sc.border} bg-slate-900/60 flex flex-col overflow-hidden hover:shadow-lg hover:shadow-black/20 transition-all`}>
-                      {/* Vessel header */}
-                      <div className={`px-3 py-2.5 flex items-start justify-between gap-2 ${sc.bg}`}>
-                        <div className="min-w-0">
-                          <p className={`text-[9px] font-black uppercase truncate ${sc.text}`}>{v.navio}</p>
-                          {v.viagem && <p className="text-[7px] text-slate-500 font-bold">{v.viagem}</p>}
+                    <tr
+                      key={idx}
+                      className={`border-b border-slate-800/50 transition-colors group ${sc.rowBg || ''} hover:brightness-125`}
+                    >
+                      {/* TERMINAL (sticky) */}
+                      <td className={`sticky left-0 z-10 px-3 py-2 border-r border-slate-800/40 ${sc.rowBg || 'bg-[#0f172a]'}`}>
+                        <TermBadge terminal={v.terminal}/>
+                      </td>
+
+                      {/* NAVIO (sticky) */}
+                      <td className={`sticky left-16 z-10 px-3 py-2 border-r border-slate-800/40 ${sc.rowBg || 'bg-[#0f172a]'}`}>
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`font-black uppercase whitespace-nowrap ${sc.text}`}>{v.navio}</span>
+                          {v.rap && <span className="text-[7px] text-slate-600 font-bold">RAP: {v.rap}</span>}
                         </div>
-                        <SBadge status={mappedStatus} size="xs"/>
-                      </div>
-                      {/* Vessel details */}
-                      <div className="px-3 py-2 space-y-1 flex-1">
-                        <p className="text-[8px] text-slate-400 font-bold">{v.situacao}</p>
-                        {v.previsao && (
-                          <div className="flex items-center gap-1.5">
-                            <I.History className="w-2.5 h-2.5 text-slate-600"/>
-                            <p className="text-[8px] text-slate-500 font-bold">{v.previsao}</p>
-                          </div>
-                        )}
-                        {v.berco && <p className="text-[7px] text-slate-600 font-bold">Berço {v.berco}</p>}
-                        {v.armador && <p className="text-[7px] text-slate-600 font-bold">{v.armador}</p>}
-                      </div>
-                      {/* Pin to monitoring */}
-                      <div className="px-3 py-2 border-t border-slate-800/50">
-                        {isMonitored ? (
-                          <span className="text-[7px] font-black text-blue-400 flex items-center gap-1">
-                            <I.Pin className="w-2.5 h-2.5"/> Monitorado
+                      </td>
+
+                      {/* STATUS (sticky) */}
+                      <td className={`sticky left-[196px] z-10 px-3 py-2 border-r border-slate-800/40 ${sc.rowBg || 'bg-[#0f172a]'}`}>
+                        <SBadge status={st} size="xs"/>
+                      </td>
+
+                      {/* VIAGEM */}
+                      <td className="px-3 py-2">
+                        <span className="text-slate-400 font-bold whitespace-nowrap">{v.viagem || '—'}</span>
+                      </td>
+
+                      {/* AGÊNCIA */}
+                      <td className="px-3 py-2">
+                        <span className="text-slate-400 whitespace-nowrap">{v.agencia || v.armador || '—'}</span>
+                      </td>
+
+                      {/* BERÇO */}
+                      <td className="px-3 py-2">
+                        <span className="text-slate-400 whitespace-nowrap">{v.berco || '—'}</span>
+                      </td>
+
+                      {hasExtended && <>
+                        {/* PREV. CHEGADA */}
+                        <td className="px-3 py-2"><TC v={v.dtPrevChegada} muted/></td>
+
+                        {/* CHEGADA */}
+                        <td className="px-3 py-2"><TC v={v.dtChegada}/></td>
+
+                        {/* PREV. ATRAC. */}
+                        <td className="px-3 py-2"><TC v={v.dtPrevAtrac} muted/></td>
+
+                        {/* ATRACAÇÃO */}
+                        <td className="px-3 py-2">
+                          <span className={`whitespace-nowrap font-black ${v.dtAtracacao ? sc.text : 'text-slate-700'}`}>
+                            {fmtCell(v.dtAtracacao) || '—'}
                           </span>
+                        </td>
+
+                        {/* PREV. SAÍDA */}
+                        <td className="px-3 py-2"><TC v={v.dtPrevSaida} muted/></td>
+
+                        {/* SAÍDA */}
+                        <td className="px-3 py-2"><TC v={v.dtSaida}/></td>
+
+                        {/* GATE DRY */}
+                        <td className="px-3 py-2 text-center">
+                          <GateTag value={v.gateDry}/>
+                        </td>
+
+                        {/* GATE REEFER */}
+                        <td className="px-3 py-2 text-center">
+                          <GateTag value={v.gateReefer}/>
+                        </td>
+
+                        {/* DEAD-LINE */}
+                        <td className="px-3 py-2 text-center">
+                          <GateTag value={v.deadLineStr} isDeadline/>
+                        </td>
+
+                        {/* SERVIÇO */}
+                        <td className="px-3 py-2">
+                          <span className="text-slate-400 whitespace-nowrap">{v.servico || '—'}</span>
+                        </td>
+                      </>}
+
+                      {/* PREVISÃO (fallback for non-BTP) */}
+                      {!hasExtended && (
+                        <td className="px-3 py-2">
+                          <TC v={v.previsao || v.dtPrevAtrac} muted/>
+                        </td>
+                      )}
+
+                      {/* PIN ACTION */}
+                      <td className="px-3 py-2">
+                        {isMonitored ? (
+                          <I.Pin className="w-3 h-3 text-blue-500" title="Monitorado"/>
                         ) : (
-                          <button onClick={() => handlePinFromTerminal(v)}
-                            className="text-[7px] font-black text-slate-500 hover:text-blue-400 flex items-center gap-1 transition-colors">
-                            <I.Pin className="w-2.5 h-2.5"/> Adicionar ao monitoramento
+                          <button
+                            onClick={() => handlePinFromTerminal(v)}
+                            title="Adicionar ao monitoramento"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <I.Pin className="w-3 h-3 text-slate-600 hover:text-blue-400 transition-colors"/>
                           </button>
                         )}
-                      </div>
-                    </div>
+                      </td>
+                    </tr>
                   );
                 })}
+              </tbody>
+            </table>
+
+            {filteredVessels.length === 0 && tvFilter !== 'TODOS' && (
+              <div className="flex items-center justify-center py-10 text-slate-600 text-[9px] font-black uppercase">
+                Nenhum navio neste filtro
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Table footer */}
+        {termVessels.length > 0 && (
+          <div className="px-5 py-2 border-t border-slate-800/60 flex items-center justify-between">
+            <span className="text-[7px] text-slate-700 font-bold uppercase">
+              {filteredVessels.length} de {termVessels.length} navios · scraped pelo Railway Bot
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1 text-[7px] text-amber-700 font-bold">
+                <span className="w-2 h-2 rounded-sm bg-amber-950/60 border border-amber-700/40"/> Atracado
+              </span>
+              <span className="flex items-center gap-1 text-[7px] text-yellow-700 font-bold">
+                <span className="w-2 h-2 rounded-sm bg-yellow-950/60 border border-yellow-700/40"/> Na Barra
+              </span>
+              <span className="flex items-center gap-1 text-[7px] text-green-700 font-bold">
+                <span className="w-2 h-2 rounded-sm bg-green-950/60 border border-green-700/40"/> Gate Aberto
+              </span>
+              <span className="flex items-center gap-1 text-[7px] text-red-700 font-bold">
+                <span className="w-2 h-2 rounded-sm bg-red-950/60 border border-red-700/40"/> Gate Fechado
+              </span>
             </div>
-          );
-        })}
+          </div>
+        )}
       </div>
 
-      {/* ── MONITORAMENTO MANUAL ── */}
+      {/* ══════════════════════════════════════════════════════════════
+          NAVIOS MONITORADOS (manual)
+      ══════════════════════════════════════════════════════════════ */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <button onClick={() => setShowMonit(p => !p)}
-          className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-all">
+        <button
+          onClick={() => setShowMonit(p => !p)}
+          className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-all"
+        >
           <div className="flex items-center gap-2">
             <I.Ship className="w-4 h-4 text-slate-400"/>
             <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Navios Monitorados</p>
@@ -387,9 +670,9 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
             </div>
           ) : (
             <div className="border-t border-slate-100">
-              {/* Active */}
+              {/* Active ships */}
               <div className="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                {ships.filter(s => s.status !== 'FINALIZADO' && s.status !== 'SAÍDO' && s.status !== 'DESATRACADO').map(ship => {
+                {ships.filter(s => !['FINALIZADO','SAÍDO','DESATRACADO'].includes(s.status)).map(ship => {
                   const c = STATUS_CFG[ship.status]; const dlExp = isExpired(ship.deadLine);
                   return (
                     <div key={ship.id} className={`bg-[#0f172a] rounded-2xl border ${c.border} flex flex-col overflow-hidden`}>
@@ -398,7 +681,9 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
                           <p className={`text-[10px] font-black uppercase truncate ${c.text}`}>
                             {ship.name}{ship.viagem && <span className="ml-1.5 opacity-70 font-bold">· {ship.viagem}</span>}
                           </p>
-                          <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">{ship.terminal ?? '—'}{ship.berco ? ` · Berço ${ship.berco}` : ''}</p>
+                          <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">
+                            {ship.terminal ?? '—'}{ship.berco ? ` · Berço ${ship.berco}` : ''}
+                          </p>
                         </div>
                         <SBadge status={ship.status} size="xs"/>
                       </div>
@@ -425,15 +710,17 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
                 })}
               </div>
 
-              {/* Finished */}
+              {/* Finished/desatracado */}
               {ships.filter(s => ['FINALIZADO','SAÍDO','DESATRACADO'].includes(s.status)).length > 0 && (
                 <div className="border-t border-slate-100 overflow-x-auto">
                   <table className="w-full text-[9px]">
                     <thead><tr className="border-b border-slate-100">
-                      {['Navio','Viagem','Terminal','Status','Atualizado',''].map(h=><th key={h} className="px-4 py-2.5 text-left font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>)}
+                      {['Navio','Viagem','Terminal','Status','Atualizado',''].map(h => (
+                        <th key={h} className="px-4 py-2.5 text-left font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                      ))}
                     </tr></thead>
                     <tbody>
-                      {ships.filter(s => ['FINALIZADO','SAÍDO','DESATRACADO'].includes(s.status)).map(s=>(
+                      {ships.filter(s => ['FINALIZADO','SAÍDO','DESATRACADO'].includes(s.status)).map(s => (
                         <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                           <td className="px-4 py-2.5 font-black text-slate-600 uppercase">{s.name}</td>
                           <td className="px-3 py-2.5 text-slate-400">{s.viagem??'—'}</td>
@@ -442,9 +729,9 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
                           <td className="px-3 py-2.5 text-slate-400">{fmtDate(s.updatedAt)}</td>
                           <td className="px-3 py-2.5">
                             <div className="flex gap-1">
-                              <Btn onClick={()=>openStModal(s)} title="Status"><I.History className="w-3 h-3"/></Btn>
-                              <Btn onClick={()=>openEdit(s)} title="Editar"><I.Edit className="w-3 h-3"/></Btn>
-                              <Btn onClick={()=>handleDelete(s.id)} title="Remover" danger><I.Trash className="w-3 h-3"/></Btn>
+                              <Btn onClick={() => openStModal(s)} title="Status"><I.History className="w-3 h-3"/></Btn>
+                              <Btn onClick={() => openEdit(s)} title="Editar"><I.Edit className="w-3 h-3"/></Btn>
+                              <Btn onClick={() => handleDelete(s.id)} title="Remover" danger><I.Trash className="w-3 h-3"/></Btn>
                             </div>
                           </td>
                         </tr>
@@ -461,11 +748,13 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
       {/* ── ÚLTIMAS ATUALIZAÇÕES ── */}
       {allHistory.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-          <button onClick={() => setShowHist(p => !p)}
-            className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-all">
+          <button
+            onClick={() => setShowHist(p => !p)}
+            className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-all"
+          >
             <div className="flex items-center gap-2">
               <I.History className="w-4 h-4 text-slate-400"/>
-              <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Últimas Atualizações</p>
+              <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Histórico de Status</p>
             </div>
             <I.ChevD className={`w-4 h-4 text-slate-400 transition-transform ${showHist ? 'rotate-180' : ''}`}/>
           </button>
@@ -492,19 +781,31 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
         </div>
       )}
 
-      {/* ── SHIP MODAL ── */}
+      {/* ══════════════════════════════════════════════════════════════
+          SHIP MODAL
+      ══════════════════════════════════════════════════════════════ */}
       {modalOpen && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
           <div className="bg-[#0f172a] w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-800 overflow-hidden">
             <div className="px-7 py-5 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center"><I.Ship className="w-4 h-4 text-blue-400"/></div>
-                <h2 className="text-[11px] font-black text-slate-100 uppercase tracking-widest">{editing.id ? 'Editar Navio' : 'Adicionar ao Monitoramento'}</h2>
+                <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <I.Ship className="w-4 h-4 text-blue-400"/>
+                </div>
+                <h2 className="text-[11px] font-black text-slate-100 uppercase tracking-widest">
+                  {editing.id ? 'Editar Navio' : 'Adicionar ao Monitoramento'}
+                </h2>
               </div>
-              <button onClick={() => setModalOpen(false)} className="p-2 text-slate-500 hover:text-slate-300 rounded-xl hover:bg-slate-800 transition-all"><I.Close className="w-4 h-4"/></button>
+              <button onClick={() => setModalOpen(false)} className="p-2 text-slate-500 hover:text-slate-300 rounded-xl hover:bg-slate-800 transition-all">
+                <I.Close className="w-4 h-4"/>
+              </button>
             </div>
             <div className="px-7 py-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              {mErr && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-[10px] font-black text-red-400 uppercase flex gap-2"><I.Warning className="w-3.5 h-3.5 shrink-0"/>{mErr}</div>}
+              {mErr && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-[10px] font-black text-red-400 uppercase flex gap-2">
+                  <I.Warning className="w-3.5 h-3.5 shrink-0"/>{mErr}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nome do Navio *</label>
@@ -536,7 +837,14 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
               </div>
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest pt-2 border-t border-slate-800">Datas</p>
               <div className="grid grid-cols-2 gap-4">
-                {([['Prev. Atracação','prevAtracacao'],['Abertura de Gate','abertGate'],['Dead-Line','deadLine'],['Status','status'],['Data de Atracação','dataAtracacao'],['Data de Desatracação','dataDesatrac']] as [string, keyof Ship][]).map(([lbl, field]) => (
+                {([
+                  ['Prev. Atracação','prevAtracacao'],
+                  ['Abertura de Gate','abertGate'],
+                  ['Dead-Line','deadLine'],
+                  ['Status','status'],
+                  ['Data de Atracação','dataAtracacao'],
+                  ['Data de Desatracação','dataDesatrac'],
+                ] as [string, keyof Ship][]).map(([lbl, field]) => (
                   <div key={field}>
                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">{lbl}</label>
                     {field === 'status' ? (
@@ -568,16 +876,22 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
         </div>
       )}
 
-      {/* ── STATUS MODAL ── */}
+      {/* ══════════════════════════════════════════════════════════════
+          STATUS MODAL
+      ══════════════════════════════════════════════════════════════ */}
       {stModal && stTarget && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
           <div className="bg-[#0f172a] w-full max-w-md rounded-3xl shadow-2xl border border-slate-800 overflow-hidden">
             <div className="px-7 py-5 border-b border-slate-800 flex items-center justify-between">
               <div>
                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Atualizar Status</p>
-                <p className="text-[12px] font-black text-slate-100 uppercase">{stTarget.name}{stTarget.viagem ? ` · ${stTarget.viagem}` : ''}</p>
+                <p className="text-[12px] font-black text-slate-100 uppercase">
+                  {stTarget.name}{stTarget.viagem ? ` · ${stTarget.viagem}` : ''}
+                </p>
               </div>
-              <button onClick={() => setStModal(false)} className="p-2 text-slate-500 hover:text-slate-300 rounded-xl hover:bg-slate-800 transition-all"><I.Close className="w-4 h-4"/></button>
+              <button onClick={() => setStModal(false)} className="p-2 text-slate-500 hover:text-slate-300 rounded-xl hover:bg-slate-800 transition-all">
+                <I.Close className="w-4 h-4"/>
+              </button>
             </div>
             <div className="px-7 py-5 space-y-4">
               <div className="grid grid-cols-2 gap-2">
@@ -597,7 +911,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user }) => {
                   className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"/>
               </div>
               {(stTarget.statusHistory ?? []).length > 0 && (
-                <div className="space-y-1.5 max-h-28 overflow-y-auto custom-scrollbar">
+                <div className="space-y-1.5 max-h-28 overflow-y-auto">
                   <p className="text-[7px] font-black text-slate-600 uppercase">Histórico</p>
                   {[...(stTarget.statusHistory ?? [])].reverse().slice(0,5).map((h,i) => (
                     <div key={i} className="flex items-center gap-2">
