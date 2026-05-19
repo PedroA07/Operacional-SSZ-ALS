@@ -712,6 +712,12 @@ export interface OpentechTrip {
   riskLevel: 'Crítico' | 'Alto' | 'Médio' | 'Baixo';
 }
 
+export interface ShipStatusEntry {
+  status: ShipStatus;
+  dateTime: string;           // ISO
+  obs?: string;
+}
+
 export interface Ship {
   id: string;
   name: string;               // nome do navio
@@ -720,8 +726,15 @@ export interface Ship {
   viagem?: string;            // número da viagem
   terminal?: string;          // ECOPORTO | SANTOS BRASIL | EMBRAPORT | BTP | OUTRO
   berco?: string;             // berço de atracação
-  eta?: string;               // previsão chegada (ISO date)
-  etd?: string;               // previsão saída (ISO date)
+  eta?: string;               // previsão chegada (ISO date) — legado
+  etd?: string;               // previsão saída (ISO date) — legado
+  // Campos de monitoramento (estilo PortRisk)
+  prevAtracacao?: string;     // previsão de atracação (ISO datetime)
+  abertGate?: string;         // abertura de gate (ISO datetime)
+  deadLine?: string;          // deadline embarque (ISO datetime)
+  dataAtracacao?: string;     // atracação efetiva (ISO datetime)
+  dataDesatrac?: string;      // desatracação efetiva (ISO datetime)
+  statusHistory?: ShipStatusEntry[];
   status: ShipStatus;
   observacoes?: string;
   tripIds?: string[];         // viagens vinculadas
@@ -763,7 +776,21 @@ export interface SILProgramacao {
   bl: string;
 }
 
-export type ShipStatus = 'EM TRÂNSITO' | 'ATRACADO' | 'FUNDEADO' | 'AGUARDANDO JANELA' | 'SAÍDO' | 'GATE ABERTO' | 'GATE FECHADO' | 'AG. ATRACAÇÃO' | 'FINALIZADO';
+export type ShipStatus =
+  | 'NOVO'
+  | 'NÃO ENCONTRADO'
+  | 'SEM PREVISÃO'
+  | 'AG. ATRACAÇÃO'
+  | 'ATRACADO'
+  | 'GATE ABERTO'
+  | 'GATE FECHADO'
+  | 'GATE ENCERRADO'
+  | 'DESATRACADO'
+  | 'FINALIZADO'
+  | 'EM TRÂNSITO'
+  | 'FUNDEADO'
+  | 'AGUARDANDO JANELA'
+  | 'SAÍDO';
 
 export interface MonitoredShip {
   id: string;
