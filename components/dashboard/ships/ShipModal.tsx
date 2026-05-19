@@ -9,9 +9,9 @@ interface Props {
   onClose: () => void;
   onSave: (ship: MonitoredShip) => Promise<void>;
   editing?: MonitoredShip | null;
+  terminalOptions?: string[];
 }
 
-const TERMINALS = ['ECOPORTO', 'SANTOS BRASIL', 'EMBRAPORT', 'BTP', 'DEPOT RECORD', 'OUTROS'];
 const STATUSES: ShipStatus[] = ['EM TRÂNSITO', 'AG. ATRACAÇÃO', 'ATRACADO', 'GATE ABERTO', 'GATE FECHADO', 'FINALIZADO'];
 
 const Field: React.FC<{ label: string; children: React.ReactNode; className?: string }> = ({ label, children, className = '' }) => (
@@ -23,13 +23,14 @@ const Field: React.FC<{ label: string; children: React.ReactNode; className?: st
 
 const inputCls = 'w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-bold text-white uppercase placeholder-white/20 outline-none focus:bg-white/15 focus:border-blue-500 transition';
 
-const ShipModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing }) => {
+const ShipModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing, terminalOptions = [] }) => {
+  const terminals = terminalOptions.length > 0 ? terminalOptions : ['ECOPORTO', 'SANTOS BRASIL', 'EMBRAPORT', 'BTP', 'DEPOT RECORD'];
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
   const hasInit = useRef<string | null>(null);
 
   const blank: Partial<MonitoredShip> = {
-    shipName: '', voyage: '', terminal: 'ECOPORTO', status: 'EM TRÂNSITO',
+    shipName: '', voyage: '', terminal: terminals[0] || '', status: 'EM TRÂNSITO',
     eta: '', etd: '', ataDate: '', atdDate: '', linkedTripOs: '', notes: '',
   };
   const [form, setForm] = useState<Partial<MonitoredShip>>(blank);
@@ -57,7 +58,7 @@ const ShipModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing }) => {
         id: editing?.id || `ship-${Date.now()}`,
         shipName:     form.shipName!.toUpperCase().trim(),
         voyage:       form.voyage!.toUpperCase().trim(),
-        terminal:     form.terminal || 'ECOPORTO',
+        terminal:     form.terminal || terminals[0] || '',
         status:       form.status as ShipStatus || 'EM TRÂNSITO',
         eta:          form.eta || undefined,
         etd:          form.etd || undefined,
@@ -114,9 +115,9 @@ const ShipModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing }) => {
               </Field>
               <Field label="Terminal">
                 <CustomSelect
-                  value={form.terminal || 'ECOPORTO'}
+                  value={form.terminal || terminals[0] || ''}
                   onChange={v => setForm(f => ({ ...f, terminal: v }))}
-                  options={TERMINALS.map(t => ({ value: t, label: t }))}
+                  options={terminals.map(t => ({ value: t, label: t }))}
                   inputClassName="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-bold text-white outline-none"
                 />
               </Field>

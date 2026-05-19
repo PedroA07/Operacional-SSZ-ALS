@@ -762,3 +762,11 @@ export interface TerminalService {
   lastCheck?: string;
   responseMs?: number;
 }
+
+export interface ShipTerminalConfig {
+  id: string;
+  name: string;
+  url: string;
+  active: boolean;
+  sortOrder: number;
+}
