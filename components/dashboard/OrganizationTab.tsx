@@ -606,6 +606,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const selectedLoc = locations.find(l => l.id === locationId);
     const schedulingData = {
       isScheduled: true,
+      sentNF: true,
       scheduledLocationId: locationId,
       scheduledDateTime: dateTime,
       destination: selectedLoc ? {
@@ -1087,16 +1088,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       key: 'scheduledDateTime',
       label: 'Data/Hora Agend.',
       render: (t: Trip) => {
-        // Prioriza scheduling.dateTime (salvo via SchedulingEditModal como ISO UTC),
-        // com fallback para scheduledDateTime (salvo via OrganizationTab como local string)
         const rawDT = t.scheduling?.dateTime || t.scheduledDateTime || '';
         const displayValue = formatToLocalInput(rawDT);
         return (
-          <input
-            type="datetime-local"
+          <DateTimePicker
             value={displayValue}
-            onChange={(e) => handleDateTimeChange(t, e.target.value)}
-            className={`bg-slate-50 border rounded-lg px-2 py-1 text-[9px] font-bold outline-none focus:border-blue-500 transition-all ${isTripScheduled(t) ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}
+            onChange={(v) => handleDateTimeChange(t, v)}
+            placeholder="Selecionar..."
+            inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
           />
         );
       }
@@ -1313,16 +1312,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Coleta</h3>
             </div>
-            <SmartOperationTable 
-              userId={userId} 
-              componentId="org-coleta-export" 
-              columns={columns} 
-              data={trips} 
+            <SmartOperationTable
+              userId={userId}
+              componentId="org-coleta-export"
+              columns={columns}
+              data={trips}
               hideInternalSearch={false}
-              getRowClassName={(t: Trip) => {
-                if (isTripReadyToFinalize(t)) return 'bg-emerald-50 border-l-4 border-emerald-500';
-                if (isTripScheduled(t)) return 'bg-amber-50/50 border-l-4 border-amber-400/50';
-                return '';
+              getRowStyle={(t: Trip) => {
+                if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
+                if (isTripScheduled(t))       return { backgroundColor: '#fffbeb', boxShadow: 'inset 4px 0 0 #f59e0b' };
+                return {};
               }}
             />
           </div>
@@ -1338,10 +1337,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               columns={columns} 
               data={trips} 
               hideInternalSearch={false}
-              getRowClassName={(t: Trip) => {
-                if (isTripReadyToFinalize(t)) return 'bg-emerald-50 border-l-4 border-emerald-500';
-                if (isTripScheduled(t)) return 'bg-amber-50/50 border-l-4 border-amber-400/50';
-                return '';
+              getRowStyle={(t: Trip) => {
+                if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
+                if (isTripScheduled(t))       return { backgroundColor: '#fffbeb', boxShadow: 'inset 4px 0 0 #f59e0b' };
+                return {};
               }}
             />
           </div>
