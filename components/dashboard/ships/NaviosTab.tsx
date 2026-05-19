@@ -16,6 +16,13 @@ const TERMINAL_KEYS: Record<string, string> = {
   BTP: 'btp',
 };
 
+const TERMINAL_LINKS: Record<string, string> = {
+  ECOPORTO: 'http://op.ecoportosantos.com.br/externa/LineUpListaAtracacao/',
+  'SANTOS BRASIL': 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao',
+  BTP: 'https://novo-tas.btp.com.br/ConsultasLivres/ListaAtracacaoIndex',
+  EMBRAPORT: 'https://www.embraport.com.br',
+};
+
 interface TerminalState {
   vessels: TerminalVessel[];
   loading: boolean;
@@ -217,6 +224,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
             const hasKey = !!TERMINAL_KEYS[term];
             return (
               <div key={term} className="bg-[#0f172a] rounded-2xl p-5 flex flex-col gap-3 border border-slate-800">
+                {/* Header */}
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black text-slate-100 uppercase tracking-widest">{term}</span>
                   <div className="flex items-center gap-2">
@@ -225,52 +233,107 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                         {state.vessels.length}
                       </span>
                     )}
-                    {hasKey ? (
+                    {hasKey && (
                       <button
                         onClick={() => fetchTerminal(term)}
                         disabled={state.loading}
                         className="text-[9px] font-black uppercase px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-all disabled:opacity-50"
                       >
-                        {state.loading ? '...' : 'Buscar'}
+                        {state.loading ? (
+                          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                          </svg>
+                        ) : '↻'}
                       </button>
-                    ) : null}
+                    )}
+                    {/* Link direto ao portal */}
+                    {TERMINAL_LINKS[term] && (
+                      <a
+                        href={TERMINAL_LINKS[term]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9px] font-black uppercase px-3 py-1.5 bg-blue-900/40 text-blue-400 rounded-lg hover:bg-blue-800/60 transition-all"
+                        title="Abrir portal do terminal"
+                      >
+                        ↗
+                      </a>
+                    )}
                   </div>
                 </div>
 
+                {/* Timestamp */}
                 {state.fetchedAt && (
                   <p className="text-[8px] text-slate-600 font-bold">
                     Atualizado: {new Date(state.fetchedAt).toLocaleTimeString('pt-BR')}
                   </p>
                 )}
 
-                {state.error && (
-                  <p className="text-[9px] text-red-400 font-bold">{state.error}</p>
+                {/* Loading */}
+                {state.loading && (
+                  <p className="text-[9px] text-slate-500 font-bold animate-pulse">Buscando dados...</p>
                 )}
 
-                {!hasKey && (
-                  <p className="text-[9px] text-slate-600 font-bold italic">Sem dados públicos disponíveis</p>
+                {/* Erro com link fallback */}
+                {!state.loading && state.error && state.vessels.length === 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[8px] text-amber-400/80 font-bold leading-relaxed">{state.error}</p>
+                    {TERMINAL_LINKS[term] && (
+                      <a
+                        href={TERMINAL_LINKS[term]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[8px] font-black text-blue-400 hover:text-blue-300 uppercase transition-colors"
+                      >
+                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                        Ver no portal do terminal
+                      </a>
+                    )}
+                  </div>
                 )}
 
+                {/* Sem chave (EMBRAPORT) */}
+                {!hasKey && !state.loading && (
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] text-slate-600 font-bold italic">Sem dados públicos disponíveis</p>
+                    {TERMINAL_LINKS[term] && (
+                      <a href={TERMINAL_LINKS[term]} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[8px] font-black text-blue-400 hover:text-blue-300 uppercase transition-colors">
+                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                        Acessar portal
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Aguardando primeira busca */}
                 {hasKey && !state.loading && state.vessels.length === 0 && !state.error && !state.fetchedAt && (
-                  <p className="text-[9px] text-slate-600 font-bold">Clique em "Buscar" para carregar</p>
+                  <p className="text-[9px] text-slate-600 font-bold">Carregando...</p>
                 )}
 
+                {/* Lista de navios */}
                 {state.vessels.length > 0 && (
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {state.vessels.slice(0, 5).map((v, idx) => (
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto custom-scrollbar">
+                    {state.vessels.slice(0, 8).map((v, idx) => (
                       <div key={idx} className="flex items-start justify-between gap-2 py-1.5 border-b border-slate-800/50 last:border-0">
                         <div className="flex-1 min-w-0">
                           <p className="text-[9px] font-black text-slate-200 truncate uppercase">{v.navio}</p>
                           {v.previsao && <p className="text-[8px] text-slate-500 font-bold">{v.previsao}</p>}
                           {v.berco && <p className="text-[8px] text-slate-600 font-bold">Berço {v.berco}</p>}
                         </div>
-                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full whitespace-nowrap ${situacaoBadgeClass(v.situacao)}`}>
+                        <span className={`shrink-0 text-[8px] font-black px-1.5 py-0.5 rounded-full whitespace-nowrap ${situacaoBadgeClass(v.situacao)}`}>
                           {v.situacao.length > 14 ? v.situacao.slice(0, 14) + '…' : v.situacao}
                         </span>
                       </div>
                     ))}
-                    {state.vessels.length > 5 && (
-                      <p className="text-[8px] text-slate-600 font-bold pt-1">+{state.vessels.length - 5} navios</p>
+                    {state.vessels.length > 8 && (
+                      <p className="text-[8px] text-slate-600 font-bold pt-1 text-center">
+                        +{state.vessels.length - 8} navios · <a href={TERMINAL_LINKS[term]} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ver todos</a>
+                      </p>
                     )}
                   </div>
                 )}

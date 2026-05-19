@@ -61,6 +61,14 @@ function findColIndex(headers: string[], keywords: string[]): number {
   return -1;
 }
 
+// Heurística: célula que parece nome de navio (maiúsculas, não é só número/data)
+function looksLikeVesselName(s: string): boolean {
+  if (!s || s.length < 3) return false;
+  if (/^\d+$/.test(s.trim())) return false;
+  if (/^\d{2}\/\d{2}/.test(s.trim())) return false;
+  return /[A-Z]{2,}/.test(s);
+}
+
 function parseHtmlTable(html: string, terminalName: string, vesselFilter?: string): TerminalVessel[] {
   const vessels: TerminalVessel[] = [];
   const rows: string[] = [];
@@ -71,10 +79,10 @@ function parseHtmlTable(html: string, terminalName: string, vesselFilter?: strin
   }
   if (rows.length === 0) return vessels;
 
-  // Encontra a linha de cabeçalho
+  // Encontra a linha de cabeçalho nas primeiras 10 linhas
   let headers: string[] = [];
   let dataStart = 0;
-  for (let i = 0; i < Math.min(8, rows.length); i++) {
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
     const h = extractHeaderCells(rows[i]);
     if (h.length >= 2) {
       headers = h;
@@ -83,29 +91,45 @@ function parseHtmlTable(html: string, terminalName: string, vesselFilter?: strin
     }
   }
 
-  const navioIdx    = findColIndex(headers, ['navio', 'vessel', 'ship', 'embarca', 'nome do navio']);
+  const navioIdx    = findColIndex(headers, ['navio', 'vessel', 'ship', 'embarca', 'nome']);
   const situacaoIdx = findColIndex(headers, ['situa', 'status', 'estado', 'opera', 'condi']);
-  const previsaoIdx = findColIndex(headers, ['previs', 'eta', 'data', 'chegada', 'atrac', 'hora']);
-  const bercoIdx    = findColIndex(headers, ['ber', 'dock', 'pier', 'cais', 'terminal']);
+  const previsaoIdx = findColIndex(headers, ['previs', 'eta', 'data', 'chegada', 'atrac', 'hora', 'inicio']);
+  const bercoIdx    = findColIndex(headers, ['ber', 'dock', 'pier', 'cais', 'bco']);
   const armadorIdx  = findColIndex(headers, ['armador', 'shipping', 'companhia', 'linha', 'agenc', 'agent']);
   const viagemIdx   = findColIndex(headers, ['viagem', 'voyage', 'trip', 'num', 'vg']);
 
   for (let i = dataStart; i < rows.length; i++) {
     const cells = extractCells(rows[i]);
-    if (cells.length === 0) continue;
+    if (cells.length < 2) continue;
     if (!cells.some(c => c.trim().length > 0)) continue;
 
-    const navio = navioIdx >= 0 ? cells[navioIdx] ?? '' : cells[0] ?? '';
+    // Pega nome do navio: por índice se header encontrado, senão heurística
+    let navio = '';
+    if (navioIdx >= 0 && navioIdx < cells.length) {
+      navio = cells[navioIdx];
+    } else {
+      navio = cells.find(looksLikeVesselName) ?? cells[0] ?? '';
+    }
     if (!navio.trim()) continue;
     if (vesselFilter && !navio.toLowerCase().includes(vesselFilter.toLowerCase())) continue;
 
+    // Situação: por índice ou segunda célula com conteúdo
+    const situacao = situacaoIdx >= 0 && situacaoIdx < cells.length
+      ? cells[situacaoIdx]
+      : cells.find((c, ci) => ci !== cells.indexOf(navio) && c.trim() && !/^\d{2}\/\d{2}/.test(c)) ?? cells[1] ?? '';
+
+    // Previsão: por índice ou primeira célula com padrão de data/hora
+    const previsao = previsaoIdx >= 0 && previsaoIdx < cells.length
+      ? cells[previsaoIdx]
+      : cells.find(c => /\d{2}\/\d{2}|\d{2}:\d{2}/.test(c));
+
     vessels.push({
       navio: navio.trim(),
-      situacao: (situacaoIdx >= 0 ? cells[situacaoIdx] : cells[1] ?? '').trim() || 'Desconhecido',
-      previsao: (previsaoIdx >= 0 ? cells[previsaoIdx] : undefined)?.trim() || undefined,
-      berco:    (bercoIdx    >= 0 ? cells[bercoIdx]    : undefined)?.trim() || undefined,
-      armador:  (armadorIdx  >= 0 ? cells[armadorIdx]  : undefined)?.trim() || undefined,
-      viagem:   (viagemIdx   >= 0 ? cells[viagemIdx]   : undefined)?.trim() || undefined,
+      situacao: situacao.trim() || 'Desconhecido',
+      previsao: previsao?.trim() || undefined,
+      berco:    (bercoIdx   >= 0 && bercoIdx   < cells.length ? cells[bercoIdx]   : undefined)?.trim() || undefined,
+      armador:  (armadorIdx >= 0 && armadorIdx < cells.length ? cells[armadorIdx] : undefined)?.trim() || undefined,
+      viagem:   (viagemIdx  >= 0 && viagemIdx  < cells.length ? cells[viagemIdx]  : undefined)?.trim() || undefined,
       terminal: terminalName,
     });
   }
