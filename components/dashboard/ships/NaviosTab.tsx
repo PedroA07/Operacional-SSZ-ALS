@@ -1,8 +1,22 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User, Trip, Ship, ShipStatus, ShipStatusEntry, TerminalVessel } from '../../../types';
 import { db, supabase } from '../../../utils/storage';
+import DateTimePicker from '../../shared/DateTimePicker';
 
 interface NaviosTabProps { user: User; trips: Trip[]; }
+
+// ── Trip type colors ───────────────────────────────────────────────────────────
+const TRIP_TYPE_CFG: Record<string, { bg: string; text: string; border: string }> = {
+  'COLETA':      { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/30' },
+  'CABOTAGEM':   { bg: 'bg-cyan-500/15',    text: 'text-cyan-300',    border: 'border-cyan-500/30'    },
+  'EXPORTAÇÃO':  { bg: 'bg-amber-500/15',   text: 'text-amber-300',   border: 'border-amber-500/30'   },
+  'ENTREGA':     { bg: 'bg-violet-500/15',  text: 'text-violet-300',  border: 'border-violet-500/30'  },
+  'IMPORTAÇÃO':  { bg: 'bg-blue-500/15',    text: 'text-blue-300',    border: 'border-blue-500/30'    },
+};
+function getTripTypeStyle(type?: string) {
+  const key = (type || '').toUpperCase();
+  return TRIP_TYPE_CFG[key] ?? { bg: 'bg-slate-700/60', text: 'text-slate-300', border: 'border-slate-600/40' };
+}
 
 // ── Terminal config ────────────────────────────────────────────────────────────
 const TERM_ACCENT: Record<string, { bg: string; text: string; border: string; badge: string }> = {
@@ -338,6 +352,250 @@ function TermBadgeLarge({ terminal }: { terminal: string }) {
   );
 }
 
+// ── Trip Detail Modal ─────────────────────────────────────────────────────────
+interface TripDetailModalProps {
+  trip: Trip;
+  locations: any[];
+  onClose: () => void;
+  onTripSaved: (updated: Trip) => void;
+}
+const TripDetailModal: React.FC<TripDetailModalProps> = ({ trip, locations, onClose, onTripSaved }) => {
+  const [tab, setTab]         = useState<'info' | 'agendamento' | 'minuta'>('info');
+  const [saving, setSaving]   = useState(false);
+  const [locSearch, setLocSearch] = useState('');
+  const [selLocId, setSelLocId]   = useState(trip.scheduledLocationId || '');
+  const [dateTime, setDateTime]   = useState(() => {
+    const raw = trip.scheduling?.dateTime || trip.scheduledDateTime || '';
+    if (!raw) return '';
+    if (raw.length <= 16 && !raw.endsWith('Z')) return raw.substring(0, 16);
+    try {
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return '';
+      const off = d.getTimezoneOffset() * 60000;
+      return new Date(d.getTime() - off).toISOString().slice(0, 16);
+    } catch { return ''; }
+  });
+
+  const filteredLocs = useMemo(() => {
+    if (!locSearch) return locations;
+    const s = locSearch.toLowerCase();
+    return locations.filter(l =>
+      l.name?.toLowerCase().includes(s) || l.legalName?.toLowerCase().includes(s) ||
+      l.cnpj?.includes(s) || l.city?.toLowerCase().includes(s)
+    );
+  }, [locations, locSearch]);
+
+  const selLoc = locations.find(l => l.id === selLocId);
+  const tc = getTripTypeStyle(trip.type);
+  const isScheduled = !!trip.isScheduled;
+  const hasMinuta = !!trip.preStackingFormData;
+
+  const handleSaveScheduling = async () => {
+    if (!selLocId || !dateTime) return;
+    setSaving(true);
+    const isoDateTime = new Date(dateTime).toISOString();
+    const schedulingData = {
+      isScheduled: true,
+      sentNF: true,
+      scheduledLocationId: selLocId,
+      scheduledDateTime: dateTime,
+      destination: selLoc ? { id: selLoc.id, name: selLoc.name, legalName: selLoc.legalName, cnpj: selLoc.cnpj, city: selLoc.city, state: selLoc.state } : trip.destination,
+      scheduling: { locationId: selLocId, location: selLoc?.name || '', dateTime: isoDateTime, obs: trip.scheduling?.obs || '' },
+    };
+    try {
+      await db.saveTrip({ ...trip, ...schedulingData });
+      onTripSaved({ ...trip, ...schedulingData } as Trip);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Agendamento salvo', type: 'success' } }));
+    } catch { window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar agendamento', type: 'error' } })); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-[#0f172a] w-full max-w-2xl rounded-2xl border border-slate-700 overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
+
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-800 flex items-start justify-between gap-3 shrink-0">
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`inline-flex items-center gap-1 text-[7px] font-black uppercase rounded px-1.5 py-0.5 border ${tc.bg} ${tc.text} ${tc.border}`}>
+                <I.Tag className="w-2 h-2"/>{trip.type}
+              </span>
+              {trip.category && <span className="text-[7px] text-slate-500 font-bold border border-slate-700 rounded px-1.5 py-0.5">{trip.category}</span>}
+              {isScheduled
+                ? <span className="flex items-center gap-1 text-[7px] font-black text-green-400"><I.Check className="w-2.5 h-2.5"/> Agendado</span>
+                : <span className="flex items-center gap-1 text-[7px] font-black text-amber-400"><I.Warning className="w-2.5 h-2.5"/> Ag. Pendente</span>}
+              {hasMinuta && <span className="text-[7px] font-black text-blue-400 border border-blue-800 rounded px-1.5 py-0.5">Minuta</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-black text-slate-100 uppercase">{trip.os}</span>
+              {trip.container && <span className="text-[9px] font-bold text-slate-400 border border-slate-700 rounded px-1.5">{trip.container}</span>}
+            </div>
+            <p className="text-[9px] text-slate-500 font-bold">{trip.driver?.name} · {trip.status}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-xl transition-all text-slate-500 hover:text-slate-200 shrink-0">
+            <I.Close className="w-4 h-4"/>
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 px-4 pt-3 shrink-0">
+          {([
+            { key: 'info'        as const, label: 'Detalhes'    },
+            { key: 'agendamento' as const, label: 'Agendamento' },
+            { key: 'minuta'      as const, label: 'Minuta'      },
+          ]).map(({ key, label }) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={`px-4 py-2 rounded-t-lg text-[8px] font-black uppercase tracking-widest transition-all border-b-2 ${
+                tab === key ? 'text-blue-300 border-blue-500' : 'text-slate-600 border-transparent hover:text-slate-400'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+          {/* ── INFO ── */}
+          {tab === 'info' && (
+            <div className="space-y-3">
+              {[
+                { label: 'Navio',       value: trip.ship },
+                { label: 'Motorista',   value: trip.driver?.name },
+                { label: 'Placa',       value: trip.driver?.plate },
+                { label: 'Container',   value: trip.container },
+                { label: 'Data Prog.',  value: trip.dateTime ? new Date(trip.dateTime).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }) : null },
+                { label: 'Destino',     value: trip.destination?.name || trip.scheduling?.location },
+                { label: 'Cidade',      value: trip.destination ? `${trip.destination.city}/${trip.destination.state}` : null },
+                { label: 'Cliente',     value: trip.customer?.name },
+                { label: 'Armador',     value: (trip as any).armador },
+                { label: 'Booking',     value: (trip as any).booking },
+              ].filter(r => r.value).map(({ label, value }) => (
+                <div key={label} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-800">
+                  <span className="text-[7px] font-black text-slate-600 uppercase tracking-widest w-20 shrink-0 pt-0.5">{label}</span>
+                  <span className="text-[9px] font-bold text-slate-200">{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── AGENDAMENTO ── */}
+          {tab === 'agendamento' && (
+            <div className="space-y-4">
+              {isScheduled && (
+                <div className="flex items-start gap-3 px-3 py-3 rounded-xl bg-green-950/20 border border-green-900/30">
+                  <I.Check className="w-4 h-4 text-green-400 shrink-0 mt-0.5"/>
+                  <div className="space-y-0.5">
+                    <p className="text-[8px] font-black text-green-400 uppercase tracking-widest">Agendado</p>
+                    {trip.scheduling?.location && <p className="text-[9px] font-bold text-slate-200">{trip.scheduling.location}</p>}
+                    {(trip.scheduling?.dateTime || trip.scheduledDateTime) && (
+                      <p className="text-[8px] text-slate-400 font-bold">
+                        {new Date(trip.scheduling?.dateTime || trip.scheduledDateTime!).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                      </p>
+                    )}
+                    {trip.scheduling?.obs && <p className="text-[8px] text-slate-500">{trip.scheduling.obs}</p>}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{isScheduled ? 'Editar agendamento' : 'Novo agendamento'}</p>
+
+                {/* Local */}
+                <div className="space-y-2">
+                  <label className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Local de destino</label>
+                  <input
+                    type="text" placeholder="Buscar local..."
+                    value={locSearch} onChange={e => setLocSearch(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-[9px] text-slate-200 placeholder-slate-600 outline-none focus:border-blue-500 transition-all"
+                  />
+                  {locSearch && (
+                    <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-700 divide-y divide-slate-800">
+                      {filteredLocs.slice(0, 15).map(l => (
+                        <button key={l.id} onClick={() => { setSelLocId(l.id); setLocSearch(''); }}
+                          className={`w-full text-left px-3 py-2 hover:bg-slate-700 transition-all ${selLocId === l.id ? 'bg-blue-900/40' : 'bg-slate-800/60'}`}>
+                          <p className="text-[8px] font-black text-slate-200">{l.name}</p>
+                          <p className="text-[7px] text-slate-500">{l.city}/{l.state} · {l.type}</p>
+                        </button>
+                      ))}
+                      {filteredLocs.length === 0 && <p className="px-3 py-2 text-[8px] text-slate-600">Nenhum local encontrado</p>}
+                    </div>
+                  )}
+                  {selLoc && !locSearch && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-900/20 border border-blue-800/40">
+                      <I.Check className="w-3 h-3 text-blue-400 shrink-0"/>
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-black text-blue-300 truncate">{selLoc.name}</p>
+                        <p className="text-[7px] text-slate-500">{selLoc.city}/{selLoc.state}</p>
+                      </div>
+                      <button onClick={() => setSelLocId('')} className="ml-auto text-slate-600 hover:text-red-400 shrink-0">
+                        <I.Close className="w-3 h-3"/>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Data/Hora */}
+                <div className="space-y-2">
+                  <label className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Data e hora</label>
+                  <DateTimePicker
+                    value={dateTime}
+                    onChange={setDateTime}
+                    placeholder="Selecionar data e hora..."
+                    inputClassName="!bg-slate-800 !border-slate-700 !text-slate-200 !placeholder-slate-600 focus:!border-blue-500 !text-[9px]"
+                  />
+                </div>
+
+                <button
+                  onClick={handleSaveScheduling}
+                  disabled={saving || !selLocId || !dateTime}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-[9px] font-black uppercase tracking-widest transition-all"
+                >
+                  {saving ? 'Salvando...' : 'Confirmar Agendamento'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── MINUTA ── */}
+          {tab === 'minuta' && (
+            <div className="space-y-3">
+              {hasMinuta ? (
+                <>
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-blue-900/20 border border-blue-800/30">
+                    <I.Check className="w-4 h-4 text-blue-400 shrink-0"/>
+                    <div>
+                      <p className="text-[8px] font-black text-blue-300 uppercase tracking-widest">Minuta gerada</p>
+                      {trip.preStackingFormData?.porto && <p className="text-[9px] font-bold text-slate-300">{trip.preStackingFormData.porto}</p>}
+                    </div>
+                  </div>
+                  {Object.entries(trip.preStackingFormData || {}).filter(([k]) => !['id','tripId'].includes(k)).slice(0, 12).map(([k, v]) => (
+                    v ? (
+                      <div key={k} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-800">
+                        <span className="text-[7px] font-black text-slate-600 uppercase tracking-widest w-28 shrink-0 pt-0.5">{k}</span>
+                        <span className="text-[9px] font-bold text-slate-300">{String(v)}</span>
+                      </div>
+                    ) : null
+                  ))}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+                  <I.Anchor className="w-8 h-8 text-slate-700"/>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Nenhuma minuta gerada</p>
+                  <p className="text-[8px] text-slate-700 max-w-xs">
+                    Para gerar a minuta, acesse a página de Organização, localize esta OS e use a opção de agendamento.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Main Component ────────────────────────────────────────────────────────────
 const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   // View tab
@@ -352,7 +610,21 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const [tvError, setTVError]         = useState<string|null>(null);
   const [tvFilter, setTVFilter]       = useState<TVFilter>('TODOS');
 
-  // Modal
+  // Locations (ports + preStacking) for scheduling modal
+  const [locations, setLocations]     = useState<any[]>([]);
+  useEffect(() => {
+    Promise.all([db.getPorts(), db.getPreStacking()]).then(([ports, preStacking]) => {
+      setLocations([
+        ...ports.map((p: any) => ({ id: p.id, name: p.name, legalName: p.legalName, cnpj: p.cnpj, city: p.city, state: p.state, type: 'PORTO' })),
+        ...preStacking.map((ps: any) => ({ id: ps.id, name: ps.name, legalName: ps.legalName, cnpj: ps.cnpj, city: ps.city, state: ps.state, type: 'UNIDADE' })),
+      ].sort((a, b) => a.name.localeCompare(b.name)));
+    }).catch(() => {});
+  }, []);
+
+  // Trip detail modal
+  const [detailTrip, setDetailTrip]   = useState<Trip|null>(null);
+
+  // Ship modal
   const [modalOpen, setModalOpen]     = useState(false);
   const [editing, setEditing]         = useState<Partial<Ship>>(emptyShip());
   const [saving, setSaving]           = useState(false);
@@ -439,9 +711,26 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   }, [termVessels]);
 
   // ── MONITORAMENTO: trip-vessel matching ──────────────────────────────────────
-  // Apenas viagens do painel Organização (não removidas) que tenham nome de navio
+  // Replica exatamente os filtros do painel de Organização (ambas as views)
   const orgTripsWithShip = useMemo(() =>
-    trips.filter(t => !INACTIVE_STATUSES.includes(t.status) && !t.isRemovedFromOrg && t.ship?.trim()),
+    trips.filter(t => {
+      if (INACTIVE_STATUSES.includes(t.status)) return false;
+      if (t.isRemovedFromOrg) return false;
+      if (!t.ship?.trim()) return false;
+      // Viagem agendada: mantém visível até o horário do agendamento passar
+      if (t.isScheduled) {
+        const scheduledDT = t.scheduling?.dateTime || t.scheduledDateTime;
+        if (!scheduledDT) return true;
+        return new Date(scheduledDT) > new Date();
+      }
+      const dt = t.dateTime;
+      if (dt) {
+        const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
+        const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
+        if (normalized < '2026-04-01') return false;
+      }
+      return true;
+    }),
   [trips]);
 
   // Todos os tipos únicos das viagens org (para o painel de configuração)
@@ -549,9 +838,21 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     status: mapSituacao(v.situacao),
   });
 
+  const handleTripSaved = useCallback((updated: Trip) => {
+    setDetailTrip(updated);
+  }, []);
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
+      {detailTrip && (
+        <TripDetailModal
+          trip={detailTrip}
+          locations={locations}
+          onClose={() => setDetailTrip(null)}
+          onTripSaved={handleTripSaved}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -982,9 +1283,11 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                       <div className="space-y-1.5 pl-2">
                         {match.matchedTrips.map((t, ti) => {
                           const isScheduled = t.isScheduled || t.status === 'Agendamento realizado';
+                          const hasMinuta = !!t.preStackingFormData;
+                          const tc = getTripTypeStyle(t.type);
                           return (
-                            <div key={ti}
-                              className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${isScheduled ? 'border-green-900/30 bg-green-950/10' : 'border-slate-800 bg-slate-900/40'}`}>
+                            <button key={ti} onClick={() => setDetailTrip(t)}
+                              className={`w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-all hover:brightness-125 cursor-pointer ${isScheduled ? 'border-green-900/30 bg-green-950/10' : 'border-slate-800 bg-slate-900/40'}`}>
                               {/* Indicador de status */}
                               <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${isScheduled ? 'bg-green-500' : 'bg-red-500'}`}/>
 
@@ -998,10 +1301,10 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                                   )}
                                   <span className="text-[8px] text-slate-500 truncate">{t.driver?.name}</span>
                                 </div>
-                                {/* Linha 2: tipo + categoria + status */}
+                                {/* Linha 2: tipo (colorido) + categoria + minuta badge */}
                                 <div className="flex items-center gap-2 flex-wrap">
                                   {t.type && (
-                                    <span className="inline-flex items-center gap-1 text-[7px] font-black uppercase rounded px-1.5 py-0.5 bg-slate-700/60 text-slate-300 border border-slate-600/40">
+                                    <span className={`inline-flex items-center gap-1 text-[7px] font-black uppercase rounded px-1.5 py-0.5 border ${tc.bg} ${tc.text} ${tc.border}`}>
                                       <I.Tag className="w-2 h-2"/>{t.type}
                                     </span>
                                   )}
@@ -1010,29 +1313,30 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                                       {t.category}
                                     </span>
                                   )}
-                                  {t.subCategory && (
-                                    <span className="text-[7px] text-slate-600 font-bold">{t.subCategory}</span>
+                                  {hasMinuta && (
+                                    <span className="text-[6px] font-black text-blue-400 border border-blue-800 rounded px-1 py-0.5">Minuta</span>
                                   )}
                                   <span className="text-[7px] text-slate-600">{t.status}</span>
                                 </div>
                               </div>
 
-                              {/* Agendamento */}
+                              {/* Agendamento + seta */}
                               <div className="shrink-0 flex flex-col items-end gap-1">
                                 {isScheduled
                                   ? <span className="flex items-center gap-1 text-[7px] font-black text-green-500">
                                       <I.Check className="w-2.5 h-2.5"/> Agendado
                                     </span>
-                                  : <span className="flex items-center gap-1 text-[7px] font-black text-red-400">
+                                  : <span className="flex items-center gap-1 text-[7px] font-black text-amber-400">
                                       <I.Warning className="w-2.5 h-2.5"/> Pendente
                                     </span>}
-                                {t.scheduledDateTime && (
+                                {(t.scheduling?.dateTime || t.scheduledDateTime) && (
                                   <span className="text-[6px] text-slate-600 font-bold">
-                                    {fmtDT(t.scheduledDateTime)}
+                                    {fmtDT(t.scheduling?.dateTime || t.scheduledDateTime)}
                                   </span>
                                 )}
+                                <I.ChevD className="w-3 h-3 text-slate-700 rotate-[-90deg]"/>
                               </div>
-                            </div>
+                            </button>
                           );
                         })}
                       </div>

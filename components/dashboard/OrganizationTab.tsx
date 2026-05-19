@@ -452,6 +452,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         if (finalizingIds.has(trip.id)) return false;
 
         if (!trip.isRemovedFromOrg) {
+          // Viagem agendada: mantém visível até o horário do agendamento passar
+          if (trip.isScheduled) {
+            const scheduledDT = trip.scheduling?.dateTime || trip.scheduledDateTime;
+            if (!scheduledDT) return true;
+            return new Date(scheduledDT) > new Date();
+          }
           const dt = trip.dateTime;
           if (dt) {
             const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
