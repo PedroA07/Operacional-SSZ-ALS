@@ -158,97 +158,191 @@ function SBadge({ status, size='sm' }: { status: ShipStatus; size?: 'xs'|'sm' })
     </span>
   );
 }
-// ── Logos SVG dos terminais ───────────────────────────────────────────────────
+// ── Logos SVG — réplicas fiéis às marcas reais ───────────────────────────────
 
-/** Santos Brasil — quadrado verde com onda azul/branca em "S" */
-function LogoSantosBrasil({ size = 20 }: { size?: number }) {
+/**
+ * SANTOS BRASIL — ícone quadrado:
+ * fundo verde (#0e9b47), área azul no canto superior-direito (#1570b8),
+ * curva S branca espessa dividindo os dois campos (como o logo real).
+ */
+function IconSantosBrasil({ size = 24 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="4" fill="#1a9247"/>
-      {/* fundo azul canto superior direito */}
-      <path d="M40 0 H40 V40 H22 Q38 30 38 18 Q38 6 22 0 Z" fill="#1472b9"/>
-      {/* onda branca central */}
-      <path d="M6 26 Q14 14 22 20 Q30 26 34 14" stroke="white" strokeWidth="5" fill="none" strokeLinecap="round"/>
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* campo verde (base) */}
+      <rect width="100" height="100" rx="8" fill="#0e9b47"/>
+      {/* campo azul — canto superior direito */}
+      <path
+        d="M100 0 L100 100 L56 100 Q94 90 94 50 Q94 10 56 0 Z"
+        fill="#1570b8"
+      />
+      {/* curva S branca — o elemento central do logo */}
+      <path
+        d="M14 86 Q34 66 50 50 Q66 34 86 14"
+        stroke="white" strokeWidth="18" strokeLinecap="round" fill="none"
+      />
     </svg>
   );
 }
 
-/** BTP — Brasil Terminal Portuário: ondas azul/verde + texto teal */
-function LogoBTP({ size = 20 }: { size?: number }) {
-  const scale = size / 40;
+/**
+ * BTP — ícone quadrado com as duas ondas de cor e texto "BTP".
+ * Onda superior teal (#5bbdd4), onda inferior verde-oliva (#8dc63f),
+ * texto "BTP" em teal escuro (#2a6e7e).
+ */
+function IconBTP({ size = 24 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="4" fill="#f0f4f8"/>
-      {/* onda teal */}
-      <path d="M4 16 Q13 8 22 14 Q31 20 36 12" stroke="#3a7d8c" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-      {/* onda verde */}
-      <path d="M4 22 Q13 14 22 20 Q31 26 36 18" stroke="#6abf44" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-      {/* texto BTP estilizado */}
-      <text x="20" y="35" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="11" fill="#2a6070" letterSpacing="1">BTP</text>
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="8" fill="#f4f8fa"/>
+      {/* onda teal (superior) */}
+      <path
+        d="M8 35 Q28 14 50 24 Q72 34 92 16"
+        stroke="#5bbdd4" strokeWidth="10" strokeLinecap="round" fill="none"
+      />
+      {/* onda verde-oliva (inferior) */}
+      <path
+        d="M8 52 Q28 31 50 41 Q72 51 92 33"
+        stroke="#8dc63f" strokeWidth="10" strokeLinecap="round" fill="none"
+      />
+      {/* "BTP" teal escuro */}
+      <text
+        x="50" y="82"
+        textAnchor="middle"
+        fontFamily="Arial Black, Arial, sans-serif"
+        fontWeight="900" fontSize="28" fill="#2a6e7e" letterSpacing="2"
+      >BTP</text>
     </svg>
   );
 }
 
-/** EcoPORTO Santos — folha verde + "eco" + "PORTO" */
-function LogoEcoporto({ size = 20 }: { size?: number }) {
+/**
+ * ECOPORTO — ícone quadrado com folha oval verde rotacionada + texto "eco PORTO".
+ * Folha sólida verde (#46b32a), "eco" em teal (#3a7d7a), "PORTO" em preto bold.
+ */
+function IconEcoporto({ size = 24 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="4" fill="#f8faf8"/>
-      {/* folha oval verde */}
-      <ellipse cx="28" cy="10" rx="9" ry="6" fill="#5ab53c" transform="rotate(-30 28 10)"/>
-      <path d="M22 14 Q28 4 37 7" stroke="#2d7a1a" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-      {/* "eco" minúsculo teal */}
-      <text x="4" y="28" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="10" fill="#3a7d7a">eco</text>
-      {/* "PORTO" maiúsculo bold preto */}
-      <text x="4" y="38" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="9" fill="#1a1a1a" letterSpacing="0.5">PORTO</text>
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="8" fill="#f8faf6"/>
+      {/* folha oval rotacionada -38° — posição superior-direita */}
+      <ellipse
+        cx="72" cy="26" rx="24" ry="12"
+        fill="#46b32a"
+        transform="rotate(-38 72 26)"
+      />
+      {/* nervura central da folha */}
+      <path
+        d="M57 40 Q70 26 80 16"
+        stroke="#2d7a1a" strokeWidth="2.5" strokeLinecap="round" fill="none"
+      />
+      {/* "eco" — peso normal, teal */}
+      <text
+        x="6" y="65"
+        fontFamily="Arial, sans-serif"
+        fontWeight="400" fontSize="28" fill="#3a7d7a"
+      >eco</text>
+      {/* "PORTO" — bold black */}
+      <text
+        x="4" y="92"
+        fontFamily="Arial Black, Arial, sans-serif"
+        fontWeight="900" fontSize="22" fill="#1a1a1a" letterSpacing="1"
+      >PORTO</text>
     </svg>
   );
 }
 
-/** Ícone genérico para terminais não mapeados */
-function LogoGeneric({ terminal, size = 20 }: { terminal: string; size?: number }) {
+/** Genérico para terminais não mapeados */
+function IconGeneric({ terminal, size = 24 }: { terminal: string; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="4" fill="#334155"/>
-      <text x="20" y="27" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="13" fill="white">
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="8" fill="#334155"/>
+      <text x="50" y="64" textAnchor="middle"
+        fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="30" fill="white">
         {terminal.slice(0,3).toUpperCase()}
       </text>
     </svg>
   );
 }
 
-function TermLogoIcon({ terminal, size = 20 }: { terminal: string; size?: number }) {
-  if (terminal === 'SANTOS BRASIL') return <LogoSantosBrasil size={size}/>;
-  if (terminal === 'BTP')           return <LogoBTP size={size}/>;
-  if (terminal === 'ECOPORTO')      return <LogoEcoporto size={size}/>;
-  return <LogoGeneric terminal={terminal} size={size}/>;
+function TermIcon({ terminal, size = 24 }: { terminal: string; size?: number }) {
+  if (terminal === 'SANTOS BRASIL') return <IconSantosBrasil size={size}/>;
+  if (terminal === 'BTP')           return <IconBTP size={size}/>;
+  if (terminal === 'ECOPORTO')      return <IconEcoporto size={size}/>;
+  return <IconGeneric terminal={terminal} size={size}/>;
 }
 
-/** Badge compact para linhas da tabela */
-function TermBadge({ terminal }: { terminal: string }) {
+// ── Logo completa (para cards do monitoramento) ────────────────────────────────
+
+/**
+ * Santos Brasil — logo completa:
+ * ícone S quadrado + "Santos Brasil" ao lado
+ */
+function LogoSantosBrasil({ height = 32 }: { height?: number }) {
+  const iconSize = height;
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0">
-      <TermLogoIcon terminal={terminal} size={22}/>
+    <span className="inline-flex items-center gap-2 shrink-0">
+      <IconSantosBrasil size={iconSize}/>
+      <svg width={90} height={height} viewBox="0 0 90 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="14" fontFamily="Arial, sans-serif" fontWeight="700" fontSize="12" fill="#0e9b47">Santos</text>
+        <text x="0" y="28" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="11" fill="#1570b8" letterSpacing="0.5">BRASIL</text>
+      </svg>
     </span>
   );
 }
 
-/** Badge grande para cards do monitoramento */
-function TermBadgeLarge({ terminal }: { terminal: string }) {
-  const labels: Record<string, string[]> = {
-    'BTP':           ['Brasil', 'Terminal Portuário'],
-    'ECOPORTO':      ['Eco', 'Porto Santos'],
-    'SANTOS BRASIL': ['Santos', 'Brasil'],
-    'EMBRAPORT':     ['Embraport', ''],
-  };
-  const [l1, l2] = labels[terminal] ?? [terminal, ''];
+/**
+ * BTP — logo completa:
+ * ícone quadrado + "Brasil / TERMINAL PORTUÁRIO"
+ */
+function LogoBTP({ height = 32 }: { height?: number }) {
   return (
-    <span className="inline-flex items-center gap-2 whitespace-nowrap shrink-0">
-      <TermLogoIcon terminal={terminal} size={28}/>
-      <span className="flex flex-col leading-none">
-        <span className="text-[9px] font-black text-slate-200 uppercase tracking-wide">{l1}</span>
-        {l2 && <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">{l2}</span>}
-      </span>
+    <span className="inline-flex items-center gap-2 shrink-0">
+      <IconBTP size={height}/>
+      <svg width={108} height={height} viewBox="0 0 108 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* onda teal tiny */}
+        <path d="M0 6 Q26 0 54 4 Q80 8 108 2" stroke="#5bbdd4" strokeWidth="3" strokeLinecap="round" fill="none"/>
+        {/* onda verde tiny */}
+        <path d="M0 11 Q26 5 54 9 Q80 13 108 7" stroke="#8dc63f" strokeWidth="3" strokeLinecap="round" fill="none"/>
+        <text x="0" y="24" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="14" fill="#2a6e7e">Brasil</text>
+        <text x="0" y="32" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="7" fill="#888" letterSpacing="1.5">TERMINAL PORTUÁRIO</text>
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * EcoPORTO — logo completa:
+ * ícone quadrado + "eco PORTO / SANTOS"
+ */
+function LogoEcoporto({ height = 32 }: { height?: number }) {
+  return (
+    <span className="inline-flex items-center gap-2 shrink-0">
+      <IconEcoporto size={height}/>
+      <svg width={72} height={height} viewBox="0 0 72 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="15" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="14" fill="#3a7d7a">eco</text>
+        <text x="0" y="28" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="13" fill="#1a1a1a" letterSpacing="0.5">PORTO</text>
+        <text x="1" y="36" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="7" fill="#999" letterSpacing="2">SANTOS</text>
+      </svg>
+    </span>
+  );
+}
+
+/** Badge compact para linhas da tabela (apenas ícone quadrado) */
+function TermBadge({ terminal }: { terminal: string }) {
+  return (
+    <span className="inline-flex items-center shrink-0">
+      <TermIcon terminal={terminal} size={26}/>
+    </span>
+  );
+}
+
+/** Badge grande para cards do monitoramento (ícone + texto da marca) */
+function TermBadgeLarge({ terminal }: { terminal: string }) {
+  if (terminal === 'SANTOS BRASIL') return <LogoSantosBrasil height={28}/>;
+  if (terminal === 'BTP')           return <LogoBTP height={28}/>;
+  if (terminal === 'ECOPORTO')      return <LogoEcoporto height={28}/>;
+  return (
+    <span className="inline-flex items-center gap-2 shrink-0">
+      <IconGeneric terminal={terminal} size={28}/>
+      <span className="text-[9px] font-black text-slate-300 uppercase">{terminal}</span>
     </span>
   );
 }
@@ -509,7 +603,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
               {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(t => (
                 <a key={t} href={TERM_LINKS[t]} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-all border border-slate-700">
-                  <TermLogoIcon terminal={t} size={16}/>
+                  <TermIcon terminal={t} size={18}/>
                   <I.Link className="w-2.5 h-2.5 text-slate-500"/>
                 </a>
               ))}
