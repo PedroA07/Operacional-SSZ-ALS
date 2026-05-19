@@ -439,9 +439,20 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   }, [termVessels]);
 
   // ── MONITORAMENTO: trip-vessel matching ──────────────────────────────────────
-  // Apenas viagens do painel Organização (não removidas) que tenham nome de navio
+  // Replica exatamente os filtros do painel de Organização (ambas as views)
   const orgTripsWithShip = useMemo(() =>
-    trips.filter(t => !INACTIVE_STATUSES.includes(t.status) && !t.isRemovedFromOrg && t.ship?.trim()),
+    trips.filter(t => {
+      if (INACTIVE_STATUSES.includes(t.status)) return false;
+      if (t.isRemovedFromOrg) return false;
+      if (!t.ship?.trim()) return false;
+      const dt = t.dateTime;
+      if (dt) {
+        const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
+        const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
+        if (normalized < '2026-04-01') return false;
+      }
+      return true;
+    }),
   [trips]);
 
   // Todos os tipos únicos das viagens org (para o painel de configuração)
