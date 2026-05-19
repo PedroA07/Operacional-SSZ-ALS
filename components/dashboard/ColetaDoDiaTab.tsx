@@ -149,6 +149,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         return serverTrip;
       })
       .sort((a, b) => {
+        // NF enviada → topo (pronto para coleta)
+        const aNF = !!a.sentNF;
+        const bNF = !!b.sentNF;
+        if (aNF !== bNF) return aNF ? -1 : 1;
         const dateA = new Date(a.scheduledDateTime || a.dateTime || 0).getTime();
         const dateB = new Date(b.scheduledDateTime || b.dateTime || 0).getTime();
         if (dateA !== dateB) return dateA - dateB;
@@ -352,10 +356,27 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       render: (t: Trip) => {
         const catColor = categories.find((c: any) => c.name?.toUpperCase() === t.category?.toUpperCase())?.color;
         const typeColor = operationTypes.find(ot => ot.name?.toUpperCase() === t.type?.toUpperCase())?.color;
+        const nfReady = !!t.sentNF && !t.coletaEmailSent && !t.coletaDocGenerated;
         return (
           <div className="flex items-center gap-3">
             <div className="flex flex-col gap-1">
-              <span className="font-black text-slate-900 text-[10px]">{t.os}</span>
+              <div className="flex items-center gap-1.5">
+                {nfReady && (
+                  <span className="relative flex h-2.5 w-2.5 shrink-0" title="NF enviada — pronto para coleta">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                  </span>
+                )}
+                <span className={`font-black text-[10px] ${nfReady ? 'text-emerald-700' : 'text-slate-900'}`}>{t.os}</span>
+              </div>
+              {nfReady && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-200 text-[7px] font-black text-emerald-700 uppercase tracking-tight w-fit">
+                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  Pronto p/ Coleta
+                </span>
+              )}
               <div className="flex flex-wrap gap-1">
                 <span
                   className="text-[7px] px-1.5 py-0.5 rounded font-black border w-fit uppercase"
@@ -550,7 +571,16 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const getRowStyle = (t: Trip) => {
     const typeId = t.coletaTipoViagem || defaultTipoViagemId;
     const type = tiposViagem.find(tv => tv.id === typeId);
-    const typeColor = type?.color || '#cbd5e1'; // slate-300 default
+    const typeColor = type?.color || '#cbd5e1';
+
+    const hexToRgba = (hex: string, alpha: number) => {
+      try {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      } catch (e) { return hex; }
+    };
 
     const style: React.CSSProperties = {
       borderLeftWidth: '6px',
@@ -559,22 +589,18 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     };
 
     if (t.coletaDocGenerated) {
-      // Verde suave para concluído (Doc Gerado)
       style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
       style.borderLeftStyle = 'dashed';
     } else if (t.coletaEmailSent) {
-      // Azul suave para e-mail enviado
       style.backgroundColor = 'rgba(59, 130, 246, 0.15)';
-    } else if (typeColor) {
-      // Cor do tipo com 10% de opacidade
-      const hexToRgba = (hex: string, alpha: number) => {
-        try {
-          const r = parseInt(hex.slice(1, 3), 16);
-          const g = parseInt(hex.slice(3, 5), 16);
-          const b = parseInt(hex.slice(5, 7), 16);
-          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        } catch (e) { return hex; }
-      };
+    } else if (t.sentNF) {
+      // NF confirmada — pronta para coleta: destaque emerald com borda pulsante
+      style.backgroundColor = 'rgba(16, 185, 129, 0.08)';
+      style.borderLeftColor = '#10b981';
+      style.borderLeftWidth = '6px';
+      style.outline = '1.5px solid rgba(16, 185, 129, 0.35)';
+      style.outlineOffset = '-1px';
+    } else {
       style.backgroundColor = hexToRgba(typeColor, 0.08);
     }
 
