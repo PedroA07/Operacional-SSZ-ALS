@@ -635,6 +635,9 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const [newSt, setNewSt]             = useState<ShipStatus>('NOVO');
   const [stObs, setStObs]             = useState('');
 
+  // EMBRAPORT scraper state (callback declared after loadTV below)
+  const [scrapingEmbraport, setScrapingEmbraport] = useState(false);
+
   // Collapsibles
   const [showMonit, setShowMonit]     = useState(true);
 
@@ -689,6 +692,29 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   }, []);
 
   useEffect(() => { loadShips(); loadTV(); }, []); // eslint-disable-line
+
+  // EMBRAPORT scraper callback — declared after loadTV to avoid "used before declaration"
+  const scrapeEmbraport = useCallback(async () => {
+    setScrapingEmbraport(true);
+    try {
+      const res = await fetch('/api/embraport-escala');
+      const data = await res.json();
+      if (data.ok) {
+        window.dispatchEvent(new CustomEvent('als_show_toast', {
+          detail: { message: `EMBRAPORT: ${data.total} navios atualizados`, type: 'success' }
+        }));
+        await loadTV();
+      } else {
+        window.dispatchEvent(new CustomEvent('als_show_toast', {
+          detail: { message: data.error || 'Erro ao buscar EMBRAPORT', type: 'error' }
+        }));
+      }
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao conectar com scraper', type: 'error' }
+      }));
+    } finally { setScrapingEmbraport(false); }
+  }, [loadTV]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
   // Status counts (panel bar)
@@ -860,10 +886,15 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
         <div>
           <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">Monitoramento de Navios</h1>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-            BTP · ECOPORTO · Santos Brasil — atualizado pelo Railway Bot
+            BTP · ECOPORTO · Santos Brasil · EMBRAPORT — atualizado pelo Railway Bot
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button onClick={scrapeEmbraport} disabled={scrapingEmbraport}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-50 text-[9px] font-black uppercase tracking-widest transition-all border border-purple-200">
+            <I.Ship className="w-3.5 h-3.5"/>
+            {scrapingEmbraport ? 'Buscando...' : 'EMBRAPORT'}
+          </button>
           <button onClick={() => { loadTV(); loadShips(); }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 text-[9px] font-black uppercase tracking-widest transition-all">
             <I.Refresh className="w-3.5 h-3.5"/> Atualizar
@@ -1319,10 +1350,24 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                                   )}
                                   <span className="text-[7px] text-slate-600">{t.status}</span>
                                 </div>
+                                {/* Local + data/hora do agendamento */}
+                                {isScheduled && (t.scheduling?.location || t.destination?.name) && (
+                                  <div className="flex items-center gap-1.5 text-[7px] flex-wrap">
+                                    <I.Pin className="w-2.5 h-2.5 text-emerald-500 shrink-0"/>
+                                    <span className="text-emerald-400 font-black truncate max-w-[14rem]">
+                                      {t.scheduling?.location || t.destination?.name}
+                                    </span>
+                                    {(t.scheduling?.dateTime || t.scheduledDateTime) && (
+                                      <span className="text-slate-500 font-bold shrink-0">
+                                        {fmtDT(t.scheduling?.dateTime || t.scheduledDateTime)}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
-                              {/* Agendamento + seta */}
-                              <div className="shrink-0 flex flex-col items-end gap-1">
+                              {/* Status agendamento + seta */}
+                              <div className="shrink-0 flex flex-col items-end gap-1 ml-2">
                                 {isScheduled
                                   ? <span className="flex items-center gap-1 text-[7px] font-black text-green-500">
                                       <I.Check className="w-2.5 h-2.5"/> Agendado
@@ -1330,11 +1375,6 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                                   : <span className="flex items-center gap-1 text-[7px] font-black text-amber-400">
                                       <I.Warning className="w-2.5 h-2.5"/> Pendente
                                     </span>}
-                                {(t.scheduling?.dateTime || t.scheduledDateTime) && (
-                                  <span className="text-[6px] text-slate-600 font-bold">
-                                    {fmtDT(t.scheduling?.dateTime || t.scheduledDateTime)}
-                                  </span>
-                                )}
                                 <I.ChevD className="w-3 h-3 text-slate-700 rotate-[-90deg]"/>
                               </div>
                             </button>
