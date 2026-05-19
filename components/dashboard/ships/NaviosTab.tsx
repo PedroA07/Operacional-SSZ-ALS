@@ -158,48 +158,97 @@ function SBadge({ status, size='sm' }: { status: ShipStatus; size?: 'xs'|'sm' })
     </span>
   );
 }
-// ── Terminal logo badges (branded) ───────────────────────────────────────────
-const TERM_LOGO_CFG: Record<string, { bg: string; text: string; label: string; icon?: React.ReactNode }> = {
-  'BTP':           { bg: '#00437a', text: '#ffffff', label: 'BTP'  },
-  'ECOPORTO':      { bg: '#006b2f', text: '#ffffff', label: 'ECO'  },
-  'SANTOS BRASIL': { bg: '#003087', text: '#ffffff', label: 'SB'   },
-  'EMBRAPORT':     { bg: '#6b21a8', text: '#ffffff', label: 'EMB'  },
-};
-function TermBadge({ terminal }: { terminal: string }) {
-  const cfg = TERM_LOGO_CFG[terminal];
-  if (!cfg) {
-    return (
-      <span className="inline-flex items-center font-black uppercase rounded border text-[7px] px-1.5 py-0.5 whitespace-nowrap bg-slate-700 text-slate-300 border-slate-600">
-        {terminal.slice(0,3)}
-      </span>
-    );
-  }
+// ── Logos SVG dos terminais ───────────────────────────────────────────────────
+
+/** Santos Brasil — quadrado verde com onda azul/branca em "S" */
+function LogoSantosBrasil({ size = 20 }: { size?: number }) {
   return (
-    <span
-      className="inline-flex items-center gap-1 font-black uppercase rounded text-[7px] px-1.5 py-0.5 whitespace-nowrap shrink-0 tracking-widest"
-      style={{ backgroundColor: cfg.bg, color: cfg.text }}>
-      {/* Anchor icon for port terminals */}
-      <svg className="w-2 h-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a3 3 0 100 6 3 3 0 000-6zm0 6v12M5 12h14M5 19.5c0-2.5 2-4.5 7-4.5s7 2 7 4.5"/>
-      </svg>
-      {cfg.label}
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="40" height="40" rx="4" fill="#1a9247"/>
+      {/* fundo azul canto superior direito */}
+      <path d="M40 0 H40 V40 H22 Q38 30 38 18 Q38 6 22 0 Z" fill="#1472b9"/>
+      {/* onda branca central */}
+      <path d="M6 26 Q14 14 22 20 Q30 26 34 14" stroke="white" strokeWidth="5" fill="none" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+/** BTP — Brasil Terminal Portuário: ondas azul/verde + texto teal */
+function LogoBTP({ size = 20 }: { size?: number }) {
+  const scale = size / 40;
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="40" height="40" rx="4" fill="#f0f4f8"/>
+      {/* onda teal */}
+      <path d="M4 16 Q13 8 22 14 Q31 20 36 12" stroke="#3a7d8c" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+      {/* onda verde */}
+      <path d="M4 22 Q13 14 22 20 Q31 26 36 18" stroke="#6abf44" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
+      {/* texto BTP estilizado */}
+      <text x="20" y="35" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="11" fill="#2a6070" letterSpacing="1">BTP</text>
+    </svg>
+  );
+}
+
+/** EcoPORTO Santos — folha verde + "eco" + "PORTO" */
+function LogoEcoporto({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="40" height="40" rx="4" fill="#f8faf8"/>
+      {/* folha oval verde */}
+      <ellipse cx="28" cy="10" rx="9" ry="6" fill="#5ab53c" transform="rotate(-30 28 10)"/>
+      <path d="M22 14 Q28 4 37 7" stroke="#2d7a1a" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+      {/* "eco" minúsculo teal */}
+      <text x="4" y="28" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="10" fill="#3a7d7a">eco</text>
+      {/* "PORTO" maiúsculo bold preto */}
+      <text x="4" y="38" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="9" fill="#1a1a1a" letterSpacing="0.5">PORTO</text>
+    </svg>
+  );
+}
+
+/** Ícone genérico para terminais não mapeados */
+function LogoGeneric({ terminal, size = 20 }: { terminal: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="40" height="40" rx="4" fill="#334155"/>
+      <text x="20" y="27" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="13" fill="white">
+        {terminal.slice(0,3).toUpperCase()}
+      </text>
+    </svg>
+  );
+}
+
+function TermLogoIcon({ terminal, size = 20 }: { terminal: string; size?: number }) {
+  if (terminal === 'SANTOS BRASIL') return <LogoSantosBrasil size={size}/>;
+  if (terminal === 'BTP')           return <LogoBTP size={size}/>;
+  if (terminal === 'ECOPORTO')      return <LogoEcoporto size={size}/>;
+  return <LogoGeneric terminal={terminal} size={size}/>;
+}
+
+/** Badge compact para linhas da tabela */
+function TermBadge({ terminal }: { terminal: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0">
+      <TermLogoIcon terminal={terminal} size={22}/>
     </span>
   );
 }
+
+/** Badge grande para cards do monitoramento */
 function TermBadgeLarge({ terminal }: { terminal: string }) {
-  const cfg = TERM_LOGO_CFG[terminal];
-  const names: Record<string,string> = {
-    'BTP': 'BTP', 'ECOPORTO': 'Ecoporto', 'SANTOS BRASIL': 'Santos Brasil', 'EMBRAPORT': 'Embraport',
+  const labels: Record<string, string[]> = {
+    'BTP':           ['Brasil', 'Terminal Portuário'],
+    'ECOPORTO':      ['Eco', 'Porto Santos'],
+    'SANTOS BRASIL': ['Santos', 'Brasil'],
+    'EMBRAPORT':     ['Embraport', ''],
   };
-  if (!cfg) return <TermBadge terminal={terminal}/>;
+  const [l1, l2] = labels[terminal] ?? [terminal, ''];
   return (
-    <span
-      className="inline-flex items-center gap-1.5 font-black uppercase rounded-md text-[8px] px-2 py-1 whitespace-nowrap shrink-0"
-      style={{ backgroundColor: cfg.bg, color: cfg.text }}>
-      <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a3 3 0 100 6 3 3 0 000-6zm0 6v12M5 12h14M5 19.5c0-2.5 2-4.5 7-4.5s7 2 7 4.5"/>
-      </svg>
-      {names[terminal] ?? terminal}
+    <span className="inline-flex items-center gap-2 whitespace-nowrap shrink-0">
+      <TermLogoIcon terminal={terminal} size={28}/>
+      <span className="flex flex-col leading-none">
+        <span className="text-[9px] font-black text-slate-200 uppercase tracking-wide">{l1}</span>
+        {l2 && <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">{l2}</span>}
+      </span>
     </span>
   );
 }
@@ -325,7 +374,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
       }
     });
     return matches;
-  }, [termVessels, activeTripsWithShip]);
+  }, [termVessels, orgTripsWithShip]);
 
   // Trips whose ship was NOT found in any terminal vessel
   const unmatchedTrips = useMemo(() => {
@@ -457,16 +506,13 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
               {loadingTV && <span className="text-[8px] text-blue-400 font-bold animate-pulse">Carregando...</span>}
             </div>
             <div className="flex items-center gap-2">
-              {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(t => {
-                const cfg = TERM_LOGO_CFG[t];
-                return (
-                  <a key={t} href={TERM_LINKS[t]} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-[7px] font-black uppercase px-2 py-1 rounded transition-all hover:opacity-80"
-                    style={{ backgroundColor: cfg?.bg ?? '#334155', color: cfg?.text ?? '#fff' }}>
-                    <I.Link className="w-2.5 h-2.5"/> {TERM_SHORT[t]}
-                  </a>
-                );
-              })}
+              {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(t => (
+                <a key={t} href={TERM_LINKS[t]} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-all border border-slate-700">
+                  <TermLogoIcon terminal={t} size={16}/>
+                  <I.Link className="w-2.5 h-2.5 text-slate-500"/>
+                </a>
+              ))}
             </div>
           </div>
 
@@ -687,12 +733,12 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                             )}
                             {dl && (
                               <span className={`text-[8px] font-black ${dlExp ? 'text-red-400' : 'text-orange-400'}`}>
-                                ⏰ Dead-Line {fmtCell(dl)}{dlExp ? ' (VENCIDO)' : ''}
+                                <I.Warning className="w-2.5 h-2.5 inline-block mr-0.5"/> Dead-Line {fmtCell(dl)}{dlExp ? ' (VENCIDO)' : ''}
                               </span>
                             )}
                             {(match.vessel.gateDry || match.vessel.gateReefer) && (
                               <span className="text-[8px] font-black text-green-400">
-                                🔓 Gate {fmtCell(match.vessel.gateDry || match.vessel.gateReefer)}
+                                <I.Check className="w-2.5 h-2.5 inline-block mr-0.5"/> Gate {fmtCell(match.vessel.gateDry || match.vessel.gateReefer)}
                               </span>
                             )}
                             {match.vessel.berco && (
