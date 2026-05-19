@@ -445,6 +445,12 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
       if (INACTIVE_STATUSES.includes(t.status)) return false;
       if (t.isRemovedFromOrg) return false;
       if (!t.ship?.trim()) return false;
+      // Viagem agendada: mantém visível até o horário do agendamento passar
+      if (t.isScheduled) {
+        const scheduledDT = t.scheduling?.dateTime || t.scheduledDateTime;
+        if (!scheduledDT) return true;
+        return new Date(scheduledDT) > new Date();
+      }
       const dt = t.dateTime;
       if (dt) {
         const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
