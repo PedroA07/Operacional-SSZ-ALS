@@ -1,28 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef } from 'react';
 import { User, Driver, DashboardTab, Port, PreStacking, Customer, OperationDefinition, Staff, Trip, Category, AvantidaRecord, SealBatch, EmailTemplate, Beneficiary, MonitoredShip } from './types';
-import OverviewTab from './components/dashboard/OverviewTab';
-import DriversTab from './components/dashboard/DriversTab';
-import FormsTab from './components/dashboard/FormsTab';
-import CustomersTab from './components/dashboard/CustomersTab';
-import PortsTab from './components/dashboard/PortsTab';
-import PreStackingTab from './components/dashboard/PreStackingTab';
-import OperationsTab from './components/dashboard/OperationsTab';
-import AdminTab from './components/dashboard/AdminTab';
-import StaffTab from './components/dashboard/StaffTab';
-import SystemTab from './components/dashboard/SystemTab';
-import DocumentsTab from './components/dashboard/DocumentsTab';
-import StaysTab from './components/dashboard/StaysTab';
-import LoginsTab from './components/dashboard/LoginsTab';
-import LacresTab from './components/dashboard/LacresTab';
-import AvantidaTab from './components/dashboard/AvantidaTab';
-import OrganizationTab from './components/dashboard/OrganizationTab';
-import ColetaDoDiaTab from './components/dashboard/ColetaDoDiaTab';
-import AutomationsTab from './components/dashboard/AutomationsTab';
-import NaviosTab from './components/dashboard/NaviosTab';
-import HandoverTab from './components/dashboard/HandoverTab';
-import ExternalUsersManager from './components/dashboard/third-party/ExternalUsersManager';
-import ExternalPortal from './components/dashboard/third-party/ExternalPortal';
 import Sidebar from './components/dashboard/Sidebar';
 import WeatherWidget from './components/dashboard/WeatherWidget';
 import OnlineStatus from './components/dashboard/OnlineStatus';
@@ -398,9 +376,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            )}
            {activeTab === DashboardTab.EXTERNAL_PORTAL && (
              <ExternalPortal user={user} trips={trips} />
-           )}
-           {activeTab === DashboardTab.NAVIOS && (
-             <NaviosTab userId={user.id} ships={ships} onSave={async (s) => { await db.saveMonitoredShip(s); await loadAllData(false); }} onDelete={async (id) => { await db.deleteMonitoredShip(id); await loadAllData(false); }} />
            )}
          </Suspense>
         </div>

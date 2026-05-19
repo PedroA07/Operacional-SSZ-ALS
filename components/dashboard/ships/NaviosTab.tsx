@@ -1,503 +1,540 @@
-
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { MonitoredShip, ShipStatus, TerminalService } from '../../../types';
-import ShipModal from './ShipModal';
+import React, { useState, useEffect, useCallback } from 'react';
+import { User, Trip, Ship, ShipStatus, TerminalVessel } from '../../../types';
+import { db, supabase } from '../../../utils/storage';
 
 interface NaviosTabProps {
-  userId: string;
-  ships: MonitoredShip[];
-  onSave: (s: MonitoredShip) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  user: User;
+  trips: Trip[];
 }
 
-const STATUS_COLORS: Record<ShipStatus, string> = {
-  'GATE ABERTO':   'bg-emerald-100 text-emerald-700 border-emerald-200',
-  'GATE FECHADO':  'bg-red-100 text-red-700 border-red-200',
-  'AG. ATRACAÇÃO': 'bg-amber-100 text-amber-700 border-amber-200',
-  'ATRACADO':      'bg-blue-100 text-blue-700 border-blue-200',
-  'EM TRÂNSITO':   'bg-slate-100 text-slate-600 border-slate-200',
-  'FINALIZADO':    'bg-slate-100 text-slate-400 border-slate-200',
+const SHIP_STATUSES: ShipStatus[] = ['EM TRÂNSITO', 'ATRACADO', 'FUNDEADO', 'AGUARDANDO JANELA', 'SAÍDO'];
+const TERMINALS = ['ECOPORTO', 'SANTOS BRASIL', 'EMBRAPORT', 'BTP', 'OUTRO'];
+
+const TERMINAL_KEYS: Record<string, string> = {
+  ECOPORTO: 'ecoporto',
+  'SANTOS BRASIL': 'santosbrasil',
+  BTP: 'btp',
 };
 
-const STATUS_DOT: Record<ShipStatus, string> = {
-  'GATE ABERTO':   'bg-emerald-500',
-  'GATE FECHADO':  'bg-red-500',
-  'AG. ATRACAÇÃO': 'bg-amber-500',
-  'ATRACADO':      'bg-blue-500',
-  'EM TRÂNSITO':   'bg-slate-400',
-  'FINALIZADO':    'bg-slate-300',
-};
+interface TerminalState {
+  vessels: TerminalVessel[];
+  loading: boolean;
+  error: string | null;
+  fetchedAt: string | null;
+}
 
-const ALL_STATUSES: ShipStatus[] = [
-  'GATE ABERTO', 'GATE FECHADO', 'AG. ATRACAÇÃO', 'ATRACADO', 'EM TRÂNSITO', 'FINALIZADO',
-];
+function statusBadgeClass(status: ShipStatus): string {
+  switch (status) {
+    case 'ATRACADO': return 'bg-green-500/20 text-green-400 border border-green-500/30';
+    case 'EM TRÂNSITO': return 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+    case 'FUNDEADO': return 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+    case 'AGUARDANDO JANELA': return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
+    case 'SAÍDO': return 'bg-slate-500/20 text-slate-400 border border-slate-500/30';
+    default: return 'bg-slate-500/20 text-slate-400 border border-slate-500/30';
+  }
+}
 
-const formatDateTime = (iso?: string): string => {
-  if (!iso) return '';
-  const [datePart, timePart] = iso.split('T');
-  if (!datePart) return '';
-  const [y, mo, d] = datePart.split('-');
-  const timeStr = timePart ? ` ${timePart.slice(0, 5)}` : '';
-  return `${d}/${mo}/${y}${timeStr}`;
-};
+function situacaoBadgeClass(situacao: string): string {
+  const s = situacao.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (s.includes('em operac') || s.includes('operando')) return 'bg-green-500/20 text-green-400';
+  if (s.includes('previsto') || s.includes('prev')) return 'bg-blue-500/20 text-blue-400';
+  if (s.includes('desatrac') || s.includes('encerr') || s.includes('saido') || s.includes('saiu')) return 'bg-slate-500/20 text-slate-400';
+  return 'bg-amber-500/20 text-amber-400';
+}
 
-// ── Terminal Status Section ──────────────────────────────────────────────────
+function formatDate(iso?: string): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('pt-BR');
+  } catch {
+    return iso;
+  }
+}
 
-const TerminalCard: React.FC<{ t: TerminalService }> = ({ t }) => {
-  const badgeCls =
-    t.status === 'online'   ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-    t.status === 'offline'  ? 'bg-red-100 text-red-700 border-red-200' :
-    t.status === 'checking' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                              'bg-slate-100 text-slate-500 border-slate-200';
-  const dotCls =
-    t.status === 'online'   ? 'bg-emerald-500' :
-    t.status === 'offline'  ? 'bg-red-500' :
-    t.status === 'checking' ? 'bg-amber-500 animate-pulse' :
-                              'bg-slate-400';
-  const label =
-    t.status === 'online'   ? 'ONLINE' :
-    t.status === 'offline'  ? 'OFFLINE' :
-    t.status === 'checking' ? 'VERIFICANDO' : 'DESCONHECIDO';
+const emptyShip = (): Partial<Ship> => ({
+  name: '',
+  imo: '',
+  armador: '',
+  viagem: '',
+  terminal: '',
+  berco: '',
+  eta: '',
+  etd: '',
+  status: 'EM TRÂNSITO',
+  observacoes: '',
+  tripIds: [],
+});
 
-  return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col gap-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest truncate">{t.name}</p>
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border shrink-0 ${badgeCls}`}>
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotCls}`} />
-          {label}
-        </span>
-      </div>
-      <div className="flex items-center gap-3 text-[8px] font-bold text-slate-400 uppercase">
-        {t.responseMs !== undefined && (
-          <span>{t.responseMs} ms</span>
-        )}
-        {t.lastCheck && (
-          <span>Verificado: {new Date(t.lastCheck).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-        )}
-        {!t.lastCheck && (
-          <span>Aguardando...</span>
-        )}
-      </div>
-    </div>
-  );
-};
+const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
+  const [ships, setShips] = useState<Ship[]>([]);
+  const [loadingShips, setLoadingShips] = useState(true);
 
-// ── Ship Card ────────────────────────────────────────────────────────────────
+  const [terminalData, setTerminalData] = useState<Record<string, TerminalState>>({
+    ECOPORTO: { vessels: [], loading: false, error: null, fetchedAt: null },
+    'SANTOS BRASIL': { vessels: [], loading: false, error: null, fetchedAt: null },
+    BTP: { vessels: [], loading: false, error: null, fetchedAt: null },
+    EMBRAPORT: { vessels: [], loading: false, error: null, fetchedAt: null },
+  });
 
-const ShipCard: React.FC<{
-  ship: MonitoredShip;
-  onEdit: () => void;
-  onDelete: () => void;
-}> = ({ ship, onEdit, onDelete }) => {
-  const [hovered, setHovered] = useState(false);
-
-  return (
-    <div
-      className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex flex-col gap-3 relative group transition-shadow hover:shadow-md"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {/* Actions overlay */}
-      {hovered && (
-        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-          <button
-            onClick={onEdit}
-            className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-            </svg>
-          </button>
-          <button
-            onClick={onDelete}
-            className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all shadow-sm"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-            </svg>
-          </button>
-        </div>
-      )}
-
-      {/* Ship name */}
-      <div>
-        <h3 className="text-[13px] font-black text-slate-900 uppercase leading-tight pr-16">{ship.shipName}</h3>
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[8px] font-black text-slate-500 uppercase tracking-widest">
-            {ship.voyage}
-          </span>
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[8px] font-black text-blue-600 uppercase tracking-widest">
-            {ship.terminal}
-          </span>
-          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${STATUS_COLORS[ship.status]}`}>
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[ship.status]}`} />
-            {ship.status}
-          </span>
-        </div>
-      </div>
-
-      {/* Dates */}
-      {(ship.eta || ship.etd) && (
-        <div className="flex items-center gap-4 text-[8px] font-black text-slate-500 uppercase">
-          {ship.eta && (
-            <span className="flex items-center gap-1">
-              <span className="text-slate-400">ETA:</span>
-              <span className="text-slate-700">{formatDateTime(ship.eta)}</span>
-            </span>
-          )}
-          {ship.etd && (
-            <span className="flex items-center gap-1">
-              <span className="text-slate-400">ETD:</span>
-              <span className="text-slate-700">{formatDateTime(ship.etd)}</span>
-            </span>
-          )}
-        </div>
-      )}
-
-      {(ship.ataDate || ship.atdDate) && (
-        <div className="flex items-center gap-4 text-[8px] font-black uppercase">
-          {ship.ataDate && (
-            <span className="flex items-center gap-1 text-emerald-600">
-              <span className="text-slate-400">Chegou:</span>
-              {formatDateTime(ship.ataDate)}
-            </span>
-          )}
-          {ship.atdDate && (
-            <span className="flex items-center gap-1 text-amber-600">
-              <span className="text-slate-400">Saiu:</span>
-              {formatDateTime(ship.atdDate)}
-            </span>
-          )}
-        </div>
-      )}
-
-      {ship.linkedTripOs && (
-        <div className="flex items-center gap-1.5 text-[8px] font-black text-slate-400 uppercase">
-          <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-          </svg>
-          <span className="text-blue-500">{ship.linkedTripOs}</span>
-        </div>
-      )}
-
-      {ship.notes && (
-        <p className="text-[9px] text-slate-400 leading-relaxed line-clamp-2 border-t border-slate-50 pt-2.5">
-          {ship.notes}
-        </p>
-      )}
-    </div>
-  );
-};
-
-// ── Main Tab ─────────────────────────────────────────────────────────────────
-
-const NaviosTab: React.FC<NaviosTabProps> = ({ userId, ships, onSave, onDelete }) => {
-  const [terminals, setTerminals] = useState<TerminalService[]>([]);
-  const [terminalChecking, setTerminalChecking] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<MonitoredShip | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ShipStatus | 'TODOS'>('TODOS');
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
-  const intervalRef = React.useRef<number | undefined>(undefined);
+  const [editingShip, setEditingShip] = useState<Partial<Ship>>(emptyShip());
+  const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
-  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  };
-
-  const fetchTerminalStatus = useCallback(async () => {
-    setTerminalChecking(true);
-    // Optimistically mark all as checking
-    setTerminals(prev => {
-      const base: TerminalService[] = prev.length
-        ? prev.map(t => ({ ...t, status: 'checking' as const }))
-        : [
-            { id: 'ecoporto',      name: 'ECOPORTO',      url: 'https://www.ecoporto.com.br',       status: 'checking' },
-            { id: 'santos_brasil', name: 'SANTOS BRASIL',  url: 'https://www.santosbrasil.com.br',   status: 'checking' },
-            { id: 'embraport',     name: 'EMBRAPORT',      url: 'https://www.embraport.com.br',      status: 'checking' },
-            { id: 'btp',           name: 'BTP',            url: 'https://www.btp.com.br',            status: 'checking' },
-            { id: 'depot_record',  name: 'DEPOT RECORD',   url: 'https://www.depotrecord.com.br',    status: 'checking' },
-          ];
-      return base;
-    });
+  const loadShips = useCallback(async () => {
+    setLoadingShips(true);
     try {
-      const res = await fetch('/api/terminal-status');
-      if (res.ok) {
-        const data: TerminalService[] = await res.json();
-        setTerminals(data);
-      } else {
-        setTerminals(prev => prev.map(t => ({ ...t, status: 'offline' as const, lastCheck: new Date().toISOString() })));
-      }
-    } catch {
-      setTerminals(prev => prev.map(t => ({ ...t, status: 'offline' as const, lastCheck: new Date().toISOString() })));
+      const data = await db.getShips();
+      setShips(data);
+    } catch (e) {
+      console.error('[NaviosTab] loadShips error:', e);
     } finally {
-      setTerminalChecking(false);
+      setLoadingShips(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchTerminalStatus();
-    intervalRef.current = window.setInterval(fetchTerminalStatus, 3 * 60 * 1000);
-    return () => {
-      if (intervalRef.current !== undefined) clearInterval(intervalRef.current);
-    };
-  }, [fetchTerminalStatus]);
+    loadShips();
+  }, [loadShips]);
 
-  const filteredShips = useMemo(() => {
-    const q = search.toLowerCase();
-    return ships.filter(s => {
-      const matchSearch =
-        s.shipName.toLowerCase().includes(q) ||
-        s.voyage.toLowerCase().includes(q) ||
-        s.terminal.toLowerCase().includes(q) ||
-        (s.linkedTripOs || '').toLowerCase().includes(q) ||
-        (s.notes || '').toLowerCase().includes(q);
-      const matchStatus = statusFilter === 'TODOS' || s.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
-  }, [ships, search, statusFilter]);
+  const fetchTerminal = useCallback(async (terminalLabel: string) => {
+    const terminalKey = TERMINAL_KEYS[terminalLabel];
+    if (!terminalKey) return; // EMBRAPORT has no public data
 
-  const handleOpen = (ship?: MonitoredShip) => {
-    setEditing(ship || null);
+    setTerminalData(prev => ({
+      ...prev,
+      [terminalLabel]: { ...prev[terminalLabel], loading: true, error: null },
+    }));
+
+    try {
+      if (!supabase) throw new Error('Supabase não configurado');
+      const { data, error } = await supabase.functions.invoke('terminal-vessels', {
+        body: { terminal: terminalKey },
+      });
+      if (error) throw error;
+      const result = data as { vessels: TerminalVessel[]; error?: string; terminal: string; fetchedAt: string };
+      setTerminalData(prev => ({
+        ...prev,
+        [terminalLabel]: {
+          vessels: result.vessels || [],
+          loading: false,
+          error: result.error || null,
+          fetchedAt: result.fetchedAt,
+        },
+      }));
+    } catch (e: any) {
+      setTerminalData(prev => ({
+        ...prev,
+        [terminalLabel]: {
+          ...prev[terminalLabel],
+          loading: false,
+          error: e?.message || 'Erro ao buscar dados',
+          fetchedAt: new Date().toISOString(),
+        },
+      }));
+    }
+  }, []);
+
+  const openNewModal = () => {
+    setEditingShip(emptyShip());
+    setModalError(null);
     setModalOpen(true);
   };
 
-  const handleSave = async (s: MonitoredShip) => {
+  const openEditModal = (ship: Ship) => {
+    setEditingShip({ ...ship });
+    setModalError(null);
+    setModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!editingShip.name?.trim()) {
+      setModalError('O nome do navio é obrigatório.');
+      return;
+    }
+    if (!editingShip.status) {
+      setModalError('O status é obrigatório.');
+      return;
+    }
+    setSaving(true);
+    setModalError(null);
     try {
-      await onSave(s);
-      showToast('Navio salvo com sucesso.');
-    } catch {
-      showToast('Erro ao salvar o navio.', 'err');
+      await db.saveShip(editingShip);
+      setModalOpen(false);
+      await loadShips();
+    } catch (e: any) {
+      setModalError(e?.message || 'Erro ao salvar navio.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!confirmDeleteId) return;
-    setIsDeleting(true);
+  const handleDelete = async (id: string) => {
+    if (!confirm('Excluir este navio do registro?')) return;
     try {
-      await onDelete(confirmDeleteId);
-      setConfirmDeleteId(null);
-      showToast('Navio removido.');
-    } catch {
-      showToast('Erro ao remover navio.', 'err');
-    } finally {
-      setIsDeleting(false);
+      await db.deleteShip(id);
+      setShips(prev => prev.filter(s => s.id !== id));
+    } catch (e: any) {
+      alert('Erro ao excluir: ' + (e?.message || e));
     }
+  };
+
+  const updateField = (field: keyof Ship, value: any) => {
+    setEditingShip(prev => ({ ...prev, [field]: value }));
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-
-      {/* Page header */}
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[13px] font-black text-slate-900 uppercase tracking-widest">Navios Monitorados</h1>
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-            Controle de embarcações e terminais
-          </p>
+          <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">Monitoramento de Navios</h1>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Acompanhe a situação dos navios nos terminais de Santos</p>
         </div>
         <button
-          onClick={() => handleOpen()}
-          className="flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
+          onClick={openNewModal}
+          className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all active:scale-95"
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
           Novo Navio
         </button>
       </div>
 
-      {/* Inline toast */}
-      {toast && (
-        <div className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border ${
-          toast.type === 'ok'
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-            : 'bg-red-50 border-red-200 text-red-700'
-        }`}>
-          {toast.msg}
-        </div>
-      )}
-
-      {/* ── Terminal Status ── */}
-      <div className="bg-slate-900 rounded-3xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Monitoramento</p>
-            <h2 className="text-[11px] font-black text-white uppercase tracking-wider">Status dos Terminais</h2>
-          </div>
-          <button
-            onClick={fetchTerminalStatus}
-            disabled={terminalChecking}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
-          >
-            {terminalChecking ? (
-              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-              </svg>
-            ) : (
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-            )}
-            Atualizar
-          </button>
-        </div>
-
-        {terminals.length === 0 ? (
-          <div className="flex items-center justify-center py-6">
-            <svg className="w-4 h-4 animate-spin text-blue-400 mr-2" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-            </svg>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Verificando terminais...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {terminals.map(t => (
-              <TerminalCard key={t.id} t={t} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Ships Section ── */}
-      <div className="space-y-4">
-        {/* Search + filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <svg className="w-3.5 h-3.5 text-slate-300 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
-            <input
-              type="text"
-              placeholder="Buscar navio, viagem, terminal..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-bold text-slate-700 placeholder:text-slate-300 outline-none focus:border-blue-400 transition-colors"
-            />
-          </div>
-        </div>
-
-        {/* Status filter pills */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setStatusFilter('TODOS')}
-            className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all ${
-              statusFilter === 'TODOS'
-                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-            }`}
-          >
-            Todos ({ships.length})
-          </button>
-          {ALL_STATUSES.map(s => {
-            const count = ships.filter(sh => sh.status === s).length;
-            const isActive = statusFilter === s;
+      {/* Terminal Status Cards */}
+      <div>
+        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Status dos Terminais</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {(['ECOPORTO', 'SANTOS BRASIL', 'BTP', 'EMBRAPORT'] as const).map(term => {
+            const state = terminalData[term];
+            const hasKey = !!TERMINAL_KEYS[term];
             return (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all ${
-                  isActive
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300'
-                }`}
-              >
-                {s} ({count})
-              </button>
+              <div key={term} className="bg-[#0f172a] rounded-2xl p-5 flex flex-col gap-3 border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-slate-100 uppercase tracking-widest">{term}</span>
+                  <div className="flex items-center gap-2">
+                    {state.vessels.length > 0 && (
+                      <span className="text-[9px] font-black bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
+                        {state.vessels.length}
+                      </span>
+                    )}
+                    {hasKey ? (
+                      <button
+                        onClick={() => fetchTerminal(term)}
+                        disabled={state.loading}
+                        className="text-[9px] font-black uppercase px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-all disabled:opacity-50"
+                      >
+                        {state.loading ? '...' : 'Buscar'}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {state.fetchedAt && (
+                  <p className="text-[8px] text-slate-600 font-bold">
+                    Atualizado: {new Date(state.fetchedAt).toLocaleTimeString('pt-BR')}
+                  </p>
+                )}
+
+                {state.error && (
+                  <p className="text-[9px] text-red-400 font-bold">{state.error}</p>
+                )}
+
+                {!hasKey && (
+                  <p className="text-[9px] text-slate-600 font-bold italic">Sem dados públicos disponíveis</p>
+                )}
+
+                {hasKey && !state.loading && state.vessels.length === 0 && !state.error && !state.fetchedAt && (
+                  <p className="text-[9px] text-slate-600 font-bold">Clique em "Buscar" para carregar</p>
+                )}
+
+                {state.vessels.length > 0 && (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {state.vessels.slice(0, 5).map((v, idx) => (
+                      <div key={idx} className="flex items-start justify-between gap-2 py-1.5 border-b border-slate-800/50 last:border-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[9px] font-black text-slate-200 truncate uppercase">{v.navio}</p>
+                          {v.previsao && <p className="text-[8px] text-slate-500 font-bold">{v.previsao}</p>}
+                          {v.berco && <p className="text-[8px] text-slate-600 font-bold">Berço {v.berco}</p>}
+                        </div>
+                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full whitespace-nowrap ${situacaoBadgeClass(v.situacao)}`}>
+                          {v.situacao.length > 14 ? v.situacao.slice(0, 14) + '…' : v.situacao}
+                        </span>
+                      </div>
+                    ))}
+                    {state.vessels.length > 5 && (
+                      <p className="text-[8px] text-slate-600 font-bold pt-1">+{state.vessels.length - 5} navios</p>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
+      </div>
 
-        {/* Cards grid */}
-        {filteredShips.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-slate-100 p-16 flex flex-col items-center justify-center gap-4">
-            <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
-              <svg className="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" d="M3 13l1.5 5.5A1 1 0 005.46 20h13.08a1 1 0 00.96-.5L21 13M3 13h18M3 13l2-8h14l2 8M12 3v10"/>
-              </svg>
-            </div>
-            <div className="text-center">
-              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                {search || statusFilter !== 'TODOS' ? 'Nenhum navio encontrado' : 'Nenhum navio cadastrado'}
-              </p>
-              <p className="text-[9px] text-slate-300 mt-1">
-                {search || statusFilter !== 'TODOS'
-                  ? 'Tente ajustar os filtros de busca.'
-                  : 'Clique em "Novo Navio" para começar o monitoramento.'}
-              </p>
-            </div>
-            {!search && statusFilter === 'TODOS' && (
-              <button
-                onClick={() => handleOpen()}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
-              >
-                Novo Navio
-              </button>
-            )}
+      {/* Ships Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Navios Cadastrados</p>
+          <span className="text-[9px] font-black text-slate-400">{ships.length} navio(s)</span>
+        </div>
+
+        {loadingShips ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : ships.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-32 text-slate-400">
+            <svg className="w-10 h-10 mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeWidth="1.5" d="M5 12H3l9-9 9 9h-2M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <p className="text-[10px] font-black uppercase tracking-widest">Nenhum navio cadastrado</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredShips.map(ship => (
-              <ShipCard
-                key={ship.id}
-                ship={ship}
-                onEdit={() => handleOpen(ship)}
-                onDelete={() => setConfirmDeleteId(ship.id)}
-              />
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-[10px]">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  {['Navio', 'IMO', 'Armador', 'Terminal', 'Status', 'ETA', 'ETD', 'Viagem', 'Ações'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {ships.map(ship => (
+                  <tr key={ship.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 font-black text-slate-800 uppercase whitespace-nowrap">{ship.name}</td>
+                    <td className="px-4 py-3 text-slate-500 font-bold">{ship.imo || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600 font-bold">{ship.armador || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600 font-bold">{ship.terminal || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full font-black uppercase text-[8px] ${statusBadgeClass(ship.status)}`}>
+                        {ship.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 font-bold whitespace-nowrap">{formatDate(ship.eta)}</td>
+                    <td className="px-4 py-3 text-slate-600 font-bold whitespace-nowrap">{formatDate(ship.etd)}</td>
+                    <td className="px-4 py-3 text-slate-500 font-bold">{ship.viagem || '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        {/* VesselFinder */}
+                        <a
+                          href={`https://www.vesselfinder.com/?name=${encodeURIComponent(ship.name)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Buscar no VesselFinder"
+                          className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
+                          </svg>
+                        </a>
+                        {/* Edit */}
+                        <button
+                          onClick={() => openEditModal(ship)}
+                          title="Editar"
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        {/* Delete */}
+                        <button
+                          onClick={() => handleDelete(ship.id)}
+                          title="Excluir"
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* ── Delete confirm overlay ── */}
-      {confirmDeleteId && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-slate-900 rounded-[2rem] shadow-2xl border border-white/5 p-8 max-w-sm w-full space-y-5">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-red-500/20 rounded-2xl flex items-center justify-center shrink-0">
-                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      {/* Ship Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-[#0f172a] w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-800 overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-8 py-6 border-b border-slate-800 flex items-center justify-between">
+              <h2 className="text-[11px] font-black text-slate-100 uppercase tracking-widest">
+                {editingShip.id ? 'Editar Navio' : 'Novo Navio'}
+              </h2>
+              <button onClick={() => setModalOpen(false)} className="p-2 text-slate-500 hover:text-slate-300 rounded-xl hover:bg-slate-800 transition-all">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeWidth="2.5" strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </div>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-8 py-6 space-y-5 max-h-[70vh] overflow-y-auto">
+              {modalError && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-[10px] font-black text-red-400 uppercase">
+                  {modalError}
+                </div>
+              )}
+
+              {/* Nome */}
               <div>
-                <p className="text-[11px] font-black text-white uppercase tracking-widest">Remover Navio</p>
-                <p className="text-[9px] text-slate-400 mt-0.5">Esta acao nao pode ser desfeita.</p>
+                <div className="flex items-center gap-3 mb-1.5">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Nome do Navio *</label>
+                  <a
+                    href={`https://www.vesselfinder.com/?name=${encodeURIComponent(editingShip.name || '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[8px] font-black text-blue-400 hover:text-blue-300 uppercase tracking-widest transition-colors"
+                  >
+                    Buscar no VesselFinder →
+                  </a>
+                </div>
+                <input
+                  value={editingShip.name || ''}
+                  onChange={e => updateField('name', e.target.value)}
+                  placeholder="Ex: MSC ANNA"
+                  className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* IMO */}
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">IMO</label>
+                  <input
+                    value={editingShip.imo || ''}
+                    onChange={e => updateField('imo', e.target.value)}
+                    placeholder="Ex: 9876543"
+                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"
+                  />
+                </div>
+                {/* Armador */}
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Armador</label>
+                  <input
+                    value={editingShip.armador || ''}
+                    onChange={e => updateField('armador', e.target.value)}
+                    placeholder="Ex: MSC, Maersk..."
+                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Nº Viagem */}
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nº Viagem</label>
+                  <input
+                    value={editingShip.viagem || ''}
+                    onChange={e => updateField('viagem', e.target.value)}
+                    placeholder="Ex: 001N"
+                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"
+                  />
+                </div>
+                {/* Berço */}
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Berço</label>
+                  <input
+                    value={editingShip.berco || ''}
+                    onChange={e => updateField('berco', e.target.value)}
+                    placeholder="Ex: 310"
+                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Terminal */}
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Terminal</label>
+                  <select
+                    value={editingShip.terminal || ''}
+                    onChange={e => updateField('terminal', e.target.value)}
+                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 focus:outline-none focus:border-blue-500 transition-all"
+                  >
+                    <option value="">Selecionar...</option>
+                    {TERMINALS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                {/* Status */}
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Status *</label>
+                  <select
+                    value={editingShip.status || 'EM TRÂNSITO'}
+                    onChange={e => updateField('status', e.target.value as ShipStatus)}
+                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 focus:outline-none focus:border-blue-500 transition-all"
+                  >
+                    {SHIP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* ETA */}
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">ETA (Chegada Prevista)</label>
+                  <input
+                    type="date"
+                    value={editingShip.eta || ''}
+                    onChange={e => updateField('eta', e.target.value)}
+                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 focus:outline-none focus:border-blue-500 transition-all"
+                  />
+                </div>
+                {/* ETD */}
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">ETD (Saída Prevista)</label>
+                  <input
+                    type="date"
+                    value={editingShip.etd || ''}
+                    onChange={e => updateField('etd', e.target.value)}
+                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 focus:outline-none focus:border-blue-500 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Observações */}
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Observações</label>
+                <textarea
+                  value={editingShip.observacoes || ''}
+                  onChange={e => updateField('observacoes', e.target.value)}
+                  rows={3}
+                  placeholder="Observações sobre o navio ou viagem..."
+                  className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all resize-none"
+                />
               </div>
             </div>
-            <div className="flex gap-3">
+
+            {/* Modal Footer */}
+            <div className="px-8 py-5 border-t border-slate-800 flex items-center gap-3 justify-end">
               <button
-                type="button"
-                onClick={() => setConfirmDeleteId(null)}
-                className="flex-1 py-3 bg-white/5 border border-white/10 text-slate-400 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                onClick={() => setModalOpen(false)}
+                className="px-6 py-3 bg-slate-800 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-all"
               >
                 Cancelar
               </button>
               <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={isDeleting}
-                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                onClick={handleSave}
+                disabled={saving}
+                className="px-8 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all disabled:opacity-50"
               >
-                {isDeleting ? 'Removendo...' : 'Remover'}
+                {saving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Ship Modal */}
-      <ShipModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={handleSave}
-        editing={editing}
-      />
     </div>
   );
 };
