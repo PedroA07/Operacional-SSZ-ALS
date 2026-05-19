@@ -743,13 +743,27 @@ export interface Ship {
 }
 
 export interface TerminalVessel {
+  terminal: string;           // BTP | ECOPORTO | SANTOS BRASIL
   navio: string;
-  situacao: string;           // Previsto | Em Operação | Desatracado | Encerrado
-  previsao?: string;
-  berco?: string;
-  armador?: string;
+  situacao: string;           // Previsto | Em Operação | Desatracado | Encerrado | ...
   viagem?: string;
-  terminal: string;           // nome do terminal
+  armador?: string;           // armador/agência
+  berco?: string;
+  previsao?: string;          // campo genérico (terminais sem colunas detalhadas)
+  // Campos detalhados (BTP e similares)
+  rap?: string;
+  agencia?: string;
+  dtPrevChegada?: string;
+  dtChegada?: string;
+  dtPrevAtrac?: string;
+  dtAtracacao?: string;
+  dtPrevSaida?: string;
+  dtSaida?: string;
+  gateDry?: string;
+  gateReefer?: string;
+  deadLineStr?: string;
+  servico?: string;
+  fetchedAt?: string;
 }
 
 export interface SILProgramacao {
