@@ -7,7 +7,7 @@ interface NaviosTabProps {
   trips: Trip[];
 }
 
-const SHIP_STATUSES: ShipStatus[] = ['EM TRÂNSITO', 'ATRACADO', 'FUNDEADO', 'AGUARDANDO JANELA', 'SAÍDO'];
+const SHIP_STATUSES: ShipStatus[] = ['EM TRÂNSITO', 'ATRACADO', 'FUNDEADO', 'AGUARDANDO JANELA', 'SAÍDO', 'GATE ABERTO', 'GATE FECHADO', 'AG. ATRACAÇÃO', 'FINALIZADO'];
 const TERMINALS = ['ECOPORTO', 'SANTOS BRASIL', 'EMBRAPORT', 'BTP', 'OUTRO'];
 
 const TERMINAL_KEYS: Record<string, string> = {

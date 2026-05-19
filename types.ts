@@ -329,8 +329,7 @@ export enum DashboardTab {
   AUTOMACOES = 'AUTOMACOES',
   NAVIOS = 'NAVIOS',
   EXTERNAL_PORTAL = 'EXTERNAL_PORTAL',
-  EXTERNAL_USERS = 'EXTERNAL_USERS',
-  NAVIOS = 'NAVIOS'
+  EXTERNAL_USERS = 'EXTERNAL_USERS'
 }
 
 export interface Automation {
@@ -713,8 +712,6 @@ export interface OpentechTrip {
   riskLevel: 'Crítico' | 'Alto' | 'Médio' | 'Baixo';
 }
 
-export type ShipStatus = 'EM TRÂNSITO' | 'ATRACADO' | 'FUNDEADO' | 'AGUARDANDO JANELA' | 'SAÍDO';
-
 export interface Ship {
   id: string;
   name: string;               // nome do navio
@@ -766,7 +763,7 @@ export interface SILProgramacao {
   bl: string;
 }
 
-export type ShipStatus = 'GATE ABERTO' | 'GATE FECHADO' | 'AG. ATRACAÇÃO' | 'ATRACADO' | 'EM TRÂNSITO' | 'FINALIZADO';
+export type ShipStatus = 'EM TRÂNSITO' | 'ATRACADO' | 'FUNDEADO' | 'AGUARDANDO JANELA' | 'SAÍDO' | 'GATE ABERTO' | 'GATE FECHADO' | 'AG. ATRACAÇÃO' | 'FINALIZADO';
 
 export interface MonitoredShip {
   id: string;
