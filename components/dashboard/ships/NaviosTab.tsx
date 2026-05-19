@@ -158,11 +158,48 @@ function SBadge({ status, size='sm' }: { status: ShipStatus; size?: 'xs'|'sm' })
     </span>
   );
 }
+// ── Terminal logo badges (branded) ───────────────────────────────────────────
+const TERM_LOGO_CFG: Record<string, { bg: string; text: string; label: string; icon?: React.ReactNode }> = {
+  'BTP':           { bg: '#00437a', text: '#ffffff', label: 'BTP'  },
+  'ECOPORTO':      { bg: '#006b2f', text: '#ffffff', label: 'ECO'  },
+  'SANTOS BRASIL': { bg: '#003087', text: '#ffffff', label: 'SB'   },
+  'EMBRAPORT':     { bg: '#6b21a8', text: '#ffffff', label: 'EMB'  },
+};
 function TermBadge({ terminal }: { terminal: string }) {
-  const acc = TERM_ACCENT[terminal] ?? { badge: 'bg-slate-700 text-slate-300 border-slate-600' };
+  const cfg = TERM_LOGO_CFG[terminal];
+  if (!cfg) {
+    return (
+      <span className="inline-flex items-center font-black uppercase rounded border text-[7px] px-1.5 py-0.5 whitespace-nowrap bg-slate-700 text-slate-300 border-slate-600">
+        {terminal.slice(0,3)}
+      </span>
+    );
+  }
   return (
-    <span className={`inline-flex items-center font-black uppercase rounded border text-[7px] px-1.5 py-0.5 whitespace-nowrap ${acc.badge}`}>
-      {TERM_SHORT[terminal] ?? terminal.slice(0,3)}
+    <span
+      className="inline-flex items-center gap-1 font-black uppercase rounded text-[7px] px-1.5 py-0.5 whitespace-nowrap shrink-0 tracking-widest"
+      style={{ backgroundColor: cfg.bg, color: cfg.text }}>
+      {/* Anchor icon for port terminals */}
+      <svg className="w-2 h-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a3 3 0 100 6 3 3 0 000-6zm0 6v12M5 12h14M5 19.5c0-2.5 2-4.5 7-4.5s7 2 7 4.5"/>
+      </svg>
+      {cfg.label}
+    </span>
+  );
+}
+function TermBadgeLarge({ terminal }: { terminal: string }) {
+  const cfg = TERM_LOGO_CFG[terminal];
+  const names: Record<string,string> = {
+    'BTP': 'BTP', 'ECOPORTO': 'Ecoporto', 'SANTOS BRASIL': 'Santos Brasil', 'EMBRAPORT': 'Embraport',
+  };
+  if (!cfg) return <TermBadge terminal={terminal}/>;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 font-black uppercase rounded-md text-[8px] px-2 py-1 whitespace-nowrap shrink-0"
+      style={{ backgroundColor: cfg.bg, color: cfg.text }}>
+      <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a3 3 0 100 6 3 3 0 000-6zm0 6v12M5 12h14M5 19.5c0-2.5 2-4.5 7-4.5s7 2 7 4.5"/>
+      </svg>
+      {names[terminal] ?? terminal}
     </span>
   );
 }
@@ -247,8 +284,9 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   }, [termVessels]);
 
   // ── MONITORAMENTO: trip-vessel matching ──────────────────────────────────────
-  const activeTripsWithShip = useMemo(() =>
-    trips.filter(t => !INACTIVE_STATUSES.includes(t.status) && t.ship?.trim()),
+  // Only trips that are in the Organização page (not removed) and have a ship name
+  const orgTripsWithShip = useMemo(() =>
+    trips.filter(t => !INACTIVE_STATUSES.includes(t.status) && !t.isRemovedFromOrg && t.ship?.trim()),
   [trips]);
 
   // Group by ship name → find matching terminal vessel
@@ -263,7 +301,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     const usedVessels = new Set<number>();
     // Group trips by ship name first
     const byShip = new Map<string, Trip[]>();
-    for (const t of activeTripsWithShip) {
+    for (const t of orgTripsWithShip) {
       const key = normShip(t.ship);
       if (!byShip.has(key)) byShip.set(key, []);
       byShip.get(key)!.push(t);
@@ -291,10 +329,10 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
 
   // Trips whose ship was NOT found in any terminal vessel
   const unmatchedTrips = useMemo(() => {
-    return activeTripsWithShip.filter(t =>
+    return orgTripsWithShip.filter(t =>
       !termVessels.some(v => shipMatch(v.navio, t.ship))
     );
-  }, [activeTripsWithShip, termVessels]);
+  }, [orgTripsWithShip, termVessels]);
 
   const allHistory = useMemo(() => {
     const e: Array<ShipStatusEntry & { shipName: string; viagem?: string; terminal?: string }> = [];
@@ -419,12 +457,16 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
               {loadingTV && <span className="text-[8px] text-blue-400 font-bold animate-pulse">Carregando...</span>}
             </div>
             <div className="flex items-center gap-2">
-              {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(t => (
-                <a key={t} href={TERM_LINKS[t]} target="_blank" rel="noopener noreferrer"
-                  className={`flex items-center gap-1 text-[7px] font-black uppercase px-2 py-1 rounded border transition-all hover:opacity-80 ${TERM_ACCENT[t].badge}`}>
-                  <I.Link className="w-2.5 h-2.5"/> {TERM_SHORT[t]}
-                </a>
-              ))}
+              {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(t => {
+                const cfg = TERM_LOGO_CFG[t];
+                return (
+                  <a key={t} href={TERM_LINKS[t]} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[7px] font-black uppercase px-2 py-1 rounded transition-all hover:opacity-80"
+                    style={{ backgroundColor: cfg?.bg ?? '#334155', color: cfg?.text ?? '#fff' }}>
+                    <I.Link className="w-2.5 h-2.5"/> {TERM_SHORT[t]}
+                  </a>
+                );
+              })}
             </div>
           </div>
 
@@ -471,23 +513,23 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
 
           {/* Table */}
           {filteredVessels.length > 0 && (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 380px)' }}>
               <table className="w-full text-[9px] border-collapse" style={{ minWidth: '900px' }}>
-                <thead>
+                <thead className="sticky top-0 z-20">
                   <tr className="border-b border-slate-800">
-                    <th className="sticky left-0 z-10 bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap border-r border-slate-800/60 w-14">Porto</th>
-                    <th className="sticky left-14 z-10 bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap border-r border-slate-800/60 min-w-[140px]">Navio</th>
-                    <th className="sticky left-[182px] z-10 bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap border-r border-slate-800/60 w-24">Status</th>
-                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Viagem</th>
-                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Armador</th>
-                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Berço</th>
-                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Atrac.</th>
-                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Atracação</th>
-                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Saída</th>
-                    <th className="px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Saída</th>
-                    <th className="px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Dead-Line</th>
-                    <th className="px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate</th>
-                    <th className="px-3 py-2.5 w-8"/>
+                    <th className="sticky left-0 z-30 bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap border-r border-slate-800/60 w-14">Porto</th>
+                    <th className="sticky left-14 z-30 bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap border-r border-slate-800/60 min-w-[140px]">Navio</th>
+                    <th className="sticky left-[182px] z-30 bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap border-r border-slate-800/60 w-24">Status</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Viagem</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Armador</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Berço</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Atrac.</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Atracação</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Saída</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Saída</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Dead-Line</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 w-8"/>
                   </tr>
                 </thead>
                 <tbody>
@@ -619,7 +661,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                       <div className={`flex items-start gap-3 p-3 rounded-xl border ${sc.border} ${sc.bg}`}>
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <TermBadge terminal={match.vessel.terminal}/>
+                            <TermBadgeLarge terminal={match.vessel.terminal}/>
                             <span className={`text-[11px] font-black uppercase ${sc.text}`}>{match.vessel.navio}</span>
                             {match.vessel.viagem && <span className="text-[8px] text-slate-500 font-bold">{match.vessel.viagem}</span>}
                             <SBadge status={st} size="xs"/>
