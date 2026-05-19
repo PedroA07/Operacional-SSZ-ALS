@@ -104,35 +104,84 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
 
   useEffect(() => {
     loadShips();
-    // Carrega todos os terminais automaticamente ao abrir a aba
-    fetchTerminal('ECOPORTO');
-    fetchTerminal('SANTOS BRASIL');
-    fetchTerminal('BTP');
+    loadAllTerminals();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Lê dados do Supabase (populados pelo Railway bot a cada 30 min)
+  const loadAllTerminals = useCallback(async () => {
+    if (!supabase) return;
+    const labels = ['ECOPORTO', 'SANTOS BRASIL', 'BTP'] as const;
+    // Marca todos como loading
+    setTerminalData(prev => {
+      const next = { ...prev };
+      labels.forEach(l => { next[l] = { ...next[l], loading: true, error: null }; });
+      return next;
+    });
+    try {
+      const { data, error } = await supabase
+        .from('terminal_vessels')
+        .select('*')
+        .order('fetched_at', { ascending: false });
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{ terminal: string; navio: string; situacao: string; previsao?: string; berco?: string; armador?: string; viagem?: string; fetched_at: string }>;
+      // Agrupa por terminal
+      const byTerminal: Record<string, typeof rows> = {};
+      for (const r of rows) {
+        if (!byTerminal[r.terminal]) byTerminal[r.terminal] = [];
+        byTerminal[r.terminal].push(r);
+      }
+      setTerminalData(prev => {
+        const next = { ...prev };
+        for (const [name, termRows] of Object.entries(byTerminal)) {
+          const fetchedAt = termRows[0]?.fetched_at ?? null;
+          next[name] = {
+            vessels: termRows.map(r => ({ navio: r.navio, situacao: r.situacao, previsao: r.previsao, berco: r.berco, armador: r.armador, viagem: r.viagem, terminal: r.terminal } as TerminalVessel)),
+            loading: false,
+            error: termRows.length === 0 ? 'Nenhum dado disponível — aguardando Railway' : null,
+            fetchedAt,
+          };
+        }
+        // Terminais sem dados ainda
+        labels.forEach(l => {
+          if (!next[l].fetchedAt || next[l].loading) {
+            next[l] = { vessels: [], loading: false, error: 'Aguardando primeira coleta do Railway (até 30 min)', fetchedAt: null };
+          }
+        });
+        return next;
+      });
+    } catch (e: any) {
+      setTerminalData(prev => {
+        const next = { ...prev };
+        ['ECOPORTO', 'SANTOS BRASIL', 'BTP'].forEach(l => {
+          next[l] = { ...next[l], loading: false, error: e?.message ?? 'Erro ao ler dados' };
+        });
+        return next;
+      });
+    }
+  }, []);
+
   const fetchTerminal = useCallback(async (terminalLabel: string) => {
-    const terminalKey = TERMINAL_KEYS[terminalLabel];
-    if (!terminalKey) return; // EMBRAPORT has no public data
-
-    setTerminalData(prev => ({
-      ...prev,
-      [terminalLabel]: { ...prev[terminalLabel], loading: true, error: null },
-    }));
-
+    const hasKey = !!TERMINAL_KEYS[terminalLabel];
+    if (!hasKey) return;
+    // Recarrega do Supabase
+    setTerminalData(prev => ({ ...prev, [terminalLabel]: { ...prev[terminalLabel], loading: true } }));
     try {
       if (!supabase) throw new Error('Supabase não configurado');
-      const { data, error } = await supabase.functions.invoke('terminal-vessels', {
-        body: { terminal: terminalKey },
-      });
+      const termName = terminalLabel; // ex: 'ECOPORTO'
+      const { data, error } = await supabase
+        .from('terminal_vessels')
+        .select('*')
+        .eq('terminal', termName)
+        .order('fetched_at', { ascending: false });
       if (error) throw error;
-      const result = data as { vessels: TerminalVessel[]; error?: string; terminal: string; fetchedAt: string };
+      const rows = (data ?? []) as Array<{ terminal: string; navio: string; situacao: string; previsao?: string; berco?: string; armador?: string; viagem?: string; fetched_at: string }>;
       setTerminalData(prev => ({
         ...prev,
         [terminalLabel]: {
-          vessels: result.vessels || [],
+          vessels: rows.map(r => ({ navio: r.navio, situacao: r.situacao, previsao: r.previsao, berco: r.berco, armador: r.armador, viagem: r.viagem, terminal: r.terminal } as TerminalVessel)),
           loading: false,
-          error: result.error || null,
-          fetchedAt: result.fetchedAt,
+          error: rows.length === 0 ? 'Sem dados — aguardando coleta do Railway' : null,
+          fetchedAt: rows[0]?.fetched_at ?? null,
         },
       }));
     } catch (e: any) {
