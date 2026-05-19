@@ -4,7 +4,7 @@ import {
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
-  BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, Ship
+  BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, ShipTerminalConfig, Ship
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1565,6 +1565,34 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('monitored_ships').delete().eq('id', id);
     if (error) { console.error('[deleteMonitoredShip]', error.message); return false; }
+    return true;
+  },
+
+  getShipTerminalConfigs: async (): Promise<ShipTerminalConfig[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('ship_terminal_config')
+      .select('*')
+      .order('sort_order');
+    if (error) { console.error('[getShipTerminalConfigs]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id, name: r.name, url: r.url, active: r.active, sortOrder: r.sort_order,
+    }));
+  },
+
+  saveShipTerminalConfig: async (t: ShipTerminalConfig): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('ship_terminal_config').upsert({
+      id: t.id, name: t.name, url: t.url, active: t.active, sort_order: t.sortOrder,
+    }, { onConflict: 'id' });
+    if (error) { console.error('[saveShipTerminalConfig]', error.message); return false; }
+    return true;
+  },
+
+  deleteShipTerminalConfig: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('ship_terminal_config').delete().eq('id', id);
+    if (error) { console.error('[deleteShipTerminalConfig]', error.message); return false; }
     return true;
   },
 

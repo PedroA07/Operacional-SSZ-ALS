@@ -5,6 +5,7 @@ import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
 import { db } from '../../utils/storage';
 import FeedbackModal from '../shared/FeedbackModal';
+import DateTimePicker from '../shared/DateTimePicker';
 
 interface OrganizationTabProps {
   userId: string;
@@ -253,17 +254,11 @@ const SchedulingModal: React.FC<SchedulingModalProps> = ({ isOpen, onClose, onCo
                   <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
                   <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Data e Hora do Agendamento <span className="text-red-500">*</span></label>
                 </div>
-                <div className="relative group">
-                  <div className="absolute left-4 top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                  </div>
-                  <input 
-                    type="datetime-local"
-                    value={dateTime}
-                    onChange={(e) => setDateTime(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] text-[12px] font-bold outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-inner"
-                  />
-                </div>
+                <DateTimePicker
+                  value={dateTime}
+                  onChange={setDateTime}
+                  placeholder="Selecionar data e hora..."
+                />
               </div>
 
               <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-4">
@@ -323,6 +318,37 @@ const formatToLocalInput = (isoString: string): string => {
     return '';
   }
 };
+
+const ToggleIconBtn: React.FC<{
+  checked: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  activeClass: string;
+  inactiveClass: string;
+  badgeColor?: string;
+  title?: string;
+  children: React.ReactNode;
+}> = ({ checked, onClick, disabled, loading, activeClass, inactiveClass, badgeColor = 'bg-slate-500', title, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled || loading}
+    title={title}
+    className={`relative flex items-center justify-center w-9 h-9 rounded-xl border-2 transition-all duration-150 ${checked ? activeClass : inactiveClass} ${!disabled && !loading ? 'cursor-pointer active:scale-90 hover:scale-105' : 'opacity-50 cursor-not-allowed'}`}
+  >
+    {loading ? (
+      <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+    ) : children}
+    {checked && !loading && (
+      <span className={`absolute -top-1.5 -right-1.5 w-4 h-4 ${badgeColor} rounded-full flex items-center justify-center shadow ring-2 ring-white`}>
+        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7"/>
+        </svg>
+      </span>
+    )}
+  </button>
+);
 
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
@@ -989,41 +1015,57 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       ) 
     },
-    { 
-      key: 'sentNF', 
-      label: 'Mandou NF', 
+    {
+      key: 'sentNF',
+      label: 'NF Enviada',
       render: (t: Trip) => (
-        <div className="flex items-center justify-center gap-2">
-          <input 
-            type="checkbox" 
-            checked={!!t.sentNF} 
-            onChange={(e) => handleToggleNF(t, e.target.checked)}
-            className="w-4 h-4 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
-          />
-          {pendingUpdates[t.id]?.data.hasOwnProperty('sentNF') && (
-            <div className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-          )}
+        <div className="flex items-center justify-center">
+          <ToggleIconBtn
+            checked={!!t.sentNF}
+            onClick={() => handleToggleNF(t, !t.sentNF)}
+            loading={'sentNF' in (pendingUpdates[t.id]?.data || {})}
+            activeClass="bg-emerald-50 border-emerald-400 text-emerald-600"
+            inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-emerald-300 hover:text-emerald-400"
+            badgeColor="bg-emerald-500"
+            title={t.sentNF ? 'NF enviada — clique para desmarcar' : 'Marcar NF como enviada'}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </ToggleIconBtn>
         </div>
       )
     },
-    { 
-      key: 'isScheduled', 
-      label: 'Agendado', 
+    {
+      key: 'isScheduled',
+      label: 'Agendado',
       render: (t: Trip) => {
         const hasMinuta = !!t.preStackingFormData;
-        const isPending = pendingUpdates[t.id]?.data.hasOwnProperty('isScheduled');
+        const isPending = 'isScheduled' in (pendingUpdates[t.id]?.data || {});
+        const isScheduled = isTripScheduled(t);
         return (
-          <div className="flex items-center justify-center gap-2">
-            <input 
-              type="checkbox" 
-              checked={isTripScheduled(t)} 
-              disabled={hasMinuta || isPending}
-              onChange={(e) => handleToggleScheduled(t, e.target.checked)}
-              className={`w-4 h-4 rounded-md border-2 border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all ${hasMinuta || isPending ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-              title={hasMinuta ? "Agendamento automático via Minuta" : (isPending ? "Salvando..." : "")}
-            />
-            {isPending && (
-              <div className="w-2.5 h-2.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+          <div className="flex flex-col items-center gap-1">
+            <ToggleIconBtn
+              checked={isScheduled}
+              onClick={() => handleToggleScheduled(t, !isScheduled)}
+              disabled={hasMinuta}
+              loading={isPending}
+              activeClass="bg-blue-50 border-blue-400 text-blue-600"
+              inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-blue-300 hover:text-blue-400"
+              badgeColor="bg-blue-500"
+              title={hasMinuta ? 'Agendamento automático via Minuta' : (isScheduled ? 'Agendado — clique para desmarcar' : 'Marcar como agendado')}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </ToggleIconBtn>
+            {isScheduled && t.sentNF && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-200 text-[6px] font-black text-emerald-700 uppercase tracking-tight" title="NF enviada e agendado">
+                <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
+                </svg>
+                NF
+              </span>
             )}
           </div>
         );
@@ -1059,23 +1101,27 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         );
       }
     },
-    { 
-      key: 'hasAdvance', 
-      label: 'Adiantamento', 
+    {
+      key: 'hasAdvance',
+      label: 'Adiantamento',
       render: (t: Trip) => (
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-2">
-            <input 
-              type="checkbox" 
-              checked={!!t.hasAdvance} 
-              onChange={(e) => handleToggleAdvance(t, e.target.checked)}
-              className="w-4 h-4 rounded-md border-2 border-slate-200 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer"
-            />
-            {pendingUpdates[t.id]?.data.hasOwnProperty('hasAdvance') && (
-              <div className="w-2.5 h-2.5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-            )}
-          </div>
-          {t.hasAdvance && <span className="text-[7px] font-black text-orange-600 uppercase">70% LIB</span>}
+        <div className="flex flex-col items-center gap-1">
+          <ToggleIconBtn
+            checked={!!t.hasAdvance}
+            onClick={() => handleToggleAdvance(t, !t.hasAdvance)}
+            loading={'hasAdvance' in (pendingUpdates[t.id]?.data || {})}
+            activeClass="bg-amber-50 border-amber-400 text-amber-600"
+            inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-amber-300 hover:text-amber-400"
+            badgeColor="bg-amber-500"
+            title={t.hasAdvance ? 'Adiantamento liberado — clique para bloquear' : 'Liberar adiantamento (70%)'}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </ToggleIconBtn>
+          {t.hasAdvance && (
+            <span className="text-[6px] font-black text-amber-600 uppercase tracking-tight">70% LIB</span>
+          )}
         </div>
       )
     },
