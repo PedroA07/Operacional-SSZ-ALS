@@ -158,190 +158,179 @@ function SBadge({ status, size='sm' }: { status: ShipStatus; size?: 'xs'|'sm' })
     </span>
   );
 }
-// ── Logos SVG — réplicas fiéis às marcas reais ───────────────────────────────
+// ── Logos SVG — réplicas pixel-perfect das marcas reais ─────────────────────
 
 /**
- * SANTOS BRASIL — ícone quadrado:
- * fundo verde (#0e9b47), área azul no canto superior-direito (#1570b8),
- * curva S branca espessa dividindo os dois campos (como o logo real).
+ * SANTOS BRASIL
+ * Quadrado: verde (#0e9b47) + azul (#1570b8) separados por curva S branca.
+ * Bezier cúbica real: M 35,0 C 20,33 80,67 65,100
+ * Blue region acompanha exatamente a borda da curva S.
  */
-function IconSantosBrasil({ size = 24 }: { size?: number }) {
+function LogoSVGSantosBrasil({ size = 32 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* campo verde (base) */}
-      <rect width="100" height="100" rx="8" fill="#0e9b47"/>
-      {/* campo azul — canto superior direito */}
+      {/* campo verde (base toda) */}
+      <rect width="100" height="100" rx="6" fill="#0e9b47"/>
+      {/* campo azul: região direita/superior delimitada pela curva S */}
       <path
-        d="M100 0 L100 100 L56 100 Q94 90 94 50 Q94 10 56 0 Z"
+        d="M 100,0 L 100,100 L 65,100 C 80,67 20,33 35,0 Z"
         fill="#1570b8"
       />
-      {/* curva S branca — o elemento central do logo */}
+      {/* curva S branca — bezier cúbica com inflexão genuína */}
       <path
-        d="M14 86 Q34 66 50 50 Q66 34 86 14"
-        stroke="white" strokeWidth="18" strokeLinecap="round" fill="none"
+        d="M 35,0 C 20,33 80,67 65,100"
+        stroke="white" strokeWidth="14" strokeLinecap="round" fill="none"
       />
     </svg>
   );
 }
 
 /**
- * BTP — ícone quadrado com as duas ondas de cor e texto "BTP".
- * Onda superior teal (#5bbdd4), onda inferior verde-oliva (#8dc63f),
- * texto "BTP" em teal escuro (#2a6e7e).
+ * BTP — Brasil Terminal Portuário
+ * Logo horizontal: duas ondas sobrepostas (teal + verde-limão) +
+ * "Brasil" em bold teal escuro + "TERMINAL PORTUÁRIO" pequeno.
+ * Exatamente como na imagem: sem box, sem fundo colorido.
  */
-function IconBTP({ size = 24 }: { size?: number }) {
+function LogoSVGBTP({ height = 32 }: { height?: number }) {
+  // Proporção do logo real: ~3.4:1 (570×89px)
+  const w = Math.round(height * 3.4);
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100" height="100" rx="8" fill="#f4f8fa"/>
-      {/* onda teal (superior) */}
+    <svg width={w} height={height} viewBox="0 0 340 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* onda azul-teal (superior) */}
       <path
-        d="M8 35 Q28 14 50 24 Q72 34 92 16"
-        stroke="#5bbdd4" strokeWidth="10" strokeLinecap="round" fill="none"
+        d="M 0,30 Q 85,2 170,18 Q 255,34 340,10"
+        stroke="#5bbdd4" strokeWidth="11" strokeLinecap="round" fill="none"
       />
-      {/* onda verde-oliva (inferior) */}
+      {/* onda verde-limão (inferior, paralela) */}
       <path
-        d="M8 52 Q28 31 50 41 Q72 51 92 33"
-        stroke="#8dc63f" strokeWidth="10" strokeLinecap="round" fill="none"
+        d="M 0,48 Q 85,20 170,36 Q 255,52 340,28"
+        stroke="#8dc63f" strokeWidth="11" strokeLinecap="round" fill="none"
       />
-      {/* "BTP" teal escuro */}
+      {/* "Brasil" — bold teal escuro, exatamente como no logo */}
       <text
-        x="50" y="82"
-        textAnchor="middle"
+        x="0" y="82"
         fontFamily="Arial Black, Arial, sans-serif"
-        fontWeight="900" fontSize="28" fill="#2a6e7e" letterSpacing="2"
-      >BTP</text>
-    </svg>
-  );
-}
-
-/**
- * ECOPORTO — ícone quadrado com folha oval verde rotacionada + texto "eco PORTO".
- * Folha sólida verde (#46b32a), "eco" em teal (#3a7d7a), "PORTO" em preto bold.
- */
-function IconEcoporto({ size = 24 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100" height="100" rx="8" fill="#f8faf6"/>
-      {/* folha oval rotacionada -38° — posição superior-direita */}
-      <ellipse
-        cx="72" cy="26" rx="24" ry="12"
-        fill="#46b32a"
-        transform="rotate(-38 72 26)"
-      />
-      {/* nervura central da folha */}
-      <path
-        d="M57 40 Q70 26 80 16"
-        stroke="#2d7a1a" strokeWidth="2.5" strokeLinecap="round" fill="none"
-      />
-      {/* "eco" — peso normal, teal */}
+        fontWeight="900" fontSize="44" fill="#2a6e7e"
+      >Brasil</text>
+      {/* "TERMINAL PORTUÁRIO" — espaçado, cinza claro */}
       <text
-        x="6" y="65"
+        x="2" y="98"
         fontFamily="Arial, sans-serif"
-        fontWeight="400" fontSize="28" fill="#3a7d7a"
-      >eco</text>
-      {/* "PORTO" — bold black */}
-      <text
-        x="4" y="92"
-        fontFamily="Arial Black, Arial, sans-serif"
-        fontWeight="900" fontSize="22" fill="#1a1a1a" letterSpacing="1"
-      >PORTO</text>
+        fontWeight="400" fontSize="14" fill="#888" letterSpacing="4"
+      >TERMINAL PORTUÁRIO</text>
     </svg>
   );
 }
 
-/** Genérico para terminais não mapeados */
-function IconGeneric({ terminal, size = 24 }: { terminal: string; size?: number }) {
+/**
+ * BTP — ícone compacto para tabela (quadrado)
+ * Versão reduzida: duas ondas + "BTP" em teal.
+ */
+function IconSVGBTP({ size = 32 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100" height="100" rx="8" fill="#334155"/>
-      <text x="50" y="64" textAnchor="middle"
-        fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="30" fill="white">
+      <rect width="100" height="100" rx="6" fill="#f0f5f8"/>
+      <path d="M 6,30 Q 30,8 54,20 Q 78,32 94,12"
+            stroke="#5bbdd4" strokeWidth="9" strokeLinecap="round" fill="none"/>
+      <path d="M 6,48 Q 30,26 54,38 Q 78,50 94,30"
+            stroke="#8dc63f" strokeWidth="9" strokeLinecap="round" fill="none"/>
+      <text x="50" y="82" textAnchor="middle"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fontWeight="900" fontSize="24" fill="#2a6e7e" letterSpacing="1">BTP</text>
+    </svg>
+  );
+}
+
+/**
+ * ECOPORTO SANTOS
+ * Logo horizontal: folha/semente oval verde rotacionada + "eco" teal leve +
+ * "PORTO" bold negro + "SANTOS" pequeno cinza abaixo.
+ * Igual à imagem: "eco" e "PORTO" formam uma palavra composta, folha acima-direita.
+ */
+function LogoSVGEcoporto({ height = 32 }: { height?: number }) {
+  const w = Math.round(height * 2.8);
+  return (
+    <svg width={w} height={height} viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* folha/semente oval sólida — verde, rotacionada ~-38° */}
+      <ellipse cx="230" cy="22" rx="46" ry="20" fill="#46b32a" transform="rotate(-38 230 22)"/>
+      {/* nervura central da folha */}
+      <path d="M 208,40 Q 228,22 244,8"
+            stroke="#2d7a1a" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      {/* "eco" — peso regular, teal, mesmo tamanho de "PORTO" mas sem bold */}
+      <text x="0" y="68"
+            fontFamily="Arial, sans-serif"
+            fontWeight="400" fontSize="44" fill="#3a7d7a">eco</text>
+      {/* "PORTO" — black/900, logo após "eco" */}
+      <text x="94" y="68"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fontWeight="900" fontSize="44" fill="#1a1a1a">PORTO</text>
+      {/* "SANTOS" — pequeno, cinza, alinhado com "PORTO" */}
+      <text x="96" y="88"
+            fontFamily="Arial, sans-serif"
+            fontWeight="400" fontSize="14" fill="#999" letterSpacing="4">SANTOS</text>
+    </svg>
+  );
+}
+
+/**
+ * ECOPORTO — ícone compacto para tabela (quadrado)
+ * Folha oval + "ECO" em teal.
+ */
+function IconSVGEcoporto({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="6" fill="#f4faf2"/>
+      <ellipse cx="68" cy="28" rx="26" ry="13" fill="#46b32a" transform="rotate(-38 68 28)"/>
+      <path d="M 52,44 Q 66,28 76,18" stroke="#2d7a1a" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <text x="50" y="80" textAnchor="middle"
+            fontFamily="Arial, sans-serif"
+            fontWeight="400" fontSize="20" fill="#3a7d7a">eco</text>
+      <text x="50" y="97" textAnchor="middle"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fontWeight="900" fontSize="16" fill="#1a1a1a" letterSpacing="1">PORTO</text>
+    </svg>
+  );
+}
+
+/** Genérico */
+function IconSVGGeneric({ terminal, size = 32 }: { terminal: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="6" fill="#334155"/>
+      <text x="50" y="65" textAnchor="middle"
+            fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="28" fill="white">
         {terminal.slice(0,3).toUpperCase()}
       </text>
     </svg>
   );
 }
 
-function TermIcon({ terminal, size = 24 }: { terminal: string; size?: number }) {
-  if (terminal === 'SANTOS BRASIL') return <IconSantosBrasil size={size}/>;
-  if (terminal === 'BTP')           return <IconBTP size={size}/>;
-  if (terminal === 'ECOPORTO')      return <IconEcoporto size={size}/>;
-  return <IconGeneric terminal={terminal} size={size}/>;
-}
-
-// ── Logo completa (para cards do monitoramento) ────────────────────────────────
-
-/**
- * Santos Brasil — logo completa:
- * ícone S quadrado + "Santos Brasil" ao lado
- */
-function LogoSantosBrasil({ height = 32 }: { height?: number }) {
-  const iconSize = height;
-  return (
-    <span className="inline-flex items-center gap-2 shrink-0">
-      <IconSantosBrasil size={iconSize}/>
-      <svg width={90} height={height} viewBox="0 0 90 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <text x="0" y="14" fontFamily="Arial, sans-serif" fontWeight="700" fontSize="12" fill="#0e9b47">Santos</text>
-        <text x="0" y="28" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="11" fill="#1570b8" letterSpacing="0.5">BRASIL</text>
-      </svg>
-    </span>
-  );
-}
-
-/**
- * BTP — logo completa:
- * ícone quadrado + "Brasil / TERMINAL PORTUÁRIO"
- */
-function LogoBTP({ height = 32 }: { height?: number }) {
-  return (
-    <span className="inline-flex items-center gap-2 shrink-0">
-      <IconBTP size={height}/>
-      <svg width={108} height={height} viewBox="0 0 108 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* onda teal tiny */}
-        <path d="M0 6 Q26 0 54 4 Q80 8 108 2" stroke="#5bbdd4" strokeWidth="3" strokeLinecap="round" fill="none"/>
-        {/* onda verde tiny */}
-        <path d="M0 11 Q26 5 54 9 Q80 13 108 7" stroke="#8dc63f" strokeWidth="3" strokeLinecap="round" fill="none"/>
-        <text x="0" y="24" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="14" fill="#2a6e7e">Brasil</text>
-        <text x="0" y="32" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="7" fill="#888" letterSpacing="1.5">TERMINAL PORTUÁRIO</text>
-      </svg>
-    </span>
-  );
-}
-
-/**
- * EcoPORTO — logo completa:
- * ícone quadrado + "eco PORTO / SANTOS"
- */
-function LogoEcoporto({ height = 32 }: { height?: number }) {
-  return (
-    <span className="inline-flex items-center gap-2 shrink-0">
-      <IconEcoporto size={height}/>
-      <svg width={72} height={height} viewBox="0 0 72 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <text x="0" y="15" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="14" fill="#3a7d7a">eco</text>
-        <text x="0" y="28" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="13" fill="#1a1a1a" letterSpacing="0.5">PORTO</text>
-        <text x="1" y="36" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="7" fill="#999" letterSpacing="2">SANTOS</text>
-      </svg>
-    </span>
-  );
-}
-
-/** Badge compact para linhas da tabela (apenas ícone quadrado) */
+/** Badge compact para linhas da tabela */
 function TermBadge({ terminal }: { terminal: string }) {
-  return (
-    <span className="inline-flex items-center shrink-0">
-      <TermIcon terminal={terminal} size={26}/>
-    </span>
-  );
+  if (terminal === 'SANTOS BRASIL') return <LogoSVGSantosBrasil size={26}/>;
+  if (terminal === 'BTP')           return <IconSVGBTP size={26}/>;
+  if (terminal === 'ECOPORTO')      return <IconSVGEcoporto size={26}/>;
+  return <IconSVGGeneric terminal={terminal} size={26}/>;
 }
 
-/** Badge grande para cards do monitoramento (ícone + texto da marca) */
+/** Badge grande para cards do monitoramento — logo completa horizontal */
 function TermBadgeLarge({ terminal }: { terminal: string }) {
-  if (terminal === 'SANTOS BRASIL') return <LogoSantosBrasil height={28}/>;
-  if (terminal === 'BTP')           return <LogoBTP height={28}/>;
-  if (terminal === 'ECOPORTO')      return <LogoEcoporto height={28}/>;
+  if (terminal === 'SANTOS BRASIL') {
+    return (
+      <span className="inline-flex items-center gap-2 shrink-0">
+        <LogoSVGSantosBrasil size={32}/>
+        <svg width={72} height={32} viewBox="0 0 72 32" fill="none">
+          <text x="0" y="14" fontFamily="Arial, sans-serif" fontWeight="600" fontSize="12" fill="#0e9b47">Santos</text>
+          <text x="0" y="28" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="12" fill="#1570b8" letterSpacing="0.5">BRASIL</text>
+        </svg>
+      </span>
+    );
+  }
+  if (terminal === 'BTP') return <LogoSVGBTP height={30}/>;
+  if (terminal === 'ECOPORTO') return <LogoSVGEcoporto height={30}/>;
   return (
     <span className="inline-flex items-center gap-2 shrink-0">
-      <IconGeneric terminal={terminal} size={28}/>
+      <IconSVGGeneric terminal={terminal} size={30}/>
       <span className="text-[9px] font-black text-slate-300 uppercase">{terminal}</span>
     </span>
   );
@@ -603,7 +592,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
               {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(t => (
                 <a key={t} href={TERM_LINKS[t]} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-all border border-slate-700">
-                  <TermIcon terminal={t} size={18}/>
+                  <TermBadge terminal={t}/>
                   <I.Link className="w-2.5 h-2.5 text-slate-500"/>
                 </a>
               ))}
