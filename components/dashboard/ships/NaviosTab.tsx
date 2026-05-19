@@ -97,7 +97,11 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
 
   useEffect(() => {
     loadShips();
-  }, [loadShips]);
+    // Carrega todos os terminais automaticamente ao abrir a aba
+    fetchTerminal('ECOPORTO');
+    fetchTerminal('SANTOS BRASIL');
+    fetchTerminal('BTP');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTerminal = useCallback(async (terminalLabel: string) => {
     const terminalKey = TERMINAL_KEYS[terminalLabel];
