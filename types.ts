@@ -327,9 +327,9 @@ export enum DashboardTab {
   ORGANIZACAO = 'ORGANIZACAO',
   COLETA_DIA = 'COLETA_DIA',
   AUTOMACOES = 'AUTOMACOES',
+  NAVIOS = 'NAVIOS',
   EXTERNAL_PORTAL = 'EXTERNAL_PORTAL',
-  EXTERNAL_USERS = 'EXTERNAL_USERS',
-  NAVIOS = 'NAVIOS'
+  EXTERNAL_USERS = 'EXTERNAL_USERS'
 }
 
 export interface Automation {
@@ -712,6 +712,60 @@ export interface OpentechTrip {
   riskLevel: 'Crítico' | 'Alto' | 'Médio' | 'Baixo';
 }
 
+export interface ShipStatusEntry {
+  status: ShipStatus;
+  dateTime: string;           // ISO
+  obs?: string;
+}
+
+export interface Ship {
+  id: string;
+  name: string;               // nome do navio
+  imo?: string;               // número IMO
+  armador?: string;           // companhia (MSC, Maersk, etc.)
+  viagem?: string;            // número da viagem
+  terminal?: string;          // ECOPORTO | SANTOS BRASIL | EMBRAPORT | BTP | OUTRO
+  berco?: string;             // berço de atracação
+  eta?: string;               // previsão chegada (ISO date) — legado
+  etd?: string;               // previsão saída (ISO date) — legado
+  // Campos de monitoramento (estilo PortRisk)
+  prevAtracacao?: string;     // previsão de atracação (ISO datetime)
+  abertGate?: string;         // abertura de gate (ISO datetime)
+  deadLine?: string;          // deadline embarque (ISO datetime)
+  dataAtracacao?: string;     // atracação efetiva (ISO datetime)
+  dataDesatrac?: string;      // desatracação efetiva (ISO datetime)
+  statusHistory?: ShipStatusEntry[];
+  status: ShipStatus;
+  observacoes?: string;
+  tripIds?: string[];         // viagens vinculadas
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TerminalVessel {
+  terminal: string;           // BTP | ECOPORTO | SANTOS BRASIL
+  navio: string;
+  situacao: string;           // Previsto | Em Operação | Desatracado | Encerrado | ...
+  viagem?: string;
+  armador?: string;           // armador/agência
+  berco?: string;
+  previsao?: string;          // campo genérico (terminais sem colunas detalhadas)
+  // Campos detalhados (BTP e similares)
+  rap?: string;
+  agencia?: string;
+  dtPrevChegada?: string;
+  dtChegada?: string;
+  dtPrevAtrac?: string;
+  dtAtracacao?: string;
+  dtPrevSaida?: string;
+  dtSaida?: string;
+  gateDry?: string;
+  gateReefer?: string;
+  deadLineStr?: string;
+  servico?: string;
+  fetchedAt?: string;
+}
+
 export interface SILProgramacao {
   _rowIndex: number;
   numeroProgramacao: string;
@@ -736,7 +790,21 @@ export interface SILProgramacao {
   bl: string;
 }
 
-export type ShipStatus = 'GATE ABERTO' | 'GATE FECHADO' | 'AG. ATRACAÇÃO' | 'ATRACADO' | 'EM TRÂNSITO' | 'FINALIZADO';
+export type ShipStatus =
+  | 'NOVO'
+  | 'NÃO ENCONTRADO'
+  | 'SEM PREVISÃO'
+  | 'AG. ATRACAÇÃO'
+  | 'ATRACADO'
+  | 'GATE ABERTO'
+  | 'GATE FECHADO'
+  | 'GATE ENCERRADO'
+  | 'DESATRACADO'
+  | 'FINALIZADO'
+  | 'EM TRÂNSITO'
+  | 'FUNDEADO'
+  | 'AGUARDANDO JANELA'
+  | 'SAÍDO';
 
 export interface MonitoredShip {
   id: string;

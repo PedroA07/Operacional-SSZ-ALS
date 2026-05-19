@@ -353,6 +353,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
            {activeTab === DashboardTab.AUTOMACOES && <AutomationsTab />}
+           {activeTab === DashboardTab.NAVIOS && <NaviosTab user={user} trips={trips} />}
            {activeTab === DashboardTab.ORGANIZACAO && (
              <OrganizationTab 
                userId={user.id} 
@@ -375,9 +376,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            )}
            {activeTab === DashboardTab.EXTERNAL_PORTAL && (
              <ExternalPortal user={user} trips={trips} />
-           )}
-           {activeTab === DashboardTab.NAVIOS && (
-             <NaviosTab userId={user.id} ships={ships} onSave={async (s) => { await db.saveMonitoredShip(s); await loadAllData(false); }} onDelete={async (id) => { await db.deleteMonitoredShip(id); await loadAllData(false); }} />
            )}
          </Suspense>
         </div>

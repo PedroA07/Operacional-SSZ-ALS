@@ -4,7 +4,7 @@ import {
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
-  BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, ShipTerminalConfig
+  BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, ShipTerminalConfig, Ship
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -15,9 +15,56 @@ import { getEnv } from './env';
 const SUPABASE_URL = getEnv('VITE_SUPABASE_URL');
 const SUPABASE_KEY = getEnv('VITE_SUPABASE_ANON_KEY');
 
-export const supabase = (SUPABASE_URL && SUPABASE_KEY) 
-  ? createClient(SUPABASE_URL, SUPABASE_KEY) 
+export const supabase = (SUPABASE_URL && SUPABASE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_KEY)
   : null;
+
+function mapShipFromDb(row: any): Ship {
+  return {
+    id: row.id,
+    name: row.name,
+    imo: row.imo,
+    armador: row.armador,
+    viagem: row.viagem,
+    terminal: row.terminal,
+    berco: row.berco,
+    eta: row.eta,
+    etd: row.etd,
+    prevAtracacao: row.prev_atracacao,
+    abertGate: row.abert_gate,
+    deadLine: row.dead_line,
+    dataAtracacao: row.data_atracacao,
+    dataDesatrac: row.data_desatrac,
+    statusHistory: row.status_history || [],
+    status: row.status || 'NOVO',
+    observacoes: row.observacoes,
+    tripIds: row.trip_ids || [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapShipToDb(s: Partial<Ship>): any {
+  return {
+    ...(s.name !== undefined && { name: s.name }),
+    ...(s.imo !== undefined && { imo: s.imo }),
+    ...(s.armador !== undefined && { armador: s.armador }),
+    ...(s.viagem !== undefined && { viagem: s.viagem }),
+    ...(s.terminal !== undefined && { terminal: s.terminal }),
+    ...(s.berco !== undefined && { berco: s.berco }),
+    ...(s.eta !== undefined && { eta: s.eta }),
+    ...(s.etd !== undefined && { etd: s.etd }),
+    ...(s.prevAtracacao !== undefined && { prev_atracacao: s.prevAtracacao || null }),
+    ...(s.abertGate !== undefined && { abert_gate: s.abertGate || null }),
+    ...(s.deadLine !== undefined && { dead_line: s.deadLine || null }),
+    ...(s.dataAtracacao !== undefined && { data_atracacao: s.dataAtracacao || null }),
+    ...(s.dataDesatrac !== undefined && { data_desatrac: s.dataDesatrac || null }),
+    ...(s.statusHistory !== undefined && { status_history: s.statusHistory }),
+    ...(s.status !== undefined && { status: s.status }),
+    ...(s.observacoes !== undefined && { observacoes: s.observacoes }),
+    ...(s.tripIds !== undefined && { trip_ids: s.tripIds }),
+  };
+}
 
 export const db = {
   checkConnection: async () => {
@@ -1461,42 +1508,23 @@ export const db = {
     const { data, error } = await supabase.from('beneficiaries').select('*').order('name');
     if (error) { console.error('[getBeneficiaries]', error.message); return []; }
     return (data || []).map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      cpf: r.cpf || undefined,
-      cnpj: r.cnpj || undefined,
-      phone: r.phone,
-      email: r.email || undefined,
-      pixKey: r.pix_key || undefined,
-      paymentPreference: r.payment_preference || undefined,
-      bankName: r.bank_name || undefined,
-      bankAgency: r.bank_agency || undefined,
-      bankAccount: r.bank_account || undefined,
-      status: r.status || 'Ativo',
-      registrationDate: r.registration_date || undefined,
-      userId: r.user_id || undefined,
-      observations: r.observations || undefined,
+      id: r.id, name: r.name, cpf: r.cpf || undefined, cnpj: r.cnpj || undefined,
+      phone: r.phone, email: r.email || undefined, pixKey: r.pix_key || undefined,
+      paymentPreference: r.payment_preference || undefined, bankName: r.bank_name || undefined,
+      bankAgency: r.bank_agency || undefined, bankAccount: r.bank_account || undefined,
+      status: r.status || 'Ativo', registrationDate: r.registration_date || undefined,
+      userId: r.user_id || undefined, observations: r.observations || undefined,
     }));
   },
 
   saveBeneficiary: async (b: Beneficiary): Promise<boolean> => {
     if (!supabase) return false;
     const { error } = await supabase.from('beneficiaries').upsert({
-      id: b.id,
-      name: b.name,
-      cpf: b.cpf || null,
-      cnpj: b.cnpj || null,
-      phone: b.phone,
-      email: b.email || null,
-      pix_key: b.pixKey || null,
-      payment_preference: b.paymentPreference || null,
-      bank_name: b.bankName || null,
-      bank_agency: b.bankAgency || null,
-      bank_account: b.bankAccount || null,
-      status: b.status,
-      registration_date: b.registrationDate || new Date().toISOString(),
-      user_id: b.userId || null,
-      observations: b.observations || null,
+      id: b.id, name: b.name, cpf: b.cpf || null, cnpj: b.cnpj || null, phone: b.phone,
+      email: b.email || null, pix_key: b.pixKey || null, payment_preference: b.paymentPreference || null,
+      bank_name: b.bankName || null, bank_agency: b.bankAgency || null, bank_account: b.bankAccount || null,
+      status: b.status, registration_date: b.registrationDate || new Date().toISOString(),
+      user_id: b.userId || null, observations: b.observations || null,
     }, { onConflict: 'id' });
     if (error) { console.error('[saveBeneficiary]', error.message); return false; }
     return true;
@@ -1516,8 +1544,7 @@ export const db = {
     return (data || []).map((r: any) => ({
       id: r.id, shipName: r.ship_name, voyage: r.voyage, terminal: r.terminal,
       status: r.status, eta: r.eta, etd: r.etd, ataDate: r.ata_date, atdDate: r.atd_date,
-      notes: r.notes, linkedTripOs: r.linked_trip_os,
-      createdAt: r.created_at, updatedAt: r.updated_at,
+      notes: r.notes, linkedTripOs: r.linked_trip_os, createdAt: r.created_at, updatedAt: r.updated_at,
     }));
   },
 
@@ -1567,5 +1594,33 @@ export const db = {
     const { error } = await supabase.from('ship_terminal_config').delete().eq('id', id);
     if (error) { console.error('[deleteShipTerminalConfig]', error.message); return false; }
     return true;
+  },
+
+  // ── Ships (Navios) ────────────────────────────────────────────────────────
+
+  getShips: async (): Promise<Ship[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('ships').select('*').order('updated_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(mapShipFromDb);
+  },
+
+  saveShip: async (ship: Partial<Ship>): Promise<Ship> => {
+    if (!supabase) throw new Error('Supabase não inicializado');
+    const payload = mapShipToDb(ship);
+    if (ship.id) {
+      const { data, error } = await supabase.from('ships').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', ship.id).select().single();
+      if (error) throw error;
+      return mapShipFromDb(data);
+    }
+    const { data, error } = await supabase.from('ships').insert({ ...payload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }).select().single();
+    if (error) throw error;
+    return mapShipFromDb(data);
+  },
+
+  deleteShip: async (id: string): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('ships').delete().eq('id', id);
+    if (error) throw error;
   },
 };
