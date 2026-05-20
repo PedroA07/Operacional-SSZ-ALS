@@ -16,7 +16,8 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState('');
-  const [color, setColor] = useState('#3b82f6'); // Default blue
+  const [color, setColor] = useState('#3b82f6');
+  const [allowDuplicateOS, setAllowDuplicateOS] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -29,6 +30,7 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
     setName('');
     setParentId('');
     setColor('#3b82f6');
+    setAllowDuplicateOS(false);
   };
 
   const handleEdit = (category: Category) => {
@@ -36,6 +38,7 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
     setName(category.name);
     setParentId(category.parentId || '');
     setColor(category.color || '#3b82f6');
+    setAllowDuplicateOS(category.allowDuplicateOS ?? false);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -46,7 +49,8 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
       id: editingId || `cat-${Date.now()}`,
       name,
       parentId: parentId || undefined,
-      color
+      color,
+      allowDuplicateOS
     };
 
     const success = await db.saveCategory(categoryData, actingUser);
@@ -93,6 +97,22 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
               </div>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setAllowDuplicateOS(v => !v)}
+            className={`w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 transition-all ${allowDuplicateOS ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+          >
+            <div className="text-left">
+              <p className="text-[10px] font-black uppercase tracking-widest">Permitir OS com mesmo valor</p>
+              <p className="text-[9px] font-medium mt-0.5 normal-case">
+                {allowDuplicateOS ? 'Múltiplas viagens podem ter a mesma OS nesta categoria' : 'Cada OS deve ser único (padrão)'}
+              </p>
+            </div>
+            <div className={`w-10 h-6 rounded-full flex items-center transition-all px-0.5 ${allowDuplicateOS ? 'bg-amber-400 justify-end' : 'bg-slate-300 justify-start'}`}>
+              <div className="w-5 h-5 bg-white rounded-full shadow-sm" />
+            </div>
+          </button>
           
           <div className="flex gap-2">
             {editingId && (
@@ -113,6 +133,9 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: parent.color || '#3b82f6' }}></div>
                     <span className="text-[10px] font-black text-slate-700">{parent.name}</span>
+                    {parent.allowDuplicateOS && (
+                      <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded uppercase">OS Dupla</span>
+                    )}
                   </div>
                   <button onClick={() => handleEdit(parent)} className="text-blue-600 hover:text-blue-800 p-1">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>

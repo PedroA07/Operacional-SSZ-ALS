@@ -82,9 +82,20 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         setOperationTypes(opTypes);
         if (!initialData) {
           const savedDefault = localStorage.getItem('defaultOperationType');
-          if (savedDefault) {
-            const found = opTypes.find(t => t.id === savedDefault);
-            if (found) setFormData((prev: any) => ({ ...prev, tipoOperacao: found.name }));
+          const defaultOp = savedDefault
+            ? opTypes.find((t: any) => t.id === savedDefault)
+            : opTypes[0];
+          if (defaultOp) {
+            const autoCategory = (() => {
+              if (!defaultOp.config?.defaultCategoryId) return '';
+              const cat = c.find((cat: any) => cat.id === defaultOp.config.defaultCategoryId);
+              return cat?.name?.toUpperCase() || '';
+            })();
+            setFormData((prev: any) => ({
+              ...prev,
+              tipoOperacao: defaultOp.name,
+              ...(autoCategory && !prev.category ? { category: autoCategory } : {}),
+            }));
           }
         }
       } else {
@@ -124,17 +135,29 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   }, [formData]);
 
 
+  const getCategoryForOpType = (typeName: string) => {
+    const op = operationTypes.find((t: any) => t.name === typeName);
+    if (!op?.config?.defaultCategoryId) return '';
+    const cat = categories.find(c => c.id === op.config.defaultCategoryId);
+    return cat?.name?.toUpperCase() || '';
+  };
+
   const handleInputChange = (field: string, value: string) => {
     const upValue = (field === 'horarioAgendado' || field === 'obs') ? value : value.toUpperCase();
-    
+
     if (field === 'category') {
       setUserHasChosenCategory(true);
     }
 
     setFormData((prev: any) => {
       let next = { ...prev, [field]: upValue };
-      
-      // Detecção automática (apenas se o usuário não tiver selecionado manualmente ainda)
+
+      if (field === 'tipoOperacao' && !userHasChosenCategory) {
+        const autoCategory = getCategoryForOpType(upValue);
+        if (autoCategory) next.category = autoCategory;
+      }
+
+      // Detecção automática por padrão de OS (apenas se o usuário não tiver selecionado manualmente ainda)
       if (field === 'os' && !userHasChosenCategory) {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
         if (detected) {

@@ -403,6 +403,7 @@ export interface Category {
   name: string;
   parentId?: string;
   color?: string;
+  allowDuplicateOS?: boolean;
 }
 
 export interface ContainerType {
