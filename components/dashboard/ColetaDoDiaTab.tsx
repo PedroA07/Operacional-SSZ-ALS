@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Trip, ColetaTipoViagemOption, EmailTemplate } from '../../types';
+import { Trip, ColetaTipoViagemOption, EmailTemplate, ColetaOpConfig, ColetaDocOriginarioRule } from '../../types';
 import { db } from '../../utils/storage';
 import SmartOperationTable from './operations/SmartOperationTable';
 import FeedbackModal from '../shared/FeedbackModal';
@@ -68,6 +68,12 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return [];
   });
   const [copied, setCopied] = useState(false);
+  const [activeOpTab, setActiveOpTab] = useState<string>('TODOS');
+  const [allCustomers, setAllCustomers] = useState<{ id: string; name: string }[]>([]);
+  // coletaOpConfig: keyed by op type id
+  const [coletaOpConfig, setColetaOpConfig] = useState<Record<string, ColetaOpConfig>>({});
+  // settings panel expanded op type
+  const [settingsExpandedOp, setSettingsExpandedOp] = useState<string | null>(null);
 
   const STABILITY_DURATION = 30000;
 
@@ -77,14 +83,22 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   useEffect(() => {
     const loadTipos = async () => {
-      const [tipos, cats, opTypes] = await Promise.all([
+      const [tipos, cats, opTypes, custs] = await Promise.all([
         db.getColetaTiposViagem(),
         db.getCategories(),
-        db.getOperationTypes()
+        db.getOperationTypes(),
+        db.getCustomers(),
       ]);
       setTiposViagem(tipos);
       setCategories(cats);
       setOperationTypes(opTypes);
+      setAllCustomers((custs as any[]).map(c => ({ id: c.id, name: c.name })));
+      // Extrai config.coleta de cada tipo de operação
+      const cfg: Record<string, ColetaOpConfig> = {};
+      (opTypes as any[]).forEach(ot => {
+        if (ot.config?.coleta) cfg[ot.id] = ot.config.coleta;
+      });
+      setColetaOpConfig(cfg);
       
       const templates = propTemplates;
       const savedTemplateId = localStorage.getItem('coletaDefaultTemplateId');
@@ -134,6 +148,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
+      .filter(trip => activeOpTab === 'TODOS' || trip.type?.toUpperCase() === activeOpTab)
       .filter(trip => {
         const dt = trip.dateTime;
         if (!dt) return true;
@@ -178,6 +193,27 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return () => clearInterval(interval);
   }, []);
 
+  // Trips sem filtro de aba (para contar por tipo nas abas)
+  const allFilteredTrips = useMemo(() => {
+    const now = Date.now();
+    return propTrips
+      .filter(trip => !finalizingIds.has(trip.id))
+      .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
+      .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
+      .filter(trip => {
+        const dt = trip.dateTime;
+        if (!dt) return true;
+        const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
+        const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
+        return normalized >= '2026-04-01';
+      })
+      .map(serverTrip => {
+        const pending = pendingUpdates[serverTrip.id];
+        if (pending && (now - pending.timestamp) < STABILITY_DURATION) return { ...serverTrip, ...pending.data };
+        return serverTrip;
+      });
+  }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes]);
+
   const handleUpdateTrip = useCallback(async (trip: Trip, data: Partial<Trip>) => {
     const now = Date.now();
     
@@ -212,12 +248,21 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   const removePunctuation = (str?: string) => str ? str.replace(/[^\w\s]/gi, '') : '---';
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     localStorage.setItem('coletaDefaultTemplateId', selectedTemplateId);
     localStorage.setItem('coletaHiddenTripTypes', JSON.stringify(hiddenTripTypes));
+    // Salva config.coleta em cada tipo de operação
+    for (const ot of operationTypes) {
+      if (coletaOpConfig[ot.id] !== undefined) {
+        await db.saveOperationType({
+          ...ot,
+          config: { ...(ot.config || {}), coleta: coletaOpConfig[ot.id] }
+        });
+      }
+    }
     setSettingsModal(false);
-    window.dispatchEvent(new CustomEvent('als_show_toast', { 
-      detail: { message: 'Configurações salvas!', type: 'success' } 
+    window.dispatchEvent(new CustomEvent('als_show_toast', {
+      detail: { message: 'Configurações salvas!', type: 'success' }
     }));
   };
 
@@ -543,6 +588,17 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     });
   };
 
+  const getDocOriginarioText = (t: Trip): string => {
+    const opType = operationTypes.find(ot => ot.name.toUpperCase() === t.type?.toUpperCase());
+    if (!opType) return `Doc. originário gerado, gentileza seguir com a emissão do CT-e:\n${t.os}`;
+    const cfg = coletaOpConfig[opType.id];
+    // Verifica regra por cliente
+    const clientRule = cfg?.docOriginarioByCustomer?.find(r => r.customerId === t.customer?.id);
+    const baseText = clientRule?.text || cfg?.docOriginarioText ||
+      'Doc. originário gerado, gentileza seguir com a emissão do CT-e:\n{os}';
+    return baseText.replace(/\{os\}/g, t.os).replace(/\{booking\}/g, t.booking || '').replace(/\{container\}/g, t.container || '').replace(/\{ship\}/g, t.ship || '');
+  };
+
   const handleCopyDocOriginario = () => {
     const docTrips = trips.filter(t => t.coletaDocGenerated);
     if (docTrips.length === 0) {
@@ -551,8 +607,11 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       }));
       return;
     }
-    const osList = docTrips.map(t => t.os).join('\n');
-    const text = `Doc. originário gerados, gentileza seguir com a emissão do CT-e:\n${osList}`;
+    // Agrupa por tipo de operação para usar texto correto
+    const lines = docTrips.map(t => getDocOriginarioText(t));
+    const text = [...new Set(lines)].length === 1
+      ? lines[0]
+      : docTrips.map(t => `[${t.type || ''}] ${getDocOriginarioText(t)}`).join('\n\n');
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       window.dispatchEvent(new CustomEvent('als_show_toast', {
@@ -640,26 +699,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             <Settings className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
-            {operationTypes.map((ot: any) => {
-              const type = ot.name.toUpperCase();
-              const isVisible = !hiddenTripTypes.includes(type);
-              return (
-                <button
-                  key={type}
-                  onClick={() => toggleTripType(type)}
-                  className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
-                    isVisible
-                      ? 'bg-white shadow-sm border border-blue-100'
-                      : 'text-slate-400 hover:text-slate-600'
-                  }`}
-                  style={isVisible && ot.color ? { color: ot.color } : {}}
-                >
-                  {type}
-                </button>
-              );
-            })}
-          </div>
+          <div></div>
 
           <button
             onClick={handleCopyDocOriginario}
@@ -700,13 +740,59 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       </div>
     </div>
 
+      {/* Abas por tipo de operação */}
+      {operationTypes.filter(ot => !hiddenTripTypes.includes(ot.name.toUpperCase())).length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          {/* Aba "Todos" */}
+          <button
+            onClick={() => setActiveOpTab('TODOS')}
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
+              activeOpTab === 'TODOS'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-lg'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-700'
+            }`}
+          >
+            Todos
+            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${activeOpTab === 'TODOS' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+              {allFilteredTrips.length}
+            </span>
+          </button>
+
+          {operationTypes
+            .filter(ot => !hiddenTripTypes.includes(ot.name.toUpperCase()))
+            .map(ot => {
+              const typeName = ot.name.toUpperCase();
+              const count = allFilteredTrips.filter(t => t.type?.toUpperCase() === typeName).length;
+              const isActive = activeOpTab === typeName;
+              return (
+                <button
+                  key={typeName}
+                  onClick={() => setActiveOpTab(typeName)}
+                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
+                    isActive ? 'text-white shadow-lg' : 'bg-white border-slate-200 hover:border-slate-400'
+                  }`}
+                  style={isActive
+                    ? { backgroundColor: ot.color || '#1e293b', borderColor: ot.color || '#1e293b', color: '#fff' }
+                    : { color: ot.color || '#475569' }
+                  }
+                >
+                  {typeName}
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+        </div>
+      )}
+
       <div className="animate-in slide-in-from-bottom-4 duration-500">
         <div className="space-y-4">
-          <SmartOperationTable 
-            userId={userId} 
-            componentId="coleta-dia-table" 
-            columns={columns} 
-            data={trips} 
+          <SmartOperationTable
+            userId={userId}
+            componentId="coleta-dia-table"
+            columns={columns}
+            data={trips}
             hideInternalSearch={false}
             getRowClassName={getRowClassName}
             getRowStyle={getRowStyle}
@@ -747,31 +833,133 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                 </div>
               </div>
 
-              {/* Filtro de Tipos de Programação */}
+              {/* Abas visíveis */}
               <div className="space-y-4">
-                <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Tipos de Programação Visíveis</h4>
-                <p className="text-[10px] font-medium text-slate-400">Selecione os tipos de viagem que você deseja ver neste painel:</p>
+                <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Abas Visíveis</h4>
+                <p className="text-[10px] font-medium text-slate-400">Selecione quais tipos aparecem como aba no painel:</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {operationTypes.map((ot: any) => {
                     const type = ot.name.toUpperCase();
                     return (
                       <label key={type} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={!hiddenTripTypes.includes(type)}
-                          onChange={() => toggleTripType(type)}
-                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                        />
-                        <span
-                          className="text-[10px] font-black uppercase tracking-widest"
-                          style={{ color: ot.color || '#475569' }}
-                        >
-                          {type}
-                        </span>
+                        <input type="checkbox" checked={!hiddenTripTypes.includes(type)} onChange={() => toggleTripType(type)} className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" />
+                        <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: ot.color || '#475569' }}>{type}</span>
                       </label>
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Configuração por tipo de operação */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Configuração por Tipo de Operação</h4>
+                {operationTypes.map((ot: any) => {
+                  const typeCfg: ColetaOpConfig = coletaOpConfig[ot.id] || {};
+                  const isExpanded = settingsExpandedOp === ot.id;
+                  const updateTypeCfg = (patch: Partial<ColetaOpConfig>) => {
+                    setColetaOpConfig(prev => ({ ...prev, [ot.id]: { ...typeCfg, ...patch } }));
+                  };
+
+                  return (
+                    <div key={ot.id} className="border border-slate-200 rounded-2xl overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setSettingsExpandedOp(isExpanded ? null : ot.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isExpanded ? 'bg-slate-50 border-b border-slate-200' : 'bg-white hover:bg-slate-50'}`}
+                      >
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ot.color || '#94a3b8' }} />
+                        <span className="flex-1 text-[11px] font-black text-slate-700 uppercase">{ot.name}</span>
+                        {typeCfg.emailRequired && <span className="text-[8px] font-black text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded uppercase">E-mail obrig.</span>}
+                        {typeCfg.docOriginarioText && <span className="text-[8px] font-black text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">Doc. custom.</span>}
+                        <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="p-4 space-y-4 bg-white">
+                          {/* Toggle e-mail obrigatório */}
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <div onClick={() => updateTypeCfg({ emailRequired: !typeCfg.emailRequired })}
+                              className={`w-10 h-5 rounded-full transition-all relative shrink-0 ${typeCfg.emailRequired ? 'bg-blue-600' : 'bg-slate-200'}`}>
+                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${typeCfg.emailRequired ? 'left-5' : 'left-0.5'}`} />
+                            </div>
+                            <span className="text-[11px] font-black text-slate-600 uppercase">Requer envio de e-mail</span>
+                          </label>
+
+                          {/* Texto padrão doc originário */}
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                              Texto do Doc. Originário <span className="font-normal">— variáveis: {'{os}'}, {'{booking}'}, {'{container}'}, {'{ship}'}</span>
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={typeCfg.docOriginarioText || ''}
+                              onChange={e => updateTypeCfg({ docOriginarioText: e.target.value })}
+                              placeholder={`Ex: Solicito emissão CT-e ref. OS {os}, booking {booking}.`}
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-medium text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            />
+                          </div>
+
+                          {/* Textos por cliente */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Texto por Cliente (exceções)</label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const rules = typeCfg.docOriginarioByCustomer || [];
+                                  updateTypeCfg({ docOriginarioByCustomer: [...rules, { customerId: '', customerName: '', text: '' }] });
+                                }}
+                                className="text-[9px] font-black text-blue-600 uppercase hover:text-blue-700 flex items-center gap-1"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+                                Adicionar
+                              </button>
+                            </div>
+                            {(typeCfg.docOriginarioByCustomer || []).map((rule: ColetaDocOriginarioRule, rIdx: number) => (
+                              <div key={rIdx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                <select
+                                  value={rule.customerId}
+                                  onChange={e => {
+                                    const cust = allCustomers.find(c => c.id === e.target.value);
+                                    const rules = [...(typeCfg.docOriginarioByCustomer || [])];
+                                    rules[rIdx] = { ...rule, customerId: e.target.value, customerName: cust?.name || '' };
+                                    updateTypeCfg({ docOriginarioByCustomer: rules });
+                                  }}
+                                  className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                >
+                                  <option value="">Selecionar cliente...</option>
+                                  {allCustomers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                                <textarea
+                                  rows={2}
+                                  value={rule.text}
+                                  onChange={e => {
+                                    const rules = [...(typeCfg.docOriginarioByCustomer || [])];
+                                    rules[rIdx] = { ...rule, text: e.target.value };
+                                    updateTypeCfg({ docOriginarioByCustomer: rules });
+                                  }}
+                                  placeholder={`Texto para ${rule.customerName || 'este cliente'}...`}
+                                  className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const rules = [...(typeCfg.docOriginarioByCustomer || [])];
+                                    rules.splice(rIdx, 1);
+                                    updateTypeCfg({ docOriginarioByCustomer: rules });
+                                  }}
+                                  className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

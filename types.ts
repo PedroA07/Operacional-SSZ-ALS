@@ -542,6 +542,18 @@ export interface Trip {
   isRemovedFromOrg?: boolean;
 }
 
+export interface ColetaDocOriginarioRule {
+  customerId: string;
+  customerName: string;
+  text: string;
+}
+
+export interface ColetaOpConfig {
+  emailRequired?: boolean;
+  docOriginarioText?: string;
+  docOriginarioByCustomer?: ColetaDocOriginarioRule[];
+}
+
 export interface OperationTypeTripRule {
   tripTypeId: string;
   isDefault?: boolean;
@@ -551,6 +563,7 @@ export interface OperationTypeTripRule {
 export interface OperationTypeConfig {
   defaultCategoryId?: string;
   tripTypeRules?: OperationTypeTripRule[];
+  coleta?: ColetaOpConfig;
 }
 
 export interface OperationType {
