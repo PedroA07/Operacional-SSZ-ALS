@@ -87,7 +87,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
   const sortedTrips = useMemo(() => {
     return [...trips].sort((a, b) => {
       const getPriority = (trip: Trip) => {
-        if (trip.isCompleted || trip.status === 'Viagem concluída' || trip.status === 'Viagem cancelada') return 3;
+        if (trip.isCompleted || trip.status === 'Viagem concluída' || trip.status === 'Viagem cancelada' || trip.status === 'Cancelado' || trip.status === 'Frete Morto') return 3;
         if (trip.status === 'Pendente') return 2;
         return 1;
       };
@@ -137,7 +137,7 @@ const TripsTab: React.FC<TripsTabProps> = ({ trips, user, onRefresh }) => {
       <div className="space-y-3">
         {sortedTrips.map((t) => {
           const tripDate = new Date(t.dateTime);
-          const isFinished = t.isCompleted || t.status === 'Viagem concluída' || t.status === 'Viagem cancelada';
+          const isFinished = t.isCompleted || t.status === 'Viagem concluída' || t.status === 'Viagem cancelada' || t.status === 'Cancelado' || t.status === 'Frete Morto';
           const isPending = t.status === 'Pendente';
           const isActive = !isFinished && !isPending;
 
