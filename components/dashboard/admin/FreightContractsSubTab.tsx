@@ -621,6 +621,19 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             driverId: trip.driver?.id ?? undefined, driverName: trip.driver?.name ?? undefined,
             status: 'linked',
           });
+          // Atualiza data e local do último contrato no motorista
+          if (onUpdateDriver && trip.driver?.id) {
+            const driverToUpdate = drivers.find(d => d.id === trip.driver.id);
+            if (driverToUpdate) {
+              try {
+                await onUpdateDriver({
+                  ...driverToUpdate,
+                  lastFreightContractDate: uploadDate.toISOString().slice(0, 10),
+                  lastFreightContractLocation: trip.destination?.name ?? trip.customer?.name ?? driverToUpdate.lastFreightContractLocation,
+                });
+              } catch { /* non-critical */ }
+            }
+          }
         } else if (entry.linkedDriverId) {
           // Vínculo apenas com motorista (sem viagem específica)
           const driver = drivers.find(d => d.id === entry.linkedDriverId);
@@ -631,6 +644,15 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             container: parsedData.container, destination: parsedData.localidade,
             driverId: driver?.id, driverName: driver?.name, status: 'linked',
           });
+          if (onUpdateDriver && driver) {
+            try {
+              await onUpdateDriver({
+                ...driver,
+                lastFreightContractDate: uploadDate.toISOString().slice(0, 10),
+                lastFreightContractLocation: parsedData.localidade ?? driver.lastFreightContractLocation,
+              });
+            } catch { /* non-critical */ }
+          }
         } else {
           // Sem vínculo: gera código de identificação e salva no Supabase
           const code = genContractCode();
@@ -693,6 +715,22 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     );
   }, [contractHistory, historySearch]);
 
+  // ── Latest contract per driver (computed from live history) ─────────────────
+  const driverLatestContractMap = useMemo(() => {
+    const map = new Map<string, { date: string; location: string }>();
+    for (const { trip, doc } of contractHistory) {
+      if (!trip?.driver?.id) continue;
+      const existing = map.get(trip.driver.id);
+      if (!existing || doc.uploadDate > existing.date) {
+        map.set(trip.driver.id, {
+          date: doc.uploadDate.slice(0, 10),
+          location: trip.destination?.name || trip.customer?.name || '',
+        });
+      }
+    }
+    return map;
+  }, [contractHistory]);
+
   // ── Recipients ────────────────────────────────────────────────────────────────
   const recipientDrivers = drivers.filter(d => d.status === 'Ativo' && d.freightContractSendTo);
   const availableToAdd = drivers.filter(d =>
@@ -705,9 +743,16 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     return recipientDrivers.filter(d => d.name.toLowerCase().includes(q) || d.plateHorse.toLowerCase().includes(q) || (d.beneficiaryName || '').toLowerCase().includes(q));
   }, [recipientDrivers, recipientSearch]);
 
-  const getEdit = (driver: Driver): RowEdit => edits[driver.id] ?? {
-    sendTo: driver.freightContractSendTo || 'driver', lastDate: driver.lastFreightContractDate || '',
-    lastLocation: driver.lastFreightContractLocation || '', saving: false, copied: false,
+  const getEdit = (driver: Driver): RowEdit => {
+    if (edits[driver.id]) return edits[driver.id];
+    const computed = driverLatestContractMap.get(driver.id);
+    return {
+      sendTo: driver.freightContractSendTo || 'driver',
+      lastDate: computed?.date || driver.lastFreightContractDate || '',
+      lastLocation: computed?.location || driver.lastFreightContractLocation || '',
+      saving: false,
+      copied: false,
+    };
   };
   const patchEdit = (driverId: string, p: Partial<RowEdit>, base: RowEdit) =>
     setEdits(prev => ({ ...prev, [driverId]: { ...base, ...prev[driverId], ...p } }));
@@ -968,8 +1013,11 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                           />
                           {!isLinked && isDriverOnly && linkedDriver && (
                             <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-xl px-2.5 py-1.5">
-                              <span className="text-[8px] font-black text-indigo-700 uppercase tracking-wide whitespace-nowrap">
-                                🚛 {linkedDriver.name.split(' ').slice(0,2).join(' ')}
+                              <span className="flex items-center gap-1 text-[8px] font-black text-indigo-700 uppercase tracking-wide whitespace-nowrap">
+                                <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+                                </svg>
+                                {linkedDriver.name.split(' ').slice(0,2).join(' ')}
                               </span>
                               {entry.autoMatchedDriver && (
                                 <span className="text-[7px] font-black text-indigo-400 bg-indigo-100 px-1 py-0.5 rounded border border-indigo-200">Auto</span>
