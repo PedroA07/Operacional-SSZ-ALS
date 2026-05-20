@@ -542,10 +542,22 @@ export interface Trip {
   isRemovedFromOrg?: boolean;
 }
 
+export interface OperationTypeTripRule {
+  tripTypeId: string;
+  isDefault?: boolean;
+  customerIds?: string[];
+}
+
+export interface OperationTypeConfig {
+  defaultCategoryId?: string;
+  tripTypeRules?: OperationTypeTripRule[];
+}
+
 export interface OperationType {
   id: string;
   name: string;
   color?: string;
+  config?: OperationTypeConfig;
   createdAt?: string;
 }
 
