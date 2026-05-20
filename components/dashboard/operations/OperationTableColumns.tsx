@@ -237,8 +237,15 @@ export const getOperationTableColumns = (
       label: 'Status',
       render: (t: Trip) => {
         const latestStatus = t.statusHistory?.[t.statusHistory.length - 1]?.status || t.status;
+        const cls =
+          latestStatus === 'Viagem concluída' || t.isCompleted ? 'bg-emerald-600 text-white border-emerald-700' :
+          latestStatus === 'Reutilização'   ? 'bg-emerald-700 text-white border-emerald-800' :
+          latestStatus === 'Cancelado'      ? 'bg-red-600 text-white border-red-700' :
+          latestStatus === 'Frete Morto'    ? 'bg-amber-500 text-white border-amber-600' :
+          latestStatus === 'Viagem cancelada' ? 'bg-red-100 text-red-700 border-red-200' :
+          'bg-blue-50 text-blue-600 border-blue-100';
         return (
-          <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-black uppercase border border-blue-100">
+          <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border ${cls}`}>
             {latestStatus}
           </span>
         );
