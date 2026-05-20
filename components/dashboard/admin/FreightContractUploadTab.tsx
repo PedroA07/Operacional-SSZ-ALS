@@ -151,7 +151,7 @@ const FreightContractUploadTab: React.FC<Props> = ({ trips }) => {
         if (trip && savedId) {
           const newDoc = {
             id:         savedId,
-            type:       'CONTRATO_FRETE',
+            type:       'CONTRATO_FRETE' as const,
             url:        fileUrl,
             fileName:   entry.file.name,
             uploadDate: new Date().toISOString(),
