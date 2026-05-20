@@ -1459,6 +1459,8 @@ export const db = {
       tripId:         r.trip_id || undefined,
       tripOs:         r.trip_os || undefined,
       destination:    r.destination || undefined,
+      driverId:       r.driver_id || undefined,
+      driverName:     r.driver_name || undefined,
       status:         r.status,
       uploadedAt:     r.uploaded_at,
     }));
@@ -1474,6 +1476,8 @@ export const db = {
       trip_id:         c.tripId || null,
       trip_os:         c.tripOs || null,
       destination:     c.destination || null,
+      driver_id:       c.driverId || null,
+      driver_name:     c.driverName || null,
       status:          c.status,
       updated_at:      new Date().toISOString(),
     }).select('id').single();

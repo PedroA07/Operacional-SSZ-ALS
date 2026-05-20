@@ -144,6 +144,8 @@ const FreightContractUploadTab: React.FC<Props> = ({ trips }) => {
           tripId:         trip?.id,
           tripOs:         trip?.os,
           destination:    trip?.destination?.name ?? trip?.customer?.name,
+          driverId:       trip?.driver?.id ?? undefined,
+          driverName:     trip?.driver?.name ?? undefined,
           status:         trip ? 'linked' : 'unlinked',
         });
 
@@ -325,6 +327,9 @@ const FreightContractUploadTab: React.FC<Props> = ({ trips }) => {
                     )}
                     {c.tripOs && (
                       <span className="text-[10px] text-blue-600 font-black">OS {c.tripOs}</span>
+                    )}
+                    {c.driverName && (
+                      <span className="text-[10px] text-indigo-600 font-black">🚛 {c.driverName}</span>
                     )}
                     {c.destination && (
                       <span className="text-[10px] text-slate-400 truncate max-w-[200px]">📍 {c.destination}</span>
