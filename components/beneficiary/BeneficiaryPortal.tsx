@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Driver, FreightContract } from '../../types';
+import { User, Driver, FreightContract, Trip } from '../../types';
 import { db } from '../../utils/storage';
 import PDFViewer from '../shared/PDFViewer';
 
@@ -33,13 +33,50 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
 
   useEffect(() => { loadDrivers(); }, [loadDrivers]);
 
-  // Carrega contratos do motorista selecionado
+  // Carrega contratos do motorista selecionado — lê direto das viagens
   const loadContracts = useCallback(async (driver: Driver) => {
     setLoadingContracts(true);
     try {
-      const all = await db.getFreightContracts();
-      const forDriver = all.filter(c => c.driverId === driver.id && c.fileUrl);
-      setContracts(forDriver);
+      const trips: Trip[] = await db.getTrips();
+      const driverTrips = trips.filter(t => t.driver?.id === driver.id);
+
+      const result: FreightContract[] = [];
+      const seen = new Set<string>();
+
+      for (const trip of driverTrips) {
+        const docs: Array<{ url?: string; fileName?: string; uploadDate?: string }> = [];
+
+        if (trip.freightContractDocs?.length) {
+          docs.push(...trip.freightContractDocs);
+        } else if (trip.freightContractDoc?.url) {
+          docs.push(trip.freightContractDoc);
+        }
+
+        for (const doc of docs) {
+          if (!doc.url) continue;
+          const key = `${trip.id}-${doc.url}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          result.push({
+            id: key,
+            fileName: doc.fileName || `Contrato-${trip.os}.pdf`,
+            fileUrl: doc.url,
+            tripId: trip.id,
+            tripOs: trip.os,
+            container: trip.container,
+            destination: trip.destination?.name || trip.customer?.name,
+            driverId: driver.id,
+            driverName: driver.name,
+            status: 'linked',
+            uploadedAt: doc.uploadDate || trip.dateTime,
+          });
+        }
+      }
+
+      // Ordena mais recente primeiro
+      result.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+      setContracts(result);
     } finally {
       setLoadingContracts(false);
     }
