@@ -11,6 +11,7 @@ import {
   compressPDFForStorage,
   normAccent,
 } from '../../../utils/freightContractParser';
+import PDFViewer from '../../shared/PDFViewer';
 
 // ── PDF thumbnail cache (module-level to survive re-renders) ─────────────────
 const _thumbCache = new Map<string, string | 'loading' | 'error'>();
@@ -300,7 +301,7 @@ const SendToDropdown: React.FC<{ driver: Driver; value: SendTo; onChange: (v: Se
 
   const options: SendToOption[] = [
     { value: 'driver', tag: 'Motorista', tagClass: 'text-blue-600 bg-blue-50 border-blue-200', label: driver.name, sublabel: driver.phone || 'Sem telefone', available: true },
-    { value: 'beneficiary', tag: 'Beneficiário', tagClass: 'text-violet-600 bg-violet-50 border-violet-200', label: driver.beneficiaryName || driver.name, sublabel: driver.beneficiaryPhone || 'Sem telefone', available: !!driver.beneficiaryPhone },
+    { value: 'beneficiary', tag: 'Beneficiário', tagClass: 'text-violet-600 bg-violet-50 border-violet-200', label: driver.beneficiaryName || driver.name, sublabel: driver.beneficiaryPhone || driver.beneficiaryEmail || 'Sem contato', available: !!(driver.beneficiaryName || driver.beneficiaryCnpj || driver.beneficiaryPhone || driver.beneficiaryUserId) },
     { value: 'group', tag: 'Grupo', tagClass: 'text-emerald-600 bg-emerald-50 border-emerald-200', label: driver.whatsappGroupName || 'Grupo WhatsApp', sublabel: 'Todos os participantes', available: !!(driver.whatsappGroupLink || driver.whatsappGroupName) },
   ];
   const selected = options.find(o => o.value === value) || options[0];
@@ -440,6 +441,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [addSearch, setAddSearch] = useState('');
   const [recipientSearch, setRecipientSearch] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [viewerDoc, setViewerDoc] = useState<{ url: string; title: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -458,6 +461,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     document.addEventListener('mousedown', fn);
     return () => document.removeEventListener('mousedown', fn);
   }, []);
+
+  useEffect(() => { setHistoryPage(1); }, [historySearch]);
 
   // ── Eligible trips ────────────────────────────────────────────────────────────
   const eligibleTrips = useMemo(() => trips.filter(t =>
@@ -1066,8 +1071,9 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             ) : filteredHistory.length === 0 ? (
               <p className="text-center py-8 text-[9px] font-black text-slate-300 uppercase">Nenhum resultado para "{historySearch}"</p>
             ) : (
+              <>
               <div className="space-y-2">
-                {filteredHistory.map(({ trip, standalone, doc }) => (
+                {filteredHistory.slice((historyPage - 1) * 10, historyPage * 10).map(({ trip, standalone, doc }) => (
                   <div key={doc.id} className={`flex items-center gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm hover:border-slate-200 transition-colors ${standalone ? 'border-amber-100' : 'border-slate-100'}`}>
                     {/* PDF thumbnail */}
                     <PDFThumbnail url={doc.url} docId={doc.id}/>
@@ -1123,10 +1129,16 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => window.open(doc.url, '_blank')} title="Ver PDF"
-                        className="p-1.5 rounded-xl text-blue-400 hover:bg-blue-50 transition-colors">
+                      <button
+                        onClick={() => {
+                          const label = standalone ? standalone.code : `OS ${trip?.os}`;
+                          setViewerDoc({ url: doc.url, title: `Contrato · ${label}` });
+                        }}
+                        title="Ver PDF"
+                        className="p-1.5 rounded-xl text-blue-400 hover:bg-blue-50 transition-colors"
+                      >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                         </svg>
                       </button>
                       <button
@@ -1155,6 +1167,25 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                   </div>
                 ))}
               </div>
+              {/* Paginação */}
+              {filteredHistory.length > 10 && (
+                <div className="flex items-center justify-center gap-2 pt-2">
+                  <button
+                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                    disabled={historyPage === 1}
+                    className="px-3 py-1.5 rounded-xl text-[9px] font-black uppercase border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition-all"
+                  >← Anterior</button>
+                  <span className="text-[9px] font-black text-slate-500 tabular-nums">
+                    {historyPage} / {Math.ceil(filteredHistory.length / 10)}
+                  </span>
+                  <button
+                    onClick={() => setHistoryPage(p => Math.min(Math.ceil(filteredHistory.length / 10), p + 1))}
+                    disabled={historyPage >= Math.ceil(filteredHistory.length / 10)}
+                    className="px-3 py-1.5 rounded-xl text-[9px] font-black uppercase border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition-all"
+                  >Próximo →</button>
+                </div>
+              )}
+              </>
             )}
           </div>
         </div>
@@ -1227,6 +1258,9 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             <SmartOperationTable userId={userId} componentId="admin-freight-recipients" columns={recipientColumns} data={filteredRecipientDrivers} hideInternalSearch/>
           )}
         </div>
+      )}
+      {viewerDoc && (
+        <PDFViewer url={viewerDoc.url} title={viewerDoc.title} onClose={() => setViewerDoc(null)} />
       )}
     </div>
   );

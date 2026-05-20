@@ -4,6 +4,7 @@ import { AppScreen, User } from './types';
 import LoginForm from './components/LoginForm';
 import Dashboard from './Dashboard';
 import DriverPortal from './components/driver/DriverPortal';
+import BeneficiaryPortal from './components/beneficiary/BeneficiaryPortal';
 import ExternalUserApp from './components/dashboard/third-party/ExternalUserApp';
 import ForcePasswordChange from './components/ForcePasswordChange';
 import StandaloneOperationsPage from './components/StandaloneOperationsPage';
@@ -118,6 +119,8 @@ const App: React.FC = () => {
         <LoginForm onLoginSuccess={handleLoginSuccess} />
       ) : user?.role === 'driver' || user?.role === 'motoboy' ? (
         <DriverPortal user={user} onLogout={handleLogout} />
+      ) : user?.role === 'beneficiary' ? (
+        <BeneficiaryPortal user={user} onLogout={handleLogout} />
       ) : user?.role === 'third_party' ? (
         <ExternalUserApp user={user} onLogout={handleLogout} />
       ) : user ? (
