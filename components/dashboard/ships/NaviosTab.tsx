@@ -29,7 +29,7 @@ const TERM_LINKS: Record<string, string> = {
   'BTP':           'https://novo-tas.btp.com.br/ConsultasLivres/ListaAtracacaoIndex',
   'ECOPORTO':      'http://op.ecoportosantos.com.br/externa/LineUpListaAtracacao/',
   'SANTOS BRASIL': 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao',
-  'EMBRAPORT':     'https://www.embraport.com.br',
+  'EMBRAPORT':     'http://www.embraportonline.com.br/Navios/Escala',
 };
 const TERM_SHORT: Record<string, string> = {
   'BTP': 'BTP', 'ECOPORTO': 'ECO', 'SANTOS BRASIL': 'SB', 'EMBRAPORT': 'EMB',
@@ -308,6 +308,51 @@ function IconSVGEcoporto({ size = 32 }: { size?: number }) {
   );
 }
 
+/**
+ * EMBRAPORT — DP World Santos
+ * Ícone quadrado: fundo azul-marinho (#003e5c), globo branco com meridianos/paralelos,
+ * "DP" bold branco + "WORLD" menor — fiel ao visual da marca DP World.
+ */
+function IconSVGEmbraport({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="6" fill="#003e5c"/>
+      {/* Globo — círculo base branco */}
+      <circle cx="50" cy="38" r="22" stroke="white" strokeWidth="2.5" fill="none"/>
+      {/* Meridiano vertical central */}
+      <path d="M 50,16 Q 58,38 50,60 Q 42,38 50,16" stroke="white" strokeWidth="1.8" fill="none"/>
+      {/* Paralelo superior */}
+      <path d="M 30,30 Q 50,35 70,30" stroke="white" strokeWidth="1.5" fill="none"/>
+      {/* Paralelo inferior */}
+      <path d="M 29,46 Q 50,51 71,46" stroke="white" strokeWidth="1.5" fill="none"/>
+      {/* Linha do equador */}
+      <line x1="28" y1="38" x2="72" y2="38" stroke="white" strokeWidth="1.5"/>
+      {/* "DP" bold */}
+      <text x="50" y="80" textAnchor="middle"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fontWeight="900" fontSize="18" fill="white" letterSpacing="1">DP</text>
+      {/* "WORLD" menor */}
+      <text x="50" y="93" textAnchor="middle"
+            fontFamily="Arial, sans-serif"
+            fontWeight="700" fontSize="10" fill="#7ecbd4" letterSpacing="2">WORLD</text>
+    </svg>
+  );
+}
+
+/** Logo completa Embraport para cards */
+function LogoSVGEmbraport({ height = 32 }: { height?: number }) {
+  return (
+    <span className="inline-flex items-center gap-2 shrink-0">
+      <IconSVGEmbraport size={height}/>
+      <svg width={90} height={height} viewBox="0 0 90 32" fill="none">
+        <text x="0" y="13" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="13" fill="#003e5c">DP WORLD</text>
+        <text x="0" y="26" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="9" fill="#888" letterSpacing="1">Santos</text>
+        <text x="0" y="36" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="7" fill="#aaa" letterSpacing="1.5">EMBRAPORT</text>
+      </svg>
+    </span>
+  );
+}
+
 /** Genérico */
 function IconSVGGeneric({ terminal, size = 32 }: { terminal: string; size?: number }) {
   return (
@@ -326,6 +371,7 @@ function TermBadge({ terminal }: { terminal: string }) {
   if (terminal === 'SANTOS BRASIL') return <LogoSVGSantosBrasil size={26}/>;
   if (terminal === 'BTP')           return <IconSVGBTP size={26}/>;
   if (terminal === 'ECOPORTO')      return <IconSVGEcoporto size={26}/>;
+  if (terminal === 'EMBRAPORT')     return <IconSVGEmbraport size={26}/>;
   return <IconSVGGeneric terminal={terminal} size={26}/>;
 }
 
@@ -342,8 +388,9 @@ function TermBadgeLarge({ terminal }: { terminal: string }) {
       </span>
     );
   }
-  if (terminal === 'BTP') return <LogoSVGBTP height={30}/>;
-  if (terminal === 'ECOPORTO') return <LogoSVGEcoporto height={30}/>;
+  if (terminal === 'BTP')       return <LogoSVGBTP height={30}/>;
+  if (terminal === 'ECOPORTO')  return <LogoSVGEcoporto height={30}/>;
+  if (terminal === 'EMBRAPORT') return <LogoSVGEmbraport height={30}/>;
   return (
     <span className="inline-flex items-center gap-2 shrink-0">
       <IconSVGGeneric terminal={terminal} size={30}/>
@@ -959,7 +1006,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
               {loadingTV && <span className="text-[8px] text-blue-400 font-bold animate-pulse">Carregando...</span>}
             </div>
             <div className="flex items-center gap-2">
-              {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(t => (
+              {(['BTP','ECOPORTO','SANTOS BRASIL','EMBRAPORT'] as const).map(t => (
                 <a key={t} href={TERM_LINKS[t]} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-all border border-slate-700">
                   <TermBadge terminal={t}/>
