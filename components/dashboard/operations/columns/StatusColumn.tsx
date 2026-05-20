@@ -16,10 +16,15 @@ export const StatusColumn = (
     return isLatest ? 'bg-blue-600 text-white shadow-xl scale-105 border-blue-400' : 'bg-white text-slate-400 border-slate-100';
   };
 
-  // Ordena o histórico: o mais recente (maior dateTime) fica no início
-  const sortedHistory = [...(t.statusHistory || [])].sort((a, b) => 
-    new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
-  );
+  const PINNED_STATUSES = new Set(['Cancelado', 'Frete Morto', 'Reutilização']);
+
+  // Especiais ficam sempre no topo; dentro de cada grupo, mais recente primeiro
+  const sortedHistory = [...(t.statusHistory || [])].sort((a, b) => {
+    const aPin = PINNED_STATUSES.has(a.status) ? 0 : 1;
+    const bPin = PINNED_STATUSES.has(b.status) ? 0 : 1;
+    if (aPin !== bPin) return aPin - bPin;
+    return new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime();
+  });
 
   return (
     <div className="flex flex-col space-y-2.5 min-w-[180px]">
