@@ -15,6 +15,7 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
   const [loading, setLoading]           = useState(true);
   const [loadingContracts, setLoadingContracts] = useState(false);
   const [viewerDoc, setViewerDoc]       = useState<{ url: string; title: string } | null>(null);
+  const [downloading, setDownloading]   = useState<string | null>(null);
   const [refreshing, setRefreshing]     = useState(false);
 
   // Carrega motoristas vinculados ao beneficiário
@@ -86,6 +87,28 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
     setSelectedDriver(driver);
     setContracts([]);
     loadContracts(driver);
+  };
+
+  const downloadContract = async (contract: FreightContract) => {
+    if (!contract.fileUrl) return;
+    setDownloading(contract.id);
+    try {
+      const res = await fetch(contract.fileUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = contract.fileName || `Contrato-${contract.tripOs || contract.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // fallback: abre em nova aba
+      window.open(contract.fileUrl, '_blank');
+    } finally {
+      setDownloading(null);
+    }
   };
 
   const handleBack = () => {
@@ -276,46 +299,83 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
               {contracts.length} contrato{contracts.length !== 1 ? 's' : ''} disponível{contracts.length !== 1 ? 'is' : ''}
             </p>
             {contracts.map(contract => (
-              <button
+              <div
                 key={contract.id}
-                onClick={() => setViewerDoc({
-                  url: contract.fileUrl!,
-                  title: `Contrato${contract.tripOs ? ` · OS ${contract.tripOs}` : ''} · ${selectedDriver.name.split(' ')[0]}`,
-                })}
-                className="w-full p-5 bg-slate-900 border border-white/5 rounded-[1.8rem] flex items-center justify-between active:bg-blue-600 transition-all group shadow-xl text-left hover:border-blue-500/20"
+                className="w-full p-5 bg-slate-900 border border-white/5 rounded-[1.8rem] shadow-xl hover:border-blue-500/20 transition-all"
               >
-                <div className="flex items-center gap-4 min-w-0">
+                <div className="flex items-center gap-4">
                   {/* PDF icon */}
-                  <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 group-active:text-white shrink-0 border border-blue-500/20">
+                  <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 shrink-0 border border-blue-500/20">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2.5"/>
                     </svg>
                   </div>
-                  <div className="text-left min-w-0">
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-black text-white uppercase truncate">
                       {contract.tripOs ? `OS ${contract.tripOs}` : contract.fileName.replace(/\.[^.]+$/, '')}
                     </p>
                     {contract.destination && (
-                      <p className="text-[8px] text-slate-500 font-bold uppercase mt-0.5 truncate group-active:text-blue-100">
-                        📍 {contract.destination}
+                      <p className="flex items-center gap-1 text-[8px] text-slate-500 font-bold uppercase mt-0.5 truncate">
+                        <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        {contract.destination}
                       </p>
                     )}
                     {contract.container && (
-                      <p className="text-[8px] font-mono font-black text-slate-400 mt-0.5 group-active:text-blue-200">
-                        📦 {contract.container}
+                      <p className="flex items-center gap-1 text-[8px] font-mono font-black text-slate-400 mt-0.5">
+                        <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                        {contract.container}
                       </p>
                     )}
+                    <span className="text-[7px] font-mono text-slate-600 mt-1 block">
+                      {new Date(contract.uploadedAt).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col gap-2 shrink-0">
+                    {/* View */}
+                    <button
+                      onClick={() => setViewerDoc({
+                        url: contract.fileUrl!,
+                        title: `Contrato${contract.tripOs ? ` · OS ${contract.tripOs}` : ''} · ${selectedDriver.name.split(' ')[0]}`,
+                      })}
+                      className="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400 active:bg-blue-600 active:text-white transition-all"
+                      title="Visualizar"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                      </svg>
+                    </button>
+
+                    {/* Download */}
+                    <button
+                      onClick={() => downloadContract(contract)}
+                      disabled={downloading === contract.id}
+                      className="w-10 h-10 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-slate-400 active:bg-emerald-600 active:text-white hover:text-emerald-400 hover:border-emerald-500/30 transition-all disabled:opacity-50"
+                      title="Baixar PDF"
+                    >
+                      {downloading === contract.id ? (
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
-                  <span className="text-[7px] font-mono text-slate-600 group-active:text-blue-200">
-                    {new Date(contract.uploadedAt).toLocaleDateString('pt-BR')}
-                  </span>
-                  <svg className="w-4 h-4 text-slate-700 group-active:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 5l7 7-7 7" strokeWidth="3"/>
-                  </svg>
-                </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
