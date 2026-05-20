@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Trip, Port, PreStacking, TripStatus } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
-import { db } from '../../utils/storage';
+import { db, supabase } from '../../utils/storage';
 import FeedbackModal from '../shared/FeedbackModal';
 import DateTimePicker from '../shared/DateTimePicker';
+import PreStackingForm from './forms/PreStackingForm';
+import { localDateStr, localDateTimeStr } from '../../utils/dateHelpers';
 
 interface OrganizationTabProps {
   userId: string;
   trips: Trip[];
   ports: Port[];
   preStacking: PreStacking[];
+  drivers: Driver[];
+  customers: Customer[];
   onRefresh: () => void;
 }
 
@@ -350,10 +354,12 @@ const ToggleIconBtn: React.FC<{
   </button>
 );
 
-const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, onRefresh }) => {
+const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, drivers, customers, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [settingsModal, setSettingsModal] = useState(false);
+  const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
+  const [minutaTrip, setMinutaTrip] = useState<Trip | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
@@ -391,6 +397,66 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     };
     fetchTypes();
   }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.from('terminal_vessels').select('*').order('fetched_at', { ascending: false })
+      .then(({ data }) => {
+        if (!data) return;
+        setTerminalVessels(data.map((r: any) => ({
+          terminal: r.terminal, navio: r.navio, situacao: r.situacao,
+          gateDry: r.gate_dry, gateReefer: r.gate_reefer,
+          deadLineStr: r.dead_line_str,
+          dtPrevAtrac: r.dt_prev_atrac, dtAtracacao: r.dt_atracacao,
+          dtPrevSaida: r.dt_prev_saida, fetchedAt: r.fetched_at,
+        } as TerminalVessel)));
+      });
+  }, []);
+
+  const parseFlexDate = (str: string): Date | null => {
+    if (!str) return null;
+    if (str.includes('/')) {
+      const parts = str.split(' ');
+      const [d, m, y] = parts[0].split('/');
+      const time = parts[1] || '12:00';
+      const dt = new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T${time}:00`);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+    const dt = new Date(str);
+    return isNaN(dt.getTime()) ? null : dt;
+  };
+
+  const getVesselForTrip = useCallback((shipName: string): TerminalVessel | null => {
+    if (!shipName) return null;
+    const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const n = norm(shipName);
+    return terminalVessels.find(v => {
+      const vn = norm(v.navio);
+      return vn === n || vn.includes(n) || n.includes(vn);
+    }) ?? null;
+  }, [terminalVessels]);
+
+  const renderGateTag = useCallback((shipName?: string): React.ReactNode => {
+    if (!shipName) return null;
+    const vessel = getVesselForTrip(shipName);
+    if (!vessel) return null;
+    const now = new Date();
+    const gateStr = vessel.gateDry || vessel.gateReefer;
+    const gateDt = parseFlexDate(gateStr || '');
+    const deadDt = parseFlexDate(vessel.deadLineStr || '');
+    if (!gateDt) return null;
+    if (gateDt > now) {
+      const label = `Abre ${gateDt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} ${gateDt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+      return <span className="inline-block px-1.5 py-0.5 rounded text-[7px] font-black bg-red-100 text-red-600 border border-red-200 uppercase leading-tight">{`Gate Fechado • ${label}`}</span>;
+    }
+    if (deadDt && deadDt < now) {
+      return <span className="inline-block px-1.5 py-0.5 rounded text-[7px] font-black bg-slate-200 text-slate-500 border border-slate-300 uppercase leading-tight">Gate Encerrado</span>;
+    }
+    const encLabel = deadDt
+      ? `Enc. ${deadDt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} ${deadDt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`
+      : 'Gate Aberto';
+    return <span className="inline-block px-1.5 py-0.5 rounded text-[7px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase leading-tight">{encLabel}</span>;
+  }, [getVesselForTrip]);
 
   useEffect(() => {
     const toRemove: string[] = [];
@@ -919,10 +985,37 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return isTripScheduled(t) && !!t.sentNF && !!t.hasAdvance;
   }, [isTripScheduled]);
 
+  const mapTripToMinuta = useCallback((t: Trip) => ({
+    os: t.os || '',
+    container: t.container || '',
+    tara: t.tara || '',
+    seal: t.seal || '',
+    booking: t.booking || '',
+    ship: t.ship || '',
+    tipo: '40HC',
+    padrao: 'CARGA GERAL',
+    tipoOperacao: t.type || 'EXPORTAÇÃO',
+    category: t.category || '',
+    driverId: t.driver?.id || '',
+    remetenteId: t.customer?.id || '',
+    destinatarioId: '',
+    date: localDateStr(),
+    displayDate: new Date().toLocaleDateString('pt-BR'),
+    horarioAgendado: localDateTimeStr(),
+    schedulingDate: '',
+    schedulingTime: '',
+    obs: '',
+    nf: '',
+    autColeta: '',
+    agencia: '',
+    embarcador: '',
+    genset: '',
+  }), []);
+
   const columns = useMemo(() => [
-    { 
-      key: 'dateTime', 
-      label: 'Data', 
+    {
+      key: 'dateTime',
+      label: 'Data',
       render: (t: Trip) => {
         const d = parseDate(t.dateTime);
         const displayDate = d ? new Intl.DateTimeFormat('pt-BR', { 
@@ -989,9 +1082,33 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         );
       }
     },
-    { 
-      key: 'driver', 
-      label: 'Motorista', 
+    {
+      key: 'booking',
+      label: 'Booking',
+      sortValue: (t: Trip) => t.booking || '',
+      render: (t: Trip) => (
+        <div className="flex flex-col gap-0.5 min-w-[90px]">
+          <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">{t.booking || '---'}</span>
+          {t.booking && (
+            <span className="text-[7px] text-slate-400 font-bold uppercase">Booking</span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'ship',
+      label: 'Navio',
+      sortValue: (t: Trip) => t.ship || '',
+      render: (t: Trip) => (
+        <div className="flex flex-col gap-1 min-w-[120px]">
+          <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">{t.ship || '---'}</span>
+          {t.ship && renderGateTag(t.ship)}
+        </div>
+      )
+    },
+    {
+      key: 'driver',
+      label: 'Motorista',
       sortValue: (t: Trip) => t.driver?.name || '',
       render: (t: Trip) => (
         <div className="flex flex-col">
@@ -1096,13 +1213,27 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       render: (t: Trip) => {
         const rawDT = t.scheduling?.dateTime || t.scheduledDateTime || '';
         const displayValue = formatToLocalInput(rawDT);
+        const hasMinuta = !!t.preStackingFormData;
         return (
-          <DateTimePicker
-            value={displayValue}
-            onChange={(v) => handleDateTimeChange(t, v)}
-            placeholder="Selecionar..."
-            inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
-          />
+          <div className="flex flex-col gap-1.5 min-w-[9rem]">
+            <DateTimePicker
+              value={displayValue}
+              onChange={(v) => handleDateTimeChange(t, v)}
+              placeholder="Selecionar..."
+              inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
+            />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setMinutaTrip(t); }}
+              className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${hasMinuta ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+              title={hasMinuta ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking'}
+            >
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              {hasMinuta ? 'Minuta ✓' : 'Gerar Minuta'}
+            </button>
+          </div>
         );
       }
     },
@@ -1152,17 +1283,30 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, mapTripToMinuta]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      <FeedbackModal 
-        isOpen={confirmModal.isOpen} 
-        title={confirmModal.title} 
-        message={confirmModal.message} 
-        type="confirm" 
-        onConfirm={confirmModal.onConfirm} 
-        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} 
+      {minutaTrip && (
+        <div className="fixed inset-0 z-[300] bg-slate-950/80 backdrop-blur-md flex flex-col overflow-y-auto animate-in fade-in duration-300">
+          <PreStackingForm
+            user={undefined}
+            drivers={drivers}
+            customers={customers}
+            ports={ports}
+            onClose={() => { setMinutaTrip(null); onRefresh(); }}
+            initialFormData={minutaTrip.preStackingFormData || mapTripToMinuta(minutaTrip)}
+          />
+        </div>
+      )}
+
+      <FeedbackModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type="confirm"
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
       />
 
       <SchedulingModal 

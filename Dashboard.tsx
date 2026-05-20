@@ -355,12 +355,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.AUTOMACOES && <AutomationsTab />}
            {activeTab === DashboardTab.NAVIOS && <NaviosTab user={user} trips={trips} />}
            {activeTab === DashboardTab.ORGANIZACAO && (
-             <OrganizationTab 
-               userId={user.id} 
-               trips={trips} 
-               ports={ports} 
+             <OrganizationTab
+               userId={user.id}
+               trips={trips}
+               ports={ports}
                preStacking={preStacking}
-               onRefresh={() => loadAllData(false)} 
+               drivers={drivers}
+               customers={customers}
+               onRefresh={() => loadAllData(false)}
              />
            )}
            {activeTab === DashboardTab.COLETA_DIA && (
