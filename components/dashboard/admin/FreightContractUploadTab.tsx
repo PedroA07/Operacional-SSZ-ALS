@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { db } from '../../../utils/storage';
+import { fileStorage } from '../../../utils/fileStorage';
 import { FreightContract, Trip } from '../../../types';
 
 // ─── Container number extractor ───────────────────────────────────────────────
@@ -119,9 +120,21 @@ const FreightContractUploadTab: React.FC<Props> = ({ trips }) => {
     for (const entry of pending) {
       patchEntry(entry.id, { status: 'processing' });
       try {
-        const fileUrl = await readFileAsBase64(entry.file);
-        const contractNumber = extractContractNumber(entry.file.name);
         const trip = entry.matchedTrip;
+        const contractNumber = extractContractNumber(entry.file.name);
+
+        // Upload to R2 storage if trip is linked, otherwise fall back to base64
+        let fileUrl: string;
+        if (trip) {
+          try {
+            const existingDocs = trip.freightContractDocs?.length ? trip.freightContractDocs : (trip.freightContractDoc ? [trip.freightContractDoc] : []);
+            fileUrl = await fileStorage.uploadFreightContract(entry.file, trip.os, existingDocs.length + 1);
+          } catch {
+            fileUrl = await readFileAsBase64(entry.file);
+          }
+        } else {
+          fileUrl = await readFileAsBase64(entry.file);
+        }
 
         const savedId = await db.saveFreightContract({
           fileName:       entry.file.name,
@@ -134,17 +147,20 @@ const FreightContractUploadTab: React.FC<Props> = ({ trips }) => {
           status:         trip ? 'linked' : 'unlinked',
         });
 
-        // Se vinculado a uma trip, atualiza o freightContractDoc da trip também
+        // Se vinculado a uma trip, atualiza freightContractDoc e freightContractDocs da trip
         if (trip && savedId) {
+          const newDoc = {
+            id:         savedId,
+            type:       'CONTRATO_FRETE',
+            url:        fileUrl,
+            fileName:   entry.file.name,
+            uploadDate: new Date().toISOString(),
+          };
+          const existingDocs = trip.freightContractDocs?.length ? trip.freightContractDocs : (trip.freightContractDoc ? [trip.freightContractDoc] : []);
           await db.saveTrip({
             ...trip,
-            freightContractDoc: {
-              id:         savedId,
-              type:       'CONTRATO_FRETE',
-              url:        fileUrl,
-              fileName:   entry.file.name,
-              uploadDate: new Date().toISOString(),
-            },
+            freightContractDoc: newDoc,
+            freightContractDocs: [...existingDocs, newDoc],
           }, { id: 'system', role: 'admin' } as any);
 
           // Atualiza data e local do último contrato no motorista

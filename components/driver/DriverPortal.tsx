@@ -178,7 +178,13 @@ const DriverPortal: React.FC<DriverPortalProps> = ({ user, onLogout }) => {
       <main className="flex-1 px-5 pt-6 overflow-y-auto custom-scrollbar">
         {activeTab === 'inicio' && <HomeTab user={user} trips={trips} onRefresh={() => loadPortalData(false)} />}
         {activeTab === 'viagens' && <TripsTab trips={trips} user={user} onRefresh={() => loadPortalData(false)} />}
-        {activeTab === 'docs' && <DocsTab trips={trips} driver={driver} canSeeContracts={user.role !== 'beneficiary'} />}
+        {activeTab === 'docs' && <DocsTab trips={trips} driver={driver} canSeeContracts={(() => {
+          const sendTo = driver?.freightContractSendTo;
+          if (!sendTo || sendTo === 'group') return true;
+          if (sendTo === 'driver') return user.role === 'driver';
+          if (sendTo === 'beneficiary') return user.role === 'beneficiary';
+          return true;
+        })()} />}
         {activeTab === 'perfil' && <ProfileTab user={user} driver={driver} onLogout={onLogout} />}
         {activeTab === 'download' && <DownloadAppTab />}
       </main>
