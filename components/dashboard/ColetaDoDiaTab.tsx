@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Trip, ColetaTipoViagemOption, EmailTemplate, ColetaOpConfig, ColetaDocOriginarioRule } from '../../types';
+import React, { useState, useMemo, useCallback, useEffect, useRef, useTransition } from 'react';
+import { Trip, ColetaTipoViagemOption, EmailTemplate, ColetaOpConfig, ColetaDocOriginarioRule, ColetaReplaceRule } from '../../types';
 import { db } from '../../utils/storage';
 import SmartOperationTable from './operations/SmartOperationTable';
 import FeedbackModal from '../shared/FeedbackModal';
@@ -45,6 +45,180 @@ const ToggleIconBtn: React.FC<{
   </button>
 );
 
+// ── DocOriginarioEditor ────────────────────────────────────────────────────────
+const VARS = [
+  { label: '{os}', title: 'Número da OS' },
+  { label: '{booking}', title: 'Booking' },
+  { label: '{container}', title: 'Container' },
+  { label: '{ship}', title: 'Navio' },
+  { label: '{cliente}', title: 'Cliente' },
+  { label: '{motorista}', title: 'Motorista' },
+];
+
+function DocOriginarioEditor({ cfg, allCustomers, onChange }: {
+  cfg: ColetaOpConfig;
+  allCustomers: { id: string; name: string }[];
+  onChange: (patch: Partial<ColetaOpConfig>) => void;
+}) {
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertAtCursor = (variable: string, field: 'docOriginarioText' | 'docOriginarioPrefix' | 'docOriginarioSuffix') => {
+    const ta = taRef.current;
+    if (!ta) { onChange({ [field]: ((cfg[field] as string) || '') + variable }); return; }
+    const start = ta.selectionStart ?? (cfg[field] as string || '').length;
+    const end   = ta.selectionEnd   ?? start;
+    const cur   = (cfg[field] as string) || '';
+    onChange({ [field]: cur.slice(0, start) + variable + cur.slice(end) });
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(start + variable.length, start + variable.length); }, 0);
+  };
+
+  const VarButtons = ({ field }: { field: 'docOriginarioText' | 'docOriginarioPrefix' | 'docOriginarioSuffix' }) => (
+    <div className="flex flex-wrap gap-1 mb-1">
+      {VARS.map(v => (
+        <button key={v.label} type="button" title={v.title}
+          onClick={() => insertAtCursor(v.label, field)}
+          className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700 rounded text-[9px] font-mono font-black border border-slate-200 hover:border-blue-300 transition-all">
+          {v.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const replaceRules: ColetaReplaceRule[] = cfg.docOriginarioReplaceRules || [];
+  const updateRule = (idx: number, patch: Partial<ColetaReplaceRule>) => {
+    const next = replaceRules.map((r, i) => i === idx ? { ...r, ...patch } : r);
+    onChange({ docOriginarioReplaceRules: next });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Template por OS */}
+      <div className="space-y-1">
+        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+          Template por OS <span className="font-normal text-slate-400">(repete para cada OS)</span>
+        </label>
+        <VarButtons field="docOriginarioText" />
+        <textarea
+          ref={taRef}
+          rows={3}
+          value={cfg.docOriginarioText || ''}
+          onChange={e => onChange({ docOriginarioText: e.target.value })}
+          placeholder="Ex: CT-e ref. OS {os} — booking {booking}"
+          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-medium text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono"
+        />
+      </div>
+
+      {/* Separador */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Separador entre OSes</label>
+          <input
+            value={cfg.docOriginarioSeparator !== undefined ? cfg.docOriginarioSeparator : '\n'}
+            onChange={e => onChange({ docOriginarioSeparator: e.target.value })}
+            placeholder="\n (padrão = nova linha)"
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <p className="text-[8px] text-slate-400">Use \n para nova linha ou | para separar na mesma linha</p>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">&nbsp;</label>
+          <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-[8px] text-slate-500 font-mono leading-relaxed">
+            <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Prévia</span>
+            {['OS001', 'OS002', 'OS003'].join(
+              (cfg.docOriginarioSeparator !== undefined ? cfg.docOriginarioSeparator : '\n').replace(/\\n/g, '\n')
+            ).split('\n').map((l, i) => <div key={i}>{l}</div>)}
+          </div>
+        </div>
+      </div>
+
+      {/* Prefixo / Sufixo */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Prefixo (antes das OSes)</label>
+          <VarButtons field="docOriginarioPrefix" />
+          <input value={cfg.docOriginarioPrefix || ''} onChange={e => onChange({ docOriginarioPrefix: e.target.value })}
+            placeholder="Ex: Solicito emissão CT-e:"
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Sufixo (após as OSes)</label>
+          <VarButtons field="docOriginarioSuffix" />
+          <input value={cfg.docOriginarioSuffix || ''} onChange={e => onChange({ docOriginarioSuffix: e.target.value })}
+            placeholder="Ex: Obrigado."
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        </div>
+      </div>
+
+      {/* Substituições */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Substituições (find → replace)</label>
+          <button type="button"
+            onClick={() => onChange({ docOriginarioReplaceRules: [...replaceRules, { find: '', replace: '' }] })}
+            className="text-[9px] font-black text-blue-600 uppercase hover:text-blue-700 flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+            Adicionar
+          </button>
+        </div>
+        {replaceRules.map((r, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input value={r.find} onChange={e => updateRule(i, { find: e.target.value })}
+              placeholder='Buscar ex: "/"'
+              className="flex-1 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-mono text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M9 5l7 7-7 7"/></svg>
+            <input value={r.replace} onChange={e => updateRule(i, { replace: e.target.value })}
+              placeholder='Substituir ex: "-"'
+              className="flex-1 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-mono text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            <button type="button" onClick={() => { const n = [...replaceRules]; n.splice(i,1); onChange({ docOriginarioReplaceRules: n }); }}
+              className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Exceções por cliente */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Exceções por cliente</label>
+          <button type="button"
+            onClick={() => onChange({ docOriginarioByCustomer: [...(cfg.docOriginarioByCustomer || []), { customerId: '', customerName: '', text: '' }] })}
+            className="text-[9px] font-black text-blue-600 uppercase hover:text-blue-700 flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+            Adicionar
+          </button>
+        </div>
+        {(cfg.docOriginarioByCustomer || []).map((rule, rIdx) => (
+          <div key={rIdx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-center gap-2">
+              <select value={rule.customerId}
+                onChange={e => {
+                  const cust = allCustomers.find(c => c.id === e.target.value);
+                  const rules = [...(cfg.docOriginarioByCustomer || [])];
+                  rules[rIdx] = { ...rule, customerId: e.target.value, customerName: cust?.name || '' };
+                  onChange({ docOriginarioByCustomer: rules });
+                }}
+                className="flex-1 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                <option value="">Selecionar cliente...</option>
+                {allCustomers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <button type="button" onClick={() => { const r = [...(cfg.docOriginarioByCustomer||[])]; r.splice(rIdx,1); onChange({ docOriginarioByCustomer: r }); }}
+                className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <VarButtons field="docOriginarioText" />
+            <textarea rows={2} value={rule.text}
+              onChange={e => { const rules = [...(cfg.docOriginarioByCustomer||[])]; rules[rIdx] = { ...rule, text: e.target.value }; onChange({ docOriginarioByCustomer: rules }); }}
+              placeholder={`Template específico para ${rule.customerName || 'este cliente'}...`}
+              className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-mono text-slate-700 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrips, emailTemplates: propTemplates, onRefresh }) => {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
@@ -69,6 +243,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   });
   const [copied, setCopied] = useState(false);
   const [activeOpTab, setActiveOpTab] = useState<string>('TODOS');
+  const [isPending, startTransition] = useTransition();
   const [allCustomers, setAllCustomers] = useState<{ id: string; name: string }[]>([]);
   // coletaOpConfig: keyed by coleta tipo viagem id (tipo de operação)
   const [coletaOpConfig, setColetaOpConfig] = useState<Record<string, ColetaOpConfig>>({});
@@ -139,21 +314,13 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     }
   }, [propTrips, pendingUpdates]);
 
-  const trips = useMemo(() => {
+  // Pré-computa todos os trips válidos (sem filtro de aba) e ordena uma única vez
+  const baseTrips = useMemo(() => {
     const now = Date.now();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     return propTrips
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
-      .filter(trip => {
-        if (activeOpTab === 'TODOS') return true;
-        const effective = trip.coletaTipoViagem || defaultTipoViagemId || null;
-        if (activeOpTab === '__NONE__') return !effective;
-        return effective === activeOpTab;
-      })
       .filter(trip => {
         const dt = trip.dateTime;
         if (!dt) return true;
@@ -163,13 +330,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       })
       .map(serverTrip => {
         const pending = pendingUpdates[serverTrip.id];
-        if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
-          return { ...serverTrip, ...pending.data };
-        }
+        if (pending && (now - pending.timestamp) < STABILITY_DURATION) return { ...serverTrip, ...pending.data };
         return serverTrip;
       })
       .sort((a, b) => {
-        // NF enviada → topo (pronto para coleta)
         const aNF = !!a.sentNF;
         const bNF = !!b.sentNF;
         if (aNF !== bNF) return aNF ? -1 : 1;
@@ -179,6 +343,16 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
   }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes]);
+
+  // Troca de aba é apenas um filtro leve sobre baseTrips
+  const trips = useMemo(() => {
+    if (activeOpTab === 'TODOS') return baseTrips;
+    return baseTrips.filter(trip => {
+      const effective = trip.coletaTipoViagem || defaultTipoViagemId || null;
+      if (activeOpTab === '__NONE__') return !effective;
+      return effective === activeOpTab;
+    });
+  }, [baseTrips, activeOpTab, defaultTipoViagemId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -198,26 +372,8 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return () => clearInterval(interval);
   }, []);
 
-  // Trips sem filtro de aba — para contadores nas abas
-  const allFilteredTrips = useMemo(() => {
-    const now = Date.now();
-    return propTrips
-      .filter(trip => !finalizingIds.has(trip.id))
-      .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
-      .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
-      .filter(trip => {
-        const dt = trip.dateTime;
-        if (!dt) return true;
-        const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
-        const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
-        return normalized >= '2026-04-01';
-      })
-      .map(serverTrip => {
-        const pending = pendingUpdates[serverTrip.id];
-        if (pending && (now - pending.timestamp) < STABILITY_DURATION) return { ...serverTrip, ...pending.data };
-        return serverTrip;
-      });
-  }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes]);
+  // Para contadores nas abas, reutiliza baseTrips
+  const allFilteredTrips = baseTrips;
 
   // Abas de tipos de operação (da coleta_tipos_viagem) — inclui "Sem tipo" apenas se houver trips sem tipo E sem padrão
   const opTabOptions = useMemo(() => {
@@ -606,16 +762,46 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     });
   };
 
-  const getDocOriginarioText = (t: Trip): string => {
-    const cfg = t.coletaTipoViagem ? coletaOpConfig[t.coletaTipoViagem] : undefined;
-    const clientRule = cfg?.docOriginarioByCustomer?.find(r => r.customerId === t.customer?.id);
-    const baseText = clientRule?.text || cfg?.docOriginarioText ||
-      'Doc. originário gerado, gentileza seguir com a emissão do CT-e:\n{os}';
-    return baseText
+  const applyTripVars = (template: string, t: Trip) =>
+    template
       .replace(/\{os\}/g, t.os)
       .replace(/\{booking\}/g, t.booking || '')
       .replace(/\{container\}/g, t.container || '')
-      .replace(/\{ship\}/g, t.ship || '');
+      .replace(/\{ship\}/g, t.ship || '')
+      .replace(/\{cliente\}/g, t.customer?.name || '')
+      .replace(/\{motorista\}/g, t.driver?.name || '');
+
+  const buildDocOriginarioOutput = (docTrips: Trip[]): string => {
+    // Agrupa por tipo de operação para aplicar config correto
+    const groups = new Map<string | null, Trip[]>();
+    docTrips.forEach(t => {
+      const key = t.coletaTipoViagem || defaultTipoViagemId || null;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(t);
+    });
+
+    const blocks: string[] = [];
+    for (const [tipoId, groupTrips] of groups.entries()) {
+      const cfg = tipoId ? coletaOpConfig[tipoId] : undefined;
+      const template = cfg?.docOriginarioText || '{os}';
+      const sep     = cfg?.docOriginarioSeparator !== undefined ? cfg.docOriginarioSeparator : '\n';
+      const prefix  = cfg?.docOriginarioPrefix  || '';
+      const suffix  = cfg?.docOriginarioSuffix  || '';
+      const rules   = cfg?.docOriginarioReplaceRules || [];
+
+      const lines = groupTrips.map(t => {
+        const clientRule = cfg?.docOriginarioByCustomer?.find(r => r.customerId === t.customer?.id);
+        const tpl = clientRule?.text || template;
+        return applyTripVars(tpl, t);
+      });
+
+      let block = lines.join(sep);
+      rules.forEach(r => { if (r.find) block = block.split(r.find).join(r.replace ?? ''); });
+      if (prefix) block = prefix + '\n' + block;
+      if (suffix) block = block + '\n' + suffix;
+      blocks.push(block);
+    }
+    return blocks.join('\n\n');
   };
 
   const handleCopyDocOriginario = () => {
@@ -626,11 +812,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       }));
       return;
     }
-    // Agrupa por tipo de operação para usar texto correto
-    const lines = docTrips.map(t => getDocOriginarioText(t));
-    const text = [...new Set(lines)].length === 1
-      ? lines[0]
-      : docTrips.map(t => `[${t.type || ''}] ${getDocOriginarioText(t)}`).join('\n\n');
+    const text = buildDocOriginarioOutput(docTrips);
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       window.dispatchEvent(new CustomEvent('als_show_toast', {
@@ -763,7 +945,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       {opTabOptions.length > 0 && (
         <div className="flex gap-2 flex-wrap">
           <button
-            onClick={() => setActiveOpTab('TODOS')}
+            onClick={() => startTransition(() => setActiveOpTab('TODOS'))}
             className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
               activeOpTab === 'TODOS'
                 ? 'bg-slate-900 text-white border-slate-900 shadow-lg'
@@ -781,7 +963,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveOpTab(tab.id)}
+                onClick={() => startTransition(() => setActiveOpTab(tab.id))}
                 className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
                   isActive ? 'text-white shadow-lg' : 'bg-white border-slate-200 hover:border-slate-400'
                 }`}
@@ -899,76 +1081,12 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                             <span className="text-[11px] font-black text-slate-600 uppercase">Requer envio de e-mail</span>
                           </label>
 
-                          {/* Texto padrão doc originário */}
-                          <div className="space-y-1.5">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
-                              Texto do Doc. Originário <span className="font-normal">— variáveis: {'{os}'}, {'{booking}'}, {'{container}'}, {'{ship}'}</span>
-                            </label>
-                            <textarea
-                              rows={3}
-                              value={typeCfg.docOriginarioText || ''}
-                              onChange={e => updateTypeCfg({ docOriginarioText: e.target.value })}
-                              placeholder={`Ex: Solicito emissão CT-e ref. OS {os}, booking {booking}.`}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-medium text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            />
-                          </div>
-
-                          {/* Textos por cliente */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Texto por Cliente (exceções)</label>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const rules = typeCfg.docOriginarioByCustomer || [];
-                                  updateTypeCfg({ docOriginarioByCustomer: [...rules, { customerId: '', customerName: '', text: '' }] });
-                                }}
-                                className="text-[9px] font-black text-blue-600 uppercase hover:text-blue-700 flex items-center gap-1"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
-                                Adicionar
-                              </button>
-                            </div>
-                            {(typeCfg.docOriginarioByCustomer || []).map((rule: ColetaDocOriginarioRule, rIdx: number) => (
-                              <div key={rIdx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                <select
-                                  value={rule.customerId}
-                                  onChange={e => {
-                                    const cust = allCustomers.find(c => c.id === e.target.value);
-                                    const rules = [...(typeCfg.docOriginarioByCustomer || [])];
-                                    rules[rIdx] = { ...rule, customerId: e.target.value, customerName: cust?.name || '' };
-                                    updateTypeCfg({ docOriginarioByCustomer: rules });
-                                  }}
-                                  className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                >
-                                  <option value="">Selecionar cliente...</option>
-                                  {allCustomers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
-                                <textarea
-                                  rows={2}
-                                  value={rule.text}
-                                  onChange={e => {
-                                    const rules = [...(typeCfg.docOriginarioByCustomer || [])];
-                                    rules[rIdx] = { ...rule, text: e.target.value };
-                                    updateTypeCfg({ docOriginarioByCustomer: rules });
-                                  }}
-                                  placeholder={`Texto para ${rule.customerName || 'este cliente'}...`}
-                                  className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const rules = [...(typeCfg.docOriginarioByCustomer || [])];
-                                    rules.splice(rIdx, 1);
-                                    updateTypeCfg({ docOriginarioByCustomer: rules });
-                                  }}
-                                  className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
+                          {/* Editor completo do Doc. Originário */}
+                          <DocOriginarioEditor
+                            cfg={typeCfg}
+                            allCustomers={allCustomers}
+                            onChange={updateTypeCfg}
+                          />
                         </div>
                       )}
                     </div>
