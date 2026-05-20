@@ -23,7 +23,7 @@ const TERM_ACCENT: Record<string, { bg: string; text: string; border: string; ba
   'BTP':           { bg: 'bg-amber-500/10',   text: 'text-amber-300',   border: 'border-amber-500/30',   badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
   'ECOPORTO':      { bg: 'bg-blue-500/10',    text: 'text-blue-300',    border: 'border-blue-500/30',    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
   'SANTOS BRASIL': { bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/30', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
-  'EMBRAPORT':     { bg: 'bg-purple-500/10',  text: 'text-purple-300',  border: 'border-purple-500/30',  badge: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
+  'EMBRAPORT':     { bg: 'bg-blue-900/20',     text: 'text-blue-300',    border: 'border-blue-800/40',    badge: 'bg-blue-900/30 text-blue-200 border-blue-700/40' },
 };
 const TERM_LINKS: Record<string, string> = {
   'BTP':           'https://novo-tas.btp.com.br/ConsultasLivres/ListaAtracacaoIndex',
@@ -328,48 +328,73 @@ function IconSVGEcoporto({ size = 32 }: { size?: number }) {
 
 /**
  * EMBRAPORT — DP World Santos
- * Ícone quadrado: fundo azul-marinho (#003e5c), globo branco com meridianos/paralelos,
- * "DP" bold branco + "WORLD" menor — fiel ao visual da marca DP World.
+ * Ícone quadrado: réplica fiel do mark DP World 2021.
+ * "D" em negrito com 3 faixas horizontais: vermelho (#cc003d) / branco / verde (#00956d)
+ * Stem esquerdo + curva direita formam o "D" — fundo navy (#003764).
  */
 function IconSVGEmbraport({ size = 32 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100" height="100" rx="6" fill="#003e5c"/>
-      {/* Globo — círculo base branco */}
-      <circle cx="50" cy="38" r="22" stroke="white" strokeWidth="2.5" fill="none"/>
-      {/* Meridiano vertical central */}
-      <path d="M 50,16 Q 58,38 50,60 Q 42,38 50,16" stroke="white" strokeWidth="1.8" fill="none"/>
-      {/* Paralelo superior */}
-      <path d="M 30,30 Q 50,35 70,30" stroke="white" strokeWidth="1.5" fill="none"/>
-      {/* Paralelo inferior */}
-      <path d="M 29,46 Q 50,51 71,46" stroke="white" strokeWidth="1.5" fill="none"/>
-      {/* Linha do equador */}
-      <line x1="28" y1="38" x2="72" y2="38" stroke="white" strokeWidth="1.5"/>
-      {/* "DP" bold */}
-      <text x="50" y="80" textAnchor="middle"
-            fontFamily="Arial Black, Arial, sans-serif"
-            fontWeight="900" fontSize="18" fill="white" letterSpacing="1">DP</text>
-      {/* "WORLD" menor */}
-      <text x="50" y="93" textAnchor="middle"
-            fontFamily="Arial, sans-serif"
-            fontWeight="700" fontSize="10" fill="#7ecbd4" letterSpacing="2">WORLD</text>
+      <rect width="100" height="100" rx="6" fill="#003764"/>
+      <defs>
+        {/* Forma do "D" — stem esquerdo + curva direita */}
+        <clipPath id="dpw-icon-d">
+          <path d="M 16,12 L 16,88 L 44,88 Q 84,88 84,50 Q 84,12 44,12 Z"/>
+        </clipPath>
+      </defs>
+      {/* Faixa vermelha — terço superior do D */}
+      <rect x="0" y="12" width="100" height="25" fill="#cc003d" clipPath="url(#dpw-icon-d)"/>
+      {/* Faixa branca — terço central */}
+      <rect x="0" y="37" width="100" height="26" fill="white" clipPath="url(#dpw-icon-d)"/>
+      {/* Faixa verde — terço inferior */}
+      <rect x="0" y="63" width="100" height="25" fill="#00956d" clipPath="url(#dpw-icon-d)"/>
+      {/* Stem esquerdo do D em navy (separador visual) */}
+      <rect x="16" y="12" width="10" height="76" fill="#003764"/>
+      {/* Separador vermelho/branco */}
+      <rect x="26" y="36" width="60" height="2.5" fill="#003764" clipPath="url(#dpw-icon-d)"/>
+      {/* Separador branco/verde */}
+      <rect x="26" y="62" width="60" height="2.5" fill="#003764" clipPath="url(#dpw-icon-d)"/>
     </svg>
   );
 }
 
-/** Logo completa Embraport para cards */
+/**
+ * Logo completa DP World Santos para cards.
+ * Horizontal: D mark (3 faixas) + "DP WORLD" navy bold + "SANTOS" verde.
+ * Aspect ratio ~4.2:1 — fiel ao logo oficial DP World 2021.
+ */
 function LogoSVGEmbraport({ height = 32 }: { height?: number }) {
+  const w = Math.round(height * 4.2);
   return (
-    <span className="inline-flex items-center gap-2 shrink-0">
-      <IconSVGEmbraport size={height}/>
-      <svg width={90} height={height} viewBox="0 0 90 32" fill="none">
-        <text x="0" y="13" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="13" fill="#003e5c">DP WORLD</text>
-        <text x="0" y="26" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="9" fill="#888" letterSpacing="1">Santos</text>
-        <text x="0" y="36" fontFamily="Arial, sans-serif" fontWeight="400" fontSize="7" fill="#aaa" letterSpacing="1.5">EMBRAPORT</text>
-      </svg>
-    </span>
+    <svg width={w} height={height} viewBox="0 0 420 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="dpw-logo-d">
+          <path d="M 0,0 L 0,100 L 36,100 Q 76,100 76,50 Q 76,0 36,0 Z"/>
+        </clipPath>
+      </defs>
+      {/* D mark: faixa vermelha */}
+      <rect x="0" y="0"  width="80" height="33" fill="#cc003d" clipPath="url(#dpw-logo-d)"/>
+      {/* D mark: faixa branca */}
+      <rect x="0" y="33" width="80" height="34" fill="white"   clipPath="url(#dpw-logo-d)"/>
+      {/* D mark: faixa verde */}
+      <rect x="0" y="67" width="80" height="33" fill="#00956d" clipPath="url(#dpw-logo-d)"/>
+      {/* Stem esquerdo navy */}
+      <rect x="0" y="0" width="10" height="100" fill="#003764"/>
+      {/* Separadores */}
+      <rect x="10" y="32" width="68" height="2.5" fill="#003764" clipPath="url(#dpw-logo-d)"/>
+      <rect x="10" y="65" width="68" height="2.5" fill="#003764" clipPath="url(#dpw-logo-d)"/>
+      {/* "DP WORLD" — bold navy, alinhado com o D */}
+      <text x="92" y="62"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fontWeight="900" fontSize="50" fill="#003764" letterSpacing="-1">DP WORLD</text>
+      {/* "SANTOS" — verde, espaçado, abaixo */}
+      <text x="93" y="84"
+            fontFamily="Arial, sans-serif"
+            fontWeight="700" fontSize="17" fill="#00956d" letterSpacing="6">SANTOS</text>
+    </svg>
   );
 }
+
 
 /** Genérico */
 function IconSVGGeneric({ terminal, size = 32 }: { terminal: string; size?: number }) {
