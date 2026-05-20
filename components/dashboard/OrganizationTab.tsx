@@ -413,16 +413,25 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       });
   }, []);
 
-  // Separa "NAVIO/VIAGEM" ou "NAVIO VIAGEM" → { name, voyage }
+  // Separa "NAVIO/VIAGEM", "NAVIO|VIAGEM" ou "NAVIO VIAGEM" → { name, voyage }
   const splitShipField = useCallback((raw: string): { name: string; voyage: string } => {
     if (!raw) return { name: '', voyage: '' };
-    if (raw.includes('/')) {
-      const idx = raw.indexOf('/');
-      return { name: raw.slice(0, idx).trim(), voyage: raw.slice(idx + 1).trim() };
+    // Separador explícito: / ou |
+    const explicitMatch = raw.match(/^([^/|]+)[/|](.*)$/);
+    if (explicitMatch) {
+      return { name: explicitMatch[1].trim(), voyage: explicitMatch[2].trim() };
     }
-    // Voyage code ao final: dígitos seguidos de 0-2 letras, ex "621N", "621", "A12"
-    const match = raw.match(/^(.*?)\s+([A-Z]?\d+[A-Z]{0,2})$/i);
-    if (match) return { name: match[1].trim(), voyage: match[2].trim().toUpperCase() };
+    // Código de viagem ao final após espaço: letras/dígitos curtos (ex: "621N", "0BCNQN1RC", "619S")
+    // Padrão: última "palavra" que seja alfanumérica compacta (sem espaços internos, 2-12 chars)
+    const spaceMatch = raw.match(/^(.*?)\s+([A-Z0-9]{2,12})$/i);
+    if (spaceMatch) {
+      const candidate = spaceMatch[2].toUpperCase();
+      // Só considera como viagem se não for apenas uma palavra simples do nome do navio
+      // (viagens tendem a misturar dígitos e letras ou serem alfanuméricos curtos)
+      if (/\d/.test(candidate) || candidate.length <= 6) {
+        return { name: spaceMatch[1].trim(), voyage: candidate };
+      }
+    }
     return { name: raw.trim(), voyage: '' };
   }, []);
 
@@ -442,12 +451,25 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const getVesselForTrip = useCallback((shipRaw: string): TerminalVessel | null => {
     if (!shipRaw) return null;
     const { name } = splitShipField(shipRaw);
-    const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    // Normaliza: apenas letras e dígitos, sem espaços/acentos
+    const norm = (s: string) => s.toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')  // remove acentos
+      .replace(/[^A-Z0-9]/g, '');
     const n = norm(name || shipRaw);
-    if (!n) return null;
+    if (!n || n.length < 3) return null;
+
+    // Tenta match exato primeiro, depois parcial por palavras
+    const nameWords = (name || shipRaw).toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .split(/\s+/).filter(w => w.length > 2);
+
     return terminalVessels.find(v => {
       const vn = norm(v.navio);
-      return vn === n || vn.includes(n) || n.includes(vn);
+      const vRaw = v.navio.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      if (vn === n) return true;
+      if (vn.includes(n) || n.includes(vn)) return true;
+      // Match por palavras: todas as palavras do nome da trip devem estar no navio do terminal
+      return nameWords.length >= 2 && nameWords.every(w => vRaw.includes(w));
     }) ?? null;
   }, [terminalVessels, splitShipField]);
 
