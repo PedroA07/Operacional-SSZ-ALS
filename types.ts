@@ -363,7 +363,8 @@ export type TripStatus =
   | 'Agendamento realizado'
   | 'Emissão Solicitada'
   | 'Cancelado'
-  | 'Frete Morto';
+  | 'Frete Morto'
+  | 'Reutilização';
 
 export type VWStatus = TripStatus;
 

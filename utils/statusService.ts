@@ -9,10 +9,12 @@ export interface StatusOption {
   operationalOnly?: boolean;
 }
 
-// Encerramentos globais — aparecem para todo tipo de programação, nunca para o motorista
+// Status globais operacionais — aparecem para todo tipo de programação, nunca para o motorista
+// Cancelado e Frete Morto NÃO encerram a viagem — aguardam Reutilização ou Baixa normal
 const GLOBAL_CLOSURE_STATUSES: StatusOption[] = [
-  { label: 'Cancelado',   value: 'Cancelado',   color: 'bg-amber-500', isFinal: true, operationalOnly: true },
-  { label: 'Frete Morto', value: 'Frete Morto', color: 'bg-red-600',   isFinal: true, operationalOnly: true },
+  { label: 'Cancelado',    value: 'Cancelado',    color: 'bg-red-600',     isFinal: false, operationalOnly: true },
+  { label: 'Frete Morto',  value: 'Frete Morto',  color: 'bg-amber-600',   isFinal: false, operationalOnly: true },
+  { label: 'Reutilização', value: 'Reutilização', color: 'bg-emerald-700', isFinal: true,  operationalOnly: true },
 ];
 
 export const statusService = {
@@ -112,8 +114,7 @@ export const statusService = {
 
   /** Verifica se o status atual marca a trip como concluída */
   isTripCompleted: (status: string, trip: Trip | null, customStatuses: CustomStatus[]): boolean => {
-    if (status === 'Viagem concluída') return true;
-    if (status === 'Cancelado' || status === 'Frete Morto') return true;
+    if (status === 'Viagem concluída' || status === 'Reutilização') return true;
     if (!trip) return false;
 
     const options = statusService.getCustomOptions(trip, customStatuses);
