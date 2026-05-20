@@ -413,6 +413,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       });
   }, []);
 
+  // Separa "NAVIO/VIAGEM" ou "NAVIO VIAGEM" → { name, voyage }
+  const splitShipField = useCallback((raw: string): { name: string; voyage: string } => {
+    if (!raw) return { name: '', voyage: '' };
+    if (raw.includes('/')) {
+      const idx = raw.indexOf('/');
+      return { name: raw.slice(0, idx).trim(), voyage: raw.slice(idx + 1).trim() };
+    }
+    // Voyage code ao final: dígitos seguidos de 0-2 letras, ex "621N", "621", "A12"
+    const match = raw.match(/^(.*?)\s+([A-Z]?\d+[A-Z]{0,2})$/i);
+    if (match) return { name: match[1].trim(), voyage: match[2].trim().toUpperCase() };
+    return { name: raw.trim(), voyage: '' };
+  }, []);
+
   const parseFlexDate = (str: string): Date | null => {
     if (!str) return null;
     if (str.includes('/')) {
@@ -426,15 +439,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return isNaN(dt.getTime()) ? null : dt;
   };
 
-  const getVesselForTrip = useCallback((shipName: string): TerminalVessel | null => {
-    if (!shipName) return null;
+  const getVesselForTrip = useCallback((shipRaw: string): TerminalVessel | null => {
+    if (!shipRaw) return null;
+    const { name } = splitShipField(shipRaw);
     const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const n = norm(shipName);
+    const n = norm(name || shipRaw);
+    if (!n) return null;
     return terminalVessels.find(v => {
       const vn = norm(v.navio);
       return vn === n || vn.includes(n) || n.includes(vn);
     }) ?? null;
-  }, [terminalVessels]);
+  }, [terminalVessels, splitShipField]);
 
   const renderGateTag = useCallback((shipName?: string): React.ReactNode => {
     if (!shipName) return null;
@@ -1126,12 +1141,22 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       key: 'ship',
       label: 'Navio',
       sortValue: (t: Trip) => t.ship || '',
-      render: (t: Trip) => (
-        <div className="flex flex-col gap-1 min-w-[120px]">
-          <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">{t.ship || '---'}</span>
-          {t.ship && renderGateTag(t.ship)}
-        </div>
-      )
+      render: (t: Trip) => {
+        const { name, voyage } = splitShipField(t.ship || '');
+        return (
+          <div className="flex flex-col gap-1 min-w-[130px]">
+            <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">
+              {name || '---'}
+            </span>
+            {voyage && (
+              <span className="text-[7px] font-bold text-slate-400 uppercase tracking-tight">
+                Viagem: {voyage}
+              </span>
+            )}
+            {t.ship && renderGateTag(t.ship)}
+          </div>
+        );
+      }
     },
     {
       key: 'driver',
