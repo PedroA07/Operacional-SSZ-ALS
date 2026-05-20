@@ -138,6 +138,24 @@ function isExpiredStr(v?: string | null) {
   }
   return new Date(v) < new Date();
 }
+function isToday(v?: string | null): boolean {
+  if (!v || v === '—' || v === '-') return false;
+  let d: Date;
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(v)) {
+    const parts = v.split(/[\/\s:]/);
+    d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+  } else {
+    try { d = new Date(v); } catch { return false; }
+  }
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+function gateTimeStr(v?: string | null): string {
+  if (!v) return '';
+  if (/^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}/.test(v)) return v.split(' ')[1].slice(0, 5);
+  return '';
+}
 const emptyShip = (): Partial<Ship> => ({
   name:'', imo:'', armador:'', viagem:'', terminal:'BTP', berco:'',
   prevAtracacao:'', abertGate:'', deadLine:'', dataAtracacao:'', dataDesatrac:'',
@@ -657,6 +675,10 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const [loadingTV, setLTV]           = useState(true);
   const [tvError, setTVError]         = useState<string|null>(null);
   const [tvFilter, setTVFilter]       = useState<TVFilter>('TODOS');
+  const [tvTermFilter, setTVTermFilter] = useState<string>('TODOS');
+  const [shipSearch, setShipSearch]   = useState('');
+  // Monitoramento: set de índices expandidos
+  const [expandedVessels, setExpandedVessels] = useState<Set<number>>(new Set());
 
   // Locations (ports + preStacking) for scheduling modal
   const [locations, setLocations]     = useState<any[]>([]);
@@ -774,9 +796,15 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
 
   // Filtered vessels for Programação tab
   const filteredVessels = useMemo(() => {
-    if (tvFilter === 'TODOS') return termVessels;
-    return termVessels.filter(v => mapSituacao(v.situacao) === tvFilter);
-  }, [termVessels, tvFilter]);
+    let res = termVessels;
+    if (tvFilter !== 'TODOS')      res = res.filter(v => mapSituacao(v.situacao) === tvFilter);
+    if (tvTermFilter !== 'TODOS')  res = res.filter(v => v.terminal === tvTermFilter);
+    if (shipSearch.trim()) {
+      const q = shipSearch.trim().toUpperCase();
+      res = res.filter(v => v.navio.toUpperCase().includes(q));
+    }
+    return res;
+  }, [termVessels, tvFilter, tvTermFilter, shipSearch]);
 
   const filterCounts = useMemo(() => {
     const c: Partial<Record<TVFilter, number>> = { TODOS: termVessels.length };
@@ -1016,7 +1044,45 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
             </div>
           </div>
 
-          {/* Filters */}
+          {/* Search + Terminal filter */}
+          <div className="px-5 py-2.5 border-b border-slate-800/60 flex items-center gap-3 flex-wrap">
+            {/* Busca de navio */}
+            <div className="relative flex items-center">
+              <I.Search className="absolute left-2.5 w-3 h-3 text-slate-500 pointer-events-none"/>
+              <input
+                type="text"
+                placeholder="Buscar navio..."
+                value={shipSearch}
+                onChange={e => setShipSearch(e.target.value)}
+                className="pl-7 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-[8px] font-bold text-slate-200 placeholder-slate-600 outline-none focus:border-blue-500 transition-all w-40"
+              />
+              {shipSearch && (
+                <button onClick={() => setShipSearch('')} className="absolute right-2 text-slate-500 hover:text-slate-300">
+                  <I.Close className="w-2.5 h-2.5"/>
+                </button>
+              )}
+            </div>
+            {/* Filtro por porto */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(['TODOS', 'BTP', 'ECOPORTO', 'SANTOS BRASIL', 'EMBRAPORT'] as const).map(t => {
+                const active = tvTermFilter === t;
+                const acc = t === 'TODOS' ? null : TERM_ACCENT[t];
+                return (
+                  <button key={t} onClick={() => setTVTermFilter(t)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border ${
+                      active
+                        ? acc ? `${acc.bg} ${acc.text} ${acc.border}` : 'bg-slate-700 text-slate-200 border-slate-600'
+                        : 'bg-slate-900 text-slate-500 border-slate-800 hover:border-slate-700 hover:text-slate-400'
+                    }`}>
+                    {t !== 'TODOS' && <TermBadge terminal={t}/>}
+                    {t === 'TODOS' ? 'Todos' : TERM_SHORT[t]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Status Filters */}
           <div className="px-5 py-2.5 border-b border-slate-800/60 flex items-center gap-2 flex-wrap">
             {TV_FILTERS.map(({ key, label }) => {
               const active = tvFilter === key;
@@ -1094,6 +1160,25 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                         <td className={`sticky left-14 z-10 px-3 py-2 border-r border-slate-800/40 ${sc.rowBg || 'bg-[#0f172a]'}`}>
                           <span className={`font-black uppercase whitespace-nowrap text-[9px] ${sc.text}`}>{v.navio}</span>
                           {v.rap && <div className="text-[7px] text-slate-600 font-bold">RAP {v.rap}</div>}
+                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                            {/* Tag: Gate Fechado/Encerrado */}
+                            {(st === 'GATE ENCERRADO' || (isExpiredStr(v.deadLineStr) && st !== 'GATE ABERTO' && st !== 'ATRACADO' && st !== 'DESATRACADO')) && (
+                              <span className="inline-flex items-center gap-0.5 text-[6px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 whitespace-nowrap">
+                                <I.Warning className="w-2 h-2"/> Gate Fechado
+                              </span>
+                            )}
+                            {/* Tag: Abre Hoje (previsão de abertura de gate no dia atual) */}
+                            {(() => {
+                              const gv = v.gateDry || v.gateReefer;
+                              const t2 = gateTimeStr(gv);
+                              if (isToday(gv) && !isExpiredStr(gv)) return (
+                                <span className="inline-flex items-center gap-0.5 text-[6px] font-black uppercase px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30 whitespace-nowrap">
+                                  <I.Check className="w-2 h-2"/> Abre Hoje{t2 ? ` ${t2}` : ''}
+                                </span>
+                              );
+                              return null;
+                            })()}
+                          </div>
                         </td>
                         <td className={`sticky left-[182px] z-10 px-3 py-2 border-r border-slate-800/40 ${sc.rowBg || 'bg-[#0f172a]'}`}>
                           <SBadge status={st} size="xs"/>
@@ -1268,14 +1353,38 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                   const dlExp = isExpiredStr(dl);
                   return (
                     <div key={idx} className="p-4 space-y-3">
-                      {/* Vessel info row */}
-                      <div className={`flex items-start gap-3 p-3 rounded-xl border ${sc.border} ${sc.bg}`}>
+                      {/* Vessel info row — clicável para expandir/recolher viagens */}
+                      <div
+                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all hover:brightness-110 ${sc.border} ${sc.bg}`}
+                        onClick={() => setExpandedVessels(prev => {
+                          const next = new Set(prev);
+                          if (next.has(idx)) next.delete(idx); else next.add(idx);
+                          return next;
+                        })}
+                      >
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
                             <TermBadgeLarge terminal={match.vessel.terminal}/>
                             <span className={`text-[11px] font-black uppercase ${sc.text}`}>{match.vessel.navio}</span>
                             {match.vessel.viagem && <span className="text-[8px] text-slate-500 font-bold">{match.vessel.viagem}</span>}
                             <SBadge status={st} size="xs"/>
+                            {/* Tag: Gate Fechado */}
+                            {(st === 'GATE ENCERRADO' || (isExpiredStr(match.vessel.deadLineStr) && st !== 'GATE ABERTO' && st !== 'ATRACADO' && st !== 'DESATRACADO')) && (
+                              <span className="inline-flex items-center gap-1 text-[7px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+                                <I.Warning className="w-2.5 h-2.5"/> Gate Fechado
+                              </span>
+                            )}
+                            {/* Tag: Abre Hoje */}
+                            {(() => {
+                              const gv = match.vessel.gateDry || match.vessel.gateReefer;
+                              const t2 = gateTimeStr(gv);
+                              if (isToday(gv) && !isExpiredStr(gv)) return (
+                                <span className="inline-flex items-center gap-1 text-[7px] font-black uppercase px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                                  <I.Check className="w-2.5 h-2.5"/> Abre Hoje{t2 ? ` às ${t2}` : ''}
+                                </span>
+                              );
+                              return null;
+                            })()}
                           </div>
                           <div className="flex items-center gap-4 flex-wrap">
                             {(match.vessel.dtPrevAtrac || match.vessel.previsao) && (
@@ -1314,12 +1423,12 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                             )}
                           </div>
                         </div>
-                        {/* Counts */}
-                        <div className="flex gap-2 shrink-0">
+                        {/* Counts + chevron */}
+                        <div className="flex items-center gap-2 shrink-0">
                           {match.pendingCount > 0 && (
                             <div className="text-center px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
                               <p className="text-[14px] font-black text-red-400">{match.pendingCount}</p>
-                              <p className="text-[6px] font-black text-red-500 uppercase">Ag. Pendente</p>
+                              <p className="text-[6px] font-black text-red-500 uppercase">Pendente</p>
                             </div>
                           )}
                           {match.scheduledCount > 0 && (
@@ -1328,10 +1437,14 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                               <p className="text-[6px] font-black text-green-600 uppercase">Agendados</p>
                             </div>
                           )}
+                          <div className="flex flex-col items-center gap-0.5 ml-1">
+                            <span className="text-[6px] font-black text-slate-600 uppercase">{match.matchedTrips.length} viag.</span>
+                            <I.ChevD className={`w-3.5 h-3.5 text-slate-500 transition-transform ${expandedVessels.has(idx) ? 'rotate-180' : ''}`}/>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Gate + Deadline do terminal (do vessel) */}
+                      {/* Gate + Deadline do terminal (do vessel) — visível sempre */}
                       {(match.vessel.gateDry || match.vessel.gateReefer || match.vessel.deadLineStr || match.vessel.dtPrevAtrac) && (
                         <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-800/40 flex-wrap">
                           {match.vessel.dtPrevAtrac && (
@@ -1358,14 +1471,15 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                         </div>
                       )}
 
-                      {/* Trips list */}
+                      {/* Trips list — exibida somente quando expandido */}
+                      {expandedVessels.has(idx) && (
                       <div className="space-y-1.5 pl-2">
                         {match.matchedTrips.map((t, ti) => {
                           const isScheduled = t.isScheduled || t.status === 'Agendamento realizado';
                           const hasMinuta = !!t.preStackingFormData;
                           const tc = getTripTypeStyle(t.type);
                           return (
-                            <button key={ti} onClick={() => setDetailTrip(t)}
+                            <button key={ti} onClick={e => { e.stopPropagation(); setDetailTrip(t); }}
                               className={`w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-all hover:brightness-125 cursor-pointer ${isScheduled ? 'border-green-900/30 bg-green-950/10' : 'border-slate-800 bg-slate-900/40'}`}>
                               {/* Indicador de status */}
                               <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${isScheduled ? 'bg-green-500' : 'bg-red-500'}`}/>
@@ -1428,6 +1542,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                           );
                         })}
                       </div>
+                      )}
                     </div>
                   );
                 })}
