@@ -525,6 +525,7 @@ export const db = {
       id: c.id,
       name: c.name,
       color: c.color,
+      config: c.config || {},
       createdAt: c.created_at
     }));
   },
@@ -534,9 +535,10 @@ export const db = {
     const payload: any = {
       name: c.name,
       color: c.color,
+      config: c.config || {},
       created_at: c.createdAt || new Date().toISOString()
     };
-    
+
     let error;
     if (c.id) {
       const { error: updateError } = await supabase.from('operation_types').update(payload).eq('id', c.id);
