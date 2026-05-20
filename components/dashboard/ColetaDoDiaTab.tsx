@@ -148,7 +148,12 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
-      .filter(trip => activeOpTab === 'TODOS' || (activeOpTab === '__NONE__' ? !trip.coletaTipoViagem : trip.coletaTipoViagem === activeOpTab))
+      .filter(trip => {
+        if (activeOpTab === 'TODOS') return true;
+        const effective = trip.coletaTipoViagem || defaultTipoViagemId || null;
+        if (activeOpTab === '__NONE__') return !effective;
+        return effective === activeOpTab;
+      })
       .filter(trip => {
         const dt = trip.dateTime;
         if (!dt) return true;
@@ -214,15 +219,18 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       });
   }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes]);
 
-  // Abas de tipos de operação (da coleta_tipos_viagem) — inclui "Sem tipo" se houver trips sem tipo
+  // Abas de tipos de operação (da coleta_tipos_viagem) — inclui "Sem tipo" apenas se houver trips sem tipo E sem padrão
   const opTabOptions = useMemo(() => {
+    // Resolve o tipo efetivo de cada trip (usa defaultTipoViagemId como fallback)
+    const effectiveType = (t: Trip) => t.coletaTipoViagem || defaultTipoViagemId || null;
+
     const opts = tiposViagem.map(tv => ({
       id: tv.id,
       name: tv.name,
       color: tv.color,
-      count: allFilteredTrips.filter(t => t.coletaTipoViagem === tv.id).length,
+      count: allFilteredTrips.filter(t => effectiveType(t) === tv.id).length,
     }));
-    const semTipo = allFilteredTrips.filter(t => !t.coletaTipoViagem).length;
+    const semTipo = allFilteredTrips.filter(t => !effectiveType(t)).length;
     if (semTipo > 0) opts.push({ id: '__NONE__', name: 'Sem Tipo', color: '#94a3b8', count: semTipo });
     return opts;
   }, [tiposViagem, allFilteredTrips]);
