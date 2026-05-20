@@ -548,9 +548,18 @@ export interface ColetaDocOriginarioRule {
   text: string;
 }
 
+export interface ColetaReplaceRule {
+  find: string;
+  replace: string;
+}
+
 export interface ColetaOpConfig {
   emailRequired?: boolean;
-  docOriginarioText?: string;
+  docOriginarioText?: string;       // template por OS — variáveis {os} {booking} {container} {ship}
+  docOriginarioSeparator?: string;  // separador entre linhas de OS (default: \n)
+  docOriginarioPrefix?: string;     // texto antes do bloco de OSes
+  docOriginarioSuffix?: string;     // texto após o bloco de OSes
+  docOriginarioReplaceRules?: ColetaReplaceRule[];
   docOriginarioByCustomer?: ColetaDocOriginarioRule[];
 }
 
