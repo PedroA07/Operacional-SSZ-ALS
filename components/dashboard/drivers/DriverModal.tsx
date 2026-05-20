@@ -433,7 +433,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                   <label className="flex items-center gap-3 cursor-pointer select-none">
                     <span className="text-[9px] text-slate-400 font-black uppercase">Motorista é o próprio beneficiário</span>
                     <div
-                      onClick={() => setForm(f => ({ ...f, beneficiaryIsDriver: !f.beneficiaryIsDriver, beneficiaryId: undefined, beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '', beneficiaryCnpj: '' }))}
+                      onClick={() => setForm(f => ({ ...f, beneficiaryIsDriver: !f.beneficiaryIsDriver, beneficiaryId: undefined, beneficiaryUserId: undefined, beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '', beneficiaryCnpj: '' }))}
                       className={`relative w-10 h-6 rounded-full transition-all ${form.beneficiaryIsDriver ? 'bg-emerald-500' : 'bg-slate-600'}`}
                     >
                       <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${form.beneficiaryIsDriver ? 'left-5' : 'left-1'}`} />
@@ -461,7 +461,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                               </div>
                               <button
                                 type="button"
-                                onClick={() => setForm(f => ({ ...f, beneficiaryId: undefined, beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '', beneficiaryCnpj: '' }))}
+                                onClick={() => setForm(f => ({ ...f, beneficiaryId: undefined, beneficiaryUserId: undefined, beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '', beneficiaryCnpj: '' }))}
                                 className="text-[9px] text-slate-400 hover:text-white font-black uppercase transition-colors"
                               >
                                 Trocar
@@ -512,6 +512,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                                     setForm(f => ({
                                       ...f,
                                       beneficiaryId: b.id,
+                                      beneficiaryUserId: b.userId || undefined,
                                       beneficiaryName: b.name,
                                       beneficiaryPhone: b.phone,
                                       beneficiaryEmail: b.email || '',
