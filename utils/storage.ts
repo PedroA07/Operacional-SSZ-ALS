@@ -483,6 +483,7 @@ export const db = {
       id: c.id,
       name: c.name,
       color: c.color,
+      config: c.config || {},
       createdAt: c.created_at
     }));
   },
@@ -492,9 +493,10 @@ export const db = {
     const payload: any = {
       name: c.name,
       color: c.color,
+      config: c.config || {},
       created_at: c.createdAt || new Date().toISOString()
     };
-    
+
     let error;
     if (c.id) {
       const { error: updateError } = await supabase.from('coleta_tipos_viagem').update(payload).eq('id', c.id);
@@ -525,7 +527,7 @@ export const db = {
       id: c.id,
       name: c.name,
       color: c.color,
-      config: c.config || {},
+      config: c.config || {},  // config usado em OperationTypesManager (categoria, tipos de viagem)
       createdAt: c.created_at
     }));
   },

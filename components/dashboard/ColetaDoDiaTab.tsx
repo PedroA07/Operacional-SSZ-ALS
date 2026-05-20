@@ -70,9 +70,9 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const [copied, setCopied] = useState(false);
   const [activeOpTab, setActiveOpTab] = useState<string>('TODOS');
   const [allCustomers, setAllCustomers] = useState<{ id: string; name: string }[]>([]);
-  // coletaOpConfig: keyed by op type id
+  // coletaOpConfig: keyed by coleta tipo viagem id (tipo de operação)
   const [coletaOpConfig, setColetaOpConfig] = useState<Record<string, ColetaOpConfig>>({});
-  // settings panel expanded op type
+  // settings panel expanded tipo de operação
   const [settingsExpandedOp, setSettingsExpandedOp] = useState<string | null>(null);
 
   const STABILITY_DURATION = 30000;
@@ -93,10 +93,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       setCategories(cats);
       setOperationTypes(opTypes);
       setAllCustomers((custs as any[]).map(c => ({ id: c.id, name: c.name })));
-      // Extrai config.coleta de cada tipo de operação
+      // Extrai config de cada tipo de operação (coleta_tipos_viagem)
       const cfg: Record<string, ColetaOpConfig> = {};
-      (opTypes as any[]).forEach(ot => {
-        if (ot.config?.coleta) cfg[ot.id] = ot.config.coleta;
+      (tipos as any[]).forEach(tv => {
+        if (tv.config) cfg[tv.id] = tv.config;
       });
       setColetaOpConfig(cfg);
       
@@ -148,7 +148,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
-      .filter(trip => activeOpTab === 'TODOS' || trip.type?.toUpperCase() === activeOpTab)
+      .filter(trip => activeOpTab === 'TODOS' || (activeOpTab === '__NONE__' ? !trip.coletaTipoViagem : trip.coletaTipoViagem === activeOpTab))
       .filter(trip => {
         const dt = trip.dateTime;
         if (!dt) return true;
@@ -193,7 +193,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return () => clearInterval(interval);
   }, []);
 
-  // Trips sem filtro de aba (para contar por tipo nas abas)
+  // Trips sem filtro de aba — para contadores nas abas
   const allFilteredTrips = useMemo(() => {
     const now = Date.now();
     return propTrips
@@ -213,6 +213,19 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         return serverTrip;
       });
   }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes]);
+
+  // Abas de tipos de operação (da coleta_tipos_viagem) — inclui "Sem tipo" se houver trips sem tipo
+  const opTabOptions = useMemo(() => {
+    const opts = tiposViagem.map(tv => ({
+      id: tv.id,
+      name: tv.name,
+      color: tv.color,
+      count: allFilteredTrips.filter(t => t.coletaTipoViagem === tv.id).length,
+    }));
+    const semTipo = allFilteredTrips.filter(t => !t.coletaTipoViagem).length;
+    if (semTipo > 0) opts.push({ id: '__NONE__', name: 'Sem Tipo', color: '#94a3b8', count: semTipo });
+    return opts;
+  }, [tiposViagem, allFilteredTrips]);
 
   const handleUpdateTrip = useCallback(async (trip: Trip, data: Partial<Trip>) => {
     const now = Date.now();
@@ -251,13 +264,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const handleSaveSettings = async () => {
     localStorage.setItem('coletaDefaultTemplateId', selectedTemplateId);
     localStorage.setItem('coletaHiddenTripTypes', JSON.stringify(hiddenTripTypes));
-    // Salva config.coleta em cada tipo de operação
-    for (const ot of operationTypes) {
-      if (coletaOpConfig[ot.id] !== undefined) {
-        await db.saveOperationType({
-          ...ot,
-          config: { ...(ot.config || {}), coleta: coletaOpConfig[ot.id] }
-        });
+    // Salva config em cada tipo de operação (coleta_tipos_viagem)
+    for (const tv of tiposViagem) {
+      if (coletaOpConfig[tv.id] !== undefined) {
+        await db.saveColetaTipoViagem({ ...tv, config: coletaOpConfig[tv.id] });
       }
     }
     setSettingsModal(false);
@@ -589,14 +599,15 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   };
 
   const getDocOriginarioText = (t: Trip): string => {
-    const opType = operationTypes.find(ot => ot.name.toUpperCase() === t.type?.toUpperCase());
-    if (!opType) return `Doc. originário gerado, gentileza seguir com a emissão do CT-e:\n${t.os}`;
-    const cfg = coletaOpConfig[opType.id];
-    // Verifica regra por cliente
+    const cfg = t.coletaTipoViagem ? coletaOpConfig[t.coletaTipoViagem] : undefined;
     const clientRule = cfg?.docOriginarioByCustomer?.find(r => r.customerId === t.customer?.id);
     const baseText = clientRule?.text || cfg?.docOriginarioText ||
       'Doc. originário gerado, gentileza seguir com a emissão do CT-e:\n{os}';
-    return baseText.replace(/\{os\}/g, t.os).replace(/\{booking\}/g, t.booking || '').replace(/\{container\}/g, t.container || '').replace(/\{ship\}/g, t.ship || '');
+    return baseText
+      .replace(/\{os\}/g, t.os)
+      .replace(/\{booking\}/g, t.booking || '')
+      .replace(/\{container\}/g, t.container || '')
+      .replace(/\{ship\}/g, t.ship || '');
   };
 
   const handleCopyDocOriginario = () => {
@@ -740,10 +751,9 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       </div>
     </div>
 
-      {/* Abas por tipo de operação */}
-      {operationTypes.filter(ot => !hiddenTripTypes.includes(ot.name.toUpperCase())).length > 0 && (
+      {/* Abas por tipo de operação (coleta_tipos_viagem) */}
+      {opTabOptions.length > 0 && (
         <div className="flex gap-2 flex-wrap">
-          {/* Aba "Todos" */}
           <button
             onClick={() => setActiveOpTab('TODOS')}
             className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
@@ -758,31 +768,27 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             </span>
           </button>
 
-          {operationTypes
-            .filter(ot => !hiddenTripTypes.includes(ot.name.toUpperCase()))
-            .map(ot => {
-              const typeName = ot.name.toUpperCase();
-              const count = allFilteredTrips.filter(t => t.type?.toUpperCase() === typeName).length;
-              const isActive = activeOpTab === typeName;
-              return (
-                <button
-                  key={typeName}
-                  onClick={() => setActiveOpTab(typeName)}
-                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
-                    isActive ? 'text-white shadow-lg' : 'bg-white border-slate-200 hover:border-slate-400'
-                  }`}
-                  style={isActive
-                    ? { backgroundColor: ot.color || '#1e293b', borderColor: ot.color || '#1e293b', color: '#fff' }
-                    : { color: ot.color || '#475569' }
-                  }
-                >
-                  {typeName}
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+          {opTabOptions.map(tab => {
+            const isActive = activeOpTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveOpTab(tab.id)}
+                className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
+                  isActive ? 'text-white shadow-lg' : 'bg-white border-slate-200 hover:border-slate-400'
+                }`}
+                style={isActive
+                  ? { backgroundColor: tab.color || '#1e293b', borderColor: tab.color || '#1e293b', color: '#fff' }
+                  : { color: tab.color || '#475569' }
+                }
+              >
+                {tab.name}
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -850,10 +856,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                 </div>
               </div>
 
-              {/* Configuração por tipo de operação */}
+              {/* Configuração por tipo de operação (coleta_tipos_viagem) */}
               <div className="space-y-3">
                 <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Configuração por Tipo de Operação</h4>
-                {operationTypes.map((ot: any) => {
+                {tiposViagem.map((ot: any) => {
                   const typeCfg: ColetaOpConfig = coletaOpConfig[ot.id] || {};
                   const isExpanded = settingsExpandedOp === ot.id;
                   const updateTypeCfg = (patch: Partial<ColetaOpConfig>) => {
