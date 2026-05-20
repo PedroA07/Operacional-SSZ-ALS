@@ -132,7 +132,9 @@ interface FileEntry {
   compressed: boolean;
   parsed: { prevTermino: string; localidade: string; motorista: string; container: string };
   linkedTripId: string | null;
+  linkedDriverId: string | null;
   autoMatched: boolean;
+  autoMatchedDriver: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -474,18 +476,70 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
   // ── Auto-match logic — busca em TODAS as viagens, não só elegíveis ───────────
   const findAutoMatch = useCallback((parsed: FileEntry['parsed']): string | null => {
-    const candidates = trips.filter(t => {
-      const cMatch = parsed.container && t.container && normAccent(t.container) === normAccent(parsed.container);
-      const dMatch = parsed.motorista && t.driver?.name &&
-        (normAccent(t.driver.name).includes(normAccent(parsed.motorista.split(' ')[0])) ||
-         normAccent(parsed.motorista).includes(normAccent(t.driver.name.split(' ')[0])));
-      // Localidade é critério obrigatório quando disponível (evita falso match em container reutilizado)
-      const lMatch = !parsed.localidade || !!(t.destination?.name &&
-        normAccent(t.destination.name).includes(normAccent(parsed.localidade.split(' ')[0])));
-      return !!((cMatch || dMatch) && lMatch);
-    });
-    return candidates.length === 1 ? candidates[0].id : null;
+    const norm = normAccent;
+
+    // Prioridade 1: container + localidade ambos conferem
+    if (parsed.container && parsed.localidade) {
+      const loc0 = norm(parsed.localidade.split(' ')[0]);
+      const hits = trips.filter(t =>
+        t.container && norm(t.container) === norm(parsed.container) &&
+        t.destination?.name && norm(t.destination.name).includes(loc0)
+      );
+      if (hits.length === 1) return hits[0].id;
+      if (hits.length > 1) {
+        // Desambigua pelo nome do motorista
+        if (parsed.motorista) {
+          const mot0 = norm(parsed.motorista.split(' ')[0]);
+          const narrow = hits.filter(t => t.driver?.name && norm(t.driver.name).includes(mot0));
+          if (narrow.length === 1) return narrow[0].id;
+        }
+        // Retorna o mais recente (trips já ordenadas desc por date)
+        return hits[0].id;
+      }
+    }
+
+    // Prioridade 2: container apenas (uma única viagem tem esse container)
+    if (parsed.container) {
+      const hits = trips.filter(t => t.container && norm(t.container) === norm(parsed.container));
+      if (hits.length === 1) return hits[0].id;
+    }
+
+    // Prioridade 3: motorista + localidade
+    if (parsed.motorista && parsed.localidade) {
+      const mot0 = norm(parsed.motorista.split(' ')[0]);
+      const loc0 = norm(parsed.localidade.split(' ')[0]);
+      const hits = trips.filter(t =>
+        t.driver?.name && norm(t.driver.name).includes(mot0) &&
+        t.destination?.name && norm(t.destination.name).includes(loc0)
+      );
+      if (hits.length === 1) return hits[0].id;
+    }
+
+    // Prioridade 4: motorista apenas (uma única viagem tem esse motorista)
+    if (parsed.motorista) {
+      const mot0 = norm(parsed.motorista.split(' ')[0]);
+      const hits = trips.filter(t => t.driver?.name &&
+        (norm(t.driver.name).includes(mot0) || mot0.includes(norm(t.driver.name.split(' ')[0])))
+      );
+      if (hits.length === 1) return hits[0].id;
+    }
+
+    return null;
   }, [trips]);
+
+  // ── Driver-only match — quando não encontra viagem, tenta vincular ao motorista ─
+  const findDriverMatch = useCallback((parsed: FileEntry['parsed']): string | null => {
+    if (!parsed.motorista || !drivers.length) return null;
+    const norm = normAccent;
+    const words = norm(parsed.motorista).split(/\s+/).filter(w => w.length > 2);
+    const hit = drivers.find(d => {
+      const dn = norm(d.name);
+      return words.length >= 2
+        ? words.every(w => dn.includes(w))
+        : dn.includes(norm(parsed.motorista.split(' ')[0]));
+    });
+    return hit?.id ?? null;
+  }, [drivers]);
 
   // ── File processing ───────────────────────────────────────────────────────────
   const patch = (id: string, delta: Partial<FileEntry>) =>
@@ -496,7 +550,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     setEntries(prev => [...prev, {
       id, file, originalSize: file.size, status: 'parsing', compressed: false,
       parsed: { prevTermino: '', localidade: '', motorista: '', container: '' },
-      linkedTripId: null, autoMatched: false,
+      linkedTripId: null, linkedDriverId: null, autoMatched: false, autoMatchedDriver: false,
     }]);
     try {
       const text = await extractTextFromPDF(file);
@@ -509,12 +563,17 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
         motorista: parsed.motorista || '',
         container: parsed.container || '',
       };
-      const autoId = findAutoMatch(parsedFilled);
-      patch(id, { file: finalFile, compressed, status: 'ready', parsed: parsedFilled, linkedTripId: autoId, autoMatched: !!autoId });
+      const autoTripId = findAutoMatch(parsedFilled);
+      const autoDriverId = !autoTripId ? findDriverMatch(parsedFilled) : null;
+      patch(id, {
+        file: finalFile, compressed, status: 'ready', parsed: parsedFilled,
+        linkedTripId: autoTripId, autoMatched: !!autoTripId,
+        linkedDriverId: autoDriverId, autoMatchedDriver: !!autoDriverId,
+      });
     } catch {
       patch(id, { status: 'error', errorMsg: 'Falha ao processar PDF.' });
     }
-  }, [findAutoMatch]);
+  }, [findAutoMatch, findDriverMatch]);
 
   const handleFiles = (files: FileList | File[]) => {
     Array.from(files).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')).forEach(processFile);
@@ -539,6 +598,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
         };
 
         if (entry.linkedTripId) {
+          // Vínculo com viagem
           const trip = trips.find(t => t.id === entry.linkedTripId);
           if (!trip) { patch(entry.id, { status: 'error', errorMsg: 'Viagem não encontrada.' }); continue; }
           const existing = activeDocs(trip);
@@ -548,6 +608,24 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(), parsedData,
           };
           await onUpdate({ ...trip, freightContractDoc: [...existing, doc][0] as TripDocument, freightContractDocs: [...existing, doc] });
+          // Salva também na tabela freight_contracts com info do motorista
+          await db.saveFreightContract({
+            fileName: entry.file.name, fileUrl: url, contractNumber: genContractCode(),
+            container: parsedData.container, tripId: trip.id, tripOs: trip.os,
+            destination: trip.destination?.name ?? trip.customer?.name,
+            driverId: trip.driver?.id ?? undefined, driverName: trip.driver?.name ?? undefined,
+            status: 'linked',
+          });
+        } else if (entry.linkedDriverId) {
+          // Vínculo apenas com motorista (sem viagem específica)
+          const driver = drivers.find(d => d.id === entry.linkedDriverId);
+          const driverKey = driver ? `motorista_${driver.id.replace(/[^a-z0-9]/gi, '_')}` : 'sem_vinculo';
+          const url = await fileStorage.uploadFreightContract(entry.file, driverKey, Date.now());
+          await db.saveFreightContract({
+            fileName: entry.file.name, fileUrl: url, contractNumber: genContractCode(),
+            container: parsedData.container, destination: parsedData.localidade,
+            driverId: driver?.id, driverName: driver?.name, status: 'linked',
+          });
         } else {
           // Sem vínculo: gera código de identificação e salva no Supabase
           const code = genContractCode();
@@ -846,6 +924,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                   ? `Contrato · ${entry.parsed.motorista.split(' ').slice(0, 2).join(' ')}${entry.parsed.container ? ` · ${entry.parsed.container}` : ''}`
                   : entry.file.name;
                 const isLinked = !!entry.linkedTripId;
+                const isDriverOnly = !entry.linkedTripId && !!entry.linkedDriverId;
+                const linkedDriver = isDriverOnly ? drivers.find(d => d.id === entry.linkedDriverId) : null;
 
                 return (
                   <div key={entry.id}
@@ -871,20 +951,48 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                         <div className="mt-1"><StatusBadge entry={entry}/></div>
                       </div>
 
-                      {/* Trip selector */}
+                      {/* Trip selector + driver fallback */}
                       {['ready', 'error'].includes(entry.status) && (
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0flex-wrap">
                           <TripSelector
                             value={entry.linkedTripId}
-                            onChange={id => patch(entry.id, { linkedTripId: id, autoMatched: false })}
+                            onChange={id => patch(entry.id, { linkedTripId: id, autoMatched: false, linkedDriverId: id ? null : entry.linkedDriverId })}
                             trips={trips}
                             parsed={entry.parsed}
                             autoMatched={entry.autoMatched}
                           />
-                          {!isLinked && (
-                            <span className="text-[8px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 uppercase tracking-wide whitespace-nowrap">
-                              Sem Vínculo
-                            </span>
+                          {!isLinked && isDriverOnly && linkedDriver && (
+                            <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-xl px-2.5 py-1.5">
+                              <span className="text-[8px] font-black text-indigo-700 uppercase tracking-wide whitespace-nowrap">
+                                🚛 {linkedDriver.name.split(' ').slice(0,2).join(' ')}
+                              </span>
+                              {entry.autoMatchedDriver && (
+                                <span className="text-[7px] font-black text-indigo-400 bg-indigo-100 px-1 py-0.5 rounded border border-indigo-200">Auto</span>
+                              )}
+                              <button
+                                onClick={() => patch(entry.id, { linkedDriverId: null, autoMatchedDriver: false })}
+                                className="text-indigo-300 hover:text-red-400 transition-colors ml-0.5"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                              </button>
+                            </div>
+                          )}
+                          {!isLinked && !isDriverOnly && (
+                            <>
+                              <select
+                                value={entry.linkedDriverId || ''}
+                                onChange={e => patch(entry.id, { linkedDriverId: e.target.value || null, autoMatchedDriver: false })}
+                                className="text-[9px] border border-slate-200 rounded-xl px-2 py-1.5 text-slate-600 bg-white focus:ring-2 focus:ring-indigo-400 outline-none max-w-[160px]"
+                              >
+                                <option value="">Vincular motorista…</option>
+                                {drivers.filter(d => d.status === 'Ativo').sort((a,b) => a.name.localeCompare(b.name)).map(d => (
+                                  <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
+                              </select>
+                              <span className="text-[8px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 uppercase tracking-wide whitespace-nowrap">
+                                Sem Vínculo
+                              </span>
+                            </>
                           )}
                         </div>
                       )}
