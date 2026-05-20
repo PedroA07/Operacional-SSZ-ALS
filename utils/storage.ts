@@ -408,6 +408,7 @@ export const db = {
       name: c.name,
       parentId: c.parent_id,
       color: c.color,
+      allowDuplicateOS: c.allow_duplicate_os ?? false,
       createdAt: c.created_at
     }));
   },
@@ -421,27 +422,27 @@ export const db = {
       name: c.name,
       parent_id: c.parentId,
       color: c.color,
+      allow_duplicate_os: c.allowDuplicateOS ?? false,
       created_at: new Date().toISOString()
     });
 
     if (error) {
-      // Se o erro for de coluna inexistente (PGRST204), tenta salvar sem a cor
-      if (error.code === 'PGRST204' || error.message.includes('color')) {
-        console.warn('Coluna "color" não encontrada na tabela "categories". Tentando salvar sem cor...');
+      if (error.code === 'PGRST204' || error.message.includes('color') || error.message.includes('allow_duplicate_os')) {
+        console.warn('Coluna opcional não encontrada em "categories". Tentando salvar sem ela...');
         const { error: retryError } = await supabase.from('categories').upsert({
           id: c.id,
           name: c.name,
           parent_id: c.parentId,
           created_at: new Date().toISOString()
         });
-        
+
         if (retryError) {
           console.error('Error saving category (retry):', retryError);
           return false;
         }
         return true;
       }
-      
+
       console.error('Error saving category:', error);
       return false;
     }

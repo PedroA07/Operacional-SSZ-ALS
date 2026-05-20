@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Trip, Driver, Customer, Category, TripStatus } from '../../../types';
+import React, { useState, useEffect } from 'react';
+import { Trip, Driver, Customer, Category, TripStatus, OperationType } from '../../../types';
 import { db } from '../../../utils/storage';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
@@ -14,10 +14,39 @@ interface NewTripModalProps {
 }
 
 const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess, drivers, customers, categories }) => {
+  const [operationTypes, setOperationTypes] = useState<OperationType[]>([]);
+
+  const getDefaultType = (types: OperationType[]) => {
+    const saved = localStorage.getItem('defaultOperationType');
+    if (saved) {
+      const found = types.find(t => t.id === saved);
+      if (found) return found.name;
+    }
+    return types[0]?.name || 'EXPORTAÇÃO';
+  };
+
+  const getCategoryForType = (typeName: string, types: OperationType[]) => {
+    const op = types.find(t => t.name === typeName);
+    if (!op?.config?.defaultCategoryId) return '';
+    const cat = categories.find(c => c.id === op.config!.defaultCategoryId);
+    return cat?.name || '';
+  };
+
   const [form, setForm] = useState<Partial<Trip>>({
     os: '', booking: '', ship: '', dateTime: '', type: 'EXPORTAÇÃO', status: 'Pendente',
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: ''
   });
+
+  useEffect(() => {
+    db.getOperationTypes().then(types => {
+      if (types && types.length > 0) {
+        setOperationTypes(types);
+        const defType = getDefaultType(types);
+        const defCategory = getCategoryForType(defType, types);
+        setForm(prev => ({ ...prev, type: defType, category: defCategory || prev.category }));
+      }
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,10 +86,41 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         </div>
         
         <form onSubmit={handleSubmit} className="p-12 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+          {/* Row 0: Tipo de Programação */}
+          <div>
+            <label className={labelClass}>Tipo de Programação</label>
+            <CustomSelect
+              required
+              value={form.type || ''}
+              onChange={v => {
+                const autoCategory = getCategoryForType(v, operationTypes);
+                setForm(prev => ({ ...prev, type: v, category: autoCategory || prev.category || '' }));
+              }}
+              placeholder="Selecione..."
+              options={
+                operationTypes.length > 0
+                  ? operationTypes.map(t => ({ value: t.name, label: t.name }))
+                  : [
+                      { value: 'EXPORTAÇÃO', label: 'EXPORTAÇÃO' },
+                      { value: 'IMPORTAÇÃO', label: 'IMPORTAÇÃO' },
+                      { value: 'COLETA', label: 'COLETA' },
+                      { value: 'ENTREGA', label: 'ENTREGA' },
+                      { value: 'CABOTAGEM', label: 'CABOTAGEM' },
+                    ]
+              }
+              inputClassName={selectClass}
+            />
+          </div>
+
           {/* Row 1: Category / Subcategory */}
           <div className="grid grid-cols-2 gap-6">
             <div className="relative">
-              <label className={labelClass}>Categoria</label>
+              <label className={labelClass}>
+                Categoria
+                {form.category && getCategoryForType(form.type || '', operationTypes) === form.category && (
+                  <span className="ml-2 text-[8px] text-blue-400 normal-case font-bold animate-pulse">✓ automática</span>
+                )}
+              </label>
               <CustomSelect
                 required
                 value={form.category || ''}
