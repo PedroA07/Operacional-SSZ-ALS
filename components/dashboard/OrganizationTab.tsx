@@ -444,18 +444,45 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const gateStr = vessel.gateDry || vessel.gateReefer;
     const gateDt = parseFlexDate(gateStr || '');
     const deadDt = parseFlexDate(vessel.deadLineStr || '');
+
+    const fmtDate = (d: Date) =>
+      d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+    // Sem data de gate — nada a mostrar
     if (!gateDt) return null;
+
     if (gateDt > now) {
-      const label = `Abre ${gateDt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} ${gateDt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
-      return <span className="inline-block px-1.5 py-0.5 rounded text-[7px] font-black bg-red-100 text-red-600 border border-red-200 uppercase leading-tight">{`Gate Fechado • ${label}`}</span>;
+      // Gate ainda fechado → badge vermelho + previsão de abertura
+      return (
+        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-500"/>
+          Gate Fechado
+          <span className="font-bold text-red-400 normal-case ml-0.5">• Abre {fmtDate(gateDt)}</span>
+        </span>
+      );
     }
+
+    // Gate aberto — verificar deadline
     if (deadDt && deadDt < now) {
-      return <span className="inline-block px-1.5 py-0.5 rounded text-[7px] font-black bg-slate-200 text-slate-500 border border-slate-300 uppercase leading-tight">Gate Encerrado</span>;
+      // Deadline já passou
+      return (
+        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-pink-500/10 text-pink-600 border-pink-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-pink-500"/>
+          Gate Encerrado
+        </span>
+      );
     }
-    const encLabel = deadDt
-      ? `Enc. ${deadDt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} ${deadDt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`
-      : 'Gate Aberto';
-    return <span className="inline-block px-1.5 py-0.5 rounded text-[7px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase leading-tight">{encLabel}</span>;
+
+    // Gate aberto, com ou sem prazo futuro
+    return (
+      <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-green-500/10 text-green-700 border-green-500/30">
+        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-500"/>
+        Gate Aberto
+        {deadDt && (
+          <span className="font-bold text-orange-500 normal-case ml-0.5">• Enc. {fmtDate(deadDt)}</span>
+        )}
+      </span>
+    );
   }, [getVesselForTrip]);
 
   useEffect(() => {
