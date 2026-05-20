@@ -413,6 +413,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       });
   }, []);
 
+  // Separa "NAVIO/VIAGEM" ou "NAVIO VIAGEM" → { name, voyage }
+  const splitShipField = useCallback((raw: string): { name: string; voyage: string } => {
+    if (!raw) return { name: '', voyage: '' };
+    if (raw.includes('/')) {
+      const idx = raw.indexOf('/');
+      return { name: raw.slice(0, idx).trim(), voyage: raw.slice(idx + 1).trim() };
+    }
+    // Voyage code ao final: dígitos seguidos de 0-2 letras, ex "621N", "621", "A12"
+    const match = raw.match(/^(.*?)\s+([A-Z]?\d+[A-Z]{0,2})$/i);
+    if (match) return { name: match[1].trim(), voyage: match[2].trim().toUpperCase() };
+    return { name: raw.trim(), voyage: '' };
+  }, []);
+
   const parseFlexDate = (str: string): Date | null => {
     if (!str) return null;
     if (str.includes('/')) {
@@ -426,15 +439,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return isNaN(dt.getTime()) ? null : dt;
   };
 
-  const getVesselForTrip = useCallback((shipName: string): TerminalVessel | null => {
-    if (!shipName) return null;
+  const getVesselForTrip = useCallback((shipRaw: string): TerminalVessel | null => {
+    if (!shipRaw) return null;
+    const { name } = splitShipField(shipRaw);
     const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const n = norm(shipName);
+    const n = norm(name || shipRaw);
+    if (!n) return null;
     return terminalVessels.find(v => {
       const vn = norm(v.navio);
       return vn === n || vn.includes(n) || n.includes(vn);
     }) ?? null;
-  }, [terminalVessels]);
+  }, [terminalVessels, splitShipField]);
 
   const renderGateTag = useCallback((shipName?: string): React.ReactNode => {
     if (!shipName) return null;
@@ -444,18 +459,45 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const gateStr = vessel.gateDry || vessel.gateReefer;
     const gateDt = parseFlexDate(gateStr || '');
     const deadDt = parseFlexDate(vessel.deadLineStr || '');
+
+    const fmtDate = (d: Date) =>
+      d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+    // Sem data de gate — nada a mostrar
     if (!gateDt) return null;
+
     if (gateDt > now) {
-      const label = `Abre ${gateDt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} ${gateDt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
-      return <span className="inline-block px-1.5 py-0.5 rounded text-[7px] font-black bg-red-100 text-red-600 border border-red-200 uppercase leading-tight">{`Gate Fechado • ${label}`}</span>;
+      // Gate ainda fechado → badge vermelho + previsão de abertura
+      return (
+        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-500"/>
+          Gate Fechado
+          <span className="font-bold text-red-400 normal-case ml-0.5">• Abre {fmtDate(gateDt)}</span>
+        </span>
+      );
     }
+
+    // Gate aberto — verificar deadline
     if (deadDt && deadDt < now) {
-      return <span className="inline-block px-1.5 py-0.5 rounded text-[7px] font-black bg-slate-200 text-slate-500 border border-slate-300 uppercase leading-tight">Gate Encerrado</span>;
+      // Deadline já passou
+      return (
+        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-pink-500/10 text-pink-600 border-pink-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-pink-500"/>
+          Gate Encerrado
+        </span>
+      );
     }
-    const encLabel = deadDt
-      ? `Enc. ${deadDt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} ${deadDt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`
-      : 'Gate Aberto';
-    return <span className="inline-block px-1.5 py-0.5 rounded text-[7px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 uppercase leading-tight">{encLabel}</span>;
+
+    // Gate aberto, com ou sem prazo futuro
+    return (
+      <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-green-500/10 text-green-700 border-green-500/30">
+        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-500"/>
+        Gate Aberto
+        {deadDt && (
+          <span className="font-bold text-orange-500 normal-case ml-0.5">• Enc. {fmtDate(deadDt)}</span>
+        )}
+      </span>
+    );
   }, [getVesselForTrip]);
 
   useEffect(() => {
@@ -1099,12 +1141,22 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       key: 'ship',
       label: 'Navio',
       sortValue: (t: Trip) => t.ship || '',
-      render: (t: Trip) => (
-        <div className="flex flex-col gap-1 min-w-[120px]">
-          <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">{t.ship || '---'}</span>
-          {t.ship && renderGateTag(t.ship)}
-        </div>
-      )
+      render: (t: Trip) => {
+        const { name, voyage } = splitShipField(t.ship || '');
+        return (
+          <div className="flex flex-col gap-1 min-w-[130px]">
+            <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">
+              {name || '---'}
+            </span>
+            {voyage && (
+              <span className="text-[7px] font-bold text-slate-400 uppercase tracking-tight">
+                Viagem: {voyage}
+              </span>
+            )}
+            {t.ship && renderGateTag(t.ship)}
+          </div>
+        );
+      }
     },
     {
       key: 'driver',
