@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { Trip, Driver, FreightContractDoc } from '../../../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Trip, Driver, FreightContractDoc, FreightContract } from '../../../types';
 import PDFViewer from '../../shared/PDFViewer';
+import { db } from '../../../utils/storage';
 
 interface DocsTabProps {
   trips: Trip[];
@@ -20,6 +21,7 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips, driver, canSeeContracts = true
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<{url: string, title: string} | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [driverContracts, setDriverContracts] = useState<FreightContract[]>([]);
 
   // Estados para validação de chave
   const [isKeyPromptOpen, setIsKeyPromptOpen] = useState(false);
@@ -27,26 +29,56 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips, driver, canSeeContracts = true
   const [pendingDoc, setPendingDoc] = useState<{url: string, title: string} | null>(null);
   const [keyError, setKeyError] = useState(false);
 
+  // Busca contratos vinculados ao motorista diretamente na tabela freight_contracts
+  useEffect(() => {
+    if (!driver?.id) return;
+    db.getFreightContracts().then(all => {
+      setDriverContracts(all.filter(c => c.driverId === driver.id && c.fileUrl));
+    });
+  }, [driver?.id]);
+
   const freightContracts = useMemo<ContractItem[]>(() => {
     const now = new Date();
     const items: ContractItem[] = [];
+
+    // Contratos vindos das trips
+    const tripDocIds = new Set<string>();
     for (const t of trips) {
       const allDocs: FreightContractDoc[] = t.freightContractDocs?.length
         ? t.freightContractDocs
         : t.freightContractDoc
           ? [t.freightContractDoc as FreightContractDoc]
           : [];
-      // Exclui documentos expirados
       const docs = allDocs.filter(d => !d.expiresAt || new Date(d.expiresAt) > now);
       docs.forEach((doc, idx) => {
+        tripDocIds.add(doc.id);
         items.push({ os: t.os, customer: t.customer.name, doc, index: idx + 1, total: docs.length });
       });
     }
+
+    // Contratos do motorista na tabela freight_contracts que ainda não estão nas trips
+    const extra = driverContracts.filter(c => !tripDocIds.has(c.id));
+    extra.forEach((c, idx) => {
+      items.push({
+        os: c.tripOs || '—',
+        customer: c.destination || '—',
+        doc: {
+          id:         c.id,
+          type:       'CONTRATO_FRETE' as const,
+          url:        c.fileUrl!,
+          fileName:   c.fileName,
+          uploadDate: c.uploadedAt,
+        },
+        index: idx + 1,
+        total: extra.length,
+      });
+    });
+
     return items.filter(item =>
       item.os.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.customer.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [trips, searchQuery]);
+  }, [trips, driverContracts, searchQuery]);
 
   const handleContractClick = (url: string, title: string) => {
     if (!driver) return;

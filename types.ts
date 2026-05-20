@@ -448,6 +448,8 @@ export interface FreightContract {
   tripId?: string;
   tripOs?: string;
   destination?: string;
+  driverId?: string;
+  driverName?: string;
   status: 'linked' | 'unlinked';
   uploadedAt: string;
 }
