@@ -999,7 +999,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       {/* Modal de Configurações */}
       {settingsModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col" style={{ maxHeight: '90vh' }}>
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div>
                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Configurações da Coleta</h3>
@@ -1010,7 +1010,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
               </button>
             </div>
             
-            <div className="p-8 space-y-8">
+            <div className="p-8 space-y-8 overflow-y-auto flex-1">
               {/* Seleção de Template de E-mail */}
               <div className="space-y-4">
                 <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest border-b border-slate-100 pb-2">Modelo de E-mail</h4>
