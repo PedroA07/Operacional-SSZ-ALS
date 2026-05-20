@@ -623,35 +623,106 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         <CategoryManagerModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} categories={categories} onSuccess={onRefresh} actingUser={user} />
       )}
 
-      {isStatusModalOpen && selectedTrip && (
-        <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl space-y-6">
-             <div className="text-center">
-               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Registro de Status</p>
-               <p className="text-xl font-black text-slate-800 uppercase">OS: {selectedTrip.os}</p>
-             </div>
-             <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Status</label>
-                  <CustomSelect
-                    value={tempStatus}
-                    onChange={v => setTempStatus(v as TripStatus)}
-                    options={availableStatusesForSelectedTrip.map(opt => ({ value: opt.value, label: opt.label }))}
-                    inputClassName="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800 uppercase"
-                  />
+      {isStatusModalOpen && selectedTrip && (() => {
+        const specialValues = new Set(['Cancelado', 'Frete Morto', 'Reutilização']);
+        const specialOpts   = availableStatusesForSelectedTrip.filter(o => specialValues.has(o.value));
+        const normalOpts    = availableStatusesForSelectedTrip.filter(o => !specialValues.has(o.value));
+        const specialColorMap: Record<string, { bg: string; border: string; text: string }> = {
+          'Cancelado':    { bg: 'bg-red-600',     border: 'border-red-700',     text: 'text-white' },
+          'Frete Morto':  { bg: 'bg-amber-500',   border: 'border-amber-600',   text: 'text-white' },
+          'Reutilização': { bg: 'bg-emerald-600', border: 'border-emerald-700', text: 'text-white' },
+        };
+        return (
+          <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="px-8 pt-8 pb-4 border-b border-slate-100">
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-0.5">Registro de Status</p>
+                <p className="text-xl font-black text-slate-800 uppercase">OS: {selectedTrip.os}</p>
+              </div>
+
+              <div className="flex divide-x divide-slate-100 flex-1">
+                {/* Coluna principal — status normais */}
+                <div className="flex-1 p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Fluxo Operacional</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {normalOpts.map(opt => {
+                      const isSelected = tempStatus === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => setTempStatus(opt.value as TripStatus)}
+                          className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase border-2 transition-all flex items-center gap-3 ${
+                            isSelected
+                              ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-[1.02]'
+                              : 'bg-white border-slate-100 text-slate-600 hover:border-blue-300 hover:bg-blue-50'
+                          }`}
+                        >
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${opt.color}`} />
+                          {opt.label}
+                          {isSelected && <svg className="w-3.5 h-3.5 ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3.5" d="M5 13l4 4L19 7"/></svg>}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Data/Hora Real</label>
-                  <input type="datetime-local" className="w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 font-black text-slate-800" value={statusTime} onChange={e => setStatusTime(e.target.value)} />
+
+                {/* Coluna lateral — ações especiais */}
+                <div className="w-52 p-6 space-y-3 bg-slate-50 flex flex-col">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ações Especiais</p>
+                  {specialOpts.map(opt => {
+                    const isSelected = tempStatus === opt.value;
+                    const cfg = specialColorMap[opt.value] ?? { bg: 'bg-slate-600', border: 'border-slate-700', text: 'text-white' };
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => setTempStatus(opt.value as TripStatus)}
+                        className={`w-full py-4 px-4 rounded-2xl text-[10px] font-black uppercase border-2 transition-all shadow-sm flex flex-col items-center gap-1.5 ${
+                          isSelected
+                            ? `${cfg.bg} ${cfg.border} ${cfg.text} shadow-lg scale-[1.03] ring-2 ring-offset-2 ring-current`
+                            : `bg-white ${cfg.border} ${cfg.text.replace('text-white','text-slate-700')} hover:${cfg.bg} hover:${cfg.text} hover:shadow-md`
+                        }`}
+                      >
+                        <div className={`w-3 h-3 rounded-full ${cfg.bg} border-2 border-white shadow`} />
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+
+                  <div className="flex-1" />
+
+                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                    <label className="text-[9px] font-black text-slate-400 uppercase">Data/Hora</label>
+                    <input
+                      type="datetime-local"
+                      className="w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 bg-white font-black text-slate-800 text-[10px]"
+                      value={statusTime}
+                      onChange={e => setStatusTime(e.target.value)}
+                    />
+                  </div>
                 </div>
-             </div>
-             <div className="grid gap-3 pt-4">
-                <button disabled={isSavingStatus} onClick={handleUpdateStatus} className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700">Confirmar Registro</button>
-                <button onClick={() => setIsStatusModalOpen(false)} className="w-full text-center text-[10px] font-black text-slate-400 uppercase py-3">Cancelar</button>
-             </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-8 py-5 border-t border-slate-100 flex gap-3">
+                <button
+                  disabled={isSavingStatus}
+                  onClick={handleUpdateStatus}
+                  className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase shadow-xl hover:bg-blue-700 disabled:opacity-50 transition-all"
+                >
+                  {isSavingStatus ? 'Salvando…' : 'Confirmar Registro'}
+                </button>
+                <button
+                  onClick={() => setIsStatusModalOpen(false)}
+                  className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase hover:text-slate-600 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {isSilImporterOpen && (
         <SILExcelImporter
