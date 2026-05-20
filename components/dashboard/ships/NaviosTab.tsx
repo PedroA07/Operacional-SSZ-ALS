@@ -70,7 +70,7 @@ const TV_FILTERS: { key: TVFilter; label: string }[] = [
 ];
 
 // ── Active trip statuses (not completed) ──────────────────────────────────────
-const INACTIVE_STATUSES = ['Viagem concluída', 'Viagem cancelada'];
+const INACTIVE_STATUSES = ['Viagem concluída', 'Viagem cancelada', 'Cancelado', 'Frete Morto'];
 
 // ── Situação → ShipStatus ─────────────────────────────────────────────────────
 function mapSituacao(s: string): ShipStatus {

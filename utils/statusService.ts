@@ -9,6 +9,12 @@ export interface StatusOption {
   operationalOnly?: boolean;
 }
 
+// Encerramentos globais — aparecem para todo tipo de programação, nunca para o motorista
+const GLOBAL_CLOSURE_STATUSES: StatusOption[] = [
+  { label: 'Cancelado',   value: 'Cancelado',   color: 'bg-amber-500', isFinal: true, operationalOnly: true },
+  { label: 'Frete Morto', value: 'Frete Morto', color: 'bg-red-600',   isFinal: true, operationalOnly: true },
+];
+
 export const statusService = {
   STANDARD_STATUSES: [
     { label: 'Pendente',           value: 'Pendente',           color: 'bg-slate-500' },
@@ -39,74 +45,75 @@ export const statusService = {
     allStatuses: CustomStatus[],
     driverFacing = false
   ): StatusOption[] => {
+    let base: StatusOption[];
+
     if (!trip || !allStatuses || allStatuses.length === 0) {
-      const base = statusService.getOptions(trip);
-      return driverFacing ? base.filter(s => !s.operationalOnly) : base;
+      base = statusService.getOptions(trip);
+    } else {
+      const tripCustomer = trip.customer?.id;
+      const tripModality = trip.type?.toUpperCase();
+      const tripDest     = trip.destination?.id || trip.scheduledLocationId;
+
+      let bestScore   = -1;
+      let bestStatuses: CustomStatus[] = [];
+
+      const groupedByRule = new Map<string, CustomStatus[]>();
+      allStatuses.forEach(s => {
+        const key = `${s.customerId || 'ANY'}-${s.modality || 'ANY'}-${s.destinationId || 'ANY'}`;
+        if (!groupedByRule.has(key)) groupedByRule.set(key, []);
+        groupedByRule.get(key)!.push(s);
+      });
+
+      for (const [, statuses] of groupedByRule.entries()) {
+        const sample  = statuses[0];
+        let score     = 0;
+        let isValid   = true;
+
+        if (sample.customerId) {
+          if (sample.customerId === tripCustomer) score += 100;
+          else isValid = false;
+        }
+        if (sample.destinationId) {
+          if (sample.destinationId === tripDest) score += 10;
+          else isValid = false;
+        }
+        if (sample.modality) {
+          if (sample.modality === tripModality) score += 1;
+          else isValid = false;
+        }
+
+        if (isValid && score > bestScore) {
+          bestScore    = score;
+          bestStatuses = statuses;
+        }
+      }
+
+      if (bestStatuses.length > 0) {
+        const sorted = [...bestStatuses].sort((a, b) => a.orderIndex - b.orderIndex);
+        base = sorted.map(s => ({
+          label:           s.name,
+          value:           s.name as TripStatus,
+          color:           s.color || 'bg-blue-500',
+          isFinal:         s.isFinal         === true,
+          operationalOnly: s.operationalOnly === true,
+        }));
+      } else {
+        base = statusService.getOptions(trip);
+      }
     }
 
-    const tripCustomer = trip.customer?.id;
-    const tripModality = trip.type?.toUpperCase();
-    const tripDest     = trip.destination?.id || trip.scheduledLocationId;
+    // Encerramentos globais: sempre adicionados ao final, nunca duplicados
+    const existingValues = new Set(base.map(s => s.value));
+    const globals = GLOBAL_CLOSURE_STATUSES.filter(g => !existingValues.has(g.value));
+    const full = [...base, ...globals];
 
-    let bestScore   = -1;
-    let bestStatuses: CustomStatus[] = [];
-
-    // Agrupar status por regra (Cliente + Modalidade + Destino)
-    const groupedByRule = new Map<string, CustomStatus[]>();
-    allStatuses.forEach(s => {
-      const key = `${s.customerId || 'ANY'}-${s.modality || 'ANY'}-${s.destinationId || 'ANY'}`;
-      if (!groupedByRule.has(key)) groupedByRule.set(key, []);
-      groupedByRule.get(key)!.push(s);
-    });
-
-    for (const [, statuses] of groupedByRule.entries()) {
-      const sample  = statuses[0];
-      let score     = 0;
-      let isValid   = true;
-
-      if (sample.customerId) {
-        if (sample.customerId === tripCustomer) score += 100;
-        else isValid = false;
-      }
-      if (sample.destinationId) {
-        if (sample.destinationId === tripDest) score += 10;
-        else isValid = false;
-      }
-      if (sample.modality) {
-        if (sample.modality === tripModality) score += 1;
-        else isValid = false;
-      }
-
-      if (isValid && score > bestScore) {
-        bestScore    = score;
-        bestStatuses = statuses;
-      }
-    }
-
-    if (bestStatuses.length > 0) {
-      const sorted = [...bestStatuses].sort((a, b) => a.orderIndex - b.orderIndex);
-
-      // Se for contexto de motorista, filtra os que são só do painel operacional
-      const visible = driverFacing
-        ? sorted.filter(s => !s.operationalOnly)
-        : sorted;
-
-      return visible.map(s => ({
-        label:           s.name,
-        value:           s.name as TripStatus,
-        color:           s.color || 'bg-blue-500',
-        isFinal:         s.isFinal         === true,
-        operationalOnly: s.operationalOnly === true,
-      }));
-    }
-
-    const base = statusService.getOptions(trip);
-    return driverFacing ? base.filter(s => !s.operationalOnly) : base;
+    return driverFacing ? full.filter(s => !s.operationalOnly) : full;
   },
 
   /** Verifica se o status atual marca a trip como concluída */
   isTripCompleted: (status: string, trip: Trip | null, customStatuses: CustomStatus[]): boolean => {
     if (status === 'Viagem concluída') return true;
+    if (status === 'Cancelado' || status === 'Frete Morto') return true;
     if (!trip) return false;
 
     const options = statusService.getCustomOptions(trip, customStatuses);
@@ -114,3 +121,4 @@ export const statusService = {
     return selected?.isFinal === true;
   },
 };
+

@@ -50,7 +50,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const driverStats = useMemo(() => {
-    const todayTrips = trips.filter(t => t.dateTime.split('T')[0] === todayStr && t.status !== 'Viagem cancelada');
+    const todayTrips = trips.filter(t => t.dateTime.split('T')[0] === todayStr && t.status !== 'Viagem cancelada' && t.status !== 'Cancelado' && t.status !== 'Frete Morto');
     return {
       total: todayTrips.length,
       done: todayTrips.filter(t => t.isCompleted || t.status === 'Viagem concluída').length,
@@ -60,7 +60,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   const activeTrip = useMemo(() => {
     const pendingTrips = [...trips]
-      .filter(t => !t.isCompleted && t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada')
+      .filter(t => !t.isCompleted && t.status !== 'Viagem concluída' && t.status !== 'Viagem cancelada' && t.status !== 'Cancelado' && t.status !== 'Frete Morto')
       .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
     if (pendingTrips.length === 0) return null;
@@ -103,7 +103,7 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
 
   const availableStatuses = useMemo(() => {
     if (!activeTrip) return [];
-    return statusService.getCustomOptions(activeTrip, customStatuses);
+    return statusService.getCustomOptions(activeTrip, customStatuses, true);
   }, [activeTrip, customStatuses]);
 
   const handleStatusSelect = (status: TripStatus) => {

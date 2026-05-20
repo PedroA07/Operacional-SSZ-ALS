@@ -342,17 +342,17 @@ export interface Automation {
   updatedAt: string;
 }
 
-export type TripStatus = 
-  | 'Pendente' 
+export type TripStatus =
+  | 'Pendente'
   | 'Retirada de vazio'
-  | 'Retirada do cheio' 
-  | 'Em viagem' 
-  | 'Chegou no cliente' 
-  | 'Pegou NF' 
-  | 'Saiu do cliente' 
-  | 'Chegou no destino' 
+  | 'Retirada do cheio'
+  | 'Em viagem'
+  | 'Chegou no cliente'
+  | 'Pegou NF'
+  | 'Saiu do cliente'
+  | 'Chegou no destino'
   | 'Devolução do cheio'
-  | 'Viagem concluída' 
+  | 'Viagem concluída'
   | 'Viagem cancelada'
   | 'Chegou no Cragea'
   | 'Aguardando carregar'
@@ -361,7 +361,9 @@ export type TripStatus =
   | 'Saiu da Volkswagen'
   | 'Container sobre rodas'
   | 'Agendamento realizado'
-  | 'Emissão Solicitada';
+  | 'Emissão Solicitada'
+  | 'Cancelado'
+  | 'Frete Morto';
 
 export type VWStatus = TripStatus;
 
