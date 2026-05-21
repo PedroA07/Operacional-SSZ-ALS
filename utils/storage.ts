@@ -4,7 +4,8 @@ import {
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
-  BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, ShipTerminalConfig, Ship
+  BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, ShipTerminalConfig, Ship,
+  Devolucao, DevolucaoStatus
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1631,5 +1632,101 @@ export const db = {
     if (!supabase) return;
     const { error } = await supabase.from('ships').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  // ── Devoluções de Vazio ───────────────────────────────────────────────────
+
+  getDevolucoes: async (): Promise<Devolucao[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('devolucoes').select('*').order('created_at', { ascending: false });
+    if (error) return [];
+    return (data || []).map((r: any): Devolucao => ({
+      id:             r.id,
+      os:             r.os,
+      container:      r.container,
+      containerType:  r.container_type   ?? undefined,
+      booking:        r.booking          ?? undefined,
+      ship:           r.ship             ?? undefined,
+      agencia:        r.agencia          ?? undefined,
+      pod:            r.pod              ?? undefined,
+      padrao:         r.padrao           ?? undefined,
+      local:          r.local_name       ?? undefined,
+      localId:        r.local_id         ?? undefined,
+      customer: r.customer_id ? {
+        id:        r.customer_id,
+        name:      r.customer_name      ?? '',
+        legalName: r.customer_legal_name ?? undefined,
+        cnpj:      r.customer_cnpj      ?? undefined,
+        city:      r.customer_city      ?? undefined,
+        state:     r.customer_state     ?? undefined,
+      } : undefined,
+      driver: r.driver_id ? {
+        id:           r.driver_id,
+        name:         r.driver_name          ?? '',
+        plateHorse:   r.driver_plate_horse   ?? undefined,
+        plateTrailer: r.driver_plate_trailer ?? undefined,
+        cpf:          r.driver_cpf           ?? undefined,
+      } : undefined,
+      scheduledDateTime: r.scheduled_date_time ?? undefined,
+      agendamentoDoc: r.agendamento_doc_id ? {
+        id:         r.agendamento_doc_id,
+        type:       'AGENDAMENTO',
+        url:        r.agendamento_doc_url        ?? '',
+        fileName:   r.agendamento_doc_file_name  ?? '',
+        uploadDate: r.agendamento_doc_upload_date ?? '',
+      } : undefined,
+      obs:         r.obs          ?? undefined,
+      status:      (r.status as DevolucaoStatus) ?? 'Pendente',
+      isCompleted: r.is_completed ?? false,
+      createdAt:   r.created_at,
+      updatedAt:   r.updated_at ?? undefined,
+    }));
+  },
+
+  saveDevolucao: async (d: Devolucao): Promise<boolean> => {
+    if (!supabase) return false;
+    const now = new Date().toISOString();
+    const payload: any = {
+      id:                         d.id,
+      os:                         d.os,
+      container:                  d.container,
+      container_type:             d.containerType             ?? null,
+      booking:                    d.booking                   ?? null,
+      ship:                       d.ship                      ?? null,
+      agencia:                    d.agencia                   ?? null,
+      pod:                        d.pod                       ?? null,
+      padrao:                     d.padrao                    ?? null,
+      local_name:                 d.local                     ?? null,
+      local_id:                   d.localId                   ?? null,
+      customer_id:                d.customer?.id              ?? null,
+      customer_name:              d.customer?.name            ?? null,
+      customer_legal_name:        d.customer?.legalName       ?? null,
+      customer_cnpj:              d.customer?.cnpj            ?? null,
+      customer_city:              d.customer?.city            ?? null,
+      customer_state:             d.customer?.state           ?? null,
+      driver_id:                  d.driver?.id                ?? null,
+      driver_name:                d.driver?.name              ?? null,
+      driver_plate_horse:         d.driver?.plateHorse        ?? null,
+      driver_plate_trailer:       d.driver?.plateTrailer      ?? null,
+      driver_cpf:                 d.driver?.cpf               ?? null,
+      scheduled_date_time:        d.scheduledDateTime         ?? null,
+      agendamento_doc_id:         d.agendamentoDoc?.id        ?? null,
+      agendamento_doc_url:        d.agendamentoDoc?.url       ?? null,
+      agendamento_doc_file_name:  d.agendamentoDoc?.fileName  ?? null,
+      agendamento_doc_upload_date:d.agendamentoDoc?.uploadDate?? null,
+      obs:                        d.obs                       ?? null,
+      status:                     d.status,
+      is_completed:               d.isCompleted               ?? false,
+      created_at:                 d.createdAt || now,
+      updated_at:                 now,
+    };
+    const { error } = await supabase.from('devolucoes').upsert(payload);
+    return !error;
+  },
+
+  deleteDevolucao: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('devolucoes').delete().eq('id', id);
+    return !error;
   },
 };

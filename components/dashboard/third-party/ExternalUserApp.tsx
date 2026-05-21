@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Trip } from '../../../types';
+import { User, Trip, Devolucao } from '../../../types';
 import { db } from '../../../utils/storage';
 import ExternalPortal from './ExternalPortal';
 
@@ -9,15 +9,17 @@ interface ExternalUserAppProps {
 }
 
 const ExternalUserApp: React.FC<ExternalUserAppProps> = ({ user, onLogout }) => {
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [trips, setTrips]           = useState<Trip[]>([]);
+  const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
+  const [isLoading, setIsLoading]   = useState(true);
 
   const loadData = useCallback(async () => {
     try {
-      const allTrips = await db.getTrips();
+      const [allTrips, allDevs] = await Promise.all([db.getTrips(), db.getDevolucoes()]);
       setTrips(allTrips);
+      setDevolucoes(allDevs);
     } catch (error) {
-      console.error("Erro ao carregar viagens para usuário externo:", error);
+      console.error("Erro ao carregar dados para usuário externo:", error);
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +78,7 @@ const ExternalUserApp: React.FC<ExternalUserAppProps> = ({ user, onLogout }) => 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
         <div className="max-w-7xl mx-auto">
-          <ExternalPortal user={user} trips={trips} />
+          <ExternalPortal user={user} trips={trips} devolucoes={devolucoes} />
         </div>
       </main>
     </div>

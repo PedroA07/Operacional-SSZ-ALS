@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Customer } from '../../../types';
 import { db } from '../../../utils/storage';
+import { maskCNPJ } from '../../../utils/masks';
 
 interface ExternalUsersManagerProps {
   onRefresh: () => void;
@@ -77,7 +78,6 @@ const colorMap: Record<string, { toggle: string; chip: string; check: string; bo
   orange:  { toggle: 'bg-orange-500',  chip: 'bg-orange-100 text-orange-700 border-orange-200',   check: 'text-orange-600',  border: 'border-orange-300',  bg: 'bg-orange-50' },
 };
 
-const CONTAINER_TYPES = ['20DV', '40DV', '40HC', '40HR', '20RF', '40RF', '45HC', '20OT', '40OT'];
 
 const STATUS_DEFS = [
   { key: 'Pendente',              color: 'bg-slate-100 text-slate-700 border-slate-300' },
@@ -104,9 +104,10 @@ const STATUS_DEFS = [
 const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }) => {
   const [users, setUsers]           = useState<User[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [opTypes, setOpTypes]       = useState<any[]>([]);
-  const [customers, setCustomers]   = useState<Customer[]>([]);
+  const [categories, setCategories]         = useState<any[]>([]);
+  const [opTypes, setOpTypes]               = useState<any[]>([]);
+  const [customers, setCustomers]           = useState<Customer[]>([]);
+  const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [saving, setSaving]         = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -121,16 +122,18 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
 
   const loadData = async () => {
     setLoading(true);
-    const [allUsers, allCats, allTypes, allCustomers] = await Promise.all([
+    const [allUsers, allCats, allTypes, allCustomers, allContainerTypes] = await Promise.all([
       db.getUsers(),
       db.getCategories(),
       db.getOperationTypes(),
       db.getCustomers(),
+      db.getContainerTypes(),
     ]);
     setUsers(allUsers.filter(u => u.role === 'third_party'));
     setCategories(allCats);
     setOpTypes(allTypes);
     setCustomers(allCustomers);
+    setContainerTypes(allContainerTypes);
     setLoading(false);
   };
 
@@ -271,9 +274,14 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
 
   const filteredCustomers = useMemo(() => {
     if (!customerSearch.trim()) return customers;
-    const q = customerSearch.toLowerCase();
+    const qText   = customerSearch.toLowerCase();
+    const qDigits = customerSearch.replace(/\D/g, '');
     return customers.filter(c =>
-      c.name?.toLowerCase().includes(q) || c.legalName?.toLowerCase().includes(q)
+      c.name?.toLowerCase().includes(qText) ||
+      c.legalName?.toLowerCase().includes(qText) ||
+      c.city?.toLowerCase().includes(qText) ||
+      c.state?.toLowerCase().includes(qText) ||
+      (qDigits.length >= 4 && c.cnpj?.replace(/\D/g, '').includes(qDigits))
     );
   }, [customers, customerSearch]);
 
@@ -644,34 +652,36 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                 )}
 
                 {/* Tipos de Container */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tipos de Container</p>
-                    {(editingUser.thirdPartyConfig?.allowedContainerTypes?.length || 0) > 0 && (
-                      <button onClick={() => clearFilter('allowedContainerTypes')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
-                        Limpar ({editingUser.thirdPartyConfig?.allowedContainerTypes?.length})
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {CONTAINER_TYPES.map(ct => {
-                      const selected = editingUser.thirdPartyConfig?.allowedContainerTypes?.includes(ct);
-                      return (
-                        <button
-                          key={ct}
-                          onClick={() => toggleFilter('allowedContainerTypes', ct)}
-                          className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${
-                            selected
-                              ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
-                              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-800'
-                          }`}
-                        >
-                          {ct}
+                {containerTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tipos de Container</p>
+                      {(editingUser.thirdPartyConfig?.allowedContainerTypes?.length || 0) > 0 && (
+                        <button onClick={() => clearFilter('allowedContainerTypes')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                          Limpar ({editingUser.thirdPartyConfig?.allowedContainerTypes?.length})
                         </button>
-                      );
-                    })}
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {containerTypes.map((ct: any) => {
+                        const selected = editingUser.thirdPartyConfig?.allowedContainerTypes?.includes(ct.name);
+                        return (
+                          <button
+                            key={ct.id || ct.name}
+                            onClick={() => toggleFilter('allowedContainerTypes', ct.name)}
+                            className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${
+                              selected
+                                ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-800'
+                            }`}
+                          >
+                            {ct.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Status */}
                 <div className="space-y-2">
@@ -705,7 +715,7 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
 
                 {/* Clientes */}
                 {customers.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Clientes</p>
                       <div className="flex items-center gap-2">
@@ -721,46 +731,104 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                         )}
                       </div>
                     </div>
-                    <div className="relative">
+
+                    {/* System-style search input */}
+                    <div className="relative group">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors pointer-events-none">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                      </div>
                       <input
                         type="text"
-                        placeholder="Buscar cliente..."
+                        placeholder="Buscar por nome, razão social, CNPJ ou cidade..."
                         value={customerSearch}
                         onChange={e => setCustomerSearch(e.target.value)}
-                        className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className="w-full pl-10 pr-9 py-3 rounded-2xl border-2 border-slate-100 bg-white text-[10px] font-bold uppercase placeholder:text-slate-300 text-slate-700 focus:border-blue-400 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm"
                       />
-                      <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                      </svg>
+                      {customerSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomerSearch('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      )}
                     </div>
-                    <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+
+                    {/* Rich customer cards */}
+                    <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
                       {filteredCustomers.map((c: Customer) => {
                         const val = c.name || '';
                         const selected = editingUser.thirdPartyConfig?.allowedCustomers?.includes(val) || false;
                         return (
                           <label
                             key={c.id}
-                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                              selected ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                            className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                              selected
+                                ? 'bg-emerald-50 border-emerald-300'
+                                : 'bg-white border-slate-100 hover:border-blue-200 hover:bg-blue-50/30'
                             }`}
                           >
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => toggleFilter('allowedCustomers', val)}
-                              className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-0 shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <p className={`text-[10px] font-black uppercase leading-tight ${selected ? 'text-emerald-700' : 'text-slate-700'}`}>{c.name}</p>
-                              {c.legalName && c.legalName !== c.name && (
-                                <p className="text-[8px] text-slate-400 uppercase truncate">{c.legalName}</p>
+                            {/* Checkbox */}
+                            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${
+                              selected ? 'bg-emerald-500 border-emerald-500' : 'border-slate-200 bg-white'
+                            }`}>
+                              {selected && (
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
+                                </svg>
+                              )}
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() => toggleFilter('allowedCustomers', val)}
+                                className="sr-only"
+                              />
+                            </div>
+
+                            {/* Customer info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className={`text-[11px] font-black uppercase leading-tight ${selected ? 'text-emerald-800' : 'text-slate-800'}`}>
+                                    {c.name}
+                                  </p>
+                                  {c.legalName && c.legalName !== c.name && (
+                                    <p className="text-[8px] font-bold text-slate-400 uppercase truncate mt-0.5">{c.legalName}</p>
+                                  )}
+                                </div>
+                                {c.cnpj && (
+                                  <span className="text-[8px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg shrink-0 border border-slate-200">
+                                    {maskCNPJ(c.cnpj)}
+                                  </span>
+                                )}
+                              </div>
+                              {(c.city || c.state) && (
+                                <div className="flex items-center gap-1 mt-1.5">
+                                  <svg className="w-2.5 h-2.5 text-slate-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                  </svg>
+                                  <span className={`text-[8px] font-bold uppercase ${selected ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                    {[c.city, c.state].filter(Boolean).join(' — ')}
+                                  </span>
+                                </div>
                               )}
                             </div>
                           </label>
                         );
                       })}
                       {filteredCustomers.length === 0 && (
-                        <p className="text-[9px] text-slate-400 italic text-center py-4">Nenhum cliente encontrado</p>
+                        <div className="text-center py-6">
+                          <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Nenhum cliente encontrado</p>
+                          {customerSearch && (
+                            <button onClick={() => setCustomerSearch('')} className="text-[8px] font-bold text-blue-500 mt-1 hover:underline">Limpar busca</button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

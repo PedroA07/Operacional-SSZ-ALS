@@ -887,3 +887,47 @@ export interface ShipTerminalConfig {
   active: boolean;
   sortOrder: number;
 }
+
+export type DevolucaoStatus = 'Pendente' | 'Agendado' | 'Realizado' | 'Cancelado';
+
+export interface Devolucao {
+  id: string;
+  os: string;
+  container: string;
+  containerType?: string;
+  booking?: string;
+  ship?: string;
+  agencia?: string;
+  pod?: string;
+  padrao?: string;
+  local?: string;
+  localId?: string;
+  customer?: {
+    id: string;
+    name: string;
+    legalName?: string;
+    cnpj?: string;
+    city?: string;
+    state?: string;
+  };
+  driver?: {
+    id: string;
+    name: string;
+    plateHorse?: string;
+    plateTrailer?: string;
+    cpf?: string;
+  };
+  scheduledDateTime?: string;
+  agendamentoDoc?: {
+    id: string;
+    type: string;
+    url: string;
+    fileName: string;
+    uploadDate: string;
+  };
+  obs?: string;
+  status: DevolucaoStatus;
+  isCompleted?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
