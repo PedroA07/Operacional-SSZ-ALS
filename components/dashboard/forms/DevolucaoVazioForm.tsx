@@ -9,6 +9,7 @@ import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
 import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
 import CustomSelect from '../../shared/CustomSelect';
+import DateTimePicker from '../../shared/DateTimePicker';
 
 interface DevolucaoVazioFormProps {
   user?: User;
@@ -334,11 +335,10 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
 
         <div className="space-y-1.5">
           <label className={labelAmberClass}>7. Data/Hora do Agendamento</label>
-          <input
-            type="datetime-local"
-            className={inputClasses}
+          <DateTimePicker
             value={formData.agendamentoDateTime}
-            onChange={e => setFormData(prev => ({ ...prev, agendamentoDateTime: e.target.value }))}
+            onChange={val => setFormData(prev => ({ ...prev, agendamentoDateTime: val }))}
+            placeholder="Selecionar data e hora..."
           />
           <p className="text-[8px] text-slate-400 font-bold">Apenas para controle interno — não aparece no PDF.</p>
         </div>

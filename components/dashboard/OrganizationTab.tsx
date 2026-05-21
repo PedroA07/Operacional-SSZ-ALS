@@ -366,6 +366,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA' | 'DEVOLUÇÕES'>('COLETA');
   const [devMinutaTrip, setDevMinutaTrip] = useState<Trip | null>(null);
   const [uploadingDevId, setUploadingDevId] = useState<string | null>(null);
+  const [showDevAddForm, setShowDevAddForm] = useState(false);
+  const [devAddForm, setDevAddForm] = useState({ container: '', local: '', dateTime: '', driverId: '' });
+  const [savingDevAdd, setSavingDevAdd] = useState(false);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
@@ -1042,6 +1045,45 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     manualLocal: '',
     agendamentoDateTime: t.scheduledDateTime || '',
   }), []);
+
+  const handleAddDevEntry = useCallback(async () => {
+    if (!devAddForm.container.trim()) return;
+    setSavingDevAdd(true);
+    try {
+      const driver = drivers.find(d => d.id === devAddForm.driverId);
+      const now = new Date().toISOString();
+      const newTrip: Trip = {
+        id: crypto.randomUUID(),
+        os: `DEV-${Date.now()}`,
+        booking: '', ship: '', bu: 'SSZ', autColeta: '', embarcador: '',
+        dateTime: now, statusTime: now, isLate: false,
+        type: 'DEVOLUÇÃO VAZIO', containerType: '40HC', category: '',
+        container: devAddForm.container.trim().toUpperCase(),
+        tara: '', seal: '', cva: '', agencia: '',
+        customer: { id: '', name: '---' } as any,
+        destination: devAddForm.local.trim() ? { id: '', name: devAddForm.local.trim().toUpperCase() } as any : null,
+        driver: driver || ({ id: '', name: '---' } as any),
+        status: 'Pendente' as any,
+        statusHistory: [],
+        advancePayment: { status: 'BLOQUEADO' } as any,
+        balancePayment: { status: 'AGUARDANDO_DOCS' } as any,
+        isPriority: false, isCompleted: false, sentNF: false,
+        isScheduled: false, hasAdvance: false,
+        isRemovedFromColeta: false, isRemovedFromOrg: false,
+        scheduledDateTime: devAddForm.dateTime || null,
+      };
+      await db.saveTrip(newTrip);
+      setDevAddForm({ container: '', local: '', dateTime: '', driverId: '' });
+      setShowDevAddForm(false);
+      onRefresh();
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Devolução adicionada com sucesso', type: 'success' } }));
+    } catch (error) {
+      console.error('Erro ao adicionar devolução:', error);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao adicionar devolução', type: 'error' } }));
+    } finally {
+      setSavingDevAdd(false);
+    }
+  }, [devAddForm, drivers, onRefresh]);
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
     const advanceData = { 
@@ -1752,33 +1794,105 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               <div className="w-2 h-8 bg-orange-500 rounded-full"></div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Devoluções de Vazio</h3>
               <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-black rounded-full border border-orange-200">{trips.length}</span>
+              <button
+                onClick={() => setShowDevAddForm(v => !v)}
+                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                Adicionar
+              </button>
             </div>
 
-            {trips.length === 0 ? (
+            {showDevAddForm && (
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 shadow-sm">
+                <p className="text-[9px] font-black text-orange-700 uppercase tracking-widest mb-4">Nova Entrada Manual</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Container *</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: TCKU1234567"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold uppercase text-slate-800 focus:border-orange-400 outline-none transition-all"
+                      value={devAddForm.container}
+                      onChange={e => setDevAddForm(p => ({ ...p, container: e.target.value.toUpperCase() }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Local / Depósito</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: DEPOT RECORD"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold uppercase text-slate-800 focus:border-orange-400 outline-none transition-all"
+                      value={devAddForm.local}
+                      onChange={e => setDevAddForm(p => ({ ...p, local: e.target.value.toUpperCase() }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Data / Hora</label>
+                    <DateTimePicker
+                      value={devAddForm.dateTime}
+                      onChange={val => setDevAddForm(p => ({ ...p, dateTime: val }))}
+                      placeholder="Selecionar..."
+                      inputClassName="text-[10px] py-2.5 rounded-xl border-slate-200"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Motorista</label>
+                    <select
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-800 focus:border-orange-400 outline-none transition-all"
+                      value={devAddForm.driverId}
+                      onChange={e => setDevAddForm(p => ({ ...p, driverId: e.target.value }))}
+                    >
+                      <option value="">Selecionar...</option>
+                      {drivers.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-4">
+                  <button
+                    onClick={() => { setShowDevAddForm(false); setDevAddForm({ container: '', local: '', dateTime: '', driverId: '' }); }}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-[9px] font-black uppercase text-slate-500 hover:bg-slate-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleAddDevEntry}
+                    disabled={savingDevAdd || !devAddForm.container.trim()}
+                    className="px-6 py-2 rounded-xl bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {savingDevAdd ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>Salvando...</> : 'Salvar'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {trips.length === 0 && !showDevAddForm ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <svg className="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0v10l-8 4m-8-4V7m8 4v10"/></svg>
                 <p className="text-[11px] font-black uppercase tracking-widest">Nenhuma devolução encontrada</p>
               </div>
-            ) : (
+            ) : trips.length > 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Container / OS</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Booking / Navio</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Local / Booking</th>
                       <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Cliente</th>
                       <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Motorista</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest min-w-[180px]">Agendamento</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest min-w-[220px]">Agendamento</th>
                       <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Comprovante</th>
                       <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Minuta</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {trips.map(t => {
-                      const agendDt = t.scheduledDateTime
-                        ? new Date(t.scheduledDateTime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                        : '';
                       const isUploading = uploadingDevId === t.id;
+                      const dtPickerVal = t.scheduledDateTime
+                        ? (() => { try { const d = new Date(t.scheduledDateTime!); const off = d.getTimezoneOffset()*60000; return new Date(d.getTime()-off).toISOString().slice(0,16); } catch { return ''; }})()
+                        : '';
                       return (
                         <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
                           <td className="px-4 py-3">
@@ -1789,8 +1903,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] font-bold text-slate-700 uppercase">{t.booking || '---'}</span>
-                              <span className="text-[8px] font-bold text-slate-400 uppercase">{t.ship ? t.ship.split(/[/|]/)[0].trim() : '---'}</span>
+                              <span className="text-[10px] font-bold text-slate-700 uppercase">{t.destination?.name || t.booking || '---'}</span>
+                              {t.booking && t.destination?.name && (
+                                <span className="text-[8px] font-bold text-slate-400 uppercase">{t.booking}</span>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -1799,22 +1915,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                           <td className="px-4 py-3">
                             <span className="text-[9px] font-bold text-slate-700 uppercase">{t.driver?.name || '---'}</span>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-1.5">
-                              <input
-                                type="datetime-local"
-                                className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-[9px] font-bold text-slate-700 focus:border-orange-400 outline-none transition-all"
-                                value={t.scheduledDateTime ? (() => { try { const d = new Date(t.scheduledDateTime!); const off = d.getTimezoneOffset()*60000; return new Date(d.getTime()-off).toISOString().slice(0,16); } catch { return ''; }})() : ''}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  const iso = val ? new Date(val).toISOString() : '';
-                                  handleSaveDevAgendamento(t.id, iso);
-                                }}
-                              />
-                              {agendDt && (
-                                <span className="text-[8px] font-bold text-orange-600 px-1">{agendDt}</span>
-                              )}
-                            </div>
+                          <td className="px-4 py-3 min-w-[220px]">
+                            <DateTimePicker
+                              value={dtPickerVal}
+                              onChange={val => {
+                                const iso = val ? new Date(val).toISOString() : '';
+                                handleSaveDevAgendamento(t.id, iso);
+                              }}
+                              placeholder="Agendar..."
+                              inputClassName="text-[9px] py-1.5 rounded-lg border-slate-200"
+                            />
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-col gap-1 items-start">
@@ -1863,7 +1973,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                   </tbody>
                 </table>
               </div>
-            )}
+            ) : null}
           </div>
         )}
       </div>
