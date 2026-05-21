@@ -723,8 +723,6 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const [newSt, setNewSt]             = useState<ShipStatus>('NOVO');
   const [stObs, setStObs]             = useState('');
 
-  // EMBRAPORT scraper state (callback declared after loadTV below)
-  const [scrapingEmbraport, setScrapingEmbraport] = useState(false);
 
   // Collapsibles
   const [showMonit, setShowMonit]     = useState(true);
@@ -807,28 +805,6 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     return () => clearInterval(tick);
   }, [nextRefresh]);
 
-  // EMBRAPORT scraper callback — declared after loadTV to avoid "used before declaration"
-  const scrapeEmbraport = useCallback(async () => {
-    setScrapingEmbraport(true);
-    try {
-      const res = await fetch('/api/embraport-escala');
-      const data = await res.json();
-      if (data.ok) {
-        window.dispatchEvent(new CustomEvent('als_show_toast', {
-          detail: { message: `EMBRAPORT: ${data.total} navios atualizados`, type: 'success' }
-        }));
-        await loadTV();
-      } else {
-        window.dispatchEvent(new CustomEvent('als_show_toast', {
-          detail: { message: data.error || 'Erro ao buscar EMBRAPORT', type: 'error' }
-        }));
-      }
-    } catch {
-      window.dispatchEvent(new CustomEvent('als_show_toast', {
-        detail: { message: 'Erro ao conectar com scraper', type: 'error' }
-      }));
-    } finally { setScrapingEmbraport(false); }
-  }, [loadTV]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
   // Status counts (panel bar)
@@ -1010,11 +986,6 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={scrapeEmbraport} disabled={scrapingEmbraport}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-50 text-[9px] font-black uppercase tracking-widest transition-all border border-purple-200">
-            <I.Ship className="w-3.5 h-3.5"/>
-            {scrapingEmbraport ? 'Buscando...' : 'EMBRAPORT'}
-          </button>
           <button onClick={() => { loadTV(); loadShips(); }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 text-[9px] font-black uppercase tracking-widest transition-all">
             <I.Refresh className="w-3.5 h-3.5"/> Atualizar
