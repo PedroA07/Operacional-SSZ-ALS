@@ -29,6 +29,9 @@ export interface User {
     visibleFields: string[];
     allowedCategories?: string[];
     allowedTypes?: string[];
+    allowedContainerTypes?: string[];
+    allowedStatuses?: string[];
+    allowedCustomers?: string[];
     visibleFilters?: string[];
     pages?: {
       orgColeta?:        { enabled: boolean; visibleFields: string[] };
