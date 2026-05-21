@@ -17,11 +17,13 @@ interface DevolucaoVazioFormProps {
   ports: Port[];
   onClose: () => void;
   initialFormData?: any;
+  tripId?: string;
+  onAgendamentoSave?: (tripId: string, dateTime: string) => void;
 }
 
 const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
 
-const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, onClose, initialFormData }) => {
+const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, onClose, initialFormData, tripId, onAgendamentoSave }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -72,7 +74,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     tipo: '40HC',
     padrao: 'CARGA GERAL',
     obs: '',
-    manualLocal: ''
+    manualLocal: '',
+    agendamentoDateTime: '',
   };
   const [formData, setFormData] = useState<typeof defaultFormData>(initialFormData ?? defaultFormData);
 
@@ -121,6 +124,9 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
       const dataChanged = !initialFormData || formFingerprint(formData) !== formFingerprint(initialFormData);
       if (dataChanged) {
         db.saveFormHistory('DEVOLUCAO_VAZIO', formData, formData.container || formData.booking, activeUser);
+      }
+      if (tripId && formData.agendamentoDateTime && onAgendamentoSave) {
+        onAgendamentoSave(tripId, formData.agendamentoDateTime);
       }
 
       await new Promise(r => setTimeout(r, 800));
@@ -318,12 +324,23 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
 
         <div className="space-y-1">
           <label className={labelAmberClass}>6. Observações Operacionais</label>
-          <textarea 
-            placeholder="INSTRUÇÕES PARA O MOTORISTA OU DEPÓSITO..." 
-            className={`${inputClasses} h-28 resize-none py-4 lowercase leading-relaxed`} 
-            value={formData.obs} 
-            onChange={e => handleInputChange('obs', e.target.value)} 
+          <textarea
+            placeholder="INSTRUÇÕES PARA O MOTORISTA OU DEPÓSITO..."
+            className={`${inputClasses} h-28 resize-none py-4 lowercase leading-relaxed`}
+            value={formData.obs}
+            onChange={e => handleInputChange('obs', e.target.value)}
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className={labelAmberClass}>7. Data/Hora do Agendamento</label>
+          <input
+            type="datetime-local"
+            className={inputClasses}
+            value={formData.agendamentoDateTime}
+            onChange={e => setFormData(prev => ({ ...prev, agendamentoDateTime: e.target.value }))}
+          />
+          <p className="text-[8px] text-slate-400 font-bold">Apenas para controle interno — não aparece no PDF.</p>
         </div>
 
         <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-amber-600 shadow-xl transition-all active:scale-95">
