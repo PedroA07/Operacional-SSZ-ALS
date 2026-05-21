@@ -12,9 +12,24 @@ interface ContractItem extends FreightContract {
   localidade?: string;
   tripStatus?: string;
   localDeBaixa?: string;
+  prevTermino?: string;
+  expiresAt?: string;
 }
 
 const MONTHS_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+
+const normLoc = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+
+function locConfirmsTrip(localidade: string | undefined, tripDest: string): boolean {
+  if (!localidade || !tripDest) return true;
+  const words = normLoc(localidade).split(/[\s\-]+/).filter(w => w.length >= 3);
+  if (!words.length) return true;
+  const dest = normLoc(tripDest);
+  return words.length >= 2
+    ? words.slice(0, 2).every(w => dest.includes(w))
+    : words.some(w => dest.includes(w));
+}
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -82,21 +97,27 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
           if (seen.has(key)) continue;
           seen.add(key);
 
+          const tripDest = trip.destination?.name || trip.customer?.name || '';
+          const parsedLocalidade = doc.parsedData?.localidade;
+          const osConfirmed = locConfirmsTrip(parsedLocalidade, tripDest);
+
           result.push({
             id:           key,
             fileName:     doc.fileName || `Contrato-${trip.os}.pdf`,
             fileUrl:      doc.url,
             tripId:       trip.id,
-            tripOs:       trip.os,
-            container:    trip.container,
-            destination:  trip.destination?.name || trip.customer?.name,
+            tripOs:       osConfirmed ? trip.os : undefined,
+            container:    doc.parsedData?.container || trip.container,
+            destination:  tripDest,
             driverId:     driver.id,
             driverName:   driver.name,
             status:       'linked',
             uploadedAt:   doc.uploadDate || trip.dateTime,
-            localidade:   doc.parsedData?.localidade || trip.destination?.city || trip.customer?.city,
+            localidade:   parsedLocalidade || trip.destination?.city || trip.customer?.city,
             tripStatus:   trip.status as string,
-            localDeBaixa: trip.destination?.name || trip.customer?.name,
+            localDeBaixa: tripDest,
+            prevTermino:  doc.parsedData?.prevTermino,
+            expiresAt:    doc.expiresAt,
           });
         }
       }
@@ -349,11 +370,15 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
                     </div>
                   )}
 
-                  {/* ── Linha 3: OS + status + local de baixa ── */}
-                  <div className="px-5 py-3 border-b border-white/5 flex items-center gap-2 flex-wrap">
-                    {contract.tripOs && (
+                  {/* ── Linha 3: OS + status + térm + exp + local de baixa ── */}
+                  <div className="px-5 py-3 border-b border-white/5 flex items-center gap-1.5 flex-wrap">
+                    {contract.tripOs ? (
                       <span className="text-[8px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">
                         OS {contract.tripOs}
+                      </span>
+                    ) : (
+                      <span className="text-[8px] font-black text-slate-500 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                        Sem OS
                       </span>
                     )}
                     {contract.tripStatus && ss && (
@@ -361,8 +386,18 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
                         {contract.tripStatus}
                       </span>
                     )}
+                    {contract.prevTermino && (
+                      <span className="text-[8px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                        Térm: {contract.prevTermino}
+                      </span>
+                    )}
+                    {contract.expiresAt && (
+                      <span className="text-[8px] font-black text-slate-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                        Exp: {new Date(contract.expiresAt).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
                     {contract.localDeBaixa && (
-                      <span className="flex items-center gap-1 text-[8px] font-bold text-slate-500 truncate min-w-0">
+                      <span className="flex items-center gap-1 text-[8px] font-bold text-slate-500 truncate min-w-0 mt-0.5 w-full">
                         <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
