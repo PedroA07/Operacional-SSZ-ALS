@@ -5,7 +5,7 @@ import {
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
   BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, ShipTerminalConfig, Ship,
-  Devolucao, DevolucaoStatus
+  Devolucao, DevolucaoStatus, Liberacao, LiberacaoStatus
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -1727,6 +1727,84 @@ export const db = {
   deleteDevolucao: async (id: string): Promise<boolean> => {
     if (!supabase) return false;
     const { error } = await supabase.from('devolucoes').delete().eq('id', id);
+    return !error;
+  },
+
+  getLiberacoes: async (): Promise<Liberacao[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('liberacoes').select('*').order('created_at', { ascending: false });
+    if (error) { console.error('[getLiberacoes]', error.message); return []; }
+    return (data || []).map((r: any): Liberacao => ({
+      id: r.id,
+      os: r.os,
+      local: r.local_name || undefined,
+      localId: r.local_id || undefined,
+      booking: r.booking || undefined,
+      ship: r.ship || undefined,
+      agencia: r.agencia || undefined,
+      pod: r.pod || undefined,
+      containerType: r.container_type || undefined,
+      qtdContainer: r.qtd_container || undefined,
+      padrao: r.padrao || undefined,
+      customer: r.customer_id ? {
+        id: r.customer_id,
+        name: r.customer_name || '',
+        legalName: r.customer_legal_name || undefined,
+        cnpj: r.customer_cnpj || undefined,
+        city: r.customer_city || undefined,
+        state: r.customer_state || undefined,
+      } : undefined,
+      driver: r.driver_id ? {
+        id: r.driver_id,
+        name: r.driver_name || '',
+        plateHorse: r.driver_plate_horse || undefined,
+        plateTrailer: r.driver_plate_trailer || undefined,
+        cpf: r.driver_cpf || undefined,
+      } : undefined,
+      obs: r.obs || undefined,
+      status: (r.status as LiberacaoStatus) || 'Pendente',
+      createdAt: r.created_at,
+      updatedAt: r.updated_at || undefined,
+    }));
+  },
+
+  saveLiberacao: async (l: Liberacao): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('liberacoes').upsert({
+      id: l.id,
+      os: l.os,
+      local_name: l.local || null,
+      local_id: l.localId || null,
+      booking: l.booking || null,
+      ship: l.ship || null,
+      agencia: l.agencia || null,
+      pod: l.pod || null,
+      container_type: l.containerType || null,
+      qtd_container: l.qtdContainer || null,
+      padrao: l.padrao || null,
+      customer_id: l.customer?.id || null,
+      customer_name: l.customer?.name || null,
+      customer_legal_name: l.customer?.legalName || null,
+      customer_cnpj: l.customer?.cnpj || null,
+      customer_city: l.customer?.city || null,
+      customer_state: l.customer?.state || null,
+      driver_id: l.driver?.id || null,
+      driver_name: l.driver?.name || null,
+      driver_plate_horse: l.driver?.plateHorse || null,
+      driver_plate_trailer: l.driver?.plateTrailer || null,
+      driver_cpf: l.driver?.cpf || null,
+      obs: l.obs || null,
+      status: l.status,
+      created_at: l.createdAt,
+      updated_at: l.updatedAt || new Date().toISOString(),
+    });
+    if (error) { console.error('[saveLiberacao]', error.message); return false; }
+    return true;
+  },
+
+  deleteLiberacao: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('liberacoes').delete().eq('id', id);
     return !error;
   },
 };

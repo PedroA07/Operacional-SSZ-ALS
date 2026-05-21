@@ -10,6 +10,7 @@ import { db } from '../../../utils/storage';
 import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
+import { maskCNPJ, maskCPF } from '../../../utils/masks';
 
 interface DevolucaoVazioFormProps {
   user?: User;
@@ -38,12 +39,20 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const [plateTrailer, setPlateTrailer] = useState('');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
 
-  const [remetenteSearch, setRemetenteSearch] = useState('');
+  const [localSearch, setLocalSearch] = useState(devolucao?.local || '');
+  const [showLocalResults, setShowLocalResults] = useState(false);
+  const [remetenteSearch, setRemetenteSearch] = useState(
+    devolucao?.customer ? (devolucao.customer.legalName || devolucao.customer.name || '') : ''
+  );
   const [showRemetenteResults, setShowRemetenteResults] = useState(false);
-  const [driverSearch, setDriverSearch] = useState('');
+  const [driverSearch, setDriverSearch] = useState(devolucao?.driver?.name || '');
   const [showDriverResults, setShowDriverResults] = useState(false);
   const [podSearch, setPodSearch] = useState('');
   const [showPodResults, setShowPodResults] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const localRef = useRef<HTMLDivElement>(null);
+  const remetenteRef = useRef<HTMLDivElement>(null);
+  const driverRef = useRef<HTMLDivElement>(null);
   
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
 
@@ -58,9 +67,10 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     loadContainerTypes();
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (podRef.current && !podRef.current.contains(e.target as Node)) {
-        setShowPodResults(false);
-      }
+      if (podRef.current && !podRef.current.contains(e.target as Node)) setShowPodResults(false);
+      if (localRef.current && !localRef.current.contains(e.target as Node)) setShowLocalResults(false);
+      if (remetenteRef.current && !remetenteRef.current.contains(e.target as Node)) setShowRemetenteResults(false);
+      if (driverRef.current && !driverRef.current.contains(e.target as Node)) setShowDriverResults(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -127,6 +137,52 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
 
   const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : undefined;
 
+  const buildUpdatedDevolucao = (): Devolucao | null => {
+    if (!devolucao) return null;
+    return {
+      ...devolucao,
+      container:     formData.container,
+      containerType: formData.tipo       || undefined,
+      booking:       formData.booking    || undefined,
+      ship:          formData.ship       || undefined,
+      agencia:       formData.agencia    || undefined,
+      pod:           formData.pod        || undefined,
+      padrao:        formData.padrao     || undefined,
+      local:         formData.manualLocal || undefined,
+      localId:       formData.destinatarioId || undefined,
+      obs:           formData.obs        || undefined,
+      scheduledDateTime: formData.agendamentoDateTime || undefined,
+      status: formData.agendamentoDateTime ? 'Agendado' : devolucao.status,
+      customer: selectedRemetente ? {
+        id:        selectedRemetente.id,
+        name:      selectedRemetente.name,
+        legalName: selectedRemetente.legalName,
+        cnpj:      selectedRemetente.cnpj,
+        city:      selectedRemetente.city,
+        state:     selectedRemetente.state,
+      } : devolucao.customer,
+      driver: effectiveDriver ? {
+        id:           effectiveDriver.id,
+        name:         effectiveDriver.name,
+        plateHorse:   effectiveDriver.plateHorse   || undefined,
+        plateTrailer: effectiveDriver.plateTrailer || undefined,
+        cpf:          effectiveDriver.cpf          || undefined,
+      } : devolucao.driver,
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  const saveData = async () => {
+    if (!devolucao || !onSave) return;
+    setIsSaving(true);
+    try {
+      const updated = buildUpdatedDevolucao();
+      if (updated) await onSave(updated);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const downloadPDF = async () => {
     if (!effectiveDriver || !formData.container) {
       alert("Preencha Container e Motorista para prosseguir.");
@@ -153,37 +209,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
         onAgendamentoSave(tripId, formData.agendamentoDateTime);
       }
       if (devolucao && onSave) {
-        const updated: Devolucao = {
-          ...devolucao,
-          container:     formData.container,
-          containerType: formData.tipo       || undefined,
-          booking:       formData.booking    || undefined,
-          ship:          formData.ship       || undefined,
-          agencia:       formData.agencia    || undefined,
-          pod:           formData.pod        || undefined,
-          padrao:        formData.padrao     || undefined,
-          local:         formData.manualLocal|| undefined,
-          obs:           formData.obs        || undefined,
-          scheduledDateTime: formData.agendamentoDateTime || undefined,
-          status: formData.agendamentoDateTime ? 'Agendado' : devolucao.status,
-          customer: selectedRemetente ? {
-            id:        selectedRemetente.id,
-            name:      selectedRemetente.name,
-            legalName: selectedRemetente.legalName,
-            cnpj:      selectedRemetente.cnpj,
-            city:      selectedRemetente.city,
-            state:     selectedRemetente.state,
-          } : devolucao.customer,
-          driver: effectiveDriver ? {
-            id:           effectiveDriver.id,
-            name:         effectiveDriver.name,
-            plateHorse:   effectiveDriver.plateHorse   || undefined,
-            plateTrailer: effectiveDriver.plateTrailer || undefined,
-            cpf:          effectiveDriver.cpf          || undefined,
-          } : devolucao.driver,
-          updatedAt: new Date().toISOString(),
-        };
-        await onSave(updated);
+        const updated = buildUpdatedDevolucao();
+        if (updated) await onSave(updated);
       }
 
       await new Promise(r => setTimeout(r, 800));
@@ -202,10 +229,28 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelAmberClass = "text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1.5 block";
 
-  const filteredCustomers = customers.filter(c => 
-    (c.name && c.name.toUpperCase().includes(remetenteSearch)) || 
-    (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
-  );
+  const filteredCustomers = customers.filter(c => {
+    const q = remetenteSearch.toUpperCase();
+    return (c.name && c.name.toUpperCase().includes(q)) ||
+      (c.legalName && c.legalName.toUpperCase().includes(q)) ||
+      (c.cnpj && c.cnpj.replace(/\D/g, '').includes(q.replace(/\D/g, ''))) ||
+      (c.city && c.city.toUpperCase().includes(q));
+  });
+
+  const filteredDrivers = drivers.filter(d => {
+    const q = driverSearch.toUpperCase();
+    return d.name.toUpperCase().includes(q) ||
+      (d.cpf && d.cpf.replace(/\D/g, '').includes(q.replace(/\D/g, ''))) ||
+      (d.plateHorse && d.plateHorse.toUpperCase().includes(q)) ||
+      (d.plateTrailer && d.plateTrailer.toUpperCase().includes(q));
+  });
+
+  const filteredPorts = ports.filter(p => {
+    const q = localSearch.toUpperCase();
+    return (p.name && p.name.toUpperCase().includes(q)) ||
+      (p.legalName && p.legalName.toUpperCase().includes(q)) ||
+      (p.city && p.city.toUpperCase().includes(q));
+  });
 
   const filteredPODs = commonPODs.filter(p => p.toUpperCase().includes(podSearch.toUpperCase()));
 
@@ -223,21 +268,66 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
       </div>
 
       <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
-        <div className="space-y-1">
+        <div className="relative" ref={localRef}>
           <label className={labelAmberClass}>1. Local de Devolução (Depot / Terminal)</label>
-          <input type="text" placeholder="BUSCAR OU MANUAL..." className={inputClasses} value={formData.manualLocal} onChange={e => handleInputChange('manualLocal', e.target.value)} />
-        </div>
-
-        <div className="relative">
-          <label className={labelAmberClass}>2. Cliente (Exportador)</label>
-          <input type="text" placeholder="BUSCAR CLIENTE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => setRemetenteSearch(e.target.value.toUpperCase())} />
-          {showRemetenteResults && (
+          <input
+            type="text"
+            placeholder="BUSCAR TERMINAL OU PORTO..."
+            className={inputClasses}
+            value={localSearch}
+            onFocus={() => setShowLocalResults(true)}
+            onChange={e => {
+              const val = e.target.value.toUpperCase();
+              setLocalSearch(val);
+              setFormData(prev => ({ ...prev, manualLocal: val, destinatarioId: '' }));
+            }}
+          />
+          {showLocalResults && filteredPorts.length > 0 && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-amber-500 animate-in fade-in slide-in-from-top-2 duration-200">
-              {filteredCustomers.map(c => (
-                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50 transition-colors" onClick={() => { setFormData({...formData, remetenteId: c.id}); setRemetenteSearch(c.legalName || c.name); setShowRemetenteResults(false); }}>
-                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
+              {filteredPorts.map(p => (
+                <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50 transition-colors" onClick={() => {
+                  setLocalSearch(p.name.toUpperCase());
+                  setFormData(prev => ({ ...prev, manualLocal: p.name.toUpperCase(), destinatarioId: p.id }));
+                  setShowLocalResults(false);
+                }}>
+                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{p.name}</p>
+                  {p.city && <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">{p.city}{p.state ? `/${p.state}` : ''}</p>}
                 </button>
               ))}
+            </div>
+          )}
+        </div>
+
+        <div className="relative" ref={remetenteRef}>
+          <label className={labelAmberClass}>2. Cliente (Exportador)</label>
+          <input type="text" placeholder="BUSCAR CLIENTE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setFormData(prev => ({ ...prev, remetenteId: '' })); }} />
+          {selectedRemetente && (
+            <div className="mt-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] font-black text-slate-800 uppercase truncate">{selectedRemetente.legalName || selectedRemetente.name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {selectedRemetente.cnpj && <span className="text-[8px] font-bold text-slate-500">{maskCNPJ(selectedRemetente.cnpj)}</span>}
+                  {selectedRemetente.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{selectedRemetente.city}{selectedRemetente.state ? `/${selectedRemetente.state}` : ''}</span>}
+                </div>
+              </div>
+              <button type="button" onClick={() => { setRemetenteSearch(''); setFormData(prev => ({ ...prev, remetenteId: '' })); }} className="text-slate-300 hover:text-red-400 transition-colors shrink-0">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          )}
+          {showRemetenteResults && !selectedRemetente && (
+            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-amber-500 animate-in fade-in slide-in-from-top-2 duration-200">
+              {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
+                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50 transition-colors" onClick={() => { setFormData(prev => ({...prev, remetenteId: c.id})); setRemetenteSearch(c.legalName || c.name); setShowRemetenteResults(false); }}>
+                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {c.cnpj && <span className="text-[8px] font-bold text-slate-500">{maskCNPJ(c.cnpj)}</span>}
+                    {c.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{c.city}{c.state ? `/${c.state}` : ''}</span>}
+                  </div>
+                </button>
+              )) : (
+                <div className="px-4 py-3 text-[9px] text-slate-400 font-bold uppercase">Nenhum cliente encontrado</div>
+              )}
             </div>
           )}
         </div>
@@ -338,14 +428,38 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           <div className="space-y-1"><label className={labelClass}>Armador / Agência</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
         </div>
 
-        <div className="relative">
+        <div className="relative" ref={driverRef}>
           <label className={labelAmberClass}>5. Motorista Transportador</label>
-          <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => setDriverSearch(e.target.value.toUpperCase())} />
-          {showDriverResults && (
+          <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setFormData(prev => ({ ...prev, driverId: '' })); }} />
+          {selectedDriver && (
+            <div className="mt-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] font-black text-slate-800 uppercase truncate">{selectedDriver.name}</p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  {selectedDriver.cpf && <span className="text-[8px] font-bold text-slate-500">{maskCPF(selectedDriver.cpf)}</span>}
+                  {plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{plateHorse}</span>}
+                  {plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{plateTrailer}</span>}
+                </div>
+              </div>
+              <button type="button" onClick={() => { setDriverSearch(''); setFormData(prev => ({ ...prev, driverId: '' })); }} className="text-slate-300 hover:text-red-400 transition-colors shrink-0">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          )}
+          {showDriverResults && !selectedDriver && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-amber-500">
-              {drivers.filter(d => d.name.toUpperCase().includes(driverSearch)).map(d => (
-                <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 text-[10px] font-black uppercase border-b border-slate-50" onClick={() => { setFormData({...formData, driverId: d.id}); setDriverSearch(d.name); setShowDriverResults(false); }}>{d.name} ({d.plateHorse})</button>
-              ))}
+              {filteredDrivers.length > 0 ? filteredDrivers.map(d => (
+                <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50" onClick={() => { setFormData(prev => ({...prev, driverId: d.id})); setDriverSearch(d.name); setShowDriverResults(false); }}>
+                  <p className="text-[10px] font-black uppercase text-slate-800">{d.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {d.cpf && <span className="text-[8px] font-bold text-slate-500">{maskCPF(d.cpf)}</span>}
+                    {d.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{d.plateHorse}</span>}
+                    {d.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.plateTrailer}</span>}
+                  </div>
+                </button>
+              )) : (
+                <div className="px-4 py-3 text-[9px] text-slate-400 font-bold uppercase">Nenhum motorista encontrado</div>
+              )}
             </div>
           )}
         </div>
@@ -399,6 +513,11 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           <p className="text-[8px] text-slate-400 font-bold">Apenas para controle interno — não aparece no PDF.</p>
         </div>
 
+        {devolucao && onSave && (
+          <button disabled={isSaving} onClick={saveData} className="w-full py-4 bg-white border-2 border-amber-400 text-amber-700 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-amber-50 shadow-sm transition-all active:scale-95">
+            {isSaving ? 'SALVANDO...' : 'SALVAR DADOS'}
+          </button>
+        )}
         <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-amber-600 shadow-xl transition-all active:scale-95">
           {isExporting ? 'GERANDO PDF...' : 'BAIXAR MINUTA DE DEVOLUÇÃO'}
         </button>
