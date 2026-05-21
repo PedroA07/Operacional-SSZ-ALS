@@ -1070,7 +1070,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         isPriority: false, isCompleted: false, sentNF: false,
         isScheduled: false, hasAdvance: false,
         isRemovedFromColeta: false, isRemovedFromOrg: false,
-        scheduledDateTime: devAddForm.dateTime || null,
+        scheduledDateTime: devAddForm.dateTime || undefined,
       };
       await db.saveTrip(newTrip);
       setDevAddForm({ container: '', local: '', dateTime: '', driverId: '' });
