@@ -30,6 +30,12 @@ export interface User {
     allowedCategories?: string[];
     allowedTypes?: string[];
     visibleFilters?: string[];
+    pages?: {
+      orgColeta?:        { enabled: boolean; visibleFields: string[] };
+      orgEntrega?:       { enabled: boolean; visibleFields: string[] };
+      orgColetaEntrega?: { enabled: boolean; visibleFields: string[] };
+      orgDevolucoes?:    { enabled: boolean; visibleFields: string[] };
+    };
   };
 }
 
