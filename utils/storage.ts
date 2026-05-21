@@ -640,6 +640,34 @@ export const db = {
     }));
   },
 
+  getAllFormHistory: async (limit = 500): Promise<import('../types').FormHistoryEntry[]> => {
+    if (!supabase) return [];
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('form_history')
+      .select('*')
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) { console.error('[getAllFormHistory]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      formType: r.form_type,
+      formData: r.form_data,
+      label: r.label || '',
+      userName: r.user_name || '',
+      userId: r.user_id || '',
+      createdAt: r.created_at,
+    }));
+  },
+
+  deleteFormHistory: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('form_history').delete().eq('id', id);
+    if (error) { console.error('[deleteFormHistory]', error.message); return false; }
+    return true;
+  },
+
   // Remove registros com mais de 90 dias de form_history e notifications.
   // Chamado silenciosamente na inicialização da sessão.
   purgeOldHistory: async () => {
