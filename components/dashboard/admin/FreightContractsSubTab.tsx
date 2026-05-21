@@ -483,6 +483,18 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   const findAutoMatch = useCallback((parsed: FileEntry['parsed']): string | null => {
     const norm = normAccent;
 
+    // Verifica se a localidade do contrato não contradiz o destino da viagem
+    const locMatches = (t: Trip): boolean => {
+      if (!parsed.localidade) return true; // sem localidade → não contradiz
+      const words = norm(parsed.localidade).split(/[\s\-]+/).filter(w => w.length >= 3);
+      if (!words.length) return true;
+      const dest = norm(t.destination?.name || t.customer?.name || '');
+      if (!dest) return true; // viagem sem destino → não contradiz
+      return words.length >= 2
+        ? words.slice(0, 2).every(w => dest.includes(w))
+        : words.some(w => dest.includes(w));
+    };
+
     // Prioridade 1: container + localidade ambos conferem
     if (parsed.container && parsed.localidade) {
       const loc0 = norm(parsed.localidade.split(' ')[0]);
@@ -498,15 +510,14 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
           const narrow = hits.filter(t => t.driver?.name && norm(t.driver.name).includes(mot0));
           if (narrow.length === 1) return narrow[0].id;
         }
-        // Retorna o mais recente (trips já ordenadas desc por date)
         return hits[0].id;
       }
     }
 
-    // Prioridade 2: container apenas (uma única viagem tem esse container)
+    // Prioridade 2: container apenas — só vincula se localidade não contradiz destino
     if (parsed.container) {
       const hits = trips.filter(t => t.container && norm(t.container) === norm(parsed.container));
-      if (hits.length === 1) return hits[0].id;
+      if (hits.length === 1 && locMatches(hits[0])) return hits[0].id;
     }
 
     // Prioridade 3: motorista + localidade
@@ -520,13 +531,13 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       if (hits.length === 1) return hits[0].id;
     }
 
-    // Prioridade 4: motorista apenas (uma única viagem tem esse motorista)
+    // Prioridade 4: motorista apenas — só vincula se localidade não contradiz destino
     if (parsed.motorista) {
       const mot0 = norm(parsed.motorista.split(' ')[0]);
       const hits = trips.filter(t => t.driver?.name &&
         (norm(t.driver.name).includes(mot0) || mot0.includes(norm(t.driver.name.split(' ')[0])))
       );
-      if (hits.length === 1) return hits[0].id;
+      if (hits.length === 1 && locMatches(hits[0])) return hits[0].id;
     }
 
     return null;
