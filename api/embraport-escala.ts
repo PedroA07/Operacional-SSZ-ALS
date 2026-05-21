@@ -96,17 +96,17 @@ function parseTable(html: string, defaultSituacao: string): any[] {
   const armadorIdx     = headerFound ? findIdx(headerCells, ['armador', 'shipping', 'agent']) : 3;
   const servicoIdx     = headerFound ? findIdx(headerCells, ['servico', 'service', 'serviço']) : 4;
   const bercoIdx       = headerFound ? findIdx(headerCells, ['berco', 'berço', 'dock', 'pier', 'cais']) : 5;
-  // Gate opening = "Previsão de Abertura Gate" or "Abertura de Gate"
-  const gateAberIdx    = headerFound ? findIdx(headerCells, ['abertura gate', 'abert. gate']) : -1;
-  // Deadline (Armador) — the actual booking cut-off
-  const deadlineIdx    = headerFound ? findIdx(headerCells, ['deadline', 'dead line', 'prazo', 'encerr']) : -1;
+  // Embraport's "Deadline"/"Gate Dry" column = gate cut-off for dry containers (shown as GATE DRY)
+  const embrGateDryIdx  = headerFound ? findIdx(headerCells, ['deadline', 'dead line', 'gate dry', 'gate seco', 'prazo', 'encerr']) : -1;
+  // Embraport's "Abertura Gate" column = booking/doc deadline (shown as DEAD-LINE)
+  const embrDeadlineIdx = headerFound ? findIdx(headerCells, ['abertura gate', 'abert. gate']) : -1;
   // Previsão Chegada — arrival preview (NOT the deadline)
-  const prevChegadaIdx = headerFound ? findIdx(headerCells, ['chegada', 'prev.chegada', 'prev chegada']) : -1;
-  const prevAtracIdx   = headerFound ? findIdx(headerCells, ['atracacao', 'atracação', 'atracao', 'atrav']) : -1;
-  const prevSaidaIdx   = headerFound ? findIdx(headerCells, ['saida', 'saída', 'departure', 'etd']) : -1;
+  const prevChegadaIdx  = headerFound ? findIdx(headerCells, ['chegada', 'prev.chegada', 'prev chegada']) : -1;
+  const prevAtracIdx    = headerFound ? findIdx(headerCells, ['atracacao', 'atracação', 'atracao', 'atrav']) : -1;
+  const prevSaidaIdx    = headerFound ? findIdx(headerCells, ['saida', 'saída', 'departure', 'etd']) : -1;
 
-  // Fallback indices (when scraper finds 0 matching headers) based on observed DB evidence:
-  // col6 = Deadline (Armador), col7 = Prev.Chegada, col8 = Prev.Atracação, col9 = Prev.Saída
+  // Fallback indices (when scraper finds 0 matching headers) based on observed HTML structure:
+  // col6 = Gate Dry (Embraport "Deadline"), col7 = Prev.Chegada, col8 = Prev.Atracação, col9 = Prev.Saída
   const dataStart = headerFound ? 1 : 0;
 
   for (let i = dataStart; i < allRows.length; i++) {
@@ -131,11 +131,11 @@ function parseTable(html: string, defaultSituacao: string): any[] {
       armador:        c(armadorIdx, 3),
       servico:        c(servicoIdx, 4),
       berco:          c(bercoIdx, 5),
-      // gateDry = gate opening preview (informational)
-      gateDry:        gateAberIdx >= 0 ? c(gateAberIdx, -1) : '',
+      // gateDry = Embraport's "Deadline/Gate Dry" column = gate cut-off for dry containers
+      gateDry:        embrGateDryIdx >= 0 ? c(embrGateDryIdx, 6) : c(-1, 6),
       gateReefer:     '', // EMBRAPORT does not distinguish dry/reefer gate
-      // deadLineStr = Deadline (Armador) — used to compute gate status
-      deadLineStr:    deadlineIdx >= 0 ? c(deadlineIdx, 6) : c(-1, 6),
+      // deadLineStr = Embraport's "Abertura Gate" column = booking/doc deadline
+      deadLineStr:    embrDeadlineIdx >= 0 ? c(embrDeadlineIdx, -1) : '',
       dtPrevChegada:  prevChegadaIdx >= 0 ? c(prevChegadaIdx, 7) : c(-1, 7),
       dtPrevAtrac:    prevAtracIdx >= 0 ? c(prevAtracIdx, 8) : c(-1, 8),
       dtPrevSaida:    prevSaidaIdx >= 0 ? c(prevSaidaIdx, 9) : c(-1, 9),
