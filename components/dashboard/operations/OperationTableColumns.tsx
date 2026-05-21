@@ -8,7 +8,7 @@ import FinanceAction from './FinanceAction';
 // Componentes de coluna modulares
 import { DriverColumn } from './columns/DriverColumn';
 import { EquipmentColumn } from './columns/EquipmentColumn';
-import { ShipBookingColumn } from './columns/ShipBookingColumn';
+import { makeShipBookingColumn } from './columns/ShipBookingColumn';
 import { CustomerColumn } from './columns/CustomerColumn';
 import { DestinationColumn } from './columns/DestinationColumn';
 import { StatusColumn } from './columns/StatusColumn';
@@ -30,7 +30,8 @@ export const getOperationTableColumns = (
   onSetPriority: any,
   allDrivers: Driver[] = [],
   categories: Category[] = [],
-  operationTypes: any[] = []
+  operationTypes: any[] = [],
+  getGateTag?: (ship: string) => React.ReactNode
 ) => {
   
   const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO' | 'BATCH', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,7 +157,7 @@ export const getOperationTableColumns = (
     {
       key: 'ship_booking',
       label: '5. Navio / Booking',
-      render: ShipBookingColumn
+      render: makeShipBookingColumn(getGateTag)
     },
     { 
       key: 'customer', 

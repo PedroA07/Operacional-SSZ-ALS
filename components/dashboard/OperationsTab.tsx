@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking, CustomStatus, SILProgramacao } from '../../types';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking, CustomStatus, SILProgramacao, TerminalVessel } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
-import { db } from '../../utils/storage';
+import { db, supabase } from '../../utils/storage';
 import OperationRegisterAction from './operations/OperationRegisterAction';
 import SchedulingEditModal from './operations/SchedulingEditModal';
 import DriverDocsViewerModal from './operations/DriverDocsViewerModal';
@@ -69,7 +69,100 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [isSilImporterOpen, setIsSilImporterOpen] = useState(false);
   const [importedOs, setImportedOs] = useState<Set<string>>(new Set());
   const [lastSilImport, setLastSilImport] = useState<{ linked: number; unlinked: number } | null>(null);
+  const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
 
+  // Carrega terminal_vessels do Supabase (atualiza a cada 5 min)
+  useEffect(() => {
+    const load = async () => {
+      if (!supabase) return;
+      const { data } = await supabase.from('terminal_vessels').select('*');
+      if (data) {
+        setTerminalVessels(data.map((r: any) => ({
+          terminal:      r.terminal,
+          navio:         r.navio,
+          situacao:      r.situacao,
+          viagem:        r.viagem        ?? undefined,
+          armador:       r.armador       ?? undefined,
+          berco:         r.berco         ?? undefined,
+          rap:           r.rap           ?? undefined,
+          servico:       r.servico       ?? undefined,
+          gateDry:       r.gate_dry      ?? undefined,
+          gateReefer:    r.gate_reefer   ?? undefined,
+          deadLineStr:   r.dead_line_str ?? undefined,
+          dtPrevChegada: r.dt_prev_chegada ?? undefined,
+          dtChegada:     r.dt_chegada    ?? undefined,
+          dtPrevAtrac:   r.dt_prev_atrac ?? undefined,
+          dtAtracacao:   r.dt_atracacao  ?? undefined,
+          dtPrevSaida:   r.dt_prev_saida ?? undefined,
+          dtSaida:       r.dt_saida      ?? undefined,
+        })));
+      }
+    };
+    load();
+    const iv = setInterval(load, 5 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Retorna a tag de gate para um navio, comparando nome do navio da viagem com terminal_vessels
+  const getGateTag = useCallback((shipRaw: string): React.ReactNode => {
+    if (!shipRaw || terminalVessels.length === 0) return null;
+    const norm = (s: string) =>
+      s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+    const query = norm(shipRaw.split('/')[0].split('VIAGEM')[0]);
+    if (query.length < 3) return null;
+
+    const vessel = terminalVessels.find(v => {
+      const vn = norm(v.navio);
+      if (vn === query) return true;
+      if (vn.includes(query) || query.includes(vn)) return true;
+      const words = query.split(' ').filter(w => w.length > 2);
+      return words.length >= 2 && words.every(w => vn.includes(w));
+    });
+    if (!vessel) return null;
+
+    const parseDate = (s?: string) => {
+      if (!s || s === '-' || s === '—') return null;
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+        const p = s.split(/[\/\s:]/);
+        return new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]), Number(p[3] ?? 0), Number(p[4] ?? 0));
+      }
+      const d = new Date(s); return isNaN(d.getTime()) ? null : d;
+    };
+
+    const now = new Date();
+    const gateStr = vessel.gateDry || vessel.gateReefer;
+    const gateDt = parseDate(gateStr);
+    const deadDt = parseDate(vessel.deadLineStr);
+
+    if (!gateDt) return null;
+
+    const fmt = (d: Date) => d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+    if (gateDt > now) {
+      return (
+        <span className="inline-flex items-center gap-0.5 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-500"/>
+          Gate Fechado
+          <span className="font-bold text-red-400 normal-case ml-0.5">• Abre {fmt(gateDt)}</span>
+        </span>
+      );
+    }
+    if (deadDt && deadDt < now) {
+      return (
+        <span className="inline-flex items-center gap-0.5 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-pink-500/10 text-pink-600 border-pink-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-pink-500"/>
+          Gate Encerrado
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-0.5 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-green-500/10 text-green-700 border-green-500/30">
+        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-500"/>
+        Gate Aberto
+        {deadDt && <span className="font-bold text-orange-500 normal-case ml-0.5">• Enc. {fmt(deadDt)}</span>}
+      </span>
+    );
+  }, [terminalVessels]);
 
   const handleSetPriority = async (trip: Trip) => {
     if (isSavingStatus) return;
@@ -393,8 +486,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     handleSetPriority,
     drivers,
     categories,
-    operationTypes
-  ), [user, onRefresh, onDeleteTrip, drivers, trips, categories, operationTypes]);
+    operationTypes,
+    getGateTag
+  ), [user, onRefresh, onDeleteTrip, drivers, trips, categories, operationTypes, getGateTag]);
 
   if (activeView.type !== 'list') {
     return (
