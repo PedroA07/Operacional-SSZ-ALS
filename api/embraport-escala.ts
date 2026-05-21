@@ -30,6 +30,30 @@ function parseCells(row: string): string[] {
   return cells;
 }
 
+function parseHeaderCells(row: string): string[] {
+  const cells: string[] = [];
+  const thRe = /<th[^>]*>([\s\S]*?)<\/th>/gi;
+  let m;
+  while ((m = thRe.exec(row)) !== null) cells.push(stripHtml(m[1]).toLowerCase());
+  if (cells.length === 0) {
+    const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    while ((m = tdRe.exec(row)) !== null) cells.push(stripHtml(m[1]).toLowerCase());
+  }
+  return cells;
+}
+
+function normalizeStr(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+function findIdx(headers: string[], keywords: string[]): number {
+  const normalized = headers.map(normalizeStr);
+  for (let i = 0; i < normalized.length; i++) {
+    if (keywords.some(k => normalized[i].includes(normalizeStr(k)))) return i;
+  }
+  return -1;
+}
+
 // Detects active tab name from the HTML to infer situacao
 function detectActiveSituacao(html: string): string {
   // Look for active/selected button class
@@ -48,39 +72,73 @@ function parseTable(html: string, defaultSituacao: string): any[] {
   const situacao = detectActiveSituacao(html) || defaultSituacao;
 
   // Find the main data table
-  const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
-  if (!tbodyMatch) return rows;
+  const tableMatch = html.match(/<table[^>]*>([\s\S]*?)<\/table>/i);
+  if (!tableMatch) return rows;
+  const tableHtml = tableMatch[1];
 
-  const tbody = tbodyMatch[1];
-  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  let rowMatch;
+  // Extract header row to detect column positions dynamically
+  const allRowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let headerCells: string[] = [];
+  let headerFound = false;
+  const allRows: string[] = [];
+  let m;
+  while ((m = allRowRe.exec(tableHtml)) !== null) allRows.push(m[0]);
 
-  while ((rowMatch = rowRe.exec(tbody)) !== null) {
-    const cells = parseCells(rowMatch[1]);
-    if (cells.length < 10) continue;
+  for (let i = 0; i < Math.min(5, allRows.length); i++) {
+    const h = parseHeaderCells(allRows[i]);
+    if (h.length >= 5) { headerCells = h; headerFound = true; break; }
+  }
 
-    const navio = cells[0]?.trim();
-    if (!navio || navio.toLowerCase() === 'navio') continue;
+  // Column indices resolved by header keywords
+  const navioIdx       = headerFound ? findIdx(headerCells, ['navio', 'vessel', 'ship']) : 0;
+  const viagemIdx      = headerFound ? findIdx(headerCells, ['viagem', 'voyage']) : 1;
+  const visitaIdx      = headerFound ? findIdx(headerCells, ['visita', 'rap', 'visit']) : 2;
+  const armadorIdx     = headerFound ? findIdx(headerCells, ['armador', 'shipping', 'agent']) : 3;
+  const servicoIdx     = headerFound ? findIdx(headerCells, ['servico', 'service', 'serviço']) : 4;
+  const bercoIdx       = headerFound ? findIdx(headerCells, ['berco', 'berço', 'dock', 'pier', 'cais']) : 5;
+  // Gate opening = "Previsão de Abertura Gate" or "Abertura de Gate"
+  const gateAberIdx    = headerFound ? findIdx(headerCells, ['abertura gate', 'abert. gate']) : -1;
+  // Deadline (Armador) — the actual booking cut-off
+  const deadlineIdx    = headerFound ? findIdx(headerCells, ['deadline', 'dead line', 'prazo', 'encerr']) : -1;
+  // Previsão Chegada — arrival preview (NOT the deadline)
+  const prevChegadaIdx = headerFound ? findIdx(headerCells, ['chegada', 'prev.chegada', 'prev chegada']) : -1;
+  const prevAtracIdx   = headerFound ? findIdx(headerCells, ['atracacao', 'atracação', 'atracao', 'atrav']) : -1;
+  const prevSaidaIdx   = headerFound ? findIdx(headerCells, ['saida', 'saída', 'departure', 'etd']) : -1;
 
-    // Column order (from screenshot):
-    // 0:Navio 1:Viagem 2:Visita 3:Armador 4:Serviço 5:Berço
-    // 6:Prev.Abertura Gate 7:Abertura Gate 8:Deadline 9:Prev.Chegada
-    // 10:Prev.Atracação 11:Prev.Saída 12:Detalhes
+  // Fallback indices (when scraper finds 0 matching headers) based on observed DB evidence:
+  // col6 = Deadline (Armador), col7 = Prev.Chegada, col8 = Prev.Atracação, col9 = Prev.Saída
+  const dataStart = headerFound ? 1 : 0;
+
+  for (let i = dataStart; i < allRows.length; i++) {
+    const cells = parseCells(allRows[i]);
+    if (cells.length < 5) continue;
+
+    const c = (idx: number, fallback: number): string => {
+      if (idx >= 0 && idx < cells.length) return cells[idx];
+      if (fallback >= 0 && fallback < cells.length) return cells[fallback];
+      return '';
+    };
+
+    const navio = c(navioIdx, 0).trim().toUpperCase();
+    if (!navio || navio === 'NAVIO') continue;
+
     rows.push({
       terminal:       'EMBRAPORT',
-      navio:          navio.toUpperCase(),
+      navio,
       situacao,
-      viagem:         cells[1]  || '',
-      rap:            cells[2]  || '', // Visita code
-      armador:        cells[3]  || '',
-      servico:        cells[4]  || '',
-      berco:          cells[5]  || '',
-      gateDry:        cells[6]  || '', // Prev. Abertura Gate
-      gateReefer:     cells[7]  || '', // Abertura Gate (real)
-      deadLineStr:    cells[8]  || '',
-      dtPrevChegada:  cells[9]  || '',
-      dtPrevAtrac:    cells[10] || '',
-      dtPrevSaida:    cells[11] || '',
+      viagem:         c(viagemIdx, 1),
+      rap:            c(visitaIdx, 2),
+      armador:        c(armadorIdx, 3),
+      servico:        c(servicoIdx, 4),
+      berco:          c(bercoIdx, 5),
+      // gateDry = gate opening preview (informational)
+      gateDry:        gateAberIdx >= 0 ? c(gateAberIdx, -1) : '',
+      gateReefer:     '', // EMBRAPORT does not distinguish dry/reefer gate
+      // deadLineStr = Deadline (Armador) — used to compute gate status
+      deadLineStr:    deadlineIdx >= 0 ? c(deadlineIdx, 6) : c(-1, 6),
+      dtPrevChegada:  prevChegadaIdx >= 0 ? c(prevChegadaIdx, 7) : c(-1, 7),
+      dtPrevAtrac:    prevAtracIdx >= 0 ? c(prevAtracIdx, 8) : c(-1, 8),
+      dtPrevSaida:    prevSaidaIdx >= 0 ? c(prevSaidaIdx, 9) : c(-1, 9),
       fetchedAt:      new Date().toISOString(),
     });
   }
