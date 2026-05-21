@@ -45,6 +45,66 @@ const TabFallback = () => (
   </div>
 );
 
+// ── ErrorBoundary — captura erros de runtime e chunks do Vercel ──────────────
+interface EBState { hasError: boolean; isChunkError: boolean; msg: string }
+class TabErrorBoundary extends React.Component<
+  { children: React.ReactNode; tabKey: string },
+  EBState
+> {
+  state: EBState = { hasError: false, isChunkError: false, msg: '' };
+
+  static getDerivedStateFromError(err: any): EBState {
+    const msg: string = err?.message ?? String(err);
+    const isChunkError =
+      err?.name === 'ChunkLoadError' ||
+      /loading chunk|loading css chunk|failed to fetch dynamically imported/i.test(msg);
+    return { hasError: true, isChunkError, msg };
+  }
+
+  componentDidCatch(err: any) {
+    // ChunkLoadError após deploy do Vercel → recarrega a página automaticamente
+    if (this.state.isChunkError) {
+      console.warn('[ErrorBoundary] ChunkLoadError detectado — recarregando...', err?.message);
+      window.location.reload();
+    } else {
+      console.error('[ErrorBoundary] Erro capturado:', err);
+    }
+  }
+
+  componentDidUpdate(prev: { tabKey: string }) {
+    // Limpa o erro ao trocar de aba (permite o usuário navegar normalmente)
+    if (prev.tabKey !== this.props.tabKey && this.state.hasError) {
+      this.setState({ hasError: false, isChunkError: false, msg: '' });
+    }
+  }
+
+  render() {
+    if (this.state.hasError && !this.state.isChunkError) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center py-24 gap-6">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-black text-slate-700 uppercase tracking-widest mb-1">Algo deu errado</p>
+            <p className="text-xs text-slate-400 font-medium max-w-xs">{this.state.msg || 'Erro inesperado nesta página.'}</p>
+          </div>
+          <button
+            onClick={() => this.setState({ hasError: false, isChunkError: false, msg: '' })}
+            className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/30">
+            Tentar novamente
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+);
+
 interface DashboardProps {
   user: User;
   onLogout: () => void;
@@ -275,6 +335,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </header>
         
         <div id="dashboard-scroll" className="flex-1 overflow-y-auto overflow-x-hidden p-10 bg-[#f8fafc] custom-scrollbar">
+         <TabErrorBoundary tabKey={activeTab}>
          <Suspense fallback={<TabFallback />}>
            {activeTab === DashboardTab.INICIO && (
              <OverviewTab 
@@ -380,6 +441,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              <ExternalPortal user={user} trips={trips} />
            )}
          </Suspense>
+         </TabErrorBoundary>
         </div>
       </main>
 
