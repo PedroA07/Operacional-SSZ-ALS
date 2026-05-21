@@ -125,10 +125,10 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
           allowedCategories: [],
           allowedTypes: [],
           pages: {
-            orgColeta:        { enabled: false, visibleFields: PAGE_DEFS[0].defaultFields as string[] },
-            orgEntrega:       { enabled: false, visibleFields: PAGE_DEFS[1].defaultFields as string[] },
-            orgColetaEntrega: { enabled: false, visibleFields: PAGE_DEFS[2].defaultFields as string[] },
-            orgDevolucoes:    { enabled: false, visibleFields: PAGE_DEFS[3].defaultFields as string[] },
+            orgColeta:        { enabled: false, visibleFields: [...PAGE_DEFS[0].defaultFields] },
+            orgEntrega:       { enabled: false, visibleFields: [...PAGE_DEFS[1].defaultFields] },
+            orgColetaEntrega: { enabled: false, visibleFields: [...PAGE_DEFS[2].defaultFields] },
+            orgDevolucoes:    { enabled: false, visibleFields: [...PAGE_DEFS[3].defaultFields] },
           },
         },
       };
@@ -175,7 +175,7 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
           ...pages,
           [pageKey]: {
             enabled: !current?.enabled,
-            visibleFields: current?.visibleFields?.length ? current.visibleFields : (pageDef.defaultFields as string[]),
+            visibleFields: current?.visibleFields?.length ? current.visibleFields : [...pageDef.defaultFields],
           },
         },
       },
