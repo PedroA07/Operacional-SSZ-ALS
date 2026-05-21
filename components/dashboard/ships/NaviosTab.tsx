@@ -717,6 +717,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const [modalOpen, setModalOpen]     = useState(false);
   const [editing, setEditing]         = useState<Partial<Ship>>(emptyShip());
   const [saving, setSaving]           = useState(false);
+  const [scraping, setScraping]       = useState(false);
   const [mErr, setMErr]               = useState<string|null>(null);
   const [stModal, setStModal]         = useState(false);
   const [stTarget, setStTarget]       = useState<Ship|null>(null);
@@ -780,6 +781,22 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   // ── Auto-refresh ─────────────────────────────────────────────────────────────
   const AUTO_REFRESH_MS = 3 * 60 * 1000; // 3 minutos
   const [nextRefresh, setNextRefresh] = useState<number>(Date.now() + AUTO_REFRESH_MS);
+
+  const forceScrape = useCallback(async () => {
+    if (scraping) return;
+    setScraping(true);
+    try {
+      await Promise.allSettled([
+        fetch('/api/embraport-escala'),
+        supabase?.functions.invoke('terminal-vessels'),
+      ]);
+    } catch(e) { console.error('Scrape error', e); }
+    finally {
+      await loadTV();
+      setScraping(false);
+      setNextRefresh(Date.now() + AUTO_REFRESH_MS);
+    }
+  }, [scraping, loadTV]); // eslint-disable-line
   const [countdown, setCountdown]     = useState<string>('3:00');
 
   useEffect(() => { loadShips(); loadTV(); }, []); // eslint-disable-line
@@ -986,9 +1003,11 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => { loadTV(); loadShips(); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 text-[9px] font-black uppercase tracking-widest transition-all">
-            <I.Refresh className="w-3.5 h-3.5"/> Atualizar
+          <button onClick={() => { forceScrape(); loadShips(); }}
+            disabled={scraping}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-wait">
+            <I.Refresh className={`w-3.5 h-3.5 ${scraping ? 'animate-spin' : ''}`}/>
+            {scraping ? 'Atualizando...' : 'Atualizar'}
           </button>
           <button onClick={() => openNew()}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all active:scale-95">
