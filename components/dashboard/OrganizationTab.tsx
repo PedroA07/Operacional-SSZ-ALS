@@ -408,8 +408,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           setTerminalVessels(data.map((r: any) => ({
             terminal: r.terminal, navio: r.navio, situacao: r.situacao,
             viagem: r.viagem,
-            gateDry: r.gate_dry, gateReefer: r.gate_reefer,
-            deadLineStr: r.dead_line_str,
+            gateDry:     r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
+            gateReefer:  r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
+            deadLineStr: r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
             dtPrevAtrac: r.dt_prev_atrac, dtAtracacao: r.dt_atracacao,
             dtPrevSaida: r.dt_prev_saida, fetchedAt: r.fetched_at,
           } as TerminalVessel)));

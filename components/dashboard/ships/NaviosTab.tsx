@@ -770,8 +770,10 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
         dtPrevChegada: r.dt_prev_chegada, dtChegada: r.dt_chegada,
         dtPrevAtrac: r.dt_prev_atrac, dtAtracacao: r.dt_atracacao,
         dtPrevSaida: r.dt_prev_saida, dtSaida: r.dt_saida,
-        gateDry: r.gate_dry, gateReefer: r.gate_reefer,
-        deadLineStr: r.dead_line_str, servico: r.servico, fetchedAt: r.fetched_at,
+        gateDry:     r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
+        gateReefer:  r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
+        deadLineStr: r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
+        servico: r.servico, fetchedAt: r.fetched_at,
       } as TerminalVessel)));
       setTVAt(rows[0]?.fetched_at ?? null);
     } catch(e:any) { setTVError(e?.message ?? 'Erro ao carregar dados dos terminais'); }
