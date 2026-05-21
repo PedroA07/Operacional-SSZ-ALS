@@ -7,7 +7,9 @@ import { db, supabase } from '../../utils/storage';
 import FeedbackModal from '../shared/FeedbackModal';
 import DateTimePicker from '../shared/DateTimePicker';
 import PreStackingForm from './forms/PreStackingForm';
+import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import { localDateStr, localDateTimeStr } from '../../utils/dateHelpers';
+import { r2Service } from '../../utils/r2Service';
 
 interface OrganizationTabProps {
   userId: string;
@@ -361,7 +363,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
   const [minutaTrip, setMinutaTrip] = useState<Trip | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
+  const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA' | 'DEVOLUÇÕES'>('COLETA');
+  const [devMinutaTrip, setDevMinutaTrip] = useState<Trip | null>(null);
+  const [uploadingDevId, setUploadingDevId] = useState<string | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
@@ -676,13 +680,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return propTrips
       .filter(trip => {
         const type = trip.type?.toUpperCase() || '';
-        if (activeView === 'COLETA') {
+        if (activeView === 'DEVOLUÇÕES') {
+          if (!type.includes('DEVOLU')) return false;
+        } else if (activeView === 'COLETA') {
+          if (type.includes('DEVOLU')) return false;
           if (hiddenTripTypesColeta !== null) {
             if (hiddenTripTypesColeta.includes(type)) return false;
           } else {
             if (!['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(type)) return false;
           }
         } else {
+          if (type.includes('DEVOLU')) return false;
           if (hiddenTripTypesEntrega !== null) {
             if (hiddenTripTypesEntrega.includes(type)) return false;
           } else {
@@ -976,11 +984,64 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return next;
       });
       console.error("Erro ao salvar data/hora de agendamento:", error);
-      window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Erro ao salvar data/hora de agendamento', type: 'error' } 
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao salvar data/hora de agendamento', type: 'error' }
       }));
     }
   }, []);
+
+  const handleSaveDevAgendamento = useCallback(async (tripId: string, dateTime: string) => {
+    const trip = propTrips.find(t => t.id === tripId);
+    if (!trip) return;
+    const update = { scheduledDateTime: dateTime };
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [tripId]: { data: { ...(prev[tripId]?.data || {}), ...update }, timestamp: now }
+    }));
+    try {
+      await db.saveTrip({ ...trip, ...update });
+    } catch (error) {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[tripId]; return next; });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar agendamento', type: 'error' } }));
+    }
+  }, [propTrips]);
+
+  const handleDevComprovanteUpload = useCallback(async (trip: Trip, file: File) => {
+    setUploadingDevId(trip.id);
+    try {
+      const ext = file.name.split('.').pop() || 'pdf';
+      const fileName = `comprovante-dev-${trip.os || trip.id}-${Date.now()}.${ext}`;
+      const url = await r2Service.upload(file, fileName, `devolucoes/${trip.os || trip.id}`);
+      const doc = { id: `agd-${Date.now()}`, type: 'AGENDAMENTO' as const, url, fileName: file.name, uploadDate: new Date().toISOString() };
+      await db.saveTrip({ ...trip, agendamentoDoc: doc });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Comprovante enviado com sucesso', type: 'success' } }));
+      onRefresh();
+    } catch (error) {
+      console.error('Erro ao enviar comprovante:', error);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao enviar comprovante', type: 'error' } }));
+    } finally {
+      setUploadingDevId(null);
+    }
+  }, [onRefresh]);
+
+  const mapTripToDevolucao = useCallback((t: Trip) => ({
+    date: localDateStr(),
+    driverId: t.driver?.id || '',
+    remetenteId: t.customer?.id || '',
+    destinatarioId: '',
+    container: t.container || '',
+    booking: t.booking || '',
+    ship: t.ship || '',
+    agencia: '',
+    pod: 'SANTOS',
+    qtdContainer: '01',
+    tipo: '40HC',
+    padrao: 'CARGA GERAL',
+    obs: '',
+    manualLocal: '',
+    agendamentoDateTime: t.scheduledDateTime || '',
+  }), []);
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
     const advanceData = { 
@@ -1526,11 +1587,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             >
               Coleta/Export
             </button>
-            <button 
+            <button
               onClick={() => setActiveView('ENTREGA')}
               className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'ENTREGA' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
               Entrega/Import
+            </button>
+            <button
+              onClick={() => setActiveView('DEVOLUÇÕES')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'DEVOLUÇÕES' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Devoluções
             </button>
           </div>
 
@@ -1660,17 +1727,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               }}
             />
           </div>
-        ) : (
+        ) : activeView === 'ENTREGA' ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3 ml-4">
               <div className="w-2 h-8 bg-emerald-600 rounded-full"></div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Entrega</h3>
             </div>
-            <SmartOperationTable 
-              userId={userId} 
-              componentId="org-entrega-import" 
-              columns={columns} 
-              data={trips} 
+            <SmartOperationTable
+              userId={userId}
+              componentId="org-entrega-import"
+              columns={columns}
+              data={trips}
               hideInternalSearch={false}
               getRowStyle={(t: Trip) => {
                 if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
@@ -1679,8 +1746,154 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               }}
             />
           </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 ml-4">
+              <div className="w-2 h-8 bg-orange-500 rounded-full"></div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Devoluções de Vazio</h3>
+              <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-black rounded-full border border-orange-200">{trips.length}</span>
+            </div>
+
+            {trips.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <svg className="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0v10l-8 4m-8-4V7m8 4v10"/></svg>
+                <p className="text-[11px] font-black uppercase tracking-widest">Nenhuma devolução encontrada</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Container / OS</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Booking / Navio</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Cliente</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Motorista</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest min-w-[180px]">Agendamento</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Comprovante</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Minuta</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {trips.map(t => {
+                      const agendDt = t.scheduledDateTime
+                        ? new Date(t.scheduledDateTime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : '';
+                      const isUploading = uploadingDevId === t.id;
+                      return (
+                        <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-black text-slate-800 uppercase">{t.container || '---'}</span>
+                              <span className="text-[8px] font-bold text-slate-400 uppercase">{t.os || '---'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-bold text-slate-700 uppercase">{t.booking || '---'}</span>
+                              <span className="text-[8px] font-bold text-slate-400 uppercase">{t.ship ? t.ship.split(/[/|]/)[0].trim() : '---'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-[9px] font-bold text-slate-700 uppercase">{t.customer?.name || '---'}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-[9px] font-bold text-slate-700 uppercase">{t.driver?.name || '---'}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-1.5">
+                              <input
+                                type="datetime-local"
+                                className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-[9px] font-bold text-slate-700 focus:border-orange-400 outline-none transition-all"
+                                value={t.scheduledDateTime ? (() => { try { const d = new Date(t.scheduledDateTime!); const off = d.getTimezoneOffset()*60000; return new Date(d.getTime()-off).toISOString().slice(0,16); } catch { return ''; }})() : ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  const iso = val ? new Date(val).toISOString() : '';
+                                  handleSaveDevAgendamento(t.id, iso);
+                                }}
+                              />
+                              {agendDt && (
+                                <span className="text-[8px] font-bold text-orange-600 px-1">{agendDt}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-1 items-start">
+                              {t.agendamentoDoc ? (
+                                <a
+                                  href={t.agendamentoDoc.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                  Ver
+                                </a>
+                              ) : null}
+                              <label className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[8px] font-black cursor-pointer transition-colors ${isUploading ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'}`}>
+                                {isUploading ? (
+                                  <><div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"/><span>Enviando...</span></>
+                                ) : (
+                                  <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>{t.agendamentoDoc ? 'Substituir' : 'Anexar'}</span></>
+                                )}
+                                <input
+                                  type="file"
+                                  accept=".pdf,image/*"
+                                  className="hidden"
+                                  disabled={isUploading}
+                                  onChange={e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) { handleDevComprovanteUpload(t, file); e.target.value = ''; }
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => setDevMinutaTrip(t)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[8px] font-black text-amber-700 hover:bg-amber-100 transition-colors"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                              Minuta
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
       </div>
+
+      {devMinutaTrip && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-stretch justify-center p-4 overflow-auto">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden my-auto">
+            <div className="flex justify-between items-center px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Minuta de Devolução</h3>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{devMinutaTrip.container || devMinutaTrip.os}</p>
+              </div>
+              <button onClick={() => setDevMinutaTrip(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <DevolucaoVazioForm
+                drivers={drivers}
+                customers={customers}
+                ports={ports}
+                onClose={() => setDevMinutaTrip(null)}
+                initialFormData={mapTripToDevolucao(devMinutaTrip)}
+                tripId={devMinutaTrip.id}
+                onAgendamentoSave={handleSaveDevAgendamento}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
