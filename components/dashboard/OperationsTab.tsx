@@ -111,14 +111,19 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     const query = norm(shipRaw.split('/')[0].split('VIAGEM')[0]);
     if (query.length < 3) return null;
 
-    const vessel = terminalVessels.find(v => {
+    const words = query.split(' ').filter((w: string) => w.length > 2);
+    const isMatch = (v: TerminalVessel) => {
       const vn = norm(v.navio);
       if (vn === query) return true;
       if (vn.includes(query) || query.includes(vn)) return true;
-      const words = query.split(' ').filter(w => w.length > 2);
-      return words.length >= 2 && words.every(w => vn.includes(w));
-    });
-    if (!vessel) return null;
+      return words.length >= 2 && words.every((w: string) => vn.includes(w));
+    };
+    const matches = terminalVessels.filter(isMatch);
+    if (matches.length === 0) return null;
+    // Prefere o que tem gate data; fallback para o primeiro match
+    const vessel = matches.find(v => v.gateDry || v.gateReefer)
+      ?? matches.find(v => v.deadLineStr)
+      ?? matches[0];
 
     const parseDate = (s?: string) => {
       if (!s || s === '-' || s === '—') return null;

@@ -463,14 +463,23 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
       .split(/\s+/).filter(w => w.length > 2);
 
-    return terminalVessels.find(v => {
+    const isMatch = (v: TerminalVessel) => {
       const vn = norm(v.navio);
       const vRaw = v.navio.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       if (vn === n) return true;
       if (vn.includes(n) || n.includes(vn)) return true;
-      // Match por palavras: todas as palavras do nome da trip devem estar no navio do terminal
+      // Match por palavras: todas as palavras com >2 chars devem estar no nome do terminal
       return nameWords.length >= 2 && nameWords.every(w => vRaw.includes(w));
-    }) ?? null;
+    };
+
+    const matches = terminalVessels.filter(isMatch);
+    if (matches.length === 0) return null;
+
+    // Prefere o que tem dados de gate (gateDry ou gateReefer preenchido)
+    const withGate = matches.find(v => v.gateDry || v.gateReefer);
+    // Se nenhum tem gate, prefere o que tem deadline
+    const withDeadline = matches.find(v => v.deadLineStr);
+    return withGate ?? withDeadline ?? matches[0];
   }, [terminalVessels, splitShipField]);
 
   const renderGateTag = useCallback((shipName?: string): React.ReactNode => {
