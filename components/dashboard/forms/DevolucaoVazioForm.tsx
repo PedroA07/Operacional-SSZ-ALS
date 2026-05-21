@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port, User } from '../../../types';
+import { Driver, Customer, Port, User, Devolucao } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import DevolucaoVazioTemplate from './DevolucaoVazioTemplate';
@@ -17,14 +17,19 @@ interface DevolucaoVazioFormProps {
   customers: Customer[];
   ports: Port[];
   onClose: () => void;
+  devolucao?: Devolucao;
+  onSave?: (updated: Devolucao) => Promise<void>;
+  /** @deprecated use devolucao + onSave */
   initialFormData?: any;
+  /** @deprecated use devolucao + onSave */
   tripId?: string;
-  onAgendamentoSave?: (tripId: string, dateTime: string) => void;
+  /** @deprecated use devolucao + onSave */
+  onAgendamentoSave?: (id: string, dateTime: string) => void;
 }
 
 const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
 
-const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, onClose, initialFormData, tripId, onAgendamentoSave }) => {
+const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, onClose, devolucao, onSave, initialFormData, tripId, onAgendamentoSave }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -78,7 +83,25 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     manualLocal: '',
     agendamentoDateTime: '',
   };
-  const [formData, setFormData] = useState<typeof defaultFormData>(initialFormData ?? defaultFormData);
+  const initData = devolucao ? {
+    date: localDateStr(),
+    driverId:          devolucao.driver?.id        || '',
+    remetenteId:       devolucao.customer?.id      || '',
+    destinatarioId:    '',
+    container:         devolucao.container         || '',
+    booking:           devolucao.booking            || '',
+    ship:              devolucao.ship               || '',
+    agencia:           devolucao.agencia            || '',
+    pod:               devolucao.pod               || 'SANTOS',
+    qtdContainer:      '01',
+    tipo:              devolucao.containerType      || '40HC',
+    padrao:            devolucao.padrao             || 'CARGA GERAL',
+    obs:               devolucao.obs               || '',
+    manualLocal:       devolucao.local             || '',
+    agendamentoDateTime: devolucao.scheduledDateTime || '',
+  } : (initialFormData ?? defaultFormData);
+
+  const [formData, setFormData] = useState<typeof defaultFormData>(initData);
 
   const handleInputChange = (field: string, value: string) => {
     const val = value.toUpperCase();
@@ -128,6 +151,39 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
       }
       if (tripId && formData.agendamentoDateTime && onAgendamentoSave) {
         onAgendamentoSave(tripId, formData.agendamentoDateTime);
+      }
+      if (devolucao && onSave) {
+        const updated: Devolucao = {
+          ...devolucao,
+          container:     formData.container,
+          containerType: formData.tipo       || undefined,
+          booking:       formData.booking    || undefined,
+          ship:          formData.ship       || undefined,
+          agencia:       formData.agencia    || undefined,
+          pod:           formData.pod        || undefined,
+          padrao:        formData.padrao     || undefined,
+          local:         formData.manualLocal|| undefined,
+          obs:           formData.obs        || undefined,
+          scheduledDateTime: formData.agendamentoDateTime || undefined,
+          status: formData.agendamentoDateTime ? 'Agendado' : devolucao.status,
+          customer: selectedRemetente ? {
+            id:        selectedRemetente.id,
+            name:      selectedRemetente.name,
+            legalName: selectedRemetente.legalName,
+            cnpj:      selectedRemetente.cnpj,
+            city:      selectedRemetente.city,
+            state:     selectedRemetente.state,
+          } : devolucao.customer,
+          driver: effectiveDriver ? {
+            id:           effectiveDriver.id,
+            name:         effectiveDriver.name,
+            plateHorse:   effectiveDriver.plateHorse   || undefined,
+            plateTrailer: effectiveDriver.plateTrailer || undefined,
+            cpf:          effectiveDriver.cpf          || undefined,
+          } : devolucao.driver,
+          updatedAt: new Date().toISOString(),
+        };
+        await onSave(updated);
       }
 
       await new Promise(r => setTimeout(r, 800));

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer, Devolucao } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
@@ -364,7 +364,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [minutaTrip, setMinutaTrip] = useState<Trip | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA' | 'DEVOLUÇÕES'>('COLETA');
-  const [devMinutaTrip, setDevMinutaTrip] = useState<Trip | null>(null);
+  const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
+  const [devMinutaDev, setDevMinutaDev] = useState<Devolucao | null>(null);
   const [uploadingDevId, setUploadingDevId] = useState<string | null>(null);
   const [showDevAddForm, setShowDevAddForm] = useState(false);
   const [devAddForm, setDevAddForm] = useState({ container: '', local: '', dateTime: '', driverId: '' });
@@ -683,9 +684,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return propTrips
       .filter(trip => {
         const type = trip.type?.toUpperCase() || '';
-        if (activeView === 'DEVOLUÇÕES') {
-          if (!type.includes('DEVOLU')) return false;
-        } else if (activeView === 'COLETA') {
+        if (activeView === 'COLETA') {
           if (type.includes('DEVOLU')) return false;
           if (hiddenTripTypesColeta !== null) {
             if (hiddenTripTypesColeta.includes(type)) return false;
@@ -792,6 +791,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   useEffect(() => {
     loadData();
   }, []);
+
+  const loadDevolucoes = useCallback(async () => {
+    const devs = await db.getDevolucoes();
+    setDevolucoes(devs);
+  }, []);
+
+  useEffect(() => { loadDevolucoes(); }, [loadDevolucoes]);
 
   const handleToggleNF = useCallback(async (trip: Trip, checked: boolean) => {
     const now = Date.now();
@@ -993,58 +999,40 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
-  const handleSaveDevAgendamento = useCallback(async (tripId: string, dateTime: string) => {
-    const trip = propTrips.find(t => t.id === tripId);
-    if (!trip) return;
-    const update = { scheduledDateTime: dateTime };
-    const now = Date.now();
-    setPendingUpdates(prev => ({
-      ...prev,
-      [tripId]: { data: { ...(prev[tripId]?.data || {}), ...update }, timestamp: now }
-    }));
+  const handleSaveDevAgendamento = useCallback(async (devId: string, dateTime: string) => {
+    const dev = devolucoes.find(d => d.id === devId);
+    if (!dev) return;
     try {
-      await db.saveTrip({ ...trip, ...update });
-    } catch (error) {
-      setPendingUpdates(prev => { const next = { ...prev }; delete next[tripId]; return next; });
+      await db.saveDevolucao({ ...dev, scheduledDateTime: dateTime, status: dateTime ? 'Agendado' : dev.status });
+      await loadDevolucoes();
+    } catch {
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar agendamento', type: 'error' } }));
     }
-  }, [propTrips]);
+  }, [devolucoes, loadDevolucoes]);
 
-  const handleDevComprovanteUpload = useCallback(async (trip: Trip, file: File) => {
-    setUploadingDevId(trip.id);
+  const handleDevComprovanteUpload = useCallback(async (dev: Devolucao, file: File) => {
+    setUploadingDevId(dev.id);
     try {
       const ext = file.name.split('.').pop() || 'pdf';
-      const fileName = `comprovante-dev-${trip.os || trip.id}-${Date.now()}.${ext}`;
-      const url = await r2Service.upload(file, fileName, `devolucoes/${trip.os || trip.id}`);
-      const doc = { id: `agd-${Date.now()}`, type: 'AGENDAMENTO' as const, url, fileName: file.name, uploadDate: new Date().toISOString() };
-      await db.saveTrip({ ...trip, agendamentoDoc: doc });
+      const fileName = `comprovante-dev-${dev.os || dev.id}-${Date.now()}.${ext}`;
+      const url = await r2Service.upload(file, fileName, `devolucoes/${dev.os || dev.id}`);
+      const doc = { id: `agd-${Date.now()}`, type: 'AGENDAMENTO', url, fileName: file.name, uploadDate: new Date().toISOString() };
+      await db.saveDevolucao({ ...dev, agendamentoDoc: doc });
+      await loadDevolucoes();
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Comprovante enviado com sucesso', type: 'success' } }));
-      onRefresh();
-    } catch (error) {
-      console.error('Erro ao enviar comprovante:', error);
+    } catch {
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao enviar comprovante', type: 'error' } }));
     } finally {
       setUploadingDevId(null);
     }
-  }, [onRefresh]);
+  }, [loadDevolucoes]);
 
-  const mapTripToDevolucao = useCallback((t: Trip) => ({
-    date: localDateStr(),
-    driverId: t.driver?.id || '',
-    remetenteId: t.customer?.id || '',
-    destinatarioId: '',
-    container: t.container || '',
-    booking: t.booking || '',
-    ship: t.ship || '',
-    agencia: '',
-    pod: 'SANTOS',
-    qtdContainer: '01',
-    tipo: '40HC',
-    padrao: 'CARGA GERAL',
-    obs: '',
-    manualLocal: '',
-    agendamentoDateTime: t.scheduledDateTime || '',
-  }), []);
+  const handleSaveDevolucaoFromForm = useCallback(async (updated: Devolucao) => {
+    await db.saveDevolucao(updated);
+    await loadDevolucoes();
+    setDevMinutaDev(null);
+    window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Minuta salva com sucesso', type: 'success' } }));
+  }, [loadDevolucoes]);
 
   const handleAddDevEntry = useCallback(async () => {
     if (!devAddForm.container.trim()) return;
@@ -1052,38 +1040,33 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     try {
       const driver = drivers.find(d => d.id === devAddForm.driverId);
       const now = new Date().toISOString();
-      const newTrip: Trip = {
+      const newDev: Devolucao = {
         id: crypto.randomUUID(),
         os: `DEV-${Date.now()}`,
-        booking: '', ship: '', bu: 'SSZ', autColeta: '', embarcador: '',
-        dateTime: now, statusTime: now, isLate: false,
-        type: 'DEVOLUÇÃO VAZIO', containerType: '40HC', category: '',
         container: devAddForm.container.trim().toUpperCase(),
-        tara: '', seal: '', cva: '', agencia: '',
-        customer: { id: '', name: '---' } as any,
-        destination: devAddForm.local.trim() ? { id: '', name: devAddForm.local.trim().toUpperCase() } as any : null,
-        driver: driver || ({ id: '', name: '---' } as any),
-        status: 'Pendente' as any,
-        statusHistory: [],
-        advancePayment: { status: 'BLOQUEADO' } as any,
-        balancePayment: { status: 'AGUARDANDO_DOCS' } as any,
-        isPriority: false, isCompleted: false, sentNF: false,
-        isScheduled: false, hasAdvance: false,
-        isRemovedFromColeta: false, isRemovedFromOrg: false,
+        local: devAddForm.local.trim() ? devAddForm.local.trim().toUpperCase() : undefined,
+        driver: driver ? {
+          id: driver.id,
+          name: driver.name,
+          plateHorse: driver.plateHorse || undefined,
+          plateTrailer: driver.plateTrailer || undefined,
+          cpf: driver.cpf || undefined,
+        } : undefined,
         scheduledDateTime: devAddForm.dateTime || undefined,
+        status: 'Pendente',
+        createdAt: now,
       };
-      await db.saveTrip(newTrip);
+      await db.saveDevolucao(newDev);
+      await loadDevolucoes();
       setDevAddForm({ container: '', local: '', dateTime: '', driverId: '' });
       setShowDevAddForm(false);
-      onRefresh();
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Devolução adicionada com sucesso', type: 'success' } }));
-    } catch (error) {
-      console.error('Erro ao adicionar devolução:', error);
+    } catch {
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao adicionar devolução', type: 'error' } }));
     } finally {
       setSavingDevAdd(false);
     }
-  }, [devAddForm, drivers, onRefresh]);
+  }, [devAddForm, drivers, loadDevolucoes]);
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
     const advanceData = { 
@@ -1793,7 +1776,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             <div className="flex items-center gap-3 ml-4">
               <div className="w-2 h-8 bg-orange-500 rounded-full"></div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Devoluções de Vazio</h3>
-              <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-black rounded-full border border-orange-200">{trips.length}</span>
+              <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-black rounded-full border border-orange-200">{devolucoes.length}</span>
               <button
                 onClick={() => setShowDevAddForm(v => !v)}
                 className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-sm"
@@ -1868,12 +1851,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               </div>
             )}
 
-            {trips.length === 0 && !showDevAddForm ? (
+            {devolucoes.length === 0 && !showDevAddForm ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <svg className="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0v10l-8 4m-8-4V7m8 4v10"/></svg>
                 <p className="text-[11px] font-black uppercase tracking-widest">Nenhuma devolução encontrada</p>
               </div>
-            ) : trips.length > 0 ? (
+            ) : devolucoes.length > 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                 <table className="w-full text-left">
                   <thead>
@@ -1888,39 +1871,39 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {trips.map(t => {
-                      const isUploading = uploadingDevId === t.id;
-                      const dtPickerVal = t.scheduledDateTime
-                        ? (() => { try { const d = new Date(t.scheduledDateTime!); const off = d.getTimezoneOffset()*60000; return new Date(d.getTime()-off).toISOString().slice(0,16); } catch { return ''; }})()
+                    {devolucoes.map(d => {
+                      const isUploading = uploadingDevId === d.id;
+                      const dtPickerVal = d.scheduledDateTime
+                        ? (() => { try { const dt = new Date(d.scheduledDateTime!); const off = dt.getTimezoneOffset()*60000; return new Date(dt.getTime()-off).toISOString().slice(0,16); } catch { return ''; }})()
                         : '';
                       return (
-                        <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
+                        <tr key={d.id} className="hover:bg-slate-50/60 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] font-black text-slate-800 uppercase">{t.container || '---'}</span>
-                              <span className="text-[8px] font-bold text-slate-400 uppercase">{t.os || '---'}</span>
+                              <span className="text-[10px] font-black text-slate-800 uppercase">{d.container || '---'}</span>
+                              <span className="text-[8px] font-bold text-slate-400 uppercase">{d.os || '---'}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] font-bold text-slate-700 uppercase">{t.destination?.name || t.booking || '---'}</span>
-                              {t.booking && t.destination?.name && (
-                                <span className="text-[8px] font-bold text-slate-400 uppercase">{t.booking}</span>
+                              <span className="text-[10px] font-bold text-slate-700 uppercase">{d.local || d.booking || '---'}</span>
+                              {d.booking && d.local && (
+                                <span className="text-[8px] font-bold text-slate-400 uppercase">{d.booking}</span>
                               )}
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-[9px] font-bold text-slate-700 uppercase">{t.customer?.name || '---'}</span>
+                            <span className="text-[9px] font-bold text-slate-700 uppercase">{d.customer?.name || '---'}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-[9px] font-bold text-slate-700 uppercase">{t.driver?.name || '---'}</span>
+                            <span className="text-[9px] font-bold text-slate-700 uppercase">{d.driver?.name || '---'}</span>
                           </td>
                           <td className="px-4 py-3 min-w-[220px]">
                             <DateTimePicker
                               value={dtPickerVal}
                               onChange={val => {
                                 const iso = val ? new Date(val).toISOString() : '';
-                                handleSaveDevAgendamento(t.id, iso);
+                                handleSaveDevAgendamento(d.id, iso);
                               }}
                               placeholder="Agendar..."
                               inputClassName="text-[9px] py-1.5 rounded-lg border-slate-200"
@@ -1928,9 +1911,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-col gap-1 items-start">
-                              {t.agendamentoDoc ? (
+                              {d.agendamentoDoc ? (
                                 <a
-                                  href={t.agendamentoDoc.url}
+                                  href={d.agendamentoDoc.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors"
@@ -1943,7 +1926,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                                 {isUploading ? (
                                   <><div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"/><span>Enviando...</span></>
                                 ) : (
-                                  <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>{t.agendamentoDoc ? 'Substituir' : 'Anexar'}</span></>
+                                  <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>{d.agendamentoDoc ? 'Substituir' : 'Anexar'}</span></>
                                 )}
                                 <input
                                   type="file"
@@ -1952,7 +1935,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                                   disabled={isUploading}
                                   onChange={e => {
                                     const file = e.target.files?.[0];
-                                    if (file) { handleDevComprovanteUpload(t, file); e.target.value = ''; }
+                                    if (file) { handleDevComprovanteUpload(d, file); e.target.value = ''; }
                                   }}
                                 />
                               </label>
@@ -1960,7 +1943,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                           </td>
                           <td className="px-4 py-3">
                             <button
-                              onClick={() => setDevMinutaTrip(t)}
+                              onClick={() => setDevMinutaDev(d)}
                               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[8px] font-black text-amber-700 hover:bg-amber-100 transition-colors"
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -1978,15 +1961,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         )}
       </div>
 
-      {devMinutaTrip && (
+      {devMinutaDev && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-stretch justify-center p-4 overflow-auto">
           <div className="bg-white rounded-[2.5rem] w-full max-w-6xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden my-auto">
             <div className="flex justify-between items-center px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
               <div>
                 <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Minuta de Devolução</h3>
-                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{devMinutaTrip.container || devMinutaTrip.os}</p>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{devMinutaDev.container || devMinutaDev.os}</p>
               </div>
-              <button onClick={() => setDevMinutaTrip(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+              <button onClick={() => setDevMinutaDev(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                 <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
@@ -1995,10 +1978,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 drivers={drivers}
                 customers={customers}
                 ports={ports}
-                onClose={() => setDevMinutaTrip(null)}
-                initialFormData={mapTripToDevolucao(devMinutaTrip)}
-                tripId={devMinutaTrip.id}
-                onAgendamentoSave={handleSaveDevAgendamento}
+                onClose={() => setDevMinutaDev(null)}
+                devolucao={devMinutaDev}
+                onSave={handleSaveDevolucaoFromForm}
               />
             </div>
           </div>

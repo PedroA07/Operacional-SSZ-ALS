@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Trip, User } from '../../../types';
+import { Trip, User, Devolucao } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
 import DatePicker from '../../shared/DatePicker';
 
 interface ExternalPortalProps {
   user: User;
   trips: Trip[];
+  devolucoes?: Devolucao[];
 }
 
 const getLocalDateStr = (d: Date = new Date()) =>
@@ -38,7 +39,7 @@ const PAGE_LABELS: Record<string, { label: string; color: string; activeClass: s
   orgDevolucoes:    { label: 'Devoluções',            color: 'orange',  activeClass: 'bg-white text-orange-600 shadow-sm' },
 };
 
-const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
+const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes = [] }) => {
   const todayLocal = getLocalDateStr();
 
   const [startDate, setStartDate]   = useState<string>(todayLocal);
@@ -131,6 +132,19 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
     return baseFiltered.filter(t => matchesPage(t.type || '', currentPageKey));
   }, [baseFiltered, isLegacyMode, currentPageKey]);
 
+  /* Devoluções filtered for the orgDevolucoes page */
+  const filteredDevolucoes = useMemo(() => {
+    const cfg = user.thirdPartyConfig;
+    const allowedCustomers = cfg?.allowedCustomers;
+    return devolucoes.filter(d => {
+      if (allowedCustomers?.length) {
+        const name = (d.customer?.name || '').trim().toLowerCase();
+        if (!allowedCustomers.some(c => c.trim().toLowerCase() === name)) return false;
+      }
+      return true;
+    });
+  }, [devolucoes, user.thirdPartyConfig]);
+
   /* ── Column builders ────────────────────────────────────────── */
   const renderLocation = (loc: any) => {
     if (!loc) return <span className="text-[9px] text-slate-300 italic">—</span>;
@@ -148,50 +162,51 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
     const fields = currentPageFields;
     const isDevPage = currentPageKey === 'orgDevolucoes';
 
-    /* Devoluções-specific columns */
+    /* Devoluções-specific columns — data comes from Devolucao type */
     if (isDevPage) {
       const devCols = [
         fields.includes('container') && {
           key: 'container', label: 'Container',
-          sortValue: (t: Trip) => t.container || '',
-          render: (t: Trip) => (
+          sortValue: (d: Devolucao) => d.container || '',
+          render: (d: Devolucao) => (
             <div className="flex flex-col gap-0.5">
-              <span className="text-[11px] font-black text-blue-600 uppercase">{t.container || <span className="text-slate-300 italic font-normal text-[9px]">—</span>}</span>
-              <span className="text-[8px] text-slate-400 font-bold uppercase">{t.os}</span>
+              <span className="text-[11px] font-black text-blue-600 uppercase">{d.container || <span className="text-slate-300 italic font-normal text-[9px]">—</span>}</span>
+              <span className="text-[8px] text-slate-400 font-bold uppercase">{d.os}</span>
             </div>
           ),
         },
         fields.includes('destination') && {
           key: 'destination', label: 'Local / Depósito',
-          sortValue: (t: Trip) => t.destination?.name || '',
-          render: (t: Trip) => renderLocation(t.destination),
+          sortValue: (d: Devolucao) => d.local || '',
+          render: (d: Devolucao) => d.local
+            ? <span className="font-black text-slate-800 text-[10px] uppercase">{d.local}</span>
+            : <span className="text-[9px] text-slate-300 italic">—</span>,
         },
         fields.includes('driver') && {
           key: 'driver', label: 'Motorista',
-          sortValue: (t: Trip) => t.driver?.name || '',
-          render: (t: Trip) => (
+          sortValue: (d: Devolucao) => d.driver?.name || '',
+          render: (d: Devolucao) => (
             <div className="flex flex-col gap-0.5">
-              <span className="font-black text-slate-800 text-[10px] uppercase">{t.driver?.name || <span className="text-slate-300 italic font-normal">—</span>}</span>
-              {t.driver?.plateHorse && <span className="px-1.5 py-0.5 bg-slate-800 text-white rounded-md text-[8px] font-black w-fit">{t.driver.plateHorse}</span>}
+              <span className="font-black text-slate-800 text-[10px] uppercase">{d.driver?.name || <span className="text-slate-300 italic font-normal">—</span>}</span>
+              {d.driver?.plateHorse && <span className="px-1.5 py-0.5 bg-slate-800 text-white rounded-md text-[8px] font-black w-fit">{d.driver.plateHorse}</span>}
             </div>
           ),
         },
         fields.includes('scheduledDateTime') && {
           key: 'scheduledDateTime', label: 'Agendamento',
-          sortValue: (t: Trip) => t.scheduledDateTime || '',
-          render: (t: Trip) => {
-            if (!t.scheduledDateTime) return <span className="text-[9px] text-slate-300 italic">—</span>;
+          sortValue: (d: Devolucao) => d.scheduledDateTime || '',
+          render: (d: Devolucao) => {
+            if (!d.scheduledDateTime) return <span className="text-[9px] text-slate-300 italic">—</span>;
             try {
-              const d = new Date(t.scheduledDateTime);
-              const dt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+              const dt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(d.scheduledDateTime));
               return <span className="px-2 py-1 bg-orange-50 text-orange-700 border border-orange-100 rounded-lg text-[9px] font-black">{dt}</span>;
-            } catch { return t.scheduledDateTime; }
+            } catch { return d.scheduledDateTime; }
           },
         },
         fields.includes('agendamentoDoc') && {
           key: 'agendamentoDoc', label: 'Comprovante',
-          render: (t: Trip) => t.agendamentoDoc
-            ? <a href={t.agendamentoDoc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors">
+          render: (d: Devolucao) => d.agendamentoDoc
+            ? <a href={d.agendamentoDoc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 Ver
               </a>
@@ -330,7 +345,7 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
 
   /* Stats */
   const stats = useMemo(() => {
-    const all = filteredTrips;
+    const all = currentPageKey === 'orgDevolucoes' ? [] : filteredTrips;
     const today = all.filter(t => {
       const ds = t.dateTime?.includes('T') ? t.dateTime.split('T')[0] : t.dateTime?.split(' ')[0] || '';
       let n = ds;
@@ -422,7 +437,7 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
           userId={user.id}
           componentId={`external_portal_${currentPageKey || 'legacy'}`}
           columns={columns}
-          data={filteredTrips}
+          data={currentPageKey === 'orgDevolucoes' ? filteredDevolucoes as any[] : filteredTrips}
           defaultVisibleKeys={currentPageFields}
           noMaxHeight={true}
           stickyHeaderTop={enabledPages.length > 1 ? 192 : 148}
