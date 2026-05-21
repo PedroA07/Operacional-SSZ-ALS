@@ -103,7 +103,6 @@ class TabErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
-);
 
 interface DashboardProps {
   user: User;
