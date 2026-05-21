@@ -553,7 +553,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     // Use situacao from scraper as primary source (same as NaviosTab)
     const situacaoStatus = mapSituacaoGate(vessel.situacao);
 
-    if (situacaoStatus === 'GATE ABERTO') {
+    // Override: if bot still says "Gate Aberto" but deadline already passed, treat as fechado
+    const effectiveStatus = (situacaoStatus === 'GATE ABERTO' && deadDt && deadDt <= now)
+      ? 'GATE FECHADO'
+      : situacaoStatus;
+
+    if (effectiveStatus === 'GATE ABERTO') {
       const encDt = deadDt || gateDt;
       return (
         <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-green-500/10 text-green-700 border-green-500/30">
@@ -568,7 +573,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       );
     }
 
-    if (situacaoStatus === 'GATE FECHADO') {
+    if (effectiveStatus === 'GATE FECHADO') {
       return (
         <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
           <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-500"/>
@@ -580,7 +585,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       );
     }
 
-    if (situacaoStatus === 'GATE ENCERRADO') {
+    if (effectiveStatus === 'GATE ENCERRADO') {
       return (
         <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-pink-500/10 text-pink-600 border-pink-500/30">
           <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-pink-500"/>
@@ -589,7 +594,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       );
     }
 
-    if (situacaoStatus === 'ATRACADO') {
+    if (effectiveStatus === 'ATRACADO') {
       return (
         <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 border-amber-500/30">
           <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-500"/>
