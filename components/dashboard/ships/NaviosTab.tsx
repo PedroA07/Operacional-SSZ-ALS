@@ -328,31 +328,26 @@ function IconSVGEcoporto({ size = 32 }: { size?: number }) {
 
 /**
  * EMBRAPORT — DP World Santos  (ícone compacto para tabela)
- * Quadrado branco: globo azul-teal com calota vermelha + linhas brancas
- * + "DP" navy em baixo. Réplica do mark oficial DP World Santos.
+ * Globo navy (#003764) com grade branca + arco vermelho no topo.
+ * Fundo branco — idêntico ao mark do logo real.
  */
 function IconSVGEmbraport({ size = 32 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100" height="100" rx="6" fill="white"/>
-      {/* Globo — base azul-teal */}
-      <circle cx="50" cy="42" r="34" fill="#0077a0"/>
-      {/* Calota vermelha — polo norte */}
-      <path d="M 22,28 A 34,34 0 0 1 78,28 Q 66,10 50,8 Q 34,10 22,28 Z" fill="#cc003d"/>
-      {/* Meridiano central */}
-      <ellipse cx="50" cy="42" rx="14" ry="34" stroke="white" strokeWidth="1.8" fill="none"/>
-      {/* Equador */}
-      <line x1="16" y1="42" x2="84" y2="42" stroke="white" strokeWidth="1.8"/>
-      {/* Trópico superior */}
-      <path d="M 19,28 Q 50,34 81,28" stroke="white" strokeWidth="1.3" fill="none"/>
-      {/* Trópico inferior */}
-      <path d="M 19,56 Q 50,50 81,56" stroke="white" strokeWidth="1.3" fill="none"/>
-      {/* Borda do globo */}
-      <circle cx="50" cy="42" r="34" fill="none" stroke="white" strokeWidth="2.2"/>
-      {/* "DP WORLD" compacto em baixo */}
-      <text x="50" y="90" textAnchor="middle"
-            fontFamily="Arial Black, Arial, sans-serif"
-            fontWeight="900" fontSize="12" fill="#003764" letterSpacing="0.5">DP WORLD</text>
+      <rect width="100" height="100" rx="6" fill="#f0f4f8"/>
+      {/* Globo navy */}
+      <circle cx="50" cy="50" r="36" fill="#003764"/>
+      {/* Paralelos — branco */}
+      <path d="M 16,37 Q 50,30 84,37" stroke="white" strokeWidth="1.5" fill="none"/>
+      <line x1="14" y1="50" x2="86" y2="50" stroke="white" strokeWidth="1.5"/>
+      <path d="M 16,63 Q 50,70 84,63" stroke="white" strokeWidth="1.5" fill="none"/>
+      {/* Meridianos — branco */}
+      <path d="M 50,14 Q 63,50 50,86" stroke="white" strokeWidth="1.5" fill="none"/>
+      <path d="M 50,14 Q 37,50 50,86" stroke="white" strokeWidth="1.5" fill="none"/>
+      {/* Arco vermelho — topo do globo */}
+      <path d="M 23,27 Q 50,14 77,27" stroke="#cc003d" strokeWidth="5" strokeLinecap="round" fill="none"/>
+      {/* Contorno do globo */}
+      <circle cx="50" cy="50" r="36" stroke="white" strokeWidth="1.8" fill="none"/>
     </svg>
   );
 }
@@ -360,35 +355,36 @@ function IconSVGEmbraport({ size = 32 }: { size?: number }) {
 /**
  * EMBRAPORT — DP World Santos (logo horizontal para cards)
  * Layout fiel ao logo real:
- *   "DP WORLD" bold navy grande  +  globo pequeno no canto superior direito
- *   "Santos" coral/vermelho abaixo
- * Aspect ratio ≈ 4:1
+ *   [Globo à esquerda] + "DP WORLD" bold navy + "Santos" verde abaixo
+ * Aspect ratio ≈ 3.2:1
  */
 function LogoSVGEmbraport({ height = 32 }: { height?: number }) {
-  const w = Math.round(height * 4.0);
+  const w = Math.round(height * 3.2);
   return (
-    <svg width={w} height={height} viewBox="0 0 320 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* "DP WORLD" — bold navy, texto principal */}
-      <text x="6" y="52"
+    <svg width={w} height={height} viewBox="0 0 320 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* ── Globo (esquerda) ── */}
+      <circle cx="46" cy="46" r="38" fill="#003764"/>
+      {/* Paralelos */}
+      <path d="M 10,33 Q 46,25 82,33" stroke="white" strokeWidth="1.8" fill="none"/>
+      <line x1="8" y1="46" x2="84" y2="46" stroke="white" strokeWidth="1.8"/>
+      <path d="M 10,59 Q 46,67 82,59" stroke="white" strokeWidth="1.8" fill="none"/>
+      {/* Meridianos */}
+      <path d="M 46,8  Q 61,46 46,84" stroke="white" strokeWidth="1.8" fill="none"/>
+      <path d="M 46,8  Q 31,46 46,84" stroke="white" strokeWidth="1.8" fill="none"/>
+      {/* Arco vermelho proeminente — topo */}
+      <path d="M 19,22 Q 46,9 73,22" stroke="#cc003d" strokeWidth="6" strokeLinecap="round" fill="none"/>
+      {/* Contorno */}
+      <circle cx="46" cy="46" r="38" stroke="white" strokeWidth="2" fill="none"/>
+
+      {/* ── Texto (direita) ── */}
+      {/* "DP WORLD" — bold navy */}
+      <text x="96" y="56"
             fontFamily="Arial Black, Arial, sans-serif"
-            fontWeight="900" fontSize="44" fill="#003764" letterSpacing="-0.5">DP WORLD</text>
-      {/* "Santos" — coral DP World, abaixo e menor */}
-      <text x="8" y="73"
+            fontWeight="900" fontSize="46" fill="#003764" letterSpacing="-0.5">DP WORLD</text>
+      {/* "Santos" — verde, regular, abaixo */}
+      <text x="98" y="80"
             fontFamily="Arial, sans-serif"
-            fontWeight="600" fontSize="18" fill="#cc3d1a">Santos</text>
-      {/* Globo — canto superior direito */}
-      <circle cx="298" cy="23" r="20" fill="#0077a0"/>
-      {/* Calota vermelha */}
-      <path d="M 282,14 A 20,20 0 0 1 314,14 Q 307,4 298,3 Q 289,4 282,14 Z" fill="#cc003d"/>
-      {/* Meridiano */}
-      <ellipse cx="298" cy="23" rx="8" ry="20" stroke="white" strokeWidth="1.2" fill="none"/>
-      {/* Equador */}
-      <line x1="278" y1="23" x2="318" y2="23" stroke="white" strokeWidth="1.2"/>
-      {/* Trópicos */}
-      <path d="M 280,14 Q 298,18 316,14" stroke="white" strokeWidth="1" fill="none"/>
-      <path d="M 280,32 Q 298,28 316,32" stroke="white" strokeWidth="1" fill="none"/>
-      {/* Borda */}
-      <circle cx="298" cy="23" r="20" fill="none" stroke="white" strokeWidth="1.5"/>
+            fontWeight="400" fontSize="22" fill="#4c9e2e">Santos</text>
     </svg>
   );
 }
