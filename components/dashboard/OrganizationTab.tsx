@@ -448,46 +448,55 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return isNaN(dt.getTime()) ? null : dt;
   };
 
-  const getVesselForTrip = useCallback((shipRaw: string): TerminalVessel | null => {
+  // Normaliza string para comparação: só letras e dígitos maiúsculos
+  const normVessel = (s: string) =>
+    s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
+
+  const getVesselForTrip = useCallback((shipRaw: string, voyage?: string): TerminalVessel | null => {
     if (!shipRaw) return null;
     const { name } = splitShipField(shipRaw);
-    // Normaliza: apenas letras e dígitos, sem espaços/acentos
-    const norm = (s: string) => s.toUpperCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')  // remove acentos
-      .replace(/[^A-Z0-9]/g, '');
-    const n = norm(name || shipRaw);
+    const n = normVessel(name || shipRaw);
     if (!n || n.length < 3) return null;
 
-    // Tenta match exato primeiro, depois parcial por palavras
     const nameWords = (name || shipRaw).toUpperCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .split(/\s+/).filter(w => w.length > 2);
+      .split(/\s+/).filter((w: string) => w.length > 2);
 
     const isMatch = (v: TerminalVessel) => {
-      const vn = norm(v.navio);
-      const vRaw = v.navio.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      const vn = normVessel(v.navio);
       if (vn === n) return true;
       if (vn.includes(n) || n.includes(vn)) return true;
-      // Match por palavras: todas as palavras com >2 chars devem estar no nome do terminal
-      return nameWords.length >= 2 && nameWords.every(w => vRaw.includes(w));
+      return nameWords.length >= 2 && nameWords.every((w: string) =>
+        v.navio.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(w));
     };
 
     const matches = terminalVessels.filter(isMatch);
     if (matches.length === 0) return null;
 
-    // Prefere o que tem dados de gate (gateDry ou gateReefer preenchido)
+    // 1) Prefere match por viagem exata
+    if (voyage) {
+      const vNorm = voyage.trim().toUpperCase();
+      const byVoyage = matches.find(v => (v.viagem || '').trim().toUpperCase() === vNorm);
+      if (byVoyage) return byVoyage;
+    }
+    // 2) Prefere o que tem dados de gate
     const withGate = matches.find(v => v.gateDry || v.gateReefer);
-    // Se nenhum tem gate, prefere o que tem deadline
+    // 3) Prefere o que tem deadline
     const withDeadline = matches.find(v => v.deadLineStr);
     return withGate ?? withDeadline ?? matches[0];
   }, [terminalVessels, splitShipField]);
 
-  const renderGateTag = useCallback((shipName?: string): React.ReactNode => {
+  const renderGateTag = useCallback((shipName?: string, containerType?: string): React.ReactNode => {
     if (!shipName) return null;
-    const vessel = getVesselForTrip(shipName);
+    const { voyage } = splitShipField(shipName);
+    const vessel = getVesselForTrip(shipName, voyage || undefined);
     if (!vessel) return null;
     const now = new Date();
-    const gateStr = vessel.gateDry || vessel.gateReefer;
+    // Seleciona o gate correto com base no tipo de contêiner da viagem
+    const isReefer = /reefer|rf\b|refriger/i.test(containerType || '');
+    const gateStr = isReefer
+      ? (vessel.gateReefer || vessel.gateDry)   // reefer → gateReefer first
+      : (vessel.gateDry    || vessel.gateReefer); // dry/outro → gateDry first
     const gateDt = parseFlexDate(gateStr || '');
     const deadDt = parseFlexDate(vessel.deadLineStr || '');
 
@@ -529,7 +538,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         )}
       </span>
     );
-  }, [getVesselForTrip]);
+  }, [getVesselForTrip, splitShipField]);
 
   useEffect(() => {
     const toRemove: string[] = [];
@@ -1184,7 +1193,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 Viagem: {voyage}
               </span>
             )}
-            {t.ship && renderGateTag(t.ship)}
+            {t.ship && renderGateTag(t.ship, t.containerType)}
           </div>
         );
       }

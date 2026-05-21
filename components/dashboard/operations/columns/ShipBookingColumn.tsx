@@ -3,9 +3,10 @@ import React from 'react';
 import { Trip } from '../../../../types';
 
 /** Fábrica: retorna o renderer da coluna Navio/Booking.
- *  `getGateTag` é opcional — quando fornecido, exibe o status do gate do terminal. */
+ *  `getGateTag` é opcional — quando fornecido, exibe o status do gate do terminal.
+ *  Recebe a Trip completa para que o chamador possa usar containerType, viagem, etc. */
 export const makeShipBookingColumn =
-  (getGateTag?: (ship: string) => React.ReactNode) =>
+  (getGateTag?: (trip: Trip) => React.ReactNode) =>
   (t: Trip) => (
     <div className="flex flex-col space-y-1.5 whitespace-normal min-w-[160px]">
       <div className="flex flex-col">
@@ -14,7 +15,7 @@ export const makeShipBookingColumn =
           {t.ship || 'A DEFINIR'}
         </p>
         {getGateTag && t.ship && (
-          <div className="mt-1">{getGateTag(t.ship)}</div>
+          <div className="mt-1">{getGateTag(t)}</div>
         )}
       </div>
       <div className="flex flex-col">

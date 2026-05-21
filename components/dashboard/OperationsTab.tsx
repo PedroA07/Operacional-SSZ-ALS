@@ -103,12 +103,28 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     return () => clearInterval(iv);
   }, []);
 
-  // Retorna a tag de gate para um navio, comparando nome do navio da viagem com terminal_vessels
-  const getGateTag = useCallback((shipRaw: string): React.ReactNode => {
+  // Extrai { name, voyage } de um campo de navio como "MSC YAMUNA VI 621N" ou "NAVIO/VIAGEM"
+  const splitShipField = useCallback((raw: string): { name: string; voyage: string } => {
+    if (!raw) return { name: '', voyage: '' };
+    // Separador explícito: / ou |
+    const explicitMatch = raw.match(/^([^/|]+)[/|](.*)$/);
+    if (explicitMatch) return { name: explicitMatch[1].trim(), voyage: explicitMatch[2].trim() };
+    // Sufixo numérico no final (ex: "MSC YAMUNA VI 621N" → voyage="621N")
+    const suffixMatch = raw.match(/^(.*?)\s+(\d+[A-Z]?)$/);
+    if (suffixMatch) return { name: suffixMatch[1].trim(), voyage: suffixMatch[2].trim() };
+    return { name: raw.trim(), voyage: '' };
+  }, []);
+
+  // Retorna a tag de gate para uma viagem, usando navio + viagem + tipo de contêiner
+  const getGateTag = useCallback((trip: Trip): React.ReactNode => {
+    const shipRaw = trip.ship;
     if (!shipRaw || terminalVessels.length === 0) return null;
     const norm = (s: string) =>
       s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
-    const query = norm(shipRaw.split('/')[0].split('VIAGEM')[0]);
+
+    // Extrai nome e viagem do campo ship
+    const { name, voyage } = splitShipField(shipRaw);
+    const query = norm(name || shipRaw);
     if (query.length < 3) return null;
 
     const words = query.split(' ').filter((w: string) => w.length > 2);
@@ -120,22 +136,35 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     };
     const matches = terminalVessels.filter(isMatch);
     if (matches.length === 0) return null;
-    // Prefere o que tem gate data; fallback para o primeiro match
-    const vessel = matches.find(v => v.gateDry || v.gateReefer)
-      ?? matches.find(v => v.deadLineStr)
-      ?? matches[0];
+
+    // 1) Prefere match exato por viagem
+    let vessel: TerminalVessel | undefined;
+    if (voyage) {
+      const vNorm = voyage.trim().toUpperCase();
+      vessel = matches.find(v => (v.viagem || '').trim().toUpperCase() === vNorm);
+    }
+    // 2) Prefere o que tem gate data
+    if (!vessel) vessel = matches.find(v => v.gateDry || v.gateReefer);
+    // 3) Prefere o que tem deadline
+    if (!vessel) vessel = matches.find(v => v.deadLineStr);
+    // 4) Primeiro match
+    if (!vessel) vessel = matches[0];
 
     const parseDate = (s?: string) => {
       if (!s || s === '-' || s === '—') return null;
       if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
-        const p = s.split(/[\/\s:]/);
+        const p = s.split(/[/\s:]/);
         return new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]), Number(p[3] ?? 0), Number(p[4] ?? 0));
       }
       const d = new Date(s); return isNaN(d.getTime()) ? null : d;
     };
 
     const now = new Date();
-    const gateStr = vessel.gateDry || vessel.gateReefer;
+    // Seleciona o gate correto com base no tipo de contêiner
+    const isReefer = /reefer|rf\b|refriger/i.test(trip.containerType || '');
+    const gateStr = isReefer
+      ? (vessel.gateReefer || vessel.gateDry)
+      : (vessel.gateDry    || vessel.gateReefer);
     const gateDt = parseDate(gateStr);
     const deadDt = parseDate(vessel.deadLineStr);
 
@@ -167,7 +196,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         {deadDt && <span className="font-bold text-orange-500 normal-case ml-0.5">• Enc. {fmt(deadDt)}</span>}
       </span>
     );
-  }, [terminalVessels]);
+  }, [terminalVessels, splitShipField]);
 
   const handleSetPriority = async (trip: Trip) => {
     if (isSavingStatus) return;

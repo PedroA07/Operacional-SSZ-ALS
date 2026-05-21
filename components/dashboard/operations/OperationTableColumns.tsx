@@ -31,7 +31,7 @@ export const getOperationTableColumns = (
   allDrivers: Driver[] = [],
   categories: Category[] = [],
   operationTypes: any[] = [],
-  getGateTag?: (ship: string) => React.ReactNode
+  getGateTag?: (trip: Trip) => React.ReactNode
 ) => {
   
   const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO' | 'BATCH', e: React.ChangeEvent<HTMLInputElement>) => {
