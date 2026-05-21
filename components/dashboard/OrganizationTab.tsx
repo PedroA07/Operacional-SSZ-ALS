@@ -357,6 +357,21 @@ const ToggleIconBtn: React.FC<{
   </button>
 );
 
+type DevScheduleStatus = 'critico' | 'pendente' | 'agendado' | 'normal';
+
+function getDevScheduleStatus(d: Devolucao): DevScheduleStatus {
+  if (d.status === 'Cancelado' || d.status === 'Realizado') return 'normal';
+  if (!d.scheduledDateTime) return 'normal';
+  const now = new Date();
+  const scheduledDt = new Date(d.scheduledDateTime);
+  if (scheduledDt > now) return 'agendado';
+  if (d.agendamentoDoc) return 'normal';
+  const hoursLate = (now.getTime() - scheduledDt.getTime()) / (1000 * 60 * 60);
+  return hoursLate > 48 ? 'critico' : 'pendente';
+}
+
+const DEV_PRIORITY: Record<DevScheduleStatus, number> = { critico: 3, pendente: 2, agendado: 1, normal: 0 };
+
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, drivers, customers, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -808,6 +823,22 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, []);
 
   useEffect(() => { loadLiberacoes(); }, [loadLiberacoes]);
+
+  const sortedDevolucoes = useMemo(() => {
+    return [...devolucoes].sort((a, b) => {
+      const pa = DEV_PRIORITY[getDevScheduleStatus(a)];
+      const pb = DEV_PRIORITY[getDevScheduleStatus(b)];
+      if (pa !== pb) return pb - pa;
+      const da = a.scheduledDateTime ? new Date(a.scheduledDateTime).getTime() : Infinity;
+      const db = b.scheduledDateTime ? new Date(b.scheduledDateTime).getTime() : Infinity;
+      return da - db;
+    });
+  }, [devolucoes]);
+
+  const sortedLiberacoes = useMemo(() => {
+    const libPriority: Record<string, number> = { Pendente: 2, Emitido: 1, Cancelado: 0 };
+    return [...liberacoes].sort((a, b) => (libPriority[b.status] ?? 0) - (libPriority[a.status] ?? 0));
+  }, [liberacoes]);
 
   const handleToggleNF = useCallback(async (trip: Trip, checked: boolean) => {
     const now = Date.now();
@@ -1694,7 +1725,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     },
     {
       key: 'status',
-      label: 'Status',
+      label: 'Status / Prioridade',
       sortable: true,
       render: (d: Devolucao) => {
         const styles: Record<string, string> = {
@@ -1703,7 +1734,30 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           Realizado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
           Cancelado: 'bg-red-50 text-red-700 border-red-200',
         };
-        return <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${styles[d.status] || styles.Pendente}`}>{d.status}</span>;
+        const sched = getDevScheduleStatus(d);
+        return (
+          <div className="flex flex-col gap-1">
+            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border w-fit ${styles[d.status] || styles.Pendente}`}>{d.status}</span>
+            {sched === 'critico' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-red-600 text-white border-red-700 animate-pulse w-fit">
+                <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                +2 dias sem comprovante
+              </span>
+            )}
+            {sched === 'pendente' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-orange-100 text-orange-700 border-orange-300 w-fit">
+                <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Sem comprovante
+              </span>
+            )}
+            {sched === 'agendado' && !d.agendamentoDoc && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-blue-50 text-blue-600 border-blue-200 w-fit">
+                <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Aguardando
+              </span>
+            )}
+          </div>
+        );
       },
     },
     {
@@ -2065,10 +2119,22 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           </div>
         ) : activeView === 'DEVOLUÇÕES' ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 ml-4">
+            <div className="flex items-center gap-3 ml-4 flex-wrap">
               <div className="w-2 h-8 bg-orange-500 rounded-full"></div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Devoluções de Vazio</h3>
               <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-black rounded-full border border-orange-200">{devolucoes.length}</span>
+              {sortedDevolucoes.filter(d => getDevScheduleStatus(d) === 'critico').length > 0 && (
+                <span className="flex items-center gap-1 px-2.5 py-1 bg-red-600 text-white text-[8px] font-black rounded-full border border-red-700 animate-pulse">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                  {sortedDevolucoes.filter(d => getDevScheduleStatus(d) === 'critico').length} CRÍTICO
+                </span>
+              )}
+              {sortedDevolucoes.filter(d => getDevScheduleStatus(d) === 'pendente').length > 0 && (
+                <span className="flex items-center gap-1 px-2.5 py-1 bg-orange-100 text-orange-700 text-[8px] font-black rounded-full border border-orange-300">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  {sortedDevolucoes.filter(d => getDevScheduleStatus(d) === 'pendente').length} SEM COMPROVANTE
+                </span>
+              )}
               <button
                 onClick={() => {
                   const now = new Date().toISOString();
@@ -2084,10 +2150,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               userId={userId}
               componentId="org-devolucoes"
               columns={devolucoesColumns}
-              data={devolucoes}
+              data={sortedDevolucoes}
               hideInternalSearch={false}
               noMaxHeight
               stickyHeaderTop={0}
+              getRowStyle={(d: Devolucao) => {
+                const s = getDevScheduleStatus(d);
+                if (s === 'critico') return { backgroundColor: '#fef2f2', boxShadow: 'inset 4px 0 0 #dc2626' };
+                if (s === 'pendente') return { backgroundColor: '#fff7ed', boxShadow: 'inset 4px 0 0 #f97316' };
+                if (s === 'agendado') return { backgroundColor: '#eff6ff', boxShadow: 'inset 4px 0 0 #3b82f6' };
+                return {};
+              }}
             />
           </div>
         ) : (
@@ -2111,10 +2184,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               userId={userId}
               componentId="org-liberacoes"
               columns={liberacoesColumns}
-              data={liberacoes}
+              data={sortedLiberacoes}
               hideInternalSearch={false}
               noMaxHeight
               stickyHeaderTop={0}
+              getRowStyle={(l: Liberacao) => {
+                if (l.status === 'Pendente') return { backgroundColor: '#f5f3ff', boxShadow: 'inset 4px 0 0 #8b5cf6' };
+                if (l.status === 'Emitido') return { backgroundColor: '#f0fdf4', boxShadow: 'inset 4px 0 0 #22c55e' };
+                return {};
+              }}
             />
           </div>
         )}
