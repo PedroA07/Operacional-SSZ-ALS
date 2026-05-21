@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer, Devolucao } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer, Devolucao, Liberacao } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
@@ -8,6 +8,7 @@ import FeedbackModal from '../shared/FeedbackModal';
 import DateTimePicker from '../shared/DateTimePicker';
 import PreStackingForm from './forms/PreStackingForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
+import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
 import { localDateStr, localDateTimeStr } from '../../utils/dateHelpers';
 import { r2Service } from '../../utils/r2Service';
 
@@ -363,13 +364,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
   const [minutaTrip, setMinutaTrip] = useState<Trip | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA' | 'DEVOLUÇÕES'>('COLETA');
+  const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA' | 'DEVOLUÇÕES' | 'LIBERAÇÕES'>('COLETA');
   const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
   const [devMinutaDev, setDevMinutaDev] = useState<Devolucao | null>(null);
   const [uploadingDevId, setUploadingDevId] = useState<string | null>(null);
   const [showDevAddForm, setShowDevAddForm] = useState(false);
   const [devAddForm, setDevAddForm] = useState({ container: '', local: '', dateTime: '', driverId: '' });
   const [savingDevAdd, setSavingDevAdd] = useState(false);
+  const [liberacoes, setLiberacoes] = useState<Liberacao[]>([]);
+  const [libMinuta, setLibMinuta] = useState<Liberacao | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
@@ -799,6 +802,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   useEffect(() => { loadDevolucoes(); }, [loadDevolucoes]);
 
+  const loadLiberacoes = useCallback(async () => {
+    const libs = await db.getLiberacoes();
+    setLiberacoes(libs);
+  }, []);
+
+  useEffect(() => { loadLiberacoes(); }, [loadLiberacoes]);
+
   const handleToggleNF = useCallback(async (trip: Trip, checked: boolean) => {
     const now = Date.now();
     
@@ -1033,6 +1043,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     setDevMinutaDev(null);
     window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Minuta salva com sucesso', type: 'success' } }));
   }, [loadDevolucoes]);
+
+  const handleSaveLiberacaoFromForm = useCallback(async (updated: Liberacao) => {
+    await db.saveLiberacao(updated);
+    await loadLiberacoes();
+    setLibMinuta(null);
+    window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Liberação salva com sucesso', type: 'success' } }));
+  }, [loadLiberacoes]);
 
   const handleAddDevEntry = useCallback(async () => {
     if (!devAddForm.container.trim()) return;
@@ -1624,6 +1641,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             >
               Devoluções
             </button>
+            <button
+              onClick={() => setActiveView('LIBERAÇÕES')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'LIBERAÇÕES' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Liberações
+            </button>
           </div>
 
         </div>
@@ -1771,103 +1794,50 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               }}
             />
           </div>
-        ) : (
+        ) : activeView === 'DEVOLUÇÕES' ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3 ml-4">
               <div className="w-2 h-8 bg-orange-500 rounded-full"></div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Devoluções de Vazio</h3>
               <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-black rounded-full border border-orange-200">{devolucoes.length}</span>
               <button
-                onClick={() => setShowDevAddForm(v => !v)}
+                onClick={() => {
+                  const now = new Date().toISOString();
+                  const newDev: Devolucao = {
+                    id: crypto.randomUUID(),
+                    os: `DEV-${Date.now()}`,
+                    container: '',
+                    status: 'Pendente',
+                    createdAt: now,
+                  };
+                  setDevMinutaDev(newDev);
+                }}
                 className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
-                Adicionar
+                Nova Devolução
               </button>
             </div>
 
-            {showDevAddForm && (
-              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 shadow-sm">
-                <p className="text-[9px] font-black text-orange-700 uppercase tracking-widest mb-4">Nova Entrada Manual</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Container *</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: TCKU1234567"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold uppercase text-slate-800 focus:border-orange-400 outline-none transition-all"
-                      value={devAddForm.container}
-                      onChange={e => setDevAddForm(p => ({ ...p, container: e.target.value.toUpperCase() }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Local / Depósito</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: DEPOT RECORD"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold uppercase text-slate-800 focus:border-orange-400 outline-none transition-all"
-                      value={devAddForm.local}
-                      onChange={e => setDevAddForm(p => ({ ...p, local: e.target.value.toUpperCase() }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Data / Hora</label>
-                    <DateTimePicker
-                      value={devAddForm.dateTime}
-                      onChange={val => setDevAddForm(p => ({ ...p, dateTime: val }))}
-                      placeholder="Selecionar..."
-                      inputClassName="text-[10px] py-2.5 rounded-xl border-slate-200"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Motorista</label>
-                    <select
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-800 focus:border-orange-400 outline-none transition-all"
-                      value={devAddForm.driverId}
-                      onChange={e => setDevAddForm(p => ({ ...p, driverId: e.target.value }))}
-                    >
-                      <option value="">Selecionar...</option>
-                      {drivers.map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 mt-4">
-                  <button
-                    onClick={() => { setShowDevAddForm(false); setDevAddForm({ container: '', local: '', dateTime: '', driverId: '' }); }}
-                    className="px-4 py-2 rounded-xl border border-slate-200 text-[9px] font-black uppercase text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleAddDevEntry}
-                    disabled={savingDevAdd || !devAddForm.container.trim()}
-                    className="px-6 py-2 rounded-xl bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {savingDevAdd ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>Salvando...</> : 'Salvar'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {devolucoes.length === 0 && !showDevAddForm ? (
+            {devolucoes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <svg className="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0v10l-8 4m-8-4V7m8 4v10"/></svg>
                 <p className="text-[11px] font-black uppercase tracking-widest">Nenhuma devolução encontrada</p>
               </div>
             ) : devolucoes.length > 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                <table className="w-full text-left">
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm">
+                <table className="w-full text-left min-w-[900px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Container / OS</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Local / Booking</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Local / Depósito</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Booking / Navio</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Tipo</th>
                       <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Cliente</th>
                       <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Motorista</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest min-w-[220px]">Agendamento</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest min-w-[200px]">Agendamento</th>
                       <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Comprovante</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Minuta</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1885,20 +1855,36 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                             </div>
                           </td>
                           <td className="px-4 py-3">
+                            <span className="text-[9px] font-bold text-slate-700 uppercase">{d.local || '---'}</span>
+                          </td>
+                          <td className="px-4 py-3">
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] font-bold text-slate-700 uppercase">{d.local || d.booking || '---'}</span>
-                              {d.booking && d.local && (
-                                <span className="text-[8px] font-bold text-slate-400 uppercase">{d.booking}</span>
-                              )}
+                              <span className="text-[9px] font-bold text-slate-700 uppercase">{d.booking || '---'}</span>
+                              {d.ship && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.ship}</span>}
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-[9px] font-bold text-slate-700 uppercase">{d.customer?.name || '---'}</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[9px] font-bold text-slate-700 uppercase">{d.containerType || '---'}</span>
+                              {d.padrao && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.padrao}</span>}
+                            </div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-[9px] font-bold text-slate-700 uppercase">{d.driver?.name || '---'}</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[9px] font-bold text-slate-700 uppercase">{d.customer?.legalName || d.customer?.name || '---'}</span>
+                              {d.customer?.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.customer.city}{d.customer.state ? `/${d.customer.state}` : ''}</span>}
+                            </div>
                           </td>
-                          <td className="px-4 py-3 min-w-[220px]">
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[9px] font-bold text-slate-700 uppercase">{d.driver?.name || '---'}</span>
+                              <div className="flex items-center gap-1">
+                                {d.driver?.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{d.driver.plateHorse}</span>}
+                                {d.driver?.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.driver.plateTrailer}</span>}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 min-w-[200px]">
                             <DateTimePicker
                               value={dtPickerVal}
                               onChange={val => {
@@ -1912,12 +1898,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                           <td className="px-4 py-3">
                             <div className="flex flex-col gap-1 items-start">
                               {d.agendamentoDoc ? (
-                                <a
-                                  href={d.agendamentoDoc.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors"
-                                >
+                                <a href={d.agendamentoDoc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors">
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                   Ver
                                 </a>
@@ -1928,26 +1909,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                                 ) : (
                                   <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>{d.agendamentoDoc ? 'Substituir' : 'Anexar'}</span></>
                                 )}
-                                <input
-                                  type="file"
-                                  accept=".pdf,image/*"
-                                  className="hidden"
-                                  disabled={isUploading}
-                                  onChange={e => {
-                                    const file = e.target.files?.[0];
-                                    if (file) { handleDevComprovanteUpload(d, file); e.target.value = ''; }
-                                  }}
-                                />
+                                <input type="file" accept=".pdf,image/*" className="hidden" disabled={isUploading} onChange={e => { const file = e.target.files?.[0]; if (file) { handleDevComprovanteUpload(d, file); e.target.value = ''; } }} />
                               </label>
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => setDevMinutaDev(d)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[8px] font-black text-amber-700 hover:bg-amber-100 transition-colors"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                              Minuta
+                            <button onClick={() => setDevMinutaDev(d)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[8px] font-black text-amber-700 hover:bg-amber-100 transition-colors">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                              Editar
                             </button>
                           </td>
                         </tr>
@@ -1957,6 +1926,102 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 </table>
               </div>
             ) : null}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 ml-4">
+              <div className="w-2 h-8 bg-violet-500 rounded-full"></div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Liberações de Vazio</h3>
+              <span className="ml-1 px-2 py-0.5 bg-violet-100 text-violet-700 text-[9px] font-black rounded-full border border-violet-200">{liberacoes.length}</span>
+              <button
+                onClick={() => {
+                  const now = new Date().toISOString();
+                  const newLib: Liberacao = {
+                    id: crypto.randomUUID(),
+                    os: `LIB-${Date.now()}`,
+                    status: 'Pendente',
+                    createdAt: now,
+                  };
+                  setLibMinuta(newLib);
+                }}
+                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-violet-600 transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                Nova Liberação
+              </button>
+            </div>
+
+            {liberacoes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <svg className="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <p className="text-[11px] font-black uppercase tracking-widest">Nenhuma liberação encontrada</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm">
+                <table className="w-full text-left min-w-[800px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">OS</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Local / Retirada</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Booking / Navio</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Qtd / Tipo</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Cliente</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Motorista</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {liberacoes.map(l => (
+                      <tr key={l.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-4 py-3">
+                          <span className="text-[9px] font-bold text-slate-600 uppercase">{l.os || '---'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-[9px] font-bold text-slate-700 uppercase">{l.local || '---'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-slate-700 uppercase">{l.booking || '---'}</span>
+                            {l.ship && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.ship}</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-slate-700">{l.qtdContainer || '01'}x {l.containerType || '---'}</span>
+                            {l.padrao && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.padrao}</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-slate-700 uppercase">{l.customer?.legalName || l.customer?.name || '---'}</span>
+                            {l.customer?.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.customer.city}{l.customer.state ? `/${l.customer.state}` : ''}</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] font-bold text-slate-700 uppercase">{l.driver?.name || '---'}</span>
+                            <div className="flex items-center gap-1">
+                              {l.driver?.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{l.driver.plateHorse}</span>}
+                              {l.driver?.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.driver.plateTrailer}</span>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${l.status === 'Emitido' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : l.status === 'Cancelado' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{l.status}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => setLibMinuta(l)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-[8px] font-black text-violet-700 hover:bg-violet-100 transition-colors">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            Editar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1981,6 +2046,32 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 onClose={() => setDevMinutaDev(null)}
                 devolucao={devMinutaDev}
                 onSave={handleSaveDevolucaoFromForm}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {libMinuta && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-stretch justify-center p-4 overflow-auto">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden my-auto">
+            <div className="flex justify-between items-center px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Liberação de Vazio</h3>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{libMinuta.os}</p>
+              </div>
+              <button onClick={() => setLibMinuta(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <LiberacaoVazioForm
+                drivers={drivers}
+                customers={customers}
+                ports={ports}
+                onClose={() => setLibMinuta(null)}
+                liberacao={libMinuta}
+                onSave={handleSaveLiberacaoFromForm}
               />
             </div>
           </div>
