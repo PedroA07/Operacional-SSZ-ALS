@@ -77,7 +77,6 @@ const colorMap: Record<string, { toggle: string; chip: string; check: string; bo
   orange:  { toggle: 'bg-orange-500',  chip: 'bg-orange-100 text-orange-700 border-orange-200',   check: 'text-orange-600',  border: 'border-orange-300',  bg: 'bg-orange-50' },
 };
 
-const CONTAINER_TYPES = ['20DV', '40DV', '40HC', '40HR', '20RF', '40RF', '45HC', '20OT', '40OT'];
 
 const STATUS_DEFS = [
   { key: 'Pendente',              color: 'bg-slate-100 text-slate-700 border-slate-300' },
@@ -104,9 +103,10 @@ const STATUS_DEFS = [
 const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }) => {
   const [users, setUsers]           = useState<User[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [opTypes, setOpTypes]       = useState<any[]>([]);
-  const [customers, setCustomers]   = useState<Customer[]>([]);
+  const [categories, setCategories]         = useState<any[]>([]);
+  const [opTypes, setOpTypes]               = useState<any[]>([]);
+  const [customers, setCustomers]           = useState<Customer[]>([]);
+  const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [saving, setSaving]         = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -121,16 +121,18 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
 
   const loadData = async () => {
     setLoading(true);
-    const [allUsers, allCats, allTypes, allCustomers] = await Promise.all([
+    const [allUsers, allCats, allTypes, allCustomers, allContainerTypes] = await Promise.all([
       db.getUsers(),
       db.getCategories(),
       db.getOperationTypes(),
       db.getCustomers(),
+      db.getContainerTypes(),
     ]);
     setUsers(allUsers.filter(u => u.role === 'third_party'));
     setCategories(allCats);
     setOpTypes(allTypes);
     setCustomers(allCustomers);
+    setContainerTypes(allContainerTypes);
     setLoading(false);
   };
 
@@ -644,34 +646,36 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                 )}
 
                 {/* Tipos de Container */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tipos de Container</p>
-                    {(editingUser.thirdPartyConfig?.allowedContainerTypes?.length || 0) > 0 && (
-                      <button onClick={() => clearFilter('allowedContainerTypes')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
-                        Limpar ({editingUser.thirdPartyConfig?.allowedContainerTypes?.length})
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {CONTAINER_TYPES.map(ct => {
-                      const selected = editingUser.thirdPartyConfig?.allowedContainerTypes?.includes(ct);
-                      return (
-                        <button
-                          key={ct}
-                          onClick={() => toggleFilter('allowedContainerTypes', ct)}
-                          className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${
-                            selected
-                              ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
-                              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-800'
-                          }`}
-                        >
-                          {ct}
+                {containerTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tipos de Container</p>
+                      {(editingUser.thirdPartyConfig?.allowedContainerTypes?.length || 0) > 0 && (
+                        <button onClick={() => clearFilter('allowedContainerTypes')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                          Limpar ({editingUser.thirdPartyConfig?.allowedContainerTypes?.length})
                         </button>
-                      );
-                    })}
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {containerTypes.map((ct: any) => {
+                        const selected = editingUser.thirdPartyConfig?.allowedContainerTypes?.includes(ct.name);
+                        return (
+                          <button
+                            key={ct.id || ct.name}
+                            onClick={() => toggleFilter('allowedContainerTypes', ct.name)}
+                            className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${
+                              selected
+                                ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-800'
+                            }`}
+                          >
+                            {ct.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Status */}
                 <div className="space-y-2">
