@@ -407,6 +407,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           if (!data) return;
           setTerminalVessels(data.map((r: any) => ({
             terminal: r.terminal, navio: r.navio, situacao: r.situacao,
+            viagem: r.viagem,
             gateDry: r.gate_dry, gateReefer: r.gate_reefer,
             deadLineStr: r.dead_line_str,
             dtPrevAtrac: r.dt_prev_atrac, dtAtracacao: r.dt_atracacao,
@@ -461,34 +462,37 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   const getVesselForTrip = useCallback((shipRaw: string): TerminalVessel | null => {
     if (!shipRaw) return null;
-    const { name } = splitShipField(shipRaw);
-    // Normaliza: apenas letras e dígitos, sem espaços/acentos
+    const { name, voyage } = splitShipField(shipRaw);
     const norm = (s: string) => s.toUpperCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')  // remove acentos
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
       .replace(/[^A-Z0-9]/g, '');
     const n = norm(name || shipRaw);
     if (!n || n.length < 3) return null;
 
-    // Tenta match exato primeiro, depois parcial por palavras
     const nameWords = (name || shipRaw).toUpperCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
       .split(/\s+/).filter(w => w.length > 2);
 
-    const isMatch = (v: TerminalVessel) => {
+    const nameMatches = (v: TerminalVessel) => {
       const vn = norm(v.navio);
       const vRaw = v.navio.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       if (vn === n) return true;
       if (vn.includes(n) || n.includes(vn)) return true;
-      // Match por palavras: todas as palavras com >2 chars devem estar no nome do terminal
       return nameWords.length >= 2 && nameWords.every(w => vRaw.includes(w));
     };
 
-    const matches = terminalVessels.filter(isMatch);
+    const matches = terminalVessels.filter(nameMatches);
     if (matches.length === 0) return null;
 
-    // Prefere o que tem dados de gate (gateDry ou gateReefer preenchido)
+    // Se temos número de viagem, prioriza o vessel que bate a viagem
+    if (voyage) {
+      const normVoyage = norm(voyage);
+      const voyageMatch = matches.find(v => v.viagem && norm(v.viagem) === normVoyage);
+      if (voyageMatch) return voyageMatch;
+    }
+
+    // Sem match de viagem — prefere gate > deadline > primeiro
     const withGate = matches.find(v => v.gateDry || v.gateReefer);
-    // Se nenhum tem gate, prefere o que tem deadline
     const withDeadline = matches.find(v => v.deadLineStr);
     return withGate ?? withDeadline ?? matches[0];
   }, [terminalVessels, splitShipField]);
