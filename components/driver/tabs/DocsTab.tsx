@@ -180,13 +180,14 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips, driver, canSeeContracts = true
                   {/* Info */}
                   <div className="text-left min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {item.os ? (
+                      {item.os && (
                         <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-lg">
                           OS {item.os}
                         </span>
-                      ) : (
-                        <span className="text-[9px] font-black text-slate-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg">
-                          Contrato{item.total > 1 ? ` ${item.index}/${item.total}` : ''}
+                      )}
+                      {item.total > 1 && (
+                        <span className="text-[8px] font-black text-slate-500 tabular-nums">
+                          {item.index}/{item.total}
                         </span>
                       )}
                     </div>

@@ -80,10 +80,11 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
   const loadContracts = useCallback(async (driver: Driver) => {
     setLoadingContracts(true);
     try {
-      const trips: Trip[] = await db.getTrips();
+      const [trips, allFC] = await Promise.all([db.getTrips(), db.getFreightContracts()]);
       const result: ContractItem[] = [];
-      const seen = new Set<string>();
+      const seenUrls = new Set<string>();
 
+      // 1. Contratos vindos de viagens
       for (const trip of trips.filter(t => t.driver?.id === driver.id)) {
         const docs: FreightContractDoc[] = trip.freightContractDocs?.length
           ? trip.freightContractDocs
@@ -93,16 +94,14 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
 
         for (const doc of docs) {
           if (!doc.url) continue;
-          const key = `${trip.id}-${doc.url}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
+          seenUrls.add(doc.url);
 
           const tripDest = trip.destination?.name || trip.customer?.name || '';
           const parsedLocalidade = doc.parsedData?.localidade;
           const osConfirmed = locConfirmsTrip(parsedLocalidade, tripDest);
 
           result.push({
-            id:           key,
+            id:           `${trip.id}-${doc.url}`,
             fileName:     doc.fileName || `Contrato-${trip.os}.pdf`,
             fileUrl:      doc.url,
             tripId:       trip.id,
@@ -120,6 +119,30 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
             expiresAt:    doc.expiresAt,
           });
         }
+      }
+
+      // 2. Contratos vinculados apenas ao motorista (sem viagem)
+      for (const c of allFC.filter(c => c.driverId === driver.id && c.fileUrl)) {
+        if (seenUrls.has(c.fileUrl!)) continue;
+        seenUrls.add(c.fileUrl!);
+        result.push({
+          id:           c.id,
+          fileName:     c.fileName,
+          fileUrl:      c.fileUrl,
+          tripId:       undefined,
+          tripOs:       undefined,
+          container:    c.container,
+          destination:  c.destination,
+          driverId:     driver.id,
+          driverName:   driver.name,
+          status:       'linked',
+          uploadedAt:   c.uploadedAt,
+          localidade:   c.destination,
+          tripStatus:   undefined,
+          localDeBaixa: c.destination,
+          prevTermino:  undefined,
+          expiresAt:    undefined,
+        });
       }
 
       result.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
@@ -372,13 +395,9 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
 
                   {/* ── Linha 3: OS + status + térm + exp + local de baixa ── */}
                   <div className="px-5 py-3 border-b border-white/5 flex items-center gap-1.5 flex-wrap">
-                    {contract.tripOs ? (
+                    {contract.tripOs && (
                       <span className="text-[8px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">
                         OS {contract.tripOs}
-                      </span>
-                    ) : (
-                      <span className="text-[8px] font-black text-slate-500 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
-                        Sem OS
                       </span>
                     )}
                     {contract.tripStatus && ss && (
