@@ -65,12 +65,17 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
     ? legacyFields
     : (user.thirdPartyConfig?.pages?.[currentPageKey as keyof typeof user.thirdPartyConfig.pages]?.visibleFields || []);
 
-  /* Base trip filtering (date + search + legacy allowedCategories/Types) */
+  /* Base trip filtering (date + search + legacy allowedCategories/Types + global data filters) */
   const baseFiltered = useMemo(() => {
+    const cfg = user.thirdPartyConfig;
+    const allowedContainerTypes = cfg?.allowedContainerTypes;
+    const allowedStatuses       = cfg?.allowedStatuses;
+    const allowedCustomers      = cfg?.allowedCustomers;
+
     let result = trips.filter(trip => {
       if (isLegacyMode) {
-        const allowedCategories = user.thirdPartyConfig?.allowedCategories;
-        const allowedTypes = user.thirdPartyConfig?.allowedTypes;
+        const allowedCategories = cfg?.allowedCategories;
+        const allowedTypes      = cfg?.allowedTypes;
         if (allowedCategories?.length) {
           const cat = (trip.category || '').trim().toLowerCase();
           if (!allowedCategories.some(c => c.trim().toLowerCase() === cat)) return false;
@@ -80,6 +85,20 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
           if (!allowedTypes.some(t => t.trim().toLowerCase() === typ)) return false;
         }
       }
+
+      /* Global data filters — apply in all modes */
+      if (allowedContainerTypes?.length) {
+        if (!allowedContainerTypes.includes(trip.containerType || '')) return false;
+      }
+      if (allowedStatuses?.length) {
+        const currentStatus = trip.status || '';
+        if (!allowedStatuses.some(s => s.toLowerCase() === currentStatus.toLowerCase())) return false;
+      }
+      if (allowedCustomers?.length) {
+        const customerName = (trip.customer?.name || '').trim().toLowerCase();
+        if (!allowedCustomers.some(c => c.trim().toLowerCase() === customerName)) return false;
+      }
+
       if (!trip.dateTime) return false;
       const ds = trip.dateTime.includes('T') ? trip.dateTime.split('T')[0] : trip.dateTime;
       let norm2 = ds;

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User } from '../../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { User, Customer } from '../../../types';
 import { db } from '../../../utils/storage';
 
 interface ExternalUsersManagerProps {
@@ -77,12 +77,39 @@ const colorMap: Record<string, { toggle: string; chip: string; check: string; bo
   orange:  { toggle: 'bg-orange-500',  chip: 'bg-orange-100 text-orange-700 border-orange-200',   check: 'text-orange-600',  border: 'border-orange-300',  bg: 'bg-orange-50' },
 };
 
+const CONTAINER_TYPES = ['20DV', '40DV', '40HC', '40HR', '20RF', '40RF', '45HC', '20OT', '40OT'];
+
+const STATUS_DEFS = [
+  { key: 'Pendente',              color: 'bg-slate-100 text-slate-700 border-slate-300' },
+  { key: 'Em viagem',             color: 'bg-amber-100 text-amber-800 border-amber-300' },
+  { key: 'Retirada de vazio',     color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { key: 'Retirada do cheio',     color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { key: 'Chegou no cliente',     color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  { key: 'Pegou NF',              color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  { key: 'Saiu do cliente',       color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  { key: 'Chegou no destino',     color: 'bg-purple-100 text-purple-700 border-purple-300' },
+  { key: 'Devolução do cheio',    color: 'bg-violet-100 text-violet-700 border-violet-300' },
+  { key: 'Container sobre rodas', color: 'bg-sky-100 text-sky-700 border-sky-300' },
+  { key: 'Agendamento realizado', color: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
+  { key: 'Emissão Solicitada',    color: 'bg-purple-100 text-purple-700 border-purple-300' },
+  { key: 'Aguardando carregar',   color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { key: 'Viagem concluída',      color: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+  { key: 'Viagem cancelada',      color: 'bg-red-100 text-red-700 border-red-300' },
+  { key: 'Cancelado',             color: 'bg-red-100 text-red-700 border-red-300' },
+  { key: 'Frete Morto',           color: 'bg-slate-100 text-slate-500 border-slate-300' },
+  { key: 'Reutilização',          color: 'bg-teal-100 text-teal-700 border-teal-300' },
+];
+
 /* ── Component ──────────────────────────────────────────────────── */
 const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }) => {
-  const [users, setUsers]       = useState<User[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [users, setUsers]           = useState<User[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [opTypes, setOpTypes]       = useState<any[]>([]);
+  const [customers, setCustomers]   = useState<Customer[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [saving, setSaving]     = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
 
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [showPassword, setShowPassword]     = useState(false);
@@ -94,8 +121,16 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
 
   const loadData = async () => {
     setLoading(true);
-    const allUsers = await db.getUsers();
+    const [allUsers, allCats, allTypes, allCustomers] = await Promise.all([
+      db.getUsers(),
+      db.getCategories(),
+      db.getOperationTypes(),
+      db.getCustomers(),
+    ]);
     setUsers(allUsers.filter(u => u.role === 'third_party'));
+    setCategories(allCats);
+    setOpTypes(allTypes);
+    setCustomers(allCustomers);
     setLoading(false);
   };
 
@@ -204,6 +239,43 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
       },
     });
   };
+
+  /* ── Data filter helpers ────────────────────────────────────── */
+  const toggleFilter = (
+    field: 'allowedCategories' | 'allowedTypes' | 'allowedContainerTypes' | 'allowedStatuses' | 'allowedCustomers',
+    value: string,
+  ) => {
+    if (!editingUser) return;
+    const current: string[] = (editingUser.thirdPartyConfig as any)?.[field] || [];
+    setEditingUser({
+      ...editingUser,
+      thirdPartyConfig: {
+        ...editingUser.thirdPartyConfig,
+        visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
+        [field]: current.includes(value) ? current.filter(v => v !== value) : [...current, value],
+      },
+    });
+  };
+
+  const clearFilter = (field: 'allowedCategories' | 'allowedTypes' | 'allowedContainerTypes' | 'allowedStatuses' | 'allowedCustomers') => {
+    if (!editingUser) return;
+    setEditingUser({
+      ...editingUser,
+      thirdPartyConfig: {
+        ...editingUser.thirdPartyConfig,
+        visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
+        [field]: [],
+      },
+    });
+  };
+
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch.trim()) return customers;
+    const q = customerSearch.toLowerCase();
+    return customers.filter(c =>
+      c.name?.toLowerCase().includes(q) || c.legalName?.toLowerCase().includes(q)
+    );
+  }, [customers, customerSearch]);
 
   /* ── Rendering helpers ───────────────────────────────────────── */
   const togglePasswordVisibility = (id: string) =>
@@ -494,6 +566,207 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                 );
               })}
               </div>{/* end space-y-3 devolucoes */}
+
+              {/* ── Filtros de Dados ────────────────────────────── */}
+              <div className="space-y-5">
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Filtros de Dados</p>
+                  <div className="flex-1 h-px bg-slate-200"/>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                  <p className="text-[8px] font-bold text-amber-700 uppercase leading-relaxed">
+                    Sem seleção = mostra todos os registros. Marque itens para restringir o que este usuário visualiza.
+                  </p>
+                </div>
+
+                {/* Categorias */}
+                {categories.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Categorias</p>
+                      {(editingUser.thirdPartyConfig?.allowedCategories?.length || 0) > 0 && (
+                        <button onClick={() => clearFilter('allowedCategories')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                          Limpar ({editingUser.thirdPartyConfig?.allowedCategories?.length})
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {categories.map((c: any) => {
+                        const selected = editingUser.thirdPartyConfig?.allowedCategories?.includes(c.name);
+                        return (
+                          <button
+                            key={c.name}
+                            onClick={() => toggleFilter('allowedCategories', c.name)}
+                            className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase transition-all ${
+                              selected
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                            }`}
+                          >
+                            {selected && <span className="mr-1">✓</span>}{c.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tipos de Operação */}
+                {opTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tipos de Operação</p>
+                      {(editingUser.thirdPartyConfig?.allowedTypes?.length || 0) > 0 && (
+                        <button onClick={() => clearFilter('allowedTypes')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                          Limpar ({editingUser.thirdPartyConfig?.allowedTypes?.length})
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {opTypes.map((t: any) => {
+                        const selected = editingUser.thirdPartyConfig?.allowedTypes?.includes(t.name);
+                        return (
+                          <button
+                            key={t.name}
+                            onClick={() => toggleFilter('allowedTypes', t.name)}
+                            className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase transition-all ${
+                              selected
+                                ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
+                            }`}
+                          >
+                            {selected && <span className="mr-1">✓</span>}{t.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tipos de Container */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tipos de Container</p>
+                    {(editingUser.thirdPartyConfig?.allowedContainerTypes?.length || 0) > 0 && (
+                      <button onClick={() => clearFilter('allowedContainerTypes')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                        Limpar ({editingUser.thirdPartyConfig?.allowedContainerTypes?.length})
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CONTAINER_TYPES.map(ct => {
+                      const selected = editingUser.thirdPartyConfig?.allowedContainerTypes?.includes(ct);
+                      return (
+                        <button
+                          key={ct}
+                          onClick={() => toggleFilter('allowedContainerTypes', ct)}
+                          className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${
+                            selected
+                              ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-800'
+                          }`}
+                        >
+                          {ct}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Status</p>
+                    {(editingUser.thirdPartyConfig?.allowedStatuses?.length || 0) > 0 && (
+                      <button onClick={() => clearFilter('allowedStatuses')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                        Limpar ({editingUser.thirdPartyConfig?.allowedStatuses?.length})
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {STATUS_DEFS.map(s => {
+                      const selected = editingUser.thirdPartyConfig?.allowedStatuses?.includes(s.key);
+                      return (
+                        <button
+                          key={s.key}
+                          onClick={() => toggleFilter('allowedStatuses', s.key)}
+                          className={`px-2.5 py-1.5 rounded-xl border text-[8px] font-black uppercase transition-all cursor-pointer ${s.color} ${
+                            selected
+                              ? 'ring-2 ring-slate-400 ring-offset-1 shadow-sm scale-[1.03]'
+                              : 'opacity-40 hover:opacity-80'
+                          }`}
+                        >
+                          {s.key}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Clientes */}
+                {customers.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Clientes</p>
+                      <div className="flex items-center gap-2">
+                        {(editingUser.thirdPartyConfig?.allowedCustomers?.length || 0) > 0 && (
+                          <>
+                            <span className="text-[7px] font-black text-emerald-600 uppercase bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                              {editingUser.thirdPartyConfig?.allowedCustomers?.length} selecionado(s)
+                            </span>
+                            <button onClick={() => clearFilter('allowedCustomers')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                              Limpar
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar cliente..."
+                        value={customerSearch}
+                        onChange={e => setCustomerSearch(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      />
+                      <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                      </svg>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                      {filteredCustomers.map((c: Customer) => {
+                        const val = c.name || '';
+                        const selected = editingUser.thirdPartyConfig?.allowedCustomers?.includes(val) || false;
+                        return (
+                          <label
+                            key={c.id}
+                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                              selected ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleFilter('allowedCustomers', val)}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-0 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className={`text-[10px] font-black uppercase leading-tight ${selected ? 'text-emerald-700' : 'text-slate-700'}`}>{c.name}</p>
+                              {c.legalName && c.legalName !== c.name && (
+                                <p className="text-[8px] text-slate-400 uppercase truncate">{c.legalName}</p>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })}
+                      {filteredCustomers.length === 0 && (
+                        <p className="text-[9px] text-slate-400 italic text-center py-4">Nenhum cliente encontrado</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>{/* end filtros de dados */}
+
             </div>{/* end overflow-y-auto */}
 
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3 shrink-0 bg-slate-50 rounded-b-2xl">
