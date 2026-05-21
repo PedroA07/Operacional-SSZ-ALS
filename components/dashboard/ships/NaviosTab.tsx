@@ -327,70 +327,68 @@ function IconSVGEcoporto({ size = 32 }: { size?: number }) {
 }
 
 /**
- * EMBRAPORT — DP World Santos
- * Ícone quadrado: réplica fiel do mark DP World 2021.
- * "D" em negrito com 3 faixas horizontais: vermelho (#cc003d) / branco / verde (#00956d)
- * Stem esquerdo + curva direita formam o "D" — fundo navy (#003764).
+ * EMBRAPORT — DP World Santos  (ícone compacto para tabela)
+ * Quadrado branco: globo azul-teal com calota vermelha + linhas brancas
+ * + "DP" navy em baixo. Réplica do mark oficial DP World Santos.
  */
 function IconSVGEmbraport({ size = 32 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100" height="100" rx="6" fill="#003764"/>
-      <defs>
-        {/* Forma do "D" — stem esquerdo + curva direita */}
-        <clipPath id="dpw-icon-d">
-          <path d="M 16,12 L 16,88 L 44,88 Q 84,88 84,50 Q 84,12 44,12 Z"/>
-        </clipPath>
-      </defs>
-      {/* Faixa vermelha — terço superior do D */}
-      <rect x="0" y="12" width="100" height="25" fill="#cc003d" clipPath="url(#dpw-icon-d)"/>
-      {/* Faixa branca — terço central */}
-      <rect x="0" y="37" width="100" height="26" fill="white" clipPath="url(#dpw-icon-d)"/>
-      {/* Faixa verde — terço inferior */}
-      <rect x="0" y="63" width="100" height="25" fill="#00956d" clipPath="url(#dpw-icon-d)"/>
-      {/* Stem esquerdo do D em navy (separador visual) */}
-      <rect x="16" y="12" width="10" height="76" fill="#003764"/>
-      {/* Separador vermelho/branco */}
-      <rect x="26" y="36" width="60" height="2.5" fill="#003764" clipPath="url(#dpw-icon-d)"/>
-      {/* Separador branco/verde */}
-      <rect x="26" y="62" width="60" height="2.5" fill="#003764" clipPath="url(#dpw-icon-d)"/>
+      <rect width="100" height="100" rx="6" fill="white"/>
+      {/* Globo — base azul-teal */}
+      <circle cx="50" cy="42" r="34" fill="#0077a0"/>
+      {/* Calota vermelha — polo norte */}
+      <path d="M 22,28 A 34,34 0 0 1 78,28 Q 66,10 50,8 Q 34,10 22,28 Z" fill="#cc003d"/>
+      {/* Meridiano central */}
+      <ellipse cx="50" cy="42" rx="14" ry="34" stroke="white" strokeWidth="1.8" fill="none"/>
+      {/* Equador */}
+      <line x1="16" y1="42" x2="84" y2="42" stroke="white" strokeWidth="1.8"/>
+      {/* Trópico superior */}
+      <path d="M 19,28 Q 50,34 81,28" stroke="white" strokeWidth="1.3" fill="none"/>
+      {/* Trópico inferior */}
+      <path d="M 19,56 Q 50,50 81,56" stroke="white" strokeWidth="1.3" fill="none"/>
+      {/* Borda do globo */}
+      <circle cx="50" cy="42" r="34" fill="none" stroke="white" strokeWidth="2.2"/>
+      {/* "DP WORLD" compacto em baixo */}
+      <text x="50" y="90" textAnchor="middle"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fontWeight="900" fontSize="12" fill="#003764" letterSpacing="0.5">DP WORLD</text>
     </svg>
   );
 }
 
 /**
- * Logo completa DP World Santos para cards.
- * Horizontal: D mark (3 faixas) + "DP WORLD" navy bold + "SANTOS" verde.
- * Aspect ratio ~4.2:1 — fiel ao logo oficial DP World 2021.
+ * EMBRAPORT — DP World Santos (logo horizontal para cards)
+ * Layout fiel ao logo real:
+ *   "DP WORLD" bold navy grande  +  globo pequeno no canto superior direito
+ *   "Santos" coral/vermelho abaixo
+ * Aspect ratio ≈ 4:1
  */
 function LogoSVGEmbraport({ height = 32 }: { height?: number }) {
-  const w = Math.round(height * 4.2);
+  const w = Math.round(height * 4.0);
   return (
-    <svg width={w} height={height} viewBox="0 0 420 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <clipPath id="dpw-logo-d">
-          <path d="M 0,0 L 0,100 L 36,100 Q 76,100 76,50 Q 76,0 36,0 Z"/>
-        </clipPath>
-      </defs>
-      {/* D mark: faixa vermelha */}
-      <rect x="0" y="0"  width="80" height="33" fill="#cc003d" clipPath="url(#dpw-logo-d)"/>
-      {/* D mark: faixa branca */}
-      <rect x="0" y="33" width="80" height="34" fill="white"   clipPath="url(#dpw-logo-d)"/>
-      {/* D mark: faixa verde */}
-      <rect x="0" y="67" width="80" height="33" fill="#00956d" clipPath="url(#dpw-logo-d)"/>
-      {/* Stem esquerdo navy */}
-      <rect x="0" y="0" width="10" height="100" fill="#003764"/>
-      {/* Separadores */}
-      <rect x="10" y="32" width="68" height="2.5" fill="#003764" clipPath="url(#dpw-logo-d)"/>
-      <rect x="10" y="65" width="68" height="2.5" fill="#003764" clipPath="url(#dpw-logo-d)"/>
-      {/* "DP WORLD" — bold navy, alinhado com o D */}
-      <text x="92" y="62"
+    <svg width={w} height={height} viewBox="0 0 320 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* "DP WORLD" — bold navy, texto principal */}
+      <text x="6" y="52"
             fontFamily="Arial Black, Arial, sans-serif"
-            fontWeight="900" fontSize="50" fill="#003764" letterSpacing="-1">DP WORLD</text>
-      {/* "SANTOS" — verde, espaçado, abaixo */}
-      <text x="93" y="84"
+            fontWeight="900" fontSize="44" fill="#003764" letterSpacing="-0.5">DP WORLD</text>
+      {/* "Santos" — coral DP World, abaixo e menor */}
+      <text x="8" y="73"
             fontFamily="Arial, sans-serif"
-            fontWeight="700" fontSize="17" fill="#00956d" letterSpacing="6">SANTOS</text>
+            fontWeight="600" fontSize="18" fill="#cc3d1a">Santos</text>
+      {/* Globo — canto superior direito */}
+      <circle cx="298" cy="23" r="20" fill="#0077a0"/>
+      {/* Calota vermelha */}
+      <path d="M 282,14 A 20,20 0 0 1 314,14 Q 307,4 298,3 Q 289,4 282,14 Z" fill="#cc003d"/>
+      {/* Meridiano */}
+      <ellipse cx="298" cy="23" rx="8" ry="20" stroke="white" strokeWidth="1.2" fill="none"/>
+      {/* Equador */}
+      <line x1="278" y1="23" x2="318" y2="23" stroke="white" strokeWidth="1.2"/>
+      {/* Trópicos */}
+      <path d="M 280,14 Q 298,18 316,14" stroke="white" strokeWidth="1" fill="none"/>
+      <path d="M 280,32 Q 298,28 316,32" stroke="white" strokeWidth="1" fill="none"/>
+      {/* Borda */}
+      <circle cx="298" cy="23" r="20" fill="none" stroke="white" strokeWidth="1.5"/>
     </svg>
   );
 }
@@ -785,7 +783,33 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     finally { setLTV(false); }
   }, []);
 
+  // ── Auto-refresh ─────────────────────────────────────────────────────────────
+  const AUTO_REFRESH_MS = 3 * 60 * 1000; // 3 minutos
+  const [nextRefresh, setNextRefresh] = useState<number>(Date.now() + AUTO_REFRESH_MS);
+  const [countdown, setCountdown]     = useState<string>('3:00');
+
   useEffect(() => { loadShips(); loadTV(); }, []); // eslint-disable-line
+
+  // Polling de 3 em 3 minutos
+  useEffect(() => {
+    const refresh = () => {
+      loadTV();
+      setNextRefresh(Date.now() + AUTO_REFRESH_MS);
+    };
+    const interval = setInterval(refresh, AUTO_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [loadTV]); // eslint-disable-line
+
+  // Contador regressivo
+  useEffect(() => {
+    const tick = setInterval(() => {
+      const remaining = Math.max(0, nextRefresh - Date.now());
+      const m = Math.floor(remaining / 60000);
+      const s = Math.floor((remaining % 60000) / 1000);
+      setCountdown(`${m}:${String(s).padStart(2, '0')}`);
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [nextRefresh]);
 
   // EMBRAPORT scraper callback — declared after loadTV to avoid "used before declaration"
   const scrapeEmbraport = useCallback(async () => {
@@ -1056,7 +1080,13 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                   · {new Date(tvFetchedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
                 </span>
               )}
-              {loadingTV && <span className="text-[8px] text-blue-400 font-bold animate-pulse">Carregando...</span>}
+              {loadingTV
+                ? <span className="text-[8px] text-blue-400 font-bold animate-pulse">Carregando...</span>
+                : <span className="flex items-center gap-1 text-[7px] text-slate-600 font-bold" title="Próxima atualização automática">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0"/>
+                    auto {countdown}
+                  </span>
+              }
             </div>
             <div className="flex items-center gap-2">
               {(['BTP','ECOPORTO','SANTOS BRASIL','EMBRAPORT'] as const).map(t => (
