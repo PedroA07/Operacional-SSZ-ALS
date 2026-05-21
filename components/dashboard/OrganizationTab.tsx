@@ -1573,6 +1573,275 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, mapTripToMinuta]);
 
+  const handleDeleteDevolucao = useCallback((d: Devolucao) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Devolução',
+      message: `Deseja excluir permanentemente a devolução do container ${d.container || d.os}? Esta ação não pode ser desfeita.`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await db.deleteDevolucao(d.id);
+        await loadDevolucoes();
+        window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Devolução excluída', type: 'success' } }));
+      }
+    });
+  }, [loadDevolucoes]);
+
+  const handleDeleteLiberacao = useCallback((l: Liberacao) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Liberação',
+      message: `Deseja excluir permanentemente a liberação ${l.os}? Esta ação não pode ser desfeita.`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await db.deleteLiberacao(l.id);
+        await loadLiberacoes();
+        window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Liberação excluída', type: 'success' } }));
+      }
+    });
+  }, [loadLiberacoes]);
+
+  const devolucoesColumns = useMemo(() => [
+    {
+      key: 'container',
+      label: 'Container / OS',
+      sortable: true,
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5 py-0.5">
+          <span className="text-[10px] font-black text-slate-800 uppercase">{d.container || '---'}</span>
+          <span className="text-[8px] font-bold text-slate-400 uppercase">{d.os}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'local',
+      label: 'Local / Depósito',
+      sortable: true,
+      render: (d: Devolucao) => (
+        <span className="text-[9px] font-bold text-slate-700 uppercase">{d.local || '---'}</span>
+      ),
+    },
+    {
+      key: 'booking',
+      label: 'Booking / Navio',
+      sortable: true,
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{d.booking || '---'}</span>
+          {d.ship && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.ship}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'containerType',
+      label: 'Tipo / Padrão',
+      sortable: true,
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{d.containerType || '---'}</span>
+          {d.padrao && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.padrao}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'customer',
+      label: 'Cliente',
+      sortable: true,
+      sortValue: (d: Devolucao) => d.customer?.legalName || d.customer?.name || '',
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{d.customer?.legalName || d.customer?.name || '---'}</span>
+          {d.customer?.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.customer.city}{d.customer.state ? `/${d.customer.state}` : ''}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'driver',
+      label: 'Motorista',
+      sortable: true,
+      sortValue: (d: Devolucao) => d.driver?.name || '',
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{d.driver?.name || '---'}</span>
+          <div className="flex items-center gap-1">
+            {d.driver?.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{d.driver.plateHorse}</span>}
+            {d.driver?.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.driver.plateTrailer}</span>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'scheduledDateTime',
+      label: 'Agendamento',
+      sortable: true,
+      width: 210,
+      render: (d: Devolucao) => {
+        const dtPickerVal = d.scheduledDateTime
+          ? (() => { try { const dt = new Date(d.scheduledDateTime!); const off = dt.getTimezoneOffset()*60000; return new Date(dt.getTime()-off).toISOString().slice(0,16); } catch { return ''; }})()
+          : '';
+        return (
+          <DateTimePicker
+            value={dtPickerVal}
+            onChange={val => {
+              const iso = val ? new Date(val).toISOString() : '';
+              handleSaveDevAgendamento(d.id, iso);
+            }}
+            placeholder="Agendar..."
+            inputClassName="text-[9px] py-1.5 rounded-lg border-slate-200"
+          />
+        );
+      },
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (d: Devolucao) => {
+        const styles: Record<string, string> = {
+          Pendente: 'bg-slate-100 text-slate-600 border-slate-200',
+          Agendado: 'bg-amber-50 text-amber-700 border-amber-200',
+          Realizado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+          Cancelado: 'bg-red-50 text-red-700 border-red-200',
+        };
+        return <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${styles[d.status] || styles.Pendente}`}>{d.status}</span>;
+      },
+    },
+    {
+      key: 'agendamentoDoc',
+      label: 'Comprovante',
+      sortable: false,
+      render: (d: Devolucao) => {
+        const isUploading = uploadingDevId === d.id;
+        return (
+          <div className="flex flex-col gap-1 items-start">
+            {d.agendamentoDoc && (
+              <a href={d.agendamentoDoc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Ver
+              </a>
+            )}
+            <label className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[8px] font-black cursor-pointer transition-colors ${isUploading ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'}`}>
+              {isUploading
+                ? <><div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"/><span>Enviando...</span></>
+                : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>{d.agendamentoDoc ? 'Substituir' : 'Anexar'}</span></>
+              }
+              <input type="file" accept=".pdf,image/*" className="hidden" disabled={isUploading} onChange={e => { const file = e.target.files?.[0]; if (file) { handleDevComprovanteUpload(d, file); e.target.value = ''; } }} />
+            </label>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      label: 'Ações',
+      sortable: false,
+      width: 90,
+      render: (d: Devolucao) => (
+        <div className="flex items-center gap-1 justify-center">
+          <button onClick={() => setDevMinutaDev(d)} className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-all" title="Editar minuta">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button onClick={() => handleDeleteDevolucao(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all" title="Excluir">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      ),
+    },
+  ], [handleSaveDevAgendamento, handleDevComprovanteUpload, setDevMinutaDev, handleDeleteDevolucao, uploadingDevId]);
+
+  const liberacoesColumns = useMemo(() => [
+    {
+      key: 'os',
+      label: 'OS',
+      sortable: true,
+      render: (l: Liberacao) => <span className="text-[9px] font-bold text-slate-600 uppercase">{l.os || '---'}</span>,
+    },
+    {
+      key: 'local',
+      label: 'Local / Retirada',
+      sortable: true,
+      render: (l: Liberacao) => <span className="text-[9px] font-bold text-slate-700 uppercase">{l.local || '---'}</span>,
+    },
+    {
+      key: 'booking',
+      label: 'Booking / Navio',
+      sortable: true,
+      render: (l: Liberacao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{l.booking || '---'}</span>
+          {l.ship && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.ship}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'containerType',
+      label: 'Qtd / Tipo',
+      sortable: true,
+      render: (l: Liberacao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700">{l.qtdContainer || '01'}x {l.containerType || '---'}</span>
+          {l.padrao && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.padrao}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'customer',
+      label: 'Cliente',
+      sortable: true,
+      sortValue: (l: Liberacao) => l.customer?.legalName || l.customer?.name || '',
+      render: (l: Liberacao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{l.customer?.legalName || l.customer?.name || '---'}</span>
+          {l.customer?.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.customer.city}{l.customer.state ? `/${l.customer.state}` : ''}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'driver',
+      label: 'Motorista',
+      sortable: true,
+      sortValue: (l: Liberacao) => l.driver?.name || '',
+      render: (l: Liberacao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{l.driver?.name || '---'}</span>
+          <div className="flex items-center gap-1">
+            {l.driver?.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{l.driver.plateHorse}</span>}
+            {l.driver?.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.driver.plateTrailer}</span>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (l: Liberacao) => {
+        const styles: Record<string, string> = {
+          Pendente: 'bg-slate-100 text-slate-600 border-slate-200',
+          Emitido:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+          Cancelado:'bg-red-50 text-red-700 border-red-200',
+        };
+        return <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${styles[l.status] || styles.Pendente}`}>{l.status}</span>;
+      },
+    },
+    {
+      key: 'actions',
+      label: 'Ações',
+      sortable: false,
+      width: 90,
+      render: (l: Liberacao) => (
+        <div className="flex items-center gap-1 justify-center">
+          <button onClick={() => setLibMinuta(l)} className="p-1.5 rounded-lg hover:bg-violet-50 text-slate-400 hover:text-violet-600 transition-all" title="Editar liberação">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button onClick={() => handleDeleteLiberacao(l)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all" title="Excluir">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      ),
+    },
+  ], [setLibMinuta, handleDeleteLiberacao]);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       {minutaTrip && (
@@ -1803,14 +2072,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               <button
                 onClick={() => {
                   const now = new Date().toISOString();
-                  const newDev: Devolucao = {
-                    id: crypto.randomUUID(),
-                    os: `DEV-${Date.now()}`,
-                    container: '',
-                    status: 'Pendente',
-                    createdAt: now,
-                  };
-                  setDevMinutaDev(newDev);
+                  setDevMinutaDev({ id: crypto.randomUUID(), os: `DEV-${Date.now()}`, container: '', status: 'Pendente', createdAt: now });
                 }}
                 className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-sm"
               >
@@ -1818,114 +2080,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 Nova Devolução
               </button>
             </div>
-
-            {devolucoes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <svg className="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0v10l-8 4m-8-4V7m8 4v10"/></svg>
-                <p className="text-[11px] font-black uppercase tracking-widest">Nenhuma devolução encontrada</p>
-              </div>
-            ) : devolucoes.length > 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm">
-                <table className="w-full text-left min-w-[900px]">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Container / OS</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Local / Depósito</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Booking / Navio</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Tipo</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Cliente</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Motorista</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest min-w-[200px]">Agendamento</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Comprovante</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {devolucoes.map(d => {
-                      const isUploading = uploadingDevId === d.id;
-                      const dtPickerVal = d.scheduledDateTime
-                        ? (() => { try { const dt = new Date(d.scheduledDateTime!); const off = dt.getTimezoneOffset()*60000; return new Date(dt.getTime()-off).toISOString().slice(0,16); } catch { return ''; }})()
-                        : '';
-                      return (
-                        <tr key={d.id} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] font-black text-slate-800 uppercase">{d.container || '---'}</span>
-                              <span className="text-[8px] font-bold text-slate-400 uppercase">{d.os || '---'}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-[9px] font-bold text-slate-700 uppercase">{d.local || '---'}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[9px] font-bold text-slate-700 uppercase">{d.booking || '---'}</span>
-                              {d.ship && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.ship}</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[9px] font-bold text-slate-700 uppercase">{d.containerType || '---'}</span>
-                              {d.padrao && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.padrao}</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[9px] font-bold text-slate-700 uppercase">{d.customer?.legalName || d.customer?.name || '---'}</span>
-                              {d.customer?.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.customer.city}{d.customer.state ? `/${d.customer.state}` : ''}</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[9px] font-bold text-slate-700 uppercase">{d.driver?.name || '---'}</span>
-                              <div className="flex items-center gap-1">
-                                {d.driver?.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{d.driver.plateHorse}</span>}
-                                {d.driver?.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.driver.plateTrailer}</span>}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 min-w-[200px]">
-                            <DateTimePicker
-                              value={dtPickerVal}
-                              onChange={val => {
-                                const iso = val ? new Date(val).toISOString() : '';
-                                handleSaveDevAgendamento(d.id, iso);
-                              }}
-                              placeholder="Agendar..."
-                              inputClassName="text-[9px] py-1.5 rounded-lg border-slate-200"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-1 items-start">
-                              {d.agendamentoDoc ? (
-                                <a href={d.agendamentoDoc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                  Ver
-                                </a>
-                              ) : null}
-                              <label className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[8px] font-black cursor-pointer transition-colors ${isUploading ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'}`}>
-                                {isUploading ? (
-                                  <><div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"/><span>Enviando...</span></>
-                                ) : (
-                                  <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>{d.agendamentoDoc ? 'Substituir' : 'Anexar'}</span></>
-                                )}
-                                <input type="file" accept=".pdf,image/*" className="hidden" disabled={isUploading} onChange={e => { const file = e.target.files?.[0]; if (file) { handleDevComprovanteUpload(d, file); e.target.value = ''; } }} />
-                              </label>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <button onClick={() => setDevMinutaDev(d)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[8px] font-black text-amber-700 hover:bg-amber-100 transition-colors">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                              Editar
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
+            <SmartOperationTable
+              userId={userId}
+              componentId="org-devolucoes"
+              columns={devolucoesColumns}
+              data={devolucoes}
+              hideInternalSearch={false}
+              noMaxHeight
+              stickyHeaderTop={0}
+            />
           </div>
         ) : (
           <div className="space-y-4">
@@ -1936,13 +2099,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               <button
                 onClick={() => {
                   const now = new Date().toISOString();
-                  const newLib: Liberacao = {
-                    id: crypto.randomUUID(),
-                    os: `LIB-${Date.now()}`,
-                    status: 'Pendente',
-                    createdAt: now,
-                  };
-                  setLibMinuta(newLib);
+                  setLibMinuta({ id: crypto.randomUUID(), os: `LIB-${Date.now()}`, status: 'Pendente', createdAt: now });
                 }}
                 className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-violet-600 transition-all shadow-sm"
               >
@@ -1950,78 +2107,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 Nova Liberação
               </button>
             </div>
-
-            {liberacoes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <svg className="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                <p className="text-[11px] font-black uppercase tracking-widest">Nenhuma liberação encontrada</p>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm">
-                <table className="w-full text-left min-w-[800px]">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">OS</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Local / Retirada</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Booking / Navio</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Qtd / Tipo</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Cliente</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Motorista</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Status</th>
-                      <th className="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {liberacoes.map(l => (
-                      <tr key={l.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-4 py-3">
-                          <span className="text-[9px] font-bold text-slate-600 uppercase">{l.os || '---'}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-[9px] font-bold text-slate-700 uppercase">{l.local || '---'}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[9px] font-bold text-slate-700 uppercase">{l.booking || '---'}</span>
-                            {l.ship && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.ship}</span>}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[9px] font-bold text-slate-700">{l.qtdContainer || '01'}x {l.containerType || '---'}</span>
-                            {l.padrao && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.padrao}</span>}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[9px] font-bold text-slate-700 uppercase">{l.customer?.legalName || l.customer?.name || '---'}</span>
-                            {l.customer?.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.customer.city}{l.customer.state ? `/${l.customer.state}` : ''}</span>}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[9px] font-bold text-slate-700 uppercase">{l.driver?.name || '---'}</span>
-                            <div className="flex items-center gap-1">
-                              {l.driver?.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{l.driver.plateHorse}</span>}
-                              {l.driver?.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.driver.plateTrailer}</span>}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${l.status === 'Emitido' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : l.status === 'Cancelado' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{l.status}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button onClick={() => setLibMinuta(l)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-[8px] font-black text-violet-700 hover:bg-violet-100 transition-colors">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                            Editar
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <SmartOperationTable
+              userId={userId}
+              componentId="org-liberacoes"
+              columns={liberacoesColumns}
+              data={liberacoes}
+              hideInternalSearch={false}
+              noMaxHeight
+              stickyHeaderTop={0}
+            />
           </div>
         )}
       </div>
