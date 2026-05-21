@@ -28,38 +28,52 @@ const DEV_COLUMNS = [
   { key: 'agendamentoDoc',   label: 'Comprovante' },
 ];
 
+/* Pages are grouped visually. Group 1 = Coleta/Entrega variants, Group 2 = Devoluções */
 const PAGE_DEFS = [
   {
     key: 'orgColeta',
-    label: 'Organização — Coleta',
-    description: 'Exibe viagens de Coleta, Cabotagem e Exportação',
+    label: 'Coleta (aba separada)',
+    description: 'Coleta, Cabotagem e Exportação — aba própria no portal',
     color: 'blue',
     columns: STANDARD_COLUMNS,
     defaultFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'scheduling'],
+    group: 'coleta-entrega',
   },
   {
     key: 'orgEntrega',
-    label: 'Organização — Entrega',
-    description: 'Exibe viagens de Entrega e Importação',
+    label: 'Entrega (aba separada)',
+    description: 'Entrega e Importação — aba própria no portal',
     color: 'emerald',
     columns: STANDARD_COLUMNS,
     defaultFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'scheduling'],
+    group: 'coleta-entrega',
+  },
+  {
+    key: 'orgColetaEntrega',
+    label: 'Coleta + Entrega (aba combinada)',
+    description: 'Coleta, Cabotagem, Exportação, Entrega e Importação — uma única aba',
+    color: 'indigo',
+    columns: STANDARD_COLUMNS,
+    defaultFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'scheduling'],
+    group: 'coleta-entrega',
   },
   {
     key: 'orgDevolucoes',
-    label: 'Organização — Devoluções',
-    description: 'Exibe registros de Devolução de Vazio',
+    label: 'Devoluções',
+    description: 'Registros de Devolução de Vazio — aba própria no portal',
     color: 'orange',
     columns: DEV_COLUMNS,
     defaultFields: ['container', 'destination', 'driver', 'scheduledDateTime'],
+    group: 'devolucoes',
   },
 ] as const;
 
 type PageKey = typeof PAGE_DEFS[number]['key'];
 
 const colorMap: Record<string, { toggle: string; chip: string; check: string; border: string; bg: string }> = {
-  blue:    { toggle: 'bg-blue-600',    chip: 'bg-blue-100 text-blue-700 border-blue-200',    check: 'text-blue-600',    border: 'border-blue-300',   bg: 'bg-blue-50' },
+  blue:    { toggle: 'bg-blue-600',    chip: 'bg-blue-100 text-blue-700 border-blue-200',       check: 'text-blue-600',    border: 'border-blue-300',   bg: 'bg-blue-50' },
   emerald: { toggle: 'bg-emerald-600', chip: 'bg-emerald-100 text-emerald-700 border-emerald-200', check: 'text-emerald-600', border: 'border-emerald-300', bg: 'bg-emerald-50' },
+  indigo:  { toggle: 'bg-indigo-600',  chip: 'bg-indigo-100 text-indigo-700 border-indigo-200',   check: 'text-indigo-600',  border: 'border-indigo-300',  bg: 'bg-indigo-50' },
   orange:  { toggle: 'bg-orange-500',  chip: 'bg-orange-100 text-orange-700 border-orange-200',   check: 'text-orange-600',  border: 'border-orange-300',  bg: 'bg-orange-50' },
 };
 
@@ -111,9 +125,10 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
           allowedCategories: [],
           allowedTypes: [],
           pages: {
-            orgColeta:    { enabled: false, visibleFields: PAGE_DEFS[0].defaultFields as string[] },
-            orgEntrega:   { enabled: false, visibleFields: PAGE_DEFS[1].defaultFields as string[] },
-            orgDevolucoes: { enabled: false, visibleFields: PAGE_DEFS[2].defaultFields as string[] },
+            orgColeta:        { enabled: false, visibleFields: PAGE_DEFS[0].defaultFields as string[] },
+            orgEntrega:       { enabled: false, visibleFields: PAGE_DEFS[1].defaultFields as string[] },
+            orgColetaEntrega: { enabled: false, visibleFields: PAGE_DEFS[2].defaultFields as string[] },
+            orgDevolucoes:    { enabled: false, visibleFields: PAGE_DEFS[3].defaultFields as string[] },
           },
         },
       };
@@ -340,12 +355,85 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto custom-scrollbar space-y-4">
+            <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 Selecione quais páginas e dados o usuário pode visualizar
               </p>
 
-              {PAGE_DEFS.map(page => {
+              {/* ── Grupo: Coleta / Entrega ─────────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Organização — Operações Portuárias</p>
+                  <div className="flex-1 h-px bg-slate-200"/>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                    Escolha abas separadas <span className="text-slate-300 mx-1">ou</span> uma aba combinada — não é necessário ativar as duas opções simultaneamente
+                  </p>
+                  <div className="space-y-2">
+                    {PAGE_DEFS.filter(p => p.group === 'coleta-entrega').map((page, idx, arr) => {
+                      const c = colorMap[page.color];
+                      const pageConfig = editingUser.thirdPartyConfig?.pages?.[page.key];
+                      const isEnabled = pageConfig?.enabled ?? false;
+                      const fields = pageConfig?.visibleFields || [];
+                      const isCombined = page.key === 'orgColetaEntrega';
+
+                      return (
+                        <React.Fragment key={page.key}>
+                          {/* Divider before combined option */}
+                          {isCombined && (
+                            <div className="flex items-center gap-2 py-1">
+                              <div className="flex-1 h-px bg-slate-200"/>
+                              <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest px-2">ou</span>
+                              <div className="flex-1 h-px bg-slate-200"/>
+                            </div>
+                          )}
+                          <div className={`rounded-xl border-2 transition-all overflow-hidden ${isEnabled ? `${c.border} ${c.bg}` : 'border-slate-200 bg-white'}`}>
+                            <div className="flex items-center justify-between p-3">
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs font-black uppercase tracking-tight ${isEnabled ? 'text-slate-900' : 'text-slate-500'}`}>{page.label}</p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{page.description}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => togglePage(page.key)}
+                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ml-4 ${isEnabled ? c.toggle : 'bg-slate-200'}`}
+                                role="switch" aria-checked={isEnabled}
+                              >
+                                <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}/>
+                              </button>
+                            </div>
+                            {isEnabled && (
+                              <div className="px-3 pb-3 border-t border-white/60">
+                                <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-2 mb-2">Dados visíveis</p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+                                  {page.columns.map(col => {
+                                    const checked = fields.includes(col.key);
+                                    return (
+                                      <label key={col.key} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-[9px] font-bold uppercase ${checked ? `bg-white ${c.border} text-slate-800` : 'bg-white/60 border-white text-slate-400 hover:border-slate-200'}`}>
+                                        <input type="checkbox" checked={checked} onChange={() => togglePageField(page.key, col.key)} className={`w-3.5 h-3.5 rounded border-slate-300 focus:ring-0 ${c.check}`}/>
+                                        {col.label}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Grupo: Devoluções ───────────────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Organização — Devoluções</p>
+                  <div className="flex-1 h-px bg-slate-200"/>
+                </div>
+                {PAGE_DEFS.filter(p => p.group === 'devolucoes').map(page => {
                 const c = colorMap[page.color];
                 const pageConfig = editingUser.thirdPartyConfig?.pages?.[page.key];
                 const isEnabled = pageConfig?.enabled ?? false;
@@ -405,7 +493,8 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                   </div>
                 );
               })}
-            </div>
+              </div>{/* end space-y-3 devolucoes */}
+            </div>{/* end overflow-y-auto */}
 
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3 shrink-0 bg-slate-50 rounded-b-2xl">
               <button onClick={() => setEditingUser(null)} className="px-6 py-2.5 text-xs font-black text-slate-600 uppercase bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>

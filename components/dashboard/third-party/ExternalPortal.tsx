@@ -22,6 +22,8 @@ const matchesPage = (rawType: string, pageKey: string): boolean => {
       return !t.includes('DEVOLU') && (t.includes('COLETA') || t.includes('CABOTAG') || t.includes('EXPORTA'));
     case 'orgEntrega':
       return !t.includes('DEVOLU') && (t.includes('ENTREGA') || t.includes('IMPORTA'));
+    case 'orgColetaEntrega':
+      return !t.includes('DEVOLU');
     case 'orgDevolucoes':
       return t.includes('DEVOLU');
     default:
@@ -30,9 +32,10 @@ const matchesPage = (rawType: string, pageKey: string): boolean => {
 };
 
 const PAGE_LABELS: Record<string, { label: string; color: string; activeClass: string }> = {
-  orgColeta:    { label: 'Coleta / Export',  color: 'blue',    activeClass: 'bg-white text-blue-600 shadow-sm' },
-  orgEntrega:   { label: 'Entrega / Import', color: 'emerald', activeClass: 'bg-white text-emerald-600 shadow-sm' },
-  orgDevolucoes: { label: 'Devoluções',       color: 'orange',  activeClass: 'bg-white text-orange-600 shadow-sm' },
+  orgColeta:        { label: 'Coleta / Export',      color: 'blue',    activeClass: 'bg-white text-blue-600 shadow-sm' },
+  orgEntrega:       { label: 'Entrega / Import',     color: 'emerald', activeClass: 'bg-white text-emerald-600 shadow-sm' },
+  orgColetaEntrega: { label: 'Coleta + Entrega',     color: 'indigo',  activeClass: 'bg-white text-indigo-600 shadow-sm' },
+  orgDevolucoes:    { label: 'Devoluções',            color: 'orange',  activeClass: 'bg-white text-orange-600 shadow-sm' },
 };
 
 const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
@@ -46,7 +49,7 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips }) => {
   const enabledPages = useMemo(() => {
     const pages = user.thirdPartyConfig?.pages;
     if (!pages) return [];
-    return (['orgColeta', 'orgEntrega', 'orgDevolucoes'] as const).filter(k => pages[k]?.enabled);
+    return (['orgColeta', 'orgEntrega', 'orgColetaEntrega', 'orgDevolucoes'] as const).filter(k => pages[k]?.enabled);
   }, [user.thirdPartyConfig]);
 
   const [activePage, setActivePage] = useState<string>(() => enabledPages[0] || '');
