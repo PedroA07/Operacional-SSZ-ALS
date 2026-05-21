@@ -1,86 +1,105 @@
 import React, { useState, useEffect } from 'react';
-import { User, Category } from '../../../types';
+import { User } from '../../../types';
 import { db } from '../../../utils/storage';
 
 interface ExternalUsersManagerProps {
   onRefresh: () => void;
 }
 
-const AVAILABLE_COLUMNS = [
-  { key: 'os', label: 'OS' },
-  { key: 'container', label: 'Container' },
-  { key: 'status', label: 'Status (em camadas)' },
-  { key: 'dateTime', label: 'Data' },
-  { key: 'driver', label: 'Motorista' },
-  { key: 'customer', label: 'Cliente' },
+/* ── Column definitions per page ─────────────────────────────────── */
+const STANDARD_COLUMNS = [
+  { key: 'os',          label: 'OS / Identificação' },
+  { key: 'container',   label: 'Container' },
+  { key: 'status',      label: 'Status' },
+  { key: 'dateTime',    label: 'Data / Hora' },
+  { key: 'driver',      label: 'Motorista' },
+  { key: 'customer',    label: 'Cliente' },
   { key: 'destination', label: 'Destino' },
-  { key: 'scheduling', label: 'Agendamento' },
-  { key: 'category', label: 'Categoria' },
-  { key: 'type', label: 'Tipo' }
+  { key: 'scheduling',  label: 'Agendamento' },
+  { key: 'category',    label: 'Categoria' },
+  { key: 'type',        label: 'Tipo de Operação' },
 ];
 
+const DEV_COLUMNS = [
+  { key: 'container',        label: 'Container' },
+  { key: 'destination',      label: 'Local / Depósito' },
+  { key: 'driver',           label: 'Motorista' },
+  { key: 'scheduledDateTime', label: 'Agendamento' },
+  { key: 'agendamentoDoc',   label: 'Comprovante' },
+];
+
+const PAGE_DEFS = [
+  {
+    key: 'orgColeta',
+    label: 'Organização — Coleta',
+    description: 'Exibe viagens de Coleta, Cabotagem e Exportação',
+    color: 'blue',
+    columns: STANDARD_COLUMNS,
+    defaultFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'scheduling'],
+  },
+  {
+    key: 'orgEntrega',
+    label: 'Organização — Entrega',
+    description: 'Exibe viagens de Entrega e Importação',
+    color: 'emerald',
+    columns: STANDARD_COLUMNS,
+    defaultFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'scheduling'],
+  },
+  {
+    key: 'orgDevolucoes',
+    label: 'Organização — Devoluções',
+    description: 'Exibe registros de Devolução de Vazio',
+    color: 'orange',
+    columns: DEV_COLUMNS,
+    defaultFields: ['container', 'destination', 'driver', 'scheduledDateTime'],
+  },
+] as const;
+
+type PageKey = typeof PAGE_DEFS[number]['key'];
+
+const colorMap: Record<string, { toggle: string; chip: string; check: string; border: string; bg: string }> = {
+  blue:    { toggle: 'bg-blue-600',    chip: 'bg-blue-100 text-blue-700 border-blue-200',    check: 'text-blue-600',    border: 'border-blue-300',   bg: 'bg-blue-50' },
+  emerald: { toggle: 'bg-emerald-600', chip: 'bg-emerald-100 text-emerald-700 border-emerald-200', check: 'text-emerald-600', border: 'border-emerald-300', bg: 'bg-emerald-50' },
+  orange:  { toggle: 'bg-orange-500',  chip: 'bg-orange-100 text-orange-700 border-orange-200',   check: 'text-orange-600',  border: 'border-orange-300',  bg: 'bg-orange-50' },
+};
+
+/* ── Component ──────────────────────────────────────────────────── */
 const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }) => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [operationTypes, setOperationTypes] = useState<any[]>([]);
-  
+  const [users, setUsers]       = useState<User[]>([]);
+  const [loading, setLoading]   = useState(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]     = useState(false);
 
-  // Estados para o modal de criação de usuário
   const [isCreatingUser, setIsCreatingUser] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword]     = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
-  const [newUser, setNewUser] = useState({
-    displayName: '',
-    username: '',
-    password: ''
-  });
-
-  const togglePasswordVisibility = (userId: string) => {
-    setVisiblePasswords(prev => ({
-      ...prev,
-      [userId]: !prev[userId]
-    }));
-  };
+  const [newUser, setNewUser] = useState({ displayName: '', username: '', password: '' });
   const [creatingError, setCreatingError] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setLoading(true);
-    const [allUsers, allCategories, allTypes] = await Promise.all([
-      db.getUsers(),
-      db.getCategories(),
-      db.getOperationTypes()
-    ]);
+    const allUsers = await db.getUsers();
     setUsers(allUsers.filter(u => u.role === 'third_party'));
-    setCategories(allCategories);
-    setOperationTypes(allTypes);
     setLoading(false);
   };
 
+  /* ── Create ─────────────────────────────────────────────────── */
   const handleCreateUser = async () => {
     if (!newUser.displayName || !newUser.username || !newUser.password) {
       setCreatingError('Preencha todos os campos');
       return;
     }
-
     setSaving(true);
     setCreatingError('');
-
     try {
-      // Verifica se o usuário já existe
       const existingUsers = await db.getUsers();
       if (existingUsers.some(u => u.username === newUser.username)) {
         setCreatingError('Este nome de usuário já está em uso');
         setSaving(false);
         return;
       }
-
       const userToCreate: Omit<User, 'id'> = {
         username: newUser.username,
         password: newUser.password,
@@ -88,25 +107,29 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
         role: 'third_party',
         lastLogin: new Date().toISOString(),
         thirdPartyConfig: {
-          visibleFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'category', 'type'],
+          visibleFields: [],
           allowedCategories: [],
-          allowedTypes: []
-        }
+          allowedTypes: [],
+          pages: {
+            orgColeta:    { enabled: false, visibleFields: PAGE_DEFS[0].defaultFields as string[] },
+            orgEntrega:   { enabled: false, visibleFields: PAGE_DEFS[1].defaultFields as string[] },
+            orgDevolucoes: { enabled: false, visibleFields: PAGE_DEFS[2].defaultFields as string[] },
+          },
+        },
       };
-
       await db.saveUser({ ...userToCreate, id: `ext-${Date.now()}` });
       await loadData();
       setIsCreatingUser(false);
       setNewUser({ displayName: '', username: '', password: '' });
       onRefresh();
-    } catch (error) {
-      console.error('Error creating user:', error);
+    } catch {
       setCreatingError('Erro ao criar usuário');
     } finally {
       setSaving(false);
     }
   };
 
+  /* ── Save config ─────────────────────────────────────────────── */
   const handleSaveConfig = async () => {
     if (!editingUser) return;
     setSaving(true);
@@ -115,62 +138,73 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
       await loadData();
       setEditingUser(null);
       onRefresh();
-    } catch (error) {
-      console.error('Error saving user config:', error);
+    } catch {
+      console.error('Error saving user config');
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleColumn = (key: string) => {
+  /* ── Page toggle helpers ─────────────────────────────────────── */
+  const togglePage = (pageKey: PageKey) => {
     if (!editingUser) return;
-    const currentFields = editingUser.thirdPartyConfig?.visibleFields || [];
-    const newFields = currentFields.includes(key)
-      ? currentFields.filter(f => f !== key)
-      : [...currentFields, key];
-      
-    setEditingUser({
-      ...editingUser,
-      thirdPartyConfig: {
-        ...editingUser.thirdPartyConfig,
-        visibleFields: newFields
-      }
-    });
-  };
-
-  const toggleCategory = (categoryName: string) => {
-    if (!editingUser) return;
-    const currentCats = editingUser.thirdPartyConfig?.allowedCategories || [];
-    const newCats = currentCats.includes(categoryName)
-      ? currentCats.filter(c => c !== categoryName)
-      : [...currentCats, categoryName];
-
+    const pageDef = PAGE_DEFS.find(p => p.key === pageKey)!;
+    const pages = editingUser.thirdPartyConfig?.pages || {};
+    const current = pages[pageKey];
     setEditingUser({
       ...editingUser,
       thirdPartyConfig: {
         ...editingUser.thirdPartyConfig,
         visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
-        allowedCategories: newCats
-      }
+        pages: {
+          ...pages,
+          [pageKey]: {
+            enabled: !current?.enabled,
+            visibleFields: current?.visibleFields?.length ? current.visibleFields : (pageDef.defaultFields as string[]),
+          },
+        },
+      },
     });
   };
 
-  const toggleType = (typeName: string) => {
+  const togglePageField = (pageKey: PageKey, fieldKey: string) => {
     if (!editingUser) return;
-    const currentTypes = editingUser.thirdPartyConfig?.allowedTypes || [];
-    const newTypes = currentTypes.includes(typeName)
-      ? currentTypes.filter(t => t !== typeName)
-      : [...currentTypes, typeName];
-
+    const pages = editingUser.thirdPartyConfig?.pages || {};
+    const current = pages[pageKey];
+    const fields = current?.visibleFields || [];
     setEditingUser({
       ...editingUser,
       thirdPartyConfig: {
         ...editingUser.thirdPartyConfig,
         visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
-        allowedTypes: newTypes
-      }
+        pages: {
+          ...pages,
+          [pageKey]: {
+            enabled: current?.enabled || false,
+            visibleFields: fields.includes(fieldKey)
+              ? fields.filter(f => f !== fieldKey)
+              : [...fields, fieldKey],
+          },
+        },
+      },
     });
   };
+
+  /* ── Rendering helpers ───────────────────────────────────────── */
+  const togglePasswordVisibility = (id: string) =>
+    setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const EyeOpen = () => (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+    </svg>
+  );
+  const EyeOff = () => (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+    </svg>
+  );
 
   return (
     <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
@@ -187,49 +221,53 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
 
       {loading ? (
         <div className="flex justify-center p-8">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
         </div>
       ) : (
         <div className="space-y-4">
-          {users.map(user => (
-            <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-              <div>
-                <p className="font-black text-slate-800">{user.displayName}</p>
-                <div className="flex items-center gap-4 mt-1">
-                  <p className="text-xs text-slate-500"><span className="font-bold">Login:</span> {user.username}</p>
-                  <div className="flex items-center gap-1">
-                    <p className="text-xs text-slate-500">
-                      <span className="font-bold">Senha:</span> {visiblePasswords[user.id] ? user.password : '••••••••'}
-                    </p>
-                    <button 
-                      onClick={() => togglePasswordVisibility(user.id)}
-                      className="text-slate-400 hover:text-slate-600 ml-1"
-                      title={visiblePasswords[user.id] ? "Ocultar senha" : "Ver senha"}
-                    >
-                      {visiblePasswords[user.id] ? (
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                      )}
-                    </button>
+          {users.map(user => {
+            const enabledPages = PAGE_DEFS.filter(p => user.thirdPartyConfig?.pages?.[p.key]?.enabled);
+            return (
+              <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <div>
+                  <p className="font-black text-slate-800">{user.displayName}</p>
+                  <div className="flex items-center gap-4 mt-1 flex-wrap">
+                    <p className="text-xs text-slate-500"><span className="font-bold">Login:</span> {user.username}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs text-slate-500">
+                        <span className="font-bold">Senha:</span> {visiblePasswords[user.id] ? user.password : '••••••••'}
+                      </p>
+                      <button onClick={() => togglePasswordVisibility(user.id)} className="text-slate-400 hover:text-slate-600 ml-1">
+                        {visiblePasswords[user.id] ? <EyeOff/> : <EyeOpen/>}
+                      </button>
+                    </div>
+                    {enabledPages.length > 0 && (
+                      <div className="flex gap-1 flex-wrap">
+                        {enabledPages.map(p => (
+                          <span key={p.key} className={`text-[8px] px-2 py-0.5 rounded-full font-black border uppercase ${colorMap[p.color].chip}`}>
+                            {p.label.split('—')[1]?.trim() || p.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
+                <button
+                  onClick={() => setEditingUser(user)}
+                  className="text-xs font-black text-blue-600 uppercase hover:underline shrink-0 ml-4"
+                >
+                  Configurar Acessos
+                </button>
               </div>
-              <button 
-                onClick={() => setEditingUser(user)}
-                className="text-xs font-black text-blue-600 uppercase hover:underline"
-              >
-                Configurar Acessos
-              </button>
-            </div>
-          ))}
+            );
+          })}
           {users.length === 0 && (
             <p className="text-sm text-slate-500 italic text-center py-4">Nenhum usuário externo encontrado.</p>
           )}
         </div>
       )}
 
-      {/* Modal de Criação de Usuário */}
+      {/* ── Modal: Criar usuário ─────────────────────────────────── */}
       {isCreatingUser && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in fade-in zoom-in-95 duration-200">
@@ -242,75 +280,45 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
-
             <div className="p-6 space-y-4">
               {creatingError && (
-                <div className="p-3 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100 uppercase">
-                  {creatingError}
-                </div>
+                <div className="p-3 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100 uppercase">{creatingError}</div>
               )}
-
-              <div>
-                <label className="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1">Nome de Exibição</label>
-                <input
-                  type="text"
-                  value={newUser.displayName}
-                  onChange={(e) => setNewUser({ ...newUser, displayName: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  placeholder="Ex: Cliente ABC"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1">Nome de Usuário (Login)</label>
-                <input
-                  type="text"
-                  value={newUser.username}
-                  onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  placeholder="Ex: cliente.abc"
-                />
-              </div>
-
+              {[
+                { label: 'Nome de Exibição', field: 'displayName', placeholder: 'Ex: Cliente ABC', type: 'text' },
+                { label: 'Nome de Usuário (Login)', field: 'username', placeholder: 'Ex: cliente.abc', type: 'text' },
+              ].map(({ label, field, placeholder, type }) => (
+                <div key={field}>
+                  <label className="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1">{label}</label>
+                  <input
+                    type={type}
+                    value={(newUser as any)[field]}
+                    onChange={e => setNewUser({ ...newUser, [field]: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    placeholder={placeholder}
+                  />
+                </div>
+              ))}
               <div>
                 <label className="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1">Senha</label>
                 <div className="relative">
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? 'text' : 'password'}
                     value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    onChange={e => setNewUser({ ...newUser, password: e.target.value })}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all pr-10"
                     placeholder="Senha de acesso"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {showPassword ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                    )}
+                  <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    {showPassword ? <EyeOff/> : <EyeOpen/>}
                   </button>
                 </div>
               </div>
             </div>
-
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3 shrink-0 bg-slate-50 rounded-b-2xl">
-              <button 
-                onClick={() => setIsCreatingUser(false)}
-                className="px-6 py-2.5 text-xs font-black text-slate-600 uppercase bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleCreateUser}
-                disabled={saving}
-                className="px-6 py-2.5 text-xs font-black text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+              <button onClick={() => setIsCreatingUser(false)} className="px-6 py-2.5 text-xs font-black text-slate-600 uppercase bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>
+              <button onClick={handleCreateUser} disabled={saving} className="px-6 py-2.5 text-xs font-black text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2">
+                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>}
                 {saving ? 'Criando...' : 'Criar Usuário'}
               </button>
             </div>
@@ -318,6 +326,7 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
         </div>
       )}
 
+      {/* ── Modal: Configurar acessos ─────────────────────────────── */}
       {editingUser && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
@@ -331,87 +340,77 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto custom-scrollbar space-y-8">
-              {/* Colunas Visíveis */}
-              <div>
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-4">Colunas Visíveis</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {AVAILABLE_COLUMNS.map(col => {
-                    const isSelected = editingUser.thirdPartyConfig?.visibleFields?.includes(col.key);
-                    return (
-                      <label key={col.key} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-200'}`}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected || false}
-                          onChange={() => toggleColumn(col.key)}
-                          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                        />
-                        <span className={`text-xs font-bold uppercase ${isSelected ? 'text-blue-700' : 'text-slate-600'}`}>{col.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+            <div className="p-6 overflow-y-auto custom-scrollbar space-y-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Selecione quais páginas e dados o usuário pode visualizar
+              </p>
 
-              {/* Categorias Permitidas */}
-              <div>
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-4">Categorias Permitidas</h4>
-                <p className="text-[10px] text-slate-500 mb-3 uppercase font-bold">Se nenhuma for selecionada, todas serão exibidas.</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {categories.map(cat => {
-                    const isSelected = editingUser.thirdPartyConfig?.allowedCategories?.includes(cat.name);
-                    return (
-                      <label key={cat.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 hover:border-emerald-200'}`}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected || false}
-                          onChange={() => toggleCategory(cat.name)}
-                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                        />
-                        <span className={`text-xs font-bold uppercase ${isSelected ? 'text-emerald-700' : 'text-slate-600'}`}>{cat.name}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              {PAGE_DEFS.map(page => {
+                const c = colorMap[page.color];
+                const pageConfig = editingUser.thirdPartyConfig?.pages?.[page.key];
+                const isEnabled = pageConfig?.enabled ?? false;
+                const fields = pageConfig?.visibleFields || [];
 
-              {/* Tipos Permitidos */}
-              <div>
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-4">Tipos de Operação Permitidos</h4>
-                <p className="text-[10px] text-slate-500 mb-3 uppercase font-bold">Se nenhum for selecionado, todos serão exibidos.</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {operationTypes.map(type => {
-                    const isSelected = editingUser.thirdPartyConfig?.allowedTypes?.includes(type.name);
-                    return (
-                      <label key={type.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-purple-50 border-purple-200' : 'bg-white border-slate-200 hover:border-purple-200'}`}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected || false}
-                          onChange={() => toggleType(type.name)}
-                          className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                return (
+                  <div
+                    key={page.key}
+                    className={`rounded-2xl border-2 transition-all overflow-hidden ${isEnabled ? `${c.border} ${c.bg}` : 'border-slate-200 bg-white'}`}
+                  >
+                    {/* Page header with toggle */}
+                    <div className="flex items-center justify-between p-4">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-black uppercase tracking-tight ${isEnabled ? 'text-slate-900' : 'text-slate-500'}`}>{page.label}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{page.description}</p>
+                      </div>
+                      {/* Toggle switch */}
+                      <button
+                        type="button"
+                        onClick={() => togglePage(page.key)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ml-4 ${isEnabled ? c.toggle : 'bg-slate-200'}`}
+                        role="switch"
+                        aria-checked={isEnabled}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}
                         />
-                        <span className={`text-xs font-bold uppercase ${isSelected ? 'text-purple-700' : 'text-slate-600'}`}>{type.name}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+                      </button>
+                    </div>
+
+                    {/* Columns — only shown when enabled */}
+                    {isEnabled && (
+                      <div className="px-4 pb-4 border-t border-white/60">
+                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-3 mb-2">Dados visíveis</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {page.columns.map(col => {
+                            const checked = fields.includes(col.key);
+                            return (
+                              <label
+                                key={col.key}
+                                className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all text-[10px] font-bold uppercase
+                                  ${checked ? `bg-white ${c.border} text-slate-800` : 'bg-white/60 border-white text-slate-400 hover:border-slate-200'}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => togglePageField(page.key, col.key)}
+                                  className={`w-3.5 h-3.5 rounded border-slate-300 focus:ring-0 ${c.check}`}
+                                />
+                                {col.label}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3 shrink-0 bg-slate-50 rounded-b-2xl">
-              <button 
-                onClick={() => setEditingUser(null)}
-                className="px-6 py-2.5 text-xs font-black text-slate-600 uppercase bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleSaveConfig}
-                disabled={saving}
-                className="px-6 py-2.5 text-xs font-black text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+              <button onClick={() => setEditingUser(null)} className="px-6 py-2.5 text-xs font-black text-slate-600 uppercase bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>
+              <button onClick={handleSaveConfig} disabled={saving} className="px-6 py-2.5 text-xs font-black text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2">
+                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>}
                 {saving ? 'Salvando...' : 'Salvar Configurações'}
               </button>
             </div>
