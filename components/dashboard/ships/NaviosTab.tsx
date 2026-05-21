@@ -1162,7 +1162,8 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                     <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Saída</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Saída</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Dead-Line</th>
-                    <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Dry</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Reefer</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 w-8"/>
                   </tr>
                 </thead>
@@ -1171,8 +1172,6 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                     const st  = mapSituacao(v.situacao);
                     const sc  = STATUS_CFG[st];
                     const isM = ships.some(s => s.name.toUpperCase() === v.navio.toUpperCase());
-                    // Best gate value: gateDry → gateReefer → deadline as fallback reference
-                    const gateVal = v.gateDry || v.gateReefer;
                     const dlExpired = isExpiredStr(v.deadLineStr);
                     return (
                       <tr key={idx} className={`border-b border-slate-800/40 transition-colors group ${sc.rowBg || ''} hover:brightness-125`}>
@@ -1222,8 +1221,13 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                             : <span className="text-slate-700">—</span>}
                         </td>
                         <td className="px-3 py-2 text-center whitespace-nowrap">
-                          {gateVal
-                            ? <span className={`font-black ${isExpiredStr(gateVal) ? 'text-red-400' : 'text-green-400'}`}>{fmtCell(gateVal)}</span>
+                          {v.gateDry
+                            ? <span className={`font-black ${isExpiredStr(v.gateDry) ? 'text-red-400' : 'text-green-400'}`}>{fmtCell(v.gateDry)}</span>
+                            : <span className="text-slate-700">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-center whitespace-nowrap">
+                          {v.gateReefer
+                            ? <span className={`font-black ${isExpiredStr(v.gateReefer) ? 'text-red-400' : 'text-green-400'}`}>{fmtCell(v.gateReefer)}</span>
                             : <span className="text-slate-700">—</span>}
                         </td>
                         <td className="px-3 py-2">

@@ -533,12 +533,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return null;
   };
 
-  const renderGateTag = useCallback((shipName?: string): React.ReactNode => {
+  const renderGateTag = useCallback((shipName?: string, containerType?: string): React.ReactNode => {
     if (!shipName) return null;
     const vessel = getVesselForTrip(shipName);
     if (!vessel) return null;
     const now = new Date();
-    const gateStr = vessel.gateDry || vessel.gateReefer;
+    const isReefer = /R/i.test(containerType || '');
+    const gateStr = isReefer
+      ? (vessel.gateReefer || vessel.gateDry)
+      : (vessel.gateDry || vessel.gateReefer);
     const gateDt = parseFlexDate(gateStr || '');
     const deadDt = parseFlexDate(vessel.deadLineStr || '');
 
@@ -1276,7 +1279,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 Viagem: {voyage}
               </span>
             )}
-            {t.ship && renderGateTag(t.ship)}
+            {t.ship && renderGateTag(t.ship, t.containerType)}
           </div>
         );
       }
