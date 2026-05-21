@@ -484,17 +484,42 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const matches = terminalVessels.filter(nameMatches);
     if (matches.length === 0) return null;
 
-    // Se temos número de viagem, prioriza o vessel que bate a viagem
+    // Filtra por viagem se disponível — usa includes para cobrir "RAP621N" ⊇ "621N"
+    let pool = matches;
     if (voyage) {
       const normVoyage = norm(voyage);
-      const voyageMatch = matches.find(v => v.viagem && norm(v.viagem) === normVoyage);
-      if (voyageMatch) return voyageMatch;
+      const voyageMatches = matches.filter(v => {
+        if (!v.viagem) return false;
+        const nv = norm(v.viagem);
+        return nv === normVoyage || nv.includes(normVoyage) || normVoyage.includes(nv);
+      });
+      if (voyageMatches.length > 0) pool = voyageMatches;
     }
 
-    // Sem match de viagem — prefere gate > deadline > primeiro
-    const withGate = matches.find(v => v.gateDry || v.gateReefer);
-    const withDeadline = matches.find(v => v.deadLineStr);
-    return withGate ?? withDeadline ?? matches[0];
+    // Dentro do pool, prioriza pelo status mais útil para planejamento de entrega:
+    // GATE ABERTO > GATE FECHADO > tem deadline futuro > tem gate > resto
+    const now = new Date();
+    const statusPriority = (v: TerminalVessel): number => {
+      const s = (v.situacao || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      if (s.includes('gate abert') || s.includes('gate open')) return 5;
+      if (s.includes('gate fech') || s.includes('gate closed')) return 4;
+      if (s.includes('gate encerr') || s.includes('encerrado')) return 3;
+      if (s.includes('em operac') || s.includes('operando') || s.includes('atracad')) return 2;
+      if (s.includes('desatrac') || s.includes('saiu')) return 1;
+      return 0;
+    };
+    const hasFutureDeadline = (v: TerminalVessel) => {
+      const dt = parseFlexDate(v.deadLineStr || '');
+      return dt && dt > now ? 1 : 0;
+    };
+
+    pool.sort((a, b) =>
+      statusPriority(b) - statusPriority(a) ||
+      hasFutureDeadline(b) - hasFutureDeadline(a) ||
+      (b.gateDry || b.gateReefer ? 1 : 0) - (a.gateDry || a.gateReefer ? 1 : 0)
+    );
+
+    return pool[0];
   }, [terminalVessels, splitShipField]);
 
   const mapSituacaoGate = (s: string) => {
@@ -524,12 +549,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const situacaoStatus = mapSituacaoGate(vessel.situacao);
 
     if (situacaoStatus === 'GATE ABERTO') {
+      const encDt = deadDt || gateDt;
       return (
         <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-green-500/10 text-green-700 border-green-500/30">
           <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-500"/>
           Gate Aberto
-          {deadDt && deadDt > now && (
-            <span className="font-bold text-orange-500 normal-case ml-0.5">• Enc. {fmtDate(deadDt)}</span>
+          {encDt && (
+            <span className={`font-bold normal-case ml-0.5 ${encDt <= now ? 'text-red-500' : 'text-orange-500'}`}>
+              • Enc. {fmtDate(encDt)}
+            </span>
           )}
         </span>
       );
