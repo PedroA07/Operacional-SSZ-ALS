@@ -11,6 +11,9 @@ interface TerminalVessel {
   armador?: string;
   viagem?: string;
   terminal: string;
+  gateDry?: string;
+  gateReefer?: string;
+  deadLineStr?: string;
 }
 
 function stripTags(html: string): string {
@@ -91,12 +94,15 @@ function parseHtmlTable(html: string, terminalName: string, vesselFilter?: strin
     }
   }
 
-  const navioIdx    = findColIndex(headers, ['navio', 'vessel', 'ship', 'embarca', 'nome']);
-  const situacaoIdx = findColIndex(headers, ['situa', 'status', 'estado', 'opera', 'condi']);
-  const previsaoIdx = findColIndex(headers, ['previs', 'eta', 'data', 'chegada', 'atrac', 'hora', 'inicio']);
-  const bercoIdx    = findColIndex(headers, ['ber', 'dock', 'pier', 'cais', 'bco']);
-  const armadorIdx  = findColIndex(headers, ['armador', 'shipping', 'companhia', 'linha', 'agenc', 'agent']);
-  const viagemIdx   = findColIndex(headers, ['viagem', 'voyage', 'trip', 'num', 'vg']);
+  const navioIdx      = findColIndex(headers, ['navio', 'vessel', 'ship', 'embarca', 'nome']);
+  const situacaoIdx   = findColIndex(headers, ['situa', 'status', 'estado', 'opera', 'condi']);
+  const previsaoIdx   = findColIndex(headers, ['previs', 'eta', 'data', 'chegada', 'atrac', 'hora', 'inicio']);
+  const bercoIdx      = findColIndex(headers, ['ber', 'dock', 'pier', 'cais', 'bco']);
+  const armadorIdx    = findColIndex(headers, ['armador', 'shipping', 'companhia', 'linha', 'agenc', 'agent']);
+  const viagemIdx     = findColIndex(headers, ['viagem', 'voyage', 'trip', 'num', 'vg']);
+  const gateDryIdx    = findColIndex(headers, ['gate dry', 'dry', 'abertura gate d', 'abert. gate d']);
+  const gateReeferIdx = findColIndex(headers, ['gate reefer', 'reefer', '40hr', 'abertura gate r', 'abert. gate r']);
+  const deadLineIdx   = findColIndex(headers, ['dead', 'deadline', 'prazo', 'encerr']);
 
   for (let i = dataStart; i < rows.length; i++) {
     const cells = extractCells(rows[i]);
@@ -123,14 +129,48 @@ function parseHtmlTable(html: string, terminalName: string, vesselFilter?: strin
       ? cells[previsaoIdx]
       : cells.find(c => /\d{2}\/\d{2}|\d{2}:\d{2}/.test(c));
 
+    const gateDry   = (gateDryIdx    >= 0 && gateDryIdx    < cells.length ? cells[gateDryIdx]    : undefined)?.trim() || undefined;
+    const gateReefer = (gateReeferIdx >= 0 && gateReeferIdx < cells.length ? cells[gateReeferIdx] : undefined)?.trim() || undefined;
+    const deadLine   = (deadLineIdx   >= 0 && deadLineIdx   < cells.length ? cells[deadLineIdx]   : undefined)?.trim() || undefined;
+
+    // Deriva situacao das datas de gate quando não identificada via coluna
+    // (ex: BTP sempre retorna "Desatracado" na coluna situacao)
+    let finalSituacao = situacao.trim() || 'Desconhecido';
+    const gateStr = gateDry || gateReefer;
+    if (gateStr || deadLine) {
+      const parseDateStr = (s: string): Date | null => {
+        if (!s) return null;
+        if (s.includes('/')) {
+          const parts = s.split(' ');
+          const [d, m, y] = parts[0].split('/');
+          const time = parts[1]?.slice(0, 5) || '00:00';
+          const dt = new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T${time}:00`);
+          return isNaN(dt.getTime()) ? null : dt;
+        }
+        const dt = new Date(s);
+        return isNaN(dt.getTime()) ? null : dt;
+      };
+      const gateDt  = gateStr  ? parseDateStr(gateStr)  : null;
+      const deadDt  = deadLine ? parseDateStr(deadLine) : null;
+      const now = new Date();
+      if (gateDt || deadDt) {
+        if (gateDt && gateDt > now)                       finalSituacao = 'Gate Fechado';
+        else if (deadDt && deadDt > now)                  finalSituacao = 'Gate Aberto';
+        else if ((gateDt && gateDt <= now) || (deadDt && deadDt <= now)) finalSituacao = 'Gate Encerrado';
+      }
+    }
+
     vessels.push({
       navio: navio.trim(),
-      situacao: situacao.trim() || 'Desconhecido',
+      situacao: finalSituacao,
       previsao: previsao?.trim() || undefined,
       berco:    (bercoIdx   >= 0 && bercoIdx   < cells.length ? cells[bercoIdx]   : undefined)?.trim() || undefined,
       armador:  (armadorIdx >= 0 && armadorIdx < cells.length ? cells[armadorIdx] : undefined)?.trim() || undefined,
       viagem:   (viagemIdx  >= 0 && viagemIdx  < cells.length ? cells[viagemIdx]  : undefined)?.trim() || undefined,
       terminal: terminalName,
+      gateDry,
+      gateReefer,
+      deadLineStr: deadLine,
     });
   }
   return vessels;

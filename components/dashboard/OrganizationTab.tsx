@@ -496,28 +496,29 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       if (voyageMatches.length > 0) pool = voyageMatches;
     }
 
-    // Dentro do pool, prioriza pelo status mais útil para planejamento de entrega:
-    // GATE ABERTO > GATE FECHADO > tem deadline futuro > tem gate > resto
+    // Dentro do pool, prioriza pelo deadline mais urgente com data futura.
+    // Isso resolve o caso em que BTP e EMBRAPORT têm o mesmo navio/viagem
+    // mas prazos diferentes: o mais urgente é o relevante para a operação.
     const now = new Date();
-    const statusPriority = (v: TerminalVessel): number => {
-      const s = (v.situacao || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-      if (s.includes('gate abert') || s.includes('gate open')) return 5;
-      if (s.includes('gate fech') || s.includes('gate closed')) return 4;
-      if (s.includes('gate encerr') || s.includes('encerrado')) return 3;
-      if (s.includes('em operac') || s.includes('operando') || s.includes('atracad')) return 2;
-      if (s.includes('desatrac') || s.includes('saiu')) return 1;
-      return 0;
-    };
-    const hasFutureDeadline = (v: TerminalVessel) => {
-      const dt = parseFlexDate(v.deadLineStr || '');
-      return dt && dt > now ? 1 : 0;
-    };
+    const deadlineDt = (v: TerminalVessel) => parseFlexDate(v.deadLineStr || '');
 
-    pool.sort((a, b) =>
-      statusPriority(b) - statusPriority(a) ||
-      hasFutureDeadline(b) - hasFutureDeadline(a) ||
-      (b.gateDry || b.gateReefer ? 1 : 0) - (a.gateDry || a.gateReefer ? 1 : 0)
-    );
+    pool.sort((a, b) => {
+      const da = deadlineDt(a);
+      const db = deadlineDt(b);
+      const daFut = da && da > now;
+      const dbFut = db && db > now;
+      // Ambos com deadline futuro: prefere o mais urgente (menor prazo)
+      if (daFut && dbFut) return da!.getTime() - db!.getTime();
+      // Apenas um tem deadline futuro: prefere ele
+      if (daFut) return -1;
+      if (dbFut) return 1;
+      // Nenhum tem deadline futuro: prefere o mais recentemente expirado
+      if (da && db) return db.getTime() - da.getTime();
+      if (da) return -1;
+      if (db) return 1;
+      // Sem deadline: prefere quem tem dados de gate
+      return (b.gateDry || b.gateReefer ? 1 : 0) - (a.gateDry || a.gateReefer ? 1 : 0);
+    });
 
     return pool[0];
   }, [terminalVessels, splitShipField]);
