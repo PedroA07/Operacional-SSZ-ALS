@@ -447,11 +447,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              />
            )}
            {activeTab === DashboardTab.COLETA_DIA && (
-             <ColetaDoDiaTab 
-               userId={user.id} 
-               trips={trips} 
+             <ColetaDoDiaTab
+               userId={user.id}
+               trips={trips}
                emailTemplates={emailTemplates}
-               onRefresh={() => loadAllData(false)} 
+               onRefresh={loadTripsOnly}
              />
            )}
            {activeTab === DashboardTab.EXTERNAL_USERS && (
