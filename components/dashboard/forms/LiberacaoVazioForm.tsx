@@ -215,16 +215,20 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
 
   const filteredCustomers = customers.filter(c => {
     const q = remetenteSearch.toUpperCase();
+    if (!q) return true;
+    const qDigits = q.replace(/\D/g, '');
     return (c.name && c.name.toUpperCase().includes(q)) ||
       (c.legalName && c.legalName.toUpperCase().includes(q)) ||
-      (c.cnpj && c.cnpj.replace(/\D/g, '').includes(q.replace(/\D/g, ''))) ||
+      (qDigits && c.cnpj && c.cnpj.replace(/\D/g, '').includes(qDigits)) ||
       (c.city && c.city.toUpperCase().includes(q));
   });
 
   const filteredDrivers = drivers.filter(d => {
     const q = driverSearch.toUpperCase();
+    if (!q) return true;
+    const qDigits = q.replace(/\D/g, '');
     return d.name.toUpperCase().includes(q) ||
-      (d.cpf && d.cpf.replace(/\D/g, '').includes(q.replace(/\D/g, ''))) ||
+      (qDigits && d.cpf && d.cpf.replace(/\D/g, '').includes(qDigits)) ||
       (d.plateHorse && d.plateHorse.toUpperCase().includes(q)) ||
       (d.plateTrailer && d.plateTrailer.toUpperCase().includes(q));
   });
@@ -411,8 +415,8 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
 
         <div className="relative" ref={driverRef}>
           <label className={labelSlateClass}>5. Motorista Autorizado</label>
-          <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => setShowDriverResults(true)} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setFormData(prev => ({ ...prev, driverId: '' })); }} />
-          {selectedDriver && (
+          <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => { setShowDriverResults(true); setDriverSearch(''); }} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setShowDriverResults(true); setFormData(prev => ({ ...prev, driverId: '' })); }} />
+          {selectedDriver && !showDriverResults && (
             <div className="mt-1.5 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-[9px] font-black text-slate-800 uppercase truncate">{selectedDriver.name}</p>
@@ -427,7 +431,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
               </button>
             </div>
           )}
-          {showDriverResults && !selectedDriver && (
+          {showDriverResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-slate-700">
               {filteredDrivers.length > 0 ? filteredDrivers.map(d => (
                 <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-50 transition-colors" onClick={() => { setFormData(prev => ({...prev, driverId: d.id})); setDriverSearch(d.name); setShowDriverResults(false); }}>
