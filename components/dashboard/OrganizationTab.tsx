@@ -2215,6 +2215,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 drivers={drivers}
                 customers={customers}
                 ports={ports}
+                preStackings={preStacking}
                 onClose={() => setDevMinutaDev(null)}
                 devolucao={devMinutaDev}
                 onSave={handleSaveDevolucaoFromForm}
@@ -2241,6 +2242,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 drivers={drivers}
                 customers={customers}
                 ports={ports}
+                preStackings={preStacking}
                 onClose={() => setLibMinuta(null)}
                 liberacao={libMinuta}
                 onSave={handleSaveLiberacaoFromForm}

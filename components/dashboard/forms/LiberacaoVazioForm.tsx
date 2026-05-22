@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port, User, Liberacao } from '../../../types';
+import { Driver, Customer, Port, PreStacking, User, Liberacao } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import LiberacaoVazioTemplate from './LiberacaoVazioTemplate';
@@ -15,6 +15,7 @@ interface LiberacaoVazioFormProps {
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
+  preStackings?: PreStacking[];
   onClose: () => void;
   liberacao?: Liberacao;
   onSave?: (updated: Liberacao) => Promise<void>;
@@ -23,7 +24,7 @@ interface LiberacaoVazioFormProps {
 
 const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
 
-const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, customers, ports, onClose, liberacao, onSave, initialFormData }) => {
+const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, customers, ports, preStackings = [], onClose, liberacao, onSave, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -228,9 +229,12 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
       (d.plateTrailer && d.plateTrailer.toUpperCase().includes(q));
   });
 
-  const filteredPorts = ports.filter(p => {
+  const filteredPorts = [
+    ...ports.map(p => ({ ...p, _type: 'porto' as const })),
+    ...preStackings.map(p => ({ ...p, _type: 'pré-stacking' as const })),
+  ].filter(p => {
     const q = localSearch.toUpperCase();
-    return (p.name && p.name.toUpperCase().includes(q)) ||
+    return !q || (p.name && p.name.toUpperCase().includes(q)) ||
       (p.legalName && p.legalName.toUpperCase().includes(q)) ||
       (p.city && p.city.toUpperCase().includes(q));
   });
@@ -273,7 +277,10 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
                   setFormData(prev => ({ ...prev, manualLocal: p.name.toUpperCase(), destinatarioId: p.id }));
                   setShowLocalResults(false);
                 }}>
-                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{p.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight flex-1">{p.name}</p>
+                    <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded-full ${p._type === 'porto' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>{p._type}</span>
+                  </div>
                   {p.city && <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">{p.city}{p.state ? `/${p.state}` : ''}</p>}
                 </button>
               ))}
