@@ -58,18 +58,8 @@ const SILExcelImporter: React.FC<Props> = ({ isOpen, onClose, trips, importedOs,
           return { sil, trip, alreadyImported };
         });
         setRows(matched);
-        const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-        // Pré-seleciona:
-        //   1. SEM OS no sistema → serão criadas
-        //   2. VINCULADAS cuja dateTime é hoje E a planilha tem data diferente → corrigir data errada
-        setSelected(new Set(matched.filter(r => {
-          if (r.alreadyImported) return false;
-          if (!r.trip) return true; // SEM OS
-          // Vinculada com data suspeita (hoje) e SIL traz data diferente
-          const tripIsToday = (r.trip.dateTime || '').startsWith(today);
-          const silHasDate  = !!r.sil.previsaoAtendimento;
-          return tripIsToday && silHasDate;
-        }).map(r => r.sil._rowIndex)));
+        // Padrão: seleciona apenas SEM OS (serão criadas como novas trips)
+        setSelected(new Set(matched.filter(r => !r.alreadyImported && !r.trip).map(r => r.sil._rowIndex)));
       }
     } catch {
       setError('Erro ao ler o arquivo. Verifique se não está corrompido ou protegido por senha.');
@@ -337,6 +327,23 @@ const SILExcelImporter: React.FC<Props> = ({ isOpen, onClose, trips, importedOs,
           )}
         </div>
 
+        {/* Aviso de substituição quando VINCULADAS estão selecionadas */}
+        {(() => {
+          const vinculadasSelecionadas = rows.filter(r => selected.has(r.sil._rowIndex) && !!r.trip).length;
+          if (!vinculadasSelecionadas) return null;
+          return (
+            <div className="mx-8 mb-0 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 shrink-0">
+              <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+              </svg>
+              <p className="text-[9px] font-black text-amber-700 uppercase leading-relaxed">
+                <span className="text-amber-900">{vinculadasSelecionadas} programaç{vinculadasSelecionadas !== 1 ? 'ões vinculadas' : 'ão vinculada'} selecionada{vinculadasSelecionadas !== 1 ? 's' : ''}</span>
+                {' — '}ao importar, os dados cadastrados dessas OS serão substituídos pelas informações da planilha.
+              </p>
+            </div>
+          );
+        })()}
+
         {/* Footer */}
         <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between shrink-0">
           <p className="text-[9px] font-bold text-slate-400 uppercase">
@@ -354,14 +361,21 @@ const SILExcelImporter: React.FC<Props> = ({ isOpen, onClose, trips, importedOs,
             <button onClick={onClose} className="px-6 py-3 rounded-2xl text-[10px] font-black text-slate-500 uppercase hover:bg-slate-100 transition-all">
               Cancelar
             </button>
-            <button
-              onClick={handleImport}
-              disabled={selected.size === 0}
-              className="px-8 py-3 bg-[#001e50] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-900 transition-all shadow-lg active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-              Importar {selected.size > 0 ? `${selected.size} Programaç${selected.size !== 1 ? 'ões' : 'ão'}` : ''}
-            </button>
+            {(() => {
+              const hasVinculadas = rows.some(r => selected.has(r.sil._rowIndex) && !!r.trip);
+              return (
+                <button
+                  onClick={handleImport}
+                  disabled={selected.size === 0}
+                  className={`px-8 py-3 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 ${
+                    hasVinculadas ? 'bg-amber-500 hover:bg-amber-600' : 'bg-[#001e50] hover:bg-blue-900'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                  Importar {selected.size > 0 ? `${selected.size} Programaç${selected.size !== 1 ? 'ões' : 'ão'}` : ''}
+                </button>
+              );
+            })()}
           </div>
         </div>
       </div>
