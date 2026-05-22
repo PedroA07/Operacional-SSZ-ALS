@@ -115,7 +115,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
       // Salva histórico: sempre se for novo; só se editado se vier do histórico
       const dataChanged = !initialFormData || formFingerprint(formData) !== formFingerprint(initialFormData);
       if (dataChanged) {
-        db.saveFormHistory('RETIRADA_CHEIO', formData, formData.container, activeUser);
+        db.saveRetiradaCheio(formData, activeUser);
       }
 
       await new Promise(r => setTimeout(r, 800));

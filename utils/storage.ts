@@ -677,6 +677,195 @@ export const db = {
     await supabase.from('notifications').delete().lt('timestamp', cutoff);
   },
 
+  // ─── ORDENS DE COLETA ────────────────────────────────────────────────────
+  saveOrdemColeta: async (formData: any, user: any): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('ordens_coleta').insert({
+      os: formData.os || null,
+      container: formData.container || null,
+      booking: formData.booking || null,
+      form_data: formData,
+      user_name: user?.displayName || 'Sistema',
+      user_id: user?.id || null,
+    });
+    if (error) console.error('[saveOrdemColeta]', error.message);
+    return !error;
+  },
+
+  getOrdemColetaHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {
+    if (!supabase) return [];
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase.from('ordens_coleta')
+      .select('*').gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
+    if (error) { console.error('[getOrdemColetaHistory]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id, formType: 'ORDEM_COLETA', formData: r.form_data,
+      label: r.os || r.container || r.booking || '',
+      userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at,
+    }));
+  },
+
+  deleteOrdemColeta: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('ordens_coleta').delete().eq('id', id);
+    return !error;
+  },
+
+  // ─── PRÉ-STACKING EMISSÕES ───────────────────────────────────────────────
+  savePreStackingEmissao: async (formData: any, user: any): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('pre_stacking_emissoes').insert({
+      os: formData.os || null,
+      container: formData.container || null,
+      booking: formData.booking || null,
+      form_data: formData,
+      user_name: user?.displayName || 'Sistema',
+      user_id: user?.id || null,
+    });
+    if (error) console.error('[savePreStackingEmissao]', error.message);
+    return !error;
+  },
+
+  getPreStackingEmissaoHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {
+    if (!supabase) return [];
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase.from('pre_stacking_emissoes')
+      .select('*').gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
+    if (error) { console.error('[getPreStackingEmissaoHistory]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id, formType: 'PRE_STACKING', formData: r.form_data,
+      label: r.container || r.os || r.booking || '',
+      userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at,
+    }));
+  },
+
+  deletePreStackingEmissao: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('pre_stacking_emissoes').delete().eq('id', id);
+    return !error;
+  },
+
+  // ─── RETIRADAS DE CHEIO ──────────────────────────────────────────────────
+  saveRetiradaCheio: async (formData: any, user: any): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('retiradas_cheio').insert({
+      container: formData.container || null,
+      booking: formData.booking || null,
+      ship: formData.ship || null,
+      form_data: formData,
+      user_name: user?.displayName || 'Sistema',
+      user_id: user?.id || null,
+    });
+    if (error) console.error('[saveRetiradaCheio]', error.message);
+    return !error;
+  },
+
+  getRetiradaCheioHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {
+    if (!supabase) return [];
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase.from('retiradas_cheio')
+      .select('*').gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
+    if (error) { console.error('[getRetiradaCheioHistory]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id, formType: 'RETIRADA_CHEIO', formData: r.form_data,
+      label: r.container || r.booking || '',
+      userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at,
+    }));
+  },
+
+  deleteRetiradaCheio: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('retiradas_cheio').delete().eq('id', id);
+    return !error;
+  },
+
+  // ─── HISTÓRICO DE DEVOLUÇÃO (lê da tabela devolucoes) ───────────────────
+  getDevolucaoHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {
+    if (!supabase) return [];
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase.from('devolucoes')
+      .select('id, container, booking, ship, agencia, pod, container_type, padrao, obs, local_name, local_id, driver_id, driver_name, customer_id, scheduled_date_time, created_at')
+      .gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
+    if (error) { console.error('[getDevolucaoHistory]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id, formType: 'DEVOLUCAO_VAZIO',
+      formData: {
+        container: r.container, booking: r.booking, ship: r.ship,
+        agencia: r.agencia, pod: r.pod, tipo: r.container_type,
+        padrao: r.padrao, obs: r.obs, manualLocal: r.local_name,
+        destinatarioId: r.local_id, driverId: r.driver_id,
+        agendamentoDateTime: r.scheduled_date_time,
+      },
+      label: r.container || r.booking || '',
+      userName: r.driver_name || '', userId: r.driver_id || '', createdAt: r.created_at,
+    }));
+  },
+
+  // ─── HISTÓRICO DE LIBERAÇÃO (lê da tabela liberacoes) ───────────────────
+  getLiberacaoHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {
+    if (!supabase) return [];
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase.from('liberacoes')
+      .select('id, booking, ship, agencia, pod, container_type, qtd_container, padrao, obs, local_name, local_id, driver_id, driver_name, customer_id, created_at')
+      .gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
+    if (error) { console.error('[getLiberacaoHistory]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id, formType: 'LIBERACAO_VAZIO',
+      formData: {
+        booking: r.booking, ship: r.ship, agencia: r.agencia, pod: r.pod,
+        tipo: r.container_type, qtdContainer: r.qtd_container,
+        padrao: r.padrao, obs: r.obs, manualLocal: r.local_name,
+        destinatarioId: r.local_id, driverId: r.driver_id,
+      },
+      label: r.booking || '',
+      userName: r.driver_name || '', userId: r.driver_id || '', createdAt: r.created_at,
+    }));
+  },
+
+  // ─── HISTÓRICO COMBINADO (todas as emissões) ─────────────────────────────
+  getAllEmissoesHistory: async (limit = 500): Promise<import('../types').FormHistoryEntry[]> => {
+    if (!supabase) return [];
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const q = (table: string, cols = '*') =>
+      supabase!.from(table).select(cols).gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
+
+    const [ocR, psR, rcR, devR, libR] = await Promise.allSettled([
+      q('ordens_coleta'),
+      q('pre_stacking_emissoes'),
+      q('retiradas_cheio'),
+      q('devolucoes', 'id, container, booking, driver_name, driver_id, created_at, container_type, agencia, pod'),
+      q('liberacoes',  'id, booking, driver_name, driver_id, created_at, container_type, agencia, pod'),
+    ]);
+
+    const safe = (r: PromiseSettledResult<any>, map: (d: any) => any) =>
+      r.status === 'fulfilled' && !r.value.error ? (r.value.data || []).map(map) : [];
+
+    const entries: import('../types').FormHistoryEntry[] = [
+      ...safe(ocR,  (r) => ({ id: r.id, formType: 'ORDEM_COLETA',   formData: r.form_data, label: r.os || r.container || r.booking || '', userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at })),
+      ...safe(psR,  (r) => ({ id: r.id, formType: 'PRE_STACKING',   formData: r.form_data, label: r.container || r.os || r.booking || '',   userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at })),
+      ...safe(rcR,  (r) => ({ id: r.id, formType: 'RETIRADA_CHEIO', formData: r.form_data, label: r.container || r.booking || '',            userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at })),
+      ...safe(devR, (r) => ({ id: r.id, formType: 'DEVOLUCAO_VAZIO', formData: { container: r.container, booking: r.booking, tipo: r.container_type, agencia: r.agencia, pod: r.pod, driverId: r.driver_id }, label: r.container || r.booking || '', userName: r.driver_name || '', userId: r.driver_id || '', createdAt: r.created_at })),
+      ...safe(libR, (r) => ({ id: r.id, formType: 'LIBERACAO_VAZIO', formData: { booking: r.booking, tipo: r.container_type, agencia: r.agencia, pod: r.pod, driverId: r.driver_id },                              label: r.booking || '',            userName: r.driver_name || '', userId: r.driver_id || '', createdAt: r.created_at })),
+    ];
+
+    return entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, limit);
+  },
+
+  deleteEmissao: async (id: string, formType: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const tableMap: Record<string, string> = {
+      ORDEM_COLETA:   'ordens_coleta',
+      PRE_STACKING:   'pre_stacking_emissoes',
+      RETIRADA_CHEIO: 'retiradas_cheio',
+      DEVOLUCAO_VAZIO:'devolucoes',
+      LIBERACAO_VAZIO:'liberacoes',
+    };
+    const table = tableMap[formType];
+    if (!table) return false;
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    return !error;
+  },
+
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('avantida_records').select('*').order('date', { ascending: false });

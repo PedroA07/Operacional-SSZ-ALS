@@ -172,10 +172,28 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
           { os: formData.booking, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse }
         );
       }
-      db.saveFormHistory('LIBERACAO_VAZIO', formData, formData.booking, activeUser);
       if (liberacao && onSave) {
         const updated = buildUpdatedLiberacao();
         if (updated) await onSave(updated);
+      } else {
+        await db.saveLiberacao({
+          id: crypto.randomUUID(),
+          os: '',
+          booking: formData.booking || undefined,
+          ship: formData.ship || undefined,
+          agencia: formData.agencia || undefined,
+          pod: formData.pod || undefined,
+          local: formData.manualLocal || selectedLocalObj?.name || undefined,
+          localId: formData.destinatarioId || undefined,
+          containerType: formData.tipo || undefined,
+          qtdContainer: formData.qtdContainer || undefined,
+          padrao: formData.padrao || undefined,
+          customer: selectedRemetente ? { id: selectedRemetente.id, name: selectedRemetente.name, legalName: selectedRemetente.legalName, cnpj: selectedRemetente.cnpj, city: selectedRemetente.city, state: selectedRemetente.state } : undefined,
+          driver: effectiveDriver ? { id: effectiveDriver.id, name: effectiveDriver.name, plateHorse: effectiveDriver.plateHorse, plateTrailer: effectiveDriver.plateTrailer, cpf: (effectiveDriver as any).cpf } : undefined,
+          obs: formData.obs || undefined,
+          status: 'Emitido',
+          createdAt: new Date().toISOString(),
+        });
       }
       await new Promise(r => setTimeout(r, 800));
       const element = captureRef.current;
