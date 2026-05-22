@@ -297,9 +297,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
             ) : selectedFormType === 'PRE_STACKING' ? (
               <PreStackingForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
             ) : selectedFormType === 'LIBERACAO_VAZIO' ? (
-              <LiberacaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
+              <LiberacaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} onClose={handleClose} initialFormData={initialFormData} />
             ) : selectedFormType === 'DEVOLUCAO_VAZIO' ? (
-              <DevolucaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
+              <DevolucaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} preStacking={preStacking} onClose={handleClose} initialFormData={initialFormData} />
             ) : selectedFormType === 'RETIRADA_CHEIO' ? (
               <RetiradaCheioForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
             ) : null}

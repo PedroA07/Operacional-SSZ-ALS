@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port, User } from '../../../types';
+import { Driver, Customer, Port, PreStacking, User } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import DevolucaoVazioTemplate from './DevolucaoVazioTemplate';
@@ -15,13 +15,14 @@ interface DevolucaoVazioFormProps {
   drivers: Driver[];
   customers: Customer[];
   ports: Port[];
+  preStacking?: PreStacking[];
   onClose: () => void;
   initialFormData?: any;
 }
 
 const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
 
-const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, onClose, initialFormData }) => {
+const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, preStacking = [], onClose, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -30,6 +31,9 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const [plateTrailer, setPlateTrailer] = useState('');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
 
+  const [localSearch, setLocalSearch] = useState('');
+  const [showLocalResults, setShowLocalResults] = useState(false);
+  const localRef = useRef<HTMLDivElement>(null);
   const [remetenteSearch, setRemetenteSearch] = useState('');
   const [showRemetenteResults, setShowRemetenteResults] = useState(false);
   const [driverSearch, setDriverSearch] = useState('');
@@ -49,9 +53,14 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     };
     loadContainerTypes();
 
+    if (initialFormData?.manualLocal) setLocalSearch(initialFormData.manualLocal);
+
     const handleClickOutside = (e: MouseEvent) => {
       if (podRef.current && !podRef.current.contains(e.target as Node)) {
         setShowPodResults(false);
+      }
+      if (localRef.current && !localRef.current.contains(e.target as Node)) {
+        setShowLocalResults(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -139,8 +148,19 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const labelAmberClass = "text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1.5 block";
 
-  const filteredCustomers = customers.filter(c => 
-    (c.name && c.name.toUpperCase().includes(remetenteSearch)) || 
+  const allLocations = [
+    ...ports.map(p => ({ id: `port-${p.id}`, label: p.name, sub: p.legalName || p.city || '', type: 'PORTO' as const })),
+    ...preStacking.map(p => ({ id: `ps-${p.id}`, label: p.name, sub: p.legalName || p.city || '', type: 'PRÉ-STACKING' as const })),
+  ];
+  const filteredLocations = localSearch.length === 0
+    ? allLocations
+    : allLocations.filter(l =>
+        l.label.toUpperCase().includes(localSearch.toUpperCase()) ||
+        l.sub.toUpperCase().includes(localSearch.toUpperCase())
+      );
+
+  const filteredCustomers = customers.filter(c =>
+    (c.name && c.name.toUpperCase().includes(remetenteSearch)) ||
     (c.legalName && c.legalName.toUpperCase().includes(remetenteSearch))
   );
 
@@ -160,9 +180,48 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
       </div>
 
       <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
-        <div className="space-y-1">
+        <div className="relative" ref={localRef}>
           <label className={labelAmberClass}>1. Local de Devolução (Depot / Terminal)</label>
-          <input type="text" placeholder="BUSCAR OU MANUAL..." className={inputClasses} value={formData.manualLocal} onChange={e => handleInputChange('manualLocal', e.target.value)} />
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="BUSCAR PORTO OU PRÉ-STACKING..."
+              className={`${inputClasses} pr-10`}
+              value={localSearch}
+              onFocus={() => setShowLocalResults(true)}
+              onChange={e => {
+                const val = e.target.value.toUpperCase();
+                setLocalSearch(val);
+                handleInputChange('manualLocal', val);
+              }}
+            />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
+            </div>
+          </div>
+          {showLocalResults && (
+            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-amber-500 animate-in fade-in slide-in-from-top-2 duration-200">
+              {filteredLocations.length === 0 ? (
+                <div className="p-4 text-center text-[9px] font-bold text-slate-300 uppercase italic">Nenhum local encontrado — entrada manual</div>
+              ) : filteredLocations.map(loc => (
+                <button
+                  key={loc.id}
+                  className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50 transition-colors flex items-center justify-between gap-2"
+                  onClick={() => {
+                    setLocalSearch(loc.label);
+                    handleInputChange('manualLocal', loc.label);
+                    setShowLocalResults(false);
+                  }}
+                >
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{loc.label}</p>
+                    {loc.sub && <p className="text-[8px] text-slate-400 font-bold uppercase leading-tight">{loc.sub}</p>}
+                  </div>
+                  <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${loc.type === 'PORTO' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-700'}`}>{loc.type}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="relative">
