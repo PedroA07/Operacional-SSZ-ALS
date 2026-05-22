@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Trip, User, Devolucao, Customer } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
 import DatePicker from '../../shared/DatePicker';
+import ImageViewer from '../../shared/ImageViewer';
 import { db } from '../../../utils/storage';
 
 interface ExternalPortalProps {
@@ -50,6 +51,26 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
   const [startDate, setStartDate]   = useState<string>(todayLocal);
   const [endDate, setEndDate]       = useState<string>(todayLocal);
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  /* ── Document viewer state ──────────────────────────────────── */
+  const [viewingDoc, setViewingDoc] = useState<{ url: string; fileName: string } | null>(null);
+
+  const handleDownloadDoc = async (url: string, fileName: string) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
+  };
 
   /* ── Insert form state ───────────────────────────────────────── */
   const [showInsertModal, setShowInsertModal] = useState(false);
@@ -304,10 +325,13 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
         fields.includes('agendamentoDoc') && {
           key: 'agendamentoDoc', label: 'Comprovante',
           render: (d: Devolucao) => d.agendamentoDoc
-            ? <a href={d.agendamentoDoc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors">
+            ? <button
+                onClick={() => setViewingDoc({ url: d.agendamentoDoc!.url, fileName: d.agendamentoDoc!.fileName || 'comprovante' })}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors active:scale-95"
+              >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 Ver
-              </a>
+              </button>
             : <span className="text-[9px] text-slate-300 italic">—</span>,
         },
       ].filter(Boolean) as any[];
@@ -556,6 +580,49 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
           stickyHeaderTop={enabledPages.length > 1 ? 192 : 148}
         />
       </div>
+
+      {/* ── Native document viewer ───────────────────────────────── */}
+      {viewingDoc && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col" style={{ height: '90vh' }}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black text-slate-800 uppercase tracking-widest truncate">{viewingDoc.fileName}</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Comprovante de Agendamento</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => handleDownloadDoc(viewingDoc.url, viewingDoc.fileName)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all active:scale-95 shadow-sm"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                  </svg>
+                  Baixar
+                </button>
+                <button
+                  onClick={() => setViewingDoc(null)}
+                  className="w-9 h-9 flex items-center justify-center bg-slate-200 hover:bg-red-100 hover:text-red-600 text-slate-500 rounded-xl transition-all"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 p-4 min-h-0">
+              <ImageViewer url={viewingDoc.url} alt={viewingDoc.fileName} className="h-full" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Insert devolução modal ────────────────────────────────── */}
       {showInsertModal && (

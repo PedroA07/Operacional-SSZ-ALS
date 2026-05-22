@@ -96,8 +96,10 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
     });
   };
 
+  const allLocais = [...ports, ...preStackings];
   const selectedDriver    = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
+  const selectedLocalObj  = allLocais.find(l => l.id === formData.destinatarioId) ?? null;
 
   useEffect(() => {
     if (selectedDriver) {
@@ -192,7 +194,6 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
   const labelSlateClass = "text-[10px] font-black text-slate-700 uppercase tracking-widest mb-2 block";
 
   const filteredPODs = commonPODs.filter(p => p.toUpperCase().includes(podSearch.toUpperCase()));
-  const allLocais = [...ports, ...preStackings];
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
@@ -202,7 +203,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
             formData={formData}
             selectedDriver={effectiveDriver}
             selectedRemetente={selectedRemetente}
-            selectedDestinatario={null}
+            selectedDestinatario={selectedLocalObj}
           />
         </div>
       </div>
@@ -368,7 +369,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
 
       <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-12 custom-scrollbar">
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
-          <LiberacaoVazioTemplate formData={formData} selectedDriver={effectiveDriver} selectedRemetente={selectedRemetente} selectedDestinatario={null} />
+          <LiberacaoVazioTemplate formData={formData} selectedDriver={effectiveDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedLocalObj} />
         </div>
       </div>
     </div>
