@@ -569,7 +569,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       ...trip,
       status: 'Reutilização',
       statusHistory: [
-        { status: 'Reutilização', dateTime: now },
+        { status: 'Reutilização', dateTime: now, createdAt: now },
         ...(trip.statusHistory || []),
       ],
     };
