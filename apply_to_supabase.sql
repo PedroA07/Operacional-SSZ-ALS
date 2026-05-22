@@ -27,7 +27,18 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.form_history TO anon, authenticat
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS agencia TEXT;
 CREATE INDEX IF NOT EXISTS idx_trips_agencia ON trips (agencia);
 
--- 3. AUTOMATIONS — conceder permissões para anon (causava erro 401)
+-- 3. AUTOMATIONS — criar tabela (não existia) e conceder permissões para anon
+CREATE TABLE IF NOT EXISTS automations (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  status             TEXT        NOT NULL,
+  email_template_id  TEXT,
+  whatsapp_group_id  TEXT,
+  is_active          BOOLEAN     DEFAULT true,
+  created_at         TIMESTAMPTZ DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_automations_status ON automations (status);
+ALTER TABLE automations DISABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.automations TO anon, authenticated;
 
 -- Verificação final
