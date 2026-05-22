@@ -832,7 +832,6 @@ export interface SILProgramacao {
   placaVeiculo: string;
   placaCarreta: string;
   cidadeAtendimento: string;
-  referenciaPosCidade: string;
   nomeLocalAtendimento: string;
   numeroColeta: string;
   embarcador: string;

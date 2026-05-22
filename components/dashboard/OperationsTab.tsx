@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking, CustomStatus, SILProgramacao, TerminalVessel } from '../../types';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking, CustomStatus, SILProgramacao, TerminalVessel, Devolucao } from '../../types';
+import { detectContainerReuse } from '../../utils/containerReuseService';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db, supabase } from '../../utils/storage';
 import OperationRegisterAction from './operations/OperationRegisterAction';
@@ -70,6 +71,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [importedOs, setImportedOs] = useState<Set<string>>(new Set());
   const [lastSilImport, setLastSilImport] = useState<{ linked: number; unlinked: number } | null>(null);
   const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
+  const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
 
   // Carrega terminal_vessels do Supabase (atualiza a cada 5 min)
   useEffect(() => {
@@ -239,6 +241,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     fetchStatuses();
   }, []);
 
+  useEffect(() => {
+    db.getDevolucoes().then(setDevolucoes).catch(() => {});
+  }, []);
+
   const formatISOToInput = (isoString?: string) => {
     const date = isoString ? new Date(isoString) : new Date();
     if (isNaN(date.getTime())) return '';
@@ -354,6 +360,16 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       return best.score > 0 ? best.name : sil.toUpperCase();
     };
 
+    const mapCategory = (typeName: string): string => {
+      if (!typeName) return '';
+      const opType = operationTypes.find(
+        (ot: any) => ot.name?.toUpperCase() === typeName.toUpperCase()
+      );
+      if (!opType?.config?.defaultCategoryId) return '';
+      const cat = categories.find(c => c.id === opType.config!.defaultCategoryId);
+      return cat?.name || '';
+    };
+
     const mapStatus = (sit: string): TripStatus | null => {
       const s = sit.toLowerCase();
       if (s.includes('encerr') || s.includes('conclu') || s.includes('finaliz')) return 'Viagem concluída';
@@ -407,11 +423,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       const newStatus   = sil.situacao ? mapStatus(sil.situacao) : null;
       const newDateTime = sil.previsaoAtendimento ? parseDate(sil.previsaoAtendimento) : '';
 
+      const resolvedType = newType || trip.type;
       const updated: Trip = {
         ...trip,
         driver:        driverRef,
         customer:      customerRef,
-        type:          newType || trip.type,
+        type:          resolvedType,
+        category:      trip.category || mapCategory(resolvedType),
         ...(newDateTime ? { dateTime: newDateTime } : {}),
         ...(newStatus   ? { status: newStatus }   : {}),
         booking:       sil.booking        || trip.booking,
@@ -455,7 +473,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         tara: sil.taraEspecifica || '',
         seal: sil.lacre1 || '',
         type: mapType(sil.tipoProgramado),
-        category: '',
+        category: mapCategory(mapType(sil.tipoProgramado)),
         status: 'Pendente',
         dateTime: parseDate(sil.previsaoAtendimento) || new Date().toISOString().slice(0, 16),
         isLate: false,
@@ -486,11 +504,19 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       createCount++;
     }
 
+    // Corrigir trips existentes sem categoria cujo tipo permite inferir
+    const tripsToFix = trips.filter(t => !t.category && t.type);
+    for (const t of tripsToFix) {
+      const cat = mapCategory(t.type);
+      if (!cat) continue;
+      await db.saveTrip({ ...t, category: cat }, user);
+    }
+
     setImportedOs(prev => { const n = new Set(prev); newOs.forEach(o => n.add(o)); return n; });
     setLastSilImport({ linked: updateCount + createCount, unlinked: 0 });
     setIsSilImporterOpen(false);
     onRefresh();
-  }, [drivers, customers, operationTypes, importedOs, user, onRefresh]);
+  }, [drivers, customers, operationTypes, categories, trips, importedOs, user, onRefresh]);
 
   const filteredTrips = useMemo(() => {
     let result = [...trips];
@@ -532,6 +558,25 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     return result.sort((a, b) => b.dateTime.localeCompare(a.dateTime));
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery, customStatuses]);
 
+  const reuseMap = useMemo(
+    () => detectContainerReuse(trips, devolucoes),
+    [trips, devolucoes]
+  );
+
+  const handleMarkReuse = useCallback(async (trip: Trip) => {
+    const now = new Date().toISOString();
+    const updated: Trip = {
+      ...trip,
+      status: 'Reutilização',
+      statusHistory: [
+        { status: 'Reutilização', dateTime: now, createdAt: now },
+        ...(trip.statusHistory || []),
+      ],
+    };
+    await db.saveTrip(updated, user);
+    onRefresh();
+  }, [user, onRefresh]);
+
   const columns = useMemo(() => getOperationTableColumns(
     handleOpenStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
@@ -549,8 +594,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     drivers,
     categories,
     operationTypes,
-    getGateTag
-  ), [user, onRefresh, onDeleteTrip, drivers, trips, categories, operationTypes, getGateTag]);
+    getGateTag,
+    reuseMap,
+    handleMarkReuse
+  ), [user, onRefresh, onDeleteTrip, drivers, trips, categories, operationTypes, getGateTag, reuseMap, handleMarkReuse]);
 
   if (activeView.type !== 'list') {
     return (
