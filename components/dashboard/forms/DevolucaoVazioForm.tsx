@@ -300,8 +300,21 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
 
         <div className="relative" ref={remetenteRef}>
           <label className={labelAmberClass}>2. Cliente (Exportador)</label>
-          <input type="text" placeholder="BUSCAR CLIENTE..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setFormData(prev => ({ ...prev, remetenteId: '' })); }} />
-          {selectedRemetente && (
+          <input
+            type="text"
+            placeholder="BUSCAR CLIENTE..."
+            className={inputClasses}
+            value={remetenteSearch}
+            onFocus={() => { setShowRemetenteResults(true); setRemetenteSearch(''); }}
+            onChange={e => {
+              const val = e.target.value.toUpperCase();
+              setRemetenteSearch(val);
+              setShowRemetenteResults(true);
+              setFormData(prev => ({ ...prev, remetenteId: '' }));
+            }}
+          />
+          {/* Card de cliente selecionado — só aparece quando o dropdown está fechado */}
+          {selectedRemetente && !showRemetenteResults && (
             <div className="mt-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-[9px] font-black text-slate-800 uppercase truncate">{selectedRemetente.legalName || selectedRemetente.name}</p>
@@ -315,10 +328,15 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
               </button>
             </div>
           )}
-          {showRemetenteResults && !selectedRemetente && (
+          {/* Dropdown — aparece sempre que o campo estiver focado */}
+          {showRemetenteResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-amber-500 animate-in fade-in slide-in-from-top-2 duration-200">
               {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
-                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50 transition-colors" onClick={() => { setFormData(prev => ({...prev, remetenteId: c.id})); setRemetenteSearch(c.legalName || c.name); setShowRemetenteResults(false); }}>
+                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50 transition-colors" onClick={() => {
+                  setFormData(prev => ({ ...prev, remetenteId: c.id }));
+                  setRemetenteSearch(c.legalName || c.name);
+                  setShowRemetenteResults(false);
+                }}>
                   <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     {c.cnpj && <span className="text-[8px] font-bold text-slate-500">{maskCNPJ(c.cnpj)}</span>}
@@ -326,7 +344,10 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
                   </div>
                 </button>
               )) : (
-                <div className="px-4 py-3 text-[9px] text-slate-400 font-bold uppercase">Nenhum cliente encontrado</div>
+                <div className="px-4 py-6 text-center">
+                  <p className="text-[9px] text-slate-400 font-bold uppercase">Nenhum cliente encontrado</p>
+                  <p className="text-[8px] text-slate-300 font-bold mt-1">Tente outra busca</p>
+                </div>
               )}
             </div>
           )}
