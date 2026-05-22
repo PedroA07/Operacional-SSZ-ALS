@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking, CustomStatus, SILProgramacao, TerminalVessel } from '../../types';
+import { User, Driver, Customer, Port, Trip, TripStatus, Category, OperationDefinition, PreStacking, CustomStatus, SILProgramacao, TerminalVessel, Devolucao } from '../../types';
+import { detectContainerReuse } from '../../utils/containerReuseService';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { db, supabase } from '../../utils/storage';
 import OperationRegisterAction from './operations/OperationRegisterAction';
@@ -70,6 +71,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   const [importedOs, setImportedOs] = useState<Set<string>>(new Set());
   const [lastSilImport, setLastSilImport] = useState<{ linked: number; unlinked: number } | null>(null);
   const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
+  const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
 
   // Carrega terminal_vessels do Supabase (atualiza a cada 5 min)
   useEffect(() => {
@@ -237,6 +239,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       }
     };
     fetchStatuses();
+  }, []);
+
+  useEffect(() => {
+    db.getDevolucoes().then(setDevolucoes).catch(() => {});
   }, []);
 
   const formatISOToInput = (isoString?: string) => {
@@ -532,6 +538,25 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     return result.sort((a, b) => b.dateTime.localeCompare(a.dateTime));
   }, [trips, activeStatusTab, filterTypes, filterClientNames, filterDriverNames, startDate, endDate, searchQuery, customStatuses]);
 
+  const reuseMap = useMemo(
+    () => detectContainerReuse(trips, devolucoes),
+    [trips, devolucoes]
+  );
+
+  const handleMarkReuse = useCallback(async (trip: Trip) => {
+    const now = new Date().toISOString();
+    const updated: Trip = {
+      ...trip,
+      status: 'Reutilização',
+      statusHistory: [
+        { status: 'Reutilização', dateTime: now },
+        ...(trip.statusHistory || []),
+      ],
+    };
+    await db.saveTrip(updated, user);
+    onRefresh();
+  }, [user, onRefresh]);
+
   const columns = useMemo(() => getOperationTableColumns(
     handleOpenStatusEditor,
     (t) => { setSelectedTrip(t); setIsTripModalOpen(true); }, 
@@ -549,8 +574,10 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
     drivers,
     categories,
     operationTypes,
-    getGateTag
-  ), [user, onRefresh, onDeleteTrip, drivers, trips, categories, operationTypes, getGateTag]);
+    getGateTag,
+    reuseMap,
+    handleMarkReuse
+  ), [user, onRefresh, onDeleteTrip, drivers, trips, categories, operationTypes, getGateTag, reuseMap, handleMarkReuse]);
 
   if (activeView.type !== 'list') {
     return (
