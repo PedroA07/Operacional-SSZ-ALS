@@ -720,6 +720,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const now = Date.now();
 
     return propTrips
+      .map(serverTrip => {
+        const pending = pendingUpdates[serverTrip.id];
+        // Se houver uma atualização local feita há menos de STABILITY_DURATION, ela tem prioridade
+        if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
+          return { ...serverTrip, ...pending.data };
+        }
+        return serverTrip;
+      })
       .filter(trip => {
         const type = trip.type?.toUpperCase() || '';
         if (activeView === 'COLETA') {
@@ -756,14 +764,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           return true;
         }
         return false;
-      })
-      .map(serverTrip => {
-        const pending = pendingUpdates[serverTrip.id];
-        // Se houver uma atualização local feita há menos de STABILITY_DURATION, ela tem prioridade
-        if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
-          return { ...serverTrip, ...pending.data };
-        }
-        return serverTrip;
       })
       .sort((a, b) => {
         const dateA = new Date(a.dateTime || 0).getTime();

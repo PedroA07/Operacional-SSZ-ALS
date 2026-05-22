@@ -318,6 +318,11 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const baseTrips = useMemo(() => {
     const now = Date.now();
     return propTrips
+      .map(serverTrip => {
+        const pending = pendingUpdates[serverTrip.id];
+        if (pending && (now - pending.timestamp) < STABILITY_DURATION) return { ...serverTrip, ...pending.data };
+        return serverTrip;
+      })
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
@@ -327,11 +332,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
         const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
         return normalized >= '2026-04-01';
-      })
-      .map(serverTrip => {
-        const pending = pendingUpdates[serverTrip.id];
-        if (pending && (now - pending.timestamp) < STABILITY_DURATION) return { ...serverTrip, ...pending.data };
-        return serverTrip;
       })
       .sort((a, b) => {
         const aNF = !!a.sentNF;
