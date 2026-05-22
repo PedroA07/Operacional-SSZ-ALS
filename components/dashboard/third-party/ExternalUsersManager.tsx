@@ -546,27 +546,64 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
 
                     {/* Columns — only shown when enabled */}
                     {isEnabled && (
-                      <div className="px-4 pb-4 border-t border-white/60">
-                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-3 mb-2">Dados visíveis</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {page.columns.map(col => {
-                            const checked = fields.includes(col.key);
-                            return (
-                              <label
-                                key={col.key}
-                                className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all text-[10px] font-bold uppercase
-                                  ${checked ? `bg-white ${c.border} text-slate-800` : 'bg-white/60 border-white text-slate-400 hover:border-slate-200'}`}
+                      <div className="px-4 pb-4 border-t border-white/60 space-y-4">
+                        <div>
+                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-3 mb-2">Dados visíveis</p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {page.columns.map(col => {
+                              const checked = fields.includes(col.key);
+                              return (
+                                <label
+                                  key={col.key}
+                                  className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all text-[10px] font-bold uppercase
+                                    ${checked ? `bg-white ${c.border} text-slate-800` : 'bg-white/60 border-white text-slate-400 hover:border-slate-200'}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => togglePageField(page.key, col.key)}
+                                    className={`w-3.5 h-3.5 rounded border-slate-300 focus:ring-0 ${c.check}`}
+                                  />
+                                  {col.label}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Insert permission */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Permissões de Inserção</p>
+                            <div className="flex-1 h-px bg-white/60"/>
+                          </div>
+                          <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${editingUser.thirdPartyConfig?.allowInsertDevolucao ? `${c.border} bg-white` : 'border-white/80 bg-white/60 hover:border-slate-200'}`}>
+                            <div className="mt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => setEditingUser({
+                                  ...editingUser,
+                                  thirdPartyConfig: {
+                                    ...editingUser.thirdPartyConfig,
+                                    visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
+                                    allowInsertDevolucao: !editingUser.thirdPartyConfig?.allowInsertDevolucao,
+                                  }
+                                })}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${editingUser.thirdPartyConfig?.allowInsertDevolucao ? c.toggle : 'bg-slate-200'}`}
+                                role="switch"
+                                aria-checked={editingUser.thirdPartyConfig?.allowInsertDevolucao}
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => togglePageField(page.key, col.key)}
-                                  className={`w-3.5 h-3.5 rounded border-slate-300 focus:ring-0 ${c.check}`}
-                                />
-                                {col.label}
-                              </label>
-                            );
-                          })}
+                                <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${editingUser.thirdPartyConfig?.allowInsertDevolucao ? 'translate-x-4' : 'translate-x-0'}`}/>
+                              </button>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] font-black uppercase text-slate-700 leading-tight">Permitir inserção de devoluções</p>
+                              <p className="text-[8px] font-bold text-slate-400 mt-1 leading-relaxed">
+                                Usuário pode registrar novos containers no portal. Container é obrigatório; cliente e OS são opcionais.
+                                Se houver uma OS no sistema com o mesmo container e cliente, ela será vinculada automaticamente.
+                              </p>
+                            </div>
+                          </label>
                         </div>
                       </div>
                     )}
