@@ -283,8 +283,8 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
 
         <div className="relative" ref={remetenteRef}>
           <label className={labelSlateClass}>2. Cliente (Exportador)</label>
-          <input type="text" placeholder="BUSCAR..." className={inputClasses} value={remetenteSearch} onFocus={() => setShowRemetenteResults(true)} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setFormData(prev => ({ ...prev, remetenteId: '' })); }} />
-          {selectedRemetente && (
+          <input type="text" placeholder="BUSCAR..." className={inputClasses} value={remetenteSearch} onFocus={() => { setShowRemetenteResults(true); setRemetenteSearch(''); }} onChange={e => { setRemetenteSearch(e.target.value.toUpperCase()); setShowRemetenteResults(true); setFormData(prev => ({ ...prev, remetenteId: '' })); }} />
+          {selectedRemetente && !showRemetenteResults && (
             <div className="mt-1.5 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-[9px] font-black text-slate-800 uppercase truncate">{selectedRemetente.legalName || selectedRemetente.name}</p>
@@ -298,7 +298,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
               </button>
             </div>
           )}
-          {showRemetenteResults && !selectedRemetente && (
+          {showRemetenteResults && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-slate-700 animate-in fade-in slide-in-from-top-2 duration-200">
               {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
                 <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-50 transition-colors" onClick={() => { setFormData(prev => ({...prev, remetenteId: c.id})); setRemetenteSearch(c.legalName || c.name); setShowRemetenteResults(false); }}>
