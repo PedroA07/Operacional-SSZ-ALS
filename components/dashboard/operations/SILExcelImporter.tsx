@@ -56,8 +56,18 @@ const SILExcelImporter: React.FC<Props> = ({ isOpen, onClose, trips, importedOs,
           return { sil, trip, alreadyImported };
         });
         setRows(matched);
-        // Pré-seleciona: SEM OS no sistema E ainda não foi importado (serão criadas)
-        setSelected(new Set(matched.filter(r => !r.trip && !r.alreadyImported).map(r => r.sil._rowIndex)));
+        const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+        // Pré-seleciona:
+        //   1. SEM OS no sistema → serão criadas
+        //   2. VINCULADAS cuja dateTime é hoje E a planilha tem data diferente → corrigir data errada
+        setSelected(new Set(matched.filter(r => {
+          if (r.alreadyImported) return false;
+          if (!r.trip) return true; // SEM OS
+          // Vinculada com data suspeita (hoje) e SIL traz data diferente
+          const tripIsToday = (r.trip.dateTime || '').startsWith(today);
+          const silHasDate  = !!r.sil.previsaoAtendimento;
+          return tripIsToday && silHasDate;
+        }).map(r => r.sil._rowIndex)));
       }
     } catch {
       setError('Erro ao ler o arquivo. Verifique se não está corrompido ou protegido por senha.');
@@ -328,9 +338,15 @@ const SILExcelImporter: React.FC<Props> = ({ isOpen, onClose, trips, importedOs,
         {/* Footer */}
         <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between shrink-0">
           <p className="text-[9px] font-bold text-slate-400 uppercase">
-            {rows.length > 0
-              ? `${selected.size} selecionada${selected.size !== 1 ? 's' : ''} · ${rows.filter(r => selected.has(r.sil._rowIndex) && !r.trip).length} serão criadas · ${rows.filter(r => selected.has(r.sil._rowIndex) && r.trip).length} atualizarão existentes`
-              : 'Nenhum arquivo carregado'}
+            {rows.length > 0 ? (() => {
+              const sel = rows.filter(r => selected.has(r.sil._rowIndex));
+              const toCreate = sel.filter(r => !r.trip).length;
+              const toUpdate = sel.filter(r => !!r.trip).length;
+              const parts = [];
+              if (toCreate) parts.push(`${toCreate} serão criadas`);
+              if (toUpdate) parts.push(`${toUpdate} atualizarão existentes`);
+              return `${selected.size} selecionada${selected.size !== 1 ? 's' : ''} · ${parts.join(' · ') || 'nenhuma ação'}`;
+            })() : 'Nenhum arquivo carregado'}
           </p>
           <div className="flex gap-3">
             <button onClick={onClose} className="px-6 py-3 rounded-2xl text-[10px] font-black text-slate-500 uppercase hover:bg-slate-100 transition-all">

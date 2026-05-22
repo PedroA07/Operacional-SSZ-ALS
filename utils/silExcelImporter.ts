@@ -27,17 +27,20 @@ const COL_MAP: Record<keyof Omit<SILProgramacao, '_rowIndex'>, string[]> = {
 };
 
 function normalizeHeader(h: string): string {
-  return h.toString().trim().toLowerCase().replace(/\s+/g, ' ');
+  return h.toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')  // remove acentos
+    .replace(/\s+/g, ' ');
 }
 
 function findColIndex(headers: string[], candidates: string[]): number {
   const normalized = headers.map(normalizeHeader);
-  for (const c of candidates) {
+  const normCandidates = candidates.map(normalizeHeader);
+  for (const c of normCandidates) {
     const idx = normalized.indexOf(c);
     if (idx !== -1) return idx;
   }
   // busca parcial como fallback
-  for (const c of candidates) {
+  for (const c of normCandidates) {
     const idx = normalized.findIndex(h => h.includes(c) || c.includes(h));
     if (idx !== -1) return idx;
   }
