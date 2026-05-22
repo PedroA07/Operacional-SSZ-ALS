@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, useTransition } from 'react';
 import { Trip, ColetaTipoViagemOption, EmailTemplate, ColetaOpConfig, ColetaDocOriginarioRule, ColetaReplaceRule } from '../../types';
-import { db } from '../../utils/storage';
+import { db, supabase } from '../../utils/storage';
 import SmartOperationTable from './operations/SmartOperationTable';
 import FeedbackModal from '../shared/FeedbackModal';
 import { Mail, Settings, Send, X, Copy } from 'lucide-react';
@@ -371,6 +371,16 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Subscription direta em trips — sem debounce, todos os usuários recebem imediatamente
+  useEffect(() => {
+    if (!supabase) return;
+    const ch = supabase
+      .channel('coleta-dia-trips-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => onRefresh())
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [onRefresh]);
 
   // Para contadores nas abas, reutiliza baseTrips
   const allFilteredTrips = baseTrips;
