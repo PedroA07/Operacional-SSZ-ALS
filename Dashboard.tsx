@@ -443,7 +443,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                preStacking={preStacking}
                drivers={drivers}
                customers={customers}
-               onRefresh={() => loadAllData(false)}
+               onRefresh={loadTripsOnly}
              />
            )}
            {activeTab === DashboardTab.COLETA_DIA && (
