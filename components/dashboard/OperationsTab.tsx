@@ -391,7 +391,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
 
     for (const { sil, trip } of matched) {
       const osKey = trip.os.trim().toLowerCase();
-      if (importedOs.has(osKey)) continue;
 
       const matchedDriver =
         driverByName.get(norm(sil.nomeMotorista)) ||
@@ -417,7 +416,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         cnpj: matchedCustomer.cnpj,
         city: matchedCustomer.city,
         state: matchedCustomer.state,
-      } : trip.customer;
+      } : sil.nomeLocalAtendimento
+        ? { id: trip.customer?.id || '', name: sil.nomeLocalAtendimento, city: sil.cidadeAtendimento || trip.customer?.city || '' }
+        : trip.customer;
 
       const newType     = sil.tipoProgramado ? mapType(sil.tipoProgramado) : '';
       const newStatus   = sil.situacao ? mapStatus(sil.situacao) : null;
@@ -443,7 +444,6 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       };
 
       await db.saveTrip(updated, user);
-      newOs.add(osKey);
       updateCount++;
     }
 

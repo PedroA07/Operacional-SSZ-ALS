@@ -377,6 +377,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [locations, setLocations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [settingsModal, setSettingsModal] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<Trip | null>(null);
   const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
   const [minutaTrip, setMinutaTrip] = useState<Trip | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
@@ -858,6 +859,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       .subscribe();
     return () => { supabase!.removeChannel(ch); };
   }, [loadLiberacoes]);
+
+  // Subscription direta em trips — sem debounce, todos os usuários recebem imediatamente
+  useEffect(() => {
+    if (!supabase) return;
+    const ch = supabase
+      .channel('org-trips-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => onRefresh())
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [onRefresh]);
 
   const sortedDevolucoes = useMemo(() => {
     return [...devolucoes].sort((a, b) => {
@@ -1621,12 +1632,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       sortable: false,
       render: (t: Trip) => (
         <div className="flex items-center justify-center">
-          <button 
-            onClick={() => {
-              if (window.confirm(`Deseja remover a OS ${t.os} deste painel?`)) {
-                handleRemoveFromOrg(t);
-              }
-            }}
+          <button
+            onClick={() => setConfirmRemove(t)}
             className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
             title="Limpar deste painel"
           >
@@ -2321,6 +2328,41 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             {/* Conteúdo */}
             <div className="flex-1 overflow-hidden p-6">
               <ImageViewer url={viewingDoc.url} alt={viewingDoc.fileName} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmação de remoção */}
+      {confirmRemove && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 w-full max-w-sm flex flex-col gap-6 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-[13px] font-black text-slate-800 uppercase tracking-tight">Remover do painel</p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  A OS <span className="font-black text-blue-700">{confirmRemove.os}</span> será removida deste painel.<br/>A viagem não será excluída do sistema.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmRemove(null)}
+                className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black text-slate-500 uppercase hover:bg-slate-100 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { handleRemoveFromOrg(confirmRemove); setConfirmRemove(null); }}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg"
+              >
+                Confirmar
+              </button>
             </div>
           </div>
         </div>
