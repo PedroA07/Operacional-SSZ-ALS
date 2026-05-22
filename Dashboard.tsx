@@ -217,6 +217,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   }, []);
 
+  const loadPreStackingOnly = useCallback(async () => {
+    try { setPreStacking(await db.getPreStacking()); } catch (e) { console.error('[loadPreStackingOnly]', e); }
+  }, []);
+
+  const loadUsersOnly = useCallback(async () => {
+    try {
+      const [driversData, staffData] = await Promise.all([db.getDrivers(), db.getStaff()]);
+      setDrivers(driversData);
+      setStaffList(staffData);
+    } catch (e) { console.error('[loadUsersOnly]', e); }
+  }, []);
+
   useEffect(() => {
     // Purga silenciosa de registros com mais de 90 dias (form_history + notifications)
     db.purgeOldHistory().catch(() => {});

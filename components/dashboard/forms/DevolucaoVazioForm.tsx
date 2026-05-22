@@ -184,13 +184,37 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           { os: formData.container, motorista: effectiveDriver!.name, placa: effectiveDriver!.plateHorse }
         );
       }
-      db.saveFormHistory('DEVOLUCAO_VAZIO', formData, formData.container || formData.booking, activeUser);
-      if (tripId && formData.agendamentoDateTime && onAgendamentoSave) {
-        onAgendamentoSave(tripId, formData.agendamentoDateTime);
-      }
       if (devolucao && onSave) {
         const updated = buildUpdatedDevolucao();
         if (updated) await onSave(updated);
+      } else {
+        // Fire-and-forget: registro não deve bloquear a geração do PDF
+        try {
+          const newId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+          db.saveDevolucao({
+            id: newId,
+            os: '',
+            container: formData.container,
+            containerType: formData.tipo || undefined,
+            booking: formData.booking || undefined,
+            ship: formData.ship || undefined,
+            agencia: formData.agencia || undefined,
+            pod: formData.pod || undefined,
+            padrao: formData.padrao || undefined,
+            local: formData.manualLocal || selectedDestinatario?.name || undefined,
+            localId: formData.destinatarioId || undefined,
+            customer: selectedRemetente ? { id: selectedRemetente.id, name: selectedRemetente.name, legalName: selectedRemetente.legalName, cnpj: selectedRemetente.cnpj, city: selectedRemetente.city, state: selectedRemetente.state } : undefined,
+            driver: effectiveDriver ? { id: effectiveDriver.id, name: effectiveDriver.name, plateHorse: effectiveDriver.plateHorse, plateTrailer: effectiveDriver.plateTrailer, cpf: (effectiveDriver as any).cpf } : undefined,
+            obs: formData.obs || undefined,
+            status: 'Pendente',
+            createdAt: new Date().toISOString(),
+          }).catch(e => console.error('[saveDevolucao standalone]', e));
+        } catch (e) { console.error('[saveDevolucao standalone]', e); }
+      }
+      if (tripId && formData.agendamentoDateTime && onAgendamentoSave) {
+        onAgendamentoSave(tripId, formData.agendamentoDateTime);
       }
       await new Promise(r => setTimeout(r, 800));
       const element = captureRef.current;

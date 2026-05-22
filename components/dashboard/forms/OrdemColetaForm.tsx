@@ -218,7 +218,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       const activeUser = user || currentUser;
       const dataChanged = !initialData || formFingerprint(formData) !== formFingerprint(initialData);
       if (dataChanged) {
-        db.saveFormHistory('ORDEM_COLETA', formData, formData.container || formData.os || 'OC', activeUser);
+        db.saveOrdemColeta(formData, activeUser);
       }
 
       generateBarcodes();

@@ -41,9 +41,44 @@ CREATE INDEX IF NOT EXISTS idx_automations_status ON automations (status);
 ALTER TABLE automations DISABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.automations TO anon, authenticated;
 
+-- 4. TABELAS DE EMISSÃO POR FORMULÁRIO
+CREATE TABLE IF NOT EXISTS ordens_coleta (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  os TEXT, container TEXT, booking TEXT,
+  form_data JSONB NOT NULL,
+  user_name TEXT, user_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ordens_coleta_created ON ordens_coleta (created_at DESC);
+ALTER TABLE ordens_coleta DISABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ordens_coleta TO anon, authenticated;
+
+CREATE TABLE IF NOT EXISTS pre_stacking_emissoes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  os TEXT, container TEXT, booking TEXT,
+  form_data JSONB NOT NULL,
+  user_name TEXT, user_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_pre_stacking_emissoes_created ON pre_stacking_emissoes (created_at DESC);
+ALTER TABLE pre_stacking_emissoes DISABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.pre_stacking_emissoes TO anon, authenticated;
+
+CREATE TABLE IF NOT EXISTS retiradas_cheio (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  container TEXT, booking TEXT, ship TEXT,
+  form_data JSONB NOT NULL,
+  user_name TEXT, user_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_retiradas_cheio_created ON retiradas_cheio (created_at DESC);
+ALTER TABLE retiradas_cheio DISABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.retiradas_cheio TO anon, authenticated;
+
 -- Verificação final
 SELECT
-  (SELECT COUNT(*) FROM form_history)           AS form_history_rows,
-  (SELECT relrowsecurity FROM pg_class WHERE relname = 'form_history') AS form_history_rls,
-  (SELECT COUNT(*) FROM information_schema.columns
-   WHERE table_name = 'trips' AND column_name = 'agencia') AS trips_has_agencia;
+  (SELECT relrowsecurity FROM pg_class WHERE relname = 'form_history')         AS form_history_rls,
+  (SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'trips' AND column_name = 'agencia') AS trips_has_agencia,
+  (SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'ordens_coleta')        AS tbl_ordens_coleta,
+  (SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'pre_stacking_emissoes') AS tbl_pre_stacking_emissoes,
+  (SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'retiradas_cheio')       AS tbl_retiradas_cheio;

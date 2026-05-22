@@ -215,7 +215,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
       }
       const dataChanged = !initialFormData || formFingerprint(formData) !== formFingerprint(initialFormData);
       if (dataChanged) {
-        db.saveFormHistory('PRE_STACKING', formData, formData.container || formData.os, activeUser);
+        db.savePreStackingEmissao(formData, activeUser);
       }
 
       if (effectiveDriver && selectedRemetente) {

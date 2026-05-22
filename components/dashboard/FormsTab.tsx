@@ -85,7 +85,7 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
   const loadAllHistory = useCallback(async () => {
     setIsLoadingAllHistory(true);
     try {
-      const data = await db.getAllFormHistory(500);
+      const data = await db.getAllEmissoesHistory(500);
       setAllHistory(data);
     } finally {
       setIsLoadingAllHistory(false);
@@ -98,6 +98,17 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
     }
   }, [activeView, loadAllHistory]);
 
+  const fetchHistoryForType = (type: FormType): Promise<FormHistoryEntry[]> => {
+    const map: Record<FormType, () => Promise<FormHistoryEntry[]>> = {
+      ORDEM_COLETA:    () => db.getOrdemColetaHistory(8),
+      PRE_STACKING:    () => db.getPreStackingEmissaoHistory(8),
+      RETIRADA_CHEIO:  () => db.getRetiradaCheioHistory(8),
+      DEVOLUCAO_VAZIO: () => db.getDevolucaoHistory(8),
+      LIBERACAO_VAZIO: () => db.getLiberacaoHistory(8),
+    };
+    return map[type]();
+  };
+
   const toggleHistory = async (type: FormType) => {
     if (openHistoryType === type) {
       setOpenHistoryType(null);
@@ -107,8 +118,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
     if (!histories[type]) {
       setLoadingHistory(type);
       try {
-        const data = await db.getFormHistory(type, 8);
-        setHistories(prev => ({ ...prev, [type]: data as FormHistoryEntry[] }));
+        const data = await fetchHistoryForType(type);
+        setHistories(prev => ({ ...prev, [type]: data }));
       } finally {
         setLoadingHistory(null);
       }
@@ -138,8 +149,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
     setIsFormModalOpen(false);
     setInitialFormData(null);
     if (selectedFormType) {
-      db.getFormHistory(selectedFormType, 8).then(data => {
-        setHistories(prev => ({ ...prev, [selectedFormType!]: data as FormHistoryEntry[] }));
+      fetchHistoryForType(selectedFormType).then(data => {
+        setHistories(prev => ({ ...prev, [selectedFormType!]: data }));
       });
     }
     if (activeView === 'history') {
@@ -153,9 +164,14 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
       title: 'Excluir Registro',
       message: `Deseja remover "${entry.label || entry.formType}" do histórico? A viagem/documento original não será afetado.`,
       onConfirm: async () => {
-        const ok = await db.deleteFormHistory(entry.id);
+        const ok = await db.deleteEmissao(entry.id, entry.formType);
         if (ok) {
           setAllHistory(prev => prev.filter(h => h.id !== entry.id));
+          setHistories(prev => {
+            const type = entry.formType as FormType;
+            const updated = (prev[type] || []).filter(h => h.id !== entry.id);
+            return { ...prev, [type]: updated };
+          });
         }
       },
     });
