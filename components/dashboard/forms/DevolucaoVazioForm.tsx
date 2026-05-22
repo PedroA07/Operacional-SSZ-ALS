@@ -202,10 +202,10 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
-  const inputClasses  = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
-  const selectClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm cursor-pointer";
-  const labelClass     = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block";
-  const labelBlueClass = "text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 block";
+  const inputClasses  = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-amber-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
+  const selectClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-amber-500 outline-none transition-all shadow-sm cursor-pointer";
+  const labelClass      = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block";
+  const labelAmberClass = "text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2 block";
 
   const filteredPODs = commonPODs.filter(p => p.toUpperCase().includes(podSearch.toUpperCase()));
   const allLocais = [...ports, ...preStackings];
@@ -264,7 +264,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
                   container: containerValue,
                   agencia: carrierName !== '' ? carrierName : prev.agencia,
                 }))}
-                className={`${inputClasses} text-lg border-blue-100`}
+                className={`${inputClasses} text-lg border-amber-100`}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -318,10 +318,10 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
               </div>
             </div>
             {showPodResults && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-h-52 overflow-y-auto border-t-4 border-blue-500 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-h-52 overflow-y-auto border-t-4 border-amber-500 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="p-2 space-y-0.5">
                   {filteredPODs.map(p => (
-                    <button key={p} className={`w-full text-left px-4 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${formData.pod === p ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-600'}`} onClick={() => { handleInputChange('pod', p); setPodSearch(p); setShowPodResults(false); }}>
+                    <button key={p} className={`w-full text-left px-4 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${formData.pod === p ? 'bg-amber-50 text-amber-600' : 'hover:bg-slate-50 text-slate-600'}`} onClick={() => { handleInputChange('pod', p); setPodSearch(p); setShowPodResults(false); }}>
                       {p}
                     </button>
                   ))}
@@ -367,7 +367,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 space-y-6 shadow-sm">
           <div className="space-y-1">
-            <label className={labelBlueClass}>6. Observações Operacionais</label>
+            <label className={labelAmberClass}>6. Observações Operacionais</label>
             <textarea
               placeholder="INSTRUÇÕES PARA O MOTORISTA OU DEPÓSITO..."
               className={`${inputClasses} h-28 resize-none lowercase leading-relaxed`}
@@ -376,7 +376,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
             />
           </div>
           <div className="space-y-1">
-            <label className={labelBlueClass}>7. Data/Hora do Agendamento</label>
+            <label className={labelAmberClass}>7. Data/Hora do Agendamento</label>
             <DateTimePicker
               value={formData.agendamentoDateTime}
               onChange={val => setFormData(prev => ({ ...prev, agendamentoDateTime: val }))}
@@ -393,7 +393,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
               {isSaving ? 'Processando...' : 'Salvar Dados'}
             </button>
           )}
-          <button disabled={isExporting} onClick={downloadPDF} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${devolucao && onSave ? '' : 'col-span-2'}`}>
+          <button disabled={isExporting} onClick={downloadPDF} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-amber-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${devolucao && onSave ? '' : 'col-span-2'}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2.5"/></svg>
             {isExporting ? 'Gerando PDF...' : 'Baixar Minuta'}
           </button>
