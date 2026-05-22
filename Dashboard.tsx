@@ -167,7 +167,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const loadAllData = useCallback(async (isInitial = false, silent = false) => {
     if (isInitial) setIsLoadingInitial(true);
     if (!silent) setIsSyncing(true);
-    
+
     try {
       const responses = await Promise.allSettled([
         db.getDrivers(),
@@ -189,10 +189,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[2].status === 'fulfilled') setPorts(responses[2].value);
       if (responses[3].status === 'fulfilled') setPreStacking(responses[3].value);
       if (responses[4].status === 'fulfilled') setStaffList(responses[4].value);
-      if (responses[5].status === 'fulfilled') {
-        console.log("Trips carregadas:", responses[5].value);
-        setTrips(responses[5].value);
-      }
+      if (responses[5].status === 'fulfilled') setTrips(responses[5].value);
       if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
       if (responses[7].status === 'fulfilled') setAvantidaRecords(responses[7].value);
       if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value);
@@ -209,26 +206,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   }, []);
 
+  // Atualiza apenas trips — usado pelo realtime para evitar recarregar todas as 12 tabelas
+  const loadTripsOnly = useCallback(async () => {
+    try {
+      const data = await db.getTrips();
+      setTrips(data);
+      setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
+    } catch (e) {
+      console.error('[loadTripsOnly]', e);
+    }
+  }, []);
+
   useEffect(() => {
     // Purga silenciosa de registros com mais de 90 dias (form_history + notifications)
     db.purgeOldHistory().catch(() => {});
 
     loadAllData(true);
 
-    const refreshDataInterval = setInterval(() => loadAllData(false, true), 30000);
+    // Polling de 5 minutos — fallback caso o realtime caia; realtime cobre as mudanças frequentes
+    const refreshDataInterval = setInterval(() => loadAllData(false, true), 300000);
 
-    // Debounce realtime — evita múltiplos reloads em batch updates do servidor
-    const debouncedRealtimeRefresh = () => {
+    // Debounce de 3s: só recarrega trips (não as 12 tabelas); aguarda rajadas de updates em lote
+    const debouncedTripsRefresh = () => {
       if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
-      realtimeDebounceRef.current = setTimeout(() => loadAllData(false, true), 800);
+      realtimeDebounceRef.current = setTimeout(() => loadTripsOnly(), 3000);
     };
 
     let channel: any = null;
     if (supabase) {
       channel = supabase
         .channel('db-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, debouncedRealtimeRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'seal_records' }, debouncedRealtimeRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, debouncedTripsRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'seal_records' }, debouncedTripsRefresh)
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') setIsRealtimeActive(true);
         });
@@ -242,7 +251,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (channel) supabase?.removeChannel(channel);
       window.removeEventListener('als_force_global_refresh', handleGlobalRefresh);
     };
-  }, [loadAllData]);
+  }, [loadAllData, loadTripsOnly]);
 
   const handleDeleteTripRequest = (id: string) => {
     const trip = trips.find(t => t.id === id);

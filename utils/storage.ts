@@ -640,7 +640,7 @@ export const db = {
     }));
   },
 
-  getAllFormHistory: async (limit = 500): Promise<import('../types').FormHistoryEntry[]> => {
+  getAllFormHistory: async (limit = 100): Promise<import('../types').FormHistoryEntry[]> => {
     if (!supabase) return [];
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
