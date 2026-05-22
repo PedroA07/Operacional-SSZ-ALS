@@ -6,6 +6,7 @@ import { advanceService } from '../../services/advanceService';
 import { db, supabase } from '../../utils/storage';
 import FeedbackModal from '../shared/FeedbackModal';
 import DateTimePicker from '../shared/DateTimePicker';
+import ImageViewer from '../shared/ImageViewer';
 import PreStackingForm from './forms/PreStackingForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
@@ -383,6 +384,24 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
   const [devMinutaDev, setDevMinutaDev] = useState<Devolucao | null>(null);
   const [uploadingDevId, setUploadingDevId] = useState<string | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<{ url: string; fileName: string } | null>(null);
+
+  const handleDownloadDoc = async (url: string, fileName: string) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
+  };
   const [showDevAddForm, setShowDevAddForm] = useState(false);
   const [devAddForm, setDevAddForm] = useState({ container: '', local: '', dateTime: '', driverId: '' });
   const [savingDevAdd, setSavingDevAdd] = useState(false);
@@ -1769,10 +1788,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return (
           <div className="flex flex-col gap-1 items-start">
             {d.agendamentoDoc && (
-              <a href={d.agendamentoDoc.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors">
+              <button
+                onClick={() => setViewingDoc({ url: d.agendamentoDoc!.url, fileName: d.agendamentoDoc!.fileName })}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors"
+              >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Ver
-              </a>
+                Visualizar
+              </button>
             )}
             <label className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[8px] font-black cursor-pointer transition-colors ${isUploading ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'}`}>
               {isUploading
@@ -2247,6 +2269,42 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 liberacao={libMinuta}
                 onSave={handleSaveLiberacaoFromForm}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal visualizador de comprovantes */}
+      {viewingDoc && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[400] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setViewingDoc(null); }}>
+          <div className="bg-white rounded-[2.5rem] w-full max-w-4xl h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-100">
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Comprovante</p>
+                  <p className="text-sm font-black text-slate-800 truncate">{viewingDoc.fileName}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => handleDownloadDoc(viewingDoc.url, viewingDoc.fileName)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                  Baixar
+                </button>
+                <button onClick={() => setViewingDoc(null)} className="p-2.5 hover:bg-slate-200 rounded-xl transition-colors">
+                  <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+            {/* Conteúdo */}
+            <div className="flex-1 overflow-hidden p-6">
+              <ImageViewer url={viewingDoc.url} alt={viewingDoc.fileName} />
             </div>
           </div>
         </div>

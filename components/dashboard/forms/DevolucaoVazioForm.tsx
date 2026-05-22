@@ -4,13 +4,14 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import DevolucaoVazioTemplate from './DevolucaoVazioTemplate';
 import ContainerInput from '../../shared/ContainerInput';
+import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
-import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
+import { localDateStr } from '../../../utils/dateHelpers';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
-import { maskCNPJ, maskCPF } from '../../../utils/masks';
+import { searchService } from '../../../utils/searchService';
 
 interface DevolucaoVazioFormProps {
   user?: User;
@@ -39,39 +40,21 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const [plateHorse, setPlateHorse] = useState('');
   const [plateTrailer, setPlateTrailer] = useState('');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
-
-  const [localSearch, setLocalSearch] = useState(devolucao?.local || '');
-  const [showLocalResults, setShowLocalResults] = useState(false);
-  const [remetenteSearch, setRemetenteSearch] = useState(
-    devolucao?.customer ? (devolucao.customer.legalName || devolucao.customer.name || '') : ''
-  );
-  const [showRemetenteResults, setShowRemetenteResults] = useState(false);
-  const [driverSearch, setDriverSearch] = useState(devolucao?.driver?.name || '');
-  const [showDriverResults, setShowDriverResults] = useState(false);
   const [podSearch, setPodSearch] = useState('');
   const [showPodResults, setShowPodResults] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const localRef = useRef<HTMLDivElement>(null);
-  const remetenteRef = useRef<HTMLDivElement>(null);
-  const driverRef = useRef<HTMLDivElement>(null);
-  
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) setCurrentUser(JSON.parse(saved));
-
     const loadContainerTypes = async () => {
       const types = await db.getContainerTypes();
       setContainerTypes(types);
     };
     loadContainerTypes();
-
     const handleClickOutside = (e: MouseEvent) => {
       if (podRef.current && !podRef.current.contains(e.target as Node)) setShowPodResults(false);
-      if (localRef.current && !localRef.current.contains(e.target as Node)) setShowLocalResults(false);
-      if (remetenteRef.current && !remetenteRef.current.contains(e.target as Node)) setShowRemetenteResults(false);
-      if (driverRef.current && !driverRef.current.contains(e.target as Node)) setShowDriverResults(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -94,21 +77,22 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     manualLocal: '',
     agendamentoDateTime: '',
   };
+
   const initData = devolucao ? {
     date: localDateStr(),
-    driverId:          devolucao.driver?.id        || '',
-    remetenteId:       devolucao.customer?.id      || '',
-    destinatarioId:    '',
-    container:         devolucao.container         || '',
-    booking:           devolucao.booking            || '',
-    ship:              devolucao.ship               || '',
-    agencia:           devolucao.agencia            || '',
-    pod:               devolucao.pod               || 'SANTOS',
-    qtdContainer:      '01',
-    tipo:              devolucao.containerType      || '40HC',
-    padrao:            devolucao.padrao             || 'CARGA GERAL',
-    obs:               devolucao.obs               || '',
-    manualLocal:       devolucao.local             || '',
+    driverId:            devolucao.driver?.id        || '',
+    remetenteId:         devolucao.customer?.id      || '',
+    destinatarioId:      '',
+    container:           devolucao.container         || '',
+    booking:             devolucao.booking           || '',
+    ship:                devolucao.ship              || '',
+    agencia:             devolucao.agencia           || '',
+    pod:                 devolucao.pod               || 'SANTOS',
+    qtdContainer:        '01',
+    tipo:                devolucao.containerType     || '40HC',
+    padrao:              devolucao.padrao            || 'CARGA GERAL',
+    obs:                 devolucao.obs               || '',
+    manualLocal:         devolucao.local             || '',
     agendamentoDateTime: devolucao.scheduledDateTime || '',
   } : (initialFormData ?? defaultFormData);
 
@@ -118,14 +102,12 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     const val = value.toUpperCase();
     setFormData(prev => {
       const next = { ...prev, [field]: val };
-      if (field === 'tipo' && val === '40HR') {
-        next.padrao = 'REEFER';
-      }
+      if (field === 'tipo' && val === '40HR') next.padrao = 'REEFER';
       return next;
     });
   };
 
-  const selectedDriver = drivers.find(d => d.id === formData.driverId);
+  const selectedDriver    = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
   const selectedDestinatario = ports.find(l => l.id === formData.destinatarioId);
 
@@ -142,16 +124,16 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     if (!devolucao) return null;
     return {
       ...devolucao,
-      container:     formData.container,
-      containerType: formData.tipo       || undefined,
-      booking:       formData.booking    || undefined,
-      ship:          formData.ship       || undefined,
-      agencia:       formData.agencia    || undefined,
-      pod:           formData.pod        || undefined,
-      padrao:        formData.padrao     || undefined,
-      local:         formData.manualLocal || undefined,
-      localId:       formData.destinatarioId || undefined,
-      obs:           formData.obs        || undefined,
+      container:         formData.container,
+      containerType:     formData.tipo              || undefined,
+      booking:           formData.booking           || undefined,
+      ship:              formData.ship              || undefined,
+      agencia:           formData.agencia           || undefined,
+      pod:               formData.pod               || undefined,
+      padrao:            formData.padrao            || undefined,
+      local:             formData.manualLocal       || undefined,
+      localId:           formData.destinatarioId    || undefined,
+      obs:               formData.obs               || undefined,
       scheduledDateTime: formData.agendamentoDateTime || undefined,
       status: formData.agendamentoDateTime ? 'Agendado' : devolucao.status,
       customer: selectedRemetente ? {
@@ -189,7 +171,6 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
       alert("Preencha Container e Motorista para prosseguir.");
       return;
     }
-
     setIsExporting(true);
     try {
       const activeUser = user || currentUser;
@@ -202,10 +183,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           { os: formData.container, motorista: effectiveDriver!.name, placa: effectiveDriver!.plateHorse }
         );
       }
-      const dataChanged = !initialFormData || formFingerprint(formData) !== formFingerprint(initialFormData);
-      if (dataChanged) {
-        db.saveFormHistory('DEVOLUCAO_VAZIO', formData, formData.container || formData.booking, activeUser);
-      }
+      db.saveFormHistory('DEVOLUCAO_VAZIO', formData, formData.container || formData.booking, activeUser);
       if (tripId && formData.agendamentoDateTime && onAgendamentoSave) {
         onAgendamentoSave(tripId, formData.agendamentoDateTime);
       }
@@ -213,7 +191,6 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
         const updated = buildUpdatedDevolucao();
         if (updated) await onSave(updated);
       }
-
       await new Promise(r => setTimeout(r, 800));
       const element = captureRef.current;
       if (!element) return;
@@ -221,238 +198,134 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      
       pdf.save(`DEVOLUÇÃO DE VAZIO - ${effectiveDriver!.name} - ${formData.container}.pdf`);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
-  const inputClasses = "w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:border-amber-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
-  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
-  const labelAmberClass = "text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1.5 block";
-
-  const filteredCustomers = customers.filter(c => {
-    const q = remetenteSearch.toUpperCase();
-    if (!q) return true;
-    const qDigits = q.replace(/\D/g, '');
-    return (c.name && c.name.toUpperCase().includes(q)) ||
-      (c.legalName && c.legalName.toUpperCase().includes(q)) ||
-      (qDigits && c.cnpj && c.cnpj.replace(/\D/g, '').includes(qDigits)) ||
-      (c.city && c.city.toUpperCase().includes(q));
-  });
-
-  const filteredDrivers = drivers.filter(d => {
-    const q = driverSearch.toUpperCase();
-    if (!q) return true;
-    const qDigits = q.replace(/\D/g, '');
-    return d.name.toUpperCase().includes(q) ||
-      (qDigits && d.cpf && d.cpf.replace(/\D/g, '').includes(qDigits)) ||
-      (d.plateHorse && d.plateHorse.toUpperCase().includes(q)) ||
-      (d.plateTrailer && d.plateTrailer.toUpperCase().includes(q));
-  });
-
-  const filteredPorts = [
-    ...ports.map(p => ({ ...p, _type: 'porto' as const })),
-    ...preStackings.map(p => ({ ...p, _type: 'pré-stacking' as const })),
-  ].filter(p => {
-    const q = localSearch.toUpperCase();
-    return !q || (p.name && p.name.toUpperCase().includes(q)) ||
-      (p.legalName && p.legalName.toUpperCase().includes(q)) ||
-      (p.city && p.city.toUpperCase().includes(q));
-  });
+  const inputClasses  = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-amber-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
+  const selectClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-amber-500 outline-none transition-all shadow-sm cursor-pointer";
+  const labelClass      = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block";
+  const labelAmberClass = "text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2 block";
 
   const filteredPODs = commonPODs.filter(p => p.toUpperCase().includes(podSearch.toUpperCase()));
+  const allLocais = [...ports, ...preStackings];
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
-          <DevolucaoVazioTemplate 
-            formData={formData} 
-            selectedDriver={effectiveDriver} 
-            selectedRemetente={selectedRemetente} 
-            selectedDestinatario={selectedDestinatario} 
+          <DevolucaoVazioTemplate
+            formData={formData}
+            selectedDriver={effectiveDriver}
+            selectedRemetente={selectedRemetente}
+            selectedDestinatario={selectedDestinatario}
           />
         </div>
       </div>
 
-      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
-        <div className="relative" ref={localRef}>
-          <label className={labelAmberClass}>1. Local de Devolução (Depot / Terminal)</label>
-          <input
-            type="text"
-            placeholder="BUSCAR TERMINAL OU PORTO..."
-            className={inputClasses}
-            value={localSearch}
-            onFocus={() => setShowLocalResults(true)}
-            onChange={e => {
-              const val = e.target.value.toUpperCase();
-              setLocalSearch(val);
-              setFormData(prev => ({ ...prev, manualLocal: val, destinatarioId: '' }));
-            }}
-          />
-          {showLocalResults && filteredPorts.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto border-t-4 border-amber-500 animate-in fade-in slide-in-from-top-2 duration-200">
-              {filteredPorts.map(p => (
-                <button key={p.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50 transition-colors" onClick={() => {
-                  setLocalSearch(p.name.toUpperCase());
-                  setFormData(prev => ({ ...prev, manualLocal: p.name.toUpperCase(), destinatarioId: p.id }));
-                  setShowLocalResults(false);
-                }}>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] font-black uppercase text-slate-800 leading-tight flex-1">{p.name}</p>
-                    <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded-full ${p._type === 'porto' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>{p._type}</span>
-                  </div>
-                  {p.city && <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">{p.city}{p.state ? `/${p.state}` : ''}</p>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="w-full lg:min-w-[560px] lg:w-[560px] p-10 overflow-y-auto space-y-8 bg-slate-50 border-r border-slate-100 custom-scrollbar relative">
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full shadow-sm border border-slate-200 transition-colors z-10"
+          title="Fechar"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
 
-        <div className="relative" ref={remetenteRef}>
-          <label className={labelAmberClass}>2. Cliente (Exportador)</label>
-          <input
-            type="text"
-            placeholder="BUSCAR CLIENTE..."
-            className={inputClasses}
-            value={remetenteSearch}
-            onFocus={() => { setShowRemetenteResults(true); setRemetenteSearch(''); }}
-            onChange={e => {
-              const val = e.target.value.toUpperCase();
-              setRemetenteSearch(val);
-              setShowRemetenteResults(true);
-              setFormData(prev => ({ ...prev, remetenteId: '' }));
-            }}
-          />
-          {/* Card de cliente selecionado — só aparece quando o dropdown está fechado */}
-          {selectedRemetente && !showRemetenteResults && (
-            <div className="mt-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-[9px] font-black text-slate-800 uppercase truncate">{selectedRemetente.legalName || selectedRemetente.name}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {selectedRemetente.cnpj && <span className="text-[8px] font-bold text-slate-500">{maskCNPJ(selectedRemetente.cnpj)}</span>}
-                  {selectedRemetente.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{selectedRemetente.city}{selectedRemetente.state ? `/${selectedRemetente.state}` : ''}</span>}
-                </div>
-              </div>
-              <button type="button" onClick={() => { setRemetenteSearch(''); setFormData(prev => ({ ...prev, remetenteId: '' })); }} className="text-slate-300 hover:text-red-400 transition-colors shrink-0">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-          )}
-          {/* Dropdown — aparece sempre que o campo estiver focado */}
-          {showRemetenteResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto border-t-4 border-amber-500 animate-in fade-in slide-in-from-top-2 duration-200">
-              {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
-                <button key={c.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50 transition-colors" onClick={() => {
-                  setFormData(prev => ({ ...prev, remetenteId: c.id }));
-                  setRemetenteSearch(c.legalName || c.name);
-                  setShowRemetenteResults(false);
-                }}>
-                  <p className="text-[10px] font-black uppercase text-slate-800 leading-tight">{c.legalName || c.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {c.cnpj && <span className="text-[8px] font-bold text-slate-500">{maskCNPJ(c.cnpj)}</span>}
-                    {c.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{c.city}{c.state ? `/${c.state}` : ''}</span>}
-                  </div>
-                </button>
-              )) : (
-                <div className="px-4 py-6 text-center">
-                  <p className="text-[9px] text-slate-400 font-bold uppercase">Nenhum cliente encontrado</p>
-                  <p className="text-[8px] text-slate-300 font-bold mt-1">Tente outra busca</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <AutocompleteSearch
+          label="1. Local de Devolução (Depot / Terminal)"
+          placeholder="Nome do Porto ou Pré-Stacking..."
+          data={allLocais}
+          onSelect={(p) => setFormData(prev => ({ ...prev, manualLocal: (p.legalName || p.name).toUpperCase(), destinatarioId: p.id }))}
+          mapToAutocomplete={searchService.mapPort}
+          initialValue={formData.manualLocal}
+          icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>}
+        />
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-           <p className={labelClass}>3. Dados do Equipamento</p>
-           <div className="space-y-3">
+        <AutocompleteSearch
+          label="2. Cliente (Exportador)"
+          placeholder="Razão, Fantasia, CNPJ ou Cidade..."
+          data={customers}
+          onSelect={(c) => setFormData(prev => ({ ...prev, remetenteId: c.id }))}
+          mapToAutocomplete={searchService.mapCustomer}
+          initialValue={selectedRemetente ? (selectedRemetente.legalName || selectedRemetente.name) : ''}
+          icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>}
+        />
+
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 space-y-6 shadow-sm">
+          <p className={labelClass}>3. Dados do Equipamento</p>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className={labelClass}>Container</label>
+              <ContainerInput
+                value={formData.container}
+                onChange={(containerValue, carrierName) => setFormData(prev => ({
+                  ...prev,
+                  container: containerValue,
+                  agencia: carrierName !== '' ? carrierName : prev.agencia,
+                }))}
+                className={`${inputClasses} text-lg border-amber-100`}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                 <label className={labelClass}>Container</label>
-                 <ContainerInput
-                   value={formData.container}
-                   onChange={(containerValue, carrierName) => setFormData(prev => ({
-                     ...prev,
-                     container: containerValue,
-                     agencia: carrierName !== '' ? carrierName : prev.agencia,
-                   }))}
-                   className={`${inputClasses} text-lg border-amber-100`}
-                 />
+                <label className={labelClass}>Tipo</label>
+                <CustomSelect
+                  value={formData.tipo}
+                  onChange={v => handleInputChange('tipo', v)}
+                  options={containerTypes.map(t => ({ value: t.name, label: t.name }))}
+                  inputClassName={selectClasses}
+                />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-1">
-                    <label className={labelClass}>Tipo</label>
-                    <CustomSelect
-                       value={formData.tipo}
-                       onChange={v => handleInputChange('tipo', v)}
-                       options={containerTypes.map(t => ({ value: t.name, label: t.name }))}
-                       inputClassName={inputClasses}
-                    />
-                 </div>
-                 <div className="space-y-1">
-                    <label className={labelClass}>Padrão</label>
-                    <CustomSelect
-                       value={formData.padrao}
-                       onChange={v => handleInputChange('padrao', v)}
-                       options={[
-                         { value: 'CARGA GERAL', label: 'CARGA GERAL' },
-                         { value: 'CARGO PREMIUM', label: 'CARGO PREMIUM' },
-                         { value: 'PADRÃO ALIMENTO', label: 'PADRÃO ALIMENTO' },
-                         { value: 'REEFER', label: 'REEFER' },
-                         { value: 'PRODUTO QUÍMICO', label: 'PRODUTO QUÍMICO' },
-                       ]}
-                       inputClassName={inputClasses}
-                    />
-                 </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Padrão</label>
+                <CustomSelect
+                  value={formData.padrao}
+                  onChange={v => handleInputChange('padrao', v)}
+                  options={[
+                    { value: 'CARGA GERAL', label: 'CARGA GERAL' },
+                    { value: 'CARGO PREMIUM', label: 'CARGO PREMIUM' },
+                    { value: 'PADRÃO ALIMENTO', label: 'PADRÃO ALIMENTO' },
+                    { value: 'REEFER', label: 'REEFER' },
+                    { value: 'PRODUTO QUÍMICO', label: 'PRODUTO QUÍMICO' },
+                  ]}
+                  inputClassName={selectClasses}
+                />
               </div>
-           </div>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 space-y-6 shadow-sm">
           <p className={labelClass}>4. Dados da Operação</p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={labelClass}>Booking</label><input className={inputClasses} value={formData.booking} onChange={e => handleInputChange('booking', e.target.value)} /></div>
             <div className="space-y-1"><label className={labelClass}>Navio</label><input className={inputClasses} value={formData.ship} onChange={e => handleInputChange('ship', e.target.value)} /></div>
           </div>
-          
           <div className="space-y-1 relative" ref={podRef}>
             <label className={labelClass}>Porto de Descarga (POD)</label>
             <div className="relative">
-              <input 
-                type="text" 
-                placeholder="BUSCAR OU DIGITAR POD..." 
-                className={`${inputClasses} pr-10`} 
-                value={podSearch || formData.pod} 
+              <input
+                type="text"
+                placeholder="BUSCAR OU DIGITAR POD..."
+                className={`${inputClasses} pr-10`}
+                value={podSearch || formData.pod}
                 onFocus={() => setShowPodResults(true)}
-                onChange={e => {
-                  const val = e.target.value.toUpperCase();
-                  setPodSearch(val);
-                  handleInputChange('pod', val);
-                }} 
+                onChange={e => { const val = e.target.value.toUpperCase(); setPodSearch(val); handleInputChange('pod', val); }}
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" strokeWidth="3"/></svg>
               </div>
             </div>
-            
             {showPodResults && (
               <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] max-h-52 overflow-y-auto border-t-4 border-amber-500 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="p-2 space-y-0.5">
-                  {filteredPODs.length > 0 ? filteredPODs.map(p => (
-                    <button 
-                      key={p} 
-                      className={`w-full text-left px-4 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-between group ${formData.pod === p ? 'bg-amber-50 text-amber-600' : 'hover:bg-slate-50 text-slate-600'}`}
-                      onClick={() => {
-                        handleInputChange('pod', p);
-                        setPodSearch(p);
-                        setShowPodResults(false);
-                      }}
-                    >
-                      <span>{p}</span>
+                  {filteredPODs.map(p => (
+                    <button key={p} className={`w-full text-left px-4 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${formData.pod === p ? 'bg-amber-50 text-amber-600' : 'hover:bg-slate-50 text-slate-600'}`} onClick={() => { handleInputChange('pod', p); setPodSearch(p); setShowPodResults(false); }}>
+                      {p}
                     </button>
-                  )) : (
-                    <div className="p-4 text-center text-[9px] font-bold text-slate-300 uppercase italic">Entrada manual</div>
-                  )}
+                  ))}
+                  {filteredPODs.length === 0 && <div className="p-4 text-center text-[9px] font-bold text-slate-300 uppercase italic">Entrada manual</div>}
                 </div>
               </div>
             )}
@@ -460,41 +333,15 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           <div className="space-y-1"><label className={labelClass}>Armador / Agência</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
         </div>
 
-        <div className="relative" ref={driverRef}>
-          <label className={labelAmberClass}>5. Motorista Transportador</label>
-          <input type="text" placeholder="BUSCAR MOTORISTA..." className={inputClasses} value={driverSearch} onFocus={() => { setShowDriverResults(true); setDriverSearch(''); }} onChange={e => { setDriverSearch(e.target.value.toUpperCase()); setShowDriverResults(true); setFormData(prev => ({ ...prev, driverId: '' })); }} />
-          {selectedDriver && !showDriverResults && (
-            <div className="mt-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-[9px] font-black text-slate-800 uppercase truncate">{selectedDriver.name}</p>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  {selectedDriver.cpf && <span className="text-[8px] font-bold text-slate-500">{maskCPF(selectedDriver.cpf)}</span>}
-                  {plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{plateHorse}</span>}
-                  {plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{plateTrailer}</span>}
-                </div>
-              </div>
-              <button type="button" onClick={() => { setDriverSearch(''); setFormData(prev => ({ ...prev, driverId: '' })); }} className="text-slate-300 hover:text-red-400 transition-colors shrink-0">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-          )}
-          {showDriverResults && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto border-t-4 border-amber-500">
-              {filteredDrivers.length > 0 ? filteredDrivers.map(d => (
-                <button key={d.id} className="w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-slate-50" onClick={() => { setFormData(prev => ({...prev, driverId: d.id})); setDriverSearch(d.name); setShowDriverResults(false); }}>
-                  <p className="text-[10px] font-black uppercase text-slate-800">{d.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {d.cpf && <span className="text-[8px] font-bold text-slate-500">{maskCPF(d.cpf)}</span>}
-                    {d.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{d.plateHorse}</span>}
-                    {d.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.plateTrailer}</span>}
-                  </div>
-                </button>
-              )) : (
-                <div className="px-4 py-3 text-[9px] text-slate-400 font-bold uppercase">Nenhum motorista encontrado</div>
-              )}
-            </div>
-          )}
-        </div>
+        <AutocompleteSearch
+          label="5. Motorista Transportador"
+          placeholder="Nome, Placa ou CPF..."
+          data={drivers}
+          onSelect={(d) => setFormData(prev => ({ ...prev, driverId: d.id }))}
+          mapToAutocomplete={searchService.mapDriver}
+          initialValue={selectedDriver ? selectedDriver.name : ''}
+          icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>}
+        />
         <DriverPlateSelector
           driver={selectedDriver}
           plateHorse={plateHorse}
@@ -503,11 +350,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           onChangePlateTrailer={setPlateTrailer}
         />
         {selectedDriver && (
-          <button
-            type="button"
-            onClick={() => setSwapModalOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all text-[10px] font-black uppercase tracking-widest"
-          >
+          <button type="button" onClick={() => setSwapModalOpen(true)} className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all text-[10px] font-black uppercase tracking-widest">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
             Trocar Equipamento
           </button>
@@ -519,43 +362,45 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           drivers={drivers}
           currentPlateHorse={plateHorse}
           currentPlateTrailer={plateTrailer}
-          onConfirm={(result: DriverSwapResult) => {
-            setPlateHorse(result.plateHorse);
-            setPlateTrailer(result.plateTrailer);
-          }}
+          onConfirm={(result: DriverSwapResult) => { setPlateHorse(result.plateHorse); setPlateTrailer(result.plateTrailer); }}
         />
 
-        <div className="space-y-1">
-          <label className={labelAmberClass}>6. Observações Operacionais</label>
-          <textarea
-            placeholder="INSTRUÇÕES PARA O MOTORISTA OU DEPÓSITO..."
-            className={`${inputClasses} h-28 resize-none py-4 lowercase leading-relaxed`}
-            value={formData.obs}
-            onChange={e => handleInputChange('obs', e.target.value)}
-          />
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 space-y-6 shadow-sm">
+          <div className="space-y-1">
+            <label className={labelAmberClass}>6. Observações Operacionais</label>
+            <textarea
+              placeholder="INSTRUÇÕES PARA O MOTORISTA OU DEPÓSITO..."
+              className={`${inputClasses} h-28 resize-none lowercase leading-relaxed`}
+              value={formData.obs}
+              onChange={e => handleInputChange('obs', e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={labelAmberClass}>7. Data/Hora do Agendamento</label>
+            <DateTimePicker
+              value={formData.agendamentoDateTime}
+              onChange={val => setFormData(prev => ({ ...prev, agendamentoDateTime: val }))}
+              placeholder="Selecionar data e hora..."
+              inputClassName={inputClasses}
+            />
+            <p className="text-[8px] text-slate-400 font-bold mt-1">Apenas para controle interno — não aparece no PDF.</p>
+          </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className={labelAmberClass}>7. Data/Hora do Agendamento</label>
-          <DateTimePicker
-            value={formData.agendamentoDateTime}
-            onChange={val => setFormData(prev => ({ ...prev, agendamentoDateTime: val }))}
-            placeholder="Selecionar data e hora..."
-          />
-          <p className="text-[8px] text-slate-400 font-bold">Apenas para controle interno — não aparece no PDF.</p>
-        </div>
-
-        {devolucao && onSave && (
-          <button disabled={isSaving} onClick={saveData} className="w-full py-4 bg-white border-2 border-amber-400 text-amber-700 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-amber-50 shadow-sm transition-all active:scale-95">
-            {isSaving ? 'SALVANDO...' : 'SALVAR DADOS'}
+        <div className="grid grid-cols-2 gap-4">
+          {devolucao && onSave && (
+            <button disabled={isSaving} onClick={saveData} className="py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-sm">
+              {isSaving ? 'Processando...' : 'Salvar Dados'}
+            </button>
+          )}
+          <button disabled={isExporting} onClick={downloadPDF} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-amber-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${devolucao && onSave ? '' : 'col-span-2'}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2.5"/></svg>
+            {isExporting ? 'Gerando PDF...' : 'Baixar Minuta'}
           </button>
-        )}
-        <button disabled={isExporting} onClick={downloadPDF} className="w-full py-6 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-amber-600 shadow-xl transition-all active:scale-95">
-          {isExporting ? 'GERANDO PDF...' : 'BAIXAR MINUTA DE DEVOLUÇÃO'}
-        </button>
+        </div>
       </div>
 
-      <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
+      <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-12 custom-scrollbar">
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
           <DevolucaoVazioTemplate formData={formData} selectedDriver={effectiveDriver} selectedRemetente={selectedRemetente} selectedDestinatario={null} />
         </div>
