@@ -52,7 +52,9 @@ const SILExcelImporter: React.FC<Props> = ({ isOpen, onClose, trips, importedOs,
         const matched: MatchedRow[] = parsed.map(sil => {
           const key = sil.numeroProgramacao.trim().toLowerCase();
           const trip = osMap.get(key) || null;
-          const alreadyImported = importedOs.has(key);
+          // alreadyImported só bloqueia SEM OS (evita criar a mesma trip duas vezes)
+          // VINCULADAS podem sempre ser re-importadas para atualizar dados
+          const alreadyImported = !trip && importedOs.has(key);
           return { sil, trip, alreadyImported };
         });
         setRows(matched);
