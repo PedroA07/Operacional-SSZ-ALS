@@ -429,8 +429,65 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       updateCount++;
     }
 
+    let createCount = 0;
+    for (const sil of unmatched) {
+      const osKey = sil.numeroProgramacao.trim().toLowerCase();
+      if (importedOs.has(osKey)) continue;
+
+      const matchedDriver =
+        driverByName.get(norm(sil.nomeMotorista)) ||
+        driverByCpf.get(norm(sil.cpfMotorista)) ||
+        driverByPlate.get(norm(sil.placaVeiculo));
+
+      const matchedCustomer =
+        customerByNameCity.get(`${norm(sil.nomeLocalAtendimento)}|${norm(sil.cidadeAtendimento)}`) ||
+        customerByName.get(norm(sil.nomeLocalAtendimento));
+
+      const newTrip: import('../../types').Trip = {
+        id: crypto.randomUUID(),
+        os: sil.numeroProgramacao.trim().toUpperCase(),
+        booking: sil.booking || '',
+        ship: sil.navio || '',
+        bu: sil.bl || '',
+        embarcador: sil.embarcador || '',
+        container: sil.container || '',
+        containerType: sil.tipoContainer || '',
+        tara: sil.taraEspecifica || '',
+        seal: sil.lacre1 || '',
+        type: mapType(sil.tipoProgramado),
+        category: '',
+        status: 'Pendente',
+        dateTime: parseDate(sil.previsaoAtendimento) || new Date().toISOString().slice(0, 16),
+        isLate: false,
+        statusHistory: [],
+        balancePayment: { status: 'AGUARDANDO_DOCS' },
+        advancePayment: { status: 'BLOQUEADO' },
+        driver: matchedDriver ? {
+          id: matchedDriver.id,
+          name: matchedDriver.name,
+          plateHorse: matchedDriver.plateHorse,
+          plateTrailer: matchedDriver.plateTrailer,
+          status: matchedDriver.status,
+          cpf: matchedDriver.cpf,
+          phone: matchedDriver.phone,
+        } : { id: '', name: sil.nomeMotorista || '', plateHorse: sil.placaVeiculo || '', plateTrailer: sil.placaCarreta || '', status: '' },
+        customer: matchedCustomer ? {
+          id: matchedCustomer.id,
+          name: matchedCustomer.name,
+          legalName: matchedCustomer.legalName,
+          cnpj: matchedCustomer.cnpj,
+          city: matchedCustomer.city,
+          state: matchedCustomer.state,
+        } : { id: '', name: sil.nomeLocalAtendimento || '', city: sil.cidadeAtendimento || '' },
+      };
+
+      await db.saveTrip(newTrip, user);
+      newOs.add(osKey);
+      createCount++;
+    }
+
     setImportedOs(prev => { const n = new Set(prev); newOs.forEach(o => n.add(o)); return n; });
-    setLastSilImport({ linked: updateCount, unlinked: unmatched.length });
+    setLastSilImport({ linked: updateCount + createCount, unlinked: 0 });
     setIsSilImporterOpen(false);
     onRefresh();
   }, [drivers, customers, operationTypes, importedOs, user, onRefresh]);
