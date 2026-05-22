@@ -56,8 +56,8 @@ const SILExcelImporter: React.FC<Props> = ({ isOpen, onClose, trips, importedOs,
           return { sil, trip, alreadyImported };
         });
         setRows(matched);
-        // Pré-seleciona: tem vinculo E ainda não foi importado
-        setSelected(new Set(matched.filter(r => r.trip && !r.alreadyImported).map(r => r.sil._rowIndex)));
+        // Pré-seleciona: SEM OS no sistema E ainda não foi importado (serão criadas)
+        setSelected(new Set(matched.filter(r => !r.trip && !r.alreadyImported).map(r => r.sil._rowIndex)));
       }
     } catch {
       setError('Erro ao ler o arquivo. Verifique se não está corrompido ou protegido por senha.');
@@ -329,7 +329,7 @@ const SILExcelImporter: React.FC<Props> = ({ isOpen, onClose, trips, importedOs,
         <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between shrink-0">
           <p className="text-[9px] font-bold text-slate-400 uppercase">
             {rows.length > 0
-              ? `${selected.size} selecionada${selected.size !== 1 ? 's' : ''} · ${rows.filter(r => selected.has(r.sil._rowIndex) && r.trip).length} vincularão trips · ${rows.filter(r => selected.has(r.sil._rowIndex) && !r.trip).length} sem OS`
+              ? `${selected.size} selecionada${selected.size !== 1 ? 's' : ''} · ${rows.filter(r => selected.has(r.sil._rowIndex) && !r.trip).length} serão criadas · ${rows.filter(r => selected.has(r.sil._rowIndex) && r.trip).length} atualizarão existentes`
               : 'Nenhum arquivo carregado'}
           </p>
           <div className="flex gap-3">
