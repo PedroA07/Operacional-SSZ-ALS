@@ -174,7 +174,7 @@ export const tripRepository = {
     let oldStatus: string | null = null;
     if (trip.id && !trip.id.startsWith('new-')) {
       try {
-        const { data } = await supabase.from('trips').select('status').eq('id', trip.id).single();
+        const { data } = await supabase.from('trips').select('status').eq('id', trip.id).maybeSingle();
         if (data) oldStatus = data.status;
       } catch (e) {}
     }
