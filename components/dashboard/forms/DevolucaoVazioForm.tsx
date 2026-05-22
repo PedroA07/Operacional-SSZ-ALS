@@ -107,9 +107,10 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     });
   };
 
-  const selectedDriver    = drivers.find(d => d.id === formData.driverId);
-  const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
-  const selectedDestinatario = ports.find(l => l.id === formData.destinatarioId);
+  const allLocais = [...ports, ...preStackings];
+  const selectedDriver       = drivers.find(d => d.id === formData.driverId);
+  const selectedRemetente    = customers.find(c => c.id === formData.remetenteId);
+  const selectedDestinatario = allLocais.find(l => l.id === formData.destinatarioId) ?? null;
 
   useEffect(() => {
     if (selectedDriver) {
@@ -208,7 +209,6 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const labelAmberClass = "text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2 block";
 
   const filteredPODs = commonPODs.filter(p => p.toUpperCase().includes(podSearch.toUpperCase()));
-  const allLocais = [...ports, ...preStackings];
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
@@ -218,7 +218,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
             formData={formData}
             selectedDriver={effectiveDriver}
             selectedRemetente={selectedRemetente}
-            selectedDestinatario={selectedDestinatario}
+            selectedDestinatario={selectedDestinatario ?? null}
           />
         </div>
       </div>
@@ -402,7 +402,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
 
       <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-12 custom-scrollbar">
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
-          <DevolucaoVazioTemplate formData={formData} selectedDriver={effectiveDriver} selectedRemetente={selectedRemetente} selectedDestinatario={null} />
+          <DevolucaoVazioTemplate formData={formData} selectedDriver={effectiveDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario ?? null} />
         </div>
       </div>
     </div>

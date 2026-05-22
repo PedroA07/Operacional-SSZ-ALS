@@ -79,6 +79,11 @@ const DevolucaoVazioTemplate: React.FC<DevolucaoVazioTemplateProps> = ({
         <div style={{ ...p0, fontSize: '15px', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', lineHeight: '1.2' }}>
           {localDevolucao}
         </div>
+        {selectedDestinatario && (selectedDestinatario.address || selectedDestinatario.city) && (
+          <div style={{ ...p0, fontSize: '8px', fontWeight: 700, color: '#92400e', marginTop: '3px', textTransform: 'uppercase' }}>
+            {[selectedDestinatario.address, selectedDestinatario.neighborhood, selectedDestinatario.city, selectedDestinatario.state].filter(Boolean).join(' — ')}
+          </div>
+        )}
       </div>
 
       {/* ── BL / ARMADOR / NAVIO ── */}
