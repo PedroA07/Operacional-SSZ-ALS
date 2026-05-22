@@ -834,14 +834,30 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     setDevolucoes(devs);
   }, []);
 
-  useEffect(() => { loadDevolucoes(); }, [loadDevolucoes]);
+  useEffect(() => {
+    loadDevolucoes();
+    if (!supabase) return;
+    const ch = supabase
+      .channel('org-devolucoes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'devolucoes' }, loadDevolucoes)
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [loadDevolucoes]);
 
   const loadLiberacoes = useCallback(async () => {
     const libs = await db.getLiberacoes();
     setLiberacoes(libs);
   }, []);
 
-  useEffect(() => { loadLiberacoes(); }, [loadLiberacoes]);
+  useEffect(() => {
+    loadLiberacoes();
+    if (!supabase) return;
+    const ch = supabase
+      .channel('org-liberacoes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'liberacoes' }, loadLiberacoes)
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [loadLiberacoes]);
 
   const sortedDevolucoes = useMemo(() => {
     return [...devolucoes].sort((a, b) => {
