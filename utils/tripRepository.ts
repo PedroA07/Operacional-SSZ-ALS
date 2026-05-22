@@ -56,8 +56,6 @@ export const tripRepository = {
     coleta_emissao_solicitada: trip.coletaEmissaoSolicitada || false,
     is_removed_from_coleta: trip.isRemovedFromColeta || false,
     is_removed_from_org: trip.isRemovedFromOrg || false,
-    removed_from_coleta_by: trip.removedFromColetaBy || [],
-    removed_from_org_by: trip.removedFromOrgBy || [],
     is_completed: trip.isCompleted || false
   }),
 
@@ -138,8 +136,6 @@ export const tripRepository = {
       coletaEmissaoSolicitada: d.coleta_emissao_solicitada ?? false,
       isRemovedFromColeta: d.is_removed_from_coleta ?? false,
       isRemovedFromOrg: d.is_removed_from_org ?? false,
-      removedFromColetaBy: safeParse(d.removed_from_coleta_by, []),
-      removedFromOrgBy: safeParse(d.removed_from_org_by, []),
     };
   },
 

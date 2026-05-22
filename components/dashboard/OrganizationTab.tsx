@@ -740,7 +740,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
         if (finalizingIds.has(trip.id)) return false;
 
-        if (!trip.isRemovedFromOrg && !(trip.removedFromOrgBy || []).includes(userId)) {
+        if (!trip.isRemovedFromOrg) {
           // Viagem agendada: mantém visível até o horário do agendamento passar
           if (trip.isScheduled) {
             const scheduledDT = trip.scheduling?.dateTime || trip.scheduledDateTime;
@@ -771,7 +771,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         if (dateA !== dateB) return dateA - dateB;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
-  }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega, userId]);
+  }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega]);
 
   // Limpeza periódica de atualizações expiradas para liberar memória
   useEffect(() => {
@@ -1193,22 +1193,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   const handleRemoveFromOrg = useCallback(async (trip: Trip) => {
     const now = Date.now();
-    const current = trip.removedFromOrgBy || [];
-    if (current.includes(userId)) return;
-    const newRemovedBy = [...current, userId];
-
+    
     setPendingUpdates(prev => ({
       ...prev,
-      [trip.id]: {
-        data: { ...(prev[trip.id]?.data || {}), removedFromOrgBy: newRemovedBy },
-        timestamp: now
+      [trip.id]: { 
+        data: { ...(prev[trip.id]?.data || {}), isRemovedFromOrg: true }, 
+        timestamp: now 
       }
     }));
 
     try {
-      await db.saveTrip({ ...trip, removedFromOrgBy: newRemovedBy });
-      window.dispatchEvent(new CustomEvent('als_show_toast', {
-        detail: { message: 'Viagem limpa do painel', type: 'success' }
+      await db.saveTrip({ ...trip, isRemovedFromOrg: true });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { 
+        detail: { message: 'Viagem limpa do painel', type: 'success' } 
       }));
     } catch (error) {
       setPendingUpdates(prev => {
@@ -1217,11 +1214,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return next;
       });
       console.error("Erro ao remover do painel:", error);
-      window.dispatchEvent(new CustomEvent('als_show_toast', {
-        detail: { message: 'Erro ao processar alteração', type: 'error' }
+      window.dispatchEvent(new CustomEvent('als_show_toast', { 
+        detail: { message: 'Erro ao processar alteração', type: 'error' } 
       }));
     }
-  }, [userId]);
+  }, []);
 
   const toggleTripType = (type: string) => {
     if (activeView === 'COLETA') {

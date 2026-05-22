@@ -553,8 +553,6 @@ export interface Trip {
   coletaEmissaoSolicitada?: boolean;
   isRemovedFromColeta?: boolean;
   isRemovedFromOrg?: boolean;
-  removedFromColetaBy?: string[];
-  removedFromOrgBy?: string[];
 }
 
 export interface ColetaDocOriginarioRule {
