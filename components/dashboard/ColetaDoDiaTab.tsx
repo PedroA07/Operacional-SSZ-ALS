@@ -319,7 +319,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     const now = Date.now();
     return propTrips
       .filter(trip => !finalizingIds.has(trip.id))
-      .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
+      .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta && !(trip.removedFromColetaBy || []).includes(userId))
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
       .filter(trip => {
         const dt = trip.dateTime;
@@ -714,7 +714,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         <button
           onClick={() => {
             if (window.confirm('Deseja remover esta viagem do painel de Coleta do Dia?')) {
-              handleUpdateTrip(t, { isRemovedFromColeta: true });
+              const current = t.removedFromColetaBy || [];
+              if (!current.includes(userId)) {
+                handleUpdateTrip(t, { removedFromColetaBy: [...current, userId] });
+              }
             }
           }}
           className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
