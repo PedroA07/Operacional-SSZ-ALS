@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Trip, TripDocument, FreightContractDoc, Driver, FreightContract } from '../../../types';
+import { Trip, TripDocument, FreightContractDoc, Driver } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
 import DatePicker from '../../shared/DatePicker';
 import { fileStorage } from '../../../utils/fileStorage';
@@ -438,7 +438,6 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const [historySearch, setHistorySearch] = useState('');
   const [standaloneContracts, setStandaloneContracts] = useState<StandaloneContract[]>([]);
-  const [unlinkedFreightContracts, setUnlinkedFreightContracts] = useState<FreightContract[]>([]);
   const [edits, setEdits] = useState<Record<string, RowEdit>>({});
   const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [addSearch, setAddSearch] = useState('');
@@ -454,7 +453,6 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
   useEffect(() => {
     db.getStandaloneContracts().then(setStandaloneContracts).catch(() => {});
-    db.getFreightContracts().then(all => setUnlinkedFreightContracts(all.filter(c => !c.tripId && c.status === 'unlinked'))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -670,23 +668,16 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             } catch { /* non-critical */ }
           }
         } else {
-          // Sem vínculo: usa container como OS (ou código gerado) e salva em freight_contracts
-          const osKey = parsedData.container || genContractCode();
-          const url = await fileStorage.uploadFreightContract(entry.file, osKey, 0);
-          const savedId = await db.saveFreightContract({
-            fileName: entry.file.name, fileUrl: url, contractNumber: osKey,
-            container: parsedData.container, tripOs: parsedData.container,
-            destination: parsedData.localidade,
-            driverName: parsedData.motorista, status: 'unlinked',
-          });
-          if (!savedId) throw new Error('Falha ao salvar contrato no banco de dados');
-          const newFc: FreightContract = {
-            id: savedId, fileName: entry.file.name, fileUrl: url, contractNumber: osKey,
-            container: parsedData.container, tripOs: parsedData.container,
-            destination: parsedData.localidade, driverName: parsedData.motorista,
-            status: 'unlinked', uploadedAt: uploadDate.toISOString(),
+          // Sem vínculo: usa container como identificador e salva em standalone_freight_contracts
+          const code = parsedData.container || genContractCode();
+          const url = await fileStorage.uploadFreightContract(entry.file, code, 0);
+          const standalone: StandaloneContract = {
+            id: entry.id, code, url, fileName: entry.file.name,
+            uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(), parsedData,
           };
-          setUnlinkedFreightContracts(prev => [newFc, ...prev]);
+          const saved = await db.saveStandaloneContract(standalone);
+          if (!saved) throw new Error('Falha ao salvar contrato avulso. Verifique as permissões do banco.');
+          setStandaloneContracts(prev => [standalone, ...prev]);
         }
         patch(entry.id, { status: 'done' });
       } catch (err: any) {
@@ -723,19 +714,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     for (const s of standaloneContracts) {
       items.push({ trip: null, standalone: s, isUnlinkedFc: false, doc: s });
     }
-    for (const fc of unlinkedFreightContracts) {
-      const asSA: StandaloneContract = {
-        id: fc.id,
-        code: fc.container || fc.tripOs || fc.contractNumber || fc.id,
-        url: fc.fileUrl || '',
-        fileName: fc.fileName,
-        uploadDate: fc.uploadedAt,
-        parsedData: { container: fc.container, localidade: fc.destination, motorista: fc.driverName },
-      };
-      items.push({ trip: null, standalone: asSA, isUnlinkedFc: true, doc: asSA });
-    }
     return items.sort((a, b) => new Date(b.doc.uploadDate).getTime() - new Date(a.doc.uploadDate).getTime());
-  }, [trips, standaloneContracts, unlinkedFreightContracts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trips, standaloneContracts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredHistory = useMemo(() => {
     if (!historySearch.trim()) return contractHistory;
