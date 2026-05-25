@@ -133,26 +133,41 @@ async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
 
     const text = await res.text();
 
-    // Tenta JSON primeiro (alguns endpoints .NET retornam JSON)
+    // BTP retorna JSON com formato: { Result, Records (HTML), TotalRecordCount, erro, msg }
     try {
       const json = JSON.parse(text) as Record<string, unknown>;
+
+      // Formato específico do BTP
+      if ('Records' in json || 'Result' in json) {
+        if (json.erro === true) {
+          return { vessels: [], error: `BTP: servidor retornou erro — ${json.msg ?? 'falha inesperada'} (IP bloqueado ou sessão inválida)` };
+        }
+        const records = String(json.Records ?? '');
+        if (records.length > 0) {
+          const vessels = parseBTPHtmlTable(records);
+          if (vessels.length > 0) return { vessels };
+        }
+        if ((json.TotalRecordCount as number) === 0) {
+          return { vessels: [], error: 'BTP: nenhum navio na programação no momento' };
+        }
+      }
+
+      // Outros formatos JSON genéricos
       const list = (json.data ?? json.Data ?? json.vessels ?? json.rows ?? json.Items ?? json.items ?? []) as Record<string, unknown>[];
       if (Array.isArray(list) && list.length > 0) {
         return { vessels: list.map(mapBTPRow) };
       }
-    } catch { /* não é JSON, tenta HTML */ }
+    } catch { /* não é JSON, tenta HTML direto */ }
 
-    // Tenta HTML da resposta POST
+    // Fallback: parse HTML direto
     const trCount = (text.match(/<tr/gi) ?? []).length;
     if (trCount >= 3) {
       const vessels = parseBTPHtmlTable(text);
       if (vessels.length > 0) return { vessels };
     }
 
-    // Diagnóstico: mostra snippet da resposta para facilitar debug
     const snippet = text.slice(0, 200).replace(/\s+/g, ' ').trim();
-    const hasCsrf = csrfToken ? 'com CSRF' : 'sem CSRF (não encontrado na página)';
-    return { vessels: [], error: `BTP: sem dados (${hasCsrf}, ${trCount} <tr>). Início resp: ${snippet}` };
+    return { vessels: [], error: `BTP: resposta sem dados reconhecíveis. Resp: ${snippet}` };
   } catch (e: any) {
     return { vessels: [], error: `BTP: ${e?.message ?? e}` };
   }
@@ -235,22 +250,33 @@ function parseBTPHtmlTable(html: string): Vessel[] {
 }
 
 // ─── SANTOS BRASIL ────────────────────────────────────────────────────────────
-// A página faz fetch para /pesquisa?unidade=tecon-santos e recebe JSON
-// com VAtracacao: Array(N) — sem precisar resolver o reCAPTCHA.
 async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string }> {
   const base    = 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/';
-  const referer = 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao?unidade=tecon-santos';
+  const pageUrl = 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao?unidade=tecon-santos';
   const ua      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-  // Variantes JSON (API interna da página)
+  // 1) Busca cookies de sessão da página principal
+  let sessionCookies = '';
+  try {
+    const pageInit = await fetch(pageUrl, {
+      headers: { 'User-Agent': ua, 'Accept': 'text/html', 'Referer': 'https://www.santosbrasil.com.br/' },
+      signal: AbortSignal.timeout(12000),
+      redirect: 'follow',
+    });
+    const rawCookie = pageInit.headers.get('set-cookie') ?? '';
+    sessionCookies = rawCookie.split(',').map(c => c.trim().split(';')[0]).filter(Boolean).join('; ');
+  } catch { /* ignora, tenta sem cookies */ }
+
+  const cookieHeader: Record<string, string> = sessionCookies ? { 'Cookie': sessionCookies } : {};
+
+  // 2) Variantes do endpoint JSON interno
   const jsonVariants = [
     base + 'pesquisa?unidade=tecon-santos',
     base + 'pesquisa?unidade=tecon-santos&pagina=1&itensPorPagina=200',
-    base + 'pesquisa?unidade=tecon-santos&lista=atracacao',
     'https://www.santosbrasil.com.br/api/lista-de-atracacao?unidade=tecon-santos',
-    'https://www.santosbrasil.com.br/api/atracacao?unidade=tecon-santos',
   ];
 
+  const lastErrors: string[] = [];
   for (const url of jsonVariants) {
     try {
       const res = await fetch(url, {
@@ -259,23 +285,24 @@ async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string
           'Accept': 'application/json, text/javascript, */*; q=0.01',
           'Accept-Language': 'pt-BR,pt;q=0.9',
           'X-Requested-With': 'XMLHttpRequest',
-          'Referer': referer,
+          'Referer': pageUrl,
+          ...cookieHeader,
         },
         signal: AbortSignal.timeout(15000),
         redirect: 'follow',
       });
 
-      if (!res.ok) continue;
+      if (!res.ok) { lastErrors.push(`HTTP ${res.status} em ${url}`); continue; }
 
       const text = await res.text();
       let json: Record<string, unknown>;
-      try { json = JSON.parse(text); } catch { continue; }
+      try { json = JSON.parse(text); } catch { lastErrors.push(`JSON inválido em ${url}: ${text.slice(0,80)}`); continue; }
 
       const list = (json.VAtracacao ?? json.vAtracacao ?? json.data ?? json.Data ?? json.items ?? json.vessels ?? []) as Record<string, unknown>[];
-      if (!Array.isArray(list) || list.length === 0) continue;
+      if (!Array.isArray(list) || list.length === 0) { lastErrors.push(`Lista vazia em ${url}`); continue; }
 
       return { vessels: list.map(mapSBRow) };
-    } catch { /* tenta próxima variante */ }
+    } catch (e: any) { lastErrors.push(`Erro em ${url}: ${e?.message}`); }
   }
 
   // Fallback: tenta parsear a página HTML principal
@@ -304,7 +331,7 @@ async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string
     }
   } catch { /* ignora */ }
 
-  return { vessels: [], error: 'Santos Brasil: endpoint /pesquisa não acessível' };
+  return { vessels: [], error: `Santos Brasil: endpoint /pesquisa não acessível. Detalhes: ${lastErrors.join(' | ')}` };
 }
 
 function mapSBRow(r: Record<string, unknown>): Vessel {
