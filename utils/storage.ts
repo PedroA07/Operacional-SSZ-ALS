@@ -2097,4 +2097,23 @@ export const db = {
     const { error } = await supabase.from('freight_routes').delete().eq('id', id);
     return !error;
   },
+
+  consultarPedagioRotas: async (
+    origin: string,
+    destination: string,
+    axles: number,
+    token: string,
+    via?: string,
+  ): Promise<any> => {
+    if (!supabase) return { error: 'Supabase não configurado' };
+    try {
+      const { data, error } = await supabase.functions.invoke('rotas-brasil-proxy', {
+        body: { origin, destination, axles, token, ...(via ? { via } : {}) },
+      });
+      if (error) { console.error('[consultarPedagioRotas]', error); return { error: error.message ?? 'Erro na consulta' }; }
+      return data;
+    } catch (e) {
+      return { error: String(e) };
+    }
+  },
 };
