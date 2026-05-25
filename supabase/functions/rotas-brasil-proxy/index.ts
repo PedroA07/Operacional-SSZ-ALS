@@ -6,15 +6,17 @@ const CORS = {
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
-  try {
-    const { origin, destination, axles, token, via } = await req.json();
+  // Token lido do secret do Supabase — nunca vem do cliente
+  const token = Deno.env.get('ROTAS_BRASIL_TOKEN');
+  if (!token) {
+    return new Response(
+      JSON.stringify({ error: 'Secret ROTAS_BRASIL_TOKEN não configurado no Supabase.' }),
+      { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } },
+    );
+  }
 
-    if (!token?.trim()) {
-      return new Response(
-        JSON.stringify({ error: 'Token da API não fornecido. Cadastre-se em rotasbrasil.com.br' }),
-        { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } },
-      );
-    }
+  try {
+    const { origin, destination, axles, via } = await req.json();
 
     // Build waypoints string: origin [; via] ; destination
     const pontos = [origin, ...(via?.trim() ? [via.trim()] : []), destination].join(';');
@@ -24,11 +26,11 @@ Deno.serve(async (req: Request) => {
       veiculo: 'caminhao',
       eixo: String(axles),
       paradas: 'true',
-      token: token.trim(),
+      token,
     });
 
     const url = `http://rotasbrasil.com.br/apiRotas/enderecos/?${params}`;
-    console.log('[rotas-brasil-proxy]', url.replace(token.trim(), '***'));
+    console.log('[rotas-brasil-proxy]', url.replace(token, '***'));
 
     const resp = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ALSLogistica/1.0)' },

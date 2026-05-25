@@ -718,7 +718,6 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
   );
   // API RotasBrasil
   const [showApiPanel, setShowApiPanel] = useState(false);
-  const [apiToken, setApiToken] = useState(() => { try { return localStorage.getItem('rb_token') ?? ''; } catch { return ''; } });
   const [viaCity, setViaCity] = useState('');
   const [consultando, setConsultando] = useState(false);
   const [tollLive, setTollLive] = useState<{
@@ -778,18 +777,17 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
   }, [selectedRoute, visibleTypes]);
 
   const handleConsultar = async () => {
-    if (!selectedRoute || !apiToken.trim()) return;
+    if (!selectedRoute) return;
     setConsultando(true);
     setApiError(null);
     setTollLive(null);
-    try { localStorage.setItem('rb_token', apiToken); } catch {}
     const origin = toApiCity(selectedRoute.originCity);
     const dest   = toApiCity(selectedRoute.destinationCity);
     const via    = viaCity ? toApiCity(viaCity) : undefined;
     try {
       const [resIda, resVolta] = await Promise.all([
-        db.consultarPedagioRotas(origin, dest, axlesEmpty, apiToken, via),
-        db.consultarPedagioRotas(origin, dest, axlesFull,  apiToken, via),
+        db.consultarPedagioRotas(origin, dest, axlesEmpty, via),
+        db.consultarPedagioRotas(origin, dest, axlesFull,  via),
       ]);
       if (resIda?.error)   { setApiError(String(resIda.error));   return; }
       if (resVolta?.error) { setApiError(String(resVolta.error)); return; }
@@ -920,34 +918,16 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
 
           {showApiPanel && (
             <div className="mt-4 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                    Token RotasBrasil
-                    <a href="https://rotasbrasil.com.br" target="_blank" rel="noopener noreferrer"
-                      className="ml-2 text-blue-400 normal-case font-medium hover:underline">
-                      ↗ obter token
-                    </a>
-                  </label>
-                  <input
-                    type="password"
-                    value={apiToken}
-                    onChange={e => setApiToken(e.target.value)}
-                    placeholder="Cole seu token aqui"
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                    Via (cidade intermediária)
-                    <span className="ml-2 text-slate-300 normal-case font-medium">opcional · define o trecho</span>
-                  </label>
-                  <CitySearchSelect
-                    value={viaCity}
-                    onChange={setViaCity}
-                    placeholder="Ex: São Paulo - SP..."
-                  />
-                </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                  Via (cidade intermediária)
+                  <span className="ml-2 text-slate-300 normal-case font-medium">opcional · define o trecho/rodovia</span>
+                </label>
+                <CitySearchSelect
+                  value={viaCity}
+                  onChange={setViaCity}
+                  placeholder="Ex: Cotia - SP (para usar Rodoanel)..."
+                />
               </div>
 
               {viaCity && selectedRoute && (
@@ -967,7 +947,7 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleConsultar}
-                  disabled={consultando || !selectedRoute || !apiToken.trim()}
+                  disabled={consultando || !selectedRoute}
                   className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-40 transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20"
                 >
                   {consultando ? (
