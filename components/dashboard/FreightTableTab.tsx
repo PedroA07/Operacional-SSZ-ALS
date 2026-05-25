@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FreightRoute, FreightVehicleType, FreightRouteVehicleValue } from '../../types';
 import { db } from '../../utils/storage';
 import CustomSelect, { SelectOption } from '../shared/CustomSelect';
+import CitySearchSelect from '../shared/CitySearchSelect';
+import SmartOperationTable from './operations/SmartOperationTable';
 
 type View = 'table' | 'calculator';
 
@@ -28,13 +30,12 @@ interface RouteModalProps {
   editingRoute: FreightRoute | null;
   onClose: () => void;
   onSave: (route: Omit<FreightRoute, 'createdAt' | 'updatedAt'>) => Promise<void>;
-  existingCities: string[];
 }
 
-const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onClose, onSave, existingCities }) => {
+const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onClose, onSave }) => {
   const blank = (): FreightRouteVehicleValue => ({ freight: 0, tollGoing: 0, tollReturning: 0 });
 
-  const [origin, setOrigin] = useState(editingRoute?.originCity ?? '');
+  const [origin, setOrigin]           = useState(editingRoute?.originCity ?? '');
   const [destination, setDestination] = useState(editingRoute?.destinationCity ?? '');
   const [values, setValues] = useState<{ [code: string]: FreightRouteVehicleValue }>(() => {
     const init: { [code: string]: FreightRouteVehicleValue } = {};
@@ -61,8 +62,6 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
     setSaving(false);
   };
 
-  const cities = useMemo(() => Array.from(new Set(existingCities)).sort(), [existingCities]);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -81,36 +80,35 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-6">
-          {/* Cidades */}
+          {/* Cidades — CitySearchSelect */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Cidade Origem</label>
-              <input
-                list="cities-list"
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                Cidade Origem
+              </label>
+              <CitySearchSelect
                 value={origin}
-                onChange={e => setOrigin(e.target.value)}
-                placeholder="Ex: Santos"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={setOrigin}
+                placeholder="Buscar cidade de origem..."
               />
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Cidade Destino</label>
-              <input
-                list="cities-list"
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                Cidade Destino
+              </label>
+              <CitySearchSelect
                 value={destination}
-                onChange={e => setDestination(e.target.value)}
-                placeholder="Ex: São Paulo"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={setDestination}
+                placeholder="Buscar cidade de destino..."
               />
             </div>
           </div>
-          <datalist id="cities-list">
-            {cities.map(c => <option key={c} value={c} />)}
-          </datalist>
 
           {/* Valores por tipo de veículo */}
           <div>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Valores por Tipo de Veículo</p>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
+              Valores por Tipo de Veículo
+            </p>
             <div className="overflow-x-auto rounded-2xl border border-slate-100">
               <table className="w-full text-sm">
                 <thead>
@@ -273,9 +271,10 @@ const VehicleTypesModal: React.FC<VehicleTypesModalProps> = ({ vehicleTypes, onC
   );
 };
 
-// ── View: Tabela de Frete ─────────────────────────────────────────────────────
+// ── View: Tabela de Frete (SmartOperationTable) ───────────────────────────────
 
 interface FreightTableViewProps {
+  userId: string;
   routes: FreightRoute[];
   vehicleTypes: FreightVehicleType[];
   onEdit: (r: FreightRoute) => void;
@@ -284,144 +283,166 @@ interface FreightTableViewProps {
   onManageTypes: () => void;
 }
 
-const FreightTableView: React.FC<FreightTableViewProps> = ({ routes, vehicleTypes, onEdit, onDelete, onAdd, onManageTypes }) => {
-  const [search, setSearch] = useState('');
+const FreightTableView: React.FC<FreightTableViewProps> = ({
+  userId, routes, vehicleTypes, onEdit, onDelete, onAdd, onManageTypes,
+}) => {
+  // Achata dados para SmartOperationTable
+  const tableData = useMemo(() => routes.map(r => {
+    const row: any = {
+      id: r.id,
+      originCity: r.originCity,
+      destinationCity: r.destinationCity,
+      _route: r,
+    };
+    vehicleTypes.forEach(vt => {
+      const v = r.vehicleValues[vt.code];
+      row[`${vt.code}_frete`]   = v?.freight      ?? 0;
+      row[`${vt.code}_ida`]     = v?.tollGoing     ?? 0;
+      row[`${vt.code}_volta`]   = v?.tollReturning ?? 0;
+    });
+    return row;
+  }), [routes, vehicleTypes]);
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return routes.filter(r =>
-      r.originCity.toLowerCase().includes(q) || r.destinationCity.toLowerCase().includes(q)
-    );
-  }, [routes, search]);
+  // Colunas dinâmicas por tipo de veículo
+  const columns = useMemo(() => {
+    const base = [
+      {
+        key: 'originCity',
+        label: 'Origem',
+        sortable: true,
+        render: (row: any) => (
+          <span className="font-bold text-slate-800 text-xs">{row.originCity}</span>
+        ),
+      },
+      {
+        key: 'destinationCity',
+        label: 'Destino',
+        sortable: true,
+        render: (row: any) => (
+          <span className="text-slate-600 text-xs font-medium">{row.destinationCity}</span>
+        ),
+      },
+    ];
+
+    const vtCols = vehicleTypes.flatMap(vt => [
+      {
+        key: `${vt.code}_frete`,
+        label: `${vt.code} Frete`,
+        sortable: true,
+        sortValue: (row: any) => row[`${vt.code}_frete`],
+        render: (row: any) => {
+          const v = row[`${vt.code}_frete`];
+          return (
+            <span className="text-xs font-bold text-slate-700 tabular-nums">
+              {v > 0 ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : <span className="text-slate-300">—</span>}
+            </span>
+          );
+        },
+      },
+      {
+        key: `${vt.code}_ida`,
+        label: `${vt.code} Ped.Ida`,
+        sortable: true,
+        sortValue: (row: any) => row[`${vt.code}_ida`],
+        render: (row: any) => {
+          const v = row[`${vt.code}_ida`];
+          return (
+            <span className="text-xs text-slate-600 tabular-nums">
+              {v > 0 ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : <span className="text-slate-300">—</span>}
+            </span>
+          );
+        },
+      },
+      {
+        key: `${vt.code}_volta`,
+        label: `${vt.code} Ped.Volta`,
+        sortable: true,
+        sortValue: (row: any) => row[`${vt.code}_volta`],
+        render: (row: any) => {
+          const v = row[`${vt.code}_volta`];
+          return (
+            <span className="text-xs text-slate-600 tabular-nums">
+              {v > 0 ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : <span className="text-slate-300">—</span>}
+            </span>
+          );
+        },
+      },
+    ]);
+
+    const actions = {
+      key: 'actions',
+      label: 'Ações',
+      sortable: false,
+      render: (row: any) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={e => { e.stopPropagation(); onEdit(row._route); }}
+            className="p-2 hover:bg-blue-100 rounded-lg text-blue-500 transition-all"
+            title="Editar"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(row.id); }}
+            className="p-2 hover:bg-red-100 rounded-lg text-red-400 transition-all"
+            title="Excluir"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </button>
+        </div>
+      ),
+    };
+
+    return [...base, ...vtCols, actions];
+  }, [vehicleTypes, onEdit, onDelete]);
+
+  const defaultVisibleKeys = useMemo(() => [
+    'originCity',
+    'destinationCity',
+    ...vehicleTypes.flatMap(vt => [`${vt.code}_frete`, `${vt.code}_ida`, `${vt.code}_volta`]),
+    'actions',
+  ], [vehicleTypes]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex-1">
-          <div className="relative">
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
-            </svg>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar por cidade..."
-              className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
-            />
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={onManageTypes}
-            className="px-5 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 shadow-sm transition-all flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-            </svg>
-            Tipos
-          </button>
-          <button
-            onClick={onAdd}
-            className="px-5 py-3 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/>
-            </svg>
-            Nova Rota
-          </button>
-        </div>
+    <div className="space-y-4">
+      {/* Botões de ação acima da tabela */}
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={onManageTypes}
+          className="px-5 py-2.5 rounded-2xl border border-slate-200 bg-white text-slate-600 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 shadow-sm transition-all flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"
+              d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+          </svg>
+          Tipos de Veículo
+        </button>
+        <button
+          onClick={onAdd}
+          className="px-5 py-2.5 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/>
+          </svg>
+          Nova Rota
+        </button>
       </div>
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
-            <svg className="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-          </div>
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
-            {routes.length === 0 ? 'Nenhuma rota cadastrada' : 'Nenhuma rota encontrada'}
-          </p>
-          {routes.length === 0 && (
-            <p className="text-xs text-slate-400 mt-1">Clique em "Nova Rota" para começar</p>
-          )}
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full text-sm whitespace-nowrap">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="sticky left-0 bg-slate-50 text-left px-5 py-3.5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Origem</th>
-                <th className="text-left px-5 py-3.5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Destino</th>
-                {vehicleTypes.map(vt => (
-                  <th key={vt.code} colSpan={3} className="text-center px-2 py-3.5 border-l border-slate-100">
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-lg text-[9px] font-black uppercase">{vt.code}</span>
-                  </th>
-                ))}
-                <th className="text-center px-5 py-3.5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
-              </tr>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="sticky left-0 bg-slate-50/50" />
-                <th />
-                {vehicleTypes.map(vt => (
-                  <React.Fragment key={vt.code}>
-                    <th className="px-3 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest border-l border-slate-100 text-right">Frete</th>
-                    <th className="px-3 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Ped. Ida</th>
-                    <th className="px-3 py-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Ped. Volta</th>
-                  </React.Fragment>
-                ))}
-                <th />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filtered.map(route => (
-                <tr key={route.id} className="hover:bg-blue-50/30 transition-colors group">
-                  <td className="sticky left-0 bg-white group-hover:bg-blue-50/30 px-5 py-4 font-bold text-slate-800 text-xs">{route.originCity}</td>
-                  <td className="px-5 py-4 text-xs text-slate-600 font-medium">{route.destinationCity}</td>
-                  {vehicleTypes.map(vt => {
-                    const v = route.vehicleValues[vt.code];
-                    return (
-                      <React.Fragment key={vt.code}>
-                        <td className="px-3 py-4 text-xs text-right text-slate-700 border-l border-slate-50 font-medium">{v ? fmt(v.freight) : '—'}</td>
-                        <td className="px-3 py-4 text-xs text-right text-slate-600">{v ? fmt(v.tollGoing) : '—'}</td>
-                        <td className="px-3 py-4 text-xs text-right text-slate-600">{v ? fmt(v.tollReturning) : '—'}</td>
-                      </React.Fragment>
-                    );
-                  })}
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => onEdit(route)}
-                        className="p-2 hover:bg-blue-100 rounded-lg text-blue-500 transition-all"
-                        title="Editar"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => onDelete(route.id)}
-                        className="p-2 hover:bg-red-100 rounded-lg text-red-400 transition-all"
-                        title="Excluir"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <p className="text-[10px] text-slate-400 font-medium">
-        {filtered.length} {filtered.length === 1 ? 'rota' : 'rotas'} {search ? 'encontradas' : 'cadastradas'}
-      </p>
+      <SmartOperationTable
+        userId={userId}
+        componentId="freight-routes-table"
+        title="Rotas Cadastradas"
+        columns={columns}
+        data={tableData}
+        defaultVisibleKeys={defaultVisibleKeys}
+        noMaxHeight
+      />
     </div>
   );
 };
@@ -436,28 +457,29 @@ interface CalculatorViewProps {
 const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes }) => {
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
   const [axlesEmpty, setAxlesEmpty] = useState(4);
-  const [axlesFull, setAxlesFull] = useState(6);
+  const [axlesFull, setAxlesFull]   = useState(6);
 
-  const routeOptions = useMemo<SelectOption[]>(() => [
-    ...routes.map(r => ({ value: r.id, label: `${r.originCity} → ${r.destinationCity}` })),
-  ], [routes]);
+  const routeOptions = useMemo<SelectOption[]>(() =>
+    routes.map(r => ({ value: r.id, label: `${r.originCity} → ${r.destinationCity}` })),
+    [routes]
+  );
 
   const selectedRoute = useMemo(
     () => routes.find(r => r.id === selectedRouteId) ?? null,
     [routes, selectedRouteId]
   );
 
-  const totalRow = useMemo(() => {
+  const totals = useMemo(() => {
     if (!selectedRoute) return null;
-    return vehicleTypes.reduce<{ freight: number; tollGoing: number; tollReturning: number; total: number }>(
+    return vehicleTypes.reduce(
       (acc, vt) => {
         const v = selectedRoute.vehicleValues[vt.code];
         if (!v) return acc;
         return {
-          freight: acc.freight + v.freight,
-          tollGoing: acc.tollGoing + v.tollGoing,
+          freight:       acc.freight       + v.freight,
+          tollGoing:     acc.tollGoing     + v.tollGoing,
           tollReturning: acc.tollReturning + v.tollReturning,
-          total: acc.total + v.freight + v.tollGoing + v.tollReturning,
+          total:         acc.total         + v.freight + v.tollGoing + v.tollReturning,
         };
       },
       { freight: 0, tollGoing: 0, tollReturning: 0, total: 0 }
@@ -466,12 +488,12 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
 
   return (
     <div className="space-y-6 max-w-5xl">
-      {/* Seleção de Rota + Eixos */}
+      {/* Configuração */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Configuração</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Rota */}
+          {/* Rota — CustomSelect personalizado */}
           <div className="sm:col-span-1">
             <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Rota</label>
             <CustomSelect
@@ -490,22 +512,16 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
               <span className="ml-2 px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[8px] font-black normal-case">Vazio</span>
             </label>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setAxlesEmpty(v => Math.max(1, v - 1))}
-                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all"
-              >−</button>
+              <button onClick={() => setAxlesEmpty(v => Math.max(1, v - 1))}
+                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all">−</button>
               <input
-                type="number"
-                min="1"
-                max="20"
+                type="number" min="1" max="20"
                 value={axlesEmpty}
                 onChange={e => setAxlesEmpty(Math.max(1, parseInt(e.target.value) || 1))}
                 className="flex-1 text-center px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button
-                onClick={() => setAxlesEmpty(v => Math.min(20, v + 1))}
-                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all"
-              >+</button>
+              <button onClick={() => setAxlesEmpty(v => Math.min(20, v + 1))}
+                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all">+</button>
             </div>
           </div>
 
@@ -516,22 +532,16 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
               <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-[8px] font-black normal-case">Cheio</span>
             </label>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setAxlesFull(v => Math.max(1, v - 1))}
-                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all"
-              >−</button>
+              <button onClick={() => setAxlesFull(v => Math.max(1, v - 1))}
+                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all">−</button>
               <input
-                type="number"
-                min="1"
-                max="20"
+                type="number" min="1" max="20"
                 value={axlesFull}
                 onChange={e => setAxlesFull(Math.max(1, parseInt(e.target.value) || 1))}
                 className="flex-1 text-center px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button
-                onClick={() => setAxlesFull(v => Math.min(20, v + 1))}
-                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all"
-              >+</button>
+              <button onClick={() => setAxlesFull(v => Math.min(20, v + 1))}
+                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all">+</button>
             </div>
           </div>
         </div>
@@ -552,7 +562,8 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
         <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-200 shadow-sm">
           <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
             <svg className="w-6 h-6 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
             </svg>
           </div>
           <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Selecione uma rota para ver os valores</p>
@@ -593,7 +604,6 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
               <tbody className="divide-y divide-slate-50">
                 {vehicleTypes.map(vt => {
                   const v = selectedRoute.vehicleValues[vt.code];
-                  if (!v && (v === undefined)) return null;
                   const total = (v?.freight ?? 0) + (v?.tollGoing ?? 0) + (v?.tollReturning ?? 0);
                   return (
                     <tr key={vt.code} className="hover:bg-blue-50/30 transition-colors">
@@ -631,30 +641,22 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
                   );
                 })}
               </tbody>
-              {totalRow && (totalRow.freight > 0 || totalRow.tollGoing > 0 || totalRow.tollReturning > 0) && (
+              {totals && totals.total > 0 && (
                 <tfoot>
                   <tr className="bg-slate-50 border-t-2 border-slate-200">
-                    <td colSpan={1} className="px-5 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">—</td>
-                    <td className="px-5 py-4 text-right text-xs font-black text-slate-700">{fmt(totalRow.freight)}</td>
-                    <td className="px-5 py-4 text-right text-xs font-black text-slate-700">{fmt(totalRow.tollGoing)}</td>
-                    <td className="px-5 py-4 text-right text-xs font-black text-slate-700">{fmt(totalRow.tollReturning)}</td>
-                    <td className="px-5 py-4 text-right text-sm font-black text-blue-700">{fmt(totalRow.total)}</td>
+                    <td className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase">Total Geral</td>
+                    <td className="px-5 py-4 text-right text-xs font-black text-slate-700">{fmt(totals.freight)}</td>
+                    <td className="px-5 py-4 text-right text-xs font-black text-slate-700">{fmt(totals.tollGoing)}</td>
+                    <td className="px-5 py-4 text-right text-xs font-black text-slate-700">{fmt(totals.tollReturning)}</td>
+                    <td className="px-5 py-4 text-right text-sm font-black text-blue-700">{fmt(totals.total)}</td>
                   </tr>
                 </tfoot>
               )}
             </table>
           </div>
 
-          {/* Info sobre eixos */}
-          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-wrap gap-6 text-[10px] text-slate-500">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
-              Pedágios são valores fixos por rota/tipo de veículo
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
-              Eixos exibidos para referência operacional
-            </span>
+          <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex flex-wrap gap-6 text-[10px] text-slate-400">
+            <span>Pedágios fixos por rota/tipo de veículo · Eixos exibidos para referência operacional</span>
           </div>
         </div>
       )}
@@ -664,15 +666,19 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
 
 // ── Tab principal ─────────────────────────────────────────────────────────────
 
-const FreightTableTab: React.FC = () => {
+interface FreightTableTabProps {
+  userId: string;
+}
+
+const FreightTableTab: React.FC<FreightTableTabProps> = ({ userId }) => {
   const [view, setView] = useState<View>('table');
   const [routes, setRoutes] = useState<FreightRoute[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<FreightVehicleType[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
+  const [isRouteModalOpen, setIsRouteModalOpen]         = useState(false);
   const [isVehicleTypesModalOpen, setIsVehicleTypesModalOpen] = useState(false);
-  const [editingRoute, setEditingRoute] = useState<FreightRoute | null>(null);
+  const [editingRoute, setEditingRoute]                 = useState<FreightRoute | null>(null);
 
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -690,12 +696,6 @@ const FreightTableTab: React.FC = () => {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const existingCities = useMemo(() => {
-    const cities: string[] = [];
-    routes.forEach(r => { cities.push(r.originCity); cities.push(r.destinationCity); });
-    return cities;
-  }, [routes]);
 
   const handleSaveRoute = async (route: Omit<FreightRoute, 'createdAt' | 'updatedAt'>) => {
     const ok = await db.saveFreightRoute(route as FreightRoute);
@@ -729,21 +729,18 @@ const FreightTableTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
         <div>
           <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight">Tabela de Frete</h1>
           <p className="text-xs text-slate-400 mt-0.5">Gerencie fretes e pedágios por rota e tipo de veículo</p>
         </div>
 
-        {/* View switcher */}
         <div className="flex bg-slate-100 rounded-2xl p-1 self-start sm:self-auto">
           <button
             onClick={() => setView('table')}
             className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              view === 'table'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+              view === 'table' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             Tabela
@@ -751,9 +748,7 @@ const FreightTableTab: React.FC = () => {
           <button
             onClick={() => setView('calculator')}
             className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              view === 'calculator'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+              view === 'calculator' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             Calculadora de Rota
@@ -761,13 +756,13 @@ const FreightTableTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : view === 'table' ? (
         <FreightTableView
+          userId={userId}
           routes={routes}
           vehicleTypes={vehicleTypes}
           onEdit={r => { setEditingRoute(r); setIsRouteModalOpen(true); }}
@@ -779,14 +774,12 @@ const FreightTableTab: React.FC = () => {
         <CalculatorView routes={routes} vehicleTypes={vehicleTypes} />
       )}
 
-      {/* Modals */}
       {isRouteModalOpen && (
         <RouteModal
           vehicleTypes={vehicleTypes}
           editingRoute={editingRoute}
           onClose={() => { setIsRouteModalOpen(false); setEditingRoute(null); }}
           onSave={handleSaveRoute}
-          existingCities={existingCities}
         />
       )}
 
@@ -798,7 +791,6 @@ const FreightTableTab: React.FC = () => {
         />
       )}
 
-      {/* Toast */}
       {toast && (
         <div className={`fixed bottom-6 right-6 z-[200] px-5 py-3.5 rounded-2xl shadow-xl text-white text-xs font-black uppercase tracking-widest animate-in slide-in-from-bottom-4 fade-in duration-300 ${
           toast.type === 'success' ? 'bg-green-600 shadow-green-600/20' : 'bg-red-600 shadow-red-600/20'

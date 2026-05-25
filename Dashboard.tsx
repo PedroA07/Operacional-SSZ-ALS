@@ -461,7 +461,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.EXTERNAL_PORTAL && (
              <ExternalPortal user={user} trips={trips} />
            )}
-           {activeTab === DashboardTab.TABELA_FRETE && <FreightTableTab />}
+           {activeTab === DashboardTab.TABELA_FRETE && <FreightTableTab userId={user.id} />}
          </Suspense>
          </TabErrorBoundary>
         </div>

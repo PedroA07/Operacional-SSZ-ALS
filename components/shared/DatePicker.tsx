@@ -19,6 +19,10 @@ const MONTHS_PT = [
 ];
 const DAYS_PT = ['D','S','T','Q','Q','S','S'];
 
+const POPUP_W  = 288;
+const POPUP_H  = 340; // estimate
+const MARGIN   = 8;
+
 // Devolve YYYY-MM-DD para "hoje + offsetDays"
 const offsetDate = (offsetDays: number): string => {
   const d = new Date();
@@ -34,32 +38,53 @@ const DatePicker: React.FC<DatePickerProps> = ({
     ? { y: parseInt(v.slice(0, 4)), m: parseInt(v.slice(5, 7)) - 1 }
     : { y: today.getFullYear(), m: today.getMonth() };
 
-  const [isOpen, setIsOpen]     = useState(false);
-  const [viewYear, setViewYear] = useState(() => parseView(value).y);
-  const [viewMonth, setViewMonth] = useState(() => parseView(value).m);
+  const [isOpen, setIsOpen]           = useState(false);
+  const [viewYear, setViewYear]       = useState(() => parseView(value).y);
+  const [viewMonth, setViewMonth]     = useState(() => parseView(value).m);
   const [showYearPicker, setShowYearPicker] = useState(false);
-  const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
+  const [popupStyle, setPopupStyle]   = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef   = useRef<HTMLDivElement>(null);
 
-  // Calcula posição fixed ao abrir
+  // ── Cálculo de posição (4-way: cima/baixo + esquerda/direita) ─────────────
   const recalcPosition = () => {
     if (!triggerRef.current) return;
-    const r = triggerRef.current.getBoundingClientRect();
-    const popupW = 288;
-    const spaceBelow = window.innerHeight - r.bottom;
-    const openUp = spaceBelow < 340 && r.top > 340;
-    setPopupStyle({
+    const r   = triggerRef.current.getBoundingClientRect();
+    const vw  = window.innerWidth;
+    const vh  = window.innerHeight;
+
+    const spaceBelow = vh - r.bottom - MARGIN;
+    const spaceAbove = r.top - MARGIN;
+    const spaceRight = vw - r.left;
+
+    // Vertical
+    const openDown = spaceBelow >= POPUP_H || spaceBelow >= spaceAbove;
+
+    // Horizontal: alinhar à esquerda do trigger se couber, senão à direita
+    const alignLeft = spaceRight >= POPUP_W;
+
+    const style: React.CSSProperties = {
       position: 'fixed',
-      top: openUp ? undefined : r.bottom + 6,
-      bottom: openUp ? window.innerHeight - r.top + 6 : undefined,
-      left: Math.min(r.left, window.innerWidth - popupW - 8),
-      width: popupW,
+      width: POPUP_W,
       zIndex: 9999,
-    });
+    };
+
+    if (openDown) {
+      style.top    = r.bottom + MARGIN;
+    } else {
+      style.bottom = vh - r.top + MARGIN;
+    }
+
+    if (alignLeft) {
+      style.left  = r.left;
+    } else {
+      style.right = vw - r.right;
+    }
+
+    setPopupStyle(style);
   };
 
-  // Fecha ao clicar fora (trigger + popup)
+  // ── Fecha ao clicar fora ──────────────────────────────────────────────────
   useEffect(() => {
     const fn = (e: MouseEvent) => {
       const t = e.target as Node;
@@ -75,19 +100,18 @@ const DatePicker: React.FC<DatePickerProps> = ({
     return () => document.removeEventListener('mousedown', fn);
   }, []);
 
-  // Recalcula posição ao scroll / resize enquanto aberto
+  // ── Recalcula no scroll/resize enquanto aberto ────────────────────────────
   useEffect(() => {
     if (!isOpen) return;
-    const update = () => recalcPosition();
-    window.addEventListener('scroll', update, true);
-    window.addEventListener('resize', update);
+    window.addEventListener('scroll', recalcPosition, true);
+    window.addEventListener('resize', recalcPosition);
     return () => {
-      window.removeEventListener('scroll', update, true);
-      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', recalcPosition, true);
+      window.removeEventListener('resize', recalcPosition);
     };
   }, [isOpen]);
 
-  // Sincroniza view quando valor muda externamente
+  // ── Sincroniza view quando valor muda externamente ────────────────────────
   useEffect(() => {
     if (value) {
       const { y, m } = parseView(value);
@@ -142,16 +166,21 @@ const DatePicker: React.FC<DatePickerProps> = ({
     return false;
   };
 
-  // Intervalo de anos para o seletor
   const yearRange = Array.from({ length: 21 }, (_, i) => today.getFullYear() - 5 + i);
 
-  const baseInput = `w-full px-4 py-3.5 rounded-2xl border-2 border-slate-100 bg-slate-50 hover:border-blue-300 text-[11px] font-bold text-slate-800 uppercase cursor-pointer flex items-center justify-between transition-all select-none ${inputClassName || ''}`;
+  const baseInput = [
+    'w-full px-4 py-3.5 rounded-2xl border-2 border-slate-100 bg-slate-50',
+    'hover:border-blue-300 text-[11px] font-bold text-slate-800 uppercase',
+    'cursor-pointer flex items-center justify-between transition-all select-none',
+    isOpen ? 'border-blue-400 bg-white shadow-sm' : '',
+    inputClassName || '',
+  ].join(' ');
 
   const popup = (
     <div
       id="datepicker-portal-popup"
       style={popupStyle}
-      className="bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
+      className="bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
       onMouseDown={e => e.nativeEvent.stopPropagation()}
     >
       {/* Quick shortcuts */}
@@ -253,13 +282,22 @@ const DatePicker: React.FC<DatePickerProps> = ({
     </div>
   );
 
+  // Seta do trigger reflete se vai abrir pra cima ou baixo
+  const willOpenDown = (() => {
+    if (!triggerRef.current) return true;
+    const r = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - r.bottom - MARGIN;
+    const spaceAbove = r.top - MARGIN;
+    return spaceBelow >= POPUP_H || spaceBelow >= spaceAbove;
+  })();
+
   return (
     <div ref={containerRef} className={`relative ${className || ''}`}>
       {/* ── Trigger ── */}
       <div
         ref={triggerRef}
         onClick={() => {
-          if (!isOpen) recalcPosition();
+          recalcPosition();
           setIsOpen(v => !v);
           setShowYearPicker(false);
         }}
@@ -268,12 +306,15 @@ const DatePicker: React.FC<DatePickerProps> = ({
         <span className={displayValue ? 'text-slate-800' : 'text-slate-300'}>
           {displayValue || placeholder || 'Selecionar data...'}
         </span>
-        <svg className="w-4 h-4 text-slate-400 shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${isOpen ? (willOpenDown ? 'rotate-180' : 'rotate-0') : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
       </div>
 
-      {/* ── Calendar popup — renderizado via portal para sobrepor overflow containers ── */}
+      {/* ── Calendar popup via portal ── */}
       {isOpen && ReactDOM.createPortal(popup, document.body)}
     </div>
   );
