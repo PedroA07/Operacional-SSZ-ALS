@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FreightRoute, FreightVehicleType, FreightRouteVehicleValue } from '../../types';
 import { db } from '../../utils/storage';
+import CustomSelect, { SelectOption } from '../shared/CustomSelect';
 
 type View = 'table' | 'calculator';
 
@@ -437,6 +438,10 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
   const [axlesEmpty, setAxlesEmpty] = useState(4);
   const [axlesFull, setAxlesFull] = useState(6);
 
+  const routeOptions = useMemo<SelectOption[]>(() => [
+    ...routes.map(r => ({ value: r.id, label: `${r.originCity} → ${r.destinationCity}` })),
+  ], [routes]);
+
   const selectedRoute = useMemo(
     () => routes.find(r => r.id === selectedRouteId) ?? null,
     [routes, selectedRouteId]
@@ -469,16 +474,13 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
           {/* Rota */}
           <div className="sm:col-span-1">
             <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Rota</label>
-            <select
+            <CustomSelect
               value={selectedRouteId}
-              onChange={e => setSelectedRouteId(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">Selecione uma rota...</option>
-              {routes.map(r => (
-                <option key={r.id} value={r.id}>{r.originCity} → {r.destinationCity}</option>
-              ))}
-            </select>
+              onChange={setSelectedRouteId}
+              options={routeOptions}
+              placeholder="Selecione uma rota..."
+              searchable={routes.length > 5}
+            />
           </div>
 
           {/* Eixos Ida */}

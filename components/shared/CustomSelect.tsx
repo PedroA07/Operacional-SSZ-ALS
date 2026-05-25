@@ -1,11 +1,20 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 
 export interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean;
   color?: string; // optional color dot
+}
+
+interface DropdownPos {
+  top?: number;
+  bottom?: number;
+  left?: number;
+  right?: number;
+  minWidth: number;
+  maxWidth: number;
 }
 
 interface CustomSelectProps {
@@ -20,24 +29,84 @@ interface CustomSelectProps {
   searchable?: boolean; // auto-enabled when options.length > 8
 }
 
+const DROPDOWN_MAX_H = 288; // matches max-h-56 (224px list) + search (40px) + clear (40px)
+const DROPDOWN_MIN_W = 180;
+const DROPDOWN_MAX_W = 400;
+const MARGIN = 8; // gap from trigger
+
 const CustomSelect: React.FC<CustomSelectProps> = ({
   value, onChange, options, placeholder, className, inputClassName,
   disabled = false, required = false, searchable,
 }) => {
   const [isOpen,  setIsOpen]  = useState(false);
   const [search,  setSearch]  = useState('');
+  const [pos,     setPos]     = useState<DropdownPos | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef    = useRef<HTMLInputElement>(null);
+  const dropdownRef  = useRef<HTMLDivElement>(null);
 
   const shouldSearch = searchable ?? options.length > 8;
-
   const selectedOption = options.find(o => o.value === value);
   const displayLabel   = selectedOption?.label ?? '';
 
-  // ── Close on outside click ─────────────────────────────────────────────────
+  // ── Calcula posição ótima do dropdown ─────────────────────────────────────
+  const calcPosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const r = containerRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const estimatedH = Math.min(DROPDOWN_MAX_H, options.length * 40 + (shouldSearch ? 48 : 0) + (!required && value ? 40 : 0) + 8);
+    const w = Math.min(DROPDOWN_MAX_W, Math.max(DROPDOWN_MIN_W, r.width));
+
+    const spaceBelow = vh - r.bottom - MARGIN;
+    const spaceAbove = r.top - MARGIN;
+    const spaceRight = vw - r.left;
+    const spaceLeft  = r.right;
+
+    // Vertical: preferir abaixo, senão acima
+    const openDown = spaceBelow >= estimatedH || spaceBelow >= spaceAbove;
+
+    // Horizontal: alinhar à esquerda se couber, senão à direita
+    const alignLeft = spaceRight >= w;
+
+    const result: DropdownPos = { minWidth: r.width, maxWidth: DROPDOWN_MAX_W };
+
+    if (openDown) {
+      result.top = r.bottom + MARGIN;
+    } else {
+      result.bottom = vh - r.top + MARGIN;
+    }
+
+    if (alignLeft) {
+      result.left = r.left;
+    } else {
+      result.right = vw - r.right;
+    }
+
+    setPos(result);
+  }, [options.length, shouldSearch, required, value]);
+
+  // ── Recalcula ao abrir e no scroll/resize ─────────────────────────────────
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    calcPosition();
+    window.addEventListener('scroll', calcPosition, true);
+    window.addEventListener('resize', calcPosition);
+    return () => {
+      window.removeEventListener('scroll', calcPosition, true);
+      window.removeEventListener('resize', calcPosition);
+    };
+  }, [isOpen, calcPosition]);
+
+  // ── Fecha ao clicar fora ──────────────────────────────────────────────────
   useEffect(() => {
     const fn = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideContainer = containerRef.current?.contains(target);
+      const insideDropdown  = dropdownRef.current?.contains(target);
+      if (!insideContainer && !insideDropdown) {
         setIsOpen(false);
         setSearch('');
       }
@@ -46,7 +115,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     return () => document.removeEventListener('mousedown', fn);
   }, []);
 
-  // ── Focus search input when opening ───────────────────────────────────────
+  // ── Focus na busca ao abrir ───────────────────────────────────────────────
   useEffect(() => {
     if (isOpen && shouldSearch) {
       setTimeout(() => searchRef.current?.focus(), 30);
@@ -54,7 +123,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     if (!isOpen) setSearch('');
   }, [isOpen, shouldSearch]);
 
-  // ── Close on ESC ──────────────────────────────────────────────────────────
+  // ── ESC fecha ────────────────────────────────────────────────────────────
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setIsOpen(false); setSearch(''); }
@@ -73,6 +142,11 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     setSearch('');
   };
 
+  const openDropdown = () => {
+    if (disabled) return;
+    setIsOpen(v => !v);
+  };
+
   const triggerClass = [
     'w-full px-4 py-3.5 rounded-2xl border-2 text-[11px] font-bold uppercase',
     'flex items-center justify-between transition-all select-none',
@@ -83,6 +157,9 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     inputClassName ?? '',
   ].join(' ');
 
+  // Seta indica a direção em que o dropdown abrirá
+  const arrowDown = pos ? pos.top !== undefined : true;
+
   return (
     <div ref={containerRef} className={`relative ${className ?? ''}`}>
 
@@ -92,8 +169,13 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         tabIndex={disabled ? -1 : 0}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        onClick={() => { if (!disabled) setIsOpen(v => !v); }}
-        onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !disabled) { e.preventDefault(); setIsOpen(v => !v); } }}
+        onClick={openDropdown}
+        onKeyDown={e => {
+          if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
+            e.preventDefault();
+            openDropdown();
+          }
+        }}
         className={triggerClass}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -108,18 +190,26 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
           </span>
         </div>
         <svg
-          className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${isOpen ? (arrowDown ? 'rotate-180' : 'rotate-0') : (arrowDown ? 'rotate-0' : 'rotate-180')}`}
           fill="none" stroke="currentColor" viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/>
         </svg>
       </div>
 
-      {/* ── Dropdown ── */}
-      {isOpen && (
+      {/* ── Dropdown (portal via fixed) ── */}
+      {isOpen && pos && (
         <div
-          className="absolute top-full left-0 mt-2 z-[600] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-          style={{ minWidth: '100%', maxWidth: '400px' }}
+          ref={dropdownRef}
+          className="fixed z-[9999] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+          style={{
+            top:      pos.top    !== undefined ? `${pos.top}px`    : undefined,
+            bottom:   pos.bottom !== undefined ? `${pos.bottom}px` : undefined,
+            left:     pos.left   !== undefined ? `${pos.left}px`   : undefined,
+            right:    pos.right  !== undefined ? `${pos.right}px`  : undefined,
+            minWidth: `${pos.minWidth}px`,
+            maxWidth: `${pos.maxWidth}px`,
+          }}
         >
           {/* Search input */}
           {shouldSearch && (
@@ -141,7 +231,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
           )}
 
           {/* Options list */}
-          <div className="max-h-56 overflow-y-auto py-1">
+          <div className="max-h-56 overflow-y-auto py-1 custom-scrollbar">
             {filtered.length === 0 ? (
               <p className="text-[9px] font-bold text-slate-300 uppercase text-center py-5">
                 Nenhum resultado
