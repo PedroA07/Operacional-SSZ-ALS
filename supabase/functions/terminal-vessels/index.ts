@@ -265,6 +265,64 @@ async function fetchTerminal(
   return { vessels: [], error: lastError || 'Terminal indisponível', terminal: config.name, fetchedAt };
 }
 
+// ─── Persist vessels to Supabase ─────────────────────────────────────────────
+async function saveVessels(vessels: TerminalVessel[], fetchedAt: string): Promise<{ saved: number; error?: string }> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !supabaseKey || vessels.length === 0) return { saved: 0 };
+
+  const terminals = [...new Set(vessels.map(v => v.terminal))];
+
+  // Delete stale rows for the fetched terminals
+  const deleteRes = await fetch(
+    `${supabaseUrl}/rest/v1/terminal_vessels?terminal=in.(${terminals.map(t => `"${t}"`).join(',')})`,
+    {
+      method: 'DELETE',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+  if (!deleteRes.ok) {
+    const errText = await deleteRes.text();
+    return { saved: 0, error: `DELETE failed: ${errText}` };
+  }
+
+  const rows = vessels.map(v => ({
+    terminal:      v.terminal,
+    navio:         v.navio,
+    situacao:      v.situacao,
+    previsao:      v.previsao      ?? null,
+    berco:         v.berco         ?? null,
+    armador:       v.armador       ?? null,
+    viagem:        v.viagem        ?? null,
+    gate_dry:      v.gateDry       ?? null,
+    gate_reefer:   v.gateReefer    ?? null,
+    dead_line_str: v.deadLineStr   ?? null,
+    fetched_at:    fetchedAt,
+  }));
+
+  const insertRes = await fetch(`${supabaseUrl}/rest/v1/terminal_vessels`, {
+    method: 'POST',
+    headers: {
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal',
+    },
+    body: JSON.stringify(rows),
+  });
+
+  if (!insertRes.ok) {
+    const errText = await insertRes.text();
+    return { saved: 0, error: `INSERT failed: ${errText}` };
+  }
+
+  return { saved: rows.length };
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -295,13 +353,27 @@ Deno.serve(async (req) => {
         }
       }
 
+      const saveResult = await saveVessels(allVessels, fetchedAt);
+
       return new Response(
-        JSON.stringify({ vessels: allVessels, error: errors.length ? errors.join(' | ') : undefined, terminal: 'all', fetchedAt }),
+        JSON.stringify({
+          vessels: allVessels,
+          saved: saveResult.saved,
+          saveError: saveResult.error,
+          error: errors.length ? errors.join(' | ') : undefined,
+          terminal: 'all',
+          fetchedAt,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const result = await fetchTerminal(terminal, vessel);
+
+    if (result.vessels.length > 0) {
+      await saveVessels(result.vessels, fetchedAt);
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
