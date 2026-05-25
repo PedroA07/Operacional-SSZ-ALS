@@ -324,50 +324,77 @@ const FreightTableView: React.FC<FreightTableViewProps> = ({
       },
     ];
 
-    const vtCols = vehicleTypes.flatMap(vt => [
+    const money = (v: number) =>
+      v > 0 ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null;
+
+    const vtCols = [
       {
-        key: `${vt.code}_frete`,
-        label: `${vt.code} Frete`,
-        sortable: true,
-        sortValue: (row: any) => row[`${vt.code}_frete`],
-        render: (row: any) => {
-          const v = row[`${vt.code}_frete`];
-          return (
-            <span className="text-xs font-bold text-slate-700 tabular-nums">
-              {v > 0 ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : <span className="text-slate-300">—</span>}
-            </span>
-          );
-        },
+        key: 'col_frete',
+        label: 'Frete',
+        sortable: false,
+        render: (row: any) => (
+          <div className="flex flex-col gap-1">
+            {vehicleTypes.map(vt => {
+              const val = money(row[`${vt.code}_frete`] ?? 0);
+              return (
+                <div key={vt.code} className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-black uppercase leading-none shrink-0">
+                    {vt.code}
+                  </span>
+                  <span className="text-xs font-bold text-slate-700 tabular-nums">
+                    {val ?? <span className="text-slate-300 font-normal">—</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ),
       },
       {
-        key: `${vt.code}_ida`,
-        label: `${vt.code} Ped.Ida`,
-        sortable: true,
-        sortValue: (row: any) => row[`${vt.code}_ida`],
-        render: (row: any) => {
-          const v = row[`${vt.code}_ida`];
-          return (
-            <span className="text-xs text-slate-600 tabular-nums">
-              {v > 0 ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : <span className="text-slate-300">—</span>}
-            </span>
-          );
-        },
+        key: 'col_ida',
+        label: 'Pedágio Ida',
+        sortable: false,
+        render: (row: any) => (
+          <div className="flex flex-col gap-1">
+            {vehicleTypes.map(vt => {
+              const val = money(row[`${vt.code}_ida`] ?? 0);
+              return (
+                <div key={vt.code} className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-[9px] font-black uppercase leading-none shrink-0">
+                    {vt.code}
+                  </span>
+                  <span className="text-xs text-slate-600 tabular-nums">
+                    {val ?? <span className="text-slate-300">—</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ),
       },
       {
-        key: `${vt.code}_volta`,
-        label: `${vt.code} Ped.Volta`,
-        sortable: true,
-        sortValue: (row: any) => row[`${vt.code}_volta`],
-        render: (row: any) => {
-          const v = row[`${vt.code}_volta`];
-          return (
-            <span className="text-xs text-slate-600 tabular-nums">
-              {v > 0 ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : <span className="text-slate-300">—</span>}
-            </span>
-          );
-        },
+        key: 'col_volta',
+        label: 'Pedágio Volta',
+        sortable: false,
+        render: (row: any) => (
+          <div className="flex flex-col gap-1">
+            {vehicleTypes.map(vt => {
+              const val = money(row[`${vt.code}_volta`] ?? 0);
+              return (
+                <div key={vt.code} className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black uppercase leading-none shrink-0">
+                    {vt.code}
+                  </span>
+                  <span className="text-xs text-slate-600 tabular-nums">
+                    {val ?? <span className="text-slate-300">—</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ),
       },
-    ]);
+    ];
 
     const actions = {
       key: 'actions',
@@ -402,12 +429,10 @@ const FreightTableView: React.FC<FreightTableViewProps> = ({
     return [...base, ...vtCols, actions];
   }, [vehicleTypes, onEdit, onDelete]);
 
-  const defaultVisibleKeys = useMemo(() => [
-    'originCity',
-    'destinationCity',
-    ...vehicleTypes.flatMap(vt => [`${vt.code}_frete`, `${vt.code}_ida`, `${vt.code}_volta`]),
-    'actions',
-  ], [vehicleTypes]);
+  const defaultVisibleKeys = useMemo(
+    () => ['originCity', 'destinationCity', 'col_frete', 'col_ida', 'col_volta', 'actions'],
+    []
+  );
 
   return (
     <div className="space-y-4">
