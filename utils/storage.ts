@@ -101,7 +101,7 @@ export const db = {
     }));
   },
 
-  saveUser: async (user: User) => {
+  saveUser: async (user: User): Promise<string | false> => {
     if (!supabase) return false;
     const payload = {
       id: user.id,
@@ -130,12 +130,12 @@ export const db = {
       if (existing?.id) {
         const { error: e2 } = await supabase
           .from('users').upsert({ ...payload, id: existing.id }, { onConflict: 'id' });
-        if (e2) console.error('[saveUser] Erro:', e2.message);
-        return !e2;
+        if (e2) { console.error('[saveUser] Erro:', e2.message); return false; }
+        return existing.id; // Retorna o ID real do usuário existente
       }
     }
-    if (error) console.error('[saveUser] Erro:', error.message);
-    return !error;
+    if (error) { console.error('[saveUser] Erro:', error.message); return false; }
+    return user.id;
   },
 
   deleteUser: async (id: string) => {
