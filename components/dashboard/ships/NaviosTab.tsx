@@ -790,6 +790,9 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const AUTO_REFRESH_MS = 3 * 60 * 1000; // 3 minutos
   const [nextRefresh, setNextRefresh] = useState<number>(Date.now() + AUTO_REFRESH_MS);
 
+  const toast = (message: string, type: 'success'|'error'|'info' = 'info') =>
+    window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message, type } }));
+
   const forceScrape = useCallback(async () => {
     if (scraping) return;
     setScraping(true);
@@ -802,12 +805,26 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
       // Persiste BTP/ECOPORTO/Santos Brasil no banco a partir da resposta da edge function
       if (supabase && tvResult.status === 'fulfilled') {
         const tvData = (tvResult.value as any)?.data;
+        const fnError = (tvResult.value as any)?.error;
+
+        if (fnError) {
+          toast(`Edge function erro: ${fnError.message ?? JSON.stringify(fnError)}`, 'error');
+        }
+
         const vessels: TerminalVessel[] = tvData?.vessels ?? [];
-        if (vessels.length > 0) {
+
+        if (vessels.length === 0) {
+          const detail = tvData?.error ? ` (${tvData.error})` : '';
+          toast(`Nenhum navio retornado pela edge function${detail}`, 'error');
+        } else {
           const fetchedAt = tvData?.fetchedAt ?? new Date().toISOString();
           const terminals = [...new Set(vessels.map((v: TerminalVessel) => v.terminal))];
-          await supabase.from('terminal_vessels').delete().in('terminal', terminals);
-          await supabase.from('terminal_vessels').insert(
+
+          const { error: delErr } = await supabase
+            .from('terminal_vessels').delete().in('terminal', terminals);
+          if (delErr) toast(`Erro ao limpar tabela: ${delErr.message}`, 'error');
+
+          const { error: insErr } = await supabase.from('terminal_vessels').insert(
             vessels.map((v: TerminalVessel) => ({
               terminal:      v.terminal,
               navio:         v.navio,
@@ -822,10 +839,16 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
               fetched_at:    fetchedAt,
             }))
           );
+          if (insErr) toast(`Erro ao salvar navios: ${insErr.message}`, 'error');
+          else toast(`${vessels.length} navios salvos (${terminals.join(', ')})`, 'success');
         }
+      } else if (tvResult.status === 'rejected') {
+        toast(`Falha ao chamar edge function: ${tvResult.reason}`, 'error');
       }
-    } catch(e) { console.error('Scrape error', e); }
-    finally {
+    } catch(e: any) {
+      toast(`Erro inesperado: ${e?.message ?? e}`, 'error');
+      console.error('Scrape error', e);
+    } finally {
       await loadTV();
       setScraping(false);
       setNextRefresh(Date.now() + AUTO_REFRESH_MS);
