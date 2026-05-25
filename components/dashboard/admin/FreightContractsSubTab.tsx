@@ -482,6 +482,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   // ── Auto-match logic — busca em TODAS as viagens, não só elegíveis ───────────
   const findAutoMatch = useCallback((parsed: FileEntry['parsed']): string | null => {
     const norm = normAccent;
+    // Strip espaços/hífens/pontos para comparar container (ISO 6346 pode ter variações)
+    const normCtn = (s: string) => s.toUpperCase().replace(/[\s\-_.]/g, '');
 
     // Verifica se a localidade do contrato não contradiz o destino da viagem
     const locMatches = (t: Trip): boolean => {
@@ -499,7 +501,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     if (parsed.container && parsed.localidade) {
       const loc0 = norm(parsed.localidade.split(' ')[0]);
       const hits = trips.filter(t =>
-        t.container && norm(t.container) === norm(parsed.container) &&
+        t.container && normCtn(t.container) === normCtn(parsed.container) &&
         t.destination?.name && norm(t.destination.name).includes(loc0)
       );
       if (hits.length === 1) return hits[0].id;
@@ -516,7 +518,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
     // Prioridade 2: container apenas — só vincula se localidade não contradiz destino
     if (parsed.container) {
-      const hits = trips.filter(t => t.container && norm(t.container) === norm(parsed.container));
+      const hits = trips.filter(t => t.container && normCtn(t.container) === normCtn(parsed.container));
       if (hits.length === 1 && locMatches(hits[0])) return hits[0].id;
     }
 

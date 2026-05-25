@@ -171,13 +171,15 @@ export function parseFreightContractText(text: string): ParsedFreightContract {
 
   // ── Container ─────────────────────────────────────────────────────────────────
   // Padrão: "Nr conteiner: HASU4364753," — captura SOMENTE o primeiro
-  const ctnMatch = text.match(/Nr\.?\s*conteiner[:\s]+([A-Z]{4}\d{7})/i);
+  // Aceita espaço/hífen entre letras e dígitos e 6-7 dígitos (ISO 6346)
+  const normCtn = (s: string) => s.toUpperCase().replace(/[\s\-_.]/g, '');
+  const ctnMatch = text.match(/Nr\.?\s*conteiner[:\s]+([A-Z]{4}[\s\-]?\d{6,7})/i);
   if (ctnMatch) {
-    result.container = ctnMatch[1].toUpperCase();
+    result.container = normCtn(ctnMatch[1]);
   } else {
-    // Fallback: qualquer sequência 4 letras + 7 dígitos no texto
-    const fallback = text.match(/\b([A-Z]{4}\d{7})\b/);
-    if (fallback) result.container = fallback[1].toUpperCase();
+    // Fallback: qualquer sequência 4 letras + 6-7 dígitos (com ou sem espaço/hífen)
+    const fallback = text.match(/\b([A-Z]{4})[\s\-]?(\d{6,7})\b/);
+    if (fallback) result.container = normCtn(fallback[1] + fallback[2]);
   }
 
   return result;
