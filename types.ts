@@ -348,6 +348,8 @@ export interface FreightVehicleType {
   code: string;
   name: string;
   sortOrder: number;
+  axlesGoing: number;
+  axlesReturning: number;
   createdAt?: string;
 }
 

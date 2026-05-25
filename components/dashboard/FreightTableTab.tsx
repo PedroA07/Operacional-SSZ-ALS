@@ -10,11 +10,11 @@ import SmartOperationTable from './operations/SmartOperationTable';
 type View = 'table' | 'calculator';
 
 const DEFAULT_VEHICLE_TYPES: FreightVehicleType[] = [
-  { id: 'l',  code: 'L',  name: 'Leve',             sortOrder: 1 },
-  { id: 'ls', code: 'LS', name: 'Leve Semi-Reboque', sortOrder: 2 },
-  { id: 'm',  code: 'M',  name: 'Médio',             sortOrder: 3 },
-  { id: 'ml', code: 'ML', name: 'Médio Rod. Leve',   sortOrder: 4 },
-  { id: 've', code: 'VE', name: 'Veículo Especial',  sortOrder: 5 },
+  { id: 'l',  code: 'L',  name: 'Leve',             sortOrder: 1, axlesGoing: 4, axlesReturning: 5 },
+  { id: 'ls', code: 'LS', name: 'Leve Semi-Reboque', sortOrder: 2, axlesGoing: 4, axlesReturning: 6 },
+  { id: 'm',  code: 'M',  name: 'Médio',             sortOrder: 3, axlesGoing: 4, axlesReturning: 6 },
+  { id: 'ml', code: 'ML', name: 'Médio Rod. Leve',   sortOrder: 4, axlesGoing: 5, axlesReturning: 7 },
+  { id: 've', code: 'VE', name: 'Veículo Especial',  sortOrder: 5, axlesGoing: 6, axlesReturning: 9 },
 ];
 
 const fmt = (v: number) =>
@@ -93,6 +93,59 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
   });
   const [saving, setSaving] = useState(false);
 
+  // Consulta RotasBrasil
+  const [viaConsulta, setViaConsulta]   = useState('');
+  const [consultando, setConsultando]   = useState(false);
+  const [consultError, setConsultError] = useState<string | null>(null);
+  const [consultOk, setConsultOk]       = useState(false);
+
+  const handleConsultarPedagios = async () => {
+    if (!origin.trim() || !destination.trim()) return;
+    setConsultando(true);
+    setConsultError(null);
+    setConsultOk(false);
+
+    const orig = toApiCity(origin);
+    const dest = toApiCity(destination);
+    const via  = viaConsulta ? toApiCity(viaConsulta) : undefined;
+
+    // Deduplica chamadas por quantidade de eixos
+    const goingAxles     = [...new Set(vehicleTypes.map(vt => vt.axlesGoing))];
+    const returningAxles = [...new Set(vehicleTypes.map(vt => vt.axlesReturning))];
+
+    try {
+      const [goingRes, returningRes] = await Promise.all([
+        Promise.all(goingAxles.map(ax =>
+          db.consultarPedagioRotas(orig, dest, ax, via).then(r => ({ ax, data: r }))
+        )),
+        Promise.all(returningAxles.map(ax =>
+          db.consultarPedagioRotas(orig, dest, ax, via).then(r => ({ ax, data: r }))
+        )),
+      ]);
+
+      const anyErr = [...goingRes, ...returningRes].find(r => r.data?.error);
+      if (anyErr) { setConsultError(String(anyErr.data.error)); return; }
+
+      const goingMap     = new Map(goingRes.map(r => [r.ax, extractToll(r.data)]));
+      const returningMap = new Map(returningRes.map(r => [r.ax, extractToll(r.data)]));
+
+      setValues(prev => {
+        const next = { ...prev };
+        vehicleTypes.forEach(vt => {
+          const tg = goingMap.get(vt.axlesGoing)     ?? 0;
+          const tv = returningMap.get(vt.axlesReturning) ?? 0;
+          next[vt.code] = { ...next[vt.code], tollGoing: tg, tollReturning: tv };
+        });
+        return next;
+      });
+      setConsultOk(true);
+    } catch (e) {
+      setConsultError(String(e));
+    } finally {
+      setConsultando(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!origin.trim() || !destination.trim()) return;
     setSaving(true);
@@ -147,6 +200,70 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
             </div>
           </div>
 
+          {/* Consulta automática de pedágios */}
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 space-y-3">
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+              Calcular Pedágios via RotasBrasil
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                  Via (opcional)
+                  <span className="ml-2 text-slate-300 normal-case font-normal">define o trecho/rodovia</span>
+                </label>
+                <CitySearchSelect
+                  value={viaConsulta}
+                  onChange={setViaConsulta}
+                  placeholder="Ex: Cotia - SP (para usar Rodoanel)..."
+                />
+              </div>
+              <div className="flex flex-col justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleConsultarPedagios}
+                  disabled={consultando || !origin.trim() || !destination.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-40 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20"
+                >
+                  {consultando ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      Consultando API...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                      </svg>
+                      Calcular e Preencher
+                    </>
+                  )}
+                </button>
+                {consultOk && (
+                  <p className="text-[9px] font-black text-emerald-600 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Pedágios preenchidos com sucesso
+                  </p>
+                )}
+              </div>
+            </div>
+            {viaConsulta && origin && destination && (
+              <p className="text-[9px] text-slate-400">
+                Trajeto: {origin} → <span className="text-blue-600 font-bold">{viaConsulta}</span> → {destination}
+              </p>
+            )}
+            {consultError && (
+              <p className="text-[10px] text-red-500 font-medium">{consultError}</p>
+            )}
+            <p className="text-[9px] text-slate-300">
+              Cada tipo de veículo usa seus próprios eixos cadastrados. Preenche automaticamente os campos de Pedágio Ida e Pedágio Volta abaixo.
+            </p>
+          </div>
+
           {/* Valores por tipo de veículo */}
           <div>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
@@ -167,9 +284,14 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
                   {vehicleTypes.map(vt => (
                     <tr key={vt.code} className="hover:bg-slate-50/50">
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-black uppercase">{vt.code}</span>
-                          <span className="text-[10px] text-slate-400 font-bold">({vt.name})</span>
+                        <span className="inline-flex flex-col gap-0.5">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-black uppercase">{vt.code}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">({vt.name})</span>
+                          </span>
+                          <span className="text-[9px] text-slate-300 pl-0.5">
+                            ida {vt.axlesGoing} eixos · volta {vt.axlesReturning} eixos
+                          </span>
                         </span>
                       </td>
                       <td className="px-3 py-2.5 w-36">
@@ -235,8 +357,10 @@ interface VehicleTypesModalProps {
 
 const VehicleTypesModal: React.FC<VehicleTypesModalProps> = ({ vehicleTypes, onClose, onSave }) => {
   const [types, setTypes] = useState<FreightVehicleType[]>(vehicleTypes);
-  const [newCode, setNewCode] = useState('');
-  const [newName, setNewName] = useState('');
+  const [newCode, setNewCode]           = useState('');
+  const [newName, setNewName]           = useState('');
+  const [newAxlesGoing, setNewAxlesGoing]         = useState(4);
+  const [newAxlesReturning, setNewAxlesReturning] = useState(6);
   const [saving, setSaving] = useState(false);
 
   const addType = () => {
@@ -247,6 +371,8 @@ const VehicleTypesModal: React.FC<VehicleTypesModalProps> = ({ vehicleTypes, onC
       code: newCode.toUpperCase().trim(),
       name: newName.trim(),
       sortOrder: prev.length + 1,
+      axlesGoing:     newAxlesGoing,
+      axlesReturning: newAxlesReturning,
     }]);
     setNewCode('');
     setNewName('');
@@ -277,8 +403,13 @@ const VehicleTypesModal: React.FC<VehicleTypesModalProps> = ({ vehicleTypes, onC
             {types.map(t => (
               <div key={t.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
                 <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-black uppercase min-w-[40px] text-center">{t.code}</span>
-                <span className="flex-1 text-xs text-slate-600 font-medium">{t.name}</span>
-                <button onClick={() => removeType(t.id)} className="p-1.5 hover:bg-red-100 rounded-lg text-red-400 transition-all">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-600 font-medium truncate">{t.name}</p>
+                  <p className="text-[9px] text-slate-400">
+                    ida {t.axlesGoing ?? 4} eixos · volta {t.axlesReturning ?? 6} eixos
+                  </p>
+                </div>
+                <button onClick={() => removeType(t.id)} className="p-1.5 hover:bg-red-100 rounded-lg text-red-400 transition-all shrink-0">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
                   </svg>
@@ -289,20 +420,32 @@ const VehicleTypesModal: React.FC<VehicleTypesModalProps> = ({ vehicleTypes, onC
 
           <div className="pt-2 border-t border-slate-100">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Adicionar Tipo</p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <input
                 value={newCode}
                 onChange={e => setNewCode(e.target.value)}
-                placeholder="Código (ex: LT)"
+                placeholder="Código"
                 maxLength={6}
-                className="w-24 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-20 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 placeholder="Nome do tipo"
-                className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] font-black text-slate-400 uppercase shrink-0">Ida</span>
+                <input type="number" min="1" max="20" value={newAxlesGoing}
+                  onChange={e => setNewAxlesGoing(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-12 text-center px-2 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-[9px] font-black text-slate-400 uppercase shrink-0">Volta</span>
+                <input type="number" min="1" max="20" value={newAxlesReturning}
+                  onChange={e => setNewAxlesReturning(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-12 text-center px-2 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
               <button
                 onClick={addType}
                 disabled={!newCode.trim() || !newName.trim()}
@@ -711,8 +854,6 @@ function extractToll(data: any): number {
 
 const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes }) => {
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
-  const [axlesEmpty, setAxlesEmpty] = useState(4);
-  const [axlesFull, setAxlesFull]   = useState(6);
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(
     () => new Set(vehicleTypes.map(vt => vt.code))
   );
@@ -784,10 +925,14 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
     const origin = toApiCity(selectedRoute.originCity);
     const dest   = toApiCity(selectedRoute.destinationCity);
     const via    = viaCity ? toApiCity(viaCity) : undefined;
+    // Usa eixos do primeiro tipo visível como referência para exibição
+    const refType = visibleTypes[0];
+    const axlesGoing    = refType?.axlesGoing     ?? 4;
+    const axlesReturning = refType?.axlesReturning ?? 6;
     try {
       const [resIda, resVolta] = await Promise.all([
-        db.consultarPedagioRotas(origin, dest, axlesEmpty, via),
-        db.consultarPedagioRotas(origin, dest, axlesFull,  via),
+        db.consultarPedagioRotas(origin, dest, axlesGoing,    via),
+        db.consultarPedagioRotas(origin, dest, axlesReturning, via),
       ]);
       if (resIda?.error)   { setApiError(String(resIda.error));   return; }
       if (resVolta?.error) { setApiError(String(resVolta.error)); return; }
@@ -808,58 +953,15 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Configuração</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Rota — CustomSelect personalizado */}
-          <div className="sm:col-span-1">
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Rota</label>
-            <CustomSelect
-              value={selectedRouteId}
-              onChange={setSelectedRouteId}
-              options={routeOptions}
-              placeholder="Selecione uma rota..."
-              searchable={routes.length > 5}
-            />
-          </div>
-
-          {/* Eixos Ida */}
-          <div>
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-              Eixos na Ida
-              <span className="ml-2 px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[8px] font-black normal-case">Vazio</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setAxlesEmpty(v => Math.max(1, v - 1))}
-                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all">−</button>
-              <input
-                type="number" min="1" max="20"
-                value={axlesEmpty}
-                onChange={e => setAxlesEmpty(Math.max(1, parseInt(e.target.value) || 1))}
-                className="flex-1 text-center px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button onClick={() => setAxlesEmpty(v => Math.min(20, v + 1))}
-                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all">+</button>
-            </div>
-          </div>
-
-          {/* Eixos Volta */}
-          <div>
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-              Eixos na Volta
-              <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-[8px] font-black normal-case">Cheio</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setAxlesFull(v => Math.max(1, v - 1))}
-                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all">−</button>
-              <input
-                type="number" min="1" max="20"
-                value={axlesFull}
-                onChange={e => setAxlesFull(Math.max(1, parseInt(e.target.value) || 1))}
-                className="flex-1 text-center px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button onClick={() => setAxlesFull(v => Math.min(20, v + 1))}
-                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 text-lg font-black flex items-center justify-center hover:bg-slate-200 transition-all">+</button>
-            </div>
-          </div>
+        <div>
+          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Rota</label>
+          <CustomSelect
+            value={selectedRouteId}
+            onChange={setSelectedRouteId}
+            options={routeOptions}
+            placeholder="Selecione uma rota..."
+            searchable={routes.length > 5}
+          />
         </div>
 
         {/* Filtro de tipos de veículo */}
@@ -1028,7 +1130,7 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white rounded-xl p-4 border border-orange-100">
               <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest mb-2">
-                Pedágio Ida · {axlesEmpty} eixos vazios
+                Pedágio Ida · {visibleTypes[0]?.axlesGoing ?? 4} eixos vazios
               </p>
               <p className="text-2xl font-black text-slate-800 tabular-nums">
                 {tollLive.ida > 0
@@ -1039,7 +1141,7 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
             </div>
             <div className="bg-white rounded-xl p-4 border border-emerald-100">
               <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-2">
-                Pedágio Volta · {axlesFull} eixos cheios
+                Pedágio Volta · {visibleTypes[0]?.axlesReturning ?? 6} eixos cheios
               </p>
               <p className="text-2xl font-black text-slate-800 tabular-nums">
                 {tollLive.volta > 0
@@ -1074,18 +1176,12 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
               <p className="text-[9px] font-black text-blue-200 uppercase tracking-widest">Resultado</p>
               <p className="text-sm font-black text-white mt-0.5">{selectedRoute.originCity} → {selectedRoute.destinationCity}</p>
             </div>
-            <div className="flex items-center gap-4 text-right">
-              <div>
-                <p className="text-[8px] font-black text-blue-200 uppercase">Eixos Ida</p>
-                <p className="text-lg font-black text-white">{axlesEmpty}</p>
-                <p className="text-[8px] text-blue-300 uppercase">vazio</p>
-              </div>
-              <div className="w-px h-10 bg-blue-500" />
-              <div>
-                <p className="text-[8px] font-black text-blue-200 uppercase">Eixos Volta</p>
-                <p className="text-lg font-black text-white">{axlesFull}</p>
-                <p className="text-[8px] text-blue-300 uppercase">cheio</p>
-              </div>
+            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+              {visibleTypes.map(vt => (
+                <span key={vt.code} className="text-[8px] font-black text-blue-200 bg-blue-500/30 px-2 py-1 rounded-lg">
+                  {vt.code} · {vt.axlesGoing}↑ {vt.axlesReturning}↓
+                </span>
+              ))}
             </div>
           </div>
 
@@ -1121,7 +1217,7 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
                         <div className="flex flex-col items-end">
                           <span className="text-sm font-bold text-orange-600">{v ? fmt(v.tollGoing) : '—'}</span>
                           {v && v.tollGoing > 0 && (
-                            <span className="text-[9px] text-slate-400">{axlesEmpty} eixos vazios</span>
+                            <span className="text-[9px] text-slate-400">{vt.axlesGoing} eixos vazios</span>
                           )}
                         </div>
                       </td>
@@ -1129,7 +1225,7 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
                         <div className="flex flex-col items-end">
                           <span className="text-sm font-bold text-emerald-700">{v ? fmt(v.tollReturning) : '—'}</span>
                           {v && v.tollReturning > 0 && (
-                            <span className="text-[9px] text-slate-400">{axlesFull} eixos cheios</span>
+                            <span className="text-[9px] text-slate-400">{vt.axlesReturning} eixos cheios</span>
                           )}
                         </div>
                       </td>
