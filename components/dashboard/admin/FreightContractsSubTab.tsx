@@ -707,12 +707,12 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
   // ── History ───────────────────────────────────────────────────────────────────
   const contractHistory = useMemo(() => {
-    const items: { trip: Trip | null; standalone: StandaloneContract | null; isUnlinkedFc: boolean; doc: FreightContractDoc | StandaloneContract }[] = [];
+    const items: { trip: Trip | null; standalone: StandaloneContract | null; doc: FreightContractDoc | StandaloneContract }[] = [];
     for (const t of trips) {
-      for (const doc of activeDocs(t)) items.push({ trip: t, standalone: null, isUnlinkedFc: false, doc });
+      for (const doc of activeDocs(t)) items.push({ trip: t, standalone: null, doc });
     }
     for (const s of standaloneContracts) {
-      items.push({ trip: null, standalone: s, isUnlinkedFc: false, doc: s });
+      items.push({ trip: null, standalone: s, doc: s });
     }
     return items.sort((a, b) => new Date(b.doc.uploadDate).getTime() - new Date(a.doc.uploadDate).getTime());
   }, [trips, standaloneContracts]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1137,7 +1137,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             ) : (
               <>
               <div className="space-y-2">
-                {filteredHistory.slice((historyPage - 1) * 10, historyPage * 10).map(({ trip, standalone, isUnlinkedFc, doc }) => (
+                {filteredHistory.slice((historyPage - 1) * 10, historyPage * 10).map(({ trip, standalone, doc }) => (
                   <div key={doc.id} className={`flex items-center gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm hover:border-slate-200 transition-colors ${standalone ? 'border-amber-100' : 'border-slate-100'}`}>
                     {/* PDF thumbnail */}
                     <PDFThumbnail url={doc.url} docId={doc.id}/>
@@ -1212,13 +1212,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                           if (standalone) {
                             setDeletingDocId(doc.id);
                             try { await fileStorage.deleteFile(standalone.url); } catch { /* ignore */ }
-                            if (isUnlinkedFc) {
-                              await db.deleteFreightContract(standalone.id);
-                              setUnlinkedFreightContracts(prev => prev.filter(fc => fc.id !== standalone.id));
-                            } else {
-                              await db.deleteStandaloneContract(standalone.id);
-                              setStandaloneContracts(prev => prev.filter(s => s.id !== standalone.id));
-                            }
+                            await db.deleteStandaloneContract(standalone.id);
+                            setStandaloneContracts(prev => prev.filter(s => s.id !== standalone.id));
                             setDeletingDocId(null);
                           } else if (trip) {
                             handleDeleteDoc(trip, doc.id);
