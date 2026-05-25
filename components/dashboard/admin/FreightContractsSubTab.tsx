@@ -452,7 +452,11 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   }, [view]);
 
   useEffect(() => {
-    db.getStandaloneContracts().then(setStandaloneContracts).catch(() => {});
+    let mounted = true;
+    db.getStandaloneContracts()
+      .then(contracts => { if (mounted) setStandaloneContracts(contracts); })
+      .catch(() => {});
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -677,7 +681,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
           };
           const saved = await db.saveStandaloneContract(standalone);
           if (!saved) throw new Error('Falha ao salvar contrato avulso. Verifique as permissões do banco.');
-          setStandaloneContracts(prev => [standalone, ...prev]);
+          const refreshed = await db.getStandaloneContracts();
+          setStandaloneContracts(refreshed);
         }
         patch(entry.id, { status: 'done' });
       } catch (err: any) {
