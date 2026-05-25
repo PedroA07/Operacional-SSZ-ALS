@@ -121,15 +121,21 @@ async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
       ? `__RequestVerificationToken=${encodeURIComponent(csrfToken)}`
       : '';
 
-    const res = await fetch(base + 'ListaAtracacao', {
-      method: 'POST',
-      headers,
-      body: postBody,
-      signal: AbortSignal.timeout(20000),
-      redirect: 'follow',
-    });
-
-    if (!res.ok) return { vessels: [], error: `BTP: HTTP ${res.status} no POST` };
+    // Tenta dois endpoints: ListaAtracacao (padrão) e GetListaAtracacao (alternativo)
+    let res: Response | null = null;
+    for (const endpoint of ['ListaAtracacao', 'GetListaAtracacao']) {
+      try {
+        const r = await fetch(base + endpoint, {
+          method: 'POST',
+          headers: { ...headers, ...(endpoint === 'GetListaAtracacao' ? { 'Content-Type': 'application/json' } : {}) },
+          body: endpoint === 'GetListaAtracacao' ? '{}' : postBody,
+          signal: AbortSignal.timeout(20000),
+          redirect: 'follow',
+        });
+        if (r.ok) { res = r; break; }
+      } catch { /* tenta próximo */ }
+    }
+    if (!res) return { vessels: [], error: 'BTP: todos os endpoints POST falharam' };
 
     const text = await res.text();
 
@@ -250,30 +256,123 @@ function parseBTPHtmlTable(html: string): Vessel[] {
 }
 
 // ─── SANTOS BRASIL ────────────────────────────────────────────────────────────
-async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string }> {
-  const base    = 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/';
-  const pageUrl = 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao?unidade=tecon-santos';
-  const ua      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+function parseSBHtmlTable(html: string): Vessel[] {
+  function strip(s: string) {
+    return s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+  }
+  const vessels: Vessel[] = [];
+  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rows: string[] = [];
+  let m;
+  while ((m = rowRe.exec(html)) !== null) rows.push(m[0]);
+  if (rows.length < 3) return vessels;
 
-  // 1) Busca cookies de sessão da página principal
+  let headers: string[] = [];
+  let start = 0;
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const thRe = /<th[^>]*>([\s\S]*?)<\/th>/gi;
+    const ths: string[] = [];
+    while ((m = thRe.exec(rows[i])) !== null) ths.push(strip(m[1]).toLowerCase());
+    if (ths.length >= 3) { headers = ths; start = i + 1; break; }
+    // fallback: primeira linha com tds se não tiver th
+    if (i === 0) {
+      const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+      const tds: string[] = [];
+      while ((m = tdRe.exec(rows[i])) !== null) tds.push(strip(m[1]).toLowerCase());
+      if (tds.length >= 4 && tds.some(t => t.includes('navio') || t.includes('vessel'))) {
+        headers = tds; start = 1; break;
+      }
+    }
+  }
+
+  const idx = (kws: string[]) => {
+    for (let i = 0; i < headers.length; i++)
+      if (kws.some(k => headers[i].includes(k))) return i;
+    return -1;
+  };
+  const nIdx  = idx(['navio','vessel','embarca','nome']);
+  const sIdx  = idx(['situa','status','opera','estado']);
+  const bIdx  = idx(['berco','berço','dock','cais']);
+  const aIdx  = idx(['armador','shipping','agenc','companhia']);
+  const vIdx  = idx(['viagem','voyage']);
+  const gdIdx = idx(['liberacao do dry','liberação do dry','gate dry','abertura de gate dry','abert. gate d']);
+  const grIdx = idx(['liberacao do reefer','liberação do reefer','gate reefer','abertura de gate reefer','abert. gate r']);
+  const dlIdx = idx(['dead-line','dead line','deadline','prazo']);
+  const pIdx  = idx(['previs','chegada','atrac','eta']);
+
+  for (let i = start; i < rows.length; i++) {
+    const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    const cells: string[] = [];
+    while ((m = tdRe.exec(rows[i])) !== null) cells.push(strip(m[1]));
+    if (cells.length < 2) continue;
+    const g = (i: number) => i >= 0 && i < cells.length ? cells[i].trim() : '';
+    const navio = g(nIdx >= 0 ? nIdx : 0);
+    if (!navio || navio.toLowerCase() === 'navio') continue;
+    const gateDry    = g(gdIdx) || undefined;
+    const gateReefer = g(grIdx) || undefined;
+    const deadline   = g(dlIdx) || undefined;
+    const situacao   = g(sIdx) || deriveSituacao(gateDry, gateReefer, deadline);
+    vessels.push({
+      terminal: 'SANTOS BRASIL', navio,
+      situacao,
+      previsao: g(pIdx) || undefined,
+      berco: g(bIdx) || undefined,
+      armador: g(aIdx) || undefined,
+      viagem: g(vIdx) || undefined,
+      gateDry, gateReefer, deadLineStr: deadline,
+    });
+  }
+  return vessels;
+}
+
+async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string }> {
+  const ua      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  const referer = 'https://www.santosbrasil.com.br/';
+  const pageUrl = 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao?unidade=tecon-santos';
+
+  // 1) Endpoint legado ASP (sem reCAPTCHA — era o que funcionava antes)
+  const legacyUrls = [
+    'https://www.santosbrasil.com.br/tecon-santos-sistemas/atracacao-table.asp?unidade=tecon-santos',
+    'https://www.santosbrasil.com.br/tecon-santos-sistemas/atracacao-table.asp',
+  ];
+  for (const url of legacyUrls) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': ua,
+          'Accept': 'text/html,application/xhtml+xml,*/*;q=0.9',
+          'Accept-Language': 'pt-BR,pt;q=0.9',
+          'Referer': referer,
+        },
+        signal: AbortSignal.timeout(15000),
+        redirect: 'follow',
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      if (html.includes('recaptcha') && (html.match(/<tr/gi) ?? []).length < 10) continue;
+      const vessels = parseSBHtmlTable(html);
+      if (vessels.length > 0) return { vessels };
+    } catch { /* tenta próximo */ }
+  }
+
+  // 2) Busca cookies de sessão da página principal antes do endpoint JSON
   let sessionCookies = '';
   try {
     const pageInit = await fetch(pageUrl, {
-      headers: { 'User-Agent': ua, 'Accept': 'text/html', 'Referer': 'https://www.santosbrasil.com.br/' },
+      headers: { 'User-Agent': ua, 'Accept': 'text/html', 'Referer': referer },
       signal: AbortSignal.timeout(12000),
       redirect: 'follow',
     });
     const rawCookie = pageInit.headers.get('set-cookie') ?? '';
     sessionCookies = rawCookie.split(',').map(c => c.trim().split(';')[0]).filter(Boolean).join('; ');
-  } catch { /* ignora, tenta sem cookies */ }
+  } catch { /* ignora */ }
 
-  const cookieHeader: Record<string, string> = sessionCookies ? { 'Cookie': sessionCookies } : {};
+  const cookieHeader: Record<string, string> = sessionCookies ? { Cookie: sessionCookies } : {};
 
-  // 2) Variantes do endpoint JSON interno
+  // 3) Endpoints JSON modernos
   const jsonVariants = [
-    base + 'pesquisa?unidade=tecon-santos',
-    base + 'pesquisa?unidade=tecon-santos&pagina=1&itensPorPagina=200',
-    'https://www.santosbrasil.com.br/api/lista-de-atracacao?unidade=tecon-santos',
+    'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/pesquisa?unidade=tecon-santos',
+    'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/pesquisa?unidade=tecon-santos&pagina=1&itensPorPagina=200',
   ];
 
   const lastErrors: string[] = [];
@@ -291,47 +390,17 @@ async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string
         signal: AbortSignal.timeout(15000),
         redirect: 'follow',
       });
-
-      if (!res.ok) { lastErrors.push(`HTTP ${res.status} em ${url}`); continue; }
-
+      if (!res.ok) { lastErrors.push(`HTTP ${res.status}`); continue; }
       const text = await res.text();
       let json: Record<string, unknown>;
-      try { json = JSON.parse(text); } catch { lastErrors.push(`JSON inválido em ${url}: ${text.slice(0,80)}`); continue; }
-
-      const list = (json.VAtracacao ?? json.vAtracacao ?? json.data ?? json.Data ?? json.items ?? json.vessels ?? []) as Record<string, unknown>[];
-      if (!Array.isArray(list) || list.length === 0) { lastErrors.push(`Lista vazia em ${url}`); continue; }
-
+      try { json = JSON.parse(text); } catch { lastErrors.push(`JSON inválido: ${text.slice(0, 60)}`); continue; }
+      const list = (json.VAtracacao ?? json.vAtracacao ?? json.data ?? json.Data ?? json.items ?? []) as Record<string, unknown>[];
+      if (!Array.isArray(list) || list.length === 0) { lastErrors.push(`Lista vazia`); continue; }
       return { vessels: list.map(mapSBRow) };
-    } catch (e: any) { lastErrors.push(`Erro em ${url}: ${e?.message}`); }
+    } catch (e: any) { lastErrors.push(e?.message); }
   }
 
-  // Fallback: tenta parsear a página HTML principal
-  try {
-    const pageRes = await fetch('https://www.santosbrasil.com.br/v2021/lista-de-atracacao?unidade=tecon-santos', {
-      headers: {
-        'User-Agent': ua,
-        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.9',
-        'Accept-Language': 'pt-BR,pt;q=0.9',
-        'Referer': 'https://www.santosbrasil.com.br/',
-      },
-      signal: AbortSignal.timeout(15000),
-      redirect: 'follow',
-    });
-    if (pageRes.ok) {
-      const html = await pageRes.text();
-      // Procura JSON embutido na página (window.__DATA__ ou similar)
-      const jsonMatch = html.match(/window\.__(?:DATA|STATE|INITIAL_DATA)__\s*=\s*(\{[\s\S]*?\});/);
-      if (jsonMatch) {
-        try {
-          const embedded = JSON.parse(jsonMatch[1]) as Record<string, unknown>;
-          const list = (embedded.VAtracacao ?? embedded.atracacao ?? embedded.vessels ?? []) as Record<string, unknown>[];
-          if (Array.isArray(list) && list.length > 0) return { vessels: list.map(mapSBRow) };
-        } catch { /* ignora */ }
-      }
-    }
-  } catch { /* ignora */ }
-
-  return { vessels: [], error: `Santos Brasil: endpoint /pesquisa não acessível. Detalhes: ${lastErrors.join(' | ')}` };
+  return { vessels: [], error: `Santos Brasil: endpoint legado e /pesquisa inacessíveis (${lastErrors.join(', ')})` };
 }
 
 function mapSBRow(r: Record<string, unknown>): Vessel {
