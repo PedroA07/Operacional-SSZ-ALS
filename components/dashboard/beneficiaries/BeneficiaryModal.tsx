@@ -115,9 +115,9 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
     setCreatingLogin(true);
     try {
       const creds = generateCredentials(form);
-      const userId = form.userId || `u-ben-${Date.now()}`;
+      const tentativeId = form.userId || `u-ben-${Date.now()}`;
       const userPayload: User = {
-        id: userId,
+        id: tentativeId,
         username: creds.username.toLowerCase(),
         password: creds.password,
         displayName: form.name.trim(),
@@ -126,8 +126,9 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
         status: 'Ativo',
         isFirstLogin: true,
       };
-      await db.saveUser(userPayload);
-      setForm(f => ({ ...f, userId }));
+      const actualId = await db.saveUser(userPayload);
+      if (!actualId) throw new Error('Erro ao criar login no banco de dados.');
+      setForm(f => ({ ...f, userId: actualId }));
       setGeneratedCreds(creds);
       showToast('Login criado com sucesso.');
     } catch (e: any) {
