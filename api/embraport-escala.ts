@@ -229,14 +229,15 @@ export default async function handler(req: Request) {
   // Try the default page first (most reliable)
   const defaultResult = await fetchTab(BASE_URL, 'Previsto');
 
-  // If the first fetch failed, return error immediately
+  // If the first fetch failed, return error (200 OK so the browser doesn't log a console error)
   if (defaultResult.error && defaultResult.rows.length === 0) {
     return new Response(JSON.stringify({
       ok: false,
-      error: defaultResult.error,
+      total: 0,
+      errors: [defaultResult.error],
       hint: 'O servidor da EMBRAPORT pode estar bloqueando requisições externas. Tente executar a partir de uma rede brasileira.',
     }), {
-      status: 502,
+      status: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }

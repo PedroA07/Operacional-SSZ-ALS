@@ -808,6 +808,8 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
         const data = await embraportRes.value.json().catch(() => null);
         if (data?.total > 0) toast(`EMBRAPORT: ${data.total} navios salvos`, 'success');
         else if (data?.errors?.length) toast(`EMBRAPORT: ${data.errors[0]}`, 'error');
+        else if (data?.error) toast(`EMBRAPORT: ${data.error}`, 'error');
+        else if (!embraportRes.value.ok) toast(`EMBRAPORT: erro ${embraportRes.value.status}`, 'error');
       } else {
         toast(`EMBRAPORT: falha na requisição`, 'error');
       }
