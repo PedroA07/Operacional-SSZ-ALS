@@ -794,10 +794,36 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     if (scraping) return;
     setScraping(true);
     try {
-      await Promise.allSettled([
+      const [, tvResult] = await Promise.allSettled([
         fetch('/api/embraport-escala'),
         supabase?.functions.invoke('terminal-vessels'),
       ]);
+
+      // Persiste BTP/ECOPORTO/Santos Brasil no banco a partir da resposta da edge function
+      if (supabase && tvResult.status === 'fulfilled') {
+        const tvData = (tvResult.value as any)?.data;
+        const vessels: TerminalVessel[] = tvData?.vessels ?? [];
+        if (vessels.length > 0) {
+          const fetchedAt = tvData?.fetchedAt ?? new Date().toISOString();
+          const terminals = [...new Set(vessels.map((v: TerminalVessel) => v.terminal))];
+          await supabase.from('terminal_vessels').delete().in('terminal', terminals);
+          await supabase.from('terminal_vessels').insert(
+            vessels.map((v: TerminalVessel) => ({
+              terminal:      v.terminal,
+              navio:         v.navio,
+              situacao:      v.situacao,
+              previsao:      v.previsao      ?? null,
+              berco:         v.berco         ?? null,
+              armador:       v.armador       ?? null,
+              viagem:        v.viagem        ?? null,
+              gate_dry:      v.gateDry       ?? null,
+              gate_reefer:   v.gateReefer    ?? null,
+              dead_line_str: v.deadLineStr   ?? null,
+              fetched_at:    fetchedAt,
+            }))
+          );
+        }
+      }
     } catch(e) { console.error('Scrape error', e); }
     finally {
       await loadTV();
