@@ -1,74 +1,7 @@
 export const config = { runtime: 'edge' };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function stripHtml(s: string): string {
-  return s
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ').trim();
-}
-
-function extractCells(row: string): string[] {
-  const cells: string[] = [];
-  const re = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-  let m;
-  while ((m = re.exec(row)) !== null) cells.push(stripHtml(m[1]));
-  return cells;
-}
-
-function extractHeaderCells(row: string): string[] {
-  const cells: string[] = [];
-  const thRe = /<th[^>]*>([\s\S]*?)<\/th>/gi;
-  let m;
-  while ((m = thRe.exec(row)) !== null) cells.push(stripHtml(m[1]).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''));
-  if (cells.length === 0) {
-    const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-    while ((m = tdRe.exec(row)) !== null) cells.push(stripHtml(m[1]).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''));
-  }
-  return cells;
-}
-
-function findCol(headers: string[], keywords: string[]): number {
-  for (let i = 0; i < headers.length; i++) {
-    if (keywords.some(k => headers[i].includes(k))) return i;
-  }
-  return -1;
-}
-
-function looksLikeVessel(s: string): boolean {
-  if (!s || s.length < 3) return false;
-  if (/^\d+$/.test(s)) return false;
-  if (/^\d{2}\/\d{2}/.test(s)) return false;
-  return /[A-Z]{2,}/.test(s);
-}
-
-function parseDateStr(s: string): Date | null {
-  if (!s) return null;
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
-    const [d, mo, y] = s.split(' ')[0].split('/');
-    const time = s.split(' ')[1]?.slice(0, 5) ?? '00:00';
-    const dt = new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}T${time}:00`);
-    return isNaN(dt.getTime()) ? null : dt;
-  }
-  const dt = new Date(s);
-  return isNaN(dt.getTime()) ? null : dt;
-}
-
-function deriveSituacao(gateDry?: string, gateReefer?: string, deadline?: string): string {
-  const gateStr = gateDry || gateReefer;
-  const now = new Date();
-  if (gateStr || deadline) {
-    const gateDt  = gateStr  ? parseDateStr(gateStr)  : null;
-    const deadDt  = deadline ? parseDateStr(deadline) : null;
-    if (gateDt && gateDt > now)  return 'Gate Fechado';
-    if (deadDt && deadDt > now)  return 'Gate Aberto';
-    if ((gateDt && gateDt <= now) || (deadDt && deadDt <= now)) return 'Gate Encerrado';
-  }
-  return 'SEM PREVISÃO';
-}
-
-interface ParsedVessel {
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface Vessel {
   terminal: string;
   navio: string;
   situacao: string;
@@ -81,134 +14,337 @@ interface ParsedVessel {
   deadLineStr?: string;
 }
 
-function parseTable(html: string, terminalName: string): ParsedVessel[] {
-  const vessels: ParsedVessel[] = [];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function parseDateStr(s: string): Date | null {
+  if (!s) return null;
+  // "dd/mm/yyyy hh:mm" format
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+    const [d, mo, y] = s.split(' ')[0].split('/');
+    const time = s.split(' ')[1]?.slice(0, 5) ?? '00:00';
+    const dt = new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}T${time}:00`);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  // "yyyy-mm-ddThh:mm" format
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const dt = new Date(s);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  return null;
+}
+
+function deriveSituacao(gateDry?: string, gateReefer?: string, deadline?: string): string {
+  const gateStr = gateDry || gateReefer;
+  const now = new Date();
+  if (gateStr || deadline) {
+    const gateDt = gateStr  ? parseDateStr(gateStr)  : null;
+    const deadDt = deadline ? parseDateStr(deadline) : null;
+    if (gateDt && gateDt > now)  return 'Gate Fechado';
+    if (deadDt && deadDt > now)  return 'Gate Aberto';
+    if ((gateDt && gateDt <= now) || (deadDt && deadDt <= now)) return 'Gate Encerrado';
+  }
+  return 'SEM PREVISÃO';
+}
+
+function str(v: unknown): string {
+  if (!v) return '';
+  return String(v).trim();
+}
+
+// Pega primeiro campo não-vazio de uma lista de keys num objeto
+function pick(obj: Record<string, unknown>, keys: string[]): string {
+  for (const k of keys) {
+    const v = str(obj[k]);
+    if (v && v !== '-' && v !== '--') return v;
+  }
+  return '';
+}
+
+// ─── BTP ─────────────────────────────────────────────────────────────────────
+// O browser faz: GET ListaAtracacaoIndex (pega session cookie) →
+//                POST ListaAtracacao (retorna HTML parcial com a tabela)
+async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
+  const base    = 'https://novo-tas.btp.com.br/ConsultasLivres/';
+  const referer = 'https://novo-tas.btp.com.br/';
+  const ua      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+  // 1) Inicializa sessão e captura cookies
+  let sessionCookies = '';
+  try {
+    const init = await fetch(base + 'ListaAtracacaoIndex', {
+      headers: { 'User-Agent': ua, 'Accept': 'text/html', 'Referer': referer },
+      signal: AbortSignal.timeout(12000),
+      redirect: 'follow',
+    });
+    const raw = init.headers.get('set-cookie') ?? '';
+    // Extrai pares nome=valor de cada Set-Cookie
+    sessionCookies = raw.split(',')
+      .map(c => c.trim().split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+  } catch { /* ignora */ }
+
+  // 2) POST para o endpoint de dados (mesmo que o browser chama via jQuery AJAX)
+  try {
+    const headers: Record<string, string> = {
+      'User-Agent': ua,
+      'Accept': '*/*',
+      'Accept-Language': 'pt-BR,pt;q=0.9',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Referer': base + 'ListaAtracacaoIndex',
+    };
+    if (sessionCookies) headers['Cookie'] = sessionCookies;
+
+    const res = await fetch(base + 'ListaAtracacao', {
+      method: 'POST',
+      headers,
+      body: '',
+      signal: AbortSignal.timeout(20000),
+      redirect: 'follow',
+    });
+
+    if (!res.ok) return { vessels: [], error: `BTP: HTTP ${res.status} no POST` };
+
+    const text = await res.text();
+
+    // Tenta JSON primeiro (alguns endpoints .NET retornam JSON)
+    try {
+      const json = JSON.parse(text) as Record<string, unknown>;
+      const list = (json.data ?? json.Data ?? json.vessels ?? json.rows ?? []) as Record<string, unknown>[];
+      if (Array.isArray(list) && list.length > 0) {
+        return { vessels: list.map(mapBTPRow) };
+      }
+    } catch { /* não é JSON, tenta HTML */ }
+
+    // Tenta HTML
+    const trCount = (text.match(/<tr/gi) ?? []).length;
+    if (trCount >= 3) {
+      const vessels = parseBTPHtmlTable(text);
+      if (vessels.length > 0) return { vessels };
+    }
+
+    return { vessels: [], error: 'BTP: resposta recebida mas sem dados reconhecíveis (pode precisar de sessão válida)' };
+  } catch (e: any) {
+    return { vessels: [], error: `BTP: ${e?.message ?? e}` };
+  }
+}
+
+function mapBTPRow(r: Record<string, unknown>): Vessel {
+  const navio      = pick(r, ['navio', 'Navio', 'NAVIO', 'vessel', 'name']);
+  const viagem     = pick(r, ['viagem', 'Viagem', 'VIAGEM', 'voyage']);
+  const armador    = pick(r, ['agencia', 'Agencia', 'agência', 'Agência', 'armador']);
+  const berco      = pick(r, ['berco', 'Berco', 'berco', 'dock']);
+  const gateDry    = pick(r, ['aberturaGateDry', 'AberturaGateDry', 'abert_gate_dry', 'gate_dry', 'gateDry']);
+  const gateReefer = pick(r, ['aberturaGateReefer', 'AberturaGateReefer', 'abert_gate_reefer', 'gate_reefer', 'gateReefer']);
+  const deadline   = pick(r, ['deadLine', 'DeadLine', 'dead_line', 'DEADLINE']);
+  const previsao   = pick(r, ['dtPrevAtrac', 'DtPrevAtrac', 'prevAtracacao', 'dtPrevChegada']);
+  return {
+    terminal: 'BTP', navio,
+    situacao: deriveSituacao(gateDry || undefined, gateReefer || undefined, deadline || undefined),
+    previsao: previsao || undefined, berco: berco || undefined,
+    armador: armador || undefined, viagem: viagem || undefined,
+    gateDry: gateDry || undefined, gateReefer: gateReefer || undefined,
+    deadLineStr: deadline || undefined,
+  };
+}
+
+// Fallback: parse da tabela HTML do BTP (caso o endpoint retorne HTML parcial)
+function parseBTPHtmlTable(html: string): Vessel[] {
+  function stripTags(s: string) {
+    return s.replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
+  }
   const rows: string[] = [];
   const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   let m;
   while ((m = rowRe.exec(html)) !== null) rows.push(m[0]);
-  if (rows.length === 0) return vessels;
 
   let headers: string[] = [];
   let dataStart = 0;
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
-    const h = extractHeaderCells(rows[i]);
-    if (h.length >= 3) { headers = h; dataStart = i + 1; break; }
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const thRe = /<th[^>]*>([\s\S]*?)<\/th>/gi;
+    const ths: string[] = [];
+    while ((m = thRe.exec(rows[i])) !== null) ths.push(stripTags(m[1]).toLowerCase());
+    if (ths.length >= 5) { headers = ths; dataStart = i + 1; break; }
   }
 
-  const navioIdx    = findCol(headers, ['navio', 'vessel', 'ship', 'nome']);
-  const situacaoIdx = findCol(headers, ['situa', 'status', 'estado', 'opera', 'condi']);
-  const bercoIdx    = findCol(headers, ['berco', 'berço', 'brc', 'dock', 'pier', 'cais']);
-  const armadorIdx  = findCol(headers, ['armador', 'shipping', 'agenc', 'agent', 'companhia']);
-  const viagemIdx   = findCol(headers, ['viagem', 'voyage']);
-  const previsaoIdx = findCol(headers, ['prev. atrac', 'previsao de atrac', 'dt. prev. atrac', 'previsao chegada', 'prev chegada']);
-  // BTP: "ABERTURA DE GATE DRY" | Santos Brasil: "LIBERACAO DO DRY"
-  const gateDryIdx    = findCol(headers, ['abertura de gate dry', 'abertura gate dry', 'gate dry', 'liberacao do dry', 'liberação do dry', 'liberacoes dry']);
-  const gateReeferIdx = findCol(headers, ['abertura de gate reefer', 'abertura gate reefer', 'gate reefer', 'liberacao do reefer', 'liberação do reefer']);
-  const deadLineIdx   = findCol(headers, ['dead-line', 'dead line', 'deadline', 'prazo']);
+  const idx = (kws: string[]) => {
+    for (let i = 0; i < headers.length; i++)
+      if (kws.some(k => headers[i].includes(k))) return i;
+    return -1;
+  };
 
+  const navIdx  = idx(['navio','vessel']);
+  const viajIdx = idx(['viagem','voyage']);
+  const agIdx   = idx(['agência','agencia','agent','armador']);
+  const berIdx  = idx(['berco','berço','dock','pier']);
+  const gdIdx   = idx(['gate dry','abertura de gate dry','abertura gate d']);
+  const grIdx   = idx(['gate reefer','abertura de gate reefer','abertura gate r']);
+  const dlIdx   = idx(['dead-line','dead line','deadline']);
+  const paIdx   = idx(['dt. prev. atrac','prev. atrac','previsao atrac']);
+
+  const vessels: Vessel[] = [];
   for (let i = dataStart; i < rows.length; i++) {
-    const cells = extractCells(rows[i]);
-    if (cells.length < 2) continue;
-
-    let navio = navioIdx >= 0 && navioIdx < cells.length
-      ? cells[navioIdx]
-      : (cells.find(looksLikeVessel) ?? '');
-    navio = navio.trim();
-    if (!navio || navio.length < 2) continue;
-
-    const situacao = situacaoIdx >= 0 && situacaoIdx < cells.length ? cells[situacaoIdx] : '';
-    const gateDry    = (gateDryIdx    >= 0 ? cells[gateDryIdx]    : undefined)?.trim() || undefined;
-    const gateReefer = (gateReeferIdx >= 0 ? cells[gateReeferIdx] : undefined)?.trim() || undefined;
-    const deadLine   = (deadLineIdx   >= 0 ? cells[deadLineIdx]   : undefined)?.trim() || undefined;
-
-    const finalSituacao = situacao.trim() || deriveSituacao(gateDry, gateReefer, deadLine);
-
+    const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    const cells: string[] = [];
+    while ((m = tdRe.exec(rows[i])) !== null) cells.push(stripTags(m[1]));
+    if (cells.length < 5) continue;
+    const g = (idx: number) => idx >= 0 && idx < cells.length ? cells[idx].trim() : '';
+    const navio = g(navIdx);
+    if (!navio || navio === 'NAVIO') continue;
+    const gateDry    = g(gdIdx) || undefined;
+    const gateReefer = g(grIdx) || undefined;
+    const deadline   = g(dlIdx) || undefined;
     vessels.push({
-      terminal:    terminalName,
-      navio,
-      situacao:    finalSituacao,
-      previsao:    (previsaoIdx >= 0 ? cells[previsaoIdx] : undefined)?.trim() || undefined,
-      berco:       (bercoIdx    >= 0 ? cells[bercoIdx]    : undefined)?.trim() || undefined,
-      armador:     (armadorIdx  >= 0 ? cells[armadorIdx]  : undefined)?.trim() || undefined,
-      viagem:      (viagemIdx   >= 0 ? cells[viagemIdx]   : undefined)?.trim() || undefined,
-      gateDry,
-      gateReefer,
-      deadLineStr: deadLine,
+      terminal: 'BTP', navio,
+      situacao: deriveSituacao(gateDry, gateReefer, deadline),
+      previsao: g(paIdx) || undefined, berco: g(berIdx) || undefined,
+      armador: g(agIdx) || undefined, viagem: g(viajIdx) || undefined,
+      gateDry, gateReefer, deadLineStr: deadline,
     });
   }
   return vessels;
 }
 
-// ─── Fetchers por terminal ────────────────────────────────────────────────────
-const HEADERS = (referer: string): Record<string, string> => ({
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8',
-  'Referer': referer,
-  'Cache-Control': 'no-cache',
-});
+// ─── SANTOS BRASIL ────────────────────────────────────────────────────────────
+// A página faz fetch para /pesquisa?unidade=tecon-santos e recebe JSON
+// com VAtracacao: Array(N) — sem precisar resolver o reCAPTCHA.
+async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string }> {
+  const base    = 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/';
+  const referer = 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao?unidade=tecon-santos';
+  const ua      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-async function fetchHtml(url: string, options?: RequestInit): Promise<string | null> {
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000), redirect: 'follow', ...options });
-    if (!res.ok) return null;
-    const html = await res.text();
-    if ((html.match(/<tr/gi) || []).length < 3) return null;
-    return html;
-  } catch { return null; }
+  const urlVariants = [
+    base + 'pesquisa?unidade=tecon-santos',
+    base + 'pesquisa?unidade=tecon-santos&pagina=1&itensPorPagina=200',
+    base + 'pesquisa?unidade=tecon-santos&lista=atracacao',
+  ];
+
+  for (const url of urlVariants) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': ua,
+          'Accept': 'application/json, text/javascript, */*; q=0.01',
+          'Accept-Language': 'pt-BR,pt;q=0.9',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Referer': referer,
+        },
+        signal: AbortSignal.timeout(15000),
+        redirect: 'follow',
+      });
+
+      if (!res.ok) continue;
+
+      const json = await res.json() as Record<string, unknown>;
+      if (!json.Success) continue;
+
+      const list = (json.VAtracacao ?? json.vAtracacao ?? json.data ?? []) as Record<string, unknown>[];
+      if (!Array.isArray(list) || list.length === 0) continue;
+
+      return { vessels: list.map(mapSBRow) };
+    } catch { /* tenta próxima variante */ }
+  }
+
+  return { vessels: [], error: 'Santos Brasil: endpoint /pesquisa não acessível' };
 }
 
-async function scrapeBTP(): Promise<{ vessels: ParsedVessel[]; error?: string }> {
-  const referer = 'https://novo-tas.btp.com.br/';
-  // O botão "Pesquisar" sem filtros faz POST para a action de dados
-  const html = await fetchHtml('https://novo-tas.btp.com.br/ConsultasLivres/ListaAtracacao', {
-    method: 'POST',
-    headers: { ...HEADERS(referer), 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
-    body: '',
-  }) ?? await fetchHtml('https://novo-tas.btp.com.br/ConsultasLivres/ListaAtracacaoIndex', { headers: HEADERS(referer) });
-
-  if (!html) return { vessels: [], error: 'BTP: página JS-renderizada, sem acesso ao endpoint de dados' };
-  const vessels = parseTable(html, 'BTP');
-  return vessels.length > 0 ? { vessels } : { vessels: [], error: 'BTP: tabela encontrada mas sem navios' };
+function mapSBRow(r: Record<string, unknown>): Vessel {
+  const navio      = pick(r, ['Navio','navio','NomeNavio','Nome']);
+  const berco      = pick(r, ['Berco','Berço','BercoId','Brc','NumBerco','berco']);
+  const armador    = pick(r, ['Armador','armador','NomeArmador','ViagemArmador']);
+  const viagem     = pick(r, ['Viagem','viagem','NumViagem','CodViagem']);
+  const deadline   = pick(r, ['Deadline','DeadLine','deadline','DataDeadline','DtDeadline']);
+  // Liberação do Dry = gate aberto (data real); Prev. Liberação = previsão
+  const gateDry    = pick(r, ['LiberacaoDry','LiberacaoGateDry','GateDry','DtLiberacaoDry','liberacao_dry']);
+  const gateReefer = pick(r, ['LiberacaoReefer','LiberacaoGateReefer','GateReefer','DtLiberacaoReefer','liberacao_reefer']);
+  const previsao   = pick(r, ['PrevisaoChegada','DtPrevisaoChegada','PrevisaoAtracacao','DtPrevChegada']);
+  return {
+    terminal: 'SANTOS BRASIL', navio,
+    situacao: deriveSituacao(gateDry || undefined, gateReefer || undefined, deadline || undefined),
+    previsao: previsao || undefined, berco: berco || undefined,
+    armador: armador || undefined, viagem: viagem || undefined,
+    gateDry: gateDry || undefined, gateReefer: gateReefer || undefined,
+    deadLineStr: deadline || undefined,
+  };
 }
 
-async function scrapeEcoporto(): Promise<{ vessels: ParsedVessel[]; error?: string }> {
-  const referer = 'http://op.ecoportosantos.com.br/';
+// ─── ECOPORTO ─────────────────────────────────────────────────────────────────
+// HTTP 403 para IPs externos — mantido como tentativa, provavelmente vai falhar
+async function scrapeEcoporto(): Promise<{ vessels: Vessel[]; error?: string }> {
   const urls = [
     'http://op.ecoportosantos.com.br/externa/LineUpListaAtracacao/',
     'http://op.ecoportosantos.com.br/externa/LineUpListaAtracacao',
-    'https://op.ecoportosantos.com.br/externa/LineUpListaAtracacao/',
   ];
+  const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
   for (const url of urls) {
-    const html = await fetchHtml(url, { headers: HEADERS(referer) });
-    if (!html) continue;
-    const vessels = parseTable(html, 'ECOPORTO');
-    if (vessels.length > 0) return { vessels };
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': ua, 'Accept': 'text/html', 'Referer': 'http://op.ecoportosantos.com.br/' },
+        signal: AbortSignal.timeout(10000),
+        redirect: 'follow',
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const vessels = parseEcoportoTable(html);
+      if (vessels.length > 0) return { vessels };
+    } catch { /* tenta próxima */ }
   }
-  return { vessels: [], error: 'ECOPORTO: HTTP 403 — servidor bloqueia o acesso' };
+  return { vessels: [], error: 'ECOPORTO: HTTP 403 — servidor bloqueia IPs externos' };
 }
 
-async function scrapeSantosBrasil(): Promise<{ vessels: ParsedVessel[]; error?: string }> {
-  const referer = 'https://www.santosbrasil.com.br/';
-  const urls = [
-    'https://www.santosbrasil.com.br/tecon-santos-sistemas/atracacao-table.asp?unidade=tecon-santos',
-    'https://www.santosbrasil.com.br/tecon-santos-sistemas/atracacao-table.asp',
-    'https://www.santosbrasil.com.br/v2021/lista-de-atracacao?titulo=&unidade=tecon-santos&lista=recebimento-de-exportacao',
-  ];
-  for (const url of urls) {
-    const html = await fetchHtml(url, { headers: HEADERS(referer) });
-    if (!html) continue;
-    if (html.includes('recaptcha') && (html.match(/<tr/gi) || []).length < 10) continue;
-    const vessels = parseTable(html, 'SANTOS BRASIL');
-    if (vessels.length > 0) return { vessels };
+function parseEcoportoTable(html: string): Vessel[] {
+  function strip(s: string) {
+    return s.replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
   }
-  return { vessels: [], error: 'Santos Brasil: reCAPTCHA ou endpoint indisponível' };
+  const vessels: Vessel[] = [];
+  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rows: string[] = [];
+  let m;
+  while ((m = rowRe.exec(html)) !== null) rows.push(m[0]);
+  if (rows.length < 3) return vessels;
+
+  let headers: string[] = [];
+  let start = 0;
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const thRe = /<th[^>]*>([\s\S]*?)<\/th>/gi;
+    const ths: string[] = [];
+    while ((m = thRe.exec(rows[i])) !== null) ths.push(strip(m[1]).toLowerCase());
+    if (ths.length >= 3) { headers = ths; start = i + 1; break; }
+  }
+
+  const idx = (kws: string[]) => {
+    for (let i = 0; i < headers.length; i++)
+      if (kws.some(k => headers[i].includes(k))) return i;
+    return -1;
+  };
+  const nIdx = idx(['navio','vessel','ship','nome']);
+  const sIdx = idx(['situa','status','estado','opera']);
+  const bIdx = idx(['berco','berço','dock','cais']);
+  const aIdx = idx(['armador','shipping','agenc']);
+  const vIdx = idx(['viagem','voyage']);
+  const pIdx = idx(['previs','chegada','atrac']);
+
+  for (let i = start; i < rows.length; i++) {
+    const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    const cells: string[] = [];
+    while ((m = tdRe.exec(rows[i])) !== null) cells.push(strip(m[1]));
+    if (cells.length < 2) continue;
+    const g = (i: number) => i >= 0 && i < cells.length ? cells[i].trim() : '';
+    const navio = g(nIdx);
+    if (!navio) continue;
+    const situacao = g(sIdx) || 'SEM PREVISÃO';
+    vessels.push({
+      terminal: 'ECOPORTO', navio, situacao,
+      previsao: g(pIdx) || undefined, berco: g(bIdx) || undefined,
+      armador: g(aIdx) || undefined, viagem: g(vIdx) || undefined,
+    });
+  }
+  return vessels;
 }
 
 // ─── Salvar no Supabase ───────────────────────────────────────────────────────
 async function saveToSupabase(
-  vessels: ParsedVessel[],
+  vessels: Vessel[],
   supabaseUrl: string,
   supabaseKey: string,
   fetchedAt: string,
@@ -216,7 +352,6 @@ async function saveToSupabase(
   if (!vessels.length) return { saved: 0 };
 
   const terminals = [...new Set(vessels.map(v => v.terminal))];
-  // Apaga registros antigos dos terminais obtidos
   for (const t of terminals) {
     await fetch(`${supabaseUrl}/rest/v1/terminal_vessels?terminal=eq.${encodeURIComponent(t)}`, {
       method: 'DELETE',
@@ -257,8 +392,10 @@ export default async function handler(req: Request) {
     return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST' } });
   }
 
-  const supabaseUrl = (globalThis as any).VITE_SUPABASE_URL || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || '';
-  const supabaseKey = (globalThis as any).VITE_SUPABASE_ANON_KEY || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) || '';
+  const supabaseUrl = (globalThis as any).VITE_SUPABASE_URL
+    || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL : '') || '';
+  const supabaseKey = (globalThis as any).VITE_SUPABASE_ANON_KEY
+    || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY : '') || '';
   const fetchedAt = new Date().toISOString();
 
   const [btpRes, ecoRes, sbRes] = await Promise.allSettled([
@@ -267,7 +404,7 @@ export default async function handler(req: Request) {
     scrapeSantosBrasil(),
   ]);
 
-  const allVessels: ParsedVessel[] = [];
+  const allVessels: Vessel[] = [];
   const errors: string[] = [];
 
   for (const r of [btpRes, ecoRes, sbRes]) {
