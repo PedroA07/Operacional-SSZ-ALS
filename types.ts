@@ -339,7 +339,31 @@ export enum DashboardTab {
   AUTOMACOES = 'AUTOMACOES',
   NAVIOS = 'NAVIOS',
   EXTERNAL_PORTAL = 'EXTERNAL_PORTAL',
-  EXTERNAL_USERS = 'EXTERNAL_USERS'
+  EXTERNAL_USERS = 'EXTERNAL_USERS',
+  TABELA_FRETE = 'TABELA_FRETE'
+}
+
+export interface FreightVehicleType {
+  id: string;
+  code: string;
+  name: string;
+  sortOrder: number;
+  createdAt?: string;
+}
+
+export interface FreightRouteVehicleValue {
+  freight: number;
+  tollGoing: number;
+  tollReturning: number;
+}
+
+export interface FreightRoute {
+  id: string;
+  originCity: string;
+  destinationCity: string;
+  vehicleValues: { [vehicleCode: string]: FreightRouteVehicleValue };
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Automation {
