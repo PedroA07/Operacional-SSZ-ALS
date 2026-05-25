@@ -678,6 +678,37 @@ interface CalculatorViewProps {
   vehicleTypes: FreightVehicleType[];
 }
 
+// ── Conversão cidade "NOME - UF" → "nome,estado" para a API RotasBrasil ───────
+const UF_ESTADO: Record<string, string> = {
+  AC:'acre',AL:'alagoas',AM:'amazonas',AP:'amapa',BA:'bahia',CE:'ceara',
+  DF:'distrito federal',ES:'espirito santo',GO:'goias',MA:'maranhao',
+  MG:'minas gerais',MS:'mato grosso do sul',MT:'mato grosso',PA:'para',
+  PB:'paraiba',PE:'pernambuco',PI:'piaui',PR:'parana',
+  RJ:'rio de janeiro',RN:'rio grande do norte',RO:'rondonia',RR:'roraima',
+  RS:'rio grande do sul',SC:'santa catarina',SE:'sergipe',SP:'sao paulo',TO:'tocantins',
+};
+function toApiCity(label: string): string {
+  const m = label.match(/^(.+?)\s*-\s*([A-Z]{2})$/);
+  if (!m) return label.toLowerCase().replace(/\s*-\s*/g, ',');
+  return `${m[1].trim().toLowerCase()},${UF_ESTADO[m[2]] ?? m[2].toLowerCase()}`;
+}
+function extractToll(data: any): number {
+  if (!data) return 0;
+  for (const k of ['pedagio','pedagioTotal','total_pedagio','totalPedagio','valor_pedagio','vl_pedagio']) {
+    const v = (data as any)[k];
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') { const n = parseFloat(v.replace(/[^0-9,]/g,'').replace(',','.')); if (!isNaN(n) && n > 0) return n; }
+  }
+  if (Array.isArray(data?.pedagios)) {
+    const sum = data.pedagios.reduce((s: number, p: any) => {
+      const v = p.valor ?? p.value ?? p.vl_pedagio ?? 0;
+      return s + (typeof v === 'number' ? v : 0);
+    }, 0);
+    if (sum > 0) return sum;
+  }
+  return 0;
+}
+
 const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes }) => {
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
   const [axlesEmpty, setAxlesEmpty] = useState(4);
@@ -685,6 +716,15 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(
     () => new Set(vehicleTypes.map(vt => vt.code))
   );
+  // API RotasBrasil
+  const [showApiPanel, setShowApiPanel] = useState(false);
+  const [apiToken, setApiToken] = useState(() => { try { return localStorage.getItem('rb_token') ?? ''; } catch { return ''; } });
+  const [viaCity, setViaCity] = useState('');
+  const [consultando, setConsultando] = useState(false);
+  const [tollLive, setTollLive] = useState<{
+    ida: number; volta: number; routeLabel: string; distancia: string; creditos: number | null;
+  } | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // Sync selectedTypes when vehicleTypes prop changes (e.g. after first load)
   const prevVtRef = React.useRef(vehicleTypes);
@@ -736,6 +776,33 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
       { freight: 0, tollGoing: 0, tollReturning: 0, repasse: 0, total: 0 }
     );
   }, [selectedRoute, visibleTypes]);
+
+  const handleConsultar = async () => {
+    if (!selectedRoute || !apiToken.trim()) return;
+    setConsultando(true);
+    setApiError(null);
+    setTollLive(null);
+    try { localStorage.setItem('rb_token', apiToken); } catch {}
+    const origin = toApiCity(selectedRoute.originCity);
+    const dest   = toApiCity(selectedRoute.destinationCity);
+    const via    = viaCity ? toApiCity(viaCity) : undefined;
+    try {
+      const [resIda, resVolta] = await Promise.all([
+        db.consultarPedagioRotas(origin, dest, axlesEmpty, apiToken, via),
+        db.consultarPedagioRotas(origin, dest, axlesFull,  apiToken, via),
+      ]);
+      if (resIda?.error)   { setApiError(String(resIda.error));   return; }
+      if (resVolta?.error) { setApiError(String(resVolta.error)); return; }
+      const routeLabel = resIda?.rota ?? resIda?.nome ?? resIda?.highway ?? resIda?.rodovia ?? '';
+      const distancia  = String(resIda?.distancia ?? resIda?.distance ?? '');
+      const creditos   = resIda?.creditos ?? resIda?.credits ?? null;
+      setTollLive({ ida: extractToll(resIda), volta: extractToll(resVolta), routeLabel, distancia, creditos });
+    } catch (e) {
+      setApiError(String(e));
+    } finally {
+      setConsultando(false);
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -834,6 +901,113 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
           </div>
         )}
 
+        {/* ── Consulta Online (RotasBrasil) ── */}
+        <div className="pt-2 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setShowApiPanel(v => !v)}
+            className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-800 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Consultar Pedágios Online · RotasBrasil
+            <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${showApiPanel ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+
+          {showApiPanel && (
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                    Token RotasBrasil
+                    <a href="https://rotasbrasil.com.br" target="_blank" rel="noopener noreferrer"
+                      className="ml-2 text-blue-400 normal-case font-medium hover:underline">
+                      ↗ obter token
+                    </a>
+                  </label>
+                  <input
+                    type="password"
+                    value={apiToken}
+                    onChange={e => setApiToken(e.target.value)}
+                    placeholder="Cole seu token aqui"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                    Via (cidade intermediária)
+                    <span className="ml-2 text-slate-300 normal-case font-medium">opcional · define o trecho</span>
+                  </label>
+                  <CitySearchSelect
+                    value={viaCity}
+                    onChange={setViaCity}
+                    placeholder="Ex: São Paulo - SP..."
+                  />
+                </div>
+              </div>
+
+              {viaCity && selectedRoute && (
+                <p className="text-[9px] text-slate-400 font-medium -mt-1">
+                  Trajeto: {selectedRoute.originCity}
+                  {' → '}
+                  <span className="text-blue-600 font-black">{viaCity}</span>
+                  {' → '}
+                  {selectedRoute.destinationCity}
+                </p>
+              )}
+
+              <p className="text-[9px] text-slate-300 -mt-1">
+                Para alterar o trecho, adicione uma cidade intermediária. Ex: para usar o Rodoanel ao invés da Bandeirantes, adicione uma cidade ao longo do Rodoanel (ex: Cotia - SP).
+              </p>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleConsultar}
+                  disabled={consultando || !selectedRoute || !apiToken.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-40 transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20"
+                >
+                  {consultando ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      Consultando...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                      </svg>
+                      Calcular Pedágios
+                    </>
+                  )}
+                </button>
+                {tollLive && (
+                  <button
+                    type="button"
+                    onClick={() => { setTollLive(null); setApiError(null); }}
+                    className="text-[9px] font-black text-slate-400 uppercase hover:text-slate-600 transition-colors"
+                  >
+                    Limpar resultado
+                  </button>
+                )}
+              </div>
+
+              {apiError && (
+                <div className="flex items-start gap-2 p-3 bg-red-50 rounded-xl border border-red-100">
+                  <svg className="w-4 h-4 text-red-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <p className="text-[10px] text-red-600 font-medium break-words">{apiError}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {selectedRoute && (
           <div className="flex items-center gap-2 pt-1">
             <div className="flex-1 h-px bg-slate-100" />
@@ -844,6 +1018,63 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
           </div>
         )}
       </div>
+
+      {/* ── Resultado da consulta online ── */}
+      {tollLive && selectedRoute && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 shadow-sm p-6">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Pedágios Calculados · RotasBrasil</p>
+              </div>
+              {tollLive.routeLabel && (
+                <p className="text-xs font-bold text-slate-700">{tollLive.routeLabel}</p>
+              )}
+              <p className="text-[9px] text-slate-400 mt-0.5">
+                {selectedRoute.originCity}
+                {viaCity ? <> → <span className="text-blue-600 font-bold">{viaCity}</span></> : null}
+                {' → '}{selectedRoute.destinationCity}
+                {tollLive.distancia ? ` · ${tollLive.distancia}` : ''}
+              </p>
+            </div>
+            {tollLive.creditos !== null && (
+              <span className="text-[9px] font-bold text-slate-400 shrink-0 bg-white/70 px-2 py-1 rounded-lg">
+                {tollLive.creditos} créditos
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-xl p-4 border border-orange-100">
+              <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest mb-2">
+                Pedágio Ida · {axlesEmpty} eixos vazios
+              </p>
+              <p className="text-2xl font-black text-slate-800 tabular-nums">
+                {tollLive.ida > 0
+                  ? tollLive.ida.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                  : <span className="text-slate-300">—</span>
+                }
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-emerald-100">
+              <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-2">
+                Pedágio Volta · {axlesFull} eixos cheios
+              </p>
+              <p className="text-2xl font-black text-slate-800 tabular-nums">
+                {tollLive.volta > 0
+                  ? tollLive.volta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                  : <span className="text-slate-300">—</span>
+                }
+              </p>
+            </div>
+          </div>
+
+          <p className="text-[9px] text-slate-300 mt-3">
+            Valores calculados pela API RotasBrasil para veículo tipo caminhão. Para salvar estes valores no cadastro da rota, edite a rota e preencha os campos de pedágio manualmente.
+          </p>
+        </div>
+      )}
 
       {/* Resultado */}
       {!selectedRoute ? (
