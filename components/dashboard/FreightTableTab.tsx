@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import ExcelJS from 'exceljs';
 import { FreightRoute, FreightVehicleType, FreightRouteVehicleValue } from '../../types';
 import { db } from '../../utils/storage';
+import { excelStyles } from '../../utils/excelStyles';
 import CustomSelect, { SelectOption } from '../shared/CustomSelect';
 import CitySearchSelect from '../shared/CitySearchSelect';
 import SmartOperationTable from './operations/SmartOperationTable';
@@ -341,9 +343,114 @@ interface FreightTableViewProps {
   onManageTypes: () => void;
 }
 
+// ── Exportação Excel ──────────────────────────────────────────────────────────
+async function exportFreightExcel(
+  routes: FreightRoute[],
+  vehicleTypes: FreightVehicleType[],
+) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'ALS Logística';
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet('Tabela de Frete', {
+    views: [{ state: 'frozen', ySplit: 2 }],
+  });
+
+  // ── Linha 1: título mesclado ──────────────────────────────────────────────
+  const totalCols = 2 + vehicleTypes.length * 4; // origem + destino + 4 cols por tipo
+  ws.mergeCells(1, 1, 1, totalCols);
+  const titleCell = ws.getCell('A1');
+  titleCell.value = 'TABELA DE FRETE — ALS LOGÍSTICA';
+  titleCell.font   = { bold: true, size: 13, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+  titleCell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } } as ExcelJS.Fill;
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 28;
+
+  // ── Linha 2: cabeçalhos ───────────────────────────────────────────────────
+  const headerLabels: string[] = ['ORIGEM', 'DESTINO'];
+  vehicleTypes.forEach(vt => {
+    headerLabels.push(`${vt.code} (${vt.name}) — FRETE`);
+    headerLabels.push(`${vt.code} (${vt.name}) — PED. IDA`);
+    headerLabels.push(`${vt.code} (${vt.name}) — PED. VOLTA`);
+    headerLabels.push(`${vt.code} (${vt.name}) — REPASSE`);
+  });
+
+  const headerRow = ws.getRow(2);
+  headerRow.height = 36;
+  headerLabels.forEach((label, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = label;
+    cell.style = { ...excelStyles.HEADER_STYLE };
+  });
+
+  // AutoFilter na linha de cabeçalho
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: totalCols } };
+
+  // ── Dados ─────────────────────────────────────────────────────────────────
+  routes.forEach((route, rowIdx) => {
+    const isEven = rowIdx % 2 === 0;
+    const rowFill: ExcelJS.Fill = isEven
+      ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }
+      : excelStyles.ZEBRA_ROW_EVEN;
+
+    const values: (string | number)[] = [route.originCity, route.destinationCity];
+    vehicleTypes.forEach(vt => {
+      const v = route.vehicleValues[vt.code];
+      values.push(v?.freight      ?? 0);
+      values.push(v?.tollGoing    ?? 0);
+      values.push(v?.tollReturning ?? 0);
+      values.push(v?.repasse       ?? 0);
+    });
+
+    const dataRow = ws.addRow(values);
+    dataRow.height = 20;
+    dataRow.eachCell((cell, colNum) => {
+      cell.border = excelStyles.BORDER_THIN;
+      cell.fill   = rowFill;
+      if (colNum <= 2) {
+        cell.font      = { bold: true, name: 'Calibri', size: 10 };
+        cell.alignment = excelStyles.DATA_STYLE_LEFT;
+      } else {
+        cell.numFmt    = excelStyles.FORMATS.CURRENCY;
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.font      = { name: 'Calibri', size: 10 };
+      }
+    });
+  });
+
+  // ── Largura das colunas ───────────────────────────────────────────────────
+  ws.getColumn(1).width = 30; // origem
+  ws.getColumn(2).width = 30; // destino
+  let colIdx = 3;
+  vehicleTypes.forEach(() => {
+    ws.getColumn(colIdx).width     = 20; // frete
+    ws.getColumn(colIdx + 1).width = 20; // ped. ida
+    ws.getColumn(colIdx + 2).width = 20; // ped. volta
+    ws.getColumn(colIdx + 3).width = 18; // repasse
+    colIdx += 4;
+  });
+
+  // ── Download ──────────────────────────────────────────────────────────────
+  const buf  = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `tabela-frete-als-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 const FreightTableView: React.FC<FreightTableViewProps> = ({
   userId, routes, vehicleTypes, onEdit, onDelete, onAdd, onManageTypes,
 }) => {
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try { await exportFreightExcel(routes, vehicleTypes); }
+    finally { setExporting(false); }
+  };
   // Achata dados para SmartOperationTable
   const tableData = useMemo(() => routes.map(r => {
     const row: any = {
@@ -530,6 +637,17 @@ const FreightTableView: React.FC<FreightTableViewProps> = ({
           Tipos de Veículo
         </button>
         <button
+          onClick={handleExport}
+          disabled={exporting || routes.length === 0}
+          className="px-5 py-2.5 rounded-2xl border border-slate-200 bg-white text-emerald-600 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-50 shadow-sm transition-all flex items-center gap-2 disabled:opacity-40"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          {exporting ? 'Exportando...' : 'Baixar Planilha'}
+        </button>
+        <button
           onClick={onAdd}
           className="px-5 py-2.5 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2"
         >
@@ -564,6 +682,27 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
   const [axlesEmpty, setAxlesEmpty] = useState(4);
   const [axlesFull, setAxlesFull]   = useState(6);
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(
+    () => new Set(vehicleTypes.map(vt => vt.code))
+  );
+
+  // Sync selectedTypes when vehicleTypes prop changes (e.g. after first load)
+  const prevVtRef = React.useRef(vehicleTypes);
+  useEffect(() => {
+    if (prevVtRef.current !== vehicleTypes) {
+      prevVtRef.current = vehicleTypes;
+      setSelectedTypes(new Set(vehicleTypes.map(vt => vt.code)));
+    }
+  }, [vehicleTypes]);
+
+  const toggleType = (code: string) => {
+    setSelectedTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) { if (next.size > 1) next.delete(code); }
+      else next.add(code);
+      return next;
+    });
+  };
 
   const routeOptions = useMemo<SelectOption[]>(() =>
     routes.map(r => ({ value: r.id, label: `${r.originCity} → ${r.destinationCity}` })),
@@ -575,9 +714,14 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
     [routes, selectedRouteId]
   );
 
+  const visibleTypes = useMemo(
+    () => vehicleTypes.filter(vt => selectedTypes.has(vt.code)),
+    [vehicleTypes, selectedTypes]
+  );
+
   const totals = useMemo(() => {
     if (!selectedRoute) return null;
-    return vehicleTypes.reduce(
+    return visibleTypes.reduce(
       (acc, vt) => {
         const v = selectedRoute.vehicleValues[vt.code];
         if (!v) return acc;
@@ -591,7 +735,7 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
       },
       { freight: 0, tollGoing: 0, tollReturning: 0, repasse: 0, total: 0 }
     );
-  }, [selectedRoute, vehicleTypes]);
+  }, [selectedRoute, visibleTypes]);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -653,6 +797,43 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
           </div>
         </div>
 
+        {/* Filtro de tipos de veículo */}
+        {vehicleTypes.length > 0 && (
+          <div>
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+              Tipos de Veículo Exibidos
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {vehicleTypes.map(vt => {
+                const active = selectedTypes.has(vt.code);
+                return (
+                  <button
+                    key={vt.code}
+                    type="button"
+                    onClick={() => toggleType(vt.code)}
+                    className={[
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all border',
+                      active
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-600/20'
+                        : 'bg-white text-slate-400 border-slate-200 hover:border-blue-300',
+                    ].join(' ')}
+                  >
+                    <span>{vt.code}</span>
+                    <span className={`font-medium normal-case ${active ? 'text-blue-200' : 'text-slate-300'}`}>
+                      {vt.name}
+                    </span>
+                    {active && (
+                      <svg className="w-3 h-3 text-blue-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {selectedRoute && (
           <div className="flex items-center gap-2 pt-1">
             <div className="flex-1 h-px bg-slate-100" />
@@ -710,7 +891,7 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {vehicleTypes.map(vt => {
+                {visibleTypes.map(vt => {
                   const v = selectedRoute.vehicleValues[vt.code];
                   const rep = v?.repasse ?? 0;
                   const total = (v?.freight ?? 0) + (v?.tollGoing ?? 0) + (v?.tollReturning ?? 0) + rep;
