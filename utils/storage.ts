@@ -2040,6 +2040,8 @@ export const db = {
       code: t.code,
       name: t.name,
       sortOrder: t.sort_order,
+      axlesGoing:     t.axles_going     ?? 4,
+      axlesReturning: t.axles_returning ?? 6,
       createdAt: t.created_at,
     }));
   },
@@ -2051,6 +2053,8 @@ export const db = {
       code: type.code.toUpperCase().trim(),
       name: type.name,
       sort_order: type.sortOrder,
+      axles_going:     type.axlesGoing     ?? 4,
+      axles_returning: type.axlesReturning ?? 6,
     }, { onConflict: 'id' });
     if (error) { console.error('[saveFreightVehicleType]', error.message); return false; }
     return true;
