@@ -71,6 +71,14 @@ export default async function handler(req: Request) {
   }
 
   if (t === 'sb' || t === 'all') {
+    // Endpoint legado ASP (era o que funcionava antes)
+    results.sb_legacy_asp = await probe('https://www.santosbrasil.com.br/tecon-santos-sistemas/atracacao-table.asp?unidade=tecon-santos', {
+      headers: { 'User-Agent': UA, 'Accept': 'text/html', 'Referer': 'https://www.santosbrasil.com.br/' },
+    });
+    results.sb_legacy_asp2 = await probe('https://www.santosbrasil.com.br/tecon-santos-sistemas/atracacao-table.asp', {
+      headers: { 'User-Agent': UA, 'Accept': 'text/html', 'Referer': 'https://www.santosbrasil.com.br/' },
+    });
+    // Endpoint JSON moderno
     results.sb_pesquisa = await probe('https://www.santosbrasil.com.br/v2021/lista-de-atracacao/pesquisa?unidade=tecon-santos', {
       headers: {
         'User-Agent': UA, 'Accept': 'application/json, */*', 'X-Requested-With': 'XMLHttpRequest',
