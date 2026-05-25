@@ -60,29 +60,41 @@ function pick(obj: Record<string, unknown>, keys: string[]): string {
 }
 
 // ─── BTP ─────────────────────────────────────────────────────────────────────
-// O browser faz: GET ListaAtracacaoIndex (pega session cookie) →
-//                POST ListaAtracacao (retorna HTML parcial com a tabela)
+// O browser faz: GET ListaAtracacaoIndex (pega session cookie + CSRF token) →
+//                POST ListaAtracacao com __RequestVerificationToken no body
 async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
   const base    = 'https://novo-tas.btp.com.br/ConsultasLivres/';
   const referer = 'https://novo-tas.btp.com.br/';
   const ua      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-  // 1) Inicializa sessão, captura cookies e tenta parsear a própria página inicial
+  // 1) GET para capturar cookies de sessão, CSRF token e tentar parsear o HTML inicial
   let sessionCookies = '';
+  let csrfToken = '';
   let indexHtml = '';
   try {
     const init = await fetch(base + 'ListaAtracacaoIndex', {
-      headers: { 'User-Agent': ua, 'Accept': 'text/html', 'Referer': referer },
-      signal: AbortSignal.timeout(12000),
+      headers: {
+        'User-Agent': ua,
+        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.9',
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+        'Referer': referer,
+      },
+      signal: AbortSignal.timeout(15000),
       redirect: 'follow',
     });
     indexHtml = await init.text();
-    // Extrai cookies de múltiplos Set-Cookie headers
+
+    // Extrai cookies de sessão
     const rawCookie = init.headers.get('set-cookie') ?? '';
     sessionCookies = rawCookie.split(',')
       .map(c => c.trim().split(';')[0])
       .filter(Boolean)
       .join('; ');
+
+    // Extrai token anti-CSRF do HTML (padrão ASP.NET MVC)
+    const csrfMatch = indexHtml.match(/<input[^>]+name="__RequestVerificationToken"[^>]+value="([^"]+)"/i)
+      ?? indexHtml.match(/name="__RequestVerificationToken"\s+[^>]*value="([^"]+)"/i);
+    if (csrfMatch) csrfToken = csrfMatch[1];
 
     // Tenta parsear a tabela da própria página GET (pode já conter os dados)
     const indexTrCount = (indexHtml.match(/<tr/gi) ?? []).length;
@@ -92,7 +104,7 @@ async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
     }
   } catch { /* ignora, tenta POST */ }
 
-  // 2) POST para o endpoint de dados (mesmo que o browser chama via jQuery AJAX)
+  // 2) POST com token CSRF e cookies de sessão
   try {
     const headers: Record<string, string> = {
       'User-Agent': ua,
@@ -101,13 +113,18 @@ async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       'X-Requested-With': 'XMLHttpRequest',
       'Referer': base + 'ListaAtracacaoIndex',
+      'Origin': 'https://novo-tas.btp.com.br',
     };
     if (sessionCookies) headers['Cookie'] = sessionCookies;
+
+    const postBody = csrfToken
+      ? `__RequestVerificationToken=${encodeURIComponent(csrfToken)}`
+      : '';
 
     const res = await fetch(base + 'ListaAtracacao', {
       method: 'POST',
       headers,
-      body: '',
+      body: postBody,
       signal: AbortSignal.timeout(20000),
       redirect: 'follow',
     });
@@ -119,7 +136,7 @@ async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
     // Tenta JSON primeiro (alguns endpoints .NET retornam JSON)
     try {
       const json = JSON.parse(text) as Record<string, unknown>;
-      const list = (json.data ?? json.Data ?? json.vessels ?? json.rows ?? []) as Record<string, unknown>[];
+      const list = (json.data ?? json.Data ?? json.vessels ?? json.rows ?? json.Items ?? json.items ?? []) as Record<string, unknown>[];
       if (Array.isArray(list) && list.length > 0) {
         return { vessels: list.map(mapBTPRow) };
       }
@@ -132,7 +149,10 @@ async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
       if (vessels.length > 0) return { vessels };
     }
 
-    return { vessels: [], error: 'BTP: resposta recebida mas sem dados reconhecíveis (pode precisar de sessão válida)' };
+    // Diagnóstico: mostra snippet da resposta para facilitar debug
+    const snippet = text.slice(0, 200).replace(/\s+/g, ' ').trim();
+    const hasCsrf = csrfToken ? 'com CSRF' : 'sem CSRF (não encontrado na página)';
+    return { vessels: [], error: `BTP: sem dados (${hasCsrf}, ${trCount} <tr>). Início resp: ${snippet}` };
   } catch (e: any) {
     return { vessels: [], error: `BTP: ${e?.message ?? e}` };
   }
