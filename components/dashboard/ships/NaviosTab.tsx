@@ -797,53 +797,28 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     if (scraping) return;
     setScraping(true);
     try {
-      const [, tvResult] = await Promise.allSettled([
+      // Ambas as rotas rodam no Railway (mesmo servidor da app) — acesso BR garantido
+      const [embraportRes, terminaisRes] = await Promise.allSettled([
         fetch('/api/embraport-escala'),
-        supabase?.functions.invoke('terminal-vessels'),
+        fetch('/api/terminais-scraper'),
       ]);
 
-      // Persiste BTP/ECOPORTO/Santos Brasil no banco a partir da resposta da edge function
-      if (supabase && tvResult.status === 'fulfilled') {
-        const tvData = (tvResult.value as any)?.data;
-        const fnError = (tvResult.value as any)?.error;
+      // EMBRAPORT
+      if (embraportRes.status === 'fulfilled') {
+        const data = await embraportRes.value.json().catch(() => null);
+        if (data?.total > 0) toast(`EMBRAPORT: ${data.total} navios salvos`, 'success');
+        else if (data?.errors?.length) toast(`EMBRAPORT: ${data.errors[0]}`, 'error');
+      } else {
+        toast(`EMBRAPORT: falha na requisição`, 'error');
+      }
 
-        if (fnError) {
-          toast(`Edge function erro: ${fnError.message ?? JSON.stringify(fnError)}`, 'error');
-        }
-
-        const vessels: TerminalVessel[] = tvData?.vessels ?? [];
-
-        if (vessels.length === 0) {
-          const detail = tvData?.error ? ` (${tvData.error})` : '';
-          toast(`Nenhum navio retornado pela edge function${detail}`, 'error');
-        } else {
-          const fetchedAt = tvData?.fetchedAt ?? new Date().toISOString();
-          const terminals = [...new Set(vessels.map((v: TerminalVessel) => v.terminal))];
-
-          const { error: delErr } = await supabase
-            .from('terminal_vessels').delete().in('terminal', terminals);
-          if (delErr) toast(`Erro ao limpar tabela: ${delErr.message}`, 'error');
-
-          const { error: insErr } = await supabase.from('terminal_vessels').insert(
-            vessels.map((v: TerminalVessel) => ({
-              terminal:      v.terminal,
-              navio:         v.navio,
-              situacao:      v.situacao,
-              previsao:      v.previsao      ?? null,
-              berco:         v.berco         ?? null,
-              armador:       v.armador       ?? null,
-              viagem:        v.viagem        ?? null,
-              gate_dry:      v.gateDry       ?? null,
-              gate_reefer:   v.gateReefer    ?? null,
-              dead_line_str: v.deadLineStr   ?? null,
-              fetched_at:    fetchedAt,
-            }))
-          );
-          if (insErr) toast(`Erro ao salvar navios: ${insErr.message}`, 'error');
-          else toast(`${vessels.length} navios salvos (${terminals.join(', ')})`, 'success');
-        }
-      } else if (tvResult.status === 'rejected') {
-        toast(`Falha ao chamar edge function: ${tvResult.reason}`, 'error');
+      // BTP + ECOPORTO + Santos Brasil
+      if (terminaisRes.status === 'fulfilled') {
+        const data = await terminaisRes.value.json().catch(() => null);
+        if (data?.total > 0) toast(`Terminais: ${data.total} navios salvos`, 'success');
+        if (data?.errors?.length) toast(data.errors.join(' | '), 'error');
+      } else {
+        toast(`Terminais: falha na requisição`, 'error');
       }
     } catch(e: any) {
       toast(`Erro inesperado: ${e?.message ?? e}`, 'error');
