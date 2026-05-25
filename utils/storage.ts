@@ -5,7 +5,8 @@ import {
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
   BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, ShipTerminalConfig, Ship,
-  Devolucao, DevolucaoStatus, Liberacao, LiberacaoStatus
+  Devolucao, DevolucaoStatus, Liberacao, LiberacaoStatus,
+  FreightRoute, FreightVehicleType
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -2022,6 +2023,78 @@ export const db = {
   deleteLiberacao: async (id: string): Promise<boolean> => {
     if (!supabase) return false;
     const { error } = await supabase.from('liberacoes').delete().eq('id', id);
+    return !error;
+  },
+
+  // ── Tabela de Frete ──────────────────────────────────────────────────────
+
+  getFreightVehicleTypes: async (): Promise<FreightVehicleType[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('freight_vehicle_types')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) { console.error('[getFreightVehicleTypes]', error.message); return []; }
+    return (data || []).map(t => ({
+      id: t.id,
+      code: t.code,
+      name: t.name,
+      sortOrder: t.sort_order,
+      createdAt: t.created_at,
+    }));
+  },
+
+  saveFreightVehicleType: async (type: FreightVehicleType): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('freight_vehicle_types').upsert({
+      id: type.id,
+      code: type.code.toUpperCase().trim(),
+      name: type.name,
+      sort_order: type.sortOrder,
+    }, { onConflict: 'id' });
+    if (error) { console.error('[saveFreightVehicleType]', error.message); return false; }
+    return true;
+  },
+
+  deleteFreightVehicleType: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('freight_vehicle_types').delete().eq('id', id);
+    return !error;
+  },
+
+  getFreightRoutes: async (): Promise<FreightRoute[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('freight_routes')
+      .select('*')
+      .order('origin_city', { ascending: true });
+    if (error) { console.error('[getFreightRoutes]', error.message); return []; }
+    return (data || []).map(r => ({
+      id: r.id,
+      originCity: r.origin_city,
+      destinationCity: r.destination_city,
+      vehicleValues: r.vehicle_values || {},
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
+  },
+
+  saveFreightRoute: async (route: FreightRoute): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('freight_routes').upsert({
+      id: route.id,
+      origin_city: route.originCity.trim(),
+      destination_city: route.destinationCity.trim(),
+      vehicle_values: route.vehicleValues,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
+    if (error) { console.error('[saveFreightRoute]', error.message); return false; }
+    return true;
+  },
+
+  deleteFreightRoute: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('freight_routes').delete().eq('id', id);
     return !error;
   },
 };
