@@ -67,21 +67,30 @@ async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
   const referer = 'https://novo-tas.btp.com.br/';
   const ua      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-  // 1) Inicializa sessão e captura cookies
+  // 1) Inicializa sessão, captura cookies e tenta parsear a própria página inicial
   let sessionCookies = '';
+  let indexHtml = '';
   try {
     const init = await fetch(base + 'ListaAtracacaoIndex', {
       headers: { 'User-Agent': ua, 'Accept': 'text/html', 'Referer': referer },
       signal: AbortSignal.timeout(12000),
       redirect: 'follow',
     });
-    const raw = init.headers.get('set-cookie') ?? '';
-    // Extrai pares nome=valor de cada Set-Cookie
-    sessionCookies = raw.split(',')
+    indexHtml = await init.text();
+    // Extrai cookies de múltiplos Set-Cookie headers
+    const rawCookie = init.headers.get('set-cookie') ?? '';
+    sessionCookies = rawCookie.split(',')
       .map(c => c.trim().split(';')[0])
       .filter(Boolean)
       .join('; ');
-  } catch { /* ignora */ }
+
+    // Tenta parsear a tabela da própria página GET (pode já conter os dados)
+    const indexTrCount = (indexHtml.match(/<tr/gi) ?? []).length;
+    if (indexTrCount >= 3) {
+      const vessels = parseBTPHtmlTable(indexHtml);
+      if (vessels.length > 0) return { vessels };
+    }
+  } catch { /* ignora, tenta POST */ }
 
   // 2) POST para o endpoint de dados (mesmo que o browser chama via jQuery AJAX)
   try {
@@ -116,7 +125,7 @@ async function scrapeBTP(): Promise<{ vessels: Vessel[]; error?: string }> {
       }
     } catch { /* não é JSON, tenta HTML */ }
 
-    // Tenta HTML
+    // Tenta HTML da resposta POST
     const trCount = (text.match(/<tr/gi) ?? []).length;
     if (trCount >= 3) {
       const vessels = parseBTPHtmlTable(text);
@@ -213,13 +222,16 @@ async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string
   const referer = 'https://www.santosbrasil.com.br/v2021/lista-de-atracacao?unidade=tecon-santos';
   const ua      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-  const urlVariants = [
+  // Variantes JSON (API interna da página)
+  const jsonVariants = [
     base + 'pesquisa?unidade=tecon-santos',
     base + 'pesquisa?unidade=tecon-santos&pagina=1&itensPorPagina=200',
     base + 'pesquisa?unidade=tecon-santos&lista=atracacao',
+    'https://www.santosbrasil.com.br/api/lista-de-atracacao?unidade=tecon-santos',
+    'https://www.santosbrasil.com.br/api/atracacao?unidade=tecon-santos',
   ];
 
-  for (const url of urlVariants) {
+  for (const url of jsonVariants) {
     try {
       const res = await fetch(url, {
         headers: {
@@ -235,15 +247,42 @@ async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string
 
       if (!res.ok) continue;
 
-      const json = await res.json() as Record<string, unknown>;
-      if (!json.Success) continue;
+      const text = await res.text();
+      let json: Record<string, unknown>;
+      try { json = JSON.parse(text); } catch { continue; }
 
-      const list = (json.VAtracacao ?? json.vAtracacao ?? json.data ?? []) as Record<string, unknown>[];
+      const list = (json.VAtracacao ?? json.vAtracacao ?? json.data ?? json.Data ?? json.items ?? json.vessels ?? []) as Record<string, unknown>[];
       if (!Array.isArray(list) || list.length === 0) continue;
 
       return { vessels: list.map(mapSBRow) };
     } catch { /* tenta próxima variante */ }
   }
+
+  // Fallback: tenta parsear a página HTML principal
+  try {
+    const pageRes = await fetch('https://www.santosbrasil.com.br/v2021/lista-de-atracacao?unidade=tecon-santos', {
+      headers: {
+        'User-Agent': ua,
+        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.9',
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+        'Referer': 'https://www.santosbrasil.com.br/',
+      },
+      signal: AbortSignal.timeout(15000),
+      redirect: 'follow',
+    });
+    if (pageRes.ok) {
+      const html = await pageRes.text();
+      // Procura JSON embutido na página (window.__DATA__ ou similar)
+      const jsonMatch = html.match(/window\.__(?:DATA|STATE|INITIAL_DATA)__\s*=\s*(\{[\s\S]*?\});/);
+      if (jsonMatch) {
+        try {
+          const embedded = JSON.parse(jsonMatch[1]) as Record<string, unknown>;
+          const list = (embedded.VAtracacao ?? embedded.atracacao ?? embedded.vessels ?? []) as Record<string, unknown>[];
+          if (Array.isArray(list) && list.length > 0) return { vessels: list.map(mapSBRow) };
+        } catch { /* ignora */ }
+      }
+    }
+  } catch { /* ignora */ }
 
   return { vessels: [], error: 'Santos Brasil: endpoint /pesquisa não acessível' };
 }
