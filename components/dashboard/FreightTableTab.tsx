@@ -18,9 +18,54 @@ const DEFAULT_VEHICLE_TYPES: FreightVehicleType[] = [
 const fmt = (v: number) =>
   v === 0 ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const parseMoney = (s: string) => {
-  const n = parseFloat(s.replace(/[^\d,.-]/g, '').replace(',', '.'));
-  return isNaN(n) ? 0 : n;
+// ── Input de moeda estilo ATM (vírgula antes dos 2 últimos dígitos) ───────────
+const CurrencyInput: React.FC<{
+  value: number;
+  onChange: (v: number) => void;
+  placeholder?: string;
+}> = ({ value, onChange, placeholder = 'R$ 0,00' }) => {
+  // Trabalha em centavos internamente
+  const [cents, setCents] = useState(() => Math.round(value * 100));
+
+  useEffect(() => {
+    const incoming = Math.round(value * 100);
+    setCents(prev => prev === incoming ? prev : incoming);
+  }, [value]);
+
+  const display = cents === 0
+    ? ''
+    : (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const push = (next: number) => {
+    setCents(next);
+    onChange(next / 100);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key >= '0' && e.key <= '9') {
+      e.preventDefault();
+      const next = cents * 10 + parseInt(e.key);
+      if (next <= 999_999_999) push(next);
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      push(Math.floor(cents / 10));
+    } else if (e.key === 'Delete' || e.key === 'Escape') {
+      e.preventDefault();
+      push(0);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={display}
+      placeholder={placeholder}
+      onChange={() => {}}
+      onKeyDown={onKeyDown}
+      className="w-full text-right px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-300 tabular-nums"
+    />
+  );
 };
 
 // ── Modal de rota ────────────────────────────────────────────────────────────
@@ -33,7 +78,7 @@ interface RouteModalProps {
 }
 
 const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onClose, onSave }) => {
-  const blank = (): FreightRouteVehicleValue => ({ freight: 0, tollGoing: 0, tollReturning: 0 });
+  const blank = (): FreightRouteVehicleValue => ({ freight: 0, tollGoing: 0, tollReturning: 0, repasse: 0 });
 
   const [origin, setOrigin]           = useState(editingRoute?.originCity ?? '');
   const [destination, setDestination] = useState(editingRoute?.destinationCity ?? '');
@@ -54,7 +99,7 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
     if (!origin.trim() || !destination.trim()) return;
     setSaving(true);
     await onSave({
-      id: editingRoute?.id ?? `fr-${Date.now()}`,
+      id: editingRoute?.id ?? crypto.randomUUID(),
       originCity: origin.trim(),
       destinationCity: destination.trim(),
       vehicleValues: values,
@@ -114,32 +159,49 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
                 <thead>
                   <tr className="bg-slate-50">
                     <th className="text-left px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Tipo</th>
-                    <th className="text-right px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Frete (R$)</th>
-                    <th className="text-right px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Pedágio Ida (R$)</th>
-                    <th className="text-right px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Pedágio Volta (R$)</th>
+                    <th className="text-right px-4 py-3 text-[10px] font-black text-blue-600 uppercase tracking-widest">Frete</th>
+                    <th className="text-right px-4 py-3 text-[10px] font-black text-orange-500 uppercase tracking-widest">Ped. Ida</th>
+                    <th className="text-right px-4 py-3 text-[10px] font-black text-emerald-600 uppercase tracking-widest">Ped. Volta</th>
+                    <th className="text-right px-4 py-3 text-[10px] font-black text-violet-600 uppercase tracking-widest">Repasse</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {vehicleTypes.map(vt => (
                     <tr key={vt.code} className="hover:bg-slate-50/50">
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-2">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5">
                           <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-black uppercase">{vt.code}</span>
-                          <span className="text-xs text-slate-500">{vt.name}</span>
+                          <span className="text-[10px] text-slate-400 font-bold">({vt.name})</span>
                         </span>
                       </td>
-                      {(['freight', 'tollGoing', 'tollReturning'] as const).map(field => (
-                        <td key={field} className="px-4 py-3">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={values[vt.code]?.[field] ?? 0}
-                            onChange={e => setField(vt.code, field, e.target.value)}
-                            className="w-full text-right px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </td>
-                      ))}
+                      <td className="px-3 py-2.5 w-36">
+                        <CurrencyInput
+                          value={values[vt.code]?.freight ?? 0}
+                          onChange={v => setValues(p => ({ ...p, [vt.code]: { ...p[vt.code], freight: v } }))}
+                          placeholder="Frete"
+                        />
+                      </td>
+                      <td className="px-3 py-2.5 w-36">
+                        <CurrencyInput
+                          value={values[vt.code]?.tollGoing ?? 0}
+                          onChange={v => setValues(p => ({ ...p, [vt.code]: { ...p[vt.code], tollGoing: v } }))}
+                          placeholder="Ped. Ida"
+                        />
+                      </td>
+                      <td className="px-3 py-2.5 w-36">
+                        <CurrencyInput
+                          value={values[vt.code]?.tollReturning ?? 0}
+                          onChange={v => setValues(p => ({ ...p, [vt.code]: { ...p[vt.code], tollReturning: v } }))}
+                          placeholder="Ped. Volta"
+                        />
+                      </td>
+                      <td className="px-3 py-2.5 w-36">
+                        <CurrencyInput
+                          value={values[vt.code]?.repasse ?? 0}
+                          onChange={v => setValues(p => ({ ...p, [vt.code]: { ...p[vt.code], repasse: v } }))}
+                          placeholder="Repasse"
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -183,7 +245,7 @@ const VehicleTypesModal: React.FC<VehicleTypesModalProps> = ({ vehicleTypes, onC
     if (!newCode.trim() || !newName.trim()) return;
     if (types.find(t => t.code === newCode.toUpperCase())) return;
     setTypes(prev => [...prev, {
-      id: `vt-${Date.now()}`,
+      id: crypto.randomUUID(),
       code: newCode.toUpperCase().trim(),
       name: newName.trim(),
       sortOrder: prev.length + 1,
@@ -299,6 +361,7 @@ const FreightTableView: React.FC<FreightTableViewProps> = ({
       row[`${vt.code}_frete`]   = v?.freight      ?? 0;
       row[`${vt.code}_ida`]     = v?.tollGoing     ?? 0;
       row[`${vt.code}_volta`]   = v?.tollReturning ?? 0;
+      row[`${vt.code}_repasse`] = v?.repasse       ?? 0;
     });
     return row;
   }), [routes, vehicleTypes]);
@@ -394,6 +457,28 @@ const FreightTableView: React.FC<FreightTableViewProps> = ({
           </div>
         ),
       },
+      {
+        key: 'col_repasse',
+        label: 'Repasse',
+        sortable: false,
+        render: (row: any) => (
+          <div className="flex flex-col gap-1">
+            {vehicleTypes.map(vt => {
+              const val = money(row[`${vt.code}_repasse`] ?? 0);
+              return (
+                <div key={vt.code} className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[9px] font-black uppercase leading-none shrink-0">
+                    {vt.code}
+                  </span>
+                  <span className="text-xs text-slate-600 tabular-nums">
+                    {val ?? <span className="text-slate-300">—</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ),
+      },
     ];
 
     const actions = {
@@ -430,7 +515,7 @@ const FreightTableView: React.FC<FreightTableViewProps> = ({
   }, [vehicleTypes, onEdit, onDelete]);
 
   const defaultVisibleKeys = useMemo(
-    () => ['originCity', 'destinationCity', 'col_frete', 'col_ida', 'col_volta', 'actions'],
+    () => ['originCity', 'destinationCity', 'col_frete', 'col_ida', 'col_volta', 'col_repasse', 'actions'],
     []
   );
 
@@ -504,10 +589,11 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
           freight:       acc.freight       + v.freight,
           tollGoing:     acc.tollGoing     + v.tollGoing,
           tollReturning: acc.tollReturning + v.tollReturning,
-          total:         acc.total         + v.freight + v.tollGoing + v.tollReturning,
+          repasse:       acc.repasse       + (v.repasse ?? 0),
+          total:         acc.total         + v.freight + v.tollGoing + v.tollReturning + (v.repasse ?? 0),
         };
       },
-      { freight: 0, tollGoing: 0, tollReturning: 0, total: 0 }
+      { freight: 0, tollGoing: 0, tollReturning: 0, repasse: 0, total: 0 }
     );
   }, [selectedRoute, vehicleTypes]);
 
@@ -620,30 +706,32 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="text-left px-5 py-3.5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Tipo de Veículo</th>
-                  <th className="text-right px-5 py-3.5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Frete</th>
-                  <th className="text-right px-5 py-3.5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Pedágio Ida</th>
-                  <th className="text-right px-5 py-3.5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Pedágio Volta</th>
-                  <th className="text-right px-5 py-3.5 text-[9px] font-black text-blue-600 uppercase tracking-widest">Total</th>
+                  <th className="text-right px-5 py-3.5 text-[9px] font-black text-blue-600 uppercase tracking-widest">Frete</th>
+                  <th className="text-right px-5 py-3.5 text-[9px] font-black text-orange-500 uppercase tracking-widest">Pedágio Ida</th>
+                  <th className="text-right px-5 py-3.5 text-[9px] font-black text-emerald-600 uppercase tracking-widest">Pedágio Volta</th>
+                  <th className="text-right px-5 py-3.5 text-[9px] font-black text-violet-600 uppercase tracking-widest">Repasse</th>
+                  <th className="text-right px-5 py-3.5 text-[9px] font-black text-slate-700 uppercase tracking-widest">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {vehicleTypes.map(vt => {
                   const v = selectedRoute.vehicleValues[vt.code];
-                  const total = (v?.freight ?? 0) + (v?.tollGoing ?? 0) + (v?.tollReturning ?? 0);
+                  const rep = v?.repasse ?? 0;
+                  const total = (v?.freight ?? 0) + (v?.tollGoing ?? 0) + (v?.tollReturning ?? 0) + rep;
                   return (
                     <tr key={vt.code} className="hover:bg-blue-50/30 transition-colors">
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-black uppercase">{vt.code}</span>
-                          <span className="text-xs text-slate-600 font-medium">{vt.name}</span>
+                          <span className="text-[10px] text-slate-400 font-bold">({vt.name})</span>
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <span className="text-sm font-bold text-slate-800">{v ? fmt(v.freight) : '—'}</span>
+                        <span className="text-sm font-bold text-blue-700">{v ? fmt(v.freight) : '—'}</span>
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex flex-col items-end">
-                          <span className="text-sm font-bold text-slate-700">{v ? fmt(v.tollGoing) : '—'}</span>
+                          <span className="text-sm font-bold text-orange-600">{v ? fmt(v.tollGoing) : '—'}</span>
                           {v && v.tollGoing > 0 && (
                             <span className="text-[9px] text-slate-400">{axlesEmpty} eixos vazios</span>
                           )}
@@ -651,14 +739,17 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex flex-col items-end">
-                          <span className="text-sm font-bold text-slate-700">{v ? fmt(v.tollReturning) : '—'}</span>
+                          <span className="text-sm font-bold text-emerald-700">{v ? fmt(v.tollReturning) : '—'}</span>
                           {v && v.tollReturning > 0 && (
                             <span className="text-[9px] text-slate-400">{axlesFull} eixos cheios</span>
                           )}
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <span className={`text-sm font-black ${total > 0 ? 'text-blue-600' : 'text-slate-400'}`}>
+                        <span className="text-sm font-bold text-violet-700">{rep > 0 ? fmt(rep) : '—'}</span>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <span className={`text-sm font-black ${total > 0 ? 'text-slate-800' : 'text-slate-300'}`}>
                           {total > 0 ? fmt(total) : '—'}
                         </span>
                       </td>
@@ -670,10 +761,11 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
                 <tfoot>
                   <tr className="bg-slate-50 border-t-2 border-slate-200">
                     <td className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase">Total Geral</td>
-                    <td className="px-5 py-4 text-right text-xs font-black text-slate-700">{fmt(totals.freight)}</td>
-                    <td className="px-5 py-4 text-right text-xs font-black text-slate-700">{fmt(totals.tollGoing)}</td>
-                    <td className="px-5 py-4 text-right text-xs font-black text-slate-700">{fmt(totals.tollReturning)}</td>
-                    <td className="px-5 py-4 text-right text-sm font-black text-blue-700">{fmt(totals.total)}</td>
+                    <td className="px-5 py-4 text-right text-xs font-black text-blue-700">{fmt(totals.freight)}</td>
+                    <td className="px-5 py-4 text-right text-xs font-black text-orange-600">{fmt(totals.tollGoing)}</td>
+                    <td className="px-5 py-4 text-right text-xs font-black text-emerald-700">{fmt(totals.tollReturning)}</td>
+                    <td className="px-5 py-4 text-right text-xs font-black text-violet-700">{fmt(totals.repasse)}</td>
+                    <td className="px-5 py-4 text-right text-sm font-black text-slate-800">{fmt(totals.total)}</td>
                   </tr>
                 </tfoot>
               )}

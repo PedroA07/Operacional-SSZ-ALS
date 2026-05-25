@@ -355,6 +355,7 @@ export interface FreightRouteVehicleValue {
   freight: number;
   tollGoing: number;
   tollReturning: number;
+  repasse: number;
 }
 
 export interface FreightRoute {
