@@ -91,10 +91,6 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
   });
   const [saving, setSaving] = useState(false);
 
-  const setField = (code: string, field: keyof FreightRouteVehicleValue, raw: string) => {
-    setValues(prev => ({ ...prev, [code]: { ...prev[code], [field]: parseMoney(raw) } }));
-  };
-
   const handleSave = async () => {
     if (!origin.trim() || !destination.trim()) return;
     setSaving(true);
