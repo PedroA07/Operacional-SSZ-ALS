@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Trip, TripDocument, FreightContractDoc, Driver } from '../../../types';
+import { Trip, TripDocument, FreightContractDoc, Driver, FreightContract } from '../../../types';
 import SmartOperationTable from '../operations/SmartOperationTable';
 import DatePicker from '../../shared/DatePicker';
 import { fileStorage } from '../../../utils/fileStorage';
@@ -177,7 +177,8 @@ const TripSelector: React.FC<{
   const selected = trips.find(t => t.id === value) ?? null;
 
   const isMatch = (t: Trip) => {
-    const cMatch = parsed.container && t.container && normAccent(t.container) === normAccent(parsed.container);
+    const normCtn = (s: string) => s.toUpperCase().replace(/[\s\-_.]/g, '');
+    const cMatch = parsed.container && t.container && normCtn(t.container) === normCtn(parsed.container);
     const dMatch = parsed.motorista && t.driver?.name &&
       (normAccent(t.driver.name).includes(normAccent(parsed.motorista.split(' ')[0])) ||
        normAccent(parsed.motorista).includes(normAccent(t.driver.name.split(' ')[0])));
@@ -437,6 +438,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const [historySearch, setHistorySearch] = useState('');
   const [standaloneContracts, setStandaloneContracts] = useState<StandaloneContract[]>([]);
+  const [unlinkedFreightContracts, setUnlinkedFreightContracts] = useState<FreightContract[]>([]);
   const [edits, setEdits] = useState<Record<string, RowEdit>>({});
   const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [addSearch, setAddSearch] = useState('');
@@ -452,6 +454,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
   useEffect(() => {
     db.getStandaloneContracts().then(setStandaloneContracts).catch(() => {});
+    db.getFreightContracts().then(all => setUnlinkedFreightContracts(all.filter(c => !c.tripId && c.status === 'unlinked'))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -667,15 +670,23 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             } catch { /* non-critical */ }
           }
         } else {
-          // Sem vínculo: gera código de identificação e salva no Supabase
-          const code = genContractCode();
-          const url = await fileStorage.uploadFreightContract(entry.file, code, 0);
-          const standalone: StandaloneContract = {
-            id: entry.id, code, url, fileName: entry.file.name,
-            uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(), parsedData,
+          // Sem vínculo: usa container como OS (ou código gerado) e salva em freight_contracts
+          const osKey = parsedData.container || genContractCode();
+          const url = await fileStorage.uploadFreightContract(entry.file, osKey, 0);
+          const savedId = await db.saveFreightContract({
+            fileName: entry.file.name, fileUrl: url, contractNumber: osKey,
+            container: parsedData.container, tripOs: parsedData.container,
+            destination: parsedData.localidade,
+            driverName: parsedData.motorista, status: 'unlinked',
+          });
+          if (!savedId) throw new Error('Falha ao salvar contrato no banco de dados');
+          const newFc: FreightContract = {
+            id: savedId, fileName: entry.file.name, fileUrl: url, contractNumber: osKey,
+            container: parsedData.container, tripOs: parsedData.container,
+            destination: parsedData.localidade, driverName: parsedData.motorista,
+            status: 'unlinked', uploadedAt: uploadDate.toISOString(),
           };
-          await db.saveStandaloneContract(standalone);
-          setStandaloneContracts(prev => [standalone, ...prev]);
+          setUnlinkedFreightContracts(prev => [newFc, ...prev]);
         }
         patch(entry.id, { status: 'done' });
       } catch (err: any) {
@@ -705,15 +716,26 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
   // ── History ───────────────────────────────────────────────────────────────────
   const contractHistory = useMemo(() => {
-    const items: { trip: Trip | null; standalone: StandaloneContract | null; doc: FreightContractDoc | StandaloneContract }[] = [];
+    const items: { trip: Trip | null; standalone: StandaloneContract | null; isUnlinkedFc: boolean; doc: FreightContractDoc | StandaloneContract }[] = [];
     for (const t of trips) {
-      for (const doc of activeDocs(t)) items.push({ trip: t, standalone: null, doc });
+      for (const doc of activeDocs(t)) items.push({ trip: t, standalone: null, isUnlinkedFc: false, doc });
     }
     for (const s of standaloneContracts) {
-      items.push({ trip: null, standalone: s, doc: s });
+      items.push({ trip: null, standalone: s, isUnlinkedFc: false, doc: s });
+    }
+    for (const fc of unlinkedFreightContracts) {
+      const asSA: StandaloneContract = {
+        id: fc.id,
+        code: fc.container || fc.tripOs || fc.contractNumber || fc.id,
+        url: fc.fileUrl || '',
+        fileName: fc.fileName,
+        uploadDate: fc.uploadedAt,
+        parsedData: { container: fc.container, localidade: fc.destination, motorista: fc.driverName },
+      };
+      items.push({ trip: null, standalone: asSA, isUnlinkedFc: true, doc: asSA });
     }
     return items.sort((a, b) => new Date(b.doc.uploadDate).getTime() - new Date(a.doc.uploadDate).getTime());
-  }, [trips, standaloneContracts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trips, standaloneContracts, unlinkedFreightContracts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredHistory = useMemo(() => {
     if (!historySearch.trim()) return contractHistory;
@@ -724,7 +746,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       ((doc as any).parsedData?.container || '').toLowerCase().includes(q) ||
       (trip?.customer?.name || '').toLowerCase().includes(q) ||
       ((doc as any).parsedData?.motorista || '').toLowerCase().includes(q) ||
-      (standalone?.code || '').toLowerCase().includes(q)
+      (standalone?.code || '').toLowerCase().includes(q) ||
+      (standalone?.parsedData?.motorista || '').toLowerCase().includes(q)
     );
   }, [contractHistory, historySearch]);
 
@@ -1134,7 +1157,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             ) : (
               <>
               <div className="space-y-2">
-                {filteredHistory.slice((historyPage - 1) * 10, historyPage * 10).map(({ trip, standalone, doc }) => (
+                {filteredHistory.slice((historyPage - 1) * 10, historyPage * 10).map(({ trip, standalone, isUnlinkedFc, doc }) => (
                   <div key={doc.id} className={`flex items-center gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm hover:border-slate-200 transition-colors ${standalone ? 'border-amber-100' : 'border-slate-100'}`}>
                     {/* PDF thumbnail */}
                     <PDFThumbnail url={doc.url} docId={doc.id}/>
@@ -1209,8 +1232,13 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
                           if (standalone) {
                             setDeletingDocId(doc.id);
                             try { await fileStorage.deleteFile(standalone.url); } catch { /* ignore */ }
-                            await db.deleteStandaloneContract(standalone.id);
-                            setStandaloneContracts(prev => prev.filter(s => s.id !== standalone.id));
+                            if (isUnlinkedFc) {
+                              await db.deleteFreightContract(standalone.id);
+                              setUnlinkedFreightContracts(prev => prev.filter(fc => fc.id !== standalone.id));
+                            } else {
+                              await db.deleteStandaloneContract(standalone.id);
+                              setStandaloneContracts(prev => prev.filter(s => s.id !== standalone.id));
+                            }
                             setDeletingDocId(null);
                           } else if (trip) {
                             handleDeleteDoc(trip, doc.id);
