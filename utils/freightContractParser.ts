@@ -16,6 +16,7 @@ export interface ParsedFreightContract {
   localidade?: string;    // destino ou origem (exceto Guarujá/Santos)
   motorista?: string;
   container?: string;     // primeiro container
+  osNumber?: string;      // número de OS encontrado no PDF
 }
 
 async function getPdfjsLib() {
@@ -181,6 +182,14 @@ export function parseFreightContractText(text: string): ParsedFreightContract {
     const fallback = text.match(/\b([A-Z]{4})[\s\-]?(\d{6,7})\b/);
     if (fallback) result.container = normCtn(fallback[1] + fallback[2]);
   }
+
+  // ── Número de OS ──────────────────────────────────────────────────────────────
+  // Cobre: "O.S.: 6ALC588885A", "OS: 12345", "Ordem de Serviço: 6ALC588885A"
+  // OS da ALS é alfanumérico (ex: 6ALC588885A) ou numérico (ex: 12345)
+  const osMatch = text.match(
+    /(?:O\.?\s*S\.?|Ordem\s+de\s+Servi[cç]o)[\s:]+([A-Z0-9]{4,15})/i
+  );
+  if (osMatch) result.osNumber = osMatch[1].trim().toUpperCase();
 
   return result;
 }

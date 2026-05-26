@@ -113,7 +113,7 @@ type SendTo = 'driver' | 'beneficiary' | 'group';
 interface StandaloneContract {
   id: string; code: string; url: string; fileName: string;
   uploadDate: string; expiresAt?: string;
-  parsedData?: { prevTermino?: string; localidade?: string; motorista?: string; container?: string };
+  parsedData?: { prevTermino?: string; localidade?: string; motorista?: string; container?: string; osNumber?: string };
 }
 
 const genContractCode = () => {
@@ -131,7 +131,7 @@ interface FileEntry {
   status: FileStatus;
   errorMsg?: string;
   compressed: boolean;
-  parsed: { prevTermino: string; localidade: string; motorista: string; container: string };
+  parsed: { prevTermino: string; localidade: string; motorista: string; container: string; osNumber: string };
   linkedTripId: string | null;
   linkedDriverId: string | null;
   autoMatched: boolean;
@@ -487,31 +487,34 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   // ── Auto-match logic — busca em TODAS as viagens, não só elegíveis ───────────
   const findAutoMatch = useCallback((parsed: FileEntry['parsed']): string | null => {
     const norm = normAccent;
-    // Strip espaços/hífens/pontos para comparar container (ISO 6346 pode ter variações)
     const normCtn = (s: string) => s.toUpperCase().replace(/[\s\-_.]/g, '');
 
     // Verifica se a localidade do contrato não contradiz o destino da viagem
     const locMatches = (t: Trip): boolean => {
-      if (!parsed.localidade) return true; // sem localidade → não contradiz
+      if (!parsed.localidade) return true;
       const words = norm(parsed.localidade).split(/[\s\-]+/).filter(w => w.length >= 3);
       if (!words.length) return true;
       const dest = norm(t.destination?.name || t.customer?.name || '');
-      if (!dest) return true; // viagem sem destino → não contradiz
-      return words.length >= 2
-        ? words.slice(0, 2).every(w => dest.includes(w))
-        : words.some(w => dest.includes(w));
+      if (!dest) return true;
+      return words.some(w => dest.includes(w));
     };
+
+    // Prioridade 0: OS extraída do PDF bate exatamente com OS da viagem
+    if (parsed.osNumber) {
+      const normOS = parsed.osNumber.toUpperCase().trim();
+      const hit = trips.find(t => t.os && t.os.toUpperCase().trim() === normOS);
+      if (hit) return hit.id;
+    }
 
     // Prioridade 1: container + localidade ambos conferem
     if (parsed.container && parsed.localidade) {
-      const loc0 = norm(parsed.localidade.split(' ')[0]);
+      const loc0 = norm(parsed.localidade.split(/[\s\-]+/).filter(w => w.length >= 3)[0] || parsed.localidade.split(' ')[0]);
       const hits = trips.filter(t =>
         t.container && normCtn(t.container) === normCtn(parsed.container) &&
         t.destination?.name && norm(t.destination.name).includes(loc0)
       );
       if (hits.length === 1) return hits[0].id;
       if (hits.length > 1) {
-        // Desambigua pelo nome do motorista
         if (parsed.motorista) {
           const mot0 = norm(parsed.motorista.split(' ')[0]);
           const narrow = hits.filter(t => t.driver?.name && norm(t.driver.name).includes(mot0));
@@ -521,16 +524,30 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       }
     }
 
-    // Prioridade 2: container apenas — só vincula se localidade não contradiz destino
+    // Prioridade 2: container apenas (aceita qualquer localidade que não contradiga)
     if (parsed.container) {
       const hits = trips.filter(t => t.container && normCtn(t.container) === normCtn(parsed.container));
-      if (hits.length === 1 && locMatches(hits[0])) return hits[0].id;
+      if (hits.length === 1) return hits[0].id;
+      if (hits.length > 1) {
+        // Filtra por localidade para desambiguar
+        const narrowed = hits.filter(t => locMatches(t));
+        if (narrowed.length === 1) return narrowed[0].id;
+        // Filtra também por motorista
+        if (parsed.motorista) {
+          const mot0 = norm(parsed.motorista.split(' ')[0]);
+          const byDriver = narrowed.filter(t => t.driver?.name && norm(t.driver.name).includes(mot0));
+          if (byDriver.length === 1) return byDriver[0].id;
+        }
+        // Escolhe o mais recente (maior data)
+        const sorted = [...hits].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+        if (locMatches(sorted[0])) return sorted[0].id;
+      }
     }
 
-    // Prioridade 3: motorista + localidade
+    // Prioridade 3: motorista + localidade (sem container)
     if (parsed.motorista && parsed.localidade) {
       const mot0 = norm(parsed.motorista.split(' ')[0]);
-      const loc0 = norm(parsed.localidade.split(' ')[0]);
+      const loc0 = norm(parsed.localidade.split(/[\s\-]+/).filter(w => w.length >= 3)[0] || parsed.localidade.split(' ')[0]);
       const hits = trips.filter(t =>
         t.driver?.name && norm(t.driver.name).includes(mot0) &&
         t.destination?.name && norm(t.destination.name).includes(loc0)
@@ -538,7 +555,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       if (hits.length === 1) return hits[0].id;
     }
 
-    // Prioridade 4: motorista apenas — só vincula se localidade não contradiz destino
+    // Prioridade 4: motorista apenas — só vincula se for o único e localidade não contradiz
     if (parsed.motorista) {
       const mot0 = norm(parsed.motorista.split(' ')[0]);
       const hits = trips.filter(t => t.driver?.name &&
@@ -572,7 +589,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     const id = `fc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setEntries(prev => [...prev, {
       id, file, originalSize: file.size, status: 'parsing', compressed: false,
-      parsed: { prevTermino: '', localidade: '', motorista: '', container: '' },
+      parsed: { prevTermino: '', localidade: '', motorista: '', container: '', osNumber: '' },
       linkedTripId: null, linkedDriverId: null, autoMatched: false, autoMatchedDriver: false,
     }]);
     try {
@@ -585,6 +602,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
         localidade: parsed.localidade || '',
         motorista: parsed.motorista || '',
         container: parsed.container || '',
+        osNumber: parsed.osNumber || '',
       };
       const autoTripId = findAutoMatch(parsedFilled);
       const autoDriverId = !autoTripId ? findDriverMatch(parsedFilled) : null;
@@ -618,6 +636,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
           localidade: entry.parsed.localidade || undefined,
           motorista: entry.parsed.motorista || undefined,
           container: entry.parsed.container || undefined,
+          osNumber: entry.parsed.osNumber || undefined,
         };
 
         if (entry.linkedTripId) {
