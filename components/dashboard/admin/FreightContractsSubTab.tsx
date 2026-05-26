@@ -672,15 +672,20 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             } catch { /* non-critical */ }
           }
         } else {
-          // Sem vínculo: usa container como identificador e salva em standalone_freight_contracts
-          const code = parsedData.container || genContractCode();
-          const url = await fileStorage.uploadFreightContract(entry.file, code, 0);
+          // Sem vínculo: gera código SEM-OS-{container ou rand} e salva em standalone_freight_contracts
+          const d = uploadDate;
+          const pad = (n: number) => String(n).padStart(2, '0');
+          const datePart = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+          const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+          const ctnPart = parsedData.container ? parsedData.container.replace(/[\s\-_.]/g, '').toUpperCase() : rand;
+          const code = `SEM-OS-${ctnPart}-${datePart}`;
+          const url = await fileStorage.uploadFreightContract(entry.file, `sem_os_${ctnPart}`, 0);
           const standalone: StandaloneContract = {
             id: entry.id, code, url, fileName: entry.file.name,
             uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(), parsedData,
           };
           const saved = await db.saveStandaloneContract(standalone);
-          if (!saved) throw new Error('Falha ao salvar contrato avulso. Verifique as permissões do banco.');
+          if (!saved) throw new Error('Falha ao salvar contrato avulso (sem OS). Verifique o console do banco.');
           const refreshed = await db.getStandaloneContracts();
           setStandaloneContracts(refreshed);
         }
