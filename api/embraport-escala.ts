@@ -31,6 +31,30 @@ function extractHiddenField(html: string, fieldName: string): string {
   return m ? decodeURIComponent(m[1].replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))) : '';
 }
 
+// ── Find the "Todos" tab __doPostBack EventTarget ─────────────────────────────
+// The Embraport page has tabs: Previstos | Em Operação | Desatracados | Detidos | Todos
+// Default tab is "Previstos" which may be empty. We need to navigate to "Todos".
+// ASP.NET WebForms tabs use __doPostBack('EventTarget','') anchors.
+
+function findTodosTarget(html: string): { target: string; arg: string } | null {
+  // Scan every __doPostBack href/onclick and check if "Todos" appears right after it (within 250 chars)
+  const re = /(?:href|onclick)="javascript:__doPostBack\('([^']+)','([^']*)'\)"/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const after = html.slice(m.index, m.index + m[0].length + 250);
+    if (/>\s*Todos\s*</i.test(after)) return { target: m[1], arg: m[2] };
+  }
+  // Reverse scan: "Todos" link text first, then __doPostBack within 250 chars before it
+  const re2 = />\s*Todos\s*</gi;
+  let m2;
+  while ((m2 = re2.exec(html)) !== null) {
+    const before = html.slice(Math.max(0, m2.index - 250), m2.index + m2[0].length);
+    const pbMatch = before.match(/javascript:__doPostBack\('([^']+)','([^']*)'\)[^>]*$/i);
+    if (pbMatch) return { target: pbMatch[1], arg: pbMatch[2] };
+  }
+  return null;
+}
+
 // ── Parse one page of the table ───────────────────────────────────────────────
 
 function parseTable(html: string): any[] {
@@ -50,25 +74,25 @@ function parseTable(html: string): any[] {
     const navio = cells[0]?.trim();
     if (!navio || navio.toLowerCase() === 'navio') continue;
 
-    // Column order (from Embraport site):
+    // Column order (confirmed from site screenshot):
     // 0:Navio 1:Viagem 2:Visita 3:Armador 4:Serviço 5:Berço
-    // 6:Chegada / Prev.Abertura Gate 7:Abertura Gate 8:Deadline
-    // 9:Prev.Chegada 10:Prev.Atracação 11:Prev.Saída 12:Detalhes
+    // 6:Chegada 7:Prev.Abertura Gate 8:Abertura Gate 9:Deadline(Armador)
+    // 10:Prev.Chegada 11:Prev.Atracação 12:Prev.Saída 13:Detalhes
     rows.push({
       terminal:      'EMBRAPORT',
       navio:         navio.toUpperCase(),
-      situacao:      'Previsto',      // updated below via mapping in frontend
+      situacao:      'Previsto',
       viagem:        cells[1]  || '',
-      rap:           cells[2]  || '',  // Visita/RAP code
+      rap:           cells[2]  || '',
       armador:       cells[3]  || '',
       servico:       cells[4]  || '',
       berco:         cells[5]  || '',
-      gateDry:       cells[6]  || '',  // Chegada / Prev. Abertura Gate
-      gateReefer:    cells[7]  || '',  // Abertura Gate (real)
-      deadLineStr:   cells[8]  || '',
-      dtPrevChegada: cells[9]  || '',
-      dtPrevAtrac:   cells[10] || '',
-      dtPrevSaida:   cells[11] || '',
+      dtChegada:     cells[6]  || '',  // Chegada real
+      gateDry:       cells[8]  || '',  // Abertura Gate (real)
+      deadLineStr:   cells[9]  || '',  // Deadline (Armador)
+      dtPrevChegada: cells[10] || '',
+      dtPrevAtrac:   cells[11] || '',
+      dtPrevSaida:   cells[12] || '',
       fetchedAt:     new Date().toISOString(),
     });
   }
@@ -76,14 +100,49 @@ function parseTable(html: string): any[] {
   return rows;
 }
 
-// ── Fetch all pages via ASP.NET WebForms pagination ───────────────────────────
+// ── POST helper ───────────────────────────────────────────────────────────────
+
+async function postForm(html: string, eventTarget: string, eventArg: string): Promise<string | null> {
+  const viewState    = extractHiddenField(html, '__VIEWSTATE');
+  const viewStateGen = extractHiddenField(html, '__VIEWSTATEGENERATOR');
+  const eventVal     = extractHiddenField(html, '__EVENTVALIDATION');
+
+  if (!viewState) return null;
+
+  const body = new URLSearchParams();
+  body.append('__EVENTTARGET',   eventTarget);
+  body.append('__EVENTARGUMENT', eventArg);
+  body.append('__VIEWSTATE',     viewState);
+  if (viewStateGen) body.append('__VIEWSTATEGENERATOR', viewStateGen);
+  if (eventVal)     body.append('__EVENTVALIDATION',    eventVal);
+
+  try {
+    const res = await fetch(BASE_URL, {
+      method: 'POST',
+      headers: {
+        ...HEADERS,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': 'http://www.embraportonline.com.br',
+      },
+      body: body.toString(),
+      redirect: 'follow',
+      signal: AbortSignal.timeout(25000),
+    });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
+// ── Fetch all pages (GET → navigate to Todos → paginate) ─────────────────────
 
 async function fetchAllPages(): Promise<{ rows: any[]; pages: number; error?: string }> {
   const allRows: any[] = [];
   let pagesCount = 0;
 
   try {
-    // ── Page 1: GET ──────────────────────────────────────────────────────────
+    // ── Step 1: GET initial page ─────────────────────────────────────────────
     const res1 = await fetch(BASE_URL, {
       method: 'GET',
       headers: HEADERS,
@@ -96,73 +155,56 @@ async function fetchAllPages(): Promise<{ rows: any[]; pages: number; error?: st
     }
 
     let currentHtml = await res1.text();
+
+    // ── Step 2: Navigate to "Todos" tab ──────────────────────────────────────
+    // The default tab "Previstos" may be empty if all ships already arrived.
+    // Find the "Todos" tab's __doPostBack EventTarget and POST to switch to it.
+    const todosInfo = findTodosTarget(currentHtml);
+    if (todosInfo) {
+      const todosHtml = await postForm(currentHtml, todosInfo.target, todosInfo.arg);
+      if (todosHtml && todosHtml.length > 500) {
+        currentHtml = todosHtml;
+      }
+    }
+
+    // ── Step 3: Parse first page ─────────────────────────────────────────────
     const firstPageRows = parseTable(currentHtml);
     allRows.push(...firstPageRows);
     pagesCount++;
 
     if (firstPageRows.length === 0) {
-      // Possibly empty / blocked — return what we have
       return { rows: allRows, pages: pagesCount, error: 'Nenhum navio encontrado na primeira página' };
     }
 
-    // ── Paginate: POST with ASP.NET __doPostBack ─────────────────────────────
-    const MAX_PAGES = 60; // safety cap (60 × 10 = 600 ships max)
+    // ── Step 4: Paginate via ASP.NET __doPostBack ────────────────────────────
+    const MAX_PAGES = 60;
     let pageNum = 2;
 
     while (pageNum <= MAX_PAGES) {
-      // Stop if there's no link to this page in the pagination strip
       if (!currentHtml.includes(`Page$${pageNum}`)) break;
 
-      // Extract ASP.NET hidden fields from the CURRENT page response
-      const viewState     = extractHiddenField(currentHtml, '__VIEWSTATE');
-      const viewStateGen  = extractHiddenField(currentHtml, '__VIEWSTATEGENERATOR');
-      const eventVal      = extractHiddenField(currentHtml, '__EVENTVALIDATION');
-
-      if (!viewState) break; // page has no form state — stop
-
-      // Find the grid control that handles pagination
-      // Pattern: javascript:__doPostBack('ctl00$...','Page$N')
       const evtMatch = currentHtml.match(/javascript:__doPostBack\('([^']+)','Page\$\d+'\)/);
       if (!evtMatch) break;
       const eventTarget = evtMatch[1];
 
-      // Build form body
-      const formBody = new URLSearchParams();
-      formBody.append('__EVENTTARGET',        eventTarget);
-      formBody.append('__EVENTARGUMENT',      `Page$${pageNum}`);
-      formBody.append('__VIEWSTATE',          viewState);
-      if (viewStateGen) formBody.append('__VIEWSTATEGENERATOR', viewStateGen);
-      if (eventVal)     formBody.append('__EVENTVALIDATION',    eventVal);
+      const nextHtml = await postForm(currentHtml, eventTarget, `Page$${pageNum}`);
+      if (!nextHtml) break;
 
-      const resN = await fetch(BASE_URL, {
-        method: 'POST',
-        headers: {
-          ...HEADERS,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Origin': 'http://www.embraportonline.com.br',
-        },
-        body: formBody.toString(),
-        redirect: 'follow',
-        signal: AbortSignal.timeout(25000),
-      });
-
-      if (!resN.ok) break;
-
-      currentHtml = await resN.text();
+      currentHtml = nextHtml;
       const pageRows = parseTable(currentHtml);
-
-      if (pageRows.length === 0) break; // empty page — we're done
+      if (pageRows.length === 0) break;
 
       allRows.push(...pageRows);
       pagesCount++;
       pageNum++;
     }
 
-    // Deduplicate by navio name (same ship may appear in multiple status tabs)
+    // Deduplicate by navio+viagem
     const seen = new Set<string>();
     const unique = allRows.filter(r => {
-      if (seen.has(r.navio)) return false;
-      seen.add(r.navio);
+      const key = `${r.navio}|${r.viagem}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
 
@@ -178,7 +220,6 @@ async function saveToSupabase(rows: any[], supabaseUrl: string, supabaseKey: str
   if (rows.length === 0) return { saved: 0 };
 
   try {
-    // Delete old EMBRAPORT rows first
     await fetch(`${supabaseUrl}/rest/v1/terminal_vessels?terminal=eq.EMBRAPORT`, {
       method: 'DELETE',
       headers: {
@@ -188,7 +229,6 @@ async function saveToSupabase(rows: any[], supabaseUrl: string, supabaseKey: str
       },
     });
 
-    // Insert new rows
     const snakeRows = rows.map(r => ({
       terminal:        r.terminal,
       navio:           r.navio,
@@ -201,6 +241,7 @@ async function saveToSupabase(rows: any[], supabaseUrl: string, supabaseKey: str
       gate_dry:        r.gateDry       || null,
       gate_reefer:     r.gateReefer    || null,
       dead_line_str:   r.deadLineStr   || null,
+      dt_chegada:      r.dtChegada     || null,
       dt_prev_chegada: r.dtPrevChegada || null,
       dt_prev_atrac:   r.dtPrevAtrac   || null,
       dt_prev_saida:   r.dtPrevSaida   || null,
@@ -243,19 +284,17 @@ export default async function handler(req: Request) {
 
   const { rows: allRows, pages: pagesCount, error: fetchError } = await fetchAllPages();
 
-  // Hard failure — nothing fetched and there was an error
   if (fetchError && allRows.length === 0) {
     return new Response(JSON.stringify({
       ok: false,
       error: fetchError,
-      hint: 'O servidor da EMBRAPORT pode estar bloqueando requisições externas. Tente executar a partir de uma rede brasileira.',
+      hint: 'Embraport pode estar bloqueando requisições ou a aba "Todos" não foi encontrada.',
     }), {
       status: 502,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
 
-  // Save to Supabase if credentials available
   let saveResult: { saved: number; error?: string } = { saved: 0 };
   if (supabaseUrl && supabaseKey && allRows.length > 0) {
     saveResult = await saveToSupabase(allRows, supabaseUrl, supabaseKey);
@@ -267,7 +306,7 @@ export default async function handler(req: Request) {
     pages: pagesCount,
     saved: saveResult.saved,
     vessels: allRows,
-    errors:    fetchError  ? [fetchError]         : undefined,
+    errors:    fetchError   ? [fetchError]        : undefined,
     saveError: saveResult.error,
     fetchedAt: new Date().toISOString(),
   }), {

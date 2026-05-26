@@ -369,10 +369,16 @@ async function scrapeSantosBrasil(): Promise<{ vessels: Vessel[]; error?: string
 
   const cookieHeader: Record<string, string> = sessionCookies ? { Cookie: sessionCookies } : {};
 
-  // 3) Endpoints JSON modernos
+  // 3) Endpoints JSON modernos — "Recebimento de Exportação" e "Lista de Atracação"
   const jsonVariants = [
+    // Aba "Recebimento de Exportação" (tem Gate Dry / Reefer / Deadline)
+    'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/pesquisa?unidade=tecon-santos&lista=recebimento-de-exportacao',
+    'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/pesquisa?unidade=tecon-santos&lista=recebimento-de-exportacao&pagina=1&itensPorPagina=200',
+    // Aba "Lista de Atracação" (ETA / ATA)
     'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/pesquisa?unidade=tecon-santos',
     'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/pesquisa?unidade=tecon-santos&pagina=1&itensPorPagina=200',
+    // Sem parâmetro de unidade (fallback genérico)
+    'https://www.santosbrasil.com.br/v2021/lista-de-atracacao/pesquisa',
   ];
 
   const lastErrors: string[] = [];
