@@ -924,7 +924,7 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
           tollGoing:     acc.tollGoing     + v.tollGoing,
           tollReturning: acc.tollReturning + v.tollReturning,
           repasse:       acc.repasse       + (v.repasse ?? 0),
-          total:         acc.total         + v.freight + v.tollGoing + v.tollReturning + (v.repasse ?? 0),
+          total:         acc.total         + (v.repasse ?? 0),
         };
       },
       { freight: 0, tollGoing: 0, tollReturning: 0, repasse: 0, total: 0 }
@@ -1215,7 +1215,7 @@ const CalculatorView: React.FC<CalculatorViewProps> = ({ routes, vehicleTypes })
                 {visibleTypes.map(vt => {
                   const v = selectedRoute.vehicleValues[vt.code];
                   const rep = v?.repasse ?? 0;
-                  const total = (v?.freight ?? 0) + (v?.tollGoing ?? 0) + (v?.tollReturning ?? 0) + rep;
+                  const total = rep;
                   return (
                     <tr key={vt.code} className="hover:bg-blue-50/30 transition-colors">
                       <td className="px-5 py-4">
