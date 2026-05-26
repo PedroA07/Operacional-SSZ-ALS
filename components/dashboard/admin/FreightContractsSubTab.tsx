@@ -444,6 +444,9 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   const [recipientSearch, setRecipientSearch] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
   const [viewerDoc, setViewerDoc] = useState<{ url: string; title: string } | null>(null);
+  const [linkingStandaloneId, setLinkingStandaloneId] = useState<string | null>(null);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkingInProgress, setLinkingInProgress] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -745,6 +748,36 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       alert(`Erro ao excluir: ${e?.message || 'desconhecido'}`);
     } finally {
       setDeletingDocId(null);
+    }
+  };
+
+  // ── Link standalone → viagem ─────────────────────────────────────────────────
+  const handleLinkToTrip = async (standalone: StandaloneContract, trip: Trip) => {
+    setLinkingInProgress(true);
+    try {
+      const doc: FreightContractDoc = {
+        id: standalone.id,
+        type: 'CONTRATO_FRETE',
+        url: standalone.url,
+        fileName: standalone.fileName,
+        uploadDate: standalone.uploadDate,
+        expiresAt: standalone.expiresAt,
+        parsedData: standalone.parsedData,
+      };
+      const existing = activeDocs(trip);
+      await onUpdate({
+        ...trip,
+        freightContractDoc: [...existing, doc][0] as TripDocument,
+        freightContractDocs: [...existing, doc],
+      });
+      await db.deleteStandaloneContract(standalone.id);
+      setStandaloneContracts(prev => prev.filter(s => s.id !== standalone.id));
+      setLinkingStandaloneId(null);
+      setLinkSearch('');
+    } catch (e: any) {
+      alert(`Erro ao vincular: ${e?.message || 'desconhecido'}`);
+    } finally {
+      setLinkingInProgress(false);
     }
   };
 
@@ -1236,6 +1269,74 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
+                      {/* Botão Vincular — só para standalone */}
+                      {standalone && (
+                        <div className="relative">
+                          <button
+                            onClick={() => {
+                              setLinkingStandaloneId(linkingStandaloneId === standalone.id ? null : standalone.id);
+                              setLinkSearch('');
+                            }}
+                            title="Vincular a uma viagem"
+                            className={`p-1.5 rounded-xl transition-colors ${linkingStandaloneId === standalone.id ? 'bg-green-100 text-green-600' : 'text-green-400 hover:bg-green-50'}`}
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                            </svg>
+                          </button>
+                          {linkingStandaloneId === standalone.id && (
+                            <div className="absolute right-0 top-8 z-50 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 space-y-2">
+                              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Vincular a uma OS</p>
+                              <input
+                                autoFocus
+                                type="text"
+                                value={linkSearch}
+                                onChange={e => setLinkSearch(e.target.value)}
+                                placeholder="Buscar por OS ou motorista…"
+                                className="w-full text-[9px] font-bold border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-green-400 placeholder:text-slate-300"
+                              />
+                              <div className="max-h-48 overflow-y-auto space-y-1">
+                                {trips
+                                  .filter(t => {
+                                    if (!linkSearch.trim()) return true;
+                                    const q = linkSearch.toLowerCase();
+                                    return t.os.toLowerCase().includes(q) ||
+                                      (t.driver?.name || '').toLowerCase().includes(q) ||
+                                      (t.container || '').toLowerCase().includes(q) ||
+                                      (t.destination?.name || '').toLowerCase().includes(q);
+                                  })
+                                  .slice(0, 20)
+                                  .map(t => (
+                                    <button
+                                      key={t.id}
+                                      disabled={linkingInProgress}
+                                      onClick={() => handleLinkToTrip(standalone, t)}
+                                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-green-50 transition-colors disabled:opacity-50"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-blue-700 font-mono shrink-0">{t.os}</span>
+                                        <span className="text-[8px] font-bold text-slate-500 truncate">{t.driver?.name}</span>
+                                      </div>
+                                      {(t.destination?.name || t.container) && (
+                                        <div className="flex gap-1.5 mt-0.5">
+                                          {t.destination?.name && <span className="text-[7px] text-slate-400 truncate">{t.destination.name}</span>}
+                                          {t.container && <span className="text-[7px] font-mono text-slate-400">{t.container}</span>}
+                                        </div>
+                                      )}
+                                    </button>
+                                  ))}
+                                {trips.filter(t => {
+                                  if (!linkSearch.trim()) return true;
+                                  const q = linkSearch.toLowerCase();
+                                  return t.os.toLowerCase().includes(q) || (t.driver?.name || '').toLowerCase().includes(q) || (t.container || '').toLowerCase().includes(q) || (t.destination?.name || '').toLowerCase().includes(q);
+                                }).length === 0 && (
+                                  <p className="text-[9px] text-slate-300 text-center py-4">Nenhuma viagem encontrada</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <button
                         onClick={() => {
                           const label = standalone ? standalone.code : `OS ${trip?.os}`;
