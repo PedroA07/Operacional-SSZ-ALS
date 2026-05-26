@@ -662,17 +662,14 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             status: 'linked',
           });
           // Atualiza data e local do último contrato no motorista
-          if (onUpdateDriver && trip.driver?.id) {
-            const driverToUpdate = drivers.find(d => d.id === trip.driver.id);
-            if (driverToUpdate) {
-              try {
-                await onUpdateDriver({
-                  ...driverToUpdate,
-                  lastFreightContractDate: uploadDate.toISOString().slice(0, 10),
-                  lastFreightContractLocation: trip.destination?.name ?? trip.customer?.name ?? driverToUpdate.lastFreightContractLocation,
-                });
-              } catch { /* non-critical */ }
-            }
+          if (trip.driver?.id) {
+            try {
+              await db.updateDriverLastFreightContract(
+                trip.driver.id,
+                uploadDate.toISOString().slice(0, 10),
+                trip.destination?.name ?? trip.customer?.name,
+              );
+            } catch { /* non-critical */ }
           }
         } else if (entry.linkedDriverId) {
           // Vínculo apenas com motorista (sem viagem específica)
@@ -696,13 +693,13 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             parsedData: { ...parsedData, motorista: parsedData.motorista || driver?.name },
           };
           await db.saveStandaloneContract(standaloneDriver);
-          if (onUpdateDriver && driver) {
+          if (driver?.id) {
             try {
-              await onUpdateDriver({
-                ...driver,
-                lastFreightContractDate: uploadDate.toISOString().slice(0, 10),
-                lastFreightContractLocation: parsedData.localidade ?? driver.lastFreightContractLocation,
-              });
+              await db.updateDriverLastFreightContract(
+                driver.id,
+                uploadDate.toISOString().slice(0, 10),
+                parsedData.localidade,
+              );
             } catch { /* non-critical */ }
           }
           const refreshed2 = await db.getStandaloneContracts();
@@ -771,6 +768,15 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
         freightContractDocs: [...existing, doc],
       });
       await db.deleteStandaloneContract(standalone.id);
+      if (trip.driver?.id) {
+        try {
+          await db.updateDriverLastFreightContract(
+            trip.driver.id,
+            new Date(standalone.uploadDate).toISOString().slice(0, 10),
+            trip.destination?.name ?? trip.customer?.name,
+          );
+        } catch { /* non-critical */ }
+      }
       setStandaloneContracts(prev => prev.filter(s => s.id !== standalone.id));
       setLinkingStandaloneId(null);
       setLinkSearch('');

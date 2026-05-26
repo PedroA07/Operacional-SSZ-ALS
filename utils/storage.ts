@@ -204,6 +204,15 @@ export const db = {
   saveDriver: (d: Driver, user?: User) => driverRepository.save(supabase!, d),
   deleteDriver: (id: string) => driverRepository.delete(supabase!, id),
 
+  updateDriverLastFreightContract: async (driverId: string, date: string, location?: string) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('drivers').update({
+      last_freight_contract_date: date,
+      last_freight_contract_location: location?.trim() || null,
+    }).eq('id', driverId);
+    if (error) console.error('[updateDriverLastFreightContract]', error.message);
+  },
+
   getCustomers: async (): Promise<Customer[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('customers').select('*').order('name');
