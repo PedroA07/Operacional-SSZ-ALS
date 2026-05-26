@@ -57,7 +57,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
     agencia: '',
     tipo: '40HC',
     padrao: 'CARGA GERAL',
-    tipoOperacao: 'EXPORTAÇÃO',
+    tipoOperacao: '',
     autColeta: '',
     embarcador: '',
     horarioAgendado: localDateTimeStr(),
@@ -80,24 +80,6 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       const opTypes = await db.getOperationTypes();
       if (opTypes && opTypes.length > 0) {
         setOperationTypes(opTypes);
-        if (!initialData) {
-          const savedDefault = localStorage.getItem('defaultOperationType');
-          const defaultOp = savedDefault
-            ? opTypes.find((t: any) => t.id === savedDefault)
-            : opTypes[0];
-          if (defaultOp) {
-            const autoCategory = (() => {
-              if (!defaultOp.config?.defaultCategoryId) return '';
-              const cat = c.find((cat: any) => cat.id === defaultOp.config.defaultCategoryId);
-              return cat?.name?.toUpperCase() || '';
-            })();
-            setFormData((prev: any) => ({
-              ...prev,
-              tipoOperacao: defaultOp.name,
-              ...(autoCategory && !prev.category ? { category: autoCategory } : {}),
-            }));
-          }
-        }
       } else {
         setOperationTypes([
           {id: '1', name: 'EXPORTAÇÃO'},
@@ -188,6 +170,10 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   const startWorkflow = async (mode: 'download' | 'print') => {
     if (!formData.os || !formData.driverId || !formData.remetenteId) {
       alert("Preencha OS, Motorista e Cliente para prosseguir.");
+      return;
+    }
+    if (!formData.tipoOperacao) {
+      alert("Selecione o Tipo de Operação antes de prosseguir.");
       return;
     }
     if (!formData.category) {
@@ -307,11 +293,16 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
               <div className="space-y-1">
                  <label className={labelClass}>Tipo de Operação</label>
                  <CustomSelect
+                    required
                     value={formData.tipoOperacao}
                     onChange={v => handleInputChange('tipoOperacao', v)}
+                    placeholder="SELECIONE O TIPO..."
                     options={operationTypes.map(op => ({ value: op.name, label: op.name }))}
-                    inputClassName={selectClasses}
+                    inputClassName={`${selectClasses} ${!formData.tipoOperacao ? 'border-red-300' : ''}`}
                  />
+                 {!formData.tipoOperacao && (
+                   <p className="text-[8px] font-black text-red-500 uppercase mt-1 ml-1">Obrigatório</p>
+                 )}
               </div>
               <div className="space-y-1">
                  <label className={labelClass}>Vínculo Operacional</label>

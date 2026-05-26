@@ -90,6 +90,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
   const [plateHorse, setPlateHorse] = useState('');
   const [plateTrailer, setPlateTrailer] = useState('');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
+  const [mode, setMode] = useState<'viagem' | 'personalizado'>('viagem');
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
@@ -187,18 +188,29 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
     if (formData.seal) generate('ps-barcode-lacre', formData.seal);
   };
 
-  const startWorkflow = async (mode: 'download' | 'print') => {
-    if (!formData.os || !formData.destinatarioId) {
-      alert("Busque uma OS e selecione o Local de Entrega.");
-      return;
+  const startWorkflow = async (exportMode: 'download' | 'print') => {
+    if (mode === 'personalizado') {
+      if (!formData.os || !formData.driverId || !formData.remetenteId || !formData.destinatarioId) {
+        alert("Preencha OS, Motorista, Cliente e Local de Entrega.");
+        return;
+      }
+    } else {
+      if (!formData.os || !formData.destinatarioId) {
+        alert("Busque uma OS e selecione o Local de Entrega.");
+        return;
+      }
     }
     if (!formData.schedulingDate || !formData.schedulingTime) {
       alert("Informe a Data e Hora de Agendamento.");
       return;
     }
-    setPendingAction(mode);
-    const existing = await tripSyncService.findExistingTrip(formData.os);
-    await executeWorkflow(existing?.id || null);
+    setPendingAction(exportMode);
+    if (mode === 'personalizado') {
+      await executeWorkflow(null);
+    } else {
+      const existing = await tripSyncService.findExistingTrip(formData.os);
+      await executeWorkflow(existing?.id || null);
+    }
   };
 
   const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : null;
@@ -218,7 +230,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
         db.savePreStackingEmissao(formData, activeUser);
       }
 
-      if (effectiveDriver && selectedRemetente) {
+      if (mode !== 'personalizado' && effectiveDriver && selectedRemetente) {
          const schedulingDateTime = formData.schedulingDate && formData.schedulingTime
            ? `${formData.schedulingDate}T${formData.schedulingTime}:00`
            : undefined;
@@ -337,19 +349,36 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
           }}
         />
 
-        <div className="bg-emerald-50 p-6 rounded-[2.2rem] border border-emerald-100 shadow-sm space-y-4 mt-4">
+        {/* ── Toggle de modo ── */}
+        <div className="flex gap-1 p-1 bg-slate-200 rounded-2xl mt-4">
+          {([['viagem','Por Viagem'],['personalizado','Personalizado']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setMode(key)}
+              className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                mode === key ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {mode === 'viagem' ? (
+        <div className="bg-emerald-50 p-6 rounded-[2.2rem] border border-emerald-100 shadow-sm space-y-4">
            <div className="space-y-1">
               <label className={labelClass}>Busca por Ordem de Serviço</label>
               <div className="flex gap-2">
-                <input 
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white font-bold uppercase focus:border-emerald-500 outline-none transition-all shadow-sm" 
-                  value={osInput} 
-                  onChange={e => setOsInput(e.target.value.toUpperCase())} 
-                  placeholder="EX: 123ALC..." 
-                  onKeyDown={e => e.key === 'Enter' && handleOSLookup()} 
+                <input
+                  className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white font-bold uppercase focus:border-emerald-500 outline-none transition-all shadow-sm"
+                  value={osInput}
+                  onChange={e => setOsInput(e.target.value.toUpperCase())}
+                  placeholder="EX: 123ALC..."
+                  onKeyDown={e => e.key === 'Enter' && handleOSLookup()}
                 />
-                <button 
-                  onClick={() => handleOSLookup()} 
+                <button
+                  onClick={() => handleOSLookup()}
                   className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg active:scale-90 shrink-0 transition-transform"
                 >
                   {isLoadingTrip ? (
@@ -361,6 +390,83 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
               </div>
            </div>
         </div>
+        ) : (
+        <div className="bg-emerald-50 p-6 rounded-[2.2rem] border border-emerald-100 shadow-sm space-y-4">
+          <div className="space-y-1">
+            <label className={labelClass}>Ordem de Serviço <span className="text-red-500">*</span></label>
+            <input
+              className={inputClass}
+              value={formData.os}
+              onChange={e => setFormData({...formData, os: e.target.value.toUpperCase()})}
+              placeholder="EX: 123ALC..."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className={labelClass}>Container</label>
+              <input className={inputClass} value={formData.container} onChange={e => setFormData({...formData, container: e.target.value.toUpperCase()})} placeholder="EX: MSCU1234567" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Tipo</label>
+              <select
+                className={inputClass}
+                value={formData.tipo}
+                onChange={e => setFormData({...formData, tipo: e.target.value})}
+              >
+                {['20\'','40\'','40HC','45HC','20 REEFER','40 REEFER'].map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Tara</label>
+              <input className={inputClass} value={formData.tara} onChange={e => setFormData({...formData, tara: e.target.value.toUpperCase()})} placeholder="EX: 3800 KG" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Lacre</label>
+              <input className={inputClass} value={formData.seal} onChange={e => setFormData({...formData, seal: e.target.value.toUpperCase()})} placeholder="EX: SB123456" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Booking</label>
+              <input className={inputClass} value={formData.booking} onChange={e => setFormData({...formData, booking: e.target.value.toUpperCase()})} placeholder="Nº Booking" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Aut. Coleta</label>
+              <input className={inputClass} value={formData.autColeta} onChange={e => setFormData({...formData, autColeta: e.target.value.toUpperCase()})} placeholder="Nº Autorização" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Motorista <span className="text-red-500">*</span></label>
+            <select
+              className={inputClass}
+              value={formData.driverId}
+              onChange={e => {
+                const drv = drivers.find(d => d.id === e.target.value) || null;
+                setFormData({...formData, driverId: e.target.value});
+                setSelectedDriver(drv);
+                if (drv) { setPlateHorse(primaryHorse(drv)); setPlateTrailer(primaryTrailer(drv)); }
+              }}
+            >
+              <option value="">SELECIONAR MOTORISTA...</option>
+              {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Cliente / Remetente <span className="text-red-500">*</span></label>
+            <select
+              className={inputClass}
+              value={formData.remetenteId}
+              onChange={e => {
+                setFormData({...formData, remetenteId: e.target.value});
+                setSelectedRemetente(customers.find(c => c.id === e.target.value) || null);
+              }}
+            >
+              <option value="">SELECIONAR CLIENTE...</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+        </div>
+        )}
 
         <div className="space-y-4 bg-white p-6 rounded-[2.2rem] border border-slate-200 shadow-sm">
           <div className="space-y-1">
@@ -437,16 +543,16 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
         
         <div className="grid grid-cols-2 gap-4 pt-4">
            <button
-             disabled={isExporting || !formData.os}
+             disabled={isExporting || !formData.os || (mode === 'personalizado' && (!formData.driverId || !formData.remetenteId))}
              onClick={() => startWorkflow('print')}
              className="py-5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase hover:bg-emerald-50 transition-all flex items-center justify-center gap-3 active:scale-95"
            >
              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
              Imprimir
            </button>
-           <button 
-             disabled={isExporting || !formData.os} 
-             onClick={() => startWorkflow('download')} 
+           <button
+             disabled={isExporting || !formData.os || (mode === 'personalizado' && (!formData.driverId || !formData.remetenteId))}
+             onClick={() => startWorkflow('download')}
              className="py-5 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-emerald-700 shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95"
            >
              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>

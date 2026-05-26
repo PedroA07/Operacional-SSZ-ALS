@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { User, Trip, Ship, ShipStatus, ShipStatusEntry, TerminalVessel } from '../../../types';
+import { User, Trip, ShipStatus, TerminalVessel } from '../../../types';
 import { db, supabase } from '../../../utils/storage';
 import DateTimePicker from '../../shared/DateTimePicker';
 
@@ -54,8 +54,6 @@ const STATUS_CFG: Record<ShipStatus, { label: string; bg: string; text: string; 
 };
 
 const PANEL_STATUSES: ShipStatus[] = ['NOVO','NÃO ENCONTRADO','SEM PREVISÃO','GATE FECHADO','GATE ABERTO','AG. ATRACAÇÃO','ATRACADO','DESATRACADO'];
-const ALL_STATUSES: ShipStatus[]   = Object.keys(STATUS_CFG) as ShipStatus[];
-const TERMINALS_MANUAL             = ['BTP','ECOPORTO','SANTOS BRASIL','EMBRAPORT','OUTRO'];
 
 // ── TV filter ──────────────────────────────────────────────────────────────────
 type TVFilter = 'TODOS' | ShipStatus;
@@ -162,12 +160,6 @@ function gateTimeStr(v?: string | null): string {
   if (/^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}/.test(v)) return v.split(' ')[1].slice(0, 5);
   return '';
 }
-const emptyShip = (): Partial<Ship> => ({
-  name:'', imo:'', armador:'', viagem:'', terminal:'BTP', berco:'',
-  prevAtracacao:'', abertGate:'', deadLine:'', dataAtracacao:'', dataDesatrac:'',
-  status:'NOVO', observacoes:'', tripIds:[], statusHistory:[],
-});
-
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
 const I = {
   Ship:    (p:any) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 13l1.5 5.5A1 1 0 005.46 20h13.08a1 1 0 00.96-.5L21 13M3 13h18M3 13l2-8h14l2 8M12 3v10"/></svg>,
@@ -693,8 +685,6 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const [viewTab, setViewTab]         = useState<'programacao' | 'monitoramento'>('programacao');
 
   // Data
-  const [ships, setShips]             = useState<Ship[]>([]);
-  const [loadingShips, setLS]         = useState(true);
   const [termVessels, setTV]          = useState<TerminalVessel[]>([]);
   const [tvFetchedAt, setTVAt]        = useState<string|null>(null);
   const [loadingTV, setLTV]           = useState(true);
@@ -719,20 +709,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   // Trip detail modal
   const [detailTrip, setDetailTrip]   = useState<Trip|null>(null);
 
-  // Ship modal
-  const [modalOpen, setModalOpen]     = useState(false);
-  const [editing, setEditing]         = useState<Partial<Ship>>(emptyShip());
-  const [saving, setSaving]           = useState(false);
   const [scraping, setScraping]       = useState(false);
-  const [mErr, setMErr]               = useState<string|null>(null);
-  const [stModal, setStModal]         = useState(false);
-  const [stTarget, setStTarget]       = useState<Ship|null>(null);
-  const [newSt, setNewSt]             = useState<ShipStatus>('NOVO');
-  const [stObs, setStObs]             = useState('');
-
-
-  // Collapsibles
-  const [showMonit, setShowMonit]     = useState(true);
 
   // ── Filtro de tipos no Monitoramento ─────────────────────────────────────────
   const [showTypeConfig, setShowTypeConfig] = useState(false);
@@ -756,11 +733,6 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   };
 
   // ── Load ────────────────────────────────────────────────────────────────────
-  const loadShips = useCallback(async () => {
-    setLS(true);
-    try { setShips(await db.getShips()); } catch(e){console.error(e);} finally { setLS(false); }
-  }, []);
-
   const loadTV = useCallback(async () => {
     if (!supabase) return;
     setLTV(true); setTVError(null);
@@ -861,9 +833,8 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const counts = useMemo(() => {
     const c: Partial<Record<ShipStatus, number>> = {};
     for (const v of termVessels) { const s = resolveVesselStatus(v); c[s] = (c[s]??0)+1; }
-    for (const s of ships) { if (!['FINALIZADO','SAÍDO'].includes(s.status)) c[s.status] = (c[s.status]??0)+1; }
     return c;
-  }, [termVessels, ships]);
+  }, [termVessels]);
 
   // Filtered vessels for Programação tab
   const filteredVessels = useMemo(() => {
@@ -965,52 +936,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     );
   }, [filteredOrgTrips, termVessels]);
 
-  const allHistory = useMemo(() => {
-    const e: Array<ShipStatusEntry & { shipName: string; viagem?: string; terminal?: string }> = [];
-    for (const s of ships) for (const h of (s.statusHistory ?? [])) e.push({ ...h, shipName: s.name, viagem: s.viagem, terminal: s.terminal });
-    return e.sort((a,b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()).slice(0,20);
-  }, [ships]);
-
   // ── Actions ──────────────────────────────────────────────────────────────────
-  const openNew = (prefill?: Partial<Ship>) => { setEditing({ ...emptyShip(), ...prefill }); setMErr(null); setModalOpen(true); };
-  const openEdit = (s: Ship) => { setEditing({ ...s }); setMErr(null); setModalOpen(true); };
-  const upd = (f: keyof Ship, v: any) => setEditing(p => ({ ...p, [f]: v }));
-
-  const handleSave = async () => {
-    if (!editing.name?.trim()) { setMErr('Nome do navio obrigatório.'); return; }
-    setSaving(true); setMErr(null);
-    try {
-      const isNew = !editing.id;
-      const toSave: Partial<Ship> = { ...editing };
-      if (isNew) toSave.statusHistory = [{ status: editing.status ?? 'NOVO', dateTime: new Date().toISOString(), obs: 'Criado' }];
-      await db.saveShip(toSave); setModalOpen(false); await loadShips();
-    } catch(e:any) { setMErr(e?.message || 'Erro ao salvar.'); }
-    finally { setSaving(false); }
-  };
-  const handleDelete = async (id: string) => {
-    if (!confirm('Remover navio do monitoramento?')) return;
-    try { await db.deleteShip(id); setShips(p => p.filter(s => s.id !== id)); }
-    catch(e:any) { alert('Erro: ' + e?.message); }
-  };
-  const openStModal = (ship: Ship) => { setStTarget(ship); setNewSt(ship.status); setStObs(''); setStModal(true); };
-  const handleStUpdate = async () => {
-    if (!stTarget) return;
-    const entry: ShipStatusEntry = { status: newSt, dateTime: new Date().toISOString(), obs: stObs || undefined };
-    const hist = [...(stTarget.statusHistory ?? []), entry];
-    const extra: Partial<Ship> = {};
-    if (newSt === 'ATRACADO'    && !stTarget.dataAtracacao) extra.dataAtracacao = new Date().toISOString();
-    if (newSt === 'DESATRACADO' && !stTarget.dataDesatrac)  extra.dataDesatrac  = new Date().toISOString();
-    try { await db.saveShip({ ...stTarget, status: newSt, statusHistory: hist, ...extra }); setStModal(false); await loadShips(); }
-    catch(e:any) { alert('Erro: ' + e?.message); }
-  };
-  const pinFromTerminal = (v: TerminalVessel) => openNew({
-    name: v.navio.toUpperCase(), terminal: v.terminal, viagem: v.viagem,
-    armador: v.armador, berco: v.berco,
-    prevAtracacao: v.dtPrevAtrac || v.previsao || '',
-    deadLine: v.deadLineStr || '',
-    status: resolveVesselStatus(v),
-  });
-
   const handleTripSaved = useCallback((updated: Trip) => {
     setDetailTrip(updated);
   }, []);
@@ -1036,15 +962,11 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => { forceScrape(); loadShips(); }}
+          <button onClick={() => forceScrape()}
             disabled={scraping}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-wait">
             <I.Refresh className={`w-3.5 h-3.5 ${scraping ? 'animate-spin' : ''}`}/>
             {scraping ? 'Atualizando...' : 'Atualizar'}
-          </button>
-          <button onClick={() => openNew()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all active:scale-95">
-            <I.Plus className="w-3.5 h-3.5"/> Monitorar Navio
           </button>
         </div>
       </div>
@@ -1216,14 +1138,12 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                     <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Dead-Line</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Dry</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Reefer</th>
-                    <th className="bg-[#0a101c] px-3 py-2.5 w-8"/>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredVessels.map((v, idx) => {
                     const st  = resolveVesselStatus(v);
                     const sc  = STATUS_CFG[st];
-                    const isM = ships.some(s => s.name.toUpperCase() === v.navio.toUpperCase());
                     const dlExpired = isExpiredStr(v.deadLineStr);
                     return (
                       <tr key={idx} className={`border-b border-slate-800/40 transition-colors group ${sc.rowBg || ''} hover:brightness-125`}>
@@ -1281,14 +1201,6 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                           {v.gateReefer
                             ? <span className={`font-black ${isExpiredStr(v.gateReefer) ? 'text-red-400' : 'text-green-400'}`}>{fmtCell(v.gateReefer)}</span>
                             : <span className="text-slate-700">—</span>}
-                        </td>
-                        <td className="px-3 py-2">
-                          {isM
-                            ? <I.Pin className="w-3 h-3 text-blue-500" title="Monitorado"/>
-                            : <button onClick={() => pinFromTerminal(v)} title="Adicionar ao monitoramento"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                <I.Pin className="w-3 h-3 text-slate-600 hover:text-blue-400 transition-colors"/>
-                              </button>}
                         </td>
                       </tr>
                     );
@@ -1652,245 +1564,11 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
             </div>
           )}
 
-          {/* ── C: Navios Monitorados (Manual) ── */}
-          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-            <button onClick={() => setShowMonit(p => !p)}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-all">
-              <div className="flex items-center gap-2">
-                <I.Ship className="w-4 h-4 text-slate-400"/>
-                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Navios Monitorados Manualmente</p>
-                <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{ships.length}</span>
-              </div>
-              <I.ChevD className={`w-4 h-4 text-slate-400 transition-transform ${showMonit ? 'rotate-180' : ''}`}/>
-            </button>
-
-            {showMonit && (
-              loadingShips ? (
-                <div className="flex items-center justify-center h-24 border-t border-slate-100">
-                  <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"/>
-                </div>
-              ) : ships.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-24 gap-2 border-t border-slate-100">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Nenhum navio adicionado</p>
-                  <button onClick={() => openNew()} className="text-[9px] font-black text-blue-500 hover:underline">+ Adicionar navio</button>
-                </div>
-              ) : (
-                <div className="border-t border-slate-100 p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                  {ships.map(ship => {
-                    const c = STATUS_CFG[ship.status]; const dlExp = ship.deadLine ? new Date(ship.deadLine) < new Date() : false;
-                    return (
-                      <div key={ship.id} className={`bg-[#0f172a] rounded-2xl border ${c.border} flex flex-col overflow-hidden`}>
-                        <div className={`px-4 py-3 ${c.bg} border-b ${c.border} flex items-start justify-between gap-2`}>
-                          <div className="min-w-0">
-                            <p className={`text-[10px] font-black uppercase truncate ${c.text}`}>
-                              {ship.name}{ship.viagem && <span className="ml-1.5 opacity-70 font-bold">· {ship.viagem}</span>}
-                            </p>
-                            <p className="text-[8px] font-bold text-slate-500 uppercase mt-0.5">
-                              {ship.terminal ?? '—'}{ship.berco ? ` · Berço ${ship.berco}` : ''}
-                            </p>
-                          </div>
-                          <SBadge status={ship.status} size="xs"/>
-                        </div>
-                        <div className="px-4 py-3 space-y-1.5 flex-1">
-                          {ship.prevAtracacao && <Row label="Prev. Atracação" value={fmtDT(ship.prevAtracacao)}/>}
-                          {ship.abertGate     && <Row label="Abert. Gate"     value={fmtDT(ship.abertGate)}/>}
-                          {ship.deadLine      && <Row label="Dead-Line"        value={fmtDT(ship.deadLine)} red={dlExp}/>}
-                          {ship.dataAtracacao && <Row label="Data Atracação"   value={fmtDT(ship.dataAtracacao)}/>}
-                          {!ship.prevAtracacao && !ship.abertGate && !ship.deadLine && (
-                            <p className="text-[8px] text-slate-600 italic font-bold">Sem datas definidas</p>
-                          )}
-                        </div>
-                        <div className="px-4 py-2.5 border-t border-slate-800/50 flex items-center justify-between">
-                          <span className="text-[7px] text-slate-600 font-bold">{fmtDate(ship.updatedAt)}</span>
-                          <div className="flex gap-1">
-                            <Btn onClick={() => openStModal(ship)} title="Status"><I.History className="w-3 h-3"/></Btn>
-                            <Btn onClick={() => openEdit(ship)} title="Editar"><I.Edit className="w-3 h-3"/></Btn>
-                            <Btn onClick={() => handleDelete(ship.id)} title="Remover" danger><I.Trash className="w-3 h-3"/></Btn>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )
-            )}
-          </div>
-
-          {/* Histórico de status */}
-          {allHistory.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <I.History className="w-4 h-4 text-slate-400"/>
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Histórico de Status</p>
-                </div>
-              </div>
-              <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                {allHistory.map((h, i) => {
-                  const c = STATUS_CFG[h.status as ShipStatus] ?? STATUS_CFG['NOVO'];
-                  return (
-                    <div key={i} className={`rounded-xl p-3 border ${c.border} ${c.bg} space-y-1`}>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[8px] font-black text-slate-400">
-                          {new Date(h.dateTime).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
-                        </p>
-                        <SBadge status={h.status as ShipStatus} size="xs"/>
-                      </div>
-                      <p className={`text-[9px] font-black uppercase truncate ${c.text}`}>{h.shipName}</p>
-                      {h.obs && <p className="text-[8px] text-slate-500 italic">{h.obs}</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════ MODALS ══ */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-[#0f172a] w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-800 overflow-hidden">
-            <div className="px-7 py-5 border-b border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center"><I.Ship className="w-4 h-4 text-blue-400"/></div>
-                <h2 className="text-[11px] font-black text-slate-100 uppercase tracking-widest">{editing.id ? 'Editar Navio' : 'Adicionar ao Monitoramento'}</h2>
-              </div>
-              <button onClick={() => setModalOpen(false)} className="p-2 text-slate-500 hover:text-slate-300 rounded-xl hover:bg-slate-800 transition-all"><I.Close className="w-4 h-4"/></button>
-            </div>
-            <div className="px-7 py-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              {mErr && <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-[10px] font-black text-red-400 uppercase flex gap-2"><I.Warning className="w-3.5 h-3.5 shrink-0"/>{mErr}</div>}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nome do Navio *</label>
-                  <input value={editing.name??''} onChange={e=>upd('name',e.target.value)} placeholder="Ex: MSC MELINE"
-                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all uppercase"/>
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nº Viagem</label>
-                  <input value={editing.viagem??''} onChange={e=>upd('viagem',e.target.value)} placeholder="Ex: MM620R"
-                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"/>
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Terminal</label>
-                  <select value={editing.terminal??'BTP'} onChange={e=>upd('terminal',e.target.value)}
-                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 focus:outline-none focus:border-blue-500 transition-all">
-                    {TERMINALS_MANUAL.map(t=><option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Armador</label>
-                  <input value={editing.armador??''} onChange={e=>upd('armador',e.target.value)} placeholder="Ex: MSC, Maersk..."
-                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"/>
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Berço</label>
-                  <input value={editing.berco??''} onChange={e=>upd('berco',e.target.value)} placeholder="Ex: 310"
-                    className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"/>
-                </div>
-              </div>
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest pt-2 border-t border-slate-800">Datas</p>
-              <div className="grid grid-cols-2 gap-4">
-                {([['Prev. Atracação','prevAtracacao'],['Abertura de Gate','abertGate'],['Dead-Line','deadLine'],['Status','status'],['Data de Atracação','dataAtracacao'],['Data de Desatracação','dataDesatrac']] as [string, keyof Ship][]).map(([lbl, field]) => (
-                  <div key={field}>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">{lbl}</label>
-                    {field === 'status' ? (
-                      <select value={(editing[field] as string)??'NOVO'} onChange={e=>upd(field, e.target.value)}
-                        className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 focus:outline-none focus:border-blue-500 transition-all">
-                        {ALL_STATUSES.map(s=><option key={s} value={s}>{STATUS_CFG[s].label}</option>)}
-                      </select>
-                    ) : (
-                      <input type="datetime-local" value={((editing[field] as string)??'').slice(0,16)}
-                        onChange={e=>upd(field, e.target.value ? new Date(e.target.value).toISOString() : '')}
-                        className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 focus:outline-none focus:border-blue-500 transition-all"/>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Observações</label>
-                <textarea value={editing.observacoes??''} onChange={e=>upd('observacoes',e.target.value)} rows={2}
-                  className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all resize-none"/>
-              </div>
-            </div>
-            <div className="px-7 py-4 border-t border-slate-800 flex gap-3 justify-end">
-              <button onClick={() => setModalOpen(false)} className="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-all">Cancelar</button>
-              <button onClick={handleSave} disabled={saving} className="px-7 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all disabled:opacity-50">
-                {saving ? 'Salvando...' : 'Salvar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {stModal && stTarget && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-[#0f172a] w-full max-w-md rounded-3xl shadow-2xl border border-slate-800 overflow-hidden">
-            <div className="px-7 py-5 border-b border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Atualizar Status</p>
-                <p className="text-[12px] font-black text-slate-100 uppercase">{stTarget.name}{stTarget.viagem ? ` · ${stTarget.viagem}` : ''}</p>
-              </div>
-              <button onClick={() => setStModal(false)} className="p-2 text-slate-500 hover:text-slate-300 rounded-xl hover:bg-slate-800 transition-all"><I.Close className="w-4 h-4"/></button>
-            </div>
-            <div className="px-7 py-5 space-y-4">
-              <div className="grid grid-cols-2 gap-2">
-                {ALL_STATUSES.map(s => {
-                  const c = STATUS_CFG[s];
-                  return (
-                    <button key={s} onClick={() => setNewSt(s)}
-                      className={`px-3 py-2 rounded-xl border text-[9px] font-black uppercase text-left transition-all flex items-center gap-2 ${newSt===s ? `${c.bg} ${c.border} ${c.text}` : 'border-slate-800 text-slate-500 hover:border-slate-700'}`}>
-                      <span className={`w-2 h-2 rounded-full ${c.dot}`}/>{c.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Observação</label>
-                <input value={stObs} onChange={e=>setStObs(e.target.value)} placeholder="Ex: Gate aberto pelo terminal BTP"
-                  className="w-full bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 text-[11px] font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all"/>
-              </div>
-              {(stTarget.statusHistory ?? []).length > 0 && (
-                <div className="space-y-1.5 max-h-28 overflow-y-auto">
-                  <p className="text-[7px] font-black text-slate-600 uppercase">Histórico</p>
-                  {[...(stTarget.statusHistory ?? [])].reverse().slice(0,5).map((h,i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="text-[7px] text-slate-600 font-bold whitespace-nowrap">
-                        {new Date(h.dateTime).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
-                      </span>
-                      <SBadge status={h.status} size="xs"/>
-                      {h.obs && <span className="text-[7px] text-slate-500 truncate">{h.obs}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="px-7 py-4 border-t border-slate-800 flex gap-3 justify-end">
-              <button onClick={() => setStModal(false)} className="px-5 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-all">Cancelar</button>
-              <button onClick={handleStUpdate} className="px-7 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all">Confirmar</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
-
-function Row({ label, value, red }: { label: string; value: string; red?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-2">
-      <span className="text-[7px] font-bold text-slate-500 uppercase tracking-wide shrink-0">{label}:</span>
-      <span className={`text-[8px] font-black truncate ${red ? 'text-red-400' : 'text-slate-200'}`}>{value}</span>
-    </div>
-  );
-}
-function Btn({ onClick, title, danger, children }: { onClick: () => void; title?: string; danger?: boolean; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} title={title}
-      className={`p-1.5 rounded-lg transition-all ${danger ? 'bg-slate-800 hover:bg-red-900/60' : 'bg-slate-800 hover:bg-slate-700'}`}>
-      <span className={danger ? 'text-slate-500' : 'text-slate-400'}>{children}</span>
-    </button>
-  );
-}
 
 export default NaviosTab;
