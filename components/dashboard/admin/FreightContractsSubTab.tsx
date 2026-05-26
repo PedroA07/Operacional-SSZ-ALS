@@ -177,7 +177,8 @@ const TripSelector: React.FC<{
   const selected = trips.find(t => t.id === value) ?? null;
 
   const isMatch = (t: Trip) => {
-    const cMatch = parsed.container && t.container && normAccent(t.container) === normAccent(parsed.container);
+    const normCtn = (s: string) => s.toUpperCase().replace(/[\s\-_.]/g, '');
+    const cMatch = parsed.container && t.container && normCtn(t.container) === normCtn(parsed.container);
     const dMatch = parsed.motorista && t.driver?.name &&
       (normAccent(t.driver.name).includes(normAccent(parsed.motorista.split(' ')[0])) ||
        normAccent(parsed.motorista).includes(normAccent(t.driver.name.split(' ')[0])));
@@ -451,7 +452,11 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   }, [view]);
 
   useEffect(() => {
-    db.getStandaloneContracts().then(setStandaloneContracts).catch(() => {});
+    let mounted = true;
+    db.getStandaloneContracts()
+      .then(contracts => { if (mounted) setStandaloneContracts(contracts); })
+      .catch(() => {});
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -482,6 +487,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
   // ── Auto-match logic — busca em TODAS as viagens, não só elegíveis ───────────
   const findAutoMatch = useCallback((parsed: FileEntry['parsed']): string | null => {
     const norm = normAccent;
+    // Strip espaços/hífens/pontos para comparar container (ISO 6346 pode ter variações)
+    const normCtn = (s: string) => s.toUpperCase().replace(/[\s\-_.]/g, '');
 
     // Verifica se a localidade do contrato não contradiz o destino da viagem
     const locMatches = (t: Trip): boolean => {
@@ -499,7 +506,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
     if (parsed.container && parsed.localidade) {
       const loc0 = norm(parsed.localidade.split(' ')[0]);
       const hits = trips.filter(t =>
-        t.container && norm(t.container) === norm(parsed.container) &&
+        t.container && normCtn(t.container) === normCtn(parsed.container) &&
         t.destination?.name && norm(t.destination.name).includes(loc0)
       );
       if (hits.length === 1) return hits[0].id;
@@ -516,7 +523,7 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
 
     // Prioridade 2: container apenas — só vincula se localidade não contradiz destino
     if (parsed.container) {
-      const hits = trips.filter(t => t.container && norm(t.container) === norm(parsed.container));
+      const hits = trips.filter(t => t.container && normCtn(t.container) === normCtn(parsed.container));
       if (hits.length === 1 && locMatches(hits[0])) return hits[0].id;
     }
 
@@ -665,15 +672,17 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             } catch { /* non-critical */ }
           }
         } else {
-          // Sem vínculo: gera código de identificação e salva no Supabase
-          const code = genContractCode();
+          // Sem vínculo: usa container como identificador e salva em standalone_freight_contracts
+          const code = parsedData.container || genContractCode();
           const url = await fileStorage.uploadFreightContract(entry.file, code, 0);
           const standalone: StandaloneContract = {
             id: entry.id, code, url, fileName: entry.file.name,
             uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(), parsedData,
           };
-          await db.saveStandaloneContract(standalone);
-          setStandaloneContracts(prev => [standalone, ...prev]);
+          const saved = await db.saveStandaloneContract(standalone);
+          if (!saved) throw new Error('Falha ao salvar contrato avulso. Verifique as permissões do banco.');
+          const refreshed = await db.getStandaloneContracts();
+          setStandaloneContracts(refreshed);
         }
         patch(entry.id, { status: 'done' });
       } catch (err: any) {
@@ -722,7 +731,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       ((doc as any).parsedData?.container || '').toLowerCase().includes(q) ||
       (trip?.customer?.name || '').toLowerCase().includes(q) ||
       ((doc as any).parsedData?.motorista || '').toLowerCase().includes(q) ||
-      (standalone?.code || '').toLowerCase().includes(q)
+      (standalone?.code || '').toLowerCase().includes(q) ||
+      (standalone?.parsedData?.motorista || '').toLowerCase().includes(q)
     );
   }, [contractHistory, historySearch]);
 

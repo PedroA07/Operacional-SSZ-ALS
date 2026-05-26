@@ -1,86 +1,157 @@
-import React, { useState, useEffect } from 'react';
-import { User, Category } from '../../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { User, Customer } from '../../../types';
 import { db } from '../../../utils/storage';
+import { maskCNPJ } from '../../../utils/masks';
 
 interface ExternalUsersManagerProps {
   onRefresh: () => void;
 }
 
-const AVAILABLE_COLUMNS = [
-  { key: 'os', label: 'OS' },
-  { key: 'container', label: 'Container' },
-  { key: 'status', label: 'Status (em camadas)' },
-  { key: 'dateTime', label: 'Data' },
-  { key: 'driver', label: 'Motorista' },
-  { key: 'customer', label: 'Cliente' },
+/* ── Column definitions per page ─────────────────────────────────── */
+const STANDARD_COLUMNS = [
+  { key: 'os',          label: 'OS / Identificação' },
+  { key: 'container',   label: 'Container' },
+  { key: 'status',      label: 'Status' },
+  { key: 'dateTime',    label: 'Data / Hora' },
+  { key: 'driver',      label: 'Motorista' },
+  { key: 'customer',    label: 'Cliente' },
   { key: 'destination', label: 'Destino' },
-  { key: 'scheduling', label: 'Agendamento' },
-  { key: 'category', label: 'Categoria' },
-  { key: 'type', label: 'Tipo' }
+  { key: 'scheduling',  label: 'Agendamento' },
+  { key: 'category',    label: 'Categoria' },
+  { key: 'type',        label: 'Tipo de Operação' },
 ];
 
+const DEV_COLUMNS = [
+  { key: 'container',        label: 'Container' },
+  { key: 'destination',      label: 'Local / Depósito' },
+  { key: 'driver',           label: 'Motorista' },
+  { key: 'scheduledDateTime', label: 'Agendamento' },
+  { key: 'agendamentoDoc',   label: 'Comprovante' },
+];
+
+/* Pages are grouped visually. Group 1 = Coleta/Entrega variants, Group 2 = Devoluções */
+const PAGE_DEFS = [
+  {
+    key: 'orgColeta',
+    label: 'Coleta (aba separada)',
+    description: 'Coleta, Cabotagem e Exportação — aba própria no portal',
+    color: 'blue',
+    columns: STANDARD_COLUMNS,
+    defaultFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'scheduling'],
+    group: 'coleta-entrega',
+  },
+  {
+    key: 'orgEntrega',
+    label: 'Entrega (aba separada)',
+    description: 'Entrega e Importação — aba própria no portal',
+    color: 'emerald',
+    columns: STANDARD_COLUMNS,
+    defaultFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'scheduling'],
+    group: 'coleta-entrega',
+  },
+  {
+    key: 'orgColetaEntrega',
+    label: 'Coleta + Entrega (aba combinada)',
+    description: 'Coleta, Cabotagem, Exportação, Entrega e Importação — uma única aba',
+    color: 'indigo',
+    columns: STANDARD_COLUMNS,
+    defaultFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'scheduling'],
+    group: 'coleta-entrega',
+  },
+  {
+    key: 'orgDevolucoes',
+    label: 'Devoluções',
+    description: 'Registros de Devolução de Vazio — aba própria no portal',
+    color: 'orange',
+    columns: DEV_COLUMNS,
+    defaultFields: ['container', 'destination', 'driver', 'scheduledDateTime'],
+    group: 'devolucoes',
+  },
+] as const;
+
+type PageKey = typeof PAGE_DEFS[number]['key'];
+
+const colorMap: Record<string, { toggle: string; chip: string; check: string; border: string; bg: string }> = {
+  blue:    { toggle: 'bg-blue-600',    chip: 'bg-blue-100 text-blue-700 border-blue-200',       check: 'text-blue-600',    border: 'border-blue-300',   bg: 'bg-blue-50' },
+  emerald: { toggle: 'bg-emerald-600', chip: 'bg-emerald-100 text-emerald-700 border-emerald-200', check: 'text-emerald-600', border: 'border-emerald-300', bg: 'bg-emerald-50' },
+  indigo:  { toggle: 'bg-indigo-600',  chip: 'bg-indigo-100 text-indigo-700 border-indigo-200',   check: 'text-indigo-600',  border: 'border-indigo-300',  bg: 'bg-indigo-50' },
+  orange:  { toggle: 'bg-orange-500',  chip: 'bg-orange-100 text-orange-700 border-orange-200',   check: 'text-orange-600',  border: 'border-orange-300',  bg: 'bg-orange-50' },
+};
+
+
+const STATUS_DEFS = [
+  { key: 'Pendente',              color: 'bg-slate-100 text-slate-700 border-slate-300' },
+  { key: 'Em viagem',             color: 'bg-amber-100 text-amber-800 border-amber-300' },
+  { key: 'Retirada de vazio',     color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { key: 'Retirada do cheio',     color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { key: 'Chegou no cliente',     color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  { key: 'Pegou NF',              color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  { key: 'Saiu do cliente',       color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  { key: 'Chegou no destino',     color: 'bg-purple-100 text-purple-700 border-purple-300' },
+  { key: 'Devolução do cheio',    color: 'bg-violet-100 text-violet-700 border-violet-300' },
+  { key: 'Container sobre rodas', color: 'bg-sky-100 text-sky-700 border-sky-300' },
+  { key: 'Agendamento realizado', color: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
+  { key: 'Emissão Solicitada',    color: 'bg-purple-100 text-purple-700 border-purple-300' },
+  { key: 'Aguardando carregar',   color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { key: 'Viagem concluída',      color: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+  { key: 'Viagem cancelada',      color: 'bg-red-100 text-red-700 border-red-300' },
+  { key: 'Cancelado',             color: 'bg-red-100 text-red-700 border-red-300' },
+  { key: 'Frete Morto',           color: 'bg-slate-100 text-slate-500 border-slate-300' },
+  { key: 'Reutilização',          color: 'bg-teal-100 text-teal-700 border-teal-300' },
+];
+
+/* ── Component ──────────────────────────────────────────────────── */
 const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }) => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [operationTypes, setOperationTypes] = useState<any[]>([]);
-  
+  const [users, setUsers]           = useState<User[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [categories, setCategories]         = useState<any[]>([]);
+  const [opTypes, setOpTypes]               = useState<any[]>([]);
+  const [customers, setCustomers]           = useState<Customer[]>([]);
+  const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
 
-  // Estados para o modal de criação de usuário
   const [isCreatingUser, setIsCreatingUser] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword]     = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
-  const [newUser, setNewUser] = useState({
-    displayName: '',
-    username: '',
-    password: ''
-  });
-
-  const togglePasswordVisibility = (userId: string) => {
-    setVisiblePasswords(prev => ({
-      ...prev,
-      [userId]: !prev[userId]
-    }));
-  };
+  const [newUser, setNewUser] = useState({ displayName: '', username: '', password: '' });
   const [creatingError, setCreatingError] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setLoading(true);
-    const [allUsers, allCategories, allTypes] = await Promise.all([
+    const [allUsers, allCats, allTypes, allCustomers, allContainerTypes] = await Promise.all([
       db.getUsers(),
       db.getCategories(),
-      db.getOperationTypes()
+      db.getOperationTypes(),
+      db.getCustomers(),
+      db.getContainerTypes(),
     ]);
     setUsers(allUsers.filter(u => u.role === 'third_party'));
-    setCategories(allCategories);
-    setOperationTypes(allTypes);
+    setCategories(allCats);
+    setOpTypes(allTypes);
+    setCustomers(allCustomers);
+    setContainerTypes(allContainerTypes);
     setLoading(false);
   };
 
+  /* ── Create ─────────────────────────────────────────────────── */
   const handleCreateUser = async () => {
     if (!newUser.displayName || !newUser.username || !newUser.password) {
       setCreatingError('Preencha todos os campos');
       return;
     }
-
     setSaving(true);
     setCreatingError('');
-
     try {
-      // Verifica se o usuário já existe
       const existingUsers = await db.getUsers();
       if (existingUsers.some(u => u.username === newUser.username)) {
         setCreatingError('Este nome de usuário já está em uso');
         setSaving(false);
         return;
       }
-
       const userToCreate: Omit<User, 'id'> = {
         username: newUser.username,
         password: newUser.password,
@@ -88,25 +159,30 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
         role: 'third_party',
         lastLogin: new Date().toISOString(),
         thirdPartyConfig: {
-          visibleFields: ['os', 'container', 'status', 'dateTime', 'driver', 'customer', 'destination', 'category', 'type'],
+          visibleFields: [],
           allowedCategories: [],
-          allowedTypes: []
-        }
+          allowedTypes: [],
+          pages: {
+            orgColeta:        { enabled: false, visibleFields: [...PAGE_DEFS[0].defaultFields] },
+            orgEntrega:       { enabled: false, visibleFields: [...PAGE_DEFS[1].defaultFields] },
+            orgColetaEntrega: { enabled: false, visibleFields: [...PAGE_DEFS[2].defaultFields] },
+            orgDevolucoes:    { enabled: false, visibleFields: [...PAGE_DEFS[3].defaultFields] },
+          },
+        },
       };
-
       await db.saveUser({ ...userToCreate, id: `ext-${Date.now()}` });
       await loadData();
       setIsCreatingUser(false);
       setNewUser({ displayName: '', username: '', password: '' });
       onRefresh();
-    } catch (error) {
-      console.error('Error creating user:', error);
+    } catch {
       setCreatingError('Erro ao criar usuário');
     } finally {
       setSaving(false);
     }
   };
 
+  /* ── Save config ─────────────────────────────────────────────── */
   const handleSaveConfig = async () => {
     if (!editingUser) return;
     setSaving(true);
@@ -115,62 +191,115 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
       await loadData();
       setEditingUser(null);
       onRefresh();
-    } catch (error) {
-      console.error('Error saving user config:', error);
+    } catch {
+      console.error('Error saving user config');
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleColumn = (key: string) => {
+  /* ── Page toggle helpers ─────────────────────────────────────── */
+  const togglePage = (pageKey: PageKey) => {
     if (!editingUser) return;
-    const currentFields = editingUser.thirdPartyConfig?.visibleFields || [];
-    const newFields = currentFields.includes(key)
-      ? currentFields.filter(f => f !== key)
-      : [...currentFields, key];
-      
-    setEditingUser({
-      ...editingUser,
-      thirdPartyConfig: {
-        ...editingUser.thirdPartyConfig,
-        visibleFields: newFields
-      }
-    });
-  };
-
-  const toggleCategory = (categoryName: string) => {
-    if (!editingUser) return;
-    const currentCats = editingUser.thirdPartyConfig?.allowedCategories || [];
-    const newCats = currentCats.includes(categoryName)
-      ? currentCats.filter(c => c !== categoryName)
-      : [...currentCats, categoryName];
-
+    const pageDef = PAGE_DEFS.find(p => p.key === pageKey)!;
+    const pages = editingUser.thirdPartyConfig?.pages || {};
+    const current = pages[pageKey];
     setEditingUser({
       ...editingUser,
       thirdPartyConfig: {
         ...editingUser.thirdPartyConfig,
         visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
-        allowedCategories: newCats
-      }
+        pages: {
+          ...pages,
+          [pageKey]: {
+            enabled: !current?.enabled,
+            visibleFields: current?.visibleFields?.length ? current.visibleFields : [...pageDef.defaultFields],
+          },
+        },
+      },
     });
   };
 
-  const toggleType = (typeName: string) => {
+  const togglePageField = (pageKey: PageKey, fieldKey: string) => {
     if (!editingUser) return;
-    const currentTypes = editingUser.thirdPartyConfig?.allowedTypes || [];
-    const newTypes = currentTypes.includes(typeName)
-      ? currentTypes.filter(t => t !== typeName)
-      : [...currentTypes, typeName];
-
+    const pages = editingUser.thirdPartyConfig?.pages || {};
+    const current = pages[pageKey];
+    const fields = current?.visibleFields || [];
     setEditingUser({
       ...editingUser,
       thirdPartyConfig: {
         ...editingUser.thirdPartyConfig,
         visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
-        allowedTypes: newTypes
-      }
+        pages: {
+          ...pages,
+          [pageKey]: {
+            enabled: current?.enabled || false,
+            visibleFields: fields.includes(fieldKey)
+              ? fields.filter(f => f !== fieldKey)
+              : [...fields, fieldKey],
+          },
+        },
+      },
     });
   };
+
+  /* ── Data filter helpers ────────────────────────────────────── */
+  const toggleFilter = (
+    field: 'allowedCategories' | 'allowedTypes' | 'allowedContainerTypes' | 'allowedStatuses' | 'allowedCustomers',
+    value: string,
+  ) => {
+    if (!editingUser) return;
+    const current: string[] = (editingUser.thirdPartyConfig as any)?.[field] || [];
+    setEditingUser({
+      ...editingUser,
+      thirdPartyConfig: {
+        ...editingUser.thirdPartyConfig,
+        visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
+        [field]: current.includes(value) ? current.filter(v => v !== value) : [...current, value],
+      },
+    });
+  };
+
+  const clearFilter = (field: 'allowedCategories' | 'allowedTypes' | 'allowedContainerTypes' | 'allowedStatuses' | 'allowedCustomers') => {
+    if (!editingUser) return;
+    setEditingUser({
+      ...editingUser,
+      thirdPartyConfig: {
+        ...editingUser.thirdPartyConfig,
+        visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
+        [field]: [],
+      },
+    });
+  };
+
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch.trim()) return customers;
+    const qText   = customerSearch.toLowerCase();
+    const qDigits = customerSearch.replace(/\D/g, '');
+    return customers.filter(c =>
+      c.name?.toLowerCase().includes(qText) ||
+      c.legalName?.toLowerCase().includes(qText) ||
+      c.city?.toLowerCase().includes(qText) ||
+      c.state?.toLowerCase().includes(qText) ||
+      (qDigits.length >= 4 && c.cnpj?.replace(/\D/g, '').includes(qDigits))
+    );
+  }, [customers, customerSearch]);
+
+  /* ── Rendering helpers ───────────────────────────────────────── */
+  const togglePasswordVisibility = (id: string) =>
+    setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const EyeOpen = () => (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+    </svg>
+  );
+  const EyeOff = () => (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+    </svg>
+  );
 
   return (
     <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
@@ -187,49 +316,53 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
 
       {loading ? (
         <div className="flex justify-center p-8">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
         </div>
       ) : (
         <div className="space-y-4">
-          {users.map(user => (
-            <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-              <div>
-                <p className="font-black text-slate-800">{user.displayName}</p>
-                <div className="flex items-center gap-4 mt-1">
-                  <p className="text-xs text-slate-500"><span className="font-bold">Login:</span> {user.username}</p>
-                  <div className="flex items-center gap-1">
-                    <p className="text-xs text-slate-500">
-                      <span className="font-bold">Senha:</span> {visiblePasswords[user.id] ? user.password : '••••••••'}
-                    </p>
-                    <button 
-                      onClick={() => togglePasswordVisibility(user.id)}
-                      className="text-slate-400 hover:text-slate-600 ml-1"
-                      title={visiblePasswords[user.id] ? "Ocultar senha" : "Ver senha"}
-                    >
-                      {visiblePasswords[user.id] ? (
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                      )}
-                    </button>
+          {users.map(user => {
+            const enabledPages = PAGE_DEFS.filter(p => user.thirdPartyConfig?.pages?.[p.key]?.enabled);
+            return (
+              <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <div>
+                  <p className="font-black text-slate-800">{user.displayName}</p>
+                  <div className="flex items-center gap-4 mt-1 flex-wrap">
+                    <p className="text-xs text-slate-500"><span className="font-bold">Login:</span> {user.username}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs text-slate-500">
+                        <span className="font-bold">Senha:</span> {visiblePasswords[user.id] ? user.password : '••••••••'}
+                      </p>
+                      <button onClick={() => togglePasswordVisibility(user.id)} className="text-slate-400 hover:text-slate-600 ml-1">
+                        {visiblePasswords[user.id] ? <EyeOff/> : <EyeOpen/>}
+                      </button>
+                    </div>
+                    {enabledPages.length > 0 && (
+                      <div className="flex gap-1 flex-wrap">
+                        {enabledPages.map(p => (
+                          <span key={p.key} className={`text-[8px] px-2 py-0.5 rounded-full font-black border uppercase ${colorMap[p.color].chip}`}>
+                            {p.label.split('—')[1]?.trim() || p.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
+                <button
+                  onClick={() => setEditingUser(user)}
+                  className="text-xs font-black text-blue-600 uppercase hover:underline shrink-0 ml-4"
+                >
+                  Configurar Acessos
+                </button>
               </div>
-              <button 
-                onClick={() => setEditingUser(user)}
-                className="text-xs font-black text-blue-600 uppercase hover:underline"
-              >
-                Configurar Acessos
-              </button>
-            </div>
-          ))}
+            );
+          })}
           {users.length === 0 && (
             <p className="text-sm text-slate-500 italic text-center py-4">Nenhum usuário externo encontrado.</p>
           )}
         </div>
       )}
 
-      {/* Modal de Criação de Usuário */}
+      {/* ── Modal: Criar usuário ─────────────────────────────────── */}
       {isCreatingUser && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in fade-in zoom-in-95 duration-200">
@@ -242,75 +375,45 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
-
             <div className="p-6 space-y-4">
               {creatingError && (
-                <div className="p-3 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100 uppercase">
-                  {creatingError}
-                </div>
+                <div className="p-3 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100 uppercase">{creatingError}</div>
               )}
-
-              <div>
-                <label className="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1">Nome de Exibição</label>
-                <input
-                  type="text"
-                  value={newUser.displayName}
-                  onChange={(e) => setNewUser({ ...newUser, displayName: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  placeholder="Ex: Cliente ABC"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1">Nome de Usuário (Login)</label>
-                <input
-                  type="text"
-                  value={newUser.username}
-                  onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  placeholder="Ex: cliente.abc"
-                />
-              </div>
-
+              {[
+                { label: 'Nome de Exibição', field: 'displayName', placeholder: 'Ex: Cliente ABC', type: 'text' },
+                { label: 'Nome de Usuário (Login)', field: 'username', placeholder: 'Ex: cliente.abc', type: 'text' },
+              ].map(({ label, field, placeholder, type }) => (
+                <div key={field}>
+                  <label className="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1">{label}</label>
+                  <input
+                    type={type}
+                    value={(newUser as any)[field]}
+                    onChange={e => setNewUser({ ...newUser, [field]: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    placeholder={placeholder}
+                  />
+                </div>
+              ))}
               <div>
                 <label className="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1">Senha</label>
                 <div className="relative">
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? 'text' : 'password'}
                     value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    onChange={e => setNewUser({ ...newUser, password: e.target.value })}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all pr-10"
                     placeholder="Senha de acesso"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {showPassword ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                    )}
+                  <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    {showPassword ? <EyeOff/> : <EyeOpen/>}
                   </button>
                 </div>
               </div>
             </div>
-
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3 shrink-0 bg-slate-50 rounded-b-2xl">
-              <button 
-                onClick={() => setIsCreatingUser(false)}
-                className="px-6 py-2.5 text-xs font-black text-slate-600 uppercase bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleCreateUser}
-                disabled={saving}
-                className="px-6 py-2.5 text-xs font-black text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+              <button onClick={() => setIsCreatingUser(false)} className="px-6 py-2.5 text-xs font-black text-slate-600 uppercase bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>
+              <button onClick={handleCreateUser} disabled={saving} className="px-6 py-2.5 text-xs font-black text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2">
+                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>}
                 {saving ? 'Criando...' : 'Criar Usuário'}
               </button>
             </div>
@@ -318,6 +421,7 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
         </div>
       )}
 
+      {/* ── Modal: Configurar acessos ─────────────────────────────── */}
       {editingUser && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
@@ -331,87 +435,449 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto custom-scrollbar space-y-8">
-              {/* Colunas Visíveis */}
-              <div>
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-4">Colunas Visíveis</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {AVAILABLE_COLUMNS.map(col => {
-                    const isSelected = editingUser.thirdPartyConfig?.visibleFields?.includes(col.key);
-                    return (
-                      <label key={col.key} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-200'}`}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected || false}
-                          onChange={() => toggleColumn(col.key)}
-                          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                        />
-                        <span className={`text-xs font-bold uppercase ${isSelected ? 'text-blue-700' : 'text-slate-600'}`}>{col.label}</span>
-                      </label>
-                    );
-                  })}
+            <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Selecione quais páginas e dados o usuário pode visualizar
+              </p>
+
+              {/* ── Grupo: Coleta / Entrega ─────────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Organização — Operações Portuárias</p>
+                  <div className="flex-1 h-px bg-slate-200"/>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                    Escolha abas separadas <span className="text-slate-300 mx-1">ou</span> uma aba combinada — não é necessário ativar as duas opções simultaneamente
+                  </p>
+                  <div className="space-y-2">
+                    {PAGE_DEFS.filter(p => p.group === 'coleta-entrega').map((page, idx, arr) => {
+                      const c = colorMap[page.color];
+                      const pageConfig = editingUser.thirdPartyConfig?.pages?.[page.key];
+                      const isEnabled = pageConfig?.enabled ?? false;
+                      const fields = pageConfig?.visibleFields || [];
+                      const isCombined = page.key === 'orgColetaEntrega';
+
+                      return (
+                        <React.Fragment key={page.key}>
+                          {/* Divider before combined option */}
+                          {isCombined && (
+                            <div className="flex items-center gap-2 py-1">
+                              <div className="flex-1 h-px bg-slate-200"/>
+                              <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest px-2">ou</span>
+                              <div className="flex-1 h-px bg-slate-200"/>
+                            </div>
+                          )}
+                          <div className={`rounded-xl border-2 transition-all overflow-hidden ${isEnabled ? `${c.border} ${c.bg}` : 'border-slate-200 bg-white'}`}>
+                            <div className="flex items-center justify-between p-3">
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs font-black uppercase tracking-tight ${isEnabled ? 'text-slate-900' : 'text-slate-500'}`}>{page.label}</p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{page.description}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => togglePage(page.key)}
+                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ml-4 ${isEnabled ? c.toggle : 'bg-slate-200'}`}
+                                role="switch" aria-checked={isEnabled}
+                              >
+                                <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}/>
+                              </button>
+                            </div>
+                            {isEnabled && (
+                              <div className="px-3 pb-3 border-t border-white/60">
+                                <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-2 mb-2">Dados visíveis</p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+                                  {page.columns.map(col => {
+                                    const checked = fields.includes(col.key);
+                                    return (
+                                      <label key={col.key} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-[9px] font-bold uppercase ${checked ? `bg-white ${c.border} text-slate-800` : 'bg-white/60 border-white text-slate-400 hover:border-slate-200'}`}>
+                                        <input type="checkbox" checked={checked} onChange={() => togglePageField(page.key, col.key)} className={`w-3.5 h-3.5 rounded border-slate-300 focus:ring-0 ${c.check}`}/>
+                                        {col.label}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {/* Categorias Permitidas */}
-              <div>
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-4">Categorias Permitidas</h4>
-                <p className="text-[10px] text-slate-500 mb-3 uppercase font-bold">Se nenhuma for selecionada, todas serão exibidas.</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {categories.map(cat => {
-                    const isSelected = editingUser.thirdPartyConfig?.allowedCategories?.includes(cat.name);
-                    return (
-                      <label key={cat.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 hover:border-emerald-200'}`}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected || false}
-                          onChange={() => toggleCategory(cat.name)}
-                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                        />
-                        <span className={`text-xs font-bold uppercase ${isSelected ? 'text-emerald-700' : 'text-slate-600'}`}>{cat.name}</span>
-                      </label>
-                    );
-                  })}
+              {/* ── Grupo: Devoluções ───────────────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Organização — Devoluções</p>
+                  <div className="flex-1 h-px bg-slate-200"/>
                 </div>
-              </div>
+                {PAGE_DEFS.filter(p => p.group === 'devolucoes').map(page => {
+                const c = colorMap[page.color];
+                const pageConfig = editingUser.thirdPartyConfig?.pages?.[page.key];
+                const isEnabled = pageConfig?.enabled ?? false;
+                const fields = pageConfig?.visibleFields || [];
 
-              {/* Tipos Permitidos */}
-              <div>
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight mb-4">Tipos de Operação Permitidos</h4>
-                <p className="text-[10px] text-slate-500 mb-3 uppercase font-bold">Se nenhum for selecionado, todos serão exibidos.</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {operationTypes.map(type => {
-                    const isSelected = editingUser.thirdPartyConfig?.allowedTypes?.includes(type.name);
-                    return (
-                      <label key={type.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-purple-50 border-purple-200' : 'bg-white border-slate-200 hover:border-purple-200'}`}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected || false}
-                          onChange={() => toggleType(type.name)}
-                          className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                return (
+                  <div
+                    key={page.key}
+                    className={`rounded-2xl border-2 transition-all overflow-hidden ${isEnabled ? `${c.border} ${c.bg}` : 'border-slate-200 bg-white'}`}
+                  >
+                    {/* Page header with toggle */}
+                    <div className="flex items-center justify-between p-4">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-black uppercase tracking-tight ${isEnabled ? 'text-slate-900' : 'text-slate-500'}`}>{page.label}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{page.description}</p>
+                      </div>
+                      {/* Toggle switch */}
+                      <button
+                        type="button"
+                        onClick={() => togglePage(page.key)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ml-4 ${isEnabled ? c.toggle : 'bg-slate-200'}`}
+                        role="switch"
+                        aria-checked={isEnabled}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}
                         />
-                        <span className={`text-xs font-bold uppercase ${isSelected ? 'text-purple-700' : 'text-slate-600'}`}>{type.name}</span>
-                      </label>
-                    );
-                  })}
+                      </button>
+                    </div>
+
+                    {/* Columns — only shown when enabled */}
+                    {isEnabled && (
+                      <div className="px-4 pb-4 border-t border-white/60 space-y-4">
+                        <div>
+                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-3 mb-2">Dados visíveis</p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {page.columns.map(col => {
+                              const checked = fields.includes(col.key);
+                              return (
+                                <label
+                                  key={col.key}
+                                  className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all text-[10px] font-bold uppercase
+                                    ${checked ? `bg-white ${c.border} text-slate-800` : 'bg-white/60 border-white text-slate-400 hover:border-slate-200'}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => togglePageField(page.key, col.key)}
+                                    className={`w-3.5 h-3.5 rounded border-slate-300 focus:ring-0 ${c.check}`}
+                                  />
+                                  {col.label}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Insert permission */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Permissões de Inserção</p>
+                            <div className="flex-1 h-px bg-white/60"/>
+                          </div>
+                          <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${editingUser.thirdPartyConfig?.allowInsertDevolucao ? `${c.border} bg-white` : 'border-white/80 bg-white/60 hover:border-slate-200'}`}>
+                            <div className="mt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => setEditingUser({
+                                  ...editingUser,
+                                  thirdPartyConfig: {
+                                    ...editingUser.thirdPartyConfig,
+                                    visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
+                                    allowInsertDevolucao: !editingUser.thirdPartyConfig?.allowInsertDevolucao,
+                                  }
+                                })}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${editingUser.thirdPartyConfig?.allowInsertDevolucao ? c.toggle : 'bg-slate-200'}`}
+                                role="switch"
+                                aria-checked={editingUser.thirdPartyConfig?.allowInsertDevolucao}
+                              >
+                                <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${editingUser.thirdPartyConfig?.allowInsertDevolucao ? 'translate-x-4' : 'translate-x-0'}`}/>
+                              </button>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] font-black uppercase text-slate-700 leading-tight">Permitir inserção de devoluções</p>
+                              <p className="text-[8px] font-bold text-slate-400 mt-1 leading-relaxed">
+                                Usuário pode registrar novos containers no portal. Container é obrigatório; cliente e OS são opcionais.
+                                Se houver uma OS no sistema com o mesmo container e cliente, ela será vinculada automaticamente.
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              </div>{/* end space-y-3 devolucoes */}
+
+              {/* ── Filtros de Dados ────────────────────────────── */}
+              <div className="space-y-5">
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Filtros de Dados</p>
+                  <div className="flex-1 h-px bg-slate-200"/>
                 </div>
-              </div>
-            </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                  <p className="text-[8px] font-bold text-amber-700 uppercase leading-relaxed">
+                    Sem seleção = mostra todos os registros. Marque itens para restringir o que este usuário visualiza.
+                  </p>
+                </div>
+
+                {/* Categorias */}
+                {categories.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Categorias</p>
+                      {(editingUser.thirdPartyConfig?.allowedCategories?.length || 0) > 0 && (
+                        <button onClick={() => clearFilter('allowedCategories')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                          Limpar ({editingUser.thirdPartyConfig?.allowedCategories?.length})
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {categories.map((c: any) => {
+                        const selected = editingUser.thirdPartyConfig?.allowedCategories?.includes(c.name);
+                        return (
+                          <button
+                            key={c.name}
+                            onClick={() => toggleFilter('allowedCategories', c.name)}
+                            className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase transition-all ${
+                              selected
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                            }`}
+                          >
+                            {selected && <span className="mr-1">✓</span>}{c.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tipos de Operação */}
+                {opTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tipos de Operação</p>
+                      {(editingUser.thirdPartyConfig?.allowedTypes?.length || 0) > 0 && (
+                        <button onClick={() => clearFilter('allowedTypes')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                          Limpar ({editingUser.thirdPartyConfig?.allowedTypes?.length})
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {opTypes.map((t: any) => {
+                        const selected = editingUser.thirdPartyConfig?.allowedTypes?.includes(t.name);
+                        return (
+                          <button
+                            key={t.name}
+                            onClick={() => toggleFilter('allowedTypes', t.name)}
+                            className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase transition-all ${
+                              selected
+                                ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
+                            }`}
+                          >
+                            {selected && <span className="mr-1">✓</span>}{t.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tipos de Container */}
+                {containerTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tipos de Container</p>
+                      {(editingUser.thirdPartyConfig?.allowedContainerTypes?.length || 0) > 0 && (
+                        <button onClick={() => clearFilter('allowedContainerTypes')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                          Limpar ({editingUser.thirdPartyConfig?.allowedContainerTypes?.length})
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {containerTypes.map((ct: any) => {
+                        const selected = editingUser.thirdPartyConfig?.allowedContainerTypes?.includes(ct.name);
+                        return (
+                          <button
+                            key={ct.id || ct.name}
+                            onClick={() => toggleFilter('allowedContainerTypes', ct.name)}
+                            className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${
+                              selected
+                                ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-800'
+                            }`}
+                          >
+                            {ct.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Status */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Status</p>
+                    {(editingUser.thirdPartyConfig?.allowedStatuses?.length || 0) > 0 && (
+                      <button onClick={() => clearFilter('allowedStatuses')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                        Limpar ({editingUser.thirdPartyConfig?.allowedStatuses?.length})
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {STATUS_DEFS.map(s => {
+                      const selected = editingUser.thirdPartyConfig?.allowedStatuses?.includes(s.key);
+                      return (
+                        <button
+                          key={s.key}
+                          onClick={() => toggleFilter('allowedStatuses', s.key)}
+                          className={`px-2.5 py-1.5 rounded-xl border text-[8px] font-black uppercase transition-all cursor-pointer ${s.color} ${
+                            selected
+                              ? 'ring-2 ring-slate-400 ring-offset-1 shadow-sm scale-[1.03]'
+                              : 'opacity-40 hover:opacity-80'
+                          }`}
+                        >
+                          {s.key}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Clientes */}
+                {customers.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Clientes</p>
+                      <div className="flex items-center gap-2">
+                        {(editingUser.thirdPartyConfig?.allowedCustomers?.length || 0) > 0 && (
+                          <>
+                            <span className="text-[7px] font-black text-emerald-600 uppercase bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                              {editingUser.thirdPartyConfig?.allowedCustomers?.length} selecionado(s)
+                            </span>
+                            <button onClick={() => clearFilter('allowedCustomers')} className="text-[7px] font-black text-red-500 uppercase hover:underline">
+                              Limpar
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* System-style search input */}
+                    <div className="relative group">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors pointer-events-none">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Buscar por nome, razão social, CNPJ ou cidade..."
+                        value={customerSearch}
+                        onChange={e => setCustomerSearch(e.target.value)}
+                        className="w-full pl-10 pr-9 py-3 rounded-2xl border-2 border-slate-100 bg-white text-[10px] font-bold uppercase placeholder:text-slate-300 text-slate-700 focus:border-blue-400 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm"
+                      />
+                      {customerSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomerSearch('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Rich customer cards */}
+                    <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                      {filteredCustomers.map((c: Customer) => {
+                        const val = c.name || '';
+                        const selected = editingUser.thirdPartyConfig?.allowedCustomers?.includes(val) || false;
+                        return (
+                          <label
+                            key={c.id}
+                            className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                              selected
+                                ? 'bg-emerald-50 border-emerald-300'
+                                : 'bg-white border-slate-100 hover:border-blue-200 hover:bg-blue-50/30'
+                            }`}
+                          >
+                            {/* Checkbox */}
+                            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${
+                              selected ? 'bg-emerald-500 border-emerald-500' : 'border-slate-200 bg-white'
+                            }`}>
+                              {selected && (
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
+                                </svg>
+                              )}
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() => toggleFilter('allowedCustomers', val)}
+                                className="sr-only"
+                              />
+                            </div>
+
+                            {/* Customer info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className={`text-[11px] font-black uppercase leading-tight ${selected ? 'text-emerald-800' : 'text-slate-800'}`}>
+                                    {c.name}
+                                  </p>
+                                  {c.legalName && c.legalName !== c.name && (
+                                    <p className="text-[8px] font-bold text-slate-400 uppercase truncate mt-0.5">{c.legalName}</p>
+                                  )}
+                                </div>
+                                {c.cnpj && (
+                                  <span className="text-[8px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg shrink-0 border border-slate-200">
+                                    {maskCNPJ(c.cnpj)}
+                                  </span>
+                                )}
+                              </div>
+                              {(c.city || c.state) && (
+                                <div className="flex items-center gap-1 mt-1.5">
+                                  <svg className="w-2.5 h-2.5 text-slate-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                  </svg>
+                                  <span className={`text-[8px] font-bold uppercase ${selected ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                    {[c.city, c.state].filter(Boolean).join(' — ')}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })}
+                      {filteredCustomers.length === 0 && (
+                        <div className="text-center py-6">
+                          <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Nenhum cliente encontrado</p>
+                          {customerSearch && (
+                            <button onClick={() => setCustomerSearch('')} className="text-[8px] font-bold text-blue-500 mt-1 hover:underline">Limpar busca</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>{/* end filtros de dados */}
+
+            </div>{/* end overflow-y-auto */}
 
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3 shrink-0 bg-slate-50 rounded-b-2xl">
-              <button 
-                onClick={() => setEditingUser(null)}
-                className="px-6 py-2.5 text-xs font-black text-slate-600 uppercase bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleSaveConfig}
-                disabled={saving}
-                className="px-6 py-2.5 text-xs font-black text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+              <button onClick={() => setEditingUser(null)} className="px-6 py-2.5 text-xs font-black text-slate-600 uppercase bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>
+              <button onClick={handleSaveConfig} disabled={saving} className="px-6 py-2.5 text-xs font-black text-white uppercase bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2">
+                {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>}
                 {saving ? 'Salvando...' : 'Salvar Configurações'}
               </button>
             </div>

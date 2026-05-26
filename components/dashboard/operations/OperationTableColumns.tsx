@@ -7,8 +7,9 @@ import FinanceAction from './FinanceAction';
 
 // Componentes de coluna modulares
 import { DriverColumn } from './columns/DriverColumn';
-import { EquipmentColumn } from './columns/EquipmentColumn';
+import { makeEquipmentColumn } from './columns/EquipmentColumn';
 import { makeShipBookingColumn } from './columns/ShipBookingColumn';
+import { ReuseMatch } from '../../../utils/containerReuseService';
 import { CustomerColumn } from './columns/CustomerColumn';
 import { DestinationColumn } from './columns/DestinationColumn';
 import { StatusColumn } from './columns/StatusColumn';
@@ -31,7 +32,9 @@ export const getOperationTableColumns = (
   allDrivers: Driver[] = [],
   categories: Category[] = [],
   operationTypes: any[] = [],
-  getGateTag?: (trip: Trip) => React.ReactNode
+  getGateTag?: (ship: string) => React.ReactNode,
+  reuseMap: Map<string, ReuseMatch> = new Map(),
+  onMarkReuse: (trip: Trip) => void = () => {}
 ) => {
   
   const handleFileUpload = async (trip: Trip, type: 'OS_PDF' | 'AGENDAMENTO' | 'CTE' | 'CVA' | 'COMPLETO' | 'BATCH', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,7 +155,7 @@ export const getOperationTableColumns = (
     {
       key: 'equipment',
       label: '4. Container / Equipamento',
-      render: EquipmentColumn
+      render: makeEquipmentColumn(reuseMap, onMarkReuse)
     },
     {
       key: 'ship_booking',

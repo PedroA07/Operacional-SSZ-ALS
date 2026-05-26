@@ -29,7 +29,17 @@ export interface User {
     visibleFields: string[];
     allowedCategories?: string[];
     allowedTypes?: string[];
+    allowedContainerTypes?: string[];
+    allowedStatuses?: string[];
+    allowedCustomers?: string[];
     visibleFilters?: string[];
+    allowInsertDevolucao?: boolean;
+    pages?: {
+      orgColeta?:        { enabled: boolean; visibleFields: string[] };
+      orgEntrega?:       { enabled: boolean; visibleFields: string[] };
+      orgColetaEntrega?: { enabled: boolean; visibleFields: string[] };
+      orgDevolucoes?:    { enabled: boolean; visibleFields: string[] };
+    };
   };
 }
 
@@ -329,7 +339,34 @@ export enum DashboardTab {
   AUTOMACOES = 'AUTOMACOES',
   NAVIOS = 'NAVIOS',
   EXTERNAL_PORTAL = 'EXTERNAL_PORTAL',
-  EXTERNAL_USERS = 'EXTERNAL_USERS'
+  EXTERNAL_USERS = 'EXTERNAL_USERS',
+  TABELA_FRETE = 'TABELA_FRETE'
+}
+
+export interface FreightVehicleType {
+  id: string;
+  code: string;
+  name: string;
+  sortOrder: number;
+  axlesGoing: number;
+  axlesReturning: number;
+  createdAt?: string;
+}
+
+export interface FreightRouteVehicleValue {
+  freight: number;
+  tollGoing: number;
+  tollReturning: number;
+  repasse: number;
+}
+
+export interface FreightRoute {
+  id: string;
+  originCity: string;
+  destinationCity: string;
+  vehicleValues: { [vehicleCode: string]: FreightRouteVehicleValue };
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Automation {
@@ -822,7 +859,6 @@ export interface SILProgramacao {
   placaVeiculo: string;
   placaCarreta: string;
   cidadeAtendimento: string;
-  referenciaPosCidade: string;
   nomeLocalAtendimento: string;
   numeroColeta: string;
   embarcador: string;
@@ -877,4 +913,82 @@ export interface ShipTerminalConfig {
   url: string;
   active: boolean;
   sortOrder: number;
+}
+
+export type DevolucaoStatus = 'Pendente' | 'Agendado' | 'Realizado' | 'Cancelado';
+export type LiberacaoStatus = 'Pendente' | 'Emitido' | 'Cancelado';
+
+export interface Devolucao {
+  id: string;
+  os: string;
+  container: string;
+  containerType?: string;
+  booking?: string;
+  ship?: string;
+  agencia?: string;
+  pod?: string;
+  padrao?: string;
+  local?: string;
+  localId?: string;
+  customer?: {
+    id: string;
+    name: string;
+    legalName?: string;
+    cnpj?: string;
+    city?: string;
+    state?: string;
+  };
+  driver?: {
+    id: string;
+    name: string;
+    plateHorse?: string;
+    plateTrailer?: string;
+    cpf?: string;
+  };
+  scheduledDateTime?: string;
+  agendamentoDoc?: {
+    id: string;
+    type: string;
+    url: string;
+    fileName: string;
+    uploadDate: string;
+  };
+  obs?: string;
+  status: DevolucaoStatus;
+  isCompleted?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface Liberacao {
+  id: string;
+  os: string;
+  local?: string;
+  localId?: string;
+  booking?: string;
+  ship?: string;
+  agencia?: string;
+  pod?: string;
+  containerType?: string;
+  qtdContainer?: string;
+  padrao?: string;
+  customer?: {
+    id: string;
+    name: string;
+    legalName?: string;
+    cnpj?: string;
+    city?: string;
+    state?: string;
+  };
+  driver?: {
+    id: string;
+    name: string;
+    plateHorse?: string;
+    plateTrailer?: string;
+    cpf?: string;
+  };
+  obs?: string;
+  status: LiberacaoStatus;
+  createdAt: string;
+  updatedAt?: string;
 }

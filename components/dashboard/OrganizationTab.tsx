@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer, Devolucao, Liberacao } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
 import { db, supabase } from '../../utils/storage';
 import FeedbackModal from '../shared/FeedbackModal';
 import DateTimePicker from '../shared/DateTimePicker';
+import ImageViewer from '../shared/ImageViewer';
 import PreStackingForm from './forms/PreStackingForm';
+import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
+import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
 import { localDateStr, localDateTimeStr } from '../../utils/dateHelpers';
+import { r2Service } from '../../utils/r2Service';
 
 interface OrganizationTabProps {
   userId: string;
@@ -354,14 +358,56 @@ const ToggleIconBtn: React.FC<{
   </button>
 );
 
+type DevScheduleStatus = 'critico' | 'pendente' | 'agendado' | 'normal';
+
+function getDevScheduleStatus(d: Devolucao): DevScheduleStatus {
+  if (d.status === 'Cancelado' || d.status === 'Realizado') return 'normal';
+  if (!d.scheduledDateTime) return 'normal';
+  const now = new Date();
+  const scheduledDt = new Date(d.scheduledDateTime);
+  if (scheduledDt > now) return 'agendado';
+  if (d.agendamentoDoc) return 'normal';
+  const hoursLate = (now.getTime() - scheduledDt.getTime()) / (1000 * 60 * 60);
+  return hoursLate > 48 ? 'critico' : 'pendente';
+}
+
+const DEV_PRIORITY: Record<DevScheduleStatus, number> = { critico: 3, pendente: 2, agendado: 1, normal: 0 };
+
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, drivers, customers, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [settingsModal, setSettingsModal] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<Trip | null>(null);
   const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
   const [minutaTrip, setMinutaTrip] = useState<Trip | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA'>('COLETA');
+  const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA' | 'DEVOLUÇÕES' | 'LIBERAÇÕES'>('COLETA');
+  const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
+  const [devMinutaDev, setDevMinutaDev] = useState<Devolucao | null>(null);
+  const [uploadingDevId, setUploadingDevId] = useState<string | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<{ url: string; fileName: string } | null>(null);
+
+  const handleDownloadDoc = async (url: string, fileName: string) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
+  };
+  const [showDevAddForm, setShowDevAddForm] = useState(false);
+  const [devAddForm, setDevAddForm] = useState({ container: '', local: '', dateTime: '', driverId: '' });
+  const [savingDevAdd, setSavingDevAdd] = useState(false);
+  const [liberacoes, setLiberacoes] = useState<Liberacao[]>([]);
+  const [libMinuta, setLibMinuta] = useState<Liberacao | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
@@ -400,17 +446,30 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.from('terminal_vessels').select('*').order('fetched_at', { ascending: false })
-      .then(({ data }) => {
-        if (!data) return;
-        setTerminalVessels(data.map((r: any) => ({
-          terminal: r.terminal, navio: r.navio, situacao: r.situacao,
-          gateDry: r.gate_dry, gateReefer: r.gate_reefer,
-          deadLineStr: r.dead_line_str,
-          dtPrevAtrac: r.dt_prev_atrac, dtAtracacao: r.dt_atracacao,
-          dtPrevSaida: r.dt_prev_saida, fetchedAt: r.fetched_at,
-        } as TerminalVessel)));
-      });
+
+    const fetchVessels = () =>
+      supabase!.from('terminal_vessels').select('*').order('fetched_at', { ascending: false })
+        .then(({ data }) => {
+          if (!data) return;
+          setTerminalVessels(data.map((r: any) => ({
+            terminal: r.terminal, navio: r.navio, situacao: r.situacao,
+            viagem: r.viagem,
+            gateDry:     r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
+            gateReefer:  r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
+            deadLineStr: r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
+            dtPrevAtrac: r.dt_prev_atrac, dtAtracacao: r.dt_atracacao,
+            dtPrevSaida: r.dt_prev_saida, fetchedAt: r.fetched_at,
+          } as TerminalVessel)));
+        });
+
+    fetchVessels();
+
+    const channel = supabase
+      .channel('org-terminal-vessels')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'terminal_vessels' }, fetchVessels)
+      .subscribe();
+
+    return () => { supabase!.removeChannel(channel); };
   }, []);
 
   // Separa "NAVIO/VIAGEM", "NAVIO|VIAGEM" ou "NAVIO VIAGEM" → { name, voyage }
@@ -448,78 +507,131 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return isNaN(dt.getTime()) ? null : dt;
   };
 
-  // Normaliza string para comparação: só letras e dígitos maiúsculos
-  const normVessel = (s: string) =>
-    s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
-
-  const getVesselForTrip = useCallback((shipRaw: string, voyage?: string): TerminalVessel | null => {
+  const getVesselForTrip = useCallback((shipRaw: string): TerminalVessel | null => {
     if (!shipRaw) return null;
-    const { name } = splitShipField(shipRaw);
-    const n = normVessel(name || shipRaw);
+    const { name, voyage } = splitShipField(shipRaw);
+    const norm = (s: string) => s.toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^A-Z0-9]/g, '');
+    const n = norm(name || shipRaw);
     if (!n || n.length < 3) return null;
 
     const nameWords = (name || shipRaw).toUpperCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .split(/\s+/).filter((w: string) => w.length > 2);
+      .split(/\s+/).filter(w => w.length > 2);
 
-    const isMatch = (v: TerminalVessel) => {
-      const vn = normVessel(v.navio);
+    const nameMatches = (v: TerminalVessel) => {
+      const vn = norm(v.navio);
+      const vRaw = v.navio.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       if (vn === n) return true;
       if (vn.includes(n) || n.includes(vn)) return true;
-      return nameWords.length >= 2 && nameWords.every((w: string) =>
-        v.navio.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(w));
+      return nameWords.length >= 2 && nameWords.every(w => vRaw.includes(w));
     };
 
-    const matches = terminalVessels.filter(isMatch);
+    const matches = terminalVessels.filter(nameMatches);
     if (matches.length === 0) return null;
 
-    // 1) Prefere match por viagem exata
+    // Filtra por viagem se disponível — usa includes para cobrir "RAP621N" ⊇ "621N"
+    let pool = matches;
     if (voyage) {
-      const vNorm = voyage.trim().toUpperCase();
-      const byVoyage = matches.find(v => (v.viagem || '').trim().toUpperCase() === vNorm);
-      if (byVoyage) return byVoyage;
+      const normVoyage = norm(voyage);
+      const voyageMatches = matches.filter(v => {
+        if (!v.viagem) return false;
+        const nv = norm(v.viagem);
+        return nv === normVoyage || nv.includes(normVoyage) || normVoyage.includes(nv);
+      });
+      if (voyageMatches.length > 0) pool = voyageMatches;
     }
-    // 2) Prefere o que tem dados de gate
-    const withGate = matches.find(v => v.gateDry || v.gateReefer);
-    // 3) Prefere o que tem deadline
-    const withDeadline = matches.find(v => v.deadLineStr);
-    return withGate ?? withDeadline ?? matches[0];
+
+    // Dentro do pool, prioriza pelo deadline mais urgente com data futura.
+    // Isso resolve o caso em que BTP e EMBRAPORT têm o mesmo navio/viagem
+    // mas prazos diferentes: o mais urgente é o relevante para a operação.
+    const now = new Date();
+    const deadlineDt = (v: TerminalVessel) => parseFlexDate(v.deadLineStr || '');
+
+    pool.sort((a, b) => {
+      const da = deadlineDt(a);
+      const db = deadlineDt(b);
+      const daFut = da && da > now;
+      const dbFut = db && db > now;
+      // Ambos com deadline futuro: prefere o mais urgente (menor prazo)
+      if (daFut && dbFut) return da!.getTime() - db!.getTime();
+      // Apenas um tem deadline futuro: prefere ele
+      if (daFut) return -1;
+      if (dbFut) return 1;
+      // Nenhum tem deadline futuro: prefere o mais recentemente expirado
+      if (da && db) return db.getTime() - da.getTime();
+      if (da) return -1;
+      if (db) return 1;
+      // Sem deadline: prefere quem tem dados de gate
+      return (b.gateDry || b.gateReefer ? 1 : 0) - (a.gateDry || a.gateReefer ? 1 : 0);
+    });
+
+    return pool[0];
   }, [terminalVessels, splitShipField]);
+
+  const mapSituacaoGate = (s: string) => {
+    const n = (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (n.includes('gate abert') || n.includes('gate open'))  return 'GATE ABERTO' as const;
+    if (n.includes('gate fech') || n.includes('gate closed')) return 'GATE FECHADO' as const;
+    if (n.includes('gate encerr') || n.includes('encerrado')) return 'GATE ENCERRADO' as const;
+    if (n.includes('em operac') || n.includes('operando') || n.includes('atracad')) return 'ATRACADO' as const;
+    if (n.includes('desatrac') || n.includes('saiu'))         return 'DESATRACADO' as const;
+    if (n.includes('na barra') || n.includes('esperado') || n.includes('previsto') || n.includes('aguard')) return 'AG_ATRAC' as const;
+    return null;
+  };
 
   const renderGateTag = useCallback((shipName?: string, containerType?: string): React.ReactNode => {
     if (!shipName) return null;
-    const { voyage } = splitShipField(shipName);
-    const vessel = getVesselForTrip(shipName, voyage || undefined);
+    const vessel = getVesselForTrip(shipName);
     if (!vessel) return null;
     const now = new Date();
-    // Seleciona o gate correto com base no tipo de contêiner da viagem
-    const isReefer = /reefer|rf\b|refriger/i.test(containerType || '');
+    const isReefer = /R/i.test(containerType || '');
     const gateStr = isReefer
-      ? (vessel.gateReefer || vessel.gateDry)   // reefer → gateReefer first
-      : (vessel.gateDry    || vessel.gateReefer); // dry/outro → gateDry first
+      ? (vessel.gateReefer || vessel.gateDry)
+      : (vessel.gateDry || vessel.gateReefer);
     const gateDt = parseFlexDate(gateStr || '');
     const deadDt = parseFlexDate(vessel.deadLineStr || '');
 
     const fmtDate = (d: Date) =>
       d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-    // Sem data de gate — nada a mostrar
-    if (!gateDt) return null;
+    // Use situacao from scraper as primary source (same as NaviosTab)
+    const situacaoStatus = mapSituacaoGate(vessel.situacao);
 
-    if (gateDt > now) {
-      // Gate ainda fechado → badge vermelho + previsão de abertura
+    // Override: if bot still says "Gate Aberto" but deadline already passed, treat as fechado
+    const effectiveStatus = (situacaoStatus === 'GATE ABERTO' && deadDt && deadDt <= now)
+      ? 'GATE FECHADO'
+      : situacaoStatus;
+
+    if (effectiveStatus === 'GATE ABERTO') {
+      const encDt = deadDt || gateDt;
       return (
-        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
-          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-500"/>
-          Gate Fechado
-          <span className="font-bold text-red-400 normal-case ml-0.5">• Abre {fmtDate(gateDt)}</span>
+        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-green-500/10 text-green-700 border-green-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-500"/>
+          Gate Aberto
+          {encDt && (
+            <span className={`font-bold normal-case ml-0.5 ${encDt <= now ? 'text-red-500' : 'text-orange-500'}`}>
+              • Enc. {fmtDate(encDt)}
+            </span>
+          )}
         </span>
       );
     }
 
-    // Gate aberto — verificar deadline
-    if (deadDt && deadDt < now) {
-      // Deadline já passou
+    if (effectiveStatus === 'GATE FECHADO') {
+      return (
+        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-500"/>
+          Gate Fechado
+          {gateDt && gateDt > now && (
+            <span className="font-bold text-red-400 normal-case ml-0.5">• Abre {fmtDate(gateDt)}</span>
+          )}
+        </span>
+      );
+    }
+
+    if (effectiveStatus === 'GATE ENCERRADO') {
       return (
         <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-pink-500/10 text-pink-600 border-pink-500/30">
           <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-pink-500"/>
@@ -528,7 +640,34 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       );
     }
 
-    // Gate aberto, com ou sem prazo futuro
+    if (effectiveStatus === 'ATRACADO') {
+      return (
+        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 border-amber-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-500"/>
+          Atracado
+        </span>
+      );
+    }
+
+    // situacao not recognized — fall back to gate datetime logic if available
+    if (!gateDt) return null;
+    if (gateDt > now) {
+      return (
+        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-500"/>
+          Gate Fechado
+          <span className="font-bold text-red-400 normal-case ml-0.5">• Abre {fmtDate(gateDt)}</span>
+        </span>
+      );
+    }
+    if (deadDt && deadDt < now) {
+      return (
+        <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-pink-500/10 text-pink-600 border-pink-500/30">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-pink-500"/>
+          Gate Encerrado
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-green-500/10 text-green-700 border-green-500/30">
         <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-500"/>
@@ -538,7 +677,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         )}
       </span>
     );
-  }, [getVesselForTrip, splitShipField]);
+  }, [getVesselForTrip]);
 
   useEffect(() => {
     const toRemove: string[] = [];
@@ -581,15 +720,25 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const now = Date.now();
 
     return propTrips
+      .map(serverTrip => {
+        const pending = pendingUpdates[serverTrip.id];
+        // Se houver uma atualização local feita há menos de STABILITY_DURATION, ela tem prioridade
+        if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
+          return { ...serverTrip, ...pending.data };
+        }
+        return serverTrip;
+      })
       .filter(trip => {
         const type = trip.type?.toUpperCase() || '';
         if (activeView === 'COLETA') {
+          if (type.includes('DEVOLU')) return false;
           if (hiddenTripTypesColeta !== null) {
             if (hiddenTripTypesColeta.includes(type)) return false;
           } else {
             if (!['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(type)) return false;
           }
         } else {
+          if (type.includes('DEVOLU')) return false;
           if (hiddenTripTypesEntrega !== null) {
             if (hiddenTripTypesEntrega.includes(type)) return false;
           } else {
@@ -615,14 +764,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           return true;
         }
         return false;
-      })
-      .map(serverTrip => {
-        const pending = pendingUpdates[serverTrip.id];
-        // Se houver uma atualização local feita há menos de STABILITY_DURATION, ela tem prioridade
-        if (pending && (now - pending.timestamp) < STABILITY_DURATION) {
-          return { ...serverTrip, ...pending.data };
-        }
-        return serverTrip;
       })
       .sort((a, b) => {
         const dateA = new Date(a.dateTime || 0).getTime();
@@ -688,6 +829,62 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   useEffect(() => {
     loadData();
   }, []);
+
+  const loadDevolucoes = useCallback(async () => {
+    const devs = await db.getDevolucoes();
+    setDevolucoes(devs);
+  }, []);
+
+  useEffect(() => {
+    loadDevolucoes();
+    if (!supabase) return;
+    const ch = supabase
+      .channel('org-devolucoes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'devolucoes' }, loadDevolucoes)
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [loadDevolucoes]);
+
+  const loadLiberacoes = useCallback(async () => {
+    const libs = await db.getLiberacoes();
+    setLiberacoes(libs);
+  }, []);
+
+  useEffect(() => {
+    loadLiberacoes();
+    if (!supabase) return;
+    const ch = supabase
+      .channel('org-liberacoes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'liberacoes' }, loadLiberacoes)
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [loadLiberacoes]);
+
+  // Subscription direta em trips — sem debounce, todos os usuários recebem imediatamente
+  useEffect(() => {
+    if (!supabase) return;
+    const ch = supabase
+      .channel('org-trips-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => onRefresh())
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [onRefresh]);
+
+  const sortedDevolucoes = useMemo(() => {
+    return [...devolucoes].sort((a, b) => {
+      const pa = DEV_PRIORITY[getDevScheduleStatus(a)];
+      const pb = DEV_PRIORITY[getDevScheduleStatus(b)];
+      if (pa !== pb) return pb - pa;
+      const da = a.scheduledDateTime ? new Date(a.scheduledDateTime).getTime() : Infinity;
+      const db = b.scheduledDateTime ? new Date(b.scheduledDateTime).getTime() : Infinity;
+      return da - db;
+    });
+  }, [devolucoes]);
+
+  const sortedLiberacoes = useMemo(() => {
+    const libPriority: Record<string, number> = { Pendente: 2, Emitido: 1, Cancelado: 0 };
+    return [...liberacoes].sort((a, b) => (libPriority[b.status] ?? 0) - (libPriority[a.status] ?? 0));
+  }, [liberacoes]);
 
   const handleToggleNF = useCallback(async (trip: Trip, checked: boolean) => {
     const now = Date.now();
@@ -883,11 +1080,87 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return next;
       });
       console.error("Erro ao salvar data/hora de agendamento:", error);
-      window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Erro ao salvar data/hora de agendamento', type: 'error' } 
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao salvar data/hora de agendamento', type: 'error' }
       }));
     }
   }, []);
+
+  const handleSaveDevAgendamento = useCallback(async (devId: string, dateTime: string) => {
+    const dev = devolucoes.find(d => d.id === devId);
+    if (!dev) return;
+    try {
+      await db.saveDevolucao({ ...dev, scheduledDateTime: dateTime, status: dateTime ? 'Agendado' : dev.status });
+      await loadDevolucoes();
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar agendamento', type: 'error' } }));
+    }
+  }, [devolucoes, loadDevolucoes]);
+
+  const handleDevComprovanteUpload = useCallback(async (dev: Devolucao, file: File) => {
+    setUploadingDevId(dev.id);
+    try {
+      const ext = file.name.split('.').pop() || 'pdf';
+      const fileName = `comprovante-dev-${dev.os || dev.id}-${Date.now()}.${ext}`;
+      const url = await r2Service.upload(file, fileName, `devolucoes/${dev.os || dev.id}`);
+      const doc = { id: `agd-${Date.now()}`, type: 'AGENDAMENTO', url, fileName: file.name, uploadDate: new Date().toISOString() };
+      await db.saveDevolucao({ ...dev, agendamentoDoc: doc });
+      await loadDevolucoes();
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Comprovante enviado com sucesso', type: 'success' } }));
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao enviar comprovante', type: 'error' } }));
+    } finally {
+      setUploadingDevId(null);
+    }
+  }, [loadDevolucoes]);
+
+  const handleSaveDevolucaoFromForm = useCallback(async (updated: Devolucao) => {
+    await db.saveDevolucao(updated);
+    await loadDevolucoes();
+    setDevMinutaDev(null);
+    window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Minuta salva com sucesso', type: 'success' } }));
+  }, [loadDevolucoes]);
+
+  const handleSaveLiberacaoFromForm = useCallback(async (updated: Liberacao) => {
+    await db.saveLiberacao(updated);
+    await loadLiberacoes();
+    setLibMinuta(null);
+    window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Liberação salva com sucesso', type: 'success' } }));
+  }, [loadLiberacoes]);
+
+  const handleAddDevEntry = useCallback(async () => {
+    if (!devAddForm.container.trim()) return;
+    setSavingDevAdd(true);
+    try {
+      const driver = drivers.find(d => d.id === devAddForm.driverId);
+      const now = new Date().toISOString();
+      const newDev: Devolucao = {
+        id: crypto.randomUUID(),
+        os: `DEV-${Date.now()}`,
+        container: devAddForm.container.trim().toUpperCase(),
+        local: devAddForm.local.trim() ? devAddForm.local.trim().toUpperCase() : undefined,
+        driver: driver ? {
+          id: driver.id,
+          name: driver.name,
+          plateHorse: driver.plateHorse || undefined,
+          plateTrailer: driver.plateTrailer || undefined,
+          cpf: driver.cpf || undefined,
+        } : undefined,
+        scheduledDateTime: devAddForm.dateTime || undefined,
+        status: 'Pendente',
+        createdAt: now,
+      };
+      await db.saveDevolucao(newDev);
+      await loadDevolucoes();
+      setDevAddForm({ container: '', local: '', dateTime: '', driverId: '' });
+      setShowDevAddForm(false);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Devolução adicionada com sucesso', type: 'success' } }));
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao adicionar devolução', type: 'error' } }));
+    } finally {
+      setSavingDevAdd(false);
+    }
+  }, [devAddForm, drivers, loadDevolucoes]);
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
     const advanceData = { 
@@ -1359,12 +1632,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       sortable: false,
       render: (t: Trip) => (
         <div className="flex items-center justify-center">
-          <button 
-            onClick={() => {
-              if (window.confirm(`Deseja remover a OS ${t.os} deste painel?`)) {
-                handleRemoveFromOrg(t);
-              }
-            }}
+          <button
+            onClick={() => setConfirmRemove(t)}
             className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
             title="Limpar deste painel"
           >
@@ -1376,6 +1645,301 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       )
     }
   ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, mapTripToMinuta]);
+
+  const handleDeleteDevolucao = useCallback((d: Devolucao) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Devolução',
+      message: `Deseja excluir permanentemente a devolução do container ${d.container || d.os}? Esta ação não pode ser desfeita.`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await db.deleteDevolucao(d.id);
+        await loadDevolucoes();
+        window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Devolução excluída', type: 'success' } }));
+      }
+    });
+  }, [loadDevolucoes]);
+
+  const handleDeleteLiberacao = useCallback((l: Liberacao) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Liberação',
+      message: `Deseja excluir permanentemente a liberação ${l.os}? Esta ação não pode ser desfeita.`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        await db.deleteLiberacao(l.id);
+        await loadLiberacoes();
+        window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Liberação excluída', type: 'success' } }));
+      }
+    });
+  }, [loadLiberacoes]);
+
+  const devolucoesColumns = useMemo(() => [
+    {
+      key: 'container',
+      label: 'Container / OS',
+      sortable: true,
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5 py-0.5">
+          <span className="text-[10px] font-black text-slate-800 uppercase">{d.container || '---'}</span>
+          <span className="text-[8px] font-bold text-slate-400 uppercase">{d.os}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'local',
+      label: 'Local / Depósito',
+      sortable: true,
+      render: (d: Devolucao) => (
+        <span className="text-[9px] font-bold text-slate-700 uppercase">{d.local || '---'}</span>
+      ),
+    },
+    {
+      key: 'booking',
+      label: 'Booking / Navio',
+      sortable: true,
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{d.booking || '---'}</span>
+          {d.ship && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.ship}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'containerType',
+      label: 'Tipo / Padrão',
+      sortable: true,
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{d.containerType || '---'}</span>
+          {d.padrao && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.padrao}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'customer',
+      label: 'Cliente',
+      sortable: true,
+      sortValue: (d: Devolucao) => d.customer?.legalName || d.customer?.name || '',
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{d.customer?.legalName || d.customer?.name || '---'}</span>
+          {d.customer?.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.customer.city}{d.customer.state ? `/${d.customer.state}` : ''}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'driver',
+      label: 'Motorista',
+      sortable: true,
+      sortValue: (d: Devolucao) => d.driver?.name || '',
+      render: (d: Devolucao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{d.driver?.name || '---'}</span>
+          <div className="flex items-center gap-1">
+            {d.driver?.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{d.driver.plateHorse}</span>}
+            {d.driver?.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{d.driver.plateTrailer}</span>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'scheduledDateTime',
+      label: 'Agendamento',
+      sortable: true,
+      width: 210,
+      render: (d: Devolucao) => {
+        const dtPickerVal = d.scheduledDateTime
+          ? (() => { try { const dt = new Date(d.scheduledDateTime!); const off = dt.getTimezoneOffset()*60000; return new Date(dt.getTime()-off).toISOString().slice(0,16); } catch { return ''; }})()
+          : '';
+        return (
+          <DateTimePicker
+            value={dtPickerVal}
+            onChange={val => {
+              const iso = val ? new Date(val).toISOString() : '';
+              handleSaveDevAgendamento(d.id, iso);
+            }}
+            placeholder="Agendar..."
+            inputClassName="text-[9px] py-1.5 rounded-lg border-slate-200"
+          />
+        );
+      },
+    },
+    {
+      key: 'status',
+      label: 'Status / Prioridade',
+      sortable: true,
+      render: (d: Devolucao) => {
+        const styles: Record<string, string> = {
+          Pendente: 'bg-slate-100 text-slate-600 border-slate-200',
+          Agendado: 'bg-amber-50 text-amber-700 border-amber-200',
+          Realizado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+          Cancelado: 'bg-red-50 text-red-700 border-red-200',
+        };
+        const sched = getDevScheduleStatus(d);
+        return (
+          <div className="flex flex-col gap-1">
+            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border w-fit ${styles[d.status] || styles.Pendente}`}>{d.status}</span>
+            {sched === 'critico' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-red-600 text-white border-red-700 animate-pulse w-fit">
+                <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                +2 dias sem comprovante
+              </span>
+            )}
+            {sched === 'pendente' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-orange-100 text-orange-700 border-orange-300 w-fit">
+                <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Sem comprovante
+              </span>
+            )}
+            {sched === 'agendado' && !d.agendamentoDoc && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-blue-50 text-blue-600 border-blue-200 w-fit">
+                <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Aguardando
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'agendamentoDoc',
+      label: 'Comprovante',
+      sortable: false,
+      render: (d: Devolucao) => {
+        const isUploading = uploadingDevId === d.id;
+        return (
+          <div className="flex flex-col gap-1 items-start">
+            {d.agendamentoDoc && (
+              <button
+                onClick={() => setViewingDoc({ url: d.agendamentoDoc!.url, fileName: d.agendamentoDoc!.fileName })}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Visualizar
+              </button>
+            )}
+            <label className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[8px] font-black cursor-pointer transition-colors ${isUploading ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'}`}>
+              {isUploading
+                ? <><div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"/><span>Enviando...</span></>
+                : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>{d.agendamentoDoc ? 'Substituir' : 'Anexar'}</span></>
+              }
+              <input type="file" accept=".pdf,image/*" className="hidden" disabled={isUploading} onChange={e => { const file = e.target.files?.[0]; if (file) { handleDevComprovanteUpload(d, file); e.target.value = ''; } }} />
+            </label>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      label: 'Ações',
+      sortable: false,
+      width: 90,
+      render: (d: Devolucao) => (
+        <div className="flex items-center gap-1 justify-center">
+          <button onClick={() => setDevMinutaDev(d)} className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-all" title="Editar minuta">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button onClick={() => handleDeleteDevolucao(d)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all" title="Excluir">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      ),
+    },
+  ], [handleSaveDevAgendamento, handleDevComprovanteUpload, setDevMinutaDev, handleDeleteDevolucao, uploadingDevId]);
+
+  const liberacoesColumns = useMemo(() => [
+    {
+      key: 'os',
+      label: 'OS',
+      sortable: true,
+      render: (l: Liberacao) => <span className="text-[9px] font-bold text-slate-600 uppercase">{l.os || '---'}</span>,
+    },
+    {
+      key: 'local',
+      label: 'Local / Retirada',
+      sortable: true,
+      render: (l: Liberacao) => <span className="text-[9px] font-bold text-slate-700 uppercase">{l.local || '---'}</span>,
+    },
+    {
+      key: 'booking',
+      label: 'Booking / Navio',
+      sortable: true,
+      render: (l: Liberacao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{l.booking || '---'}</span>
+          {l.ship && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.ship}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'containerType',
+      label: 'Qtd / Tipo',
+      sortable: true,
+      render: (l: Liberacao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700">{l.qtdContainer || '01'}x {l.containerType || '---'}</span>
+          {l.padrao && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.padrao}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'customer',
+      label: 'Cliente',
+      sortable: true,
+      sortValue: (l: Liberacao) => l.customer?.legalName || l.customer?.name || '',
+      render: (l: Liberacao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{l.customer?.legalName || l.customer?.name || '---'}</span>
+          {l.customer?.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.customer.city}{l.customer.state ? `/${l.customer.state}` : ''}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'driver',
+      label: 'Motorista',
+      sortable: true,
+      sortValue: (l: Liberacao) => l.driver?.name || '',
+      render: (l: Liberacao) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{l.driver?.name || '---'}</span>
+          <div className="flex items-center gap-1">
+            {l.driver?.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{l.driver.plateHorse}</span>}
+            {l.driver?.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{l.driver.plateTrailer}</span>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (l: Liberacao) => {
+        const styles: Record<string, string> = {
+          Pendente: 'bg-slate-100 text-slate-600 border-slate-200',
+          Emitido:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+          Cancelado:'bg-red-50 text-red-700 border-red-200',
+        };
+        return <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${styles[l.status] || styles.Pendente}`}>{l.status}</span>;
+      },
+    },
+    {
+      key: 'actions',
+      label: 'Ações',
+      sortable: false,
+      width: 90,
+      render: (l: Liberacao) => (
+        <div className="flex items-center gap-1 justify-center">
+          <button onClick={() => setLibMinuta(l)} className="p-1.5 rounded-lg hover:bg-violet-50 text-slate-400 hover:text-violet-600 transition-all" title="Editar liberação">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button onClick={() => handleDeleteLiberacao(l)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all" title="Excluir">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      ),
+    },
+  ], [setLibMinuta, handleDeleteLiberacao]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -1433,11 +1997,23 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             >
               Coleta/Export
             </button>
-            <button 
+            <button
               onClick={() => setActiveView('ENTREGA')}
               className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'ENTREGA' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
               Entrega/Import
+            </button>
+            <button
+              onClick={() => setActiveView('DEVOLUÇÕES')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'DEVOLUÇÕES' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Devoluções
+            </button>
+            <button
+              onClick={() => setActiveView('LIBERAÇÕES')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'LIBERAÇÕES' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Liberações
             </button>
           </div>
 
@@ -1567,17 +2143,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               }}
             />
           </div>
-        ) : (
+        ) : activeView === 'ENTREGA' ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3 ml-4">
               <div className="w-2 h-8 bg-emerald-600 rounded-full"></div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Entrega</h3>
             </div>
-            <SmartOperationTable 
-              userId={userId} 
-              componentId="org-entrega-import" 
-              columns={columns} 
-              data={trips} 
+            <SmartOperationTable
+              userId={userId}
+              componentId="org-entrega-import"
+              columns={columns}
+              data={trips}
               hideInternalSearch={false}
               getRowStyle={(t: Trip) => {
                 if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
@@ -1586,8 +2162,211 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               }}
             />
           </div>
+        ) : activeView === 'DEVOLUÇÕES' ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 ml-4 flex-wrap">
+              <div className="w-2 h-8 bg-orange-500 rounded-full"></div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Devoluções de Vazio</h3>
+              <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] font-black rounded-full border border-orange-200">{devolucoes.length}</span>
+              {sortedDevolucoes.filter(d => getDevScheduleStatus(d) === 'critico').length > 0 && (
+                <span className="flex items-center gap-1 px-2.5 py-1 bg-red-600 text-white text-[8px] font-black rounded-full border border-red-700 animate-pulse">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                  {sortedDevolucoes.filter(d => getDevScheduleStatus(d) === 'critico').length} CRÍTICO
+                </span>
+              )}
+              {sortedDevolucoes.filter(d => getDevScheduleStatus(d) === 'pendente').length > 0 && (
+                <span className="flex items-center gap-1 px-2.5 py-1 bg-orange-100 text-orange-700 text-[8px] font-black rounded-full border border-orange-300">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  {sortedDevolucoes.filter(d => getDevScheduleStatus(d) === 'pendente').length} SEM COMPROVANTE
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  const now = new Date().toISOString();
+                  setDevMinutaDev({ id: crypto.randomUUID(), os: `DEV-${Date.now()}`, container: '', status: 'Pendente', createdAt: now });
+                }}
+                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                Nova Devolução
+              </button>
+            </div>
+            <SmartOperationTable
+              userId={userId}
+              componentId="org-devolucoes"
+              columns={devolucoesColumns}
+              data={sortedDevolucoes}
+              hideInternalSearch={false}
+              noMaxHeight
+              stickyHeaderTop={0}
+              getRowStyle={(d: Devolucao) => {
+                const s = getDevScheduleStatus(d);
+                if (s === 'critico') return { backgroundColor: '#fef2f2', boxShadow: 'inset 4px 0 0 #dc2626' };
+                if (s === 'pendente') return { backgroundColor: '#fff7ed', boxShadow: 'inset 4px 0 0 #f97316' };
+                if (s === 'agendado') return { backgroundColor: '#eff6ff', boxShadow: 'inset 4px 0 0 #3b82f6' };
+                return {};
+              }}
+            />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 ml-4">
+              <div className="w-2 h-8 bg-violet-500 rounded-full"></div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Liberações de Vazio</h3>
+              <span className="ml-1 px-2 py-0.5 bg-violet-100 text-violet-700 text-[9px] font-black rounded-full border border-violet-200">{liberacoes.length}</span>
+              <button
+                onClick={() => {
+                  const now = new Date().toISOString();
+                  setLibMinuta({ id: crypto.randomUUID(), os: `LIB-${Date.now()}`, status: 'Pendente', createdAt: now });
+                }}
+                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500 text-white text-[9px] font-black uppercase tracking-widest hover:bg-violet-600 transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                Nova Liberação
+              </button>
+            </div>
+            <SmartOperationTable
+              userId={userId}
+              componentId="org-liberacoes"
+              columns={liberacoesColumns}
+              data={sortedLiberacoes}
+              hideInternalSearch={false}
+              noMaxHeight
+              stickyHeaderTop={0}
+              getRowStyle={(l: Liberacao) => {
+                if (l.status === 'Pendente') return { backgroundColor: '#f5f3ff', boxShadow: 'inset 4px 0 0 #8b5cf6' };
+                if (l.status === 'Emitido') return { backgroundColor: '#f0fdf4', boxShadow: 'inset 4px 0 0 #22c55e' };
+                return {};
+              }}
+            />
+          </div>
         )}
       </div>
+
+      {devMinutaDev && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-stretch justify-center p-4 overflow-auto">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden my-auto">
+            <div className="flex justify-between items-center px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Minuta de Devolução</h3>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{devMinutaDev.container || devMinutaDev.os}</p>
+              </div>
+              <button onClick={() => setDevMinutaDev(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <DevolucaoVazioForm
+                drivers={drivers}
+                customers={customers}
+                ports={ports}
+                preStackings={preStacking}
+                onClose={() => setDevMinutaDev(null)}
+                devolucao={devMinutaDev}
+                onSave={handleSaveDevolucaoFromForm}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {libMinuta && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-stretch justify-center p-4 overflow-auto">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden my-auto">
+            <div className="flex justify-between items-center px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Liberação de Vazio</h3>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{libMinuta.os}</p>
+              </div>
+              <button onClick={() => setLibMinuta(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <LiberacaoVazioForm
+                drivers={drivers}
+                customers={customers}
+                ports={ports}
+                preStackings={preStacking}
+                onClose={() => setLibMinuta(null)}
+                liberacao={libMinuta}
+                onSave={handleSaveLiberacaoFromForm}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal visualizador de comprovantes */}
+      {viewingDoc && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[400] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setViewingDoc(null); }}>
+          <div className="bg-white rounded-[2.5rem] w-full max-w-4xl h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-100">
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Comprovante</p>
+                  <p className="text-sm font-black text-slate-800 truncate">{viewingDoc.fileName}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => handleDownloadDoc(viewingDoc.url, viewingDoc.fileName)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                  Baixar
+                </button>
+                <button onClick={() => setViewingDoc(null)} className="p-2.5 hover:bg-slate-200 rounded-xl transition-colors">
+                  <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+            {/* Conteúdo */}
+            <div className="flex-1 overflow-hidden p-6">
+              <ImageViewer url={viewingDoc.url} alt={viewingDoc.fileName} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmação de remoção */}
+      {confirmRemove && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 w-full max-w-sm flex flex-col gap-6 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-[13px] font-black text-slate-800 uppercase tracking-tight">Remover do painel</p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  A OS <span className="font-black text-blue-700">{confirmRemove.os}</span> será removida deste painel.<br/>A viagem não será excluída do sistema.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmRemove(null)}
+                className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black text-slate-500 uppercase hover:bg-slate-100 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { handleRemoveFromOrg(confirmRemove); setConfirmRemove(null); }}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

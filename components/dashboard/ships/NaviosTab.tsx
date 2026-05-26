@@ -86,6 +86,12 @@ function mapSituacao(s: string): ShipStatus {
   return 'SEM PREVISÃO';
 }
 
+function resolveVesselStatus(v: TerminalVessel): ShipStatus {
+  const st = mapSituacao(v.situacao);
+  if (st === 'GATE ABERTO' && isExpiredStr(v.deadLineStr)) return 'GATE FECHADO';
+  return st;
+}
+
 // ── Ship name normalizer / matcher ────────────────────────────────────────────
 function normShip(name: string): string {
   return name.toUpperCase().trim().replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ');
@@ -717,6 +723,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   const [modalOpen, setModalOpen]     = useState(false);
   const [editing, setEditing]         = useState<Partial<Ship>>(emptyShip());
   const [saving, setSaving]           = useState(false);
+  const [scraping, setScraping]       = useState(false);
   const [mErr, setMErr]               = useState<string|null>(null);
   const [stModal, setStModal]         = useState(false);
   const [stTarget, setStTarget]       = useState<Ship|null>(null);
@@ -769,8 +776,10 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
         dtPrevChegada: r.dt_prev_chegada, dtChegada: r.dt_chegada,
         dtPrevAtrac: r.dt_prev_atrac, dtAtracacao: r.dt_atracacao,
         dtPrevSaida: r.dt_prev_saida, dtSaida: r.dt_saida,
-        gateDry: r.gate_dry, gateReefer: r.gate_reefer,
-        deadLineStr: r.dead_line_str, servico: r.servico, fetchedAt: r.fetched_at,
+        gateDry:     r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
+        gateReefer:  r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
+        deadLineStr: r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
+        servico: r.servico, fetchedAt: r.fetched_at,
       } as TerminalVessel)));
       setTVAt(rows[0]?.fetched_at ?? null);
     } catch(e:any) { setTVError(e?.message ?? 'Erro ao carregar dados dos terminais'); }
@@ -780,6 +789,47 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   // ── Auto-refresh ─────────────────────────────────────────────────────────────
   const AUTO_REFRESH_MS = 30 * 60 * 1000; // 30 minutos
   const [nextRefresh, setNextRefresh] = useState<number>(Date.now() + AUTO_REFRESH_MS);
+  const toast = (message: string, type: 'success'|'error'|'info' = 'info') =>
+    window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message, type } }));
+
+  const forceScrape = useCallback(async () => {
+    if (scraping) return;
+    setScraping(true);
+    try {
+      // Ambas as rotas rodam no Railway (mesmo servidor da app) — acesso BR garantido
+      const [embraportRes, terminaisRes] = await Promise.allSettled([
+        fetch('/api/embraport-escala'),
+        fetch('/api/terminais-scraper'),
+      ]);
+
+      // EMBRAPORT
+      if (embraportRes.status === 'fulfilled') {
+        const data = await embraportRes.value.json().catch(() => null);
+        if (data?.total > 0) toast(`EMBRAPORT: ${data.total} navios salvos`, 'success');
+        else if (data?.errors?.length) toast(`EMBRAPORT: ${data.errors[0]}`, 'error');
+        else if (data?.error) toast(`EMBRAPORT: ${data.error}`, 'error');
+        else if (!embraportRes.value.ok) toast(`EMBRAPORT: erro ${embraportRes.value.status}`, 'error');
+      } else {
+        toast(`EMBRAPORT: falha na requisição`, 'error');
+      }
+
+      // BTP + ECOPORTO + Santos Brasil
+      if (terminaisRes.status === 'fulfilled') {
+        const data = await terminaisRes.value.json().catch(() => null);
+        if (data?.total > 0) toast(`Terminais: ${data.total} navios salvos`, 'success');
+        if (data?.errors?.length) toast(data.errors.join(' | '), 'error');
+      } else {
+        toast(`Terminais: falha na requisição`, 'error');
+      }
+    } catch(e: any) {
+      toast(`Erro inesperado: ${e?.message ?? e}`, 'error');
+      console.error('Scrape error', e);
+    } finally {
+      await loadTV();
+      setScraping(false);
+      setNextRefresh(Date.now() + AUTO_REFRESH_MS);
+    }
+  }, [scraping, loadTV]); // eslint-disable-line
   const [countdown, setCountdown]     = useState<string>('30:00');
 
   useEffect(() => { loadShips(); loadTV(); }, []); // eslint-disable-line
@@ -810,7 +860,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   // Status counts (panel bar)
   const counts = useMemo(() => {
     const c: Partial<Record<ShipStatus, number>> = {};
-    for (const v of termVessels) { const s = mapSituacao(v.situacao); c[s] = (c[s]??0)+1; }
+    for (const v of termVessels) { const s = resolveVesselStatus(v); c[s] = (c[s]??0)+1; }
     for (const s of ships) { if (!['FINALIZADO','SAÍDO'].includes(s.status)) c[s.status] = (c[s.status]??0)+1; }
     return c;
   }, [termVessels, ships]);
@@ -818,7 +868,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   // Filtered vessels for Programação tab
   const filteredVessels = useMemo(() => {
     let res = termVessels;
-    if (tvFilter !== 'TODOS')      res = res.filter(v => mapSituacao(v.situacao) === tvFilter);
+    if (tvFilter !== 'TODOS')      res = res.filter(v => resolveVesselStatus(v) === tvFilter);
     if (tvTermFilter !== 'TODOS')  res = res.filter(v => v.terminal === tvTermFilter);
     if (shipSearch.trim()) {
       const q = shipSearch.trim().toUpperCase();
@@ -829,7 +879,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
 
   const filterCounts = useMemo(() => {
     const c: Partial<Record<TVFilter, number>> = { TODOS: termVessels.length };
-    for (const v of termVessels) { const s = mapSituacao(v.situacao) as TVFilter; c[s] = (c[s]??0)+1; }
+    for (const v of termVessels) { const s = resolveVesselStatus(v) as TVFilter; c[s] = (c[s]??0)+1; }
     return c;
   }, [termVessels]);
 
@@ -958,7 +1008,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     armador: v.armador, berco: v.berco,
     prevAtracacao: v.dtPrevAtrac || v.previsao || '',
     deadLine: v.deadLineStr || '',
-    status: mapSituacao(v.situacao),
+    status: resolveVesselStatus(v),
   });
 
   const handleTripSaved = useCallback((updated: Trip) => {
@@ -986,9 +1036,11 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => { loadTV(); loadShips(); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 text-[9px] font-black uppercase tracking-widest transition-all">
-            <I.Refresh className="w-3.5 h-3.5"/> Atualizar
+          <button onClick={() => { forceScrape(); loadShips(); }}
+            disabled={scraping}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-wait">
+            <I.Refresh className={`w-3.5 h-3.5 ${scraping ? 'animate-spin' : ''}`}/>
+            {scraping ? 'Atualizando...' : 'Atualizar'}
           </button>
           <button onClick={() => openNew()}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all active:scale-95">
@@ -1162,17 +1214,16 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                     <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Saída</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Saída</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Dead-Line</th>
-                    <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Dry</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Reefer</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 w-8"/>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredVessels.map((v, idx) => {
-                    const st  = mapSituacao(v.situacao);
+                    const st  = resolveVesselStatus(v);
                     const sc  = STATUS_CFG[st];
                     const isM = ships.some(s => s.name.toUpperCase() === v.navio.toUpperCase());
-                    // Best gate value: gateDry → gateReefer → deadline as fallback reference
-                    const gateVal = v.gateDry || v.gateReefer;
                     const dlExpired = isExpiredStr(v.deadLineStr);
                     return (
                       <tr key={idx} className={`border-b border-slate-800/40 transition-colors group ${sc.rowBg || ''} hover:brightness-125`}>
@@ -1184,7 +1235,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                           {v.rap && <div className="text-[7px] text-slate-600 font-bold">RAP {v.rap}</div>}
                           <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                             {/* Tag: Gate Fechado/Encerrado */}
-                            {(st === 'GATE ENCERRADO' || (isExpiredStr(v.deadLineStr) && st !== 'GATE ABERTO' && st !== 'ATRACADO' && st !== 'DESATRACADO')) && (
+                            {(st === 'GATE ENCERRADO' || (isExpiredStr(v.deadLineStr) && st !== 'GATE ABERTO' && st !== 'GATE FECHADO' && st !== 'ATRACADO' && st !== 'DESATRACADO')) && (
                               <span className="inline-flex items-center gap-0.5 text-[6px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 whitespace-nowrap">
                                 <I.Warning className="w-2 h-2"/> Gate Fechado
                               </span>
@@ -1222,8 +1273,13 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                             : <span className="text-slate-700">—</span>}
                         </td>
                         <td className="px-3 py-2 text-center whitespace-nowrap">
-                          {gateVal
-                            ? <span className={`font-black ${isExpiredStr(gateVal) ? 'text-red-400' : 'text-green-400'}`}>{fmtCell(gateVal)}</span>
+                          {v.gateDry
+                            ? <span className={`font-black ${isExpiredStr(v.gateDry) ? 'text-red-400' : 'text-green-400'}`}>{fmtCell(v.gateDry)}</span>
+                            : <span className="text-slate-700">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-center whitespace-nowrap">
+                          {v.gateReefer
+                            ? <span className={`font-black ${isExpiredStr(v.gateReefer) ? 'text-red-400' : 'text-green-400'}`}>{fmtCell(v.gateReefer)}</span>
                             : <span className="text-slate-700">—</span>}
                         </td>
                         <td className="px-3 py-2">
@@ -1368,7 +1424,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
             {vesselMatches.length > 0 && (
               <div className="divide-y divide-slate-800/60">
                 {vesselMatches.map((match, idx) => {
-                  const st  = mapSituacao(match.vessel.situacao);
+                  const st  = resolveVesselStatus(match.vessel);
                   const sc  = STATUS_CFG[st];
                   const acc = TERM_ACCENT[match.vessel.terminal] ?? TERM_ACCENT['BTP'];
                   const dl  = match.vessel.deadLineStr;
@@ -1391,7 +1447,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                             {match.vessel.viagem && <span className="text-[8px] text-slate-500 font-bold">{match.vessel.viagem}</span>}
                             <SBadge status={st} size="xs"/>
                             {/* Tag: Gate Fechado */}
-                            {(st === 'GATE ENCERRADO' || (isExpiredStr(match.vessel.deadLineStr) && st !== 'GATE ABERTO' && st !== 'ATRACADO' && st !== 'DESATRACADO')) && (
+                            {(st === 'GATE ENCERRADO' || (isExpiredStr(match.vessel.deadLineStr) && st !== 'GATE ABERTO' && st !== 'GATE FECHADO' && st !== 'ATRACADO' && st !== 'DESATRACADO')) && (
                               <span className="inline-flex items-center gap-1 text-[7px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
                                 <I.Warning className="w-2.5 h-2.5"/> Gate Fechado
                               </span>

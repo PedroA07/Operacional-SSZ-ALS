@@ -59,9 +59,9 @@ const LiberacaoVazioTemplate: React.FC<LiberacaoVazioTemplateProps> = ({
       <div style={{ ...p0, fontSize: '20px', fontWeight: 900, lineHeight: '1.2', textTransform: 'uppercase' }}>
         {selectedDestinatario?.legalName || selectedDestinatario?.name || formData?.manualLocal || 'NÃO INFORMADO'}
       </div>
-      {selectedDestinatario && (
+      {selectedDestinatario && (selectedDestinatario.address || selectedDestinatario.city) && (
         <div style={{ ...p0, fontSize: '10px', fontWeight: 700, color: '#64748b', marginTop: '3px', textTransform: 'uppercase' }}>
-          {[selectedDestinatario.address, selectedDestinatario.city, selectedDestinatario.state].filter(Boolean).join(' — ')}
+          {[selectedDestinatario.address, selectedDestinatario.neighborhood, selectedDestinatario.city, selectedDestinatario.state].filter(Boolean).join(' — ')}
         </div>
       )}
     </div>

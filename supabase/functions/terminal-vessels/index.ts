@@ -11,6 +11,9 @@ interface TerminalVessel {
   armador?: string;
   viagem?: string;
   terminal: string;
+  gateDry?: string;
+  gateReefer?: string;
+  deadLineStr?: string;
 }
 
 function stripTags(html: string): string {
@@ -91,12 +94,17 @@ function parseHtmlTable(html: string, terminalName: string, vesselFilter?: strin
     }
   }
 
-  const navioIdx    = findColIndex(headers, ['navio', 'vessel', 'ship', 'embarca', 'nome']);
-  const situacaoIdx = findColIndex(headers, ['situa', 'status', 'estado', 'opera', 'condi']);
-  const previsaoIdx = findColIndex(headers, ['previs', 'eta', 'data', 'chegada', 'atrac', 'hora', 'inicio']);
-  const bercoIdx    = findColIndex(headers, ['ber', 'dock', 'pier', 'cais', 'bco']);
-  const armadorIdx  = findColIndex(headers, ['armador', 'shipping', 'companhia', 'linha', 'agenc', 'agent']);
-  const viagemIdx   = findColIndex(headers, ['viagem', 'voyage', 'trip', 'num', 'vg']);
+  const navioIdx      = findColIndex(headers, ['navio', 'vessel', 'ship', 'embarca', 'nome']);
+  const situacaoIdx   = findColIndex(headers, ['situa', 'status', 'estado', 'opera', 'condi']);
+  const previsaoIdx   = findColIndex(headers, ['previs', 'eta', 'chegada', 'atrac', 'hora', 'inicio']);
+  const bercoIdx      = findColIndex(headers, ['berco', 'berço', 'brc', 'dock', 'pier', 'cais']);
+  const armadorIdx    = findColIndex(headers, ['armador', 'shipping', 'companhia', 'linha', 'agenc', 'agent']);
+  const viagemIdx     = findColIndex(headers, ['viagem', 'voyage', 'trip', 'vg']);
+  // BTP: "ABERTURA DE GATE DRY" / "ABERTURA DE GATE REEFER"
+  // Santos Brasil: "Liberação do Dry" / "Liberação do Reefer" (priorizar coluna sem "prev")
+  const gateDryIdx    = findColIndex(headers, ['abertura de gate dry', 'abertura gate d', 'abert. gate d', 'gate dry', 'liberacao do dry', 'liberação do dry']);
+  const gateReeferIdx = findColIndex(headers, ['abertura de gate reefer', 'abertura gate r', 'abert. gate r', 'gate reefer', 'liberacao do reefer', 'liberação do reefer']);
+  const deadLineIdx   = findColIndex(headers, ['dead-line', 'dead line', 'deadline', 'prazo', 'encerr']);
 
   for (let i = dataStart; i < rows.length; i++) {
     const cells = extractCells(rows[i]);
@@ -123,106 +131,248 @@ function parseHtmlTable(html: string, terminalName: string, vesselFilter?: strin
       ? cells[previsaoIdx]
       : cells.find(c => /\d{2}\/\d{2}|\d{2}:\d{2}/.test(c));
 
+    const gateDry   = (gateDryIdx    >= 0 && gateDryIdx    < cells.length ? cells[gateDryIdx]    : undefined)?.trim() || undefined;
+    const gateReefer = (gateReeferIdx >= 0 && gateReeferIdx < cells.length ? cells[gateReeferIdx] : undefined)?.trim() || undefined;
+    const deadLine   = (deadLineIdx   >= 0 && deadLineIdx   < cells.length ? cells[deadLineIdx]   : undefined)?.trim() || undefined;
+
+    // Deriva situacao das datas de gate quando não identificada via coluna
+    // (ex: BTP sempre retorna "Desatracado" na coluna situacao)
+    let finalSituacao = situacao.trim() || 'Desconhecido';
+    const gateStr = gateDry || gateReefer;
+    if (gateStr || deadLine) {
+      const parseDateStr = (s: string): Date | null => {
+        if (!s) return null;
+        if (s.includes('/')) {
+          const parts = s.split(' ');
+          const [d, m, y] = parts[0].split('/');
+          const time = parts[1]?.slice(0, 5) || '00:00';
+          const dt = new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T${time}:00`);
+          return isNaN(dt.getTime()) ? null : dt;
+        }
+        const dt = new Date(s);
+        return isNaN(dt.getTime()) ? null : dt;
+      };
+      const gateDt  = gateStr  ? parseDateStr(gateStr)  : null;
+      const deadDt  = deadLine ? parseDateStr(deadLine) : null;
+      const now = new Date();
+      if (gateDt || deadDt) {
+        if (gateDt && gateDt > now)                       finalSituacao = 'Gate Fechado';
+        else if (deadDt && deadDt > now)                  finalSituacao = 'Gate Aberto';
+        else if ((gateDt && gateDt <= now) || (deadDt && deadDt <= now)) finalSituacao = 'Gate Encerrado';
+      }
+    }
+
     vessels.push({
       navio: navio.trim(),
-      situacao: situacao.trim() || 'Desconhecido',
+      situacao: finalSituacao,
       previsao: previsao?.trim() || undefined,
       berco:    (bercoIdx   >= 0 && bercoIdx   < cells.length ? cells[bercoIdx]   : undefined)?.trim() || undefined,
       armador:  (armadorIdx >= 0 && armadorIdx < cells.length ? cells[armadorIdx] : undefined)?.trim() || undefined,
       viagem:   (viagemIdx  >= 0 && viagemIdx  < cells.length ? cells[viagemIdx]  : undefined)?.trim() || undefined,
       terminal: terminalName,
+      gateDry,
+      gateReefer,
+      deadLineStr: deadLine,
     });
   }
   return vessels;
 }
 
-// ─── Configuração de terminais ────────────────────────────────────────────────
-const TERMINAL_CONFIG: Record<string, {
-  urls: string[];        // tentativas em ordem
-  name: string;
-  referer: string;
-}> = {
-  ecoporto: {
-    urls: [
-      'http://op.ecoportosantos.com.br/externa/LineUpListaAtracacao/',
-      'https://op.ecoportosantos.com.br/externa/LineUpListaAtracacao/',
-    ],
-    name: 'ECOPORTO',
-    referer: 'http://op.ecoportosantos.com.br/',
-  },
-  btp: {
-    urls: [
-      'https://novo-tas.btp.com.br/ConsultasLivres/ListaAtracacaoIndex',
-      'https://portaldocliente.btp.com.br/sistemas/processos-logisticos/ConsultasLivres/listaatracacaoindex',
-    ],
-    name: 'BTP',
-    referer: 'https://novo-tas.btp.com.br/',
-  },
-  santosbrasil: {
-    urls: [
-      'https://www.santosbrasil.com.br/tecon-santos-sistemas/atracacao-table.asp',
-      'https://www.santosbrasil.com.br/v2021/lista-de-atracacao',
-    ],
-    name: 'SANTOS BRASIL',
-    referer: 'https://www.santosbrasil.com.br/',
-  },
-};
-
-const BROWSER_HEADERS = (referer: string) => ({
+const BROWSER_HEADERS = (referer: string): Record<string, string> => ({
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-  'Accept-Encoding': 'gzip, deflate, br',
   'Referer': referer,
-  'Origin': new URL(referer).origin,
   'Cache-Control': 'no-cache',
-  'Connection': 'keep-alive',
 });
 
+// ─── BTP ─────────────────────────────────────────────────────────────────────
+// Página principal é JS-rendered. Tentamos o endpoint de dados que o
+// frontend chama via AJAX (POST sem corpo retorna HTML parcial com a tabela).
+async function fetchBTP(vesselFilter?: string): Promise<{ vessels: TerminalVessel[]; error?: string; terminal: string; fetchedAt: string }> {
+  const fetchedAt = new Date().toISOString();
+  const referer = 'https://novo-tas.btp.com.br/';
+
+  const attempts: Array<{ url: string; method: string; body?: string; ct?: string }> = [
+    // Endpoint AJAX — retorna HTML parcial com a tabela já preenchida
+    { url: 'https://novo-tas.btp.com.br/ConsultasLivres/ListaAtracacao', method: 'POST', body: '', ct: 'application/x-www-form-urlencoded; charset=UTF-8' },
+    { url: 'https://novo-tas.btp.com.br/ConsultasLivres/GetListaAtracacao', method: 'POST', body: '{}', ct: 'application/json' },
+    // Página completa — pode funcionar em alguns contextos sem JS completo
+    { url: 'https://novo-tas.btp.com.br/ConsultasLivres/ListaAtracacaoIndex', method: 'GET' },
+  ];
+
+  for (const { url, method, body, ct } of attempts) {
+    try {
+      const headers: Record<string, string> = {
+        ...BROWSER_HEADERS(referer),
+        'X-Requested-With': 'XMLHttpRequest',
+      };
+      if (ct) headers['Content-Type'] = ct;
+
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: body !== undefined ? body : undefined,
+        signal: AbortSignal.timeout(15000),
+        redirect: 'follow',
+      });
+
+      if (!res.ok) continue;
+      const html = await res.text();
+      const trCount = (html.match(/<tr/gi) || []).length;
+      if (trCount < 2) continue;
+
+      const vessels = parseHtmlTable(html, 'BTP', vesselFilter);
+      if (vessels.length > 0) return { vessels, terminal: 'BTP', fetchedAt };
+    } catch { /* tenta próximo */ }
+  }
+
+  return { vessels: [], error: 'BTP: página JS-renderizada, endpoint de dados não acessível', terminal: 'BTP', fetchedAt };
+}
+
+// ─── ECOPORTO ─────────────────────────────────────────────────────────────────
+// Retorna 403 para IPs fora do Brasil. Tentamos variações de URL e cabeçalhos.
+async function fetchEcoporto(vesselFilter?: string): Promise<{ vessels: TerminalVessel[]; error?: string; terminal: string; fetchedAt: string }> {
+  const fetchedAt = new Date().toISOString();
+  const urls = [
+    'http://op.ecoportosantos.com.br/externa/LineUpListaAtracacao/',
+    'http://op.ecoportosantos.com.br/externa/LineUpListaAtracacao',
+    'https://op.ecoportosantos.com.br/externa/LineUpListaAtracacao/',
+    'http://ecoportosantos.com.br/externa/LineUpListaAtracacao/',
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          ...BROWSER_HEADERS('http://op.ecoportosantos.com.br/'),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        signal: AbortSignal.timeout(12000),
+        redirect: 'follow',
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const trCount = (html.match(/<tr/gi) || []).length;
+      if (trCount < 2) continue;
+      const vessels = parseHtmlTable(html, 'ECOPORTO', vesselFilter);
+      if (vessels.length > 0) return { vessels, terminal: 'ECOPORTO', fetchedAt };
+    } catch { /* tenta próximo */ }
+  }
+
+  return { vessels: [], error: 'ECOPORTO: HTTP 403 — servidor bloqueia IPs fora do Brasil', terminal: 'ECOPORTO', fetchedAt };
+}
+
+// ─── SANTOS BRASIL ────────────────────────────────────────────────────────────
+// Página v2021 exige reCAPTCHA. O endpoint legado atracacao-table.asp retorna
+// dados sem CAPTCHA, mas precisa dos parâmetros corretos.
+async function fetchSantosBrasil(vesselFilter?: string): Promise<{ vessels: TerminalVessel[]; error?: string; terminal: string; fetchedAt: string }> {
+  const fetchedAt = new Date().toISOString();
+  const referer = 'https://www.santosbrasil.com.br/';
+
+  const urls = [
+    // Endpoint legado — retorna tabela HTML sem CAPTCHA
+    'https://www.santosbrasil.com.br/tecon-santos-sistemas/atracacao-table.asp?unidade=tecon-santos',
+    'https://www.santosbrasil.com.br/tecon-santos-sistemas/atracacao-table.asp',
+    // Página moderna com query params corretos
+    'https://www.santosbrasil.com.br/v2021/lista-de-atracacao?titulo=&unidade=tecon-santos&lista=recebimento-de-exportacao',
+    'https://www.santosbrasil.com.br/v2021/lista-de-atracacao?unidade=tecon-santos',
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          ...BROWSER_HEADERS(referer),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        signal: AbortSignal.timeout(15000),
+        redirect: 'follow',
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+
+      // Descarta páginas de CAPTCHA ou login (poucas linhas de dados)
+      const trCount = (html.match(/<tr/gi) || []).length;
+      if (trCount < 3) continue;
+      // Se a página menciona reCAPTCHA E tem menos de 10 linhas, é a tela de bloqueio
+      if (html.includes('recaptcha') && trCount < 10) continue;
+
+      const vessels = parseHtmlTable(html, 'SANTOS BRASIL', vesselFilter);
+      if (vessels.length > 0) return { vessels, terminal: 'SANTOS BRASIL', fetchedAt };
+    } catch { /* tenta próximo */ }
+  }
+
+  return { vessels: [], error: 'Santos Brasil: reCAPTCHA bloqueou o acesso', terminal: 'SANTOS BRASIL', fetchedAt };
+}
+
+// ─── Dispatcher ───────────────────────────────────────────────────────────────
 async function fetchTerminal(
   terminalKey: string,
   vesselFilter?: string
 ): Promise<{ vessels: TerminalVessel[]; error?: string; terminal: string; fetchedAt: string }> {
-  const fetchedAt = new Date().toISOString();
-  const config = TERMINAL_CONFIG[terminalKey];
-  if (!config) return { vessels: [], error: 'Terminal desconhecido', terminal: terminalKey, fetchedAt };
+  if (terminalKey === 'btp')         return fetchBTP(vesselFilter);
+  if (terminalKey === 'ecoporto')    return fetchEcoporto(vesselFilter);
+  if (terminalKey === 'santosbrasil') return fetchSantosBrasil(vesselFilter);
+  return { vessels: [], error: 'Terminal desconhecido', terminal: terminalKey, fetchedAt: new Date().toISOString() };
+}
 
-  let lastError = '';
-  for (const url of config.urls) {
-    try {
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(12000),
-        headers: BROWSER_HEADERS(config.referer),
-        redirect: 'follow',
-      });
+// ─── Persist vessels to Supabase ─────────────────────────────────────────────
+async function saveVessels(vessels: TerminalVessel[], fetchedAt: string): Promise<{ saved: number; error?: string }> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !supabaseKey || vessels.length === 0) return { saved: 0 };
 
-      if (!response.ok) {
-        lastError = `HTTP ${response.status}`;
-        continue; // tenta próxima URL
-      }
+  const terminals = [...new Set(vessels.map(v => v.terminal))];
 
-      const html = await response.text();
-
-      // Detecta se é SPA (poucos <tr> → provavelmente JS-rendered)
-      const trCount = (html.match(/<tr/gi) || []).length;
-      if (trCount < 2) {
-        lastError = 'Página carregada via JavaScript (sem dados estáticos)';
-        continue;
-      }
-
-      const vessels = parseHtmlTable(html, config.name, vesselFilter);
-      return {
-        vessels,
-        error: vessels.length === 0 ? 'Nenhum navio encontrado na tabela' : undefined,
-        terminal: config.name,
-        fetchedAt,
-      };
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : 'Erro desconhecido';
+  // Delete stale rows for the fetched terminals
+  const deleteRes = await fetch(
+    `${supabaseUrl}/rest/v1/terminal_vessels?terminal=in.(${terminals.map(t => `"${t}"`).join(',')})`,
+    {
+      method: 'DELETE',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
     }
+  );
+  if (!deleteRes.ok) {
+    const errText = await deleteRes.text();
+    return { saved: 0, error: `DELETE failed: ${errText}` };
   }
 
-  return { vessels: [], error: lastError || 'Terminal indisponível', terminal: config.name, fetchedAt };
+  const rows = vessels.map(v => ({
+    terminal:      v.terminal,
+    navio:         v.navio,
+    situacao:      v.situacao,
+    previsao:      v.previsao      ?? null,
+    berco:         v.berco         ?? null,
+    armador:       v.armador       ?? null,
+    viagem:        v.viagem        ?? null,
+    gate_dry:      v.gateDry       ?? null,
+    gate_reefer:   v.gateReefer    ?? null,
+    dead_line_str: v.deadLineStr   ?? null,
+    fetched_at:    fetchedAt,
+  }));
+
+  const insertRes = await fetch(`${supabaseUrl}/rest/v1/terminal_vessels`, {
+    method: 'POST',
+    headers: {
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal',
+    },
+    body: JSON.stringify(rows),
+  });
+
+  if (!insertRes.ok) {
+    const errText = await insertRes.text();
+    return { saved: 0, error: `INSERT failed: ${errText}` };
+  }
+
+  return { saved: rows.length };
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -255,13 +405,27 @@ Deno.serve(async (req) => {
         }
       }
 
+      const saveResult = await saveVessels(allVessels, fetchedAt);
+
       return new Response(
-        JSON.stringify({ vessels: allVessels, error: errors.length ? errors.join(' | ') : undefined, terminal: 'all', fetchedAt }),
+        JSON.stringify({
+          vessels: allVessels,
+          saved: saveResult.saved,
+          saveError: saveResult.error,
+          error: errors.length ? errors.join(' | ') : undefined,
+          terminal: 'all',
+          fetchedAt,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const result = await fetchTerminal(terminal, vessel);
+
+    if (result.vessels.length > 0) {
+      await saveVessels(result.vessels, fetchedAt);
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

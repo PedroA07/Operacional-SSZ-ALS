@@ -38,6 +38,7 @@ const HandoverTab        = lazy(() => import('./components/dashboard/HandoverTab
 const ExternalUsersManager = lazy(() => import('./components/dashboard/third-party/ExternalUsersManager'));
 const ExternalPortal     = lazy(() => import('./components/dashboard/third-party/ExternalPortal'));
 const NaviosTab          = lazy(() => import('./components/dashboard/ships/NaviosTab'));
+const FreightTableTab    = lazy(() => import('./components/dashboard/FreightTableTab'));
 
 const TabFallback = () => (
   <div className="flex-1 flex items-center justify-center py-24">
@@ -103,7 +104,6 @@ class TabErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
-);
 
 interface DashboardProps {
   user: User;
@@ -168,7 +168,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const loadAllData = useCallback(async (isInitial = false, silent = false) => {
     if (isInitial) setIsLoadingInitial(true);
     if (!silent) setIsSyncing(true);
-    
+
     try {
       const responses = await Promise.allSettled([
         db.getDrivers(),
@@ -190,10 +190,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (responses[2].status === 'fulfilled') setPorts(responses[2].value);
       if (responses[3].status === 'fulfilled') setPreStacking(responses[3].value);
       if (responses[4].status === 'fulfilled') setStaffList(responses[4].value);
-      if (responses[5].status === 'fulfilled') {
-        console.log("Trips carregadas:", responses[5].value);
-        setTrips(responses[5].value);
-      }
+      if (responses[5].status === 'fulfilled') setTrips(responses[5].value);
       if (responses[6].status === 'fulfilled') setCategories(responses[6].value);
       if (responses[7].status === 'fulfilled') setAvantidaRecords(responses[7].value);
       if (responses[8].status === 'fulfilled') setSealBatches(responses[8].value);
@@ -210,26 +207,50 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   }, []);
 
+  // Atualiza apenas trips — usado pelo realtime para evitar recarregar todas as 12 tabelas
+  const loadTripsOnly = useCallback(async () => {
+    try {
+      const data = await db.getTrips();
+      setTrips(data);
+      setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
+    } catch (e) {
+      console.error('[loadTripsOnly]', e);
+    }
+  }, []);
+
+  const loadPreStackingOnly = useCallback(async () => {
+    try { setPreStacking(await db.getPreStacking()); } catch (e) { console.error('[loadPreStackingOnly]', e); }
+  }, []);
+
+  const loadUsersOnly = useCallback(async () => {
+    try {
+      const [driversData, staffData] = await Promise.all([db.getDrivers(), db.getStaff()]);
+      setDrivers(driversData);
+      setStaffList(staffData);
+    } catch (e) { console.error('[loadUsersOnly]', e); }
+  }, []);
+
   useEffect(() => {
     // Purga silenciosa de registros com mais de 90 dias (form_history + notifications)
     db.purgeOldHistory().catch(() => {});
 
     loadAllData(true);
 
-    const refreshDataInterval = setInterval(() => loadAllData(false, true), 30000);
+    // Polling de 5 minutos — fallback caso o realtime caia; realtime cobre as mudanças frequentes
+    const refreshDataInterval = setInterval(() => loadAllData(false, true), 300000);
 
-    // Debounce realtime — evita múltiplos reloads em batch updates do servidor
-    const debouncedRealtimeRefresh = () => {
+    // Debounce de 3s: só recarrega trips (não as 12 tabelas); aguarda rajadas de updates em lote
+    const debouncedTripsRefresh = () => {
       if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
-      realtimeDebounceRef.current = setTimeout(() => loadAllData(false, true), 800);
+      realtimeDebounceRef.current = setTimeout(() => loadTripsOnly(), 3000);
     };
 
     let channel: any = null;
     if (supabase) {
       channel = supabase
         .channel('db-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, debouncedRealtimeRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'seal_records' }, debouncedRealtimeRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, debouncedTripsRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'seal_records' }, debouncedTripsRefresh)
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') setIsRealtimeActive(true);
         });
@@ -243,7 +264,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (channel) supabase?.removeChannel(channel);
       window.removeEventListener('als_force_global_refresh', handleGlobalRefresh);
     };
-  }, [loadAllData]);
+  }, [loadAllData, loadTripsOnly]);
 
   const handleDeleteTripRequest = (id: string) => {
     const trip = trips.find(t => t.id === id);
@@ -423,15 +444,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                preStacking={preStacking}
                drivers={drivers}
                customers={customers}
-               onRefresh={() => loadAllData(false)}
+               onRefresh={loadTripsOnly}
              />
            )}
            {activeTab === DashboardTab.COLETA_DIA && (
-             <ColetaDoDiaTab 
-               userId={user.id} 
-               trips={trips} 
+             <ColetaDoDiaTab
+               userId={user.id}
+               trips={trips}
                emailTemplates={emailTemplates}
-               onRefresh={() => loadAllData(false)} 
+               onRefresh={loadTripsOnly}
              />
            )}
            {activeTab === DashboardTab.EXTERNAL_USERS && (
@@ -440,6 +461,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.EXTERNAL_PORTAL && (
              <ExternalPortal user={user} trips={trips} />
            )}
+           {activeTab === DashboardTab.TABELA_FRETE && <FreightTableTab userId={user.id} />}
          </Suspense>
          </TabErrorBoundary>
         </div>

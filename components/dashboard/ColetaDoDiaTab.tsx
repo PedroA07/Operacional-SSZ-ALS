@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, useTransition } from 'react';
 import { Trip, ColetaTipoViagemOption, EmailTemplate, ColetaOpConfig, ColetaDocOriginarioRule, ColetaReplaceRule } from '../../types';
-import { db } from '../../utils/storage';
+import { db, supabase } from '../../utils/storage';
 import SmartOperationTable from './operations/SmartOperationTable';
 import FeedbackModal from '../shared/FeedbackModal';
 import { Mail, Settings, Send, X, Copy } from 'lucide-react';
@@ -318,6 +318,11 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   const baseTrips = useMemo(() => {
     const now = Date.now();
     return propTrips
+      .map(serverTrip => {
+        const pending = pendingUpdates[serverTrip.id];
+        if (pending && (now - pending.timestamp) < STABILITY_DURATION) return { ...serverTrip, ...pending.data };
+        return serverTrip;
+      })
       .filter(trip => !finalizingIds.has(trip.id))
       .filter(trip => !trip.coletaEmissaoSolicitada && !trip.isRemovedFromColeta)
       .filter(trip => !hiddenTripTypes.includes(trip.type?.toUpperCase() || ''))
@@ -327,11 +332,6 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
         const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
         return normalized >= '2026-04-01';
-      })
-      .map(serverTrip => {
-        const pending = pendingUpdates[serverTrip.id];
-        if (pending && (now - pending.timestamp) < STABILITY_DURATION) return { ...serverTrip, ...pending.data };
-        return serverTrip;
       })
       .sort((a, b) => {
         const aNF = !!a.sentNF;
@@ -371,6 +371,16 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Subscription direta em trips — sem debounce, todos os usuários recebem imediatamente
+  useEffect(() => {
+    if (!supabase) return;
+    const ch = supabase
+      .channel('coleta-dia-trips-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, () => onRefresh())
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [onRefresh]);
 
   // Para contadores nas abas, reutiliza baseTrips
   const allFilteredTrips = baseTrips;

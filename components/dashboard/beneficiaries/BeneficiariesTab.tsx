@@ -29,14 +29,20 @@ const BeneficiariesTab: React.FC<BeneficiariesTabProps> = ({ userId, beneficiari
   const [isDeleting, setIsDeleting] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
   const [usersMap, setUsersMap] = useState<Record<string, User>>({});
+  const [usersLoading, setUsersLoading] = useState(true);
   const [revealedPasswords, setRevealedPasswords] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    const ids = beneficiaries.map(b => b.userId).filter(Boolean) as string[];
+    if (!ids.length) { setUsersLoading(false); return; }
+    setUsersLoading(true);
     db.getUsers().then(users => {
       const map: Record<string, User> = {};
-      users.forEach(u => { map[u.id] = u; });
+      users.forEach(u => { if (ids.includes(u.id)) map[u.id] = u; });
       setUsersMap(map);
-    }).catch(() => {});
+    }).catch(err => {
+      console.error('[BeneficiariesTab] getUsers:', err?.message || err);
+    }).finally(() => setUsersLoading(false));
   }, [beneficiaries]);
 
   const toggleReveal = (benId: string) => {
@@ -254,10 +260,22 @@ const BeneficiariesTab: React.FC<BeneficiariesTabProps> = ({ userId, beneficiari
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5">
-                    <div className={`w-2 h-2 rounded-full ${b.userId ? 'bg-amber-400' : 'bg-slate-300'}`} />
-                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                      {b.userId ? 'Carregando acesso...' : 'Sem acesso ao portal'}
-                    </span>
+                    {b.userId && usersLoading ? (
+                      <>
+                        <svg className="w-3 h-3 text-amber-400 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                        </svg>
+                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-500">Carregando acesso...</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className={`w-2 h-2 rounded-full ${b.userId ? 'bg-red-300' : 'bg-slate-300'}`} />
+                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                          {b.userId ? 'Usuário não encontrado' : 'Sem acesso ao portal'}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
 
