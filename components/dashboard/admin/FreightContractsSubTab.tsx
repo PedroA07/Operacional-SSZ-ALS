@@ -662,6 +662,18 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
             container: parsedData.container, destination: parsedData.localidade,
             driverId: driver?.id, driverName: driver?.name, status: 'linked',
           });
+          // Também salva em standalone para aparecer no histórico (sem OS vinculada)
+          const d2 = uploadDate;
+          const pad2 = (n: number) => String(n).padStart(2, '0');
+          const datePart2 = `${d2.getFullYear()}${pad2(d2.getMonth() + 1)}${pad2(d2.getDate())}`;
+          const ctnPart2 = parsedData.container ? parsedData.container.replace(/[\s\-_.]/g, '').toUpperCase() : Math.random().toString(36).slice(2, 6).toUpperCase();
+          const code2 = `SEM-OS-${ctnPart2}-${datePart2}`;
+          const standaloneDriver: StandaloneContract = {
+            id: entry.id, code: code2, url, fileName: entry.file.name,
+            uploadDate: uploadDate.toISOString(), expiresAt: expiresAt.toISOString(),
+            parsedData: { ...parsedData, motorista: parsedData.motorista || driver?.name },
+          };
+          await db.saveStandaloneContract(standaloneDriver);
           if (onUpdateDriver && driver) {
             try {
               await onUpdateDriver({
@@ -671,6 +683,8 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
               });
             } catch { /* non-critical */ }
           }
+          const refreshed2 = await db.getStandaloneContracts();
+          setStandaloneContracts(refreshed2);
         } else {
           // Sem vínculo: gera código SEM-OS-{container ou rand} e salva em standalone_freight_contracts
           const d = uploadDate;
