@@ -32,7 +32,7 @@ export const getOperationTableColumns = (
   allDrivers: Driver[] = [],
   categories: Category[] = [],
   operationTypes: any[] = [],
-  getGateTag?: (ship: string) => React.ReactNode,
+  getGateTag?: (trip: Trip) => React.ReactNode,
   reuseMap: Map<string, ReuseMatch> = new Map(),
   onMarkReuse: (trip: Trip) => void = () => {}
 ) => {
