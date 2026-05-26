@@ -134,7 +134,8 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
         vehicleTypes.forEach(vt => {
           const tg = goingMap.get(vt.axlesGoing)     ?? 0;
           const tv = returningMap.get(vt.axlesReturning) ?? 0;
-          next[vt.code] = { ...next[vt.code], tollGoing: tg, tollReturning: tv };
+          const fr = prev[vt.code]?.freight ?? 0;
+          next[vt.code] = { ...next[vt.code], tollGoing: tg, tollReturning: tv, repasse: fr + tg + tv };
         });
         return next;
       });
@@ -277,7 +278,10 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
                     <th className="text-right px-4 py-3 text-[10px] font-black text-blue-600 uppercase tracking-widest">Frete</th>
                     <th className="text-right px-4 py-3 text-[10px] font-black text-orange-500 uppercase tracking-widest">Ped. Ida</th>
                     <th className="text-right px-4 py-3 text-[10px] font-black text-emerald-600 uppercase tracking-widest">Ped. Volta</th>
-                    <th className="text-right px-4 py-3 text-[10px] font-black text-violet-600 uppercase tracking-widest">Repasse</th>
+                    <th className="text-right px-4 py-3 text-[10px] font-black text-violet-600 uppercase tracking-widest">
+                      Repasse
+                      <span className="ml-1 normal-case font-normal text-violet-400">(auto)</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -297,30 +301,40 @@ const RouteModal: React.FC<RouteModalProps> = ({ vehicleTypes, editingRoute, onC
                       <td className="px-3 py-2.5 w-36">
                         <CurrencyInput
                           value={values[vt.code]?.freight ?? 0}
-                          onChange={v => setValues(p => ({ ...p, [vt.code]: { ...p[vt.code], freight: v } }))}
+                          onChange={v => setValues(p => {
+                            const tg = p[vt.code]?.tollGoing ?? 0;
+                            const tv = p[vt.code]?.tollReturning ?? 0;
+                            return { ...p, [vt.code]: { ...p[vt.code], freight: v, repasse: v + tg + tv } };
+                          })}
                           placeholder="Frete"
                         />
                       </td>
                       <td className="px-3 py-2.5 w-36">
                         <CurrencyInput
                           value={values[vt.code]?.tollGoing ?? 0}
-                          onChange={v => setValues(p => ({ ...p, [vt.code]: { ...p[vt.code], tollGoing: v } }))}
+                          onChange={v => setValues(p => {
+                            const fr = p[vt.code]?.freight ?? 0;
+                            const tv = p[vt.code]?.tollReturning ?? 0;
+                            return { ...p, [vt.code]: { ...p[vt.code], tollGoing: v, repasse: fr + v + tv } };
+                          })}
                           placeholder="Ped. Ida"
                         />
                       </td>
                       <td className="px-3 py-2.5 w-36">
                         <CurrencyInput
                           value={values[vt.code]?.tollReturning ?? 0}
-                          onChange={v => setValues(p => ({ ...p, [vt.code]: { ...p[vt.code], tollReturning: v } }))}
+                          onChange={v => setValues(p => {
+                            const fr = p[vt.code]?.freight ?? 0;
+                            const tg = p[vt.code]?.tollGoing ?? 0;
+                            return { ...p, [vt.code]: { ...p[vt.code], tollReturning: v, repasse: fr + tg + v } };
+                          })}
                           placeholder="Ped. Volta"
                         />
                       </td>
                       <td className="px-3 py-2.5 w-36">
-                        <CurrencyInput
-                          value={values[vt.code]?.repasse ?? 0}
-                          onChange={v => setValues(p => ({ ...p, [vt.code]: { ...p[vt.code], repasse: v } }))}
-                          placeholder="Repasse"
-                        />
+                        <div className="w-full text-right px-3 py-2 rounded-lg border border-violet-100 bg-violet-50 text-sm font-bold text-violet-700 tabular-nums">
+                          {fmt(values[vt.code]?.repasse ?? 0)}
+                        </div>
                       </td>
                     </tr>
                   ))}
