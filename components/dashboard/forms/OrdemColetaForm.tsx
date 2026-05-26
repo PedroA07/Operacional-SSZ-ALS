@@ -36,6 +36,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   const [userHasChosenCategory, setUserHasChosenCategory] = useState(false);
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
+  const [preStackings, setPreStackings] = useState<any[]>([]);
   
   const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
   const [plateHorse, setPlateHorse] = useState('');
@@ -76,6 +77,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       
       const types = await db.getContainerTypes();
       setContainerTypes(types);
+
+      const ps = await db.getPreStacking();
+      setPreStackings(ps);
 
       const opTypes = await db.getOperationTypes();
       if (opTypes && opTypes.length > 0) {
@@ -156,7 +160,22 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
 
   const selectedDriver = drivers.find(d => d.id === formData.driverId);
   const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
-  const selectedDestinatario = ports.find(p => p.id === formData.destinatarioId);
+  const selectedDestinatario =
+    ports.find(p => p.id === formData.destinatarioId) ||
+    preStackings.find(p => p.id === formData.destinatarioId) ||
+    customers.find(c => c.id === formData.destinatarioId) ||
+    null;
+
+  const destinatarioOptions = [
+    ...ports.map(p => ({ ...p, _srcType: 'Porto' })),
+    ...preStackings.map(p => ({ ...p, _srcType: 'Pré-Stacking' })),
+    ...customers.map(c => ({ ...c, _srcType: 'Cliente' })),
+  ];
+
+  const mapDestinatario = (item: any): import('../../../utils/searchService').AutocompleteItem => ({
+    ...searchService.mapPort(item),
+    subText: `${item._srcType} · ${item.city || ''} - ${item.state || ''}`,
+  });
 
   useEffect(() => {
     if (selectedDriver) {
@@ -331,12 +350,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>}
         />
 
-        <AutocompleteSearch 
+        <AutocompleteSearch
           label="2. Destinatário (Local Destino)"
-          placeholder="Nome do Porto ou Terminal..."
-          data={ports}
+          placeholder="Porto, Pré-Stacking ou Cliente..."
+          data={destinatarioOptions}
           onSelect={(p) => setFormData({...formData, destinatarioId: p.id})}
-          mapToAutocomplete={searchService.mapPort}
+          mapToAutocomplete={mapDestinatario}
           initialValue={selectedDestinatario ? (selectedDestinatario.legalName || selectedDestinatario.name) : ''}
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>}
         />
