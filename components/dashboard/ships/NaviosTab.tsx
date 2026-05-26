@@ -1108,7 +1108,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
               }
             </div>
             <div className="flex items-center gap-2">
-              {(['BTP','ECOPORTO','SANTOS BRASIL'] as const).map(t => (
+              {(['BTP','ECOPORTO','SANTOS BRASIL','EMBRAPORT'] as const).map(t => (
                 <a key={t} href={TERM_LINKS[t]} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-all border border-slate-700">
                   <TermBadge terminal={t}/>
