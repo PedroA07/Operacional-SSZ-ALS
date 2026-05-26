@@ -67,9 +67,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
             </div>
             <h1 className="text-white font-black uppercase text-2xl tracking-[0.2em] text-center">Operacional SSZ</h1>
             <div className="flex items-center gap-3 mt-4 px-4 py-1.5 bg-blue-950/40 rounded-full border border-blue-500/20">
-              <div className={`w-2 h-2 rounded-full ${dbOnline ? 'bg-blue-400 shadow-[0_0_10px_#60a5fa]' : 'bg-red-500 animate-pulse'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${dbOnline === null ? 'bg-yellow-400 animate-pulse' : dbOnline ? 'bg-blue-400 shadow-[0_0_10px_#60a5fa]' : 'bg-red-500 animate-pulse'}`}></div>
               <p className="text-[9px] font-black text-blue-300 uppercase tracking-widest">
-                {dbOnline ? 'Sistema Conectado' : 'Link Offline'}
+                {dbOnline === null ? 'Verificando...' : dbOnline ? 'Sistema Conectado' : 'Link Offline'}
               </p>
             </div>
           </div>
