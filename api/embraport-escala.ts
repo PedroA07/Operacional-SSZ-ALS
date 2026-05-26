@@ -2,21 +2,15 @@ export const config = { runtime: 'edge' };
 
 const BASE_URL = 'http://www.embraportonline.com.br/Navios/Escala';
 
-// Tabs to fetch → situacao label
-const TABS = [
-  { url: `${BASE_URL}?situacao=Previsto`,     situacao: 'Previsto'    },
-  { url: `${BASE_URL}?situacao=EmOperacao`,   situacao: 'Em Operação' },
-  { url: `${BASE_URL}?situacao=Desatracado`,  situacao: 'Desatracado' },
-  { url: BASE_URL,                            situacao: 'Previsto'    }, // fallback
-];
-
-const HEADERS = {
+const HEADERS: Record<string, string> = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8',
   'Referer': 'http://www.embraportonline.com.br/',
   'Cache-Control': 'no-cache',
 };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&#\d+;/g, '').trim();
@@ -30,24 +24,18 @@ function parseCells(row: string): string[] {
   return cells;
 }
 
-// Detects active tab name from the HTML to infer situacao
-function detectActiveSituacao(html: string): string {
-  // Look for active/selected button class
-  const activeMatch = html.match(/class="[^"]*(?:active|selected|btn-primary)[^"]*"[^>]*>\s*(Previstos|Em Opera[çc][aã]o|Desatracados|Omitidos|Todos)/i);
-  if (activeMatch) {
-    const tab = activeMatch[1].toLowerCase();
-    if (tab.includes('opera')) return 'Em Operação';
-    if (tab.includes('desatrac')) return 'Desatracado';
-    return 'Previsto';
-  }
-  return 'Previsto';
+function extractHiddenField(html: string, fieldName: string): string {
+  const re1 = new RegExp(`<input[^>]+name="${fieldName}"[^>]+value="([^"]*)"`, 'i');
+  const re2 = new RegExp(`<input[^>]+value="([^"]*)"[^>]+name="${fieldName}"`, 'i');
+  const m = html.match(re1) || html.match(re2);
+  return m ? decodeURIComponent(m[1].replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))) : '';
 }
 
-function parseTable(html: string, defaultSituacao: string): any[] {
-  const rows: any[] = [];
-  const situacao = detectActiveSituacao(html) || defaultSituacao;
+// ── Parse one page of the table ───────────────────────────────────────────────
 
-  // Find the main data table
+function parseTable(html: string): any[] {
+  const rows: any[] = [];
+
   const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
   if (!tbodyMatch) return rows;
 
@@ -62,48 +50,129 @@ function parseTable(html: string, defaultSituacao: string): any[] {
     const navio = cells[0]?.trim();
     if (!navio || navio.toLowerCase() === 'navio') continue;
 
-    // Column order (from screenshot):
+    // Column order (from Embraport site):
     // 0:Navio 1:Viagem 2:Visita 3:Armador 4:Serviço 5:Berço
-    // 6:Prev.Abertura Gate 7:Abertura Gate 8:Deadline 9:Prev.Chegada
-    // 10:Prev.Atracação 11:Prev.Saída 12:Detalhes
+    // 6:Chegada / Prev.Abertura Gate 7:Abertura Gate 8:Deadline
+    // 9:Prev.Chegada 10:Prev.Atracação 11:Prev.Saída 12:Detalhes
     rows.push({
-      terminal:       'EMBRAPORT',
-      navio:          navio.toUpperCase(),
-      situacao,
-      viagem:         cells[1]  || '',
-      rap:            cells[2]  || '', // Visita code
-      armador:        cells[3]  || '',
-      servico:        cells[4]  || '',
-      berco:          cells[5]  || '',
-      gateDry:        cells[6]  || '', // Prev. Abertura Gate
-      gateReefer:     cells[7]  || '', // Abertura Gate (real)
-      deadLineStr:    cells[8]  || '',
-      dtPrevChegada:  cells[9]  || '',
-      dtPrevAtrac:    cells[10] || '',
-      dtPrevSaida:    cells[11] || '',
-      fetchedAt:      new Date().toISOString(),
+      terminal:      'EMBRAPORT',
+      navio:         navio.toUpperCase(),
+      situacao:      'Previsto',      // updated below via mapping in frontend
+      viagem:        cells[1]  || '',
+      rap:           cells[2]  || '',  // Visita/RAP code
+      armador:       cells[3]  || '',
+      servico:       cells[4]  || '',
+      berco:         cells[5]  || '',
+      gateDry:       cells[6]  || '',  // Chegada / Prev. Abertura Gate
+      gateReefer:    cells[7]  || '',  // Abertura Gate (real)
+      deadLineStr:   cells[8]  || '',
+      dtPrevChegada: cells[9]  || '',
+      dtPrevAtrac:   cells[10] || '',
+      dtPrevSaida:   cells[11] || '',
+      fetchedAt:     new Date().toISOString(),
     });
   }
 
   return rows;
 }
 
-async function fetchTab(url: string, situacao: string): Promise<{ rows: any[]; error?: string }> {
+// ── Fetch all pages via ASP.NET WebForms pagination ───────────────────────────
+
+async function fetchAllPages(): Promise<{ rows: any[]; pages: number; error?: string }> {
+  const allRows: any[] = [];
+  let pagesCount = 0;
+
   try {
-    const res = await fetch(url, {
+    // ── Page 1: GET ──────────────────────────────────────────────────────────
+    const res1 = await fetch(BASE_URL, {
       method: 'GET',
       headers: HEADERS,
       redirect: 'follow',
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(25000),
     });
 
-    if (!res.ok) return { rows: [], error: `HTTP ${res.status} de ${url}` };
-    const html = await res.text();
-    return { rows: parseTable(html, situacao) };
+    if (!res1.ok) {
+      return { rows: [], pages: 0, error: `HTTP ${res1.status} ao buscar primeira página` };
+    }
+
+    let currentHtml = await res1.text();
+    const firstPageRows = parseTable(currentHtml);
+    allRows.push(...firstPageRows);
+    pagesCount++;
+
+    if (firstPageRows.length === 0) {
+      // Possibly empty / blocked — return what we have
+      return { rows: allRows, pages: pagesCount, error: 'Nenhum navio encontrado na primeira página' };
+    }
+
+    // ── Paginate: POST with ASP.NET __doPostBack ─────────────────────────────
+    const MAX_PAGES = 60; // safety cap (60 × 10 = 600 ships max)
+    let pageNum = 2;
+
+    while (pageNum <= MAX_PAGES) {
+      // Stop if there's no link to this page in the pagination strip
+      if (!currentHtml.includes(`Page$${pageNum}`)) break;
+
+      // Extract ASP.NET hidden fields from the CURRENT page response
+      const viewState     = extractHiddenField(currentHtml, '__VIEWSTATE');
+      const viewStateGen  = extractHiddenField(currentHtml, '__VIEWSTATEGENERATOR');
+      const eventVal      = extractHiddenField(currentHtml, '__EVENTVALIDATION');
+
+      if (!viewState) break; // page has no form state — stop
+
+      // Find the grid control that handles pagination
+      // Pattern: javascript:__doPostBack('ctl00$...','Page$N')
+      const evtMatch = currentHtml.match(/javascript:__doPostBack\('([^']+)','Page\$\d+'\)/);
+      if (!evtMatch) break;
+      const eventTarget = evtMatch[1];
+
+      // Build form body
+      const formBody = new URLSearchParams();
+      formBody.append('__EVENTTARGET',        eventTarget);
+      formBody.append('__EVENTARGUMENT',      `Page$${pageNum}`);
+      formBody.append('__VIEWSTATE',          viewState);
+      if (viewStateGen) formBody.append('__VIEWSTATEGENERATOR', viewStateGen);
+      if (eventVal)     formBody.append('__EVENTVALIDATION',    eventVal);
+
+      const resN = await fetch(BASE_URL, {
+        method: 'POST',
+        headers: {
+          ...HEADERS,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Origin': 'http://www.embraportonline.com.br',
+        },
+        body: formBody.toString(),
+        redirect: 'follow',
+        signal: AbortSignal.timeout(25000),
+      });
+
+      if (!resN.ok) break;
+
+      currentHtml = await resN.text();
+      const pageRows = parseTable(currentHtml);
+
+      if (pageRows.length === 0) break; // empty page — we're done
+
+      allRows.push(...pageRows);
+      pagesCount++;
+      pageNum++;
+    }
+
+    // Deduplicate by navio name (same ship may appear in multiple status tabs)
+    const seen = new Set<string>();
+    const unique = allRows.filter(r => {
+      if (seen.has(r.navio)) return false;
+      seen.add(r.navio);
+      return true;
+    });
+
+    return { rows: unique, pages: pagesCount };
   } catch (e: any) {
-    return { rows: [], error: e?.message ?? String(e) };
+    return { rows: allRows, pages: pagesCount, error: e?.message ?? String(e) };
   }
 }
+
+// ── Persist to Supabase ───────────────────────────────────────────────────────
 
 async function saveToSupabase(rows: any[], supabaseUrl: string, supabaseKey: string): Promise<{ saved: number; error?: string }> {
   if (rows.length === 0) return { saved: 0 };
@@ -124,14 +193,14 @@ async function saveToSupabase(rows: any[], supabaseUrl: string, supabaseKey: str
       terminal:        r.terminal,
       navio:           r.navio,
       situacao:        r.situacao,
-      viagem:          r.viagem     || null,
-      rap:             r.rap        || null,
-      armador:         r.armador    || null,
-      servico:         r.servico    || null,
-      berco:           r.berco      || null,
-      gate_dry:        r.gateDry    || null,
-      gate_reefer:     r.gateReefer || null,
-      dead_line_str:   r.deadLineStr|| null,
+      viagem:          r.viagem        || null,
+      rap:             r.rap           || null,
+      armador:         r.armador       || null,
+      servico:         r.servico       || null,
+      berco:           r.berco         || null,
+      gate_dry:        r.gateDry       || null,
+      gate_reefer:     r.gateReefer    || null,
+      dead_line_str:   r.deadLineStr   || null,
       dt_prev_chegada: r.dtPrevChegada || null,
       dt_prev_atrac:   r.dtPrevAtrac   || null,
       dt_prev_saida:   r.dtPrevSaida   || null,
@@ -160,22 +229,25 @@ async function saveToSupabase(rows: any[], supabaseUrl: string, supabaseKey: str
   }
 }
 
+// ── Edge handler ──────────────────────────────────────────────────────────────
+
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST' } });
+    return new Response(null, {
+      headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST' },
+    });
   }
 
-  const supabaseUrl = (globalThis as any).VITE_SUPABASE_URL ?? '';
+  const supabaseUrl = (globalThis as any).VITE_SUPABASE_URL  ?? '';
   const supabaseKey = (globalThis as any).VITE_SUPABASE_ANON_KEY ?? '';
 
-  // Try the default page first (most reliable)
-  const defaultResult = await fetchTab(BASE_URL, 'Previsto');
+  const { rows: allRows, pages: pagesCount, error: fetchError } = await fetchAllPages();
 
-  // If the first fetch failed, return error immediately
-  if (defaultResult.error && defaultResult.rows.length === 0) {
+  // Hard failure — nothing fetched and there was an error
+  if (fetchError && allRows.length === 0) {
     return new Response(JSON.stringify({
       ok: false,
-      error: defaultResult.error,
+      error: fetchError,
       hint: 'O servidor da EMBRAPORT pode estar bloqueando requisições externas. Tente executar a partir de uma rede brasileira.',
     }), {
       status: 502,
@@ -183,36 +255,19 @@ export default async function handler(req: Request) {
     });
   }
 
-  // Try additional tabs if first succeeded
-  const allRows: any[] = [...defaultResult.rows];
-  const errors: string[] = [];
-
-  for (const tab of TABS.slice(0, 3)) {
-    if (tab.url === BASE_URL) continue; // already fetched
-    const result = await fetchTab(tab.url, tab.situacao);
-    // Only add rows that aren't already in allRows (by navio name)
-    const existing = new Set(allRows.map(r => r.navio));
-    for (const row of result.rows) {
-      if (!existing.has(row.navio)) {
-        allRows.push(row);
-        existing.add(row.navio);
-      }
-    }
-    if (result.error) errors.push(result.error);
-  }
-
   // Save to Supabase if credentials available
   let saveResult: { saved: number; error?: string } = { saved: 0 };
-  if (supabaseUrl && supabaseKey) {
+  if (supabaseUrl && supabaseKey && allRows.length > 0) {
     saveResult = await saveToSupabase(allRows, supabaseUrl, supabaseKey);
   }
 
   return new Response(JSON.stringify({
     ok: true,
     total: allRows.length,
+    pages: pagesCount,
     saved: saveResult.saved,
     vessels: allRows,
-    errors: errors.length > 0 ? errors : undefined,
+    errors:    fetchError  ? [fetchError]         : undefined,
     saveError: saveResult.error,
     fetchedAt: new Date().toISOString(),
   }), {
