@@ -155,24 +155,25 @@ export const db = {
       upload_date: doc.uploadDate, expires_at: doc.expiresAt || null,
       parsed_data: doc.parsedData || null,
     }, { onConflict: 'id' });
-    if (error) console.error('[saveStandaloneContract] Erro:', error.message);
+    if (error) console.error('[saveStandaloneContract] Erro:', error.code, error.message);
     return !error;
   },
 
   getStandaloneContracts: async () => {
     if (!supabase) return [];
-    const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('standalone_freight_contracts')
       .select('*')
-      .or(`expires_at.is.null,expires_at.gt.${now}`)
       .order('upload_date', { ascending: false });
-    if (error) console.error('[getStandaloneContracts] Erro:', error.message);
-    return (data || []).map((r: any) => ({
-      id: r.id, code: r.code, url: r.url, fileName: r.file_name,
-      uploadDate: r.upload_date, expiresAt: r.expires_at || undefined,
-      parsedData: r.parsed_data || undefined,
-    }));
+    if (error) { console.error('[getStandaloneContracts] Erro:', error.code, error.message); return []; }
+    const now = new Date();
+    return (data || [])
+      .filter((r: any) => !r.expires_at || new Date(r.expires_at) > now)
+      .map((r: any) => ({
+        id: r.id, code: r.code, url: r.url, fileName: r.file_name,
+        uploadDate: r.upload_date, expiresAt: r.expires_at || undefined,
+        parsedData: r.parsed_data || undefined,
+      }));
   },
 
   deleteStandaloneContract: async (id: string) => {
