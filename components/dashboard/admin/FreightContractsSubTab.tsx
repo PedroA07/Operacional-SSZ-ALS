@@ -663,11 +663,13 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
           });
           // Atualiza data e local do último contrato no motorista
           if (trip.driver?.id) {
+            const dest = trip.destination ?? trip.customer;
+            const loc = dest?.city ? (dest.state ? `${dest.city} - ${dest.state}` : dest.city) : undefined;
             try {
               await db.updateDriverLastFreightContract(
                 trip.driver.id,
                 uploadDate.toISOString().slice(0, 10),
-                trip.destination?.name ?? trip.customer?.name,
+                loc,
               );
             } catch { /* non-critical */ }
           }
@@ -769,11 +771,13 @@ const FreightContractsSubTab: React.FC<Props> = ({ trips, onUpdate, userId, driv
       });
       await db.deleteStandaloneContract(standalone.id);
       if (trip.driver?.id) {
+        const dest2 = trip.destination ?? trip.customer;
+        const loc2 = dest2?.city ? (dest2.state ? `${dest2.city} - ${dest2.state}` : dest2.city) : undefined;
         try {
           await db.updateDriverLastFreightContract(
             trip.driver.id,
             new Date(standalone.uploadDate).toISOString().slice(0, 10),
-            trip.destination?.name ?? trip.customer?.name,
+            loc2,
           );
         } catch { /* non-critical */ }
       }
