@@ -804,7 +804,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
   }, [scraping, loadTV]); // eslint-disable-line
   const [countdown, setCountdown]     = useState<string>('30:00');
 
-  useEffect(() => { loadShips(); loadTV(); }, []); // eslint-disable-line
+  useEffect(() => { loadTV(); }, []); // eslint-disable-line
 
   // Polling de 3 em 3 minutos
   useEffect(() => {
