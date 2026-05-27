@@ -39,7 +39,7 @@ export interface User {
       orgEntrega?:       { enabled: boolean; visibleFields: string[] };
       orgColetaEntrega?: { enabled: boolean; visibleFields: string[] };
       orgDevolucoes?:    { enabled: boolean; visibleFields: string[] };
-      emissoes?:         { enabled: boolean };
+      emissoes?:         { enabled: boolean; visibleFields?: string[] };
     };
   };
 }
