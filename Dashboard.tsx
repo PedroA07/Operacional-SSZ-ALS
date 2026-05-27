@@ -39,6 +39,7 @@ const ExternalUsersManager = lazy(() => import('./components/dashboard/third-par
 const ExternalPortal     = lazy(() => import('./components/dashboard/third-party/ExternalPortal'));
 const NaviosTab          = lazy(() => import('./components/dashboard/ships/NaviosTab'));
 const FreightTableTab    = lazy(() => import('./components/dashboard/FreightTableTab'));
+const EmissoesTab        = lazy(() => import('./components/dashboard/EmissoesTab'));
 
 const TabFallback = () => (
   <div className="flex-1 flex items-center justify-center py-24">
@@ -462,6 +463,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              <ExternalPortal user={user} trips={trips} />
            )}
            {activeTab === DashboardTab.TABELA_FRETE && <FreightTableTab userId={user.id} />}
+           {activeTab === DashboardTab.EMISSOES && (
+             <EmissoesTab
+               userId={user.id}
+               user={user}
+               trips={trips}
+               onRefresh={loadTripsOnly}
+               categories={categories}
+             />
+           )}
          </Suspense>
          </TabErrorBoundary>
         </div>

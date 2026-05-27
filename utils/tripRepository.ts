@@ -56,7 +56,9 @@ export const tripRepository = {
     coleta_emissao_solicitada: trip.coletaEmissaoSolicitada || false,
     is_removed_from_coleta: trip.isRemovedFromColeta || false,
     is_removed_from_org: trip.isRemovedFromOrg || false,
-    is_completed: trip.isCompleted || false
+    is_completed: trip.isCompleted || false,
+    emissao_cte_number: trip.emissaoCteNumber || null,
+    emissao_observacoes: trip.emissaoObservacoes || null,
   }),
 
   mapFromDb: (d: any): Trip => {
@@ -136,6 +138,8 @@ export const tripRepository = {
       coletaEmissaoSolicitada: d.coleta_emissao_solicitada ?? false,
       isRemovedFromColeta: d.is_removed_from_coleta ?? false,
       isRemovedFromOrg: d.is_removed_from_org ?? false,
+      emissaoCteNumber: d.emissao_cte_number || undefined,
+      emissaoObservacoes: d.emissao_observacoes || undefined,
     };
   },
 
