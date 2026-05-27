@@ -1447,17 +1447,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                   </span>
                 )}
               </div>
-              {/* Minuta button next to OS */}
+              {/* Edit OC button */}
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setMinutaTrip(t); }}
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[6px] font-black uppercase tracking-tight transition-all border w-fit mt-0.5 ${t.preStackingFormData ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
-                title={t.preStackingFormData ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking'}
+                onClick={(e) => { e.stopPropagation(); setOcTrip(t); }}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[6px] font-black uppercase tracking-tight transition-all border w-fit mt-0.5 bg-white border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:border-indigo-400"
+                title="Editar Ordem de Coleta"
               >
                 <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                 </svg>
-                {t.preStackingFormData ? 'Minuta ✓' : 'Minuta'}
+                Editar OC
               </button>
             </div>
             {pendingUpdates[t.id] && (
@@ -1617,13 +1617,27 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       render: (t: Trip) => {
         const rawDT = t.scheduling?.dateTime || t.scheduledDateTime || '';
         const displayValue = formatToLocalInput(rawDT);
+        const hasMinuta = !!t.preStackingFormData;
         return (
-          <DateTimePicker
-            value={displayValue}
-            onChange={(v) => handleDateTimeChange(t, v)}
-            placeholder="Selecionar..."
-            inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
-          />
+          <div className="flex flex-col gap-1.5 min-w-[9rem]">
+            <DateTimePicker
+              value={displayValue}
+              onChange={(v) => handleDateTimeChange(t, v)}
+              placeholder="Selecionar..."
+              inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
+            />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setMinutaTrip(t); }}
+              className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${hasMinuta ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+              title={hasMinuta ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking'}
+            >
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              {hasMinuta ? 'Minuta ✓' : 'Gerar Minuta'}
+            </button>
+          </div>
         );
       }
     },
@@ -1711,16 +1725,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 </div>
               )}
             </div>
-            {/* Edit OC */}
-            <button
-              onClick={() => setOcTrip(t)}
-              className="p-1.5 hover:bg-indigo-50 text-slate-300 hover:text-indigo-500 rounded-lg transition-all"
-              title="Editar Ordem de Coleta"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-              </svg>
-            </button>
             {/* Remove */}
             <button
               onClick={() => setConfirmRemove(t)}
