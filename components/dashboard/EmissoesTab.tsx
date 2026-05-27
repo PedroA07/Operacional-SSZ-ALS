@@ -143,22 +143,36 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
   }, [categoryFiltered, user]);
 
   // Sub-tab counts
+  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const isBeforeToday = useCallback((t: Trip) => {
+    if (!t.dateTime) return false;
+    const raw = t.dateTime.includes('T') ? t.dateTime : t.dateTime.replace(' ', 'T');
+    const tripDate = raw.split('T')[0];
+    const normalized = tripDate.includes('/') ? tripDate.split('/').reverse().join('-') : tripDate;
+    return normalized < today;
+  }, [today]);
+
+  const isConcluido = useCallback((t: Trip) =>
+    isBeforeToday(t) || (!!t.coletaDocGenerated && !!t.emissaoCteNumber),
+  [isBeforeToday]);
+
   const counts = useMemo(() => ({
     all: allowedFiltered.length,
-    pendDoc: allowedFiltered.filter(t => !t.coletaDocGenerated).length,
-    pendCte: allowedFiltered.filter(t => !!t.coletaDocGenerated && !t.emissaoCteNumber).length,
-    done: allowedFiltered.filter(t => !!t.coletaDocGenerated && !!t.emissaoCteNumber).length,
-  }), [allowedFiltered]);
+    pendDoc: allowedFiltered.filter(t => !isConcluido(t) && !t.coletaDocGenerated).length,
+    pendCte: allowedFiltered.filter(t => !isConcluido(t) && !!t.coletaDocGenerated && !t.emissaoCteNumber).length,
+    done: allowedFiltered.filter(t => isConcluido(t)).length,
+  }), [allowedFiltered, isConcluido]);
 
   // Final display trips
   const displayTrips = useMemo(() => {
     switch (activeSubTab) {
-      case 'PEND_DOC': return allowedFiltered.filter(t => !t.coletaDocGenerated);
-      case 'PEND_CTE': return allowedFiltered.filter(t => !!t.coletaDocGenerated && !t.emissaoCteNumber);
-      case 'CONCLUIDOS': return allowedFiltered.filter(t => !!t.coletaDocGenerated && !!t.emissaoCteNumber);
-      default: return allowedFiltered;
+      case 'PEND_DOC':   return allowedFiltered.filter(t => !isConcluido(t) && !t.coletaDocGenerated);
+      case 'PEND_CTE':   return allowedFiltered.filter(t => !isConcluido(t) && !!t.coletaDocGenerated && !t.emissaoCteNumber);
+      case 'CONCLUIDOS': return allowedFiltered.filter(t => isConcluido(t));
+      default:           return allowedFiltered;
     }
-  }, [allowedFiltered, activeSubTab]);
+  }, [allowedFiltered, activeSubTab, isConcluido]);
 
   const handleUpdate = useCallback(async (trip: Trip, data: Partial<Trip>) => {
     setPendingUpdates(prev => ({
@@ -272,19 +286,6 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
           </span>
         );
       },
-    },
-    {
-      key: 'customer',
-      label: 'Cliente',
-      sortValue: (t: Trip) => t.customer?.name || '',
-      render: (t: Trip) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-black text-slate-900 uppercase whitespace-normal break-words max-w-[160px]">
-            {t.customer?.legalName || t.customer?.name || '—'}
-          </span>
-          <span className="text-[8px] text-slate-400 uppercase">{t.customer?.city || ''}</span>
-        </div>
-      ),
     },
     {
       key: 'coletaDocGenerated',
@@ -430,14 +431,14 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
 
   // ── Row styling ────────────────────────────────────────────────────────────
   const getRowStyle = useCallback((t: Trip): React.CSSProperties => {
-    if (t.coletaDocGenerated && t.emissaoCteNumber) {
+    if (isConcluido(t)) {
       return { backgroundColor: 'rgba(16,185,129,0.08)', borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: '#10b981' };
     }
     if (t.coletaDocGenerated) {
       return { backgroundColor: 'rgba(234,179,8,0.06)', borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: '#eab308' };
     }
     return { borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: '#e2e8f0' };
-  }, []);
+  }, [isConcluido]);
 
   // ── Sub-tab definitions ────────────────────────────────────────────────────
   const subTabs: { id: SubTab; label: string; count: number }[] = [
@@ -579,7 +580,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
         getRowStyle={getRowStyle}
         noMaxHeight
         stickyHeaderTop={0}
-        defaultVisibleKeys={['dateTime', 'os', 'category', 'customer', 'coletaDocGenerated', 'cte', 'observacoes']}
+        defaultVisibleKeys={['dateTime', 'os', 'category', 'coletaDocGenerated', 'cte', 'observacoes']}
       />
 
       {/* Insert OS modal */}
