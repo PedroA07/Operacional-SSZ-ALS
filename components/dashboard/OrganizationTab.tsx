@@ -433,22 +433,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
   const [ocTrip, setOcTrip] = useState<Trip | null>(null);
-  const [copyMenuTripId, setCopyMenuTripId] = useState<string | null>(null);
-  const copyMenuRef = useRef<HTMLDivElement>(null);
 
   // Constantes de estabilidade
   const STABILITY_DURATION = 30000; // Aumentado para 30s pois agora temos auto-limpeza ao confirmar
-
-  useEffect(() => {
-    if (!copyMenuTripId) return;
-    const handler = (e: MouseEvent) => {
-      if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) {
-        setCopyMenuTripId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [copyMenuTripId]);
 
   // Auto-limpeza de atualizações que já foram confirmadas pelo servidor
   useEffect(() => {
@@ -1385,6 +1372,20 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     genset: '',
   }), []);
 
+  const clean = (s: string) => s.replace(/[\s.\-/()]/g, '');
+  const CopyBtn = ({ value }: { value: string }) => (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(value).catch(() => {}); }}
+      className="p-0.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded transition-all shrink-0"
+      title={`Copiar: ${value}`}
+    >
+      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+      </svg>
+    </button>
+  );
+
   const columns = useMemo(() => [
     {
       key: 'dateTime',
@@ -1427,8 +1428,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return (
           <div className="flex items-center gap-2">
             <div className="flex flex-col gap-1">
-              <span className="font-black text-slate-900 text-[9px]">{t.os}</span>
-              <span className="text-[7px] font-bold text-blue-500 uppercase">{t.container || '---'}</span>
+              <div className="flex items-center gap-1">
+                <span className="font-black text-slate-900 text-[9px]">{t.os}</span>
+                <CopyBtn value={t.os} />
+              </div>
+              {t.container ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-[7px] font-bold text-blue-500 uppercase">{t.container}</span>
+                  <CopyBtn value={t.container} />
+                </div>
+              ) : (
+                <span className="text-[7px] font-bold text-slate-300 uppercase">---</span>
+              )}
               <div className="flex flex-wrap gap-1">
                 {t.category && (
                   <span
@@ -1473,7 +1484,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       sortValue: (t: Trip) => t.booking || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5 min-w-[90px]">
-          <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">{t.booking || '---'}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">{t.booking || '---'}</span>
+            {t.booking && <CopyBtn value={t.booking} />}
+          </div>
           {t.booking && (
             <span className="text-[7px] text-slate-400 font-bold uppercase">Booking</span>
           )}
@@ -1506,16 +1520,24 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       label: 'Motorista',
       sortValue: (t: Trip) => t.driver?.name || '',
       render: (t: Trip) => (
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-0.5">
           <span className="font-bold text-slate-600 uppercase leading-none text-[9px]">{t.driver.name}</span>
-          <div className="flex flex-col gap-0.5 mt-1">
+          {t.driver.cpf && (
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] font-mono text-slate-400">{t.driver.cpf}</span>
+              <CopyBtn value={clean(t.driver.cpf)} />
+            </div>
+          )}
+          <div className="flex flex-col gap-0.5 mt-0.5">
             <div className="flex items-center gap-1">
               <span className="text-[6px] font-black text-slate-400 uppercase tracking-tighter">Cavalo:</span>
               <span className="text-[7px] bg-slate-100 px-1 py-0.5 rounded font-black text-slate-600 border border-slate-200">{t.driver.plateHorse || '---'}</span>
+              {t.driver.plateHorse && <CopyBtn value={clean(t.driver.plateHorse)} />}
             </div>
             <div className="flex items-center gap-1">
               <span className="text-[6px] font-black text-slate-400 uppercase tracking-tighter">Carreta:</span>
               <span className="text-[7px] bg-slate-100 px-1 py-0.5 rounded font-black text-slate-600 border border-slate-200">{t.driver.plateTrailer || '---'}</span>
+              {t.driver.plateTrailer && <CopyBtn value={clean(t.driver.plateTrailer)} />}
             </div>
           </div>
         </div>
@@ -1538,7 +1560,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             </span>
           )}
           {t.customer.cnpj && (
-            <span className="text-[6px] text-slate-300 font-mono">{t.customer.cnpj}</span>
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] text-slate-400 font-mono">{t.customer.cnpj}</span>
+              <CopyBtn value={clean(t.customer.cnpj)} />
+            </div>
           )}
         </div>
       )
@@ -1669,77 +1694,21 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       key: 'actions',
       label: 'Ações',
       sortable: false,
-      render: (t: Trip) => {
-        const cleanStr = (s: string) => s.replace(/[.\-/()\s]/g, '');
-        const copy = (text: string) => {
-          navigator.clipboard.writeText(text).catch(() => {});
-          setCopyMenuTripId(null);
-        };
-        const copyItems: { label: string; value: string | undefined }[] = [
-          { label: 'Container', value: t.container || undefined },
-          { label: 'OS', value: t.os || undefined },
-          { label: 'Booking', value: t.booking || undefined },
-          { label: 'CPF Motorista', value: t.driver?.cpf ? cleanStr(t.driver.cpf) : undefined },
-          { label: 'Placa Cavalo', value: t.driver?.plateHorse ? cleanStr(t.driver.plateHorse) : undefined },
-          { label: 'Placa Carreta', value: t.driver?.plateTrailer ? cleanStr(t.driver.plateTrailer) : undefined },
-          { label: 'CNPJ Cliente', value: t.customer?.cnpj ? cleanStr(t.customer.cnpj) : undefined },
-        ].filter(i => i.value);
-        const isMenuOpen = copyMenuTripId === t.id;
-        return (
-          <div className="flex items-center gap-1">
-            {/* Copy menu */}
-            <div className="relative" ref={isMenuOpen ? copyMenuRef : undefined}>
-              <button
-                onClick={() => setCopyMenuTripId(isMenuOpen ? null : t.id)}
-                className="p-1.5 hover:bg-blue-50 text-slate-300 hover:text-blue-500 rounded-lg transition-all"
-                title="Copiar dados"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                </svg>
-              </button>
-              {isMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 min-w-[160px]" style={{ bottom: 'auto' }}>
-                  <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest px-3 py-1.5 border-b border-slate-100">Copiar</p>
-                  {copyItems.map(item => (
-                    <div
-                      key={item.label}
-                      className="flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-slate-50 transition-colors"
-                    >
-                      <span className="text-[8px] font-black text-slate-500 uppercase w-20 shrink-0">{item.label}</span>
-                      <span className="text-[8px] font-mono text-slate-700 truncate flex-1">{item.value}</span>
-                      <button
-                        onClick={() => copy(item.value!)}
-                        className="p-1 hover:bg-blue-100 text-slate-300 hover:text-blue-600 rounded-lg transition-colors shrink-0"
-                        title={`Copiar ${item.label}`}
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                  {copyItems.length === 0 && (
-                    <p className="px-3 py-2 text-[8px] text-slate-300 italic">Sem dados para copiar</p>
-                  )}
-                </div>
-              )}
-            </div>
-            {/* Remove */}
-            <button
-              onClick={() => setConfirmRemove(t)}
-              className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
-              title="Limpar deste painel"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-          </div>
-        );
-      }
+      render: (t: Trip) => (
+        <div className="flex items-center justify-center">
+          <button
+            onClick={() => setConfirmRemove(t)}
+            className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
+            title="Limpar deste painel"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, mapTripToMinuta, copyMenuTripId]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, mapTripToMinuta]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
