@@ -474,14 +474,18 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   };
 
   const columns = useMemo(() => [
-    { 
-      key: 'coletaTipoViagem', 
-      label: 'Tipo de Viagem', 
+    {
+      key: 'coletaTipoViagem',
+      label: 'Tipo de Viagem',
       sortable: false,
       render: (t: Trip) => {
-        const selectedValue = t.coletaTipoViagem || defaultTipoViagemId || '';
-        const selectedColor = tiposViagem.find(tv => tv.id === selectedValue)?.color || 'inherit';
-        
+        const opType = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase());
+        const rules: { tripTypeId: string; isDefault?: boolean; customerIds?: string[] }[] = opType?.config?.tripTypeRules || [];
+        const explicitRule = rules.find(r => r.customerIds?.length && r.customerIds.includes(t.customer.id));
+        const fallbackRule = rules.find(r => r.isDefault) || rules.find(r => !r.customerIds?.length);
+        const configuredTripTypeId = (explicitRule || fallbackRule)?.tripTypeId || null;
+        const selectedValue = t.coletaTipoViagem || configuredTripTypeId || defaultTipoViagemId || '';
+
         return (
           <CustomSelect
             value={selectedValue}
@@ -694,38 +698,17 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       key: 'customerInfo',
       label: 'Local Atendimento / Cidade',
       sortValue: (t: Trip) => t.customer?.name || '',
-      render: (t: Trip) => {
-        const opType = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase());
-        const rules: { tripTypeId: string; isDefault?: boolean; customerIds?: string[] }[] = opType?.config?.tripTypeRules || [];
-        const explicitRule = rules.find(r => r.customerIds?.length && r.customerIds.includes(t.customer.id));
-        const fallbackRule = rules.find(r => r.isDefault) || rules.find(r => !r.customerIds?.length);
-        const matchedRule = explicitRule || fallbackRule;
-        const tripTypeLabel = matchedRule ? tiposViagem.find(tv => tv.id === matchedRule.tripTypeId) : null;
-        return (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words" title={t.customer.name}>
-              {t.customer.legalName ? `${t.customer.legalName} (${t.customer.name})` : t.customer.name || '---'}
-            </span>
-            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5">
-              <span className="text-[8px] font-medium text-slate-400">{t.customer.cnpj || '---'}</span>
-              <span className="text-[8px] font-black text-slate-600 uppercase">{t.customer.city || '---'}</span>
-            </div>
-            {tripTypeLabel && (
-              <span
-                className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded border w-fit mt-0.5"
-                style={{
-                  backgroundColor: `${tripTypeLabel.color}25`,
-                  color: tripTypeLabel.color,
-                  borderColor: `${tripTypeLabel.color}60`,
-                }}
-                title={`Tipo de viagem configurado: ${tripTypeLabel.name}`}
-              >
-                {tripTypeLabel.name}
-              </span>
-            )}
+      render: (t: Trip) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words" title={t.customer.name}>
+            {t.customer.legalName ? `${t.customer.legalName} (${t.customer.name})` : t.customer.name || '---'}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[8px] font-medium text-slate-400">{t.customer.cnpj || '---'}</span>
+            <span className="text-[8px] font-black text-slate-600 uppercase">{t.customer.city || '---'}</span>
           </div>
-        );
-      }
+        </div>
+      )
     },
     {
       key: 'actions',
