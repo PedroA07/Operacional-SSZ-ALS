@@ -344,15 +344,24 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       });
   }, [propTrips, pendingUpdates, finalizingIds, hiddenTripTypes]);
 
+  const resolveEffectiveTripTypeId = useCallback((t: Trip): string | null => {
+    if (t.coletaTipoViagem) return t.coletaTipoViagem;
+    const opType = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase());
+    const rules: { tripTypeId: string; isDefault?: boolean; customerIds?: string[] }[] = opType?.config?.tripTypeRules || [];
+    const explicit = rules.find(r => r.customerIds?.length && r.customerIds.includes(t.customer.id));
+    const fallback = rules.find(r => r.isDefault) || rules.find(r => !r.customerIds?.length);
+    return (explicit || fallback)?.tripTypeId || defaultTipoViagemId || null;
+  }, [operationTypes, defaultTipoViagemId]);
+
   // Troca de aba é apenas um filtro leve sobre baseTrips
   const trips = useMemo(() => {
     if (activeOpTab === 'TODOS') return baseTrips;
     return baseTrips.filter(trip => {
-      const effective = trip.coletaTipoViagem || defaultTipoViagemId || null;
+      const effective = resolveEffectiveTripTypeId(trip);
       if (activeOpTab === '__NONE__') return !effective;
       return effective === activeOpTab;
     });
-  }, [baseTrips, activeOpTab, defaultTipoViagemId]);
+  }, [baseTrips, activeOpTab, resolveEffectiveTripTypeId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -387,19 +396,16 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   // Abas de tipos de operação (da coleta_tipos_viagem) — inclui "Sem tipo" apenas se houver trips sem tipo E sem padrão
   const opTabOptions = useMemo(() => {
-    // Resolve o tipo efetivo de cada trip (usa defaultTipoViagemId como fallback)
-    const effectiveType = (t: Trip) => t.coletaTipoViagem || defaultTipoViagemId || null;
-
     const opts = tiposViagem.map(tv => ({
       id: tv.id,
       name: tv.name,
       color: tv.color,
-      count: allFilteredTrips.filter(t => effectiveType(t) === tv.id).length,
+      count: allFilteredTrips.filter(t => resolveEffectiveTripTypeId(t) === tv.id).length,
     }));
-    const semTipo = allFilteredTrips.filter(t => !effectiveType(t)).length;
+    const semTipo = allFilteredTrips.filter(t => !resolveEffectiveTripTypeId(t)).length;
     if (semTipo > 0) opts.push({ id: '__NONE__', name: 'Sem Tipo', color: '#94a3b8', count: semTipo });
     return opts;
-  }, [tiposViagem, allFilteredTrips]);
+  }, [tiposViagem, allFilteredTrips, resolveEffectiveTripTypeId]);
 
   const handleUpdateTrip = useCallback(async (trip: Trip, data: Partial<Trip>) => {
     const now = Date.now();
@@ -479,12 +485,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       label: 'Tipo de Viagem',
       sortable: false,
       render: (t: Trip) => {
-        const opType = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase());
-        const rules: { tripTypeId: string; isDefault?: boolean; customerIds?: string[] }[] = opType?.config?.tripTypeRules || [];
-        const explicitRule = rules.find(r => r.customerIds?.length && r.customerIds.includes(t.customer.id));
-        const fallbackRule = rules.find(r => r.isDefault) || rules.find(r => !r.customerIds?.length);
-        const configuredTripTypeId = (explicitRule || fallbackRule)?.tripTypeId || null;
-        const selectedValue = t.coletaTipoViagem || configuredTripTypeId || defaultTipoViagemId || '';
+        const selectedValue = resolveEffectiveTripTypeId(t) || '';
 
         return (
           <CustomSelect
@@ -627,13 +628,15 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                 )}
               </div>
             </div>
-            <button
-              onClick={() => setEmailSendModal({ isOpen: true, trip: t })}
-              className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-              title="Enviar E-mail"
-            >
-              <Mail className="w-4 h-4" />
-            </button>
+            {tiposViagem.find(tv => tv.id === resolveEffectiveTripTypeId(t))?.name?.toUpperCase() !== 'BL DE LONGO CUSTO' && (
+              <button
+                onClick={() => setEmailSendModal({ isOpen: true, trip: t })}
+                className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                title="Enviar E-mail"
+              >
+                <Mail className="w-4 h-4" />
+              </button>
+            )}
           </div>
         );
       }
@@ -843,7 +846,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   };
 
   const getRowStyle = (t: Trip) => {
-    const typeId = t.coletaTipoViagem || defaultTipoViagemId;
+    const typeId = resolveEffectiveTripTypeId(t);
     const type = tiposViagem.find(tv => tv.id === typeId);
     const typeColor = type?.color || '#cbd5e1';
 
