@@ -39,6 +39,7 @@ export interface User {
       orgEntrega?:       { enabled: boolean; visibleFields: string[] };
       orgColetaEntrega?: { enabled: boolean; visibleFields: string[] };
       orgDevolucoes?:    { enabled: boolean; visibleFields: string[] };
+      emissoes?:         { enabled: boolean };
     };
   };
 }
@@ -340,7 +341,8 @@ export enum DashboardTab {
   NAVIOS = 'NAVIOS',
   EXTERNAL_PORTAL = 'EXTERNAL_PORTAL',
   EXTERNAL_USERS = 'EXTERNAL_USERS',
-  TABELA_FRETE = 'TABELA_FRETE'
+  TABELA_FRETE = 'TABELA_FRETE',
+  EMISSOES = 'EMISSOES'
 }
 
 export interface FreightVehicleType {
@@ -580,6 +582,8 @@ export interface Trip {
   coletaEmissaoSolicitada?: boolean;
   isRemovedFromColeta?: boolean;
   isRemovedFromOrg?: boolean;
+  emissaoCteNumber?: string;
+  emissaoObservacoes?: string;
 }
 
 export interface ColetaDocOriginarioRule {
