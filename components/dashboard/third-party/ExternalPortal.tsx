@@ -800,39 +800,43 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
     return { total: all.length, today, completed, pending };
   }, [filteredTrips, todayLocal]);
 
+  const showPortalHeader = user.thirdPartyConfig?.showPortalHeader ?? true;
+
   return (
     <div className="min-h-screen bg-slate-50/50">
       {/* Header */}
       <div className="bg-white border-b border-slate-100 shadow-sm sticky top-0 z-30">
         <div className="px-6 py-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">Portal de Viagens</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-0.5">Acompanhamento de Operações em Tempo Real</p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Buscar OS, container, motorista..."
-                  className="w-full sm:w-64 pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 placeholder:text-slate-300 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 outline-none transition-all"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                />
-                <svg className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 transition-colors">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                )}
+          {showPortalHeader && (
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-3">
+              <div>
+                <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">Portal de Viagens</h1>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-0.5">Acompanhamento de Operações em Tempo Real</p>
               </div>
-              <div className="flex items-center gap-2">
-                <DatePicker value={startDate} onChange={setStartDate} placeholder="Data início..." maxDate={endDate || undefined} className="w-36" inputClassName="py-2 text-[10px]"/>
-                <span className="text-[9px] font-black text-slate-300">→</span>
-                <DatePicker value={endDate} onChange={setEndDate} placeholder="Data fim..." minDate={startDate || undefined} className="w-36" inputClassName="py-2 text-[10px]"/>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar OS, container, motorista..."
+                    className="w-full sm:w-64 pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 placeholder:text-slate-300 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50 outline-none transition-all"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                  />
+                  <svg className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 transition-colors">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <DatePicker value={startDate} onChange={setStartDate} placeholder="Data início..." maxDate={endDate || undefined} className="w-36" inputClassName="py-2 text-[10px]"/>
+                  <span className="text-[9px] font-black text-slate-300">→</span>
+                  <DatePicker value={endDate} onChange={setEndDate} placeholder="Data fim..." minDate={startDate || undefined} className="w-36" inputClassName="py-2 text-[10px]"/>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Page tabs — only shown when pages are configured */}
           {enabledPages.length > 1 && (
@@ -855,7 +859,7 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
         </div>
 
         {/* Summary cards */}
-        <div className="px-6 pb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {showPortalHeader && <div className="px-6 pb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { count: stats.total,     label: 'Total',        bg: 'bg-blue-100',    icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', iconColor: 'text-blue-600' },
             { count: stats.completed, label: 'Concluídas',   bg: 'bg-emerald-100', icon: 'M5 13l4 4L19 7',                                                                                                                      iconColor: 'text-emerald-600' },
@@ -872,7 +876,7 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
               </div>
             </div>
           ))}
-        </div>
+        </div>}
       </div>
 
       <div className="p-6 space-y-4">

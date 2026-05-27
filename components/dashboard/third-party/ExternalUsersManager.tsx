@@ -763,6 +763,7 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                 </div>
                 {(() => {
                   const isEnabled = editingUser.thirdPartyConfig?.pages?.emissoes?.enabled ?? false;
+                  const showHeader = editingUser.thirdPartyConfig?.showPortalHeader ?? true;
                   return (
                     <div className={`rounded-2xl border-2 transition-all overflow-hidden ${isEnabled ? 'border-purple-300 bg-purple-50' : 'border-slate-200 bg-white'}`}>
                       <div className="flex items-center justify-between p-4">
@@ -791,6 +792,32 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                         >
                           <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}/>
                         </button>
+                      </div>
+
+                      {/* Show portal header toggle */}
+                      <div className="px-4 pb-4 border-t border-white/60">
+                        <div className="flex items-center justify-between mt-3">
+                          <div>
+                            <p className="text-[10px] font-black text-slate-600 uppercase tracking-wide">Cabeçalho do Portal</p>
+                            <p className="text-[8px] font-bold text-slate-400 mt-0.5">Exibir busca, datas e cards de estatísticas</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditingUser({
+                              ...editingUser,
+                              thirdPartyConfig: {
+                                ...editingUser.thirdPartyConfig,
+                                visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
+                                showPortalHeader: !showHeader,
+                              },
+                            })}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${showHeader ? 'bg-slate-500' : 'bg-slate-200'}`}
+                            role="switch"
+                            aria-checked={showHeader}
+                          >
+                            <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${showHeader ? 'translate-x-5' : 'translate-x-0'}`}/>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
