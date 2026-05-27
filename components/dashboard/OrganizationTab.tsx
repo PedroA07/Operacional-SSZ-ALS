@@ -1432,14 +1432,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 <span className="font-black text-slate-900 text-[9px]">{t.os}</span>
                 <CopyBtn value={t.os} />
               </div>
-              {t.container ? (
-                <div className="flex items-center gap-1">
-                  <span className="text-[7px] font-bold text-blue-500 uppercase">{t.container}</span>
-                  <CopyBtn value={t.container} />
-                </div>
-              ) : (
-                <span className="text-[7px] font-bold text-slate-300 uppercase">---</span>
-              )}
               <div className="flex flex-wrap gap-1">
                 {t.category && (
                   <span
@@ -1479,38 +1471,64 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       }
     },
     {
-      key: 'booking',
-      label: 'Booking',
-      sortValue: (t: Trip) => t.booking || '',
+      key: 'container',
+      label: 'Container',
+      sortValue: (t: Trip) => t.container || '',
       render: (t: Trip) => (
-        <div className="flex flex-col gap-0.5 min-w-[90px]">
+        <div className="flex flex-col gap-0.5 min-w-[120px]">
           <div className="flex items-center gap-1">
-            <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">{t.booking || '---'}</span>
-            {t.booking && <CopyBtn value={t.booking} />}
+            <span className="text-[9px] font-black text-blue-600 uppercase">{t.container || '---'}</span>
+            {t.container && <CopyBtn value={t.container} />}
           </div>
-          {t.booking && (
-            <span className="text-[7px] text-slate-400 font-bold uppercase">Booking</span>
+          {t.tara && (
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] font-black text-slate-400 uppercase tracking-tighter">Tara:</span>
+              <span className="text-[7px] font-bold text-slate-600">{t.tara}</span>
+              <CopyBtn value={t.tara} />
+            </div>
+          )}
+          {t.seal && (
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] font-black text-slate-400 uppercase tracking-tighter">Lacre:</span>
+              <span className="text-[7px] font-bold text-slate-600">{t.seal}</span>
+              <CopyBtn value={t.seal} />
+            </div>
+          )}
+          {t.cva && (
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] font-black text-slate-400 uppercase tracking-tighter">CVA:</span>
+              <span className="text-[7px] font-bold text-slate-600">{t.cva}</span>
+              <CopyBtn value={t.cva} />
+            </div>
           )}
         </div>
       )
     },
     {
       key: 'ship',
-      label: 'Navio',
+      label: 'Booking / Navio',
       sortValue: (t: Trip) => t.ship || '',
       render: (t: Trip) => {
         const { name, voyage } = splitShipField(t.ship || '');
         return (
           <div className="flex flex-col gap-1 min-w-[130px]">
-            <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">
-              {name || '---'}
-            </span>
-            {voyage && (
-              <span className="text-[7px] font-bold text-slate-400 uppercase tracking-tight">
-                Viagem: {voyage}
-              </span>
+            {t.booking && (
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] font-black text-slate-700 uppercase leading-tight">{t.booking}</span>
+                <CopyBtn value={t.booking} />
+              </div>
             )}
-            {t.ship && renderGateTag(t.ship, t.containerType)}
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[9px] font-black text-slate-700 uppercase leading-tight">
+                {name || '---'}
+              </span>
+              {voyage && (
+                <span className="text-[7px] font-bold text-slate-400 uppercase tracking-tight">
+                  Viagem: {voyage}
+                </span>
+              )}
+              {t.ship && renderGateTag(t.ship, t.containerType)}
+            </div>
           </div>
         );
       }
