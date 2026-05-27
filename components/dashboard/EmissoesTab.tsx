@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Trip, User } from '../../types';
 import { db } from '../../utils/storage';
+import { osCategoryService } from '../../utils/osCategoryService';
 import SmartOperationTable from './operations/SmartOperationTable';
 
 interface Category { id: string; name: string; color?: string; }
@@ -104,6 +105,8 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
   const [showInsertModal, setShowInsertModal] = useState(false);
   const [insertOs, setInsertOs] = useState('');
   const [insertCategory, setInsertCategory] = useState('');
+  const [insertCategoryDetected, setInsertCategoryDetected] = useState<string | null>(null);
+  const [userChoseCategory, setUserChoseCategory] = useState(false);
   const [insertLoading, setInsertLoading] = useState(false);
 
   const STABILITY = 30000;
@@ -199,6 +202,28 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
     setObsEditingId(null);
   }, [handleUpdate, obsInputValue]);
 
+  const closeInsertModal = useCallback(() => {
+    setShowInsertModal(false);
+    setInsertOs('');
+    setInsertCategory('');
+    setInsertCategoryDetected(null);
+    setUserChoseCategory(false);
+  }, []);
+
+  const handleInsertOsChange = useCallback((value: string) => {
+    setInsertOs(value);
+    if (!userChoseCategory) {
+      const detected = osCategoryService.detectCategoryFromOS(value);
+      setInsertCategoryDetected(detected);
+      if (detected) {
+        const matched = categories.find(c => c.name.toLowerCase() === detected.toLowerCase());
+        setInsertCategory(matched?.name || detected);
+      } else {
+        setInsertCategory('');
+      }
+    }
+  }, [userChoseCategory, categories]);
+
   const handleInsertOs = async () => {
     if (!insertOs.trim() || !insertCategory) return;
     setInsertLoading(true);
@@ -223,9 +248,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
       };
       await db.saveTrip(newTrip);
       await onRefresh();
-      setShowInsertModal(false);
-      setInsertOs('');
-      setInsertCategory('');
+      closeInsertModal();
     } catch (e) {
       console.error('Insert OS error:', e);
     } finally {
@@ -585,12 +608,12 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
 
       {/* Insert OS modal */}
       {showInsertModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={e => { if (e.target === e.currentTarget) setShowInsertModal(false); }}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={e => { if (e.target === e.currentTarget) closeInsertModal(); }}>
           <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Inserir OS</h3>
               <button
-                onClick={() => setShowInsertModal(false)}
+                onClick={closeInsertModal}
                 className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -606,7 +629,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
                 </label>
                 <input
                   value={insertOs}
-                  onChange={e => setInsertOs(e.target.value)}
+                  onChange={e => handleInsertOsChange(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && insertCategory) handleInsertOs(); }}
                   placeholder="Ex: 6ALC123456A"
                   className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
@@ -617,17 +640,33 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">
                   Categoria <span className="text-red-400">*</span>
                 </label>
-                <SmartCategorySelect
-                  categories={categories}
-                  value={insertCategory}
-                  onChange={setInsertCategory}
-                />
+                {insertCategoryDetected && !userChoseCategory ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span className="flex-1 text-sm font-black text-emerald-700 uppercase">{insertCategory}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setUserChoseCategory(true); setInsertCategory(''); }}
+                      className="text-[8px] font-black text-emerald-600 hover:text-emerald-800 uppercase bg-emerald-100 hover:bg-emerald-200 px-2 py-0.5 rounded-lg transition-colors"
+                    >
+                      Alterar
+                    </button>
+                  </div>
+                ) : (
+                  <SmartCategorySelect
+                    categories={categories}
+                    value={insertCategory}
+                    onChange={v => { setInsertCategory(v); setUserChoseCategory(true); }}
+                  />
+                )}
               </div>
             </div>
 
             <div className="flex gap-2 pt-1">
               <button
-                onClick={() => { setShowInsertModal(false); setInsertOs(''); setInsertCategory(''); }}
+                onClick={closeInsertModal}
                 className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase hover:bg-slate-200 transition-colors"
               >
                 Cancelar

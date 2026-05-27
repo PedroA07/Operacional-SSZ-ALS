@@ -460,7 +460,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
              <ExternalUsersManager onRefresh={() => loadAllData(false)} />
            )}
            {activeTab === DashboardTab.EXTERNAL_PORTAL && (
-             <ExternalPortal user={user} trips={trips} />
+             <ExternalPortal user={user} trips={trips} categories={categories} onRefresh={loadTripsOnly} />
            )}
            {activeTab === DashboardTab.TABELA_FRETE && <FreightTableTab userId={user.id} />}
            {activeTab === DashboardTab.EMISSOES && (
