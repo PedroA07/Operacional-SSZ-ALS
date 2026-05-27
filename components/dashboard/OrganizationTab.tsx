@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer, Devolucao, Liberacao } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
@@ -8,6 +9,7 @@ import FeedbackModal from '../shared/FeedbackModal';
 import DateTimePicker from '../shared/DateTimePicker';
 import ImageViewer from '../shared/ImageViewer';
 import PreStackingForm from './forms/PreStackingForm';
+import OrdemColetaForm from './forms/OrdemColetaForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
 import { localDateStr, localDateTimeStr } from '../../utils/dateHelpers';
@@ -430,9 +432,23 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
+  const [ocTrip, setOcTrip] = useState<Trip | null>(null);
+  const [copyMenuTripId, setCopyMenuTripId] = useState<string | null>(null);
+  const copyMenuRef = useRef<HTMLDivElement>(null);
 
   // Constantes de estabilidade
   const STABILITY_DURATION = 30000; // Aumentado para 30s pois agora temos auto-limpeza ao confirmar
+
+  useEffect(() => {
+    if (!copyMenuTripId) return;
+    const handler = (e: MouseEvent) => {
+      if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) {
+        setCopyMenuTripId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [copyMenuTripId]);
 
   // Auto-limpeza de atualizações que já foram confirmadas pelo servidor
   useEffect(() => {
@@ -1052,8 +1068,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
     // Salva como ISO UTC para consistência com SchedulingEditModal
     const isoDateTime = dateTime ? new Date(dateTime).toISOString() : '';
+    // Auto-confirma o agendamento quando uma data é selecionada
     const dateTimeData = {
       scheduledDateTime: dateTime,
+      ...(dateTime ? { isScheduled: true, sentNF: true } : {}),
       scheduling: {
         locationId: trip.scheduledLocationId || '',
         location: trip.scheduling?.location || '',
@@ -1491,18 +1509,27 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     },
-    { 
-      key: 'customer', 
-      label: 'Local de Atendimento', 
+    {
+      key: 'customer',
+      label: 'Local de Atendimento',
       sortValue: (t: Trip) => t.customer?.name || '',
       render: (t: Trip) => (
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-0.5">
           <span className="font-black text-slate-800 uppercase text-[9px]">{t.customer.name}</span>
           <span className="text-[7px] text-slate-400 font-bold uppercase truncate max-w-[120px]">
             {t.customer.legalName || '---'}
           </span>
+          {(t.customer.city || t.customer.state) && (
+            <span className="text-[7px] text-slate-400 font-bold uppercase flex items-center gap-0.5">
+              <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              {[t.customer.city, t.customer.state].filter(Boolean).join(' - ')}
+            </span>
+          )}
+          {t.customer.cnpj && (
+            <span className="text-[6px] text-slate-300 font-mono">{t.customer.cnpj}</span>
+          )}
         </div>
-      ) 
+      )
     },
     {
       key: 'sentNF',
@@ -1630,21 +1657,79 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       key: 'actions',
       label: 'Ações',
       sortable: false,
-      render: (t: Trip) => (
-        <div className="flex items-center justify-center">
-          <button
-            onClick={() => setConfirmRemove(t)}
-            className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
-            title="Limpar deste painel"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      )
+      render: (t: Trip) => {
+        const cleanStr = (s: string) => s.replace(/[.\-/()\s]/g, '');
+        const copy = (text: string) => {
+          navigator.clipboard.writeText(text).catch(() => {});
+          setCopyMenuTripId(null);
+        };
+        const copyItems: { label: string; value: string | undefined }[] = [
+          { label: 'Container', value: t.container || undefined },
+          { label: 'OS', value: t.os || undefined },
+          { label: 'Booking', value: t.booking || undefined },
+          { label: 'CPF Motorista', value: t.driver?.cpf ? cleanStr(t.driver.cpf) : undefined },
+          { label: 'Placa Cavalo', value: t.driver?.plateHorse ? cleanStr(t.driver.plateHorse) : undefined },
+          { label: 'Placa Carreta', value: t.driver?.plateTrailer ? cleanStr(t.driver.plateTrailer) : undefined },
+          { label: 'CNPJ Cliente', value: t.customer?.cnpj ? cleanStr(t.customer.cnpj) : undefined },
+        ].filter(i => i.value);
+        const isMenuOpen = copyMenuTripId === t.id;
+        return (
+          <div className="flex items-center gap-1">
+            {/* Copy menu */}
+            <div className="relative" ref={isMenuOpen ? copyMenuRef : undefined}>
+              <button
+                onClick={() => setCopyMenuTripId(isMenuOpen ? null : t.id)}
+                className="p-1.5 hover:bg-blue-50 text-slate-300 hover:text-blue-500 rounded-lg transition-all"
+                title="Copiar dados"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+              </button>
+              {isMenuOpen && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 min-w-[160px]" style={{ bottom: 'auto' }}>
+                  <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest px-3 py-1.5 border-b border-slate-100">Copiar</p>
+                  {copyItems.map(item => (
+                    <button
+                      key={item.label}
+                      onClick={() => copy(item.value!)}
+                      className="w-full text-left px-3 py-1.5 text-[9px] font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center justify-between gap-2"
+                    >
+                      <span>{item.label}</span>
+                      <span className="text-[8px] font-mono text-slate-400 truncate max-w-[70px]">{item.value}</span>
+                    </button>
+                  ))}
+                  {copyItems.length === 0 && (
+                    <p className="px-3 py-2 text-[8px] text-slate-300 italic">Sem dados para copiar</p>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Edit OC */}
+            <button
+              onClick={() => setOcTrip(t)}
+              className="p-1.5 hover:bg-indigo-50 text-slate-300 hover:text-indigo-500 rounded-lg transition-all"
+              title="Editar Ordem de Coleta"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+            </button>
+            {/* Remove */}
+            <button
+              onClick={() => setConfirmRemove(t)}
+              className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
+              title="Limpar deste painel"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        );
+      }
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, mapTripToMinuta]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, mapTripToMinuta, copyMenuTripId]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
@@ -1943,6 +2028,41 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      {ocTrip && createPortal(
+        <div className="fixed inset-0 z-[400] animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
+            <div className="h-14 bg-indigo-700 flex items-center justify-between px-6 shrink-0 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </div>
+                <div>
+                  <p className="text-white font-black text-sm uppercase tracking-tight leading-none">Editar Ordem de Coleta</p>
+                  <p className="text-white/60 text-[9px] font-bold uppercase mt-0.5">OS: {ocTrip.os}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setOcTrip(null); onRefresh(); }}
+                className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center hover:bg-white/40 text-white transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <OrdemColetaForm
+                drivers={drivers}
+                customers={customers}
+                ports={ports}
+                onClose={() => { setOcTrip(null); onRefresh(); }}
+                initialData={ocTrip.ocFormData}
+                tripId={ocTrip.id}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {minutaTrip && (
         <div className="fixed inset-0 z-[300] bg-slate-950/80 backdrop-blur-md flex flex-col overflow-y-auto animate-in fade-in duration-300">
           <PreStackingForm
