@@ -1447,6 +1447,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                   </span>
                 )}
               </div>
+              {/* Minuta button next to OS */}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setMinutaTrip(t); }}
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[6px] font-black uppercase tracking-tight transition-all border w-fit mt-0.5 ${t.preStackingFormData ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                title={t.preStackingFormData ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking'}
+              >
+                <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                {t.preStackingFormData ? 'Minuta ✓' : 'Minuta'}
+              </button>
             </div>
             {pendingUpdates[t.id] && (
               <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" title="Salvando alterações..."></div>
@@ -1605,27 +1617,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       render: (t: Trip) => {
         const rawDT = t.scheduling?.dateTime || t.scheduledDateTime || '';
         const displayValue = formatToLocalInput(rawDT);
-        const hasMinuta = !!t.preStackingFormData;
         return (
-          <div className="flex flex-col gap-1.5 min-w-[9rem]">
-            <DateTimePicker
-              value={displayValue}
-              onChange={(v) => handleDateTimeChange(t, v)}
-              placeholder="Selecionar..."
-              inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
-            />
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setMinutaTrip(t); }}
-              className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${hasMinuta ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
-              title={hasMinuta ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking'}
-            >
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-              {hasMinuta ? 'Minuta ✓' : 'Gerar Minuta'}
-            </button>
-          </div>
+          <DateTimePicker
+            value={displayValue}
+            onChange={(v) => handleDateTimeChange(t, v)}
+            placeholder="Selecionar..."
+            inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
+          />
         );
       }
     },
@@ -1690,14 +1688,22 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 min-w-[160px]" style={{ bottom: 'auto' }}>
                   <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest px-3 py-1.5 border-b border-slate-100">Copiar</p>
                   {copyItems.map(item => (
-                    <button
+                    <div
                       key={item.label}
-                      onClick={() => copy(item.value!)}
-                      className="w-full text-left px-3 py-1.5 text-[9px] font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center justify-between gap-2"
+                      className="flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-slate-50 transition-colors"
                     >
-                      <span>{item.label}</span>
-                      <span className="text-[8px] font-mono text-slate-400 truncate max-w-[70px]">{item.value}</span>
-                    </button>
+                      <span className="text-[8px] font-black text-slate-500 uppercase w-20 shrink-0">{item.label}</span>
+                      <span className="text-[8px] font-mono text-slate-700 truncate flex-1">{item.value}</span>
+                      <button
+                        onClick={() => copy(item.value!)}
+                        className="p-1 hover:bg-blue-100 text-slate-300 hover:text-blue-600 rounded-lg transition-colors shrink-0"
+                        title={`Copiar ${item.label}`}
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                      </button>
+                    </div>
                   ))}
                   {copyItems.length === 0 && (
                     <p className="px-3 py-2 text-[8px] text-slate-300 italic">Sem dados para copiar</p>
