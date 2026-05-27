@@ -118,6 +118,11 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
   const [newUser, setNewUser] = useState({ displayName: '', username: '', password: '' });
   const [creatingError, setCreatingError] = useState('');
 
+  const [changingPasswordId, setChangingPasswordId] = useState<string | null>(null);
+  const [newPasswordValue, setNewPasswordValue]     = useState('');
+  const [showNewPassword, setShowNewPassword]       = useState(false);
+  const [deletingUserId, setDeletingUserId]         = useState<string | null>(null);
+
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
@@ -170,7 +175,17 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
           },
         },
       };
-      await db.saveUser({ ...userToCreate, id: `ext-${Date.now()}` });
+      await db.saveUser({
+        ...userToCreate,
+        id: `ext-${Date.now()}`,
+        thirdPartyConfig: {
+          ...userToCreate.thirdPartyConfig!,
+          pages: {
+            ...userToCreate.thirdPartyConfig!.pages,
+            emissoes: { enabled: false, visibleFields: [] },
+          },
+        },
+      });
       await loadData();
       setIsCreatingUser(false);
       setNewUser({ displayName: '', username: '', password: '' });
@@ -196,6 +211,39 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
     } finally {
       setSaving(false);
     }
+  };
+
+  /* ── Password / delete actions ──────────────────────────────── */
+  const handleChangePassword = async (userId: string) => {
+    if (!newPasswordValue.trim()) return;
+    setSaving(true);
+    try {
+      await db.changePassword(userId, newPasswordValue.trim());
+      await loadData();
+      setChangingPasswordId(null);
+      setNewPasswordValue('');
+    } catch { console.error('change password error'); }
+    finally { setSaving(false); }
+  };
+
+  const handleRequestPasswordChange = async (user: User) => {
+    setSaving(true);
+    try {
+      await db.saveUser({ ...user, isFirstLogin: true });
+      await loadData();
+    } catch { console.error('request password change error'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    setSaving(true);
+    try {
+      await db.deleteUser(userId);
+      await loadData();
+      setDeletingUserId(null);
+      onRefresh();
+    } catch { console.error('delete user error'); }
+    finally { setSaving(false); }
   };
 
   /* ── Page toggle helpers ─────────────────────────────────────── */
@@ -322,37 +370,132 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
         <div className="space-y-4">
           {users.map(user => {
             const enabledPages = PAGE_DEFS.filter(p => user.thirdPartyConfig?.pages?.[p.key]?.enabled);
+            const emissoesEnabled = user.thirdPartyConfig?.pages?.emissoes?.enabled;
+            const isChangingPw = changingPasswordId === user.id;
+            const isDeleting   = deletingUserId === user.id;
             return (
-              <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <div>
-                  <p className="font-black text-slate-800">{user.displayName}</p>
-                  <div className="flex items-center gap-4 mt-1 flex-wrap">
-                    <p className="text-xs text-slate-500"><span className="font-bold">Login:</span> {user.username}</p>
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs text-slate-500">
-                        <span className="font-bold">Senha:</span> {visiblePasswords[user.id] ? user.password : '••••••••'}
-                      </p>
-                      <button onClick={() => togglePasswordVisibility(user.id)} className="text-slate-400 hover:text-slate-600 ml-1">
-                        {visiblePasswords[user.id] ? <EyeOff/> : <EyeOpen/>}
-                      </button>
-                    </div>
-                    {enabledPages.length > 0 && (
-                      <div className="flex gap-1 flex-wrap">
-                        {enabledPages.map(p => (
-                          <span key={p.key} className={`text-[8px] px-2 py-0.5 rounded-full font-black border uppercase ${colorMap[p.color].chip}`}>
-                            {p.label.split('—')[1]?.trim() || p.label}
-                          </span>
-                        ))}
+              <div key={user.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-black text-slate-800">{user.displayName}</p>
+                    <div className="flex items-center gap-4 mt-1 flex-wrap">
+                      <p className="text-xs text-slate-500"><span className="font-bold">Login:</span> {user.username}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-xs text-slate-500">
+                          <span className="font-bold">Senha:</span> {visiblePasswords[user.id] ? user.password : '••••••••'}
+                        </p>
+                        <button onClick={() => togglePasswordVisibility(user.id)} className="text-slate-400 hover:text-slate-600 ml-1">
+                          {visiblePasswords[user.id] ? <EyeOff/> : <EyeOpen/>}
+                        </button>
                       </div>
-                    )}
+                      {(enabledPages.length > 0 || emissoesEnabled) && (
+                        <div className="flex gap-1 flex-wrap">
+                          {enabledPages.map(p => (
+                            <span key={p.key} className={`text-[8px] px-2 py-0.5 rounded-full font-black border uppercase ${colorMap[p.color].chip}`}>
+                              {p.label.split('—')[1]?.trim() || p.label}
+                            </span>
+                          ))}
+                          {emissoesEnabled && (
+                            <span className="text-[8px] px-2 py-0.5 rounded-full font-black border uppercase bg-purple-100 text-purple-700 border-purple-200">
+                              Emissões
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-4">
+                    {/* Alterar senha */}
+                    <button
+                      onClick={() => { setChangingPasswordId(isChangingPw ? null : user.id); setNewPasswordValue(''); setDeletingUserId(null); }}
+                      title="Alterar senha"
+                      className={`p-2 rounded-xl transition-all ${isChangingPw ? 'bg-amber-100 text-amber-700' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                      </svg>
+                    </button>
+                    {/* Solicitar mudança de senha */}
+                    <button
+                      onClick={() => handleRequestPasswordChange(user)}
+                      title="Solicitar troca de senha no próximo login"
+                      className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                      </svg>
+                    </button>
+                    {/* Configurar acessos */}
+                    <button
+                      onClick={() => setEditingUser(user)}
+                      title="Configurar acessos"
+                      className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </button>
+                    {/* Excluir */}
+                    <button
+                      onClick={() => { setDeletingUserId(isDeleting ? null : user.id); setChangingPasswordId(null); }}
+                      title="Excluir usuário"
+                      className={`p-2 rounded-xl transition-all ${isDeleting ? 'bg-red-100 text-red-600' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => setEditingUser(user)}
-                  className="text-xs font-black text-blue-600 uppercase hover:underline shrink-0 ml-4"
-                >
-                  Configurar Acessos
-                </button>
+
+                {/* Inline: alterar senha */}
+                {isChangingPw && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="relative flex-1">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPasswordValue}
+                        onChange={e => setNewPasswordValue(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleChangePassword(user.id); if (e.key === 'Escape') setChangingPasswordId(null); }}
+                        placeholder="Nova senha..."
+                        className="w-full px-3 py-2 text-sm bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 pr-9"
+                        autoFocus
+                      />
+                      <button type="button" onClick={() => setShowNewPassword(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                        {showNewPassword ? <EyeOff/> : <EyeOpen/>}
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => handleChangePassword(user.id)}
+                      disabled={!newPasswordValue.trim() || saving}
+                      className="px-4 py-2 bg-amber-500 text-white text-xs font-black uppercase rounded-xl hover:bg-amber-600 disabled:opacity-50 transition-colors"
+                    >
+                      Salvar
+                    </button>
+                    <button onClick={() => setChangingPasswordId(null)} className="px-3 py-2 bg-slate-200 text-slate-600 text-xs font-black uppercase rounded-xl hover:bg-slate-300 transition-colors">
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+
+                {/* Inline: confirmar exclusão */}
+                {isDeleting && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+                    <p className="text-xs font-bold text-red-700 flex-1">Confirmar exclusão de <strong>{user.displayName}</strong>? Esta ação não pode ser desfeita.</p>
+                    <button
+                      onClick={() => handleDeleteUser(user.id)}
+                      disabled={saving}
+                      className="px-4 py-2 bg-red-600 text-white text-xs font-black uppercase rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    >
+                      {saving ? 'Excluindo...' : 'Excluir'}
+                    </button>
+                    <button onClick={() => setDeletingUserId(null)} className="px-3 py-2 bg-slate-200 text-slate-600 text-xs font-black uppercase rounded-xl hover:bg-slate-300 transition-colors">
+                      Cancelar
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -611,6 +754,48 @@ const ExternalUsersManager: React.FC<ExternalUsersManagerProps> = ({ onRefresh }
                 );
               })}
               </div>{/* end space-y-3 devolucoes */}
+
+              {/* ── Página: Emissões ────────────────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Emissões</p>
+                  <div className="flex-1 h-px bg-slate-200"/>
+                </div>
+                {(() => {
+                  const isEnabled = editingUser.thirdPartyConfig?.pages?.emissoes?.enabled ?? false;
+                  return (
+                    <div className={`rounded-2xl border-2 transition-all overflow-hidden ${isEnabled ? 'border-purple-300 bg-purple-50' : 'border-slate-200 bg-white'}`}>
+                      <div className="flex items-center justify-between p-4">
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-black uppercase tracking-tight ${isEnabled ? 'text-slate-900' : 'text-slate-500'}`}>Página de Emissões</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                            Acesso à tabela de OS com Doc Originário, CT-E e observações. Permite inserir OS.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingUser({
+                            ...editingUser,
+                            thirdPartyConfig: {
+                              ...editingUser.thirdPartyConfig,
+                              visibleFields: editingUser.thirdPartyConfig?.visibleFields || [],
+                              pages: {
+                                ...editingUser.thirdPartyConfig?.pages,
+                                emissoes: { enabled: !isEnabled, visibleFields: [] },
+                              },
+                            },
+                          })}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ml-4 ${isEnabled ? 'bg-purple-600' : 'bg-slate-200'}`}
+                          role="switch"
+                          aria-checked={isEnabled}
+                        >
+                          <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}/>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
 
               {/* ── Filtros de Dados ────────────────────────────── */}
               <div className="space-y-5">
