@@ -34,6 +34,7 @@ export interface User {
     allowedCustomers?: string[];
     visibleFilters?: string[];
     allowInsertDevolucao?: boolean;
+    showPortalHeader?: boolean;
     pages?: {
       orgColeta?:        { enabled: boolean; visibleFields: string[] };
       orgEntrega?:       { enabled: boolean; visibleFields: string[] };
