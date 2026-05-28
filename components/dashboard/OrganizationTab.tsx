@@ -457,11 +457,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           setTerminalVessels(data.map((r: any) => ({
             terminal: r.terminal, navio: r.navio, situacao: r.situacao,
             viagem: r.viagem,
-            gateDry:     r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
-            gateReefer:  r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
-            deadLineStr: r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
-            dtPrevAtrac: r.dt_prev_atrac, dtAtracacao: r.dt_atracacao,
-            dtPrevSaida: r.dt_prev_saida, fetchedAt: r.fetched_at,
+            gateDry:      r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
+            gateReefer:   r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
+            deadLineStr:  r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
+            dtPrevChegada: r.dt_prev_chegada,
+            dtChegada:     r.dt_chegada,
+            dtPrevAtrac:   r.dt_prev_atrac,
+            dtAtracacao:   r.dt_atracacao,
+            dtPrevSaida:   r.dt_prev_saida,
+            dtSaida:       r.dt_saida,
+            fetchedAt:     r.fetched_at,
           } as TerminalVessel)));
         });
 
@@ -682,6 +687,47 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           <span className="font-bold text-orange-500 normal-case ml-0.5">• Enc. {fmtDate(deadDt)}</span>
         )}
       </span>
+    );
+  }, [getVesselForTrip]);
+
+  /** Mostra previsões de chegada / atracação / saída abaixo do gate tag */
+  const renderVesselDates = useCallback((shipName?: string): React.ReactNode => {
+    if (!shipName) return null;
+    const vessel = getVesselForTrip(shipName);
+    if (!vessel) return null;
+
+    const fmtShort = (s?: string): string | null => {
+      if (!s || s === '--' || s === '-') return null;
+      const d = parseFlexDate(s);
+      if (!d) return null;
+      return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
+
+    const rows: { label: string; value: string; actual: boolean }[] = [];
+
+    const chegFmt  = fmtShort(vessel.dtChegada) || fmtShort(vessel.dtPrevChegada);
+    const atracFmt = fmtShort(vessel.dtAtracacao) || fmtShort(vessel.dtPrevAtrac);
+    const saidaFmt = fmtShort(vessel.dtSaida) || fmtShort(vessel.dtPrevSaida);
+
+    if (chegFmt)  rows.push({ label: vessel.dtChegada  ? 'Chegada'   : 'Prev. Cheg.',  value: chegFmt,  actual: !!vessel.dtChegada });
+    if (atracFmt) rows.push({ label: vessel.dtAtracacao ? 'Atracação' : 'Prev. Atrac.', value: atracFmt, actual: !!vessel.dtAtracacao });
+    if (saidaFmt) rows.push({ label: vessel.dtSaida    ? 'Saída'     : 'Prev. Saída',  value: saidaFmt, actual: !!vessel.dtSaida });
+
+    if (rows.length === 0) return null;
+
+    return (
+      <div className="flex flex-col gap-px mt-0.5 pl-0.5 border-l border-slate-200">
+        {rows.map((row, i) => (
+          <div key={i} className="flex items-center gap-1 leading-none">
+            <span className="text-[6px] font-black text-slate-400 uppercase tracking-tighter whitespace-nowrap">
+              {row.label}:
+            </span>
+            <span className={`text-[7px] font-bold whitespace-nowrap ${row.actual ? 'text-slate-500' : 'text-blue-600'}`}>
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
     );
   }, [getVesselForTrip]);
 
@@ -1531,6 +1577,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 </span>
               )}
               {t.ship && renderGateTag(t.ship, t.containerType)}
+              {t.ship && renderVesselDates(t.ship)}
             </div>
           </div>
         );
@@ -1729,7 +1776,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, mapTripToMinuta]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
