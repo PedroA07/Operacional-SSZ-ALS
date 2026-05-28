@@ -611,9 +611,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const situacaoStatus = mapSituacaoGate(vessel.situacao);
 
     // Override: if bot still says "Gate Aberto" but deadline already passed, treat as fechado
-    const effectiveStatus = (situacaoStatus === 'GATE ABERTO' && deadDt && deadDt <= now)
+    let effectiveStatus = (situacaoStatus === 'GATE ABERTO' && deadDt && deadDt <= now)
       ? 'GATE FECHADO'
       : situacaoStatus;
+
+    // Override: gate opening is still in the future → not open yet, show Gate Fechado com previsão
+    if (effectiveStatus === 'GATE ABERTO' && gateDt && gateDt > now) {
+      effectiveStatus = 'GATE FECHADO';
+    }
 
     if (effectiveStatus === 'GATE ABERTO') {
       const encDt = deadDt || gateDt;
