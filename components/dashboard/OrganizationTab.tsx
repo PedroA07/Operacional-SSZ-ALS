@@ -806,8 +806,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         if (finalizingIds.has(trip.id)) return false;
 
         if (!trip.isRemovedFromOrg) {
-          // Viagem agendada: permanece visível até ser removida explicitamente via Limpar
+          // Viagem agendada ou com data de agendamento definida: permanece visível
           if (trip.isScheduled) return true;
+          if (trip.scheduledDateTime || trip.scheduling?.dateTime) return true;
           const dt = trip.dateTime;
           if (dt) {
             const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
@@ -1045,14 +1046,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     try {
       await db.saveTrip({ ...selectedTripForScheduling, ...schedulingData });
     } catch (error) {
-      setPendingUpdates(prev => {
-        const next = { ...prev };
-        delete next[tripId];
-        return next;
-      });
+      // Não reverte pendingUpdates para evitar que o trip desapareça do painel.
       console.error("Erro ao salvar agendamento:", error);
-      window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Erro ao salvar agendamento', type: 'error' } 
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao salvar agendamento', type: 'error' }
       }));
     }
   }, [selectedTripForScheduling, locations]);
@@ -1128,11 +1125,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     try {
       await db.saveTrip({ ...trip, ...dateTimeData });
     } catch (error) {
-      setPendingUpdates(prev => {
-        const next = { ...prev };
-        delete next[trip.id];
-        return next;
-      });
+      // Não reverte pendingUpdates para evitar que o trip desapareça do painel.
+      // O toast informa o erro e o timeout de 30s faz a limpeza quando necessário.
       console.error("Erro ao salvar data/hora de agendamento:", error);
       window.dispatchEvent(new CustomEvent('als_show_toast', {
         detail: { message: 'Erro ao salvar data/hora de agendamento', type: 'error' }
