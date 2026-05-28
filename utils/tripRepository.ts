@@ -185,22 +185,25 @@ export const tripRepository = {
 
     const payload = this.mapToDb(trip);
     const isExisting = !!(trip.id && !trip.id.startsWith('new-'));
-
-    // Remove id do payload para evitar que o Supabase tente atualizar a PK
     const { id: _pid, ...payloadWithoutId } = payload as any;
+    const osKey = trip.os?.trim().toUpperCase();
 
+    // Tenta salvar e, se houver conflito de OS (23505), faz UPDATE pelo OS como fallback.
+    // Isso resolve casos em que o id em memória divergiu do registro real no banco.
     const doSave = async (p: Record<string, unknown>) => {
+      let result;
       if (isExisting) {
-        // UPDATE por id — nunca causa conflito de unique constraint na própria linha
-        return supabase.from('trips').update(p).eq('id', trip.id!);
+        result = await supabase.from('trips').update(p).eq('id', trip.id!);
+      } else {
+        result = await supabase.from('trips').insert(p);
       }
-      // Nova trip: INSERT. Se houver conflito de OS (23505), faz UPDATE por OS como fallback.
-      const insertResult = await supabase.from('trips').insert(p);
-      if (insertResult.error?.code === '23505' && trip.os) {
-        console.warn(`OS ${trip.os} já existe — fazendo UPDATE por OS`);
-        return supabase.from('trips').update(p).eq('os', trip.os.trim().toUpperCase());
+
+      if (result.error?.code === '23505' && osKey) {
+        console.warn(`Conflito de OS ${osKey} — fazendo UPDATE pelo OS`);
+        result = await supabase.from('trips').update(p).eq('os', osKey);
       }
-      return insertResult;
+
+      return result;
     };
 
     const { error } = await doSave(payloadWithoutId);
