@@ -502,7 +502,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     if (str.includes('/')) {
       const parts = str.split(' ');
       const [d, m, y] = parts[0].split('/');
-      const time = parts[1] || '12:00';
+      const time = (parts[1] || '12:00').slice(0, 5); // trunca "HH:MM:SS" → "HH:MM"
       const dt = new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T${time}:00`);
       return isNaN(dt.getTime()) ? null : dt;
     }
