@@ -498,12 +498,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, []);
 
   const parseFlexDate = (str: string): Date | null => {
-    if (!str) return null;
+    if (!str || str === '--' || str === '-') return null;
     if (str.includes('/')) {
       const parts = str.split(' ');
       const [d, m, y] = parts[0].split('/');
       const time = (parts[1] || '12:00').slice(0, 5); // trunca "HH:MM:SS" → "HH:MM"
-      const dt = new Date(`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T${time}:00`);
+      // Suporta ano 2 dígitos: "26" → 2026 (Santos Brasil retorna "DD/MM/YY")
+      const yNum = parseInt(y, 10);
+      const fullY = yNum < 100 ? yNum + 2000 : yNum;
+      const dt = new Date(`${fullY}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T${time}:00`);
       return isNaN(dt.getTime()) ? null : dt;
     }
     const dt = new Date(str);

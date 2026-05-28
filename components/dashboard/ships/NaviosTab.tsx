@@ -134,24 +134,32 @@ function fmtDate(iso?: string | null) {
   if (!iso) return '—';
   try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return iso; }
 }
+/** Converte "DD/MM/YY" ou "DD/MM/YYYY" (+ opcional " HH:MM") em Date */
+function parseDMY(v: string): Date | null {
+  const parts = v.split(/[\/\s:]/);
+  const yy = Number(parts[2]);
+  const yyyy = yy < 100 ? yy + 2000 : yy;
+  const d = new Date(yyyy, Number(parts[1]) - 1, Number(parts[0]),
+                     Number(parts[3] ?? 0), Number(parts[4] ?? 0));
+  return isNaN(d.getTime()) ? null : d;
+}
 function isExpiredStr(v?: string | null) {
-  if (!v) return false;
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(v)) {
-    const [dd, mm, yyyy] = v.split(/[\/ ]/);
-    return new Date(`${yyyy}-${mm}-${dd}`) < new Date();
+  if (!v || v === '--' || v === '-') return false;
+  if (/^\d{2}\/\d{2}\/\d{2,4}/.test(v)) {
+    const d = parseDMY(v);
+    return d ? d < new Date() : false;
   }
   return new Date(v) < new Date();
 }
 function isToday(v?: string | null): boolean {
   if (!v || v === '—' || v === '-') return false;
-  let d: Date;
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(v)) {
-    const parts = v.split(/[\/\s:]/);
-    d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+  let d: Date | null;
+  if (/^\d{2}\/\d{2}\/\d{2,4}/.test(v)) {
+    d = parseDMY(v);
   } else {
     try { d = new Date(v); } catch { return false; }
   }
-  if (isNaN(d.getTime())) return false;
+  if (!d || isNaN(d.getTime())) return false;
   const now = new Date();
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
