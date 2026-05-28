@@ -144,9 +144,9 @@ export const tripRepository = {
   },
 
   async getAll(supabase: SupabaseClient): Promise<Trip[]> {
-    // O Supabase PostgREST limita 1000 linhas por request por padrão.
-    // Para garantir que todas as viagens sejam carregadas, buscamos em lotes
-    // de 1000 usando range(), repetindo até não restar mais registros.
+    // Filtra apenas viagens recentes (a partir de 2025-01-01) para evitar
+    // timeout por varredura completa da tabela em ambientes sem índice eficiente.
+    // Viagens operacionais ativas nunca ficam pendentes por mais de 1 ano.
     const PAGE_SIZE = 1000;
     let allData: any[] = [];
     let from = 0;
@@ -156,6 +156,7 @@ export const tripRepository = {
       const { data, error } = await supabase
         .from('trips')
         .select('*')
+        .gte('date_time', '2025-01-01T00:00:00.000Z')
         .order('date_time', { ascending: false })
         .range(from, from + PAGE_SIZE - 1);
 
@@ -165,7 +166,6 @@ export const tripRepository = {
         allData = allData.concat(data);
       }
 
-      // Se o lote veio com menos registros que o tamanho máximo, chegamos ao fim
       hasMore = (data?.length ?? 0) === PAGE_SIZE;
       from += PAGE_SIZE;
     }
@@ -184,20 +184,30 @@ export const tripRepository = {
     }
 
     const payload = this.mapToDb(trip);
-    
-    // Tentativa inicial de salvar com todos os campos
-    const { error } = await supabase.from('trips').upsert(payload);
-    
+    const isExisting = !!(trip.id && !trip.id.startsWith('new-'));
+
+    // Trips existentes: UPDATE por id (evita INSERT que colide com unique constraint de os).
+    // Trips novas: INSERT via upsert deixando o banco gerar o id.
+    const doSave = async (p: typeof payload) => {
+      if (isExisting) {
+        return supabase.from('trips').update(p).eq('id', trip.id!);
+      }
+      const { id: _omit, ...insertPayload } = p as any;
+      return supabase.from('trips').insert(insertPayload);
+    };
+
+    const { error } = await doSave(payload);
+
     if (error) {
       // Se o erro for de coluna inexistente (PGRST204) e envolver 'agencia'
       if (error.code === 'PGRST204' || error.message.includes('agencia')) {
         console.warn('Coluna "agencia" não encontrada na tabela "trips". Tentando salvar sem este campo...');
-        
+
         const retryPayload = { ...payload };
         delete (retryPayload as any).agencia;
-        
-        const { error: retryError } = await supabase.from('trips').upsert(retryPayload);
-        
+
+        const { error: retryError } = await doSave(retryPayload);
+
         if (retryError) {
           console.error("ERRO AO SALVAR TRIP (RETRY):", retryError);
           throw retryError;
