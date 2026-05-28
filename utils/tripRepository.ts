@@ -186,24 +186,31 @@ export const tripRepository = {
     const payload = this.mapToDb(trip);
     const isExisting = !!(trip.id && !trip.id.startsWith('new-'));
 
-    // Trips existentes: UPDATE por id (evita INSERT que colide com unique constraint de os).
-    // Trips novas: INSERT via upsert deixando o banco gerar o id.
-    const doSave = async (p: typeof payload) => {
+    // Remove id do payload para evitar que o Supabase tente atualizar a PK
+    const { id: _pid, ...payloadWithoutId } = payload as any;
+
+    const doSave = async (p: Record<string, unknown>) => {
       if (isExisting) {
+        // UPDATE por id — nunca causa conflito de unique constraint na própria linha
         return supabase.from('trips').update(p).eq('id', trip.id!);
       }
-      const { id: _omit, ...insertPayload } = p as any;
-      return supabase.from('trips').insert(insertPayload);
+      // Nova trip: INSERT. Se houver conflito de OS (23505), faz UPDATE por OS como fallback.
+      const insertResult = await supabase.from('trips').insert(p);
+      if (insertResult.error?.code === '23505' && trip.os) {
+        console.warn(`OS ${trip.os} já existe — fazendo UPDATE por OS`);
+        return supabase.from('trips').update(p).eq('os', trip.os.trim().toUpperCase());
+      }
+      return insertResult;
     };
 
-    const { error } = await doSave(payload);
+    const { error } = await doSave(payloadWithoutId);
 
     if (error) {
       // Se o erro for de coluna inexistente (PGRST204) e envolver 'agencia'
       if (error.code === 'PGRST204' || error.message.includes('agencia')) {
         console.warn('Coluna "agencia" não encontrada na tabela "trips". Tentando salvar sem este campo...');
 
-        const retryPayload = { ...payload };
+        const retryPayload = { ...payloadWithoutId };
         delete (retryPayload as any).agencia;
 
         const { error: retryError } = await doSave(retryPayload);
@@ -218,7 +225,7 @@ export const tripRepository = {
           details: error.details,
           hint: error.hint,
           code: error.code,
-          payload: payload
+          payload: payloadWithoutId
         });
         throw error;
       }
