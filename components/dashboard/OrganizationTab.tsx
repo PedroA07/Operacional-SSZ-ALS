@@ -806,12 +806,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         if (finalizingIds.has(trip.id)) return false;
 
         if (!trip.isRemovedFromOrg) {
-          // Viagem agendada: mantém visível até o horário do agendamento passar
-          if (trip.isScheduled) {
-            const scheduledDT = trip.scheduling?.dateTime || trip.scheduledDateTime;
-            if (!scheduledDT) return true;
-            return new Date(scheduledDT) > new Date();
-          }
+          // Viagem agendada: permanece visível até ser removida explicitamente via Limpar
+          if (trip.isScheduled) return true;
           const dt = trip.dateTime;
           if (dt) {
             const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
@@ -1014,7 +1010,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const selectedLoc = locations.find(l => l.id === locationId);
     const schedulingData = {
       isScheduled: true,
-      sentNF: true,
       scheduledLocationId: locationId,
       scheduledDateTime: dateTime,
       destination: selectedLoc ? {
@@ -1112,7 +1107,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     // Auto-confirma o agendamento quando uma data é selecionada
     const dateTimeData = {
       scheduledDateTime: dateTime,
-      ...(dateTime ? { isScheduled: true, sentNF: true } : {}),
+      ...(dateTime ? { isScheduled: true } : {}),
       scheduling: {
         locationId: trip.scheduledLocationId || '',
         location: trip.scheduling?.location || '',
