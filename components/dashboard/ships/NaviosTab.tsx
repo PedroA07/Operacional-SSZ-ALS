@@ -778,33 +778,21 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
     if (scraping) return;
     setScraping(true);
     try {
-      // Ambas as rotas rodam no Railway (mesmo servidor da app) — acesso BR garantido
-      const [embraportRes, terminaisRes] = await Promise.allSettled([
-        fetch('/api/embraport-escala'),
-        fetch('/api/terminais-scraper'),
-      ]);
-
-      // EMBRAPORT
-      if (embraportRes.status === 'fulfilled') {
-        const data = await embraportRes.value.json().catch(() => null);
-        if (data?.total > 0) toast(`EMBRAPORT: ${data.total} navios salvos`, 'success');
-        else if (data?.errors?.length) toast(`EMBRAPORT: ${data.errors[0]}`, 'error');
-        else if (data?.error) toast(`EMBRAPORT: ${data.error}`, 'error');
-        else if (!embraportRes.value.ok) toast(`EMBRAPORT: erro ${embraportRes.value.status}`, 'error');
+      // Chama o bot Fly.io — roda no Brasil, acesso garantido a todos os terminais
+      const res = await fetch('https://als-bot.fly.dev/terminal-vessels/refresh', {
+        method: 'POST',
+        signal: AbortSignal.timeout(120_000), // 2 min timeout
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok) {
+        toast('Terminais atualizados com sucesso!', 'success');
       } else {
-        toast(`EMBRAPORT: falha na requisição`, 'error');
-      }
-
-      // BTP + ECOPORTO + Santos Brasil
-      if (terminaisRes.status === 'fulfilled') {
-        const data = await terminaisRes.value.json().catch(() => null);
-        if (data?.total > 0) toast(`Terminais: ${data.total} navios salvos`, 'success');
-        if (data?.errors?.length) toast(data.errors.join(' | '), 'error');
-      } else {
-        toast(`Terminais: falha na requisição`, 'error');
+        const msg = data?.error ?? `Erro ${res.status}`;
+        toast(`Falha ao atualizar: ${msg}`, 'error');
       }
     } catch(e: any) {
-      toast(`Erro inesperado: ${e?.message ?? e}`, 'error');
+      const msg = e?.name === 'TimeoutError' ? 'Timeout (>2 min)' : (e?.message ?? String(e));
+      toast(`Erro inesperado: ${msg}`, 'error');
       console.error('Scrape error', e);
     } finally {
       await loadTV();
