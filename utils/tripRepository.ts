@@ -197,34 +197,28 @@ export const tripRepository = {
     }
 
     const payload = this.mapToDb(trip);
-    const isExisting = !!(trip.id && !trip.id.startsWith('new-'));
-    const { id: _pid, ...payloadWithoutId } = payload as any;
     const osKey = trip.os?.trim().toUpperCase();
 
-    // Para INSERT, gera UUID compatível com qualquer ambiente (HTTP/HTTPS).
-    // A migration 20260529000000 adiciona DEFAULT ao banco, mas o código
-    // também gera para garantir funcionamento antes da migration ser aplicada.
-    const insertPayload = isExisting ? payloadWithoutId : { id: generateUUID(), ...payloadWithoutId };
+    // Usa upsert com o payload completo (incluindo id).
+    // Para novas viagens (id começa com 'new-'), gera um id real antes de salvar.
+    if (trip.id?.startsWith('new-')) {
+      (payload as any).id = generateUUID();
+    }
 
-    // Tenta salvar e, se houver conflito de OS (23505), faz UPDATE pelo OS como fallback.
-    // Isso resolve casos em que o id em memória divergiu do registro real no banco.
-    const doSave = async (p: Record<string, unknown>) => {
-      let result;
-      if (isExisting) {
-        result = await supabase.from('trips').update(p).eq('id', trip.id!);
-      } else {
-        result = await supabase.from('trips').insert(p);
-      }
+    const doUpsert = async (p: Record<string, unknown>) => {
+      let result = await supabase.from('trips').upsert(p);
 
+      // Se conflito de OS (23505), faz UPDATE pelo OS como fallback
       if (result.error?.code === '23505' && osKey) {
         console.warn(`Conflito de OS ${osKey} — fazendo UPDATE pelo OS`);
-        result = await supabase.from('trips').update(p).eq('os', osKey);
+        const { id: _id, ...withoutId } = p as any;
+        result = await supabase.from('trips').update(withoutId).eq('os', osKey);
       }
 
       return result;
     };
 
-    const { error } = await doSave(insertPayload);
+    const { error } = await doUpsert(payload as any);
 
     if (error) {
       // Coluna inexistente no banco (migration ainda não aplicada) — remove o campo e tenta de novo
@@ -235,21 +229,18 @@ export const tripRepository = {
         || error.message.includes('coleta_order_index');
 
       if (isUnknownColumn) {
-        // Detecta quais colunas remover
-        const columnsToRemove: string[] = [];
+        const columnsToRemove: string[] = ['coleta_order_index'];
         if (error.message.includes('agencia')) columnsToRemove.push('agencia');
-        if (error.message.includes('coleta_order_index')) columnsToRemove.push('coleta_order_index');
-        if (missingColumnMatch) columnsToRemove.push(missingColumnMatch[1]);
+        if (missingColumnMatch && !columnsToRemove.includes(missingColumnMatch[1])) {
+          columnsToRemove.push(missingColumnMatch[1]);
+        }
 
-        // Fallback genérico: tenta também sem coleta_order_index sempre que o erro for de coluna
-        if (!columnsToRemove.includes('coleta_order_index')) columnsToRemove.push('coleta_order_index');
-
-        const retryPayload = { ...insertPayload };
-        columnsToRemove.forEach(col => delete (retryPayload as any)[col]);
+        const retryPayload = { ...payload } as any;
+        columnsToRemove.forEach(col => delete retryPayload[col]);
 
         console.warn(`Colunas ausentes no banco [${columnsToRemove.join(', ')}] — tentando salvar sem elas...`);
 
-        const { error: retryError } = await doSave(retryPayload);
+        const { error: retryError } = await doUpsert(retryPayload);
 
         if (retryError) {
           console.error("ERRO AO SALVAR TRIP (RETRY):", retryError);
@@ -261,7 +252,7 @@ export const tripRepository = {
           details: error.details,
           hint: error.hint,
           code: error.code,
-          payload: payloadWithoutId
+          payload
         });
         throw error;
       }
