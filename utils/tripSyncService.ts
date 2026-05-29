@@ -145,7 +145,7 @@ export const tripSyncService = {
     } else {
       finalTrip = {
         ...tripData,
-        id: `trip-sync-${Date.now()}`
+        id: `new-${Date.now()}`
       } as Trip;
     }
     
