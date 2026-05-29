@@ -647,9 +647,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
 
     if (effectiveStatus === 'GATE FECHADO') {
-      // Usa abertura efetiva (futuro) se disponível; senão mostra previsão (azul) mesmo que passada
-      const aberturaRef = (gateDt && gateDt > now) ? gateDt : prevGateDt;
-      const isPreview   = !gateDt && !!prevGateDt;
+      // showActual = tem data de abertura efetiva que ainda não chegou
+      const showActual  = !!(gateDt && gateDt > now);
+      // Se tem abertura efetiva futura → usa ela (vermelho "Abre");
+      // caso contrário → usa previsão se existir (azul "~Abre")
+      const aberturaRef = showActual ? gateDt : prevGateDt;
+      const isPreview   = !showActual && !!prevGateDt;
       return (
         <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
           <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-500"/>
