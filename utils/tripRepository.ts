@@ -3,6 +3,17 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Trip, DriverCapturedDoc, FreightContractDoc, User } from '../types';
 import { fileStorage } from './fileStorage';
 
+// Gera UUID v4 compatível com qualquer ambiente (HTTP/HTTPS)
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 export const tripRepository = {
   mapToDb: (trip: Trip) => ({
     id: trip.id,
@@ -190,8 +201,10 @@ export const tripRepository = {
     const { id: _pid, ...payloadWithoutId } = payload as any;
     const osKey = trip.os?.trim().toUpperCase();
 
-    // Para INSERT, gera UUID real pois a coluna id não tem DEFAULT no banco.
-    const insertPayload = isExisting ? payloadWithoutId : { id: crypto.randomUUID(), ...payloadWithoutId };
+    // Para INSERT, gera UUID compatível com qualquer ambiente (HTTP/HTTPS).
+    // A migration 20260529000000 adiciona DEFAULT ao banco, mas o código
+    // também gera para garantir funcionamento antes da migration ser aplicada.
+    const insertPayload = isExisting ? payloadWithoutId : { id: generateUUID(), ...payloadWithoutId };
 
     // Tenta salvar e, se houver conflito de OS (23505), faz UPDATE pelo OS como fallback.
     // Isso resolve casos em que o id em memória divergiu do registro real no banco.
